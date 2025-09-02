@@ -1,0 +1,447 @@
+{
+  "navigation": {
+    "home": "Home",
+    "visualization": "Visualization",
+    "search": "Search",
+    "settings": "Settings"
+  },
+  "home": {
+    "title": "Decentralized On-Chain Family Tree Protocol",
+    "subtitle": "A blockchain-based decentralized digital family tree smart contract that combines privacy protection, token incentives, and NFT assetization to build a trustworthy family history recording system",
+    "exploreVisualization": "Explore Visualization",
+    "configSettings": "Connection Settings",
+    "statistics": {
+      "decentralized": "Decentralized",
+      "decentralizedDesc": "No Admin",
+      "privacy": "Privacy", 
+      "privacyDesc": "Encrypted",
+      "dualLayer": "Dual-Layer",
+      "dualLayerDesc": "Privacy + Value",
+      "global": "Global",
+      "globalDesc": "Cross-Region"
+    },
+    "architecture": {
+      "title": "Dual-Layer Architecture Design",
+      "subtitle": "The dual-layer architecture balances privacy protection and value creation, enabling a natural progression from information exploration to value confirmation",
+      "layer1": {
+        "title": "Layer 1: Privacy Relationship Network Layer",
+        "subtitle": "Privacy Protection Layer",
+        "feature1": "Hash Storage Mechanism",
+        "feature1Desc": "Only hash values are stored on-chain, with original data stored off-chain for privacy protection",
+        "feature2": "Relationship Network Construction",
+        "feature2Desc": "Establishes family tree relationships through personHash → fatherHash/motherHash",
+        "feature3": "Token Incentive Mechanism",
+        "feature3Desc": "Earn DEEP by contributing data — open for everyone",
+        "description": "Features: Low barrier to entry, no privacy leakage risk"
+      },
+      "layer2": {
+        "title": "Layer 2: NFT Person Encyclopedia Value Layer",
+        "subtitle": "Value Confirmation Layer",
+        "feature1": "Community Endorsement Filtering",
+        "feature1Desc": "High-quality information endorsed by the community can mint NFTs",
+        "feature2": "Core Information On-Chain",
+        "feature2Desc": "Core information is stored directly on-chain to ensure data permanence",
+        "feature3": "Value Discovery",
+        "feature3Desc": "Unlock value through NFTs and governance",
+        "description": "Features: Quality control, Value proof, Assetization"
+      },
+      "advantages": {
+        "title": "Architectural Advantages and Value Discovery Mechanism",
+        "step1": "Anonymous Hash Relationships",
+        "step1Desc": "Low-risk exploratory trial and error",
+        "step2": "Community Endorsement Verification",
+        "step2Desc": "Credibility filtering",
+        "step3": "Selective Disclosure",
+        "step3Desc": "Core information on-chain",
+        "step4": "NFT Assetization",
+        "step4Desc": "Value discovery",
+        "conclusion": "Progressive Privacy Disclosure",
+        "conclusionDesc": "A natural progression from information exploration to value confirmation, achieving risk-stratified management and a value discovery mechanism"
+      }
+    },
+    "features": {
+      "title": "Core Features",
+      "subtitle": "Full modules supporting dual-layer operation",
+      "privacy": {
+        "title": "Encrypted Privacy Storage",
+        "description": "Only hash values are stored on-chain to establish family tree relationships while protecting user privacy data"
+      },
+      "nft": {
+        "title": "NFT Person Minting",
+        "description": "Each person version can only mint one NFT, with core information stored directly on-chain, transforming family tree data into digital assets"
+      },
+      "token": {
+        "title": "DEEP Token Mining",
+        "description": "Earn DEEP token rewards for each person relationship added (no pre-mining), with a progressive halving mining mechanism to incentivize data contribution"
+      },
+      "endorsement": {
+        "title": "Endorsement Staking System",
+        "description": "Users stake deposits to endorse trusted versions, establishing a decentralized trust mechanism"
+      },
+      "multiVersion": {
+        "title": "Multi-Version Coexistence",
+        "description": "Multiple versions of information can exist for the same person, with credibility determined through community endorsement mechanisms"
+      },
+      "governance": {
+        "title": "Governance Voting System",
+        "description": "NFT-based voting weight, supporting democratic decision-making for endorsement challenge proposals and fee adjustment proposals"
+      }
+    },
+    "contracts": {
+      "title": "Smart Contract Architecture",
+      "subtitle": "A complete family tree smart contract system covering person management, endorsement systems, NFT minting, and governance mechanisms",
+      "familyTree": {
+        "feature1": "Person Management System",
+        "feature2": "Endorsement Staking Mechanism",
+        "feature3": "NFT Minting Functionality"
+      },
+      "token": {
+        "feature1": "ERC20 Token Contract",
+        "feature2": "10 Halving Phases",
+        "feature3": "Total Supply 100 Billion"
+      },
+      "votes": {
+        "feature1": "NFT Voting Weight",
+        "feature2": "Endorsement Challenge Proposals",
+        "feature3": "Fee Adjustment Proposals"
+      }
+    },
+    "cta": {
+      "title": "Start Building Your Digital Family Tree",
+      "subtitle": "Build your digital family tree using smart contracts and participate in constructing a decentralized family history recording system",
+      "experience": "Experience Now",
+      "configure": "Configure Connection",
+      "opensource": "Open Source on GitHub",
+      "free": "Free & Open Source",
+      "license": "MIT License"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "rpcUrl": "RPC URL",
+    "subgraphUrl": "Subgraph URL",
+    "contractAddress": "Contract Address",
+    "rootHash": "Root Hash",
+    "rootVersionIndex": "Root Version Index",
+    "mode": "Mode",
+    "modes": {
+      "subgraph": "Subgraph",
+      "contract": "Contract"
+    },
+    "save": "Save",
+    "reset": "Reset to Defaults",
+    "messages": {
+      "saved": "Configuration saved",
+      "reset": "Reset to default settings",
+      "savedGoVisualConfirm": "Configuration saved. Go to visualization page now?"
+    },
+    "ui": {
+      "configDescription": "Configure your blockchain connection and family tree data source",
+      "connectionConfig": "Connection Configuration",
+      "connectionConfigDesc": "Configure blockchain node and data source connections",
+      "genealogyConfig": "Family Tree Data Configuration",
+      "genealogyConfigDesc": "Configure the root node and data mode to display",
+      "subgraphMode": "Subgraph Mode",
+      "contractMode": "Contract Mode",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saving": "Saving..."
+    },
+    "validation": {
+      "urlRequired": "Please enter a valid URL",
+      "required": "This field is required",
+      "minLength": "Minimum length is 10",
+      "versionMin": "Must be ≥1"
+    }
+  },
+  "search": {
+    "title": "Search",
+    "query": "Query",
+    "reset": "Reset",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "loading": "Loading...",
+    "noData": "No data",
+    "prev": "Previous",
+    "next": "Next",
+    "queryFailed": "Query failed",
+    "totalResults": "Total results",
+    "nameQuery": {
+      "title": "Query by Full Name (Paginated)",
+      "fullName": "Full Name",
+      "pageSize": "Page Size (≤100)",
+      "placeholder": "e.g., Confucius"
+    },
+    "endorsementQuery": {
+      "title": "Paginated Endorsement Statistics Query",
+      "personHash": "Person Hash",
+      "placeholder": "0x1234...abcd (64-character hexadecimal)",
+      "version": "Version",
+      "endorsementCount": "Endorsements",
+      "tokenId": "Token ID"
+    },
+    "uriQuery": {
+      "title": "Paginated Token URI History Query",
+      "tokenId": "Token ID",
+      "placeholder": "Enter Token ID"
+    },
+    "versionsQuery": {
+      "title": "Paginated Person Versions Query",
+      "personHash": "Person Hash",
+      "placeholder": "0x1234...abcd (64-character hexadecimal)",
+      "versionIndex": "Version Index",
+      "creator": "Creator",
+      "addTime": "Add Time",
+      "fatherHash": "Father Hash",
+      "motherHash": "Mother Hash",
+      "fatherVersion": "Father Version",
+      "motherVersion": "Mother Version",
+      "versionTag": "Version Tag",
+      "metadataCID": "Metadata CID",
+      "unknown": "Unknown",
+      "none": "None"
+    },
+    "hashCalculator": {
+      "title": "Calculate personHash Locally",
+      "tip": "💡 Tip: Use the tool below to calculate person hash, then copy it to use in the queries above",
+      "name": "Full Name",
+      "isBirthBC": "Is Birth BC",
+      "birthYear": "Birth Year",
+      "birthMonth": "1-12",
+      "birthDay": "1-31",
+      "gender": "Gender",
+      "genderOptions": {
+        "unknown": "Unknown",
+        "male": "Male",
+        "female": "Female",
+        "other": "Other"
+      },
+      "birthYearLabel": "Birth Year",
+      "birthMonthLabel": "Birth Month",
+      "birthDayLabel": "Birth Day",
+      "nameInputPlaceholder": "Note: English names are case-sensitive (e.g., John Smith)",
+      "toggleNo": "No",
+      "toggleYes": "Yes",
+      "birthPlace": "Birth Place (Optional)",
+      "birthPlacePlaceholder": "e.g., US-CA-Los Angeles",
+      "compute": "Calculate",
+      "result": "Result",
+      "description": "Note: Calculation logic is completely consistent with the contract getPersonHash (keccak256(abi.encode(...))).",
+      "bcOptions": {
+        "no": "No",
+        "yes": "Yes"
+      }
+    },
+    "validation": {
+      "nameRequired": "Please enter name",
+      "nameTooLong": "Name cannot exceed 256 bytes (approximately 256 English characters)",
+      "hashRequired": "Please enter person hash",
+      "hashInvalid": "Please enter a valid 64-character hexadecimal hash",
+      "tokenIdRequired": "Please enter a valid Token ID",
+      "required": "Required",
+      "monthRange": "Month must be between 0-12",
+      "dayRange": "Day must be between 0-31",
+      "yearRange": "Year must be between 0-10000"
+    },
+    "offset": "offset"
+  },
+  "visualization": {
+    "title": "Visualization",
+    "familyTree": "Family Tree Visualization",
+    "modes": {
+      "subgraph": "Subgraph Mode",
+      "contract": "Contract Mode"
+    },
+    "viewModes": {
+      "tree": "Tree",
+      "dag": "DAG",
+      "force": "Force Directed",
+      "virtual": "Virtualized"
+    },
+    "versionSelector": {
+      "label": "Version Selection",
+      "apply": "Apply"
+    },
+    "config": {
+      "rpc": "RPC",
+      "contract": "Contract",
+      "subgraph": "Subgraph",
+      "root": "Root"
+    },
+    "ui": {
+      "visualizationView": "Visualization View",
+      "versionNumber": "Version",
+      "subgraphModeConfig": "Subgraph Mode Configuration",
+      "contractModeConfig": "Contract Mode Configuration",
+      "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
+      "traversalBFS": "BFS - Breadth-First (level order)",
+      "traversal": "Traversal Mode",
+      "traversalDesc": "DFS depth-first (faster deep nodes) / BFS breadth-first (level-wise)",
+      "includeVersionDetails": "Load Version Details",
+      "includeVersionDetailsDesc": "Affects whether version detail batches are loaded on the next refresh (snapshot taken at refresh).",
+      "nodesLabelFull": "Nodes",
+      "depthLabelFull": "Depth",
+      "progressSummary": "Nodes {{created}} / depth {{depth}}"
+    },
+    "status": {
+      "loading": "Loading...",
+      "subgraphUnavailable": "Subgraph temporarily unavailable (port may not be running or CORS issue)",
+      "developmentProxy": "Development environment provides proxy path /api/subgraph; ensure Graph Node is running at http://127.0.0.1:8000.",
+      "currentlySubgraphMode": "Currently in subgraph mode. You can manually switch to contract mode if needed.",
+      "switchToContract": "Switch to Contract Mode",
+      "switchToProxy": "One-click Switch to Proxy",
+      "contractModeRootNotFound": "Contract mode: Root node version not found. Please check the hash and version number",
+      "subgraphTimeout": "Subgraph request timeout",
+      "subgraphConnectionFailed": "Subgraph connection failed",
+      "rootNotFound": "Root node not found. Please check the Root configuration in settings or wait for indexing",
+      "graphqlError": "GraphQL error",
+      "subgraphOk": "Subgraph reachable",
+      "contractOk": "Contract data loaded",
+      "badge": {
+        "checking": "Checking",
+        "ok": "OK",
+        "root_missing": "Root Missing",
+        "error": "Error"
+      },
+      "networkError": "Network request failed"
+    },
+    "actions": {
+      "refresh": "Refresh"
+    },
+    "nodeDetail": {
+      "title": "Node Detail",
+      "hash": "Hash",
+      "version": "Version",
+      "endorsementCount": "Endorsements",
+      "father": "Father Hash",
+      "fatherVersion": "Father Version",
+      "mother": "Mother Hash",
+      "motherVersion": "Mother Version",
+      "addedBy": "Added By",
+      "timestamp": "Timestamp",
+      "tag": "Tag",
+      "cid": "CID",
+      "nft": "NFT",
+      "tokenId": "Token ID",
+      "fullName": "Full Name",
+      "gender": "Gender",
+      "birth": "Birth",
+      "death": "Death",
+      "story": "Story",
+      "detailedStory": "Detailed Story",
+      "storyChunks": "Chunk Count",
+      "storyLength": "Total Length",
+      "sealed": "Sealed",
+      "lastUpdate": "Last Update",
+      "showFullStory": "Show Full Story",
+      "hideFullStory": "Hide Full Story",
+      "showChunks": "Show Chunks",
+      "hideChunks": "Hide Chunks",
+      "editStory": "Edit Story",
+      "viewFullStory": "View Full Story",
+      "uri": "URI",
+      "loading": "Loading NFT info…",
+      "loadErrorPrefix": "NFT load failed",
+      "bcPrefix": "BC",
+      "genders": {
+        "male": "Male",
+        "female": "Female",
+        "other": "Other"
+      },
+      "errors": {
+        "nftLoadFailed": "NFT load failed",
+        "loadFailed": "Load failed"
+      }
+    },
+    "personVersionDetail": {
+      "title": "Person Version Details"
+    },
+    "validation": {
+      "rpc": "Please enter a valid RPC URL",
+      "contract": "Please enter a valid contract address (0x + 40 hex chars)",
+      "subgraph": "Please enter a valid Subgraph URL",
+      "root": "Please enter a valid root hash (0x + 64 hex chars)"
+    }
+  },
+  "common": {
+    "confirm": "Go to Visualization",
+    "cancel": "Cancel",
+    "goBack": "Go Back",
+    "hashCopied": "Hash copied",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "storyChunkEditor": {
+    "title": "Story Chunk Editor",
+    "stats": "Chunks: {{count}}, Total Length: {{length}}",
+    "sealed": "Sealed",
+    "seal": "Seal",
+    "editChunk": "Edit Chunk #{{index}}",
+    "addChunk": "Add New Chunk",
+    "contentPlaceholder": "Enter chunk content (max 1000 characters)",
+    "saving": "Saving...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "addNewChunk": "Add New Chunk",
+    "chunks": "Existing Chunks",
+    "loading": "Loading...",
+    "contentRequired": "Content cannot be empty",
+    "contentTooLong": "Content cannot exceed 1000 characters",
+    "operationFailed": "Operation failed",
+    "sealConfirm": "Are you sure you want to seal the story? Once sealed, it cannot be modified.",
+    "sealFailed": "Seal failed",
+    "sealDialog": {
+      "title": "Seal Story",
+      "description": "Are you sure you want to seal the story? Once sealed, it can no longer be modified.",
+      "dontAskAgain": "Don't ask again",
+      "cancel": "Cancel",
+      "confirm": "Confirm Seal"
+    },
+    "contentTooLongBytes": "Content must not exceed 1000 bytes",
+    "contentPlaceholderBytes": "Enter chunk content (max 1000 bytes ≈ 1000 ASCII or ~333 CJK chars)"
+  },
+  "storyDetail": {
+    "encyclopedia": "Person Encyclopedia",
+    "pageTitle": "Story Details",
+    "title": "'s Story",
+    "loading": "Loading story...",
+    "notFound": "Story not found",
+    "chunks": "Chunks",
+    "length": "Length",
+    "sealed": "Sealed",
+    "edit": "Edit Story",
+    "fullStory": "Full Story",
+    "noStory": "No story content",
+    "chunkList": "Chunk List",
+    "characters": "characters",
+    "noChunks": "No chunks",
+    "metadata": "Metadata",
+    "totalChunks": "Total Chunks",
+    "totalLength": "Total Length",
+    "lastUpdate": "Last Update",
+    "status": "Status",
+    "editable": "Editable",
+    "storyHash": "Story Hash",
+    "owner": "Owner Address",
+    "basicInfo": "Basic Info",
+    "paragraph": "Paragraph",
+    "raw": "Raw",
+    "viewParagraph": "Paragraph Mode",
+    "viewRaw": "Raw Mode",
+    "integrityOk": "Integrity Verified",
+    "integrityWarn": "Integrity Possibly Inconsistent",
+    "integrityLenDiff": "Length mismatch local={{local}} bytes",
+    "integrityLocalHashMismatch": "Local hash mismatch",
+    "integrityChainHashMismatch": "On-chain hash mismatch",
+    "integrityMissing": "Missing indices: {{indices}}",
+    "integrityFrontendOk": "Integrity Frontend Verified",
+    "integrityChainFail": "On-chain verification failed",
+    "verify": "Contract Verify",
+    "verified": "Verified",
+    "personHashLabel": "Person Hash:",
+    "versionLabel": "Version:",
+    "viewVisualization": "Visualization View"
+  }
+}

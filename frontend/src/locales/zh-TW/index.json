@@ -1,0 +1,445 @@
+{
+  "navigation": {
+    "home": "首頁",
+    "visualization": "視覺化",
+    "search": "搜尋",
+    "settings": "設定"
+  },
+  "home": {
+    "title": "去中心化鏈上族譜協定",
+    "subtitle": "基於區塊鏈的去中心化數位族譜智慧合約，結合隱私保護、代幣激勵與NFT資產化，構建可信的家族記錄系統",
+    "exploreVisualization": "探索族譜視覺化",
+    "configSettings": "配置連接設定",
+    "statistics": {
+      "decentralized": "去中心化",
+      "decentralizedDesc": "無管理權限",
+      "privacy": "隱私保護", 
+      "privacyDesc": "加密存儲",
+      "dualLayer": "雙層架構",
+      "dualLayerDesc": "關係網絡+NFT人物百科",
+      "global": "全球化",
+      "globalDesc": "兼容不同地區"
+    },
+    "architecture": {
+      "title": "雙層架構設計",
+      "subtitle": "雙層架構，平衡隱私保護與價值創造，實現從信息探索到價值確認的自然演進",
+      "layer1": {
+        "title": "第一層：隱私關係網絡層",
+        "subtitle": "Privacy Protection Layer",
+        "feature1": "Hash存儲機制",
+        "feature1Desc": "僅儲存Hash值，原始資訊離鏈保護隱私",
+        "feature2": "關係網絡構建",
+        "feature2Desc": "通過personHash → fatherHash/motherHash建立族譜關係",
+        "feature3": "代幣激勵機制",
+        "feature3Desc": "TREE代幣激勵資訊貢獻，人人可參與",
+        "description": "特點：低門檻參與，無隱私洩露風險"
+      },
+      "layer2": {
+        "title": "第二層：NFT人物百科價值層",
+        "subtitle": "Value Confirmation Layer",
+        "feature1": "社區背書篩選",
+        "feature1Desc": "經過社區背書的高質量信息可鑄造NFT",
+        "feature2": "核心信息上鏈",
+        "feature2Desc": "核心資訊直接儲存在鏈上，確保資料永久性",
+        "feature3": "價值發現",
+        "feature3Desc": "透過NFT實現價值發現，並獲得治理投票權",
+        "description": "特點：質量把關，價值確認與資產化"
+      },
+      "advantages": {
+        "title": "架構優勢與價值發現機制",
+        "step1": "匿名Hash關係",
+        "step1Desc": "低風險試錯探索",
+        "step2": "社區背書驗證",
+        "step2Desc": "可信度篩選",
+        "step3": "選擇性公開",
+        "step3Desc": "核心信息上鏈",
+        "step4": "NFT資產化",
+        "step4Desc": "價值發現",
+        "conclusion": "漸進式隱私披露",
+        "conclusionDesc": "從信息探索到價值確認的自然演進，實現風險分層管理與價值發現機制"
+      }
+    },
+    "features": {
+      "title": "核心功能",
+      "subtitle": "完整的功能模組，支撐雙層架構的有效運行",
+      "privacy": {
+        "title": "加密隱私存儲",
+        "description": "鏈上僅儲存Hash值，建立族譜關係，保護用戶隱私資料"
+      },
+      "nft": {
+        "title": "NFT人物鑄造",
+        "description": "每個人物版本只能鑄造一次NFT，核心資訊直接上鏈儲存，將族譜資料轉化為數位資產"
+      },
+      "token": {
+        "title": "TREE代幣挖礦",
+        "description": "每次添加人物關係可獲得TREE代幣獎勵（無預挖），漸進式減半挖礦機制，激勵資料貢獻"
+      },
+      "endorsement": {
+        "title": "背書質押系統",
+        "description": "用戶質押保證金背書信任的版本，建立去中心化信任機制"
+      },
+      "multiVersion": {
+        "title": "多版本共存",
+        "description": "同一人物可存在多個版本資訊，透過社群背書機制決定可信度"
+      },
+      "governance": {
+        "title": "治理投票系統",
+        "description": "基於NFT的投票權重，支持背書挑戰提案和費用調整提案的民主決策"
+      }
+    },
+    "contracts": {
+      "title": "智能合約架構",
+      "subtitle": "完整的族譜智能合約系統，涵蓋人物管理、背書系統、NFT鑄造和治理機制",
+      "familyTree": {
+        "feature1": "人物管理系統",
+        "feature2": "背書質押機制",
+        "feature3": "NFT鑄造功能"
+      },
+      "token": {
+        "feature1": "ERC20代幣合約",
+        "feature2": "10個減半階段",
+        "feature3": "總供應量1000億"
+      },
+      "votes": {
+        "feature1": "NFT投票權重",
+        "feature2": "背書挑戰提案",
+        "feature3": "費用調整提案"
+      }
+    },
+    "cta": {
+      "title": "開始構建您的數位族譜",
+      "subtitle": "使用智慧合約構建您的數位族譜，參與去中心化家族記錄系統的建設",
+      "experience": "立即體驗",
+      "configure": "配置連接",
+      "opensource": "GitHub 開源項目",
+      "free": "開源免費",
+      "license": "MIT 許可證"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "rpcUrl": "RPC URL",
+    "subgraphUrl": "Subgraph URL",
+    "contractAddress": "合約地址",
+    "rootHash": "根節點哈希",
+    "rootVersionIndex": "根版本號",
+    "mode": "模式",
+    "modes": {
+      "subgraph": "子圖",
+      "contract": "合約"
+    },
+    "save": "儲存",
+    "reset": "重設為預設",
+    "messages": {
+      "saved": "設定已儲存",
+      "reset": "已恢復為預設設定"
+    },
+    "ui": {
+      "configDescription": "配置您的區塊鏈連接和族譜資料源",
+      "connectionConfig": "連接配置",
+      "connectionConfigDesc": "配置區塊鏈節點和數據源連接",
+      "genealogyConfig": "族譜數據配置",
+      "genealogyConfigDesc": "配置要顯示的族譜根節點和資料模式",
+      "subgraphMode": "子圖模式",
+      "contractMode": "合約模式",
+      "edit": "編輯",
+      "save": "儲存",
+      "cancel": "取消",
+      "saving": "儲存中..."
+    },
+    "validation": {
+      "urlRequired": "請輸入有效的 URL",
+      "required": "此字段為必填項",
+      "minLength": "長度至少10",
+      "versionMin": "必須≥1"
+    }
+  },
+  "search": {
+    "title": "搜尋",
+    "query": "查詢",
+    "reset": "重置",
+    "copy": "複製",
+    "copied": "已複製",
+    "copyFailed": "複製失敗",
+    "loading": "查詢中...",
+    "noData": "暫無資料",
+    "prev": "上一頁",
+    "next": "下一頁",
+    "queryFailed": "查詢失敗",
+    "totalResults": "結果總數",
+    "nameQuery": {
+      "title": "按全名分頁查詢",
+      "fullName": "全名",
+      "pageSize": "每頁數量(≤100)",
+      "placeholder": "如：Confucius"
+    },
+    "endorsementQuery": {
+      "title": "背書統計分頁查詢",
+      "personHash": "人物哈希",
+      "placeholder": "0x1234...abcd (64位十六進制)",
+      "version": "版本",
+      "endorsementCount": "背書數",
+      "tokenId": "Token ID"
+    },
+    "uriQuery": {
+      "title": "Token URI歷史分頁查詢",
+      "tokenId": "Token ID",
+      "placeholder": "請輸入Token ID"
+    },
+    "versionsQuery": {
+      "title": "人物版本分頁查詢",
+      "personHash": "人物哈希",
+      "placeholder": "0x1234...abcd (64位十六進制)",
+      "versionIndex": "版本索引",
+      "creator": "創建者",
+      "addTime": "添加時間",
+      "fatherHash": "父親哈希",
+      "motherHash": "母親哈希",
+      "fatherVersion": "父親版本",
+      "motherVersion": "母親版本",
+      "versionTag": "版本標籤",
+      "metadataCID": "元數據CID",
+      "unknown": "未知",
+      "none": "無"
+    },
+    "hashCalculator": {
+      "title": "本地計算人物哈希",
+      "tip": "💡 提示：使用下面的工具計算人物哈希，然後複製到上方的查詢中使用",
+      "name": "全名",
+      "isBirthBC": "是否公元前",
+      "birthYear": "出生年",
+      "birthMonth": "1-12",
+      "birthDay": "1-31",
+      "gender": "性別",
+      "genderOptions": {
+        "unknown": "未知",
+        "male": "男",
+        "female": "女",
+        "other": "其他"
+      },
+      "birthYearLabel": "出生年",
+      "birthMonthLabel": "出生月",
+      "birthDayLabel": "出生日",
+      "nameInputPlaceholder": "注意：英文名區分大小寫 (如：John Smith)",
+      "toggleNo": "否",
+      "toggleYes": "是",
+      "birthPlace": "出生地(可選)",
+      "birthPlacePlaceholder": "如 US-CA-Los Angeles",
+      "compute": "計算",
+      "result": "結果",
+      "description": "說明：計算邏輯與合約getPersonHash完全一致（keccak256(abi.encode(...))）。",
+      "bcOptions": {
+        "no": "否",
+        "yes": "是"
+      }
+    },
+    "validation": {
+      "nameRequired": "請輸入姓名",
+      "nameTooLong": "姓名不能超過256字節（約256個英文字符）",
+      "hashRequired": "請輸入人物哈希",
+      "hashInvalid": "請輸入有效的64位十六進制哈希值",
+      "tokenIdRequired": "請輸入有效的Token ID",
+      "required": "必填",
+      "monthRange": "月份必須在0-12之間",
+      "dayRange": "日期必須在0-31之間",
+      "yearRange": "年份必須在0-10000之間"
+    },
+    "offset": "offset"
+  },
+  "visualization": {
+    "title": "視覺化",
+    "familyTree": "族譜視覺化",
+    "modes": {
+      "subgraph": "子圖模式",
+      "contract": "合約模式"
+    },
+    "viewModes": {
+      "tree": "樹",
+      "dag": "有向無環圖",
+      "force": "力導向",
+      "virtual": "虛擬化"
+    },
+    "versionSelector": {
+      "label": "版本選擇",
+      "apply": "應用"
+    },
+    "config": {
+      "rpc": "RPC",
+      "contract": "合約",
+      "subgraph": "子圖",
+      "root": "根節點"
+    },
+    "ui": {
+      "visualizationView": "視覺化視圖",
+      "versionNumber": "版本號",
+      "subgraphModeConfig": "子圖模式配置",
+      "contractModeConfig": "合約模式配置",
+      "traversalDFS": "DFS 深度優先：快速深入後回溯",
+      "traversalBFS": "BFS 廣度優先：按層展開更均衡",
+      "traversal": "遍歷方式",
+      "traversalDesc": "DFS 深度優先(快看到深層) / BFS 廣度優先(按層展開)",
+      "includeVersionDetails": "載入版本詳情",
+      "includeVersionDetailsDesc": "僅影響下次重新整理時是否批次載入版本詳情（重新整理時鎖定快照）。",
+      "nodesLabelFull": "節點",
+      "depthLabelFull": "深度",
+      "progressSummary": "節點 {{created}} / 深度 {{depth}}"
+    },
+    "status": {
+      "loading": "加載中...",
+      "subgraphUnavailable": "子圖暫不可用（可能是端口未啟動或 CORS）",
+      "developmentProxy": "開發環境已提供代理路徑 /api/subgraph；確保 Graph Node 運行在 http://127.0.0.1:8000。",
+      "currentlySubgraphMode": "當前仍處於子圖模式。你也可以手動切換為合約模式。",
+      "switchToContract": "切換到合約模式",
+      "switchToProxy": "一鍵切換到代理",
+      "contractModeRootNotFound": "合約模式：未找到該根節點版本，請檢查哈希與版本號",
+      "subgraphTimeout": "子圖請求超時",
+      "subgraphConnectionFailed": "子圖連接失敗",
+      "rootNotFound": "未找到根節點，請在設定頁檢查 Root 配置或等待索引",
+      "graphqlError": "GraphQL 錯誤",
+      "subgraphOk": "子圖連線正常",
+      "contractOk": "合約資料載入完成",
+      "badge": {
+        "checking": "檢查中",
+        "ok": "正常",
+        "root_missing": "缺少根節點",
+        "error": "錯誤"
+      },
+      "networkError": "網絡請求失敗"
+    },
+    "actions": {
+      "refresh": "重新整理"
+    },
+    "nodeDetail": {
+      "title": "節點詳情",
+      "hash": "哈希",
+      "version": "版本",
+      "endorsementCount": "背書數",
+      "father": "父親哈希",
+      "fatherVersion": "父親版本",
+      "mother": "母親哈希",
+      "motherVersion": "母親版本",
+      "addedBy": "添加者",
+      "timestamp": "時間戳",
+      "tag": "標籤",
+      "cid": "CID",
+      "nft": "NFT",
+      "tokenId": "Token ID",
+      "fullName": "全名",
+      "gender": "性別",
+      "birth": "出生",
+      "death": "逝世",
+      "story": "事蹟",
+      "detailedStory": "詳細故事",
+      "storyChunks": "分片數量",
+      "storyLength": "總長度",
+      "sealed": "已封存",
+      "lastUpdate": "最後更新",
+      "showFullStory": "顯示完整故事",
+      "hideFullStory": "隱藏完整故事",
+      "showChunks": "顯示分片",
+      "hideChunks": "隱藏分片",
+      "editStory": "編輯故事",
+      "viewFullStory": "查看完整故事",
+      "uri": "URI",
+      "loading": "NFT 資訊載入中…",
+      "loadErrorPrefix": "NFT 載入失敗",
+      "bcPrefix": "公元前",
+      "genders": {
+        "male": "男",
+        "female": "女",
+        "other": "其他"
+      },
+      "errors": {
+        "nftLoadFailed": "NFT 載入失敗",
+        "loadFailed": "載入失敗"
+      }
+    },
+    "personVersionDetail": {
+      "title": "人物版本詳情"
+    },
+    "validation": {
+      "rpc": "請輸入有效的 RPC 位址",
+      "contract": "請輸入有效的合約位址 (0x + 40位16進制)",
+      "subgraph": "請輸入有效的 Subgraph URL",
+      "root": "請輸入有效的根雜湊 (0x + 64位16進制)"
+    }
+  },
+  "common": {
+    "confirm": "前往視覺化",
+    "cancel": "取消",
+    "goBack": "返回",
+    "hashCopied": "已複製雜湊",
+    "copy": "複製",
+    "copied": "已複製"
+  },
+  "storyChunkEditor": {
+    "title": "故事分片編輯器",
+    "stats": "分片數量: {{count}}, 總長度: {{length}}",
+    "sealed": "已封存",
+    "seal": "封存",
+    "editChunk": "編輯分片 #{{index}}",
+    "addChunk": "添加新分片",
+    "contentPlaceholder": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）",
+    "saving": "保存中...",
+    "save": "保存",
+    "cancel": "取消",
+    "addNewChunk": "添加新分片",
+    "chunks": "現有分片",
+    "loading": "載入中...",
+    "contentRequired": "內容不能為空",
+    "contentTooLong": "內容不能超過1000字符",
+    "contentTooLongBytes": "內容不能超過1000位元組",
+    "operationFailed": "操作失敗",
+    "sealConfirm": "確定要封存故事嗎？封存後將無法再修改。",
+    "sealFailed": "封存失敗",
+    "sealDialog": {
+      "title": "封存故事",
+      "description": "確定要封存故事嗎？封存後將無法再修改。",
+      "dontAskAgain": "不再詢問",
+      "cancel": "取消",
+      "confirm": "確認封存"
+    }
+  },
+  "storyDetail": {
+    "encyclopedia": "人物百科",
+    "pageTitle": "故事詳情",
+    "title": "的故事",
+    "loading": "載入故事中...",
+    "notFound": "故事未找到",
+    "chunks": "分片",
+    "length": "長度",
+    "sealed": "已封存",
+    "edit": "編輯故事",
+    "fullStory": "完整故事",
+    "noStory": "暫無故事內容",
+    "chunkList": "分片列表",
+    "characters": "字符",
+    "noChunks": "暫無分片",
+    "metadata": "元數據",
+    "totalChunks": "總分片數",
+    "totalLength": "總長度",
+    "lastUpdate": "最後更新",
+    "status": "狀態",
+    "editable": "可編輯",
+    "storyHash": "故事哈希",
+    "owner": "所有者地址",
+    "basicInfo": "基礎資訊",
+    "paragraph": "段落",
+    "raw": "原文",
+    "viewParagraph": "段落模式",
+    "viewRaw": "原文模式",
+    "integrityFrontendOk": "完整性前端已校驗",
+    "integrityOk": "已校驗",
+    "integrityWarn": "完整性可能不一致",
+    "integrityLenDiff": "長度不匹配 本地={{local}}位元組",
+    "integrityLocalHashMismatch": "本地哈希不匹配",
+    "integrityChainHashMismatch": "鏈上哈希不匹配",
+    "integrityMissing": "缺失索引: {{indices}}",
+    "integrityChainFail": "鏈上校驗失敗",
+    "verify": "合約校驗",
+    "verified": "已校驗",
+    "personHashLabel": "人物哈希：",
+    "versionLabel": "版本：",
+    "viewVisualization": "族譜視圖"
+  }
+}

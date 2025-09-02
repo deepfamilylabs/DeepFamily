@@ -1,0 +1,447 @@
+{
+  "navigation": {
+    "home": "首页",
+    "visualization": "可视化",
+    "search": "搜索",
+    "settings": "设置"
+  },
+  "home": {
+    "title": "去中心化链上族谱协议",
+    "subtitle": "基于区块链的去中心化数字族谱智能合约，结合隐私保护、代币激励与NFT资产化，构建可信的家族记录系统",
+    "exploreVisualization": "探索族谱可视化",
+    "configSettings": "配置连接设置",
+    "statistics": {
+      "decentralized": "去中心化",
+      "decentralizedDesc": "无管理权限",
+      "privacy": "隐私保护", 
+      "privacyDesc": "加密存储",
+      "dualLayer": "双层架构",
+      "dualLayerDesc": "关系网络+NFT人物百科",
+      "global": "全球化",
+      "globalDesc": "兼容不同地区"
+    },
+    "architecture": {
+      "title": "双层架构设计",
+      "subtitle": "双层架构，平衡隐私保护与价值创造，实现从信息探索到价值确认的自然演进",
+      "layer1": {
+        "title": "第一层：隐私关系网络层",
+        "subtitle": "Privacy Protection Layer",
+        "feature1": "Hash存储机制",
+        "feature1Desc": "仅存储Hash值，原始数据离链保护隐私",
+        "feature2": "关系网络构建",
+        "feature2Desc": "通过personHash → fatherHash/motherHash建立族谱关系",
+        "feature3": "代币激励机制",
+        "feature3Desc": "TREE代币激励数据贡献，人人可参与",
+        "description": "特点：低门槛参与，无隐私泄露风险"
+      },
+      "layer2": {
+        "title": "第二层：NFT人物百科价值层",
+        "subtitle": "Value Confirmation Layer",
+        "feature1": "社区背书筛选",
+        "feature1Desc": "经过社区背书的高质量信息可铸造NFT",
+        "feature2": "核心信息上链",
+        "feature2Desc": "核心信息直接存储在链上，确保数据永久性",
+        "feature3": "价值发现",
+        "feature3Desc": "通过NFT实现价值发现，并获得治理投票权",
+        "description": "特点：质量把关，价值确认与资产化"
+      },
+      "advantages": {
+        "title": "架构优势与价值发现机制",
+        "step1": "匿名Hash关系",
+        "step1Desc": "低风险试错探索",
+        "step2": "社区背书验证",
+        "step2Desc": "可信度筛选",
+        "step3": "选择性公开",
+        "step3Desc": "核心信息上链",
+        "step4": "NFT资产化",
+        "step4Desc": "价值发现",
+        "conclusion": "渐进式隐私披露",
+        "conclusionDesc": "从信息探索到价值确认的自然演进，实现风险分层管理与价值发现机制"
+      }
+    },
+    "features": {
+      "title": "核心功能",
+      "subtitle": "完整的功能模块，支撑双层架构的有效运行",
+      "privacy": {
+        "title": "加密隐私存储",
+        "description": "链上仅存储Hash值，建立族谱关系，保护用户隐私数据"
+      },
+      "nft": {
+        "title": "NFT人物铸造",
+        "description": "每个人物版本只能铸造一次NFT，核心信息直接上链存储，将族谱数据转化为数字资产"
+      },
+      "token": {
+        "title": "TREE代币挖矿",
+        "description": "每次添加人物关系可获得TREE代币奖励（无预挖），渐进式减半挖矿机制，激励数据贡献"
+      },
+      "endorsement": {
+        "title": "背书质押系统",
+        "description": "用户质押保证金背书信任的版本，建立去中心化信任机制"
+      },
+      "multiVersion": {
+        "title": "多版本共存",
+        "description": "同一人物可存在多个版本信息，通过社区背书机制决定可信度"
+      },
+      "governance": {
+        "title": "治理投票系统",
+        "description": "基于NFT的投票权重，支持背书挑战提案和费用调整提案的民主决策"
+      }
+    },
+    "contracts": {
+      "title": "智能合约架构",
+      "subtitle": "完整的族谱智能合约系统，涵盖人物管理、背书系统、NFT铸造和治理机制",
+      "familyTree": {
+        "feature1": "人物管理系统",
+        "feature2": "背书质押机制",
+        "feature3": "NFT铸造功能"
+      },
+      "token": {
+        "feature1": "ERC20代币合约",
+        "feature2": "10个减半阶段",
+        "feature3": "总供应量1000亿"
+      },
+      "votes": {
+        "feature1": "NFT投票权重",
+        "feature2": "背书挑战提案",
+        "feature3": "费用调整提案"
+      }
+    },
+    "cta": {
+      "title": "开始构建您的数字族谱",
+      "subtitle": "使用智能合约构建您的数字族谱，参与去中心化家族记录系统的建设",
+      "experience": "立即体验",
+      "configure": "配置连接",
+      "opensource": "GitHub 开源项目",
+      "free": "开源免费",
+      "license": "MIT 许可证"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "rpcUrl": "RPC URL",
+    "subgraphUrl": "Subgraph URL",
+    "contractAddress": "合约地址",
+    "rootHash": "根节点哈希",
+    "rootVersionIndex": "根版本号",
+    "mode": "模式",
+    "modes": {
+      "subgraph": "子图",
+      "contract": "合约"
+    },
+    "save": "保存",
+    "reset": "重置为默认",
+    "messages": {
+      "saved": "配置已保存",
+      "reset": "已恢复为默认配置",
+      "savedGoVisualConfirm": "配置已保存，是否跳转到可视化页面？"
+    },
+    "ui": {
+      "configDescription": "配置您的区块链连接和族谱数据源",
+      "connectionConfig": "连接配置",
+      "connectionConfigDesc": "配置区块链节点和数据源连接",
+      "genealogyConfig": "族谱数据配置",
+      "genealogyConfigDesc": "配置要显示的族谱根节点和数据模式",
+      "subgraphMode": "子图模式",
+      "contractMode": "合约模式",
+      "edit": "编辑",
+      "save": "保存",
+      "cancel": "取消",
+      "saving": "保存中..."
+    },
+    "validation": {
+      "urlRequired": "请输入有效的 URL",
+      "required": "此字段为必填项",
+      "minLength": "长度至少10",
+      "versionMin": "必须≥1"
+    }
+  },
+  "search": {
+    "title": "搜索",
+    "query": "查询",
+    "reset": "重置",
+    "copy": "复制",
+    "copied": "已复制",
+    "copyFailed": "复制失败",
+    "loading": "查询中...",
+    "noData": "暂无数据",
+    "prev": "上一页",
+    "next": "下一页",
+    "queryFailed": "查询失败",
+    "totalResults": "结果总数",
+    "nameQuery": {
+      "title": "按全名分页查询",
+      "fullName": "全名",
+      "pageSize": "每页数量(≤100)",
+      "placeholder": "如：Confucius"
+    },
+    "endorsementQuery": {
+      "title": "背书统计分页查询",
+      "personHash": "人物哈希",
+      "placeholder": "0x1234...abcd (64位十六进制)",
+      "version": "版本",
+      "endorsementCount": "背书数",
+      "tokenId": "Token ID"
+    },
+    "uriQuery": {
+      "title": "Token URI历史分页查询",
+      "tokenId": "Token ID",
+      "placeholder": "请输入Token ID"
+    },
+    "versionsQuery": {
+      "title": "人物版本分页查询",
+      "personHash": "人物哈希",
+      "placeholder": "0x1234...abcd (64位十六进制)",
+      "versionIndex": "版本索引",
+      "creator": "创建者",
+      "addTime": "添加时间",
+      "fatherHash": "父亲哈希",
+      "motherHash": "母亲哈希",
+      "fatherVersion": "父亲版本",
+      "motherVersion": "母亲版本",
+      "versionTag": "版本标签",
+      "metadataCID": "元数据CID",
+      "unknown": "未知",
+      "none": "无"
+    },
+    "hashCalculator": {
+      "title": "本地计算人物哈希",
+      "tip": "💡 提示：使用下面的工具计算人物哈希，然后复制到上方的查询中使用",
+      "name": "全名",
+      "isBirthBC": "是否公元前",
+      "birthYear": "出生年",
+      "birthMonth": "1-12",
+      "birthDay": "1-31",
+      "gender": "性别",
+      "genderOptions": {
+        "unknown": "未知",
+        "male": "男",
+        "female": "女",
+        "other": "其他"
+      },
+      "birthYearLabel": "出生年",
+      "birthMonthLabel": "出生月",
+      "birthDayLabel": "出生日",
+      "nameInputPlaceholder": "注意：英文名区分大小写 (如：John Smith)",
+      "toggleNo": "否",
+      "toggleYes": "是",
+      "birthPlace": "出生地(可选)",
+      "birthPlacePlaceholder": "如 US-CA-Los Angeles",
+      "compute": "计算",
+      "result": "结果",
+      "description": "说明：计算逻辑与合约getPersonHash完全一致（keccak256(abi.encode(...))）。",
+      "bcOptions": {
+        "no": "否",
+        "yes": "是"
+      }
+    },
+    "validation": {
+      "nameRequired": "请输入姓名",
+      "nameTooLong": "姓名不能超过256字节（约256个英文字符）",
+      "hashRequired": "请输入人物哈希",
+      "hashInvalid": "请输入有效的64位十六进制哈希值",
+      "tokenIdRequired": "请输入有效的Token ID",
+      "required": "必填",
+      "monthRange": "月份必须在0-12之间",
+      "dayRange": "日期必须在0-31之间",
+      "yearRange": "年份必须在0-10000之间"
+    },
+    "offset": "offset"
+  },
+  "visualization": {
+    "title": "可视化",
+    "familyTree": "族谱可视化",
+    "modes": {
+      "subgraph": "子图模式",
+      "contract": "合约模式"
+    },
+    "viewModes": {
+      "tree": "树",
+      "dag": "有向无环图",
+      "force": "力导向",
+      "virtual": "虚拟化"
+    },
+    "versionSelector": {
+      "label": "版本选择",
+      "apply": "应用"
+    },
+    "config": {
+      "rpc": "RPC",
+      "contract": "合约",
+      "subgraph": "子图",
+      "root": "根节点"
+    },
+    "ui": {
+      "visualizationView": "可视化视图",
+      "versionNumber": "版本号",
+      "subgraphModeConfig": "子图模式配置",
+      "contractModeConfig": "合约模式配置",
+      "traversalDFS": "DFS 深度优先：快速深入，按路径向下后回溯",
+      "traversalBFS": "BFS 广度优先：按层级展开，层结构更直观",
+      "traversal": "遍历方式",
+      "traversalDesc": "DFS 深度优先(快看到深层) / BFS 广度优先(按层展开)",
+      "includeVersionDetails": "加载版本详情",
+      "includeVersionDetailsDesc": "仅影响下一次刷新时是否批量加载版本详情（刷新时锁定快照）。",
+      "progressSummary": "节点 {{created}} / 深度 {{depth}}",
+      "nodesLabelFull": "节点",
+      "depthLabelFull": "深度"
+    },
+    "status": {
+      "loading": "加载中...",
+      "subgraphUnavailable": "子图暂不可用（可能是端口未启动或 CORS）",
+      "developmentProxy": "开发环境已提供代理路径 /api/subgraph；确保 Graph Node 运行在 http://127.0.0.1:8000。",
+      "currentlySubgraphMode": "当前仍处于子图模式。你也可以手动切换为合约模式。",
+      "switchToContract": "切换到合约模式",
+      "switchToProxy": "一键切换到代理",
+      "contractModeRootNotFound": "合约模式：未找到该根节点版本，请检查哈希与版本号",
+      "subgraphTimeout": "子图请求超时",
+      "subgraphConnectionFailed": "子图连接失败",
+      "rootNotFound": "未找到根节点，请在设置页检查 Root 配置或等待索引",
+      "graphqlError": "GraphQL 错误",
+      "subgraphOk": "子图连接正常",
+      "contractOk": "合约数据加载完成",
+      "badge": {
+        "checking": "检查中",
+        "ok": "正常",
+        "root_missing": "缺少根节点",
+        "error": "错误"
+      },
+      "networkError": "网络请求失败"
+    },
+    "actions": {
+      "refresh": "刷新"
+    },
+    "nodeDetail": {
+      "title": "节点详情",
+      "hash": "哈希",
+      "version": "版本",
+      "endorsementCount": "背书数",
+      "father": "父亲哈希",
+      "fatherVersion": "父亲版本",
+      "mother": "母亲哈希",
+      "motherVersion": "母亲版本",
+      "addedBy": "添加者",
+      "timestamp": "时间戳",
+      "tag": "标签",
+      "cid": "CID",
+      "nft": "NFT",
+      "tokenId": "Token ID",
+      "fullName": "全名",
+      "gender": "性别",
+      "birth": "出生",
+      "death": "逝世",
+      "story": "事迹",
+      "detailedStory": "详细故事",
+      "storyChunks": "分片数量",
+      "storyLength": "总长度",
+      "sealed": "已封存",
+      "lastUpdate": "最后更新",
+      "showFullStory": "显示完整故事",
+      "hideFullStory": "隐藏完整故事",
+      "showChunks": "显示分片",
+      "hideChunks": "隐藏分片",
+      "editStory": "编辑故事",
+      "viewFullStory": "查看完整故事",
+      "uri": "URI",
+      "loading": "NFT 信息加载中…",
+      "loadErrorPrefix": "NFT 加载失败",
+      "bcPrefix": "公元前",
+      "genders": {
+        "male": "男",
+        "female": "女",
+        "other": "其他"
+      },
+      "errors": {
+        "nftLoadFailed": "NFT 加载失败",
+        "loadFailed": "加载失败"
+      }
+    },
+    "personVersionDetail": {
+      "title": "人物版本详情"
+    },
+    "validation": {
+      "rpc": "请输入有效的 RPC 地址",
+      "contract": "请输入有效的合约地址 (0x + 40位16进制)",
+      "subgraph": "请输入有效的 Subgraph URL",
+      "root": "请输入有效的根哈希 (0x + 64位16进制)"
+    }
+  },
+  "common": {
+    "confirm": "前往可视化",
+    "cancel": "取消",
+    "goBack": "返回",
+    "hashCopied": "已复制哈希",
+    "copy": "复制",
+    "copied": "已复制"
+  },
+  "storyChunkEditor": {
+    "title": "故事分片编辑器",
+    "stats": "分片数量: {{count}}, 总长度: {{length}}",
+    "sealed": "已封存",
+    "seal": "封存",
+    "editChunk": "编辑分片 #{{index}}",
+    "addChunk": "添加新分片",
+    "contentPlaceholder": "请输入分片内容（最多1000字符）",
+    "saving": "保存中...",
+    "save": "保存",
+    "cancel": "取消",
+    "addNewChunk": "添加新分片",
+    "chunks": "现有分片",
+    "loading": "加载中...",
+    "contentRequired": "内容不能为空",
+    "contentTooLong": "内容不能超过1000字符",
+    "operationFailed": "操作失败",
+    "sealConfirm": "确定要封存故事吗？封存后将无法再修改。",
+    "sealFailed": "封存失败",
+    "sealDialog": {
+      "title": "封存故事",
+      "description": "确定要封存故事吗？封存后将无法再修改。",
+      "dontAskAgain": "不再询问",
+      "cancel": "取消",
+      "confirm": "确认封存"
+    },
+    "contentTooLongBytes": "内容不能超过1000字节",
+    "contentPlaceholderBytes": "请输入分片内容（最多1000字节，约=1000英文或≈333汉字）"
+  },
+  "storyDetail": {
+    "encyclopedia": "人物百科",
+    "pageTitle": "故事详情",
+    "title": "的故事",
+    "loading": "加载故事中...",
+    "notFound": "故事未找到",
+    "chunks": "分片",
+    "length": "长度",
+    "sealed": "已封存",
+    "edit": "编辑故事",
+    "fullStory": "完整故事",
+    "noStory": "暂无故事内容",
+    "chunkList": "分片列表",
+    "characters": "字符",
+    "noChunks": "暂无分片",
+    "metadata": "元数据",
+    "totalChunks": "总分片数",
+    "totalLength": "总长度",
+    "lastUpdate": "最后更新",
+    "status": "状态",
+    "editable": "可编辑",
+    "storyHash": "故事哈希",
+    "owner": "所有者地址",
+    "basicInfo": "基础信息",
+    "paragraph": "段落",
+    "raw": "原文",
+    "viewParagraph": "段落模式",
+    "viewRaw": "原文模式",
+    "integrityOk": "已校验",
+    "integrityWarn": "完整性可能不一致",
+    "integrityLenDiff": "长度不匹配 本地={{local}}字节",
+    "integrityLocalHashMismatch": "本地哈希不匹配",
+    "integrityChainHashMismatch": "链上哈希不匹配",
+    "integrityMissing": "缺失索引: {{indices}}",
+    "integrityFrontendOk": "完整性前端已校验",
+    "integrityChainFail": "链上校验失败",
+    "verify": "合约校验",
+    "verified": "已校验",
+    "personHashLabel": "人物哈希：",
+    "versionLabel": "版本：",
+    "viewVisualization": "族谱视图"
+  }
+}
