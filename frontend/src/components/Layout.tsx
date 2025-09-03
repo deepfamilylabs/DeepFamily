@@ -9,52 +9,67 @@
 
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, Settings, Search, Eye, Moon, Sun } from 'lucide-react'
+import { Home, Search, Eye, Book } from 'lucide-react'
 import BottomNav from './BottomNav'
-import LanguageSwitch from './LanguageSwitch'
+import HeaderControls from './HeaderControls'
 import Logo from './Logo'
-import { useEffect, useState } from 'react'
 
 export default function Layout() {
   const { t } = useTranslation()
   const location = useLocation()
   const isHomePage = location.pathname === '/'
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (typeof window !== 'undefined' && window.localStorage.getItem('df-theme') === 'dark' ? 'dark' : 'light'))
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'dark') root.classList.add('dark')
-    else root.classList.remove('dark')
-    window.localStorage.setItem('df-theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
 
   const navClasses = ({ isActive }: { isActive: boolean }) => {
-    const baseClasses = 'inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors'
+    const baseClasses = 'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative group'
     if (isHomePage) {
       return `${baseClasses} ${
         isActive
-          ? 'text-white bg-white/30 shadow-lg dark:bg-white/10'
-          : 'text-white/90 hover:text-white hover:bg-white/20 hover:shadow-md dark:text-gray-100/90 dark:hover:bg-white/10'
+          ? 'text-white bg-white/25 shadow-lg dark:bg-white/15 backdrop-blur-sm border border-white/20 dark:border-white/10'
+          : 'text-white/85 hover:text-white hover:bg-white/15 hover:shadow-md dark:text-gray-100/85 dark:hover:bg-white/10 hover:scale-105 backdrop-blur-sm'
       }`
     }
     return `${baseClasses} ${
       isActive
-        ? 'text-blue-700 bg-blue-50 dark:text-blue-300 dark:bg-blue-900/40'
-        : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/60'
+        ? 'text-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 dark:text-blue-300 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm border border-blue-200/50 dark:border-blue-700/30'
+        : 'text-gray-700 hover:text-gray-900 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30 hover:scale-105 hover:shadow-sm'
     }`
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900">
-      <header className={`sticky top-0 z-20 ${isHomePage ? 'bg-gradient-to-r from-blue-600/40 to-purple-600/40 dark:from-blue-650/80 dark:to-purple-650/80 backdrop-blur-md border-b border-white/20 dark:border-gray-850/60 dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.6)]' : 'bg-white/70 dark:bg-gray-950/90 backdrop-blur border-b border-gray-200 dark:border-gray-800'}`}>
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+    <div className="bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900" style={{ minHeight: '100vh' }}>
+      <header className={`sticky top-0 z-30 relative ${isHomePage ? 'bg-gradient-to-br from-blue-400/35 via-indigo-500/40 via-purple-500/35 to-violet-600/30 dark:from-blue-500/70 dark:via-indigo-600/75 dark:via-purple-600/70 dark:to-violet-700/65 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/20 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)]' : 'bg-white/85 dark:bg-gray-950/95 backdrop-blur-2xl border-b border-gray-200/70 dark:border-gray-800/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20'}`}>
+        {/* Decorative background elements for home page */}
+        {isHomePage && (
+          <>
+            {/* Enhanced floating background shapes */}
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Primary floating orbs */}
+              <div className="absolute -top-3 left-1/4 w-20 h-20 bg-gradient-to-br from-blue-400/25 via-cyan-400/20 to-teal-400/15 dark:from-blue-400/40 dark:via-cyan-400/35 dark:to-teal-400/30 rounded-full blur-xl animate-pulse-soft"></div>
+              <div className="absolute -top-6 right-1/3 w-24 h-24 bg-gradient-to-br from-purple-400/20 via-violet-400/15 to-pink-400/12 dark:from-purple-400/35 dark:via-violet-400/30 dark:to-pink-400/25 rounded-full blur-2xl animate-float"></div>
+              <div className="absolute -bottom-3 left-2/3 w-16 h-16 bg-gradient-to-br from-indigo-400/30 via-blue-400/25 to-cyan-400/20 dark:from-indigo-400/45 dark:via-blue-400/40 dark:to-cyan-400/35 rounded-full blur-lg animate-bounce-gentle"></div>
+              
+              {/* Secondary accent orbs */}
+              <div className="absolute top-0 left-1/6 w-8 h-8 bg-gradient-to-br from-emerald-400/20 to-green-400/15 dark:from-emerald-400/30 dark:to-green-400/25 rounded-full blur-md animate-float delay-1000"></div>
+              <div className="absolute -bottom-1 right-1/4 w-10 h-10 bg-gradient-to-br from-rose-400/15 to-orange-400/12 dark:from-rose-400/25 dark:to-orange-400/20 rounded-full blur-lg animate-pulse-soft delay-1000"></div>
+              <div className="absolute top-2 right-1/6 w-6 h-6 bg-gradient-to-br from-yellow-400/25 to-amber-400/20 dark:from-yellow-400/35 dark:to-amber-400/30 rounded-full blur-sm animate-bounce-gentle delay-1000"></div>
+            </div>
+            
+            {/* Multi-layer gradient overlays */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/3 to-white/8 dark:via-black/5 dark:to-black/15 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/8 via-indigo-500/5 via-purple-500/8 to-violet-500/6 dark:from-blue-500/15 dark:via-indigo-500/12 dark:via-purple-500/15 dark:to-violet-500/12 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/3 via-transparent via-transparent to-pink-400/3 dark:from-cyan-400/8 dark:to-pink-400/8 pointer-events-none"></div>
+            
+            {/* Subtle mesh pattern overlay */}
+            <div className="absolute inset-0 bg-mesh-pattern dark:bg-mesh-pattern-dark opacity-10 dark:opacity-20 pointer-events-none"></div>
+          </>
+        )}
+        
+        <div className="relative max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <NavLink to="/" className={`flex items-center gap-3 font-bold transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
             <Logo className={`w-8 h-8 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-indigo-600 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
             <span className={`text-xl font-light tracking-widest uppercase ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', letterSpacing: '0.2em'}}>DeepFamily</span>
           </NavLink>
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-2">
             <NavLink to="/" className={navClasses} end>
               <Home className="w-4 h-4" /> {t('navigation.home')}
             </NavLink>
@@ -64,24 +79,14 @@ export default function Layout() {
             <NavLink to="/search" className={navClasses}>
               <Search className="w-4 h-4" /> {t('navigation.search')}
             </NavLink>
-            <NavLink to="/settings" className={navClasses}>
-              <Settings className="w-4 h-4" /> {t('navigation.settings')}
+            <NavLink to="/stories" className={navClasses}>
+              <Book className="w-4 h-4" /> {t('navigation.stories', 'Stories')}
             </NavLink>
           </nav>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <LanguageSwitch />
-            <button
-              onClick={toggleTheme}
-              aria-label={theme==='dark' ? (t('theme.switchToLight','Switch to Light') as string) : (t('theme.switchToDark','Switch to Dark') as string)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/70 text-gray-700 dark:text-gray-200 text-xs hover:bg-gray-50 dark:hover:bg-gray-800/80 transition-colors shadow-inner/10"
-            >
-              {theme==='dark' ? <Moon size={14} className="text-indigo-300" /> : <Sun size={14} className="text-amber-500" />}
-              <span className="hidden sm:inline">{theme==='dark' ? t('theme.dark','Dark') : t('theme.light','Light')}</span>
-            </button>
-          </div>
+          <HeaderControls variant={isHomePage ? 'home' : 'normal'} />
         </div>
       </header>
-      <main className="max-w-6xl mx-auto px-4 pb-20 pt-8">
+      <main className="max-w-7xl mx-auto px-6 pb-16 pt-10">
         <Outlet />
       </main>
       <div className="md:hidden"><BottomNav /></div>

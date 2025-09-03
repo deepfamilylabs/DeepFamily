@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import VisualizationPage from './pages/VisualizationPage'
-import SettingsPage from './pages/SettingsPage'
 import SearchPage from './pages/SearchPage'
 import StoryDetailPage from './pages/StoryDetailPage'
+import StoryPage from './pages/StoryPage'
 import { ConfigProvider } from './context/ConfigContext'
 import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
@@ -26,8 +26,8 @@ function TitleUpdater() {
           return `${baseName} - ${t('navigation.visualization')}`
         case '/search':
           return `${baseName} - ${t('navigation.search')}`
-        case '/settings':
-          return `${baseName} - ${t('navigation.settings')}`
+        case '/stories':
+          return `${baseName} - ${t('navigation.stories', 'Stories')}`
         default:
           if (location.pathname.startsWith('/story/')) {
             return `${baseName} - ${t('storyDetail.pageTitle', 'Story Details')}`
@@ -56,7 +56,7 @@ export default function App() {
                   <Route index element={<Home />} />
                   <Route path="visualization" element={<VisualizationPage />} />
                   <Route path="search" element={<SearchPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="stories" element={<StoryPage />} />
                 </Route>
                 <Route path="/story/:tokenId" element={<StoryDetailPage />} />
               </Routes>
