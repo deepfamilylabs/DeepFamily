@@ -78,6 +78,13 @@ export default function PersonPage() {
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<'paragraph' | 'raw'>('paragraph')
 
+  // 动态标题：人物名 + 的档案
+  useEffect(()=>{
+    if (data?.fullName) {
+      document.title = `DeepFamily - ${t('person.pageTitle', { name: data.fullName })}`
+    }
+  }, [data?.fullName, t])
+
   const formatDate = (ts?: number) => {
     if (!ts) return '-'
     const d = new Date(ts * 1000)
@@ -156,13 +163,13 @@ export default function PersonPage() {
 
   const fetchStoryData = useCallback(async () => {
     if (!tokenId) {
-      setError(t('storyDetail.invalidTokenId', 'Invalid token ID'))
+      setError(t('person.invalidTokenId', 'Invalid token ID'))
       setLoading(false)
       return
     }
     // 簡單格式驗證：僅允許非負整數
     if (!/^\d+$/.test(tokenId)) {
-      setError(t('storyDetail.invalidTokenId', 'Invalid token ID'))
+      setError(t('person.invalidTokenId', 'Invalid token ID'))
       setLoading(false)
       return
     }
@@ -181,7 +188,7 @@ export default function PersonPage() {
       try {
         const total = await contract.totalSupply?.()
         if (total && BigInt(tokenId) >= BigInt(total)) {
-          setError(t('storyDetail.nonexistentToken', 'Token does not exist'))
+          setError(t('person.nonexistentToken', 'Token does not exist'))
           setLoading(false)
           return
         }
@@ -241,12 +248,12 @@ export default function PersonPage() {
       const lower = (raw + full).toLowerCase()
       let friendly: string | null = null
       if (lower.includes('invalidtokenid') || lower.includes('invalid token id')) {
-        friendly = t('storyDetail.invalidTokenId', 'Invalid token ID')
+        friendly = t('person.invalidTokenId', 'Invalid token ID')
       } else if (lower.includes('nonexistent token') || lower.includes('query for nonexistent token') || lower.includes('token does not exist')) {
-        friendly = t('storyDetail.nonexistentToken', 'Token does not exist')
+        friendly = t('person.nonexistentToken', 'Token does not exist')
       } else if (lower.includes('execution reverted')) {
         // 通用 revert 類型
-        friendly = t('storyDetail.fetchFailed', 'Failed to load token')
+        friendly = t('person.fetchFailed', 'Failed to load token')
       }
       setError(friendly || raw || 'Failed to fetch story data')
     } finally {
@@ -313,7 +320,7 @@ export default function PersonPage() {
           >
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">
-                {t('storyDetail.fetchFailed', 'Failed to load token')}
+                {t('person.fetchFailed', 'Failed to load token')}
               </p>
               <p className="text-sm text-red-600 dark:text-red-200 break-words">{error}</p>
             </div>
@@ -351,13 +358,13 @@ export default function PersonPage() {
                 <h1 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1 leading-tight">
                   <span className="truncate max-w-[calc(100vw-120px)] sm:max-w-[calc(60vw-80px)] md:max-w-sm text-sm sm:text-base md:text-lg leading-none" title={data.fullName || `Token #${data.tokenId}`}>{data.fullName || `Token #${data.tokenId}`}</span>
                   <span className="text-gray-300 dark:text-gray-600 hidden xs:inline">/</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap text-sm sm:text-base md:text-lg leading-none">{t('storyDetail.title', "'s Biography")}</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap text-sm sm:text-base md:text-lg leading-none">{t('person.title', "'s Biography")}</span>
                   {data.storyMetadata && data.storyMetadata.totalChunks > 0 && data.integrity && (() => {
                         const integ = data.integrity
                         const localOk = integ.missing.length === 0 && integ.lengthMatch && (integ.hashMatch === true)
                         return (
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] leading-tight font-medium ${localOk ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300' : 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-600 dark:text-amber-300'}`}>
-                            {localOk ? t('storyDetail.integrityFrontendOk','Integrity Frontend Verified') : t('storyDetail.integrityWarn','Integrity Possibly Inconsistent')}
+                            {localOk ? t('person.integrityFrontendOk','Integrity Frontend Verified') : t('person.integrityWarn','Integrity Possibly Inconsistent')}
                           </span>
                         )
                       })()}
@@ -371,22 +378,22 @@ export default function PersonPage() {
                 </h1>
                 {data.integrity && data.storyMetadata && data.storyMetadata.totalChunks > 0 && (
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-500 dark:text-gray-500/70 font-mono">
-                    {data.integrity.missing.length>0 && <span>{t('storyDetail.integrityMissing', 'Missing indices: {{indices}}', { indices: data.integrity.missing.join(',') })}</span>}
-                    {!data.integrity.lengthMatch && <span>{t('storyDetail.integrityLenDiff', 'Length mismatch local={{local}} bytes', { local: data.integrity.computedLength })}</span>}
-                    {data.integrity.hashMatch === false && <span>{t('storyDetail.integrityLocalHashMismatch', 'Local hash mismatch')}</span>}
+                    {data.integrity.missing.length>0 && <span>{t('person.integrityMissing', 'Missing indices: {{indices}}', { indices: data.integrity.missing.join(',') })}</span>}
+                    {!data.integrity.lengthMatch && <span>{t('person.integrityLenDiff', 'Length mismatch local={{local}} bytes', { local: data.integrity.computedLength })}</span>}
+                    {data.integrity.hashMatch === false && <span>{t('person.integrityLocalHashMismatch', 'Local hash mismatch')}</span>}
                   </div>
                 )}
               </div>
               <div className="flex-shrink-0 md:pt-1">
                 {data?.storyMetadata?.isSealed ? (
                   <div className="flex items-center justify-center px-3 h-7 bg-green-500 text-white rounded-md text-[10px] font-medium">
-                    {t('storyDetail.sealed', 'Sealed')}
+                    {t('person.sealed', 'Sealed')}
                   </div>
                 ) : (
                   <button
                     onClick={() => setEditorOpen(true)}
-                    aria-label={t('storyDetail.edit', 'Edit Biography') as string}
-                    title={t('storyDetail.edit', 'Edit Biography') as string}
+                    aria-label={t('person.edit', 'Edit Biography') as string}
+                    title={t('person.edit', 'Edit Biography') as string}
                     className="flex items-center justify-center w-8 h-7 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors text-[10px]"
                   >
                     <Edit2 size={14} />
@@ -406,7 +413,7 @@ export default function PersonPage() {
                   {data && (data.fullName || data.nftCoreInfo) && (
                     <div className="relative mb-8 pb-8 border-b border-gray-100/80 dark:border-gray-700/40">
                       <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-8 tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-                        {t('storyDetail.basicInfo','Basic Info')}
+                        {t('person.basicInfo','Basic Info')}
                       </h3>
                       <div className="space-y-5 font-mono text-gray-700 dark:text-gray-200 text-sm leading-relaxed tracking-wide selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30">
                         {data.fullName && (
@@ -487,7 +494,7 @@ export default function PersonPage() {
                   
                   <div className="relative flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-                      {t('storyDetail.fullStory', 'Biography')}
+                      {t('person.fullStory', 'Biography')}
                     </h2>
                     <div className="flex items-center gap-3">
                       {data && data.fullStory && data.fullStory.length > 0 && (
@@ -495,16 +502,16 @@ export default function PersonPage() {
                           <button
                             onClick={() => setViewMode('paragraph')}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'paragraph' ? 'bg-blue-600 text-white shadow-sm dark:shadow-blue-900/40' : 'text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/40'}`}
-                            title={t('storyDetail.viewParagraph', 'Paragraph Mode') as string}
+                            title={t('person.viewParagraph', 'Paragraph Mode') as string}
                           >
-                            <List size={14} />{t('storyDetail.paragraph', 'Paragraph')}
+                            <List size={14} />{t('person.paragraph', 'Paragraph')}
                           </button>
                           <button
                             onClick={() => setViewMode('raw')}
                             className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'raw' ? 'bg-blue-600 text-white shadow-sm dark:shadow-blue-900/40' : 'text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/40'}`}
-                            title={t('storyDetail.viewRaw', 'Raw Mode') as string}
+                            title={t('person.viewRaw', 'Raw Mode') as string}
                           >
-                            <FileText size={14} />{t('storyDetail.raw', 'Raw')}
+                            <FileText size={14} />{t('person.raw', 'Raw')}
                           </button>
                         </div>
                       )}
@@ -528,7 +535,7 @@ export default function PersonPage() {
                     <div className="font-mono text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-loose tracking-wide text-xs sm:text-sm selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30 overflow-x-auto p-4 story-content-surface dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700">{data.fullStory}</div>
                   ) : (
                     <div className="text-gray-400 italic text-sm py-6 text-center">
-                      {t('storyDetail.noStory', 'No biographical content')}
+                      {t('person.noStory', 'No biographical content')}
                     </div>
                   )}
                 </div>
@@ -537,14 +544,14 @@ export default function PersonPage() {
                     {/* Subtle background gradient */}
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-cyan-50/15 dark:from-blue-900/10 dark:via-transparent dark:to-cyan-900/5 pointer-events-none rounded-2xl"></div>
                     
-                    <h3 className="relative text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">{t('storyDetail.metadata', 'Metadata')}</h3>
+                    <h3 className="relative text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">{t('person.metadata', 'Metadata')}</h3>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                      <div><dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.tokenId', 'Token ID')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">#{data.tokenId}</dd></div>
-                      <div><dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.totalChunks', 'Total Chunks')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalChunks}</dd></div>
-                      <div><dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.totalLength', 'Total Length')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalLength}</dd></div>
-                      <div className="col-span-2"><dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.lastUpdate', 'Last Update')}</dt><dd className="font-mono text-xs">{formatDate(data.storyMetadata.lastUpdateTime)}</dd></div>
+                      <div><dt className="text-gray-500 dark:text-gray-400">{t('person.tokenId', 'Token ID')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">#{data.tokenId}</dd></div>
+                      <div><dt className="text-gray-500 dark:text-gray-400">{t('person.totalChunks', 'Total Chunks')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalChunks}</dd></div>
+                      <div><dt className="text-gray-500 dark:text-gray-400">{t('person.totalLength', 'Total Length')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalLength}</dd></div>
+                      <div className="col-span-2"><dt className="text-gray-500 dark:text-gray-400">{t('person.lastUpdate', 'Last Update')}</dt><dd className="font-mono text-xs">{formatDate(data.storyMetadata.lastUpdateTime)}</dd></div>
                       <div className="col-span-2">
-                        <dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.storyHash', 'Story Hash')}</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t('person.storyHash', 'Story Hash')}</dt>
                         <dd className="mt-1 flex items-center gap-1">
                           <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
                             {data.storyMetadata.fullStoryHash}
@@ -560,7 +567,7 @@ export default function PersonPage() {
                         </dd>
                       </div>
                       <div className="col-span-2">
-                        <dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.owner', 'Owner Address')}</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t('person.owner', 'Owner Address')}</dt>
                         <dd className="mt-1 flex items-center gap-1">
                           <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300" title={data.owner}>{data.owner || '-'}</div>
                           {data.owner && (
@@ -577,7 +584,7 @@ export default function PersonPage() {
                       </div>
                       {data.personHash && (
                         <div className="col-span-2">
-                          <dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.personHash', 'Person Hash')}</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('person.personHash', 'Person Hash')}</dt>
                           <dd className="mt-1 flex items-center gap-1">
                             <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
                               {data.personHash}
@@ -594,8 +601,8 @@ export default function PersonPage() {
                         </div>
                       )}
                       <div className="col-span-2 flex items-center justify-between pt-2 border-t">
-                        <span className="text-gray-500 dark:text-gray-400">{t('storyDetail.status', 'Status')}</span>
-                        <span className={`text-[10px] px-2 py-1 rounded-full uppercase tracking-wide font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>{data.storyMetadata.isSealed ? t('storyDetail.sealed', 'Sealed') : t('storyDetail.editable', 'Editable')}</span>
+                        <span className="text-gray-500 dark:text-gray-400">{t('person.status', 'Status')}</span>
+                        <span className={`text-[10px] px-2 py-1 rounded-full uppercase tracking-wide font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>{data.storyMetadata.isSealed ? t('person.sealed', 'Sealed') : t('person.editable', 'Editable')}</span>
                       </div>
                     </dl>
                   </div>
@@ -608,7 +615,7 @@ export default function PersonPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-transparent to-purple-50/15 dark:from-indigo-900/10 dark:via-transparent dark:to-purple-900/5 pointer-events-none rounded-2xl"></div>
                   
                   <h3 className="relative text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-5 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                    <span>{t('storyDetail.chunkList', 'Chunk List')}</span>
+                    <span>{t('person.chunkList', 'Chunk List')}</span>
                     {data && data.storyChunks && data.storyChunks.length > 0 && (
                       <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">{data.storyChunks.length}</span>
                     )}
@@ -630,7 +637,7 @@ export default function PersonPage() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium text-gray-900 dark:text-gray-100">#{chunk.chunkIndex}</span>
-                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{chunk.content.length} {t('storyDetail.characters', 'characters')}</span>
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{chunk.content.length} {t('person.characters', 'characters')}</span>
                                   </div>
                                   {/* Reverted font sizing */}
                                   <div className={`text-xs text-gray-600 dark:text-gray-400 mt-1 ${open ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}> 
@@ -648,7 +655,7 @@ export default function PersonPage() {
                     </div>
                   ) : (
                     <div className="text-gray-400 dark:text-gray-500 text-sm italic py-4 text-center">
-                      {t('storyDetail.noChunks', 'No chunks')}
+                      {t('person.noChunks', 'No chunks')}
                     </div>
                   )}
                 </div>
@@ -659,21 +666,21 @@ export default function PersonPage() {
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-cyan-50/15 dark:from-blue-900/10 dark:via-transparent dark:to-cyan-900/5 pointer-events-none rounded-2xl"></div>
                     
                     <div className="relative">
-                      <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">{t('storyDetail.metadata', 'Metadata')}</h3>
+                      <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">{t('person.metadata', 'Metadata')}</h3>
                       <div className="space-y-3 text-sm">
-                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('storyDetail.tokenId', 'Token ID')}</span><span className="font-mono text-gray-800 dark:text-gray-200">#{data.tokenId}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('storyDetail.totalChunks', 'Total Chunks')}</span><span className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalChunks}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('storyDetail.totalLength', 'Total Length')}</span><span className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalLength}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('storyDetail.lastUpdate', 'Last Update')}</span><span className="font-mono text-[11px]">{formatDate(data.storyMetadata.lastUpdateTime)}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('person.tokenId', 'Token ID')}</span><span className="font-mono text-gray-800 dark:text-gray-200">#{data.tokenId}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('person.totalChunks', 'Total Chunks')}</span><span className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalChunks}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('person.totalLength', 'Total Length')}</span><span className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalLength}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('person.lastUpdate', 'Last Update')}</span><span className="font-mono text-[11px]">{formatDate(data.storyMetadata.lastUpdateTime)}</span></div>
                         <div className="flex justify-between items-center pt-1">
-                          <span className="text-gray-500 dark:text-gray-400">{t('storyDetail.status', 'Status')}</span>
-                          <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>{data.storyMetadata.isSealed ? t('storyDetail.sealed', 'Sealed') : t('storyDetail.editable', 'Editable')}</span>
+                          <span className="text-gray-500 dark:text-gray-400">{t('person.status', 'Status')}</span>
+                          <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>{data.storyMetadata.isSealed ? t('person.sealed', 'Sealed') : t('person.editable', 'Editable')}</span>
                         </div>
                       </div>
                     </div>
                     <div className="pt-3 border-t space-y-3">
                       <div>
-                        <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('storyDetail.storyHash', 'Story Hash')}</div>
+                        <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.storyHash', 'Story Hash')}</div>
                         <div className="flex items-center gap-0">
                           <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 p-2 rounded select-all text-gray-700 dark:text-gray-300 flex-1">
                             {data.storyMetadata.fullStoryHash}
@@ -689,7 +696,7 @@ export default function PersonPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('storyDetail.owner', 'Owner Address')}</div>
+                        <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.owner', 'Owner Address')}</div>
                         <div className="flex items-center gap-0">
                           <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 p-2 rounded select-all text-gray-700 dark:text-gray-300 flex-1" title={data.owner}>{data.owner || '-'}</div>
                           {data.owner && (
@@ -706,7 +713,7 @@ export default function PersonPage() {
                       </div>
                       {data.personHash && (
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('storyDetail.personHash', 'Person Hash')}</div>
+                          <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.personHash', 'Person Hash')}</div>
                           <div className="flex items-center gap-0">
                             <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
                               {data.personHash}
@@ -813,7 +820,7 @@ function HashAndIndexLine({ personHash, versionIndex, t }: { personHash: string,
   return (
     <div className="mt-1 flex items-center gap-3 font-mono text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="shrink-0 text-gray-500 dark:text-gray-500/70 xs:inline">{t('storyDetail.personHashLabel','Person Hash:')}</span>
+        <span className="shrink-0 text-gray-500 dark:text-gray-500/70 xs:inline">{t('person.personHashLabel','Person Hash:')}</span>
         <span
           className="truncate max-w-[160px] sm:max-w-[260px] select-text"
           title={personHash}
@@ -830,15 +837,15 @@ function HashAndIndexLine({ personHash, versionIndex, t }: { personHash: string,
       </div>
       {versionIndex !== undefined && versionIndex > 0 && (
         <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          <span className="text-gray-500 dark:text-gray-500/80">{t('storyDetail.versionLabel','Version:')}v{versionIndex}</span>
+          <span className="text-gray-500 dark:text-gray-500/80">{t('person.versionLabel','Version:')}v{versionIndex}</span>
           <button
             onClick={goViz}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30 text-[10px] transition-colors"
-            title={t('storyDetail.viewVisualization','View Family Tree') as string}
-            aria-label={t('storyDetail.viewVisualization','View Family Tree') as string}
+            title={t('person.viewVisualization','View Family Tree') as string}
+            aria-label={t('person.viewVisualization','View Family Tree') as string}
           >
             <GitBranch size={12} />
-            <span className="hidden sm:inline">{t('storyDetail.viewVisualization','Family Tree')}</span>
+            <span className="hidden sm:inline">{t('person.viewVisualization','Family Tree')}</span>
           </button>
         </div>
       )}

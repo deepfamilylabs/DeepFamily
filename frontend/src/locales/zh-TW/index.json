@@ -400,9 +400,9 @@
       "confirm": "確認封存"
     }
   },
-  "storyDetail": {
+  "person": {
     "encyclopedia": "人物百科",
-    "pageTitle": "傳記詳情",
+    "pageTitle": "{{name}}的檔案",
     "title": "的檔案",
     "loading": "載入傳記中...",
     "notFound": "傳記未找到",
@@ -445,11 +445,11 @@
     "nonexistentToken": "該 Token 不存在",
     "fetchFailed": "載入 Token 失敗"
   },
-  "storyPage": {
-    "loading": "載入傳記中...",
+  "people": {
+    "loading": "載入人物中...",
     "badge": "人物百科",
     "title": "家族人物百科",
-    "subtitle": "探索保存在區塊鏈上的家族成員豐富敍述和傳記細節",
+    "subtitle": "探索保存在區塊鏈上的家族成員檔案",
     "totalPeople": "總人數",
     "withStories": "有詳細傳記",
     "withNFTs": "擁有NFT",
@@ -468,7 +468,7 @@
     "gridView": "網格視圖",
     "listView": "列表視圖",
     "resultsCount": "找到 {{count}} 個結果",
-    "noResults": "未找到傳記",
+    "noResults": "未找到人物",
     "noResultsDesc": "請嘗試調整您的搜尋條件或篩選器",
     "hasStory": "傳記",
     "hasNFT": "NFT",
