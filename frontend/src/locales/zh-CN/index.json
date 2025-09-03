@@ -228,7 +228,7 @@
       "birthPlacePlaceholder": "如 US-CA-Los Angeles",
       "compute": "计算",
       "result": "结果",
-      "description": "说明：计算逻辑与合约getPersonHash完全一致（keccak256(abi.encode(...))）。",
+      "description": "说明：计算逻辑与合约getPersonHash完全一致。",
       "bcOptions": {
         "no": "否",
         "yes": "是"

@@ -25,12 +25,12 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
   const isHomePage = variant === 'home'
 
   return (
-    <div className="flex items-center gap-3 flex-shrink-0">
+    <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
       <LanguageSwitch variant={variant} />
       <button
         onClick={toggleTheme}
         aria-label={theme==='dark' ? (t('theme.switchToLight','Switch to Light') as string) : (t('theme.switchToDark','Switch to Dark') as string)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm ${
+        className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
           isHomePage 
             ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
             : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
@@ -40,7 +40,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
           <Moon size={16} className={`${isHomePage ? 'text-blue-200' : 'text-indigo-500'}`} /> : 
           <Sun size={16} className={`${isHomePage ? 'text-yellow-200' : 'text-amber-500'}`} />
         }
-        <span className="hidden sm:inline">{theme==='dark' ? t('theme.dark','Dark') : t('theme.light','Light')}</span>
+        <span className="hidden lg:inline">{theme==='dark' ? t('theme.dark','Dark') : t('theme.light','Light')}</span>
       </button>
     </div>
   )

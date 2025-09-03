@@ -124,7 +124,7 @@ function FlexibleDAGViewInner({
   }), [positions, measuredWidths, nodeWidth, nodeHeight, centerOn])
 
   return (
-    <div ref={containerRef} className="relative overflow-auto bg-white dark:bg-transparent rounded-md transition-colors" style={{ height: 560 }}>
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm" style={{ height: 560 }}>
       <div className="absolute bottom-3 right-3 z-10">
         <MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} />
       </div>
@@ -132,7 +132,7 @@ function FlexibleDAGViewInner({
       <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, 560)}`} className="block min-w-full min-h-full select-none">
         <defs>
           <marker id="ftv-arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L0,6 L9,3 z" className="fill-slate-400 dark:fill-slate-500" />
+            <path d="M0,0 L0,6 L9,3 z" className="fill-blue-400 dark:fill-blue-500" />
           </marker>
         </defs>
         <g ref={innerRef as any}>
@@ -145,7 +145,7 @@ function FlexibleDAGViewInner({
             const y2 = t.y + nodeHeight / 2
             const mx = (x1 + x2) / 2
             return (
-              <path key={i} d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`} className="stroke-slate-300 dark:stroke-slate-600" fill="none" markerEnd="url(#ftv-arrow)" />
+              <path key={i} d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`} className="stroke-blue-300/70 dark:stroke-blue-500/60" fill="none" markerEnd="url(#ftv-arrow)" strokeWidth="2" />
             )
           })}
           {nodes.map(n => {

@@ -339,7 +339,7 @@ export default function SearchPage() {
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-blue-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('name')}>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('search.nameQuery.title')}</h3>
-          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('name') }} aria-expanded={openSections.name}>{openSections.name ? '-' : '+'}</button>
+          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('name') }} aria-expanded={openSections.name}>{openSections.name ? '-' : '+'}</button>
         </div>
         {openSections.name && (
           <div className="p-3 space-y-3">

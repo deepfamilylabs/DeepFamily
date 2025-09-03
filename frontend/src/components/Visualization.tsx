@@ -410,7 +410,13 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
       </div>
     )
   }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
-  return <VirtualList height={height} itemCount={rows.length} itemSize={rowHeight} width={'100%'}>{Row}</VirtualList>
+  return (
+    <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm overflow-hidden" style={{ height }}>
+      <div className="p-4 h-full">
+        <VirtualList height={height - 32} itemCount={rows.length} itemSize={rowHeight} width={'100%'}>{Row}</VirtualList>
+      </div>
+    </div>
+  )
 }
 
 export function ContractTree({ root }: { root: GraphNode }) {

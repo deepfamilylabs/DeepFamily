@@ -28,23 +28,27 @@ export default function ViewContainer({ mode, viewMode, root, subgraphBlock, con
   const content = (
     <Suspense fallback={<LoadingSkeleton />}> {
       isSubgraph ? (
-        hasRoot ? (
-          viewMode === 'tree' ? subgraphBlock : subgraphBlock
-        ) : (
-          subgraphBlock
-        )
+        <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm p-4 min-h-[560px]">
+          {hasRoot ? (
+            viewMode === 'tree' ? subgraphBlock : subgraphBlock
+          ) : (
+            subgraphBlock
+          )}
+        </div>
       ) : showContractViews ? (
         viewMode === 'force' ? <ForceDAGView root={root as GraphNode} />
         : viewMode === 'dag' ? <FlexibleDAGView root={root as GraphNode} nodeWidth={100} nodeHeight={44} />
         : viewMode === 'tree' ? <MerkleTreeView root={root as GraphNode} />
         : <VirtualizedContractTree root={root as GraphNode} height={560} rowHeight={40} />
       ) : (
-        contractMessage ? <div className="text-sm text-gray-700">{contractMessage}</div> : <LoadingSkeleton />
+        <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm p-4 min-h-[560px] flex items-center justify-center">
+          {contractMessage ? <div className="text-sm text-slate-700 dark:text-slate-300">{contractMessage}</div> : <LoadingSkeleton />}
+        </div>
       )
     } </Suspense>
   )
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/70 backdrop-blur-sm p-4 transition-colors">
+    <div className="w-full transition-colors">
       <NodeDetailProvider>
         <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
       </NodeDetailProvider>

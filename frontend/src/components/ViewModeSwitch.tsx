@@ -51,32 +51,71 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
     return () => { ro.disconnect(); window.removeEventListener('resize', onResize) }
   }, [measure])
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, mode: ViewMode) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onChange(mode)
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const currentIdx = order.indexOf(value)
+      const nextIdx = e.key === 'ArrowRight' 
+        ? (currentIdx + 1) % order.length 
+        : (currentIdx - 1 + order.length) % order.length
+      onChange(order[nextIdx])
+    }
+  }, [onChange, value])
+
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex h-9 select-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm"
+      className="relative inline-flex h-9 select-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm p-1"
     >
       <div
         className={`absolute rounded-md bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
-        style={{ top: 2, bottom: 2, left: indicator.left, width: indicator.width }}
+        style={{ top: 4, bottom: 4, left: indicator.left + 4, width: indicator.width - 8 }}
       />
       {order.map((m, idx) => (
         <button
           key={m}
           ref={el => { if (el) btnRefs.current[idx] = el }}
           type="button"
-            disabled={disabled || value === m}
+          disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1 px-3 h-full transition-colors duration-150 whitespace-nowrap ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+          className={`relative z-10 inline-flex items-center justify-center gap-1 px-3 h-full transition-colors duration-150 whitespace-nowrap focus:outline-none ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
         >
           {m === 'tree' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v6" /><path d="M6 18h12" /><path d="M6 21v-6a6 6 0 0 1 12 0v6" /></svg>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v6" />
+              <path d="M6 18h12" />
+              <path d="M6 21v-6a6 6 0 0 1 12 0v6" />
+            </svg>
           )}
           {m === 'dag' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 5h10"/><path d="M6.5 6.5l3.5 3.5"/><path d="M17.5 6.5L14 10"/><path d="M12 14v3"/><path d="M7 19h10"/></svg>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="5" cy="5" r="2"/>
+              <circle cx="19" cy="5" r="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="5" cy="19" r="2"/>
+              <circle cx="19" cy="19" r="2"/>
+              <path d="M7 5h10"/>
+              <path d="M6.5 6.5l3.5 3.5"/>
+              <path d="M17.5 6.5L14 10"/>
+              <path d="M12 14v3"/>
+              <path d="M7 19h10"/>
+            </svg>
           )}
           {m === 'force' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M5.6 5.6l2.8 2.8"/><path d="M15.6 15.6l2.8 2.8"/><path d="M18.4 5.6l-2.8 2.8"/><path d="M8.4 15.6l-2.8 2.8"/></svg>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 2v4"/>
+              <path d="M12 18v4"/>
+              <path d="M2 12h4"/>
+              <path d="M18 12h4"/>
+              <path d="M5.6 5.6l2.8 2.8"/>
+              <path d="M15.6 15.6l2.8 2.8"/>
+              <path d="M18.4 5.6l-2.8 2.8"/>
+              <path d="M8.4 15.6l-2.8 2.8"/>
+            </svg>
           )}
           {m === 'virtual' && (
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

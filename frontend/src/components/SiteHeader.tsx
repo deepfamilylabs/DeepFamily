@@ -16,7 +16,7 @@ export default function SiteHeader() {
   const isHomePage = location.pathname === '/'
 
   const navClasses = ({ isActive }: { isActive: boolean }) => {
-    const baseClasses = 'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative group'
+    const baseClasses = 'inline-flex items-center gap-2 px-2 py-2 lg:px-4 lg:py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative group whitespace-nowrap'
     if (isHomePage) {
       return `${baseClasses} ${
         isActive
@@ -55,19 +55,23 @@ export default function SiteHeader() {
           <Logo className={`w-8 h-8 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-indigo-600 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
           <span className={`text-xl font-light tracking-widest uppercase ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', letterSpacing: '0.2em' }}>DeepFamily</span>
         </NavLink>
-        <nav className="hidden md:flex items-center gap-2">
+        <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-shrink-0 min-w-0">
           <NavLink to="/" className={navClasses} end>
-            <Home className="w-4 h-4" /> {t('navigation.home')}
+            <Home className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.home')}</span>
           </NavLink>
           <NavLink to="/visualization" className={navClasses}>
-            <Eye className="w-4 h-4" /> {t('navigation.visualization')}
+            <Eye className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.visualization')}</span>
           </NavLink>
           <NavLink to="/search" className={navClasses}>
-            <Search className="w-4 h-4" /> {t('navigation.search')}
+            <Search className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.search')}</span>
           </NavLink>
-            <NavLink to="/people" className={navClasses}>
-              <Book className="w-4 h-4" /> {t('navigation.people')}
-            </NavLink>
+          <NavLink to="/people" className={navClasses}>
+            <Book className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.people')}</span>
+          </NavLink>
         </nav>
         <HeaderControls variant={isHomePage ? 'home' : 'normal'} />
       </PageContainer>

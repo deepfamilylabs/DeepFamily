@@ -52,7 +52,7 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl focus:outline-none transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm min-w-0 ${
+        className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 text-sm font-medium rounded-xl focus:outline-none transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm min-w-0 whitespace-nowrap ${
           isHomePage 
             ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15 border' 
             : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600 border'
@@ -61,7 +61,7 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
         <Globe className={`w-4 h-4 flex-shrink-0 ${
           isHomePage ? 'text-white/80 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
         }`} />
-        <span className="text-sm truncate max-w-20 font-medium">{currentLanguage.nativeName}</span>
+        <span className="text-sm truncate max-w-16 lg:max-w-20 font-medium hidden sm:inline">{currentLanguage.nativeName}</span>
         <svg 
           className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${
             isHomePage ? 'text-white/70 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'

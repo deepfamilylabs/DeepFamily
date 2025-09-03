@@ -57,9 +57,9 @@ function ForceDAGViewInner({ root, height = 560 }: { root: GraphNode; height?: n
     ;(innerRef as any).current = gRef.current
 
     const defs = svg.append('defs')
-    defs.append('marker').attr('id', 'fd-arrow').attr('viewBox', '0 0 10 10').attr('refX', 10).attr('refY', 5).attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto-start-reverse').append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#94a3b8')
+    defs.append('marker').attr('id', 'fd-arrow').attr('viewBox', '0 0 10 10').attr('refX', 10).attr('refY', 5).attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto-start-reverse').append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#60a5fa')
 
-    const link = g.append('g').attr('stroke', '#cbd5e1').attr('stroke-width', 1.2).selectAll('line').data(data.links).enter().append('line').attr('marker-end', 'url(#fd-arrow)')
+    const link = g.append('g').attr('stroke', '#93c5fd').attr('stroke-width', 2).attr('stroke-opacity', 0.7).selectAll('line').data(data.links).enter().append('line').attr('marker-end', 'url(#fd-arrow)')
 
     const node = g.append('g').selectAll('g').data(data.nodes).enter().append('g').call(d3.drag<SVGGElement, SimNode>()
       .on('start', (event: any, d: SimNode) => { if (!event.active) simulation.alphaTarget(0.3).restart(); (d as any).fx = d.x; (d as any).fy = d.y })
@@ -143,7 +143,7 @@ function ForceDAGViewInner({ root, height = 560 }: { root: GraphNode; height?: n
   miniUpdateRef.current = update
 
   return (
-    <div ref={containerRef} className="relative overflow-auto" style={{ height: 560 }}>
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm" style={{ height: 560 }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-4 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
       <svg ref={svgRef}></svg>

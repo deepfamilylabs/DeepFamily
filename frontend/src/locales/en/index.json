@@ -228,7 +228,7 @@
       "birthPlacePlaceholder": "e.g., US-CA-Los Angeles",
       "compute": "Calculate",
       "result": "Result",
-      "description": "Note: Calculation logic is completely consistent with the contract getPersonHash (keccak256(abi.encode(...))).",
+      "description": "Note: Calculation logic is completely consistent with the contract getPersonHash.",
       "bcOptions": {
         "no": "No",
         "yes": "Yes"

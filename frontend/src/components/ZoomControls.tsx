@@ -31,14 +31,14 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({ k, kToNorm, normToK,
 
   return (
     <div className={`flex flex-col items-center gap-3 select-none ${className}`}>
-      <button onClick={onZoomIn} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 shadow border border-slate-300 dark:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-700 active:scale-95 transition text-slate-700 dark:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 dark:focus-visible:ring-indigo-400/50">+</button>
+      <button onClick={onZoomIn} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg">+</button>
       <div ref={trackRef} onPointerDown={onPointerDown} className="relative w-6" style={{ height: trackHeight }}>
-        <div className="absolute left-1/2 -translate-x-1/2 top-1.5 bottom-1.5 w-1 rounded-full bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-gray-600 dark:via-gray-500 dark:to-gray-600 shadow-inner">
-          <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-blue-500 shadow ring-2 ring-white dark:ring-gray-900 hover:scale-110 transition" style={{ top: `${(1 - kToNorm(k)) * 100}%`, transform: 'translate(-50%, -50%)' }} />
-          <div className="absolute left-1/2 -translate-x-1/2 w-1 bg-blue-400/60 dark:bg-blue-500/50" style={{ top: `${(1 - kToNorm(k)) * 100}%`, bottom: 0, borderRadius: '999px' }} />
+        <div className="absolute left-1/2 -translate-x-1/2 top-1.5 bottom-1.5 w-1.5 rounded-full bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-slate-600 dark:via-slate-500 dark:to-slate-600 shadow-inner backdrop-blur-sm">
+          <div className="absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing" style={{ top: `${(1 - kToNorm(k)) * 100}%`, transform: 'translate(-50%, -50%)' }} />
+          <div className="absolute left-1/2 -translate-x-1/2 w-1.5 bg-gradient-to-t from-blue-400/80 to-indigo-400/60 dark:from-blue-500/70 dark:to-indigo-500/50" style={{ top: `${(1 - kToNorm(k)) * 100}%`, bottom: 0, borderRadius: '999px' }} />
         </div>
       </div>
-      <button onClick={onZoomOut} className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 shadow border border-slate-300 dark:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-700 active:scale-95 transition text-slate-700 dark:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 dark:focus-visible:ring-indigo-400/50">-</button>
+      <button onClick={onZoomOut} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg">-</button>
     </div>
   )
 }
@@ -55,11 +55,11 @@ export interface MiniMapProps {
 
 export const MiniMap: React.FC<MiniMapProps> = ({ width, height, miniSvgRef, viewportRef, onClick, className = '', children }) => {
   return (
-    <div className={`bg-white/80 dark:bg-gray-800/70 backdrop-blur rounded-md shadow border border-slate-300 dark:border-gray-600 p-1 select-none ${className}`}>      
+    <div className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-200/60 dark:border-slate-600/60 p-1.5 select-none transition-all duration-200 hover:shadow-xl ${className}`}>      
       <svg ref={miniSvgRef} width={width} height={height} onClick={onClick} className="cursor-pointer">
-        <rect x={0} y={0} width={width} height={height} rx={4} ry={4} fill="#f1f5f9" stroke="#cbd5e1" className="dark:fill-gray-700 dark:stroke-gray-500" />
+        <rect x={0} y={0} width={width} height={height} rx={6} ry={6} fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" className="dark:fill-slate-800 dark:stroke-slate-600" />
         <g className="nodes" />
-        <rect ref={viewportRef} x={0} y={0} width={20} height={20} fill="none" stroke="#2563eb" strokeWidth={1.5} className="dark:stroke-blue-400" />
+        <rect ref={viewportRef} x={0} y={0} width={20} height={20} fill="none" stroke="#3b82f6" strokeWidth={2} rx={2} ry={2} className="dark:stroke-blue-400" />
         {children}
       </svg>
     </div>
