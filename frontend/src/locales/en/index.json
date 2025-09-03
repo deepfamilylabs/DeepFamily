@@ -6,85 +6,171 @@
     "people": "People"
   },
   "home": {
-    "title": "Decentralized On-Chain Family Tree Protocol",
-    "subtitle": "A blockchain-based decentralized digital family tree smart contract that combines privacy protection, token incentives, and NFT assetization to build a trustworthy family history recording system",
-    "exploreVisualization": "Explore Visualization",
+    "title": "Decentralized On-Chain Genealogy Protocol",
+    "subtitle": "Multi-version Trusted Genealogies + Economic-driven Endorsements + NFT Value Attribution + Sharded Story Preservation + ZK Privacy Extensions in an Open Collaborative Network",
+    "exploreVisualization": "Explore Family Tree",
+    "addPerson": "Add Person", 
+    "participate": "Participate & Endorse",
     "configSettings": "Connection Settings",
-    "statistics": {
-      "decentralized": "Decentralized",
-      "decentralizedDesc": "No Admin",
-      "privacy": "Privacy", 
-      "privacyDesc": "Encrypted",
-      "dualLayer": "Dual-Layer",
-      "dualLayerDesc": "Privacy + Value",
-      "global": "Global",
-      "globalDesc": "Cross-Region"
+    "tagStrip": {
+      "protocol": "Decentralized",
+      "incentive": "Incentive Loop", 
+      "nft": "NFT Biography",
+      "zk": "ZK Extensions"
+    },
+    "coreValue": {
+      "title": "Core Mission",
+      "description": "Building a permanently trusted global digital genealogy infrastructure"
+    },
+    "valueProps": {
+      "title": "Core Value Propositions",
+      "subtitle": "Building a multi-dimensional trusted genealogy ecosystem, enabling natural evolution from information exploration to value confirmation",
+      "trustedGenealogy": {
+        "title": "Trusted Genealogies",
+        "description": "Parent references + version coexistence, never overwriting history, only accumulating evidence and consensus"
+      },
+      "consensusFocus": {
+        "title": "Consensus Formation", 
+        "description": "Endorsements consume tokens, costs anchored to mining rewards, filtering noise to form factual focus"
+      },
+      "valuePrecipitation": {
+        "title": "Value Precipitation",
+        "description": "Version → NFT → holders receive subsequent endorsement fee streams, incentivizing high-quality contributions"
+      },
+      "narrativeExtension": {
+        "title": "Narrative Extension", 
+        "description": "Story shards incremental writing + full hash verification + sealing creates immutable records"
+      },
+      "privacyGuardian": {
+        "title": "Privacy Protection",
+        "description": "ZK proofs verify structural correctness while hiding original sensitive fields"
+      },
+      "openComposition": {
+        "title": "Open Composability",
+        "description": "On-chain structure + Subgraph indexing, enabling community to build applications, visualizations, research databases"
+      }
     },
     "architecture": {
-      "title": "Dual-Layer Architecture Design",
-      "subtitle": "The dual-layer architecture balances privacy protection and value creation, enabling a natural progression from information exploration to value confirmation",
+      "title": "Dual-Layer Network Model",
+      "subtitle": "Synergistic design of Layer 1 Relational Layer and Layer 2 Value Layer, achieving organic integration of structured data and economic value",
       "layer1": {
-        "title": "Layer 1: Privacy Relationship Network Layer",
-        "subtitle": "Privacy Protection Layer",
-        "feature1": "Hash Storage Mechanism",
-        "feature1Desc": "Only hash values are stored on-chain, with original data stored off-chain for privacy protection",
-        "feature2": "Relationship Network Construction",
-        "feature2Desc": "Establishes family tree relationships through personHash → fatherHash/motherHash",
-        "feature3": "Token Incentive Mechanism",
-        "feature3Desc": "Earn DEEP by contributing data — open for everyone",
-        "description": "Features: Low barrier to entry, no privacy leakage risk"
+        "title": "Layer 1: Relational Layer",
+        "subtitle": "Structure & Temporal Series",
+        "feature1": "Person Hash Management",
+        "feature1Desc": "Hash-based person identification, supporting multi-version coexistence and evolution tracking",
+        "feature2": "Version Control System",
+        "feature2Desc": "Immutable version history, each version records creation time and author",
+        "feature3": "Parent-Child Topology",
+        "feature3Desc": "Building complete genealogy network topology and bloodline relationship chains",
+        "description": "Features: Structured data, temporal series, topological networks"
       },
       "layer2": {
-        "title": "Layer 2: NFT Person Encyclopedia Value Layer",
-        "subtitle": "Value Confirmation Layer",
-        "feature1": "Community Endorsement Filtering",
-        "feature1Desc": "High-quality information endorsed by the community can mint NFTs",
-        "feature2": "Core Information On-Chain",
-        "feature2Desc": "Core information is stored directly on-chain to ensure data permanence",
-        "feature3": "Value Discovery",
-        "feature3Desc": "Unlock value through NFTs and governance",
-        "description": "Features: Quality control, Value proof, Assetization"
+        "title": "Layer 2: Value Layer",
+        "subtitle": "Economic Incentives & Assetization",
+        "feature1": "NFT Asset Binding",
+        "feature1Desc": "Specific versions can be minted as NFTs, carrying value and revenue rights",
+        "feature2": "Endorsement Fee Streams",
+        "feature2Desc": "Endorsement fees distributed to NFT holders, creating continuous revenue",
+        "feature3": "Mining Reward Mechanism",
+        "feature3Desc": "Versions with complete parent references receive DEEP token rewards",
+        "description": "Features: Economic incentives, value discovery, verifiable narrative assetization"
       },
       "advantages": {
-        "title": "Architectural Advantages and Value Discovery Mechanism",
-        "step1": "Anonymous Hash Relationships",
-        "step1Desc": "Low-risk exploratory trial and error",
-        "step2": "Community Endorsement Verification",
-        "step2Desc": "Credibility filtering",
-        "step3": "Selective Disclosure",
-        "step3Desc": "Core information on-chain",
-        "step4": "NFT Assetization",
-        "step4Desc": "Value discovery",
-        "conclusion": "Progressive Privacy Disclosure",
-        "conclusionDesc": "A natural progression from information exploration to value confirmation, achieving risk-stratified management and a value discovery mechanism"
+        "title": "Operational Workflow",
+        "step1": "Add Person Version",
+        "step1Desc": "If both parents exist → receive mining rewards",
+        "step2": "Community Endorsement",
+        "step2Desc": "Pay DEEP tokens to endorse a version",
+        "step3": "Mint Version NFT",
+        "step3Desc": "Endorsers can mint NFTs for corresponding versions",
+        "step4": "Write Story Shards",
+        "step4Desc": "NFT holders write/append person story fragments",
+        "conclusion": "Value-Driven Collaborative Network",
+        "conclusionDesc": "Through economic incentive mechanisms, achieving natural accumulation and value discovery of high-quality genealogy data"
       }
     },
     "features": {
       "title": "Core Features",
-      "subtitle": "Full modules supporting dual-layer operation",
-      "privacy": {
-        "title": "Encrypted Privacy Storage",
-        "description": "Only hash values are stored on-chain to establish family tree relationships while protecting user privacy data"
+      "subtitle": "Complete feature modules supporting dual-layer network operations",
+      "zkVersion": {
+        "title": "ZK Version Addition",
+        "description": "Submit hash-bound versions with zero-knowledge proofs, verifying structural correctness while hiding sensitive fields"
       },
-      "nft": {
-        "title": "NFT Person Minting",
-        "description": "Each person version can only mint one NFT, with core information stored directly on-chain, transforming family tree data into digital assets"
+      "versionManagement": {
+        "title": "Person Version Management", 
+        "description": "Multi-version coexistence, indexable by name/parents/children, immutable with only additive alternative narratives"
       },
-      "token": {
-        "title": "DEEP Token Mining",
-        "description": "Earn DEEP token rewards for each person relationship added (no pre-mining), with a progressive halving mining mechanism to incentivize data contribution"
+      "endorsementEconomy": {
+        "title": "Endorsement Economy",
+        "description": "Fees dynamically float with current issuance rewards, endorsements filter priorities, reducing noise to form consensus"
+      },
+      "personNFT": {
+        "title": "Person NFTs",
+        "description": "Bound to specific versions, carrying value and future revenue rights, incentivizing high-quality data contributions"
+      },
+      "storySharding": {
+        "title": "Story Sharding",
+        "description": "Shard writing → hash synthesis → sealed as historical snapshots, forming verifiable on-chain archives"
+      },
+      "versionNotarization": {
+        "title": "Version Notarization",
+        "description": "Immutable version history, only additive alternative narratives, with endorsement-filtered priorities"
+      }
+    },
+    "tokenomics": {
+      "title": "Incentives & Token Economics",
+      "subtitle": "DEEP token-driven sustainable ecosystem incentive mechanism",
+      "deepToken": {
+        "title": "DEEP Token",
+        "description": "Multi-stage declining mining → entering stable issuance intervals, anti-inflation design"
+      },
+      "supply": {
+        "title": "Supply Cap",
+        "description": "100 billion token cap, no pre-mining, fair launch"
+      },
+      "mining": {
+        "title": "Mining Trigger",
+        "description": "Triggered when adding valid person versions with parent references"
       },
       "endorsement": {
-        "title": "Endorsement Staking System",
-        "description": "Users stake deposits to endorse trusted versions, establishing a decentralized trust mechanism"
+        "title": "Endorsement Fees",
+        "description": "Equal to current mining rewards, adaptively coupled with issuance intensity"
       },
-      "multiVersion": {
-        "title": "Multi-Version Coexistence",
-        "description": "Multiple versions of information can exist for the same person, with credibility determined through community endorsement mechanisms"
+      "distribution": {
+        "title": "Fee Distribution",
+        "description": "Before NFT minting → creators; after NFT minting → NFT holders"
       },
-      "governance": {
-        "title": "Governance Voting System",
-        "description": "NFT-based voting weight, supporting democratic decision-making for endorsement challenge proposals and fee adjustment proposals"
+      "goal": {
+        "title": "Economic Goals",
+        "description": "Encourage high-quality structured completion, suppress spam and repetitive noise"
+      }
+    },
+    "audience": {
+      "title": "Target Audiences",
+      "subtitle": "A collaborative ecosystem of diverse user groups",
+      "contributors": {
+        "title": "Data Contributors",
+        "description": "Input, complete and verify genealogy information, building trusted family tree data networks",
+        "benefit1": "Earn DEEP token mining rewards",
+        "benefit2": "Receive long-term endorsement fee distributions"
+      },
+      "researchers": {
+        "title": "Family Researchers", 
+        "description": "Track version evolution and divergences, explore multi-dimensional narratives and truths of family history",
+        "benefit1": "Access complete version evolution history",
+        "benefit2": "Discover hidden connections in family relationship networks"
+      },
+      "developers": {
+        "title": "Developers",
+        "description": "Integrate smart contracts, frontend components, develop secondary applications and knowledge graph systems",
+        "benefit1": "Use complete smart contract interfaces",
+        "benefit2": "Build decentralized genealogy ecosystem applications"
+      },
+      "creators": {
+        "title": "Narrative Creators",
+        "description": "Write and preserve historical stories, transforming family memories into verifiable on-chain archives",
+        "benefit1": "Created content receives permanent storage",
+        "benefit2": "Obtain copyright protection through story sharding"
       }
     },
     "contracts": {
@@ -110,6 +196,7 @@
       "title": "Start Building Your Digital Family Tree",
       "subtitle": "Build your digital family tree using smart contracts and participate in constructing a decentralized family history recording system",
       "experience": "Experience Now",
+      "search": "Search Family",
       "configure": "Configure Connection",
       "opensource": "Open Source on GitHub",
       "free": "Free & Open Source",

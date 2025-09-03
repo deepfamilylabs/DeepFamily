@@ -7,84 +7,170 @@
   },
   "home": {
     "title": "去中心化鏈上族譜協定",
-    "subtitle": "基於區塊鏈的去中心化數位族譜智慧合約，結合隱私保護、代幣激勵與NFT資產化，構建可信的家族記錄系統",
-    "exploreVisualization": "探索族譜視覺化",
+    "subtitle": "多版本可信譜系 + 經濟驅動背書 + NFT 價值歸屬 + 分片敘事封存 + ZK 隱私擴展的開放協作網絡",
+    "exploreVisualization": "瀏覽族譜",
+    "addPerson": "新增人物",
+    "participate": "參與背書",
     "configSettings": "配置連接設定",
-    "statistics": {
-      "decentralized": "去中心化",
-      "decentralizedDesc": "無管理權限",
-      "privacy": "隱私保護", 
-      "privacyDesc": "加密存儲",
-      "dualLayer": "雙層架構",
-      "dualLayerDesc": "關係網絡+NFT人物百科",
-      "global": "全球化",
-      "globalDesc": "兼容不同地區"
+    "tagStrip": {
+      "protocol": "去中心化",
+      "incentive": "激勵循環",
+      "nft": "NFT 傳記",
+      "zk": "ZK 擴展"
+    },
+    "coreValue": {
+      "title": "核心使命",
+      "description": "構建永久可信的全球數位族譜基礎設施"
+    },
+    "valueProps": {
+      "title": "核心價值主張",
+      "subtitle": "構建多維度可信譜系生態，實現從資訊探索到價值確認的自然演進",
+      "trustedGenealogy": {
+        "title": "可信譜系",
+        "description": "父母引用 + 版本共存，不覆寫歷史，只累積證據與共識"
+      },
+      "consensusFocus": {
+        "title": "共識聚焦", 
+        "description": "背書消耗代幣，成本錨定挖礦獎勵，過濾噪聲形成事實焦點"
+      },
+      "valuePrecipitation": {
+        "title": "價值沉澱",
+        "description": "版本 → NFT → 持有人獲得後續背書費用流，激勵高品質輸入"
+      },
+      "narrativeExtension": {
+        "title": "敘事擴展", 
+        "description": "故事分片增量寫入 + 全量雜湊校驗 + 封存即不可篡改"
+      },
+      "privacyGuardian": {
+        "title": "隱私守護",
+        "description": "ZK 證明驗證結構正確性，可隱藏原始敏感欄位"
+      },
+      "openComposition": {
+        "title": "開放組合",
+        "description": "鏈上結構 + Subgraph 索引，供社群構建應用、視覺化、研究資料庫"
+      }
     },
     "architecture": {
-      "title": "雙層架構設計",
-      "subtitle": "雙層架構，平衡隱私保護與價值創造，實現從信息探索到價值確認的自然演進",
+      "title": "雙層網路模型",
+      "subtitle": "第一層 關係層與第二層 價值層的協同設計，實現結構化資料與經濟價值的有機融合",
       "layer1": {
-        "title": "第一層：隱私關係網絡層",
-        "subtitle": "Privacy Protection Layer",
-        "feature1": "Hash存儲機制",
-        "feature1Desc": "僅儲存Hash值，原始資訊離鏈保護隱私",
-        "feature2": "關係網絡構建",
-        "feature2Desc": "通過personHash → fatherHash/motherHash建立族譜關係",
-        "feature3": "代幣激勵機制",
-        "feature3Desc": "DEEP代幣激勵資訊貢獻，人人可參與",
-        "description": "特點：低門檻參與，無隱私洩露風險"
+        "title": "第一層: 關係層",
+        "subtitle": "結構與時間序列",
+        "feature1": "人物雜湊管理",
+        "feature1Desc": "基於雜湊的人物標識，支援多版本並存與演化追蹤",
+        "feature2": "版本控制系統",
+        "feature2Desc": "不可篡改的版本歷史，每個版本記錄建立時間與作者",
+        "feature3": "父母-子代拓撲",
+        "feature3Desc": "構建完整的族譜網路拓撲結構與血緣關係鏈",
+        "description": "特性：結構化資料、時間序列、拓撲網路"
       },
       "layer2": {
-        "title": "第二層：NFT人物百科價值層",
-        "subtitle": "Value Confirmation Layer",
-        "feature1": "社區背書篩選",
-        "feature1Desc": "經過社區背書的高質量信息可鑄造NFT",
-        "feature2": "核心信息上鏈",
-        "feature2Desc": "核心資訊直接儲存在鏈上，確保資料永久性",
-        "feature3": "價值發現",
-        "feature3Desc": "透過NFT實現價值發現，並獲得治理投票權",
-        "description": "特點：質量把關，價值確認與資產化"
+        "title": "第二層: 價值層",
+        "subtitle": "經濟激勵與資產化",
+        "feature1": "NFT 資產綁定",
+        "feature1Desc": "特定版本可鑄造為 NFT，承載價值與收益權",
+        "feature2": "背書費用流",
+        "feature2Desc": "背書費用分配給 NFT 持有人，形成持續收益",
+        "feature3": "挖礦獎勵機制",
+        "feature3Desc": "完善雙親引用的版本可獲得 DEEP 代幣獎勵",
+        "description": "特性：經濟激勵、價值發現、可驗證敘事資產化"
       },
       "advantages": {
-        "title": "架構優勢與價值發現機制",
-        "step1": "匿名Hash關係",
-        "step1Desc": "低風險試錯探索",
-        "step2": "社區背書驗證",
-        "step2Desc": "可信度篩選",
-        "step3": "選擇性公開",
-        "step3Desc": "核心信息上鏈",
-        "step4": "NFT資產化",
-        "step4Desc": "價值發現",
-        "conclusion": "漸進式隱私披露",
-        "conclusionDesc": "從信息探索到價值確認的自然演進，實現風險分層管理與價值發現機制"
+        "title": "運作流程",
+        "step1": "新增人物版本",
+        "step1Desc": "若雙親均存在 → 獲得挖礦獎勵",
+        "step2": "其他使用者背書",
+        "step2Desc": "支付 DEEP 背書某一版本",
+        "step3": "鑄造版本 NFT",
+        "step3Desc": "背書者可鑄造對應版本的 NFT",
+        "step4": "撰寫故事分片",
+        "step4Desc": "NFT 持有人撰寫/追加人物故事分片",
+        "conclusion": "價值驅動的協作網路",
+        "conclusionDesc": "透過經濟激勵機制，實現高品質譜系資料的自然累積與價值發現"
       }
     },
     "features": {
       "title": "核心功能",
-      "subtitle": "完整的功能模組，支撐雙層架構的有效運行",
-      "privacy": {
-        "title": "加密隱私存儲",
-        "description": "鏈上僅儲存Hash值，建立族譜關係，保護用戶隱私資料"
+      "subtitle": "完整的功能模組支援雙層網路運作",
+      "zkVersion": {
+        "title": "ZK 版本新增",
+        "description": "用零知識證明提交雜湊綁定版本，驗證結構正確性的同時隱藏敏感欄位"
       },
-      "nft": {
-        "title": "NFT人物鑄造",
-        "description": "每個人物版本只能鑄造一次NFT，核心資訊直接上鏈儲存，將族譜資料轉化為數位資產"
+      "versionManagement": {
+        "title": "人物版本管理", 
+        "description": "多版本並列，按名字 / 父母 / 子代可索引，無法篡改只能新增替代敘述"
       },
-      "token": {
-        "title": "DEEP代幣挖礦",
-        "description": "每次添加人物關係可獲得DEEP代幣獎勵（無預挖），漸進式減半挖礦機制，激勵資料貢獻"
+      "endorsementEconomy": {
+        "title": "背書經濟",
+        "description": "費用隨當前發行獎勵動態浮動，背書篩選優先級，過濾噪聲形成共識"
+      },
+      "personNFT": {
+        "title": "人物 NFT",
+        "description": "綁定特定版本，承載價值與後續收益權，激勵高品質資料貢獻"
+      },
+      "storySharding": {
+        "title": "故事分片",
+        "description": "分片寫入 → 雜湊合成 → 封存為歷史快照，形成可驗證的鏈上檔案"
+      },
+      "versionNotarization": {
+        "title": "版本公證",
+        "description": "無法篡改的版本歷史，只能新增替代敘述，由背書篩選優先級"
+      }
+    },
+    "tokenomics": {
+      "title": "激勵與代幣經濟",
+      "subtitle": "DEEP 代幣驅動的可持續生態激勵機制",
+      "deepToken": {
+        "title": "DEEP 代幣",
+        "description": "多階段遞減挖礦 → 進入穩定發行區間，抗通脹設計"
+      },
+      "supply": {
+        "title": "總量上限",
+        "description": "1000 億枚代幣上限，無預挖，公平啟動"
+      },
+      "mining": {
+        "title": "挖礦觸發",
+        "description": "新增含雙親引用的有效人物版本時觸發挖礦獎勵"
       },
       "endorsement": {
-        "title": "背書質押系統",
-        "description": "用戶質押保證金背書信任的版本，建立去中心化信任機制"
+        "title": "背書費用",
+        "description": "等於當前挖礦獎勵，與發行強度自適應耦合"
       },
-      "multiVersion": {
-        "title": "多版本共存",
-        "description": "同一人物可存在多個版本資訊，透過社群背書機制決定可信度"
+      "distribution": {
+        "title": "費用分配",
+        "description": "NFT 鑄造前歸建立者，NFT 鑄造後歸 NFT 持有人"
       },
-      "governance": {
-        "title": "治理投票系統",
-        "description": "基於NFT的投票權重，支持背書挑戰提案和費用調整提案的民主決策"
+      "goal": {
+        "title": "經濟目標",
+        "description": "鼓勵高品質結構化補全，抑制刷垃圾與重複噪聲"
+      }
+    },
+    "audience": {
+      "title": "面向角色",
+      "subtitle": "多元化使用者群體的協作生態",
+      "contributors": {
+        "title": "資料貢獻者",
+        "description": "錄入、補全與考證譜系資訊，構建可信的族譜資料網路",
+        "benefit1": "獲得 DEEP 代幣挖礦獎勵",
+        "benefit2": "享受長期背書費用分成"
+      },
+      "researchers": {
+        "title": "族譜研究者", 
+        "description": "追蹤版本演化與分歧，探索家族歷史的多元敘述和真相",
+        "benefit1": "存取完整的版本演化歷史",
+        "benefit2": "發現家族關係網路的隱藏連接"
+      },
+      "developers": {
+        "title": "開發者",
+        "description": "整合智慧合約、前端元件，開發二次應用和知識圖譜系統",
+        "benefit1": "使用完整的智慧合約介面",
+        "benefit2": "構建去中心化族譜生態應用"
+      },
+      "creators": {
+        "title": "敘事創作者",
+        "description": "編寫與封存歷史故事，將家族記憶轉化為可驗證的鏈上檔案",
+        "benefit1": "創作內容獲得永久儲存",
+        "benefit2": "透過故事分片獲得版權保護"
       }
     },
     "contracts": {
@@ -110,8 +196,9 @@
       "title": "開始構建您的數位族譜",
       "subtitle": "使用智慧合約構建您的數位族譜，參與去中心化家族記錄系統的建設",
       "experience": "立即體驗",
+      "search": "搜尋族譜",
       "configure": "配置連接",
-      "opensource": "GitHub 開源項目",
+      "opensource": "GitHub 開源專案",
       "free": "開源免費",
       "license": "MIT 許可證"
     }

@@ -12,7 +12,10 @@ import {
   Sparkles,
   Lock,
   Award,
-  Book
+  Book,
+  Search,
+  Code,
+  PenTool
 } from 'lucide-react'
 import PageContainer from '../components/PageContainer'
 
@@ -61,61 +64,203 @@ export default function Home() {
           {/* Enhanced CTA Buttons */}
           <div className="animate-fade-in-up animation-delay-400 flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
             <NavLink 
-              to="/visualization" 
+              to="/people" 
               className="group relative inline-flex items-center px-10 py-5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-600 dark:hover:from-blue-400 dark:hover:to-purple-500 transform hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-blue-500/25 dark:shadow-blue-500/10 dark:hover:shadow-blue-400/20 overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative flex items-center gap-3">
-                <Zap className="w-6 h-6" />
-                {t('home.exploreVisualization')}
+                <Users className="w-6 h-6" />
+                {t('home.addPerson')}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
               </div>
             </NavLink>
             
             <NavLink 
-              to="/people" 
+              to="/visualization" 
               className="group inline-flex items-center px-10 py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-lg border-2 border-blue-200/80 dark:border-purple-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/80 dark:hover:border-purple-400/80 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-purple-500/20 transition-all duration-300 backdrop-blur-sm"
             >
               <div className="flex items-center gap-3">
-                <Book className="w-6 h-6" />
-                {t('home.cta.exploreStories', 'Explore Stories')}
+                <Network className="w-6 h-6" />
+                {t('home.exploreVisualization')}
+              </div>
+            </NavLink>
+
+            <NavLink 
+              to="/search" 
+              className="group inline-flex items-center px-10 py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-lg border-2 border-green-200/80 dark:border-green-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-green-400/80 dark:hover:border-green-400/80 hover:shadow-xl hover:shadow-green-500/10 dark:hover:shadow-green-500/20 transition-all duration-300 backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-3">
+                <Award className="w-6 h-6" />
+                {t('home.participate')}
               </div>
             </NavLink>
           </div>
           
-          {/* Enhanced Statistics with better visual hierarchy */}
+          {/* Tag Strip */}
+          <div className="animate-fade-in-up animation-delay-500 mb-16">
+            <div className="flex items-center justify-center gap-2 sm:gap-4 max-w-6xl mx-auto overflow-x-auto scrollbar-hide">
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-blue-200/50 dark:border-blue-600/30 backdrop-blur-sm flex-shrink-0">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.protocol')}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-purple-200/50 dark:border-purple-600/30 backdrop-blur-sm flex-shrink-0">
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse animation-delay-200"></div>
+                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.incentive')}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-indigo-200/50 dark:border-indigo-600/30 backdrop-blur-sm flex-shrink-0">
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse animation-delay-400"></div>
+                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.nft')}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-emerald-200/50 dark:border-emerald-600/30 backdrop-blur-sm flex-shrink-0">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse animation-delay-600"></div>
+                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.zk')}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Core Value Proposition */}
           <div className="animate-fade-in-up animation-delay-600 mb-16 sm:mb-20 lg:mb-0">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
-              <div className="group text-center p-6 rounded-2xl bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300 hover:scale-105">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <Shield className="w-6 h-6 text-white" />
+            <div className="max-w-4xl mx-auto text-center">
+              <p className="text-2xl md:text-3xl font-light text-gray-700 dark:text-gray-300 leading-relaxed">
+                {t('home.coreValue.description')}
+              </p>
+            </div>
+          </div>
+        </PageContainer>
+      </section>
+
+      {/* Value Propositions */}
+      <section className="py-28 bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-slate-900 dark:via-slate-850/50 dark:to-slate-900">
+        <PageContainer>
+          <div className="text-center mb-20 animate-fade-in-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-slate-100 to-purple-100 dark:from-slate-800 dark:to-purple-900/30 border border-slate-200 dark:border-slate-700 mb-8 backdrop-blur-sm">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Value Props</span>
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
+              <span className="bg-gradient-to-r from-slate-900 via-purple-700 to-indigo-700 dark:from-slate-100 dark:via-purple-300 dark:to-indigo-300 bg-clip-text text-transparent">
+                {t('home.valueProps.title')}
+              </span>
+            </h2>
+            
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto leading-relaxed">
+              {t('home.valueProps.subtitle')}
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in-up animation-delay-300">
+            {/* Trusted Genealogy */}
+            <div className="group relative animate-scale-in h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-blue-100/50 dark:border-blue-400/20 hover:shadow-blue-500/10 dark:hover:shadow-blue-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[320px]">
+                <div className="relative mb-8">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 dark:from-blue-400 dark:via-blue-500 dark:to-cyan-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Network className="w-8 h-8 text-white" />
+                  </div>
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">{t('home.statistics.decentralized')}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">{t('home.statistics.decentralizedDesc')}</div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.valueProps.trustedGenealogy.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
+                    {t('home.valueProps.trustedGenealogy.description')}
+                  </p>
+                </div>
               </div>
-              
-              <div className="group text-center p-6 rounded-2xl bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300 hover:scale-105">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-400 dark:to-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <Lock className="w-6 h-6 text-white" />
+            </div>
+
+            {/* Consensus Focus */}
+            <div className="group relative animate-scale-in animation-delay-100 h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-purple-100/50 dark:border-purple-400/20 hover:shadow-purple-500/10 dark:hover:shadow-purple-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[320px]">
+                <div className="relative mb-8">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-purple-500 via-purple-600 to-pink-600 dark:from-purple-400 dark:via-purple-500 dark:to-pink-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <TrendingUp className="w-8 h-8 text-white" />
+                  </div>
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400 mb-2">{t('home.statistics.privacy')}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">{t('home.statistics.privacyDesc')}</div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.valueProps.consensusFocus.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
+                    {t('home.valueProps.consensusFocus.description')}
+                  </p>
+                </div>
               </div>
-              
-              <div className="group text-center p-6 rounded-2xl bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300 hover:scale-105">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <Network className="w-6 h-6 text-white" />
+            </div>
+
+            {/* Value Precipitation */}
+            <div className="group relative animate-scale-in animation-delay-200 h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-emerald-100/50 dark:border-emerald-400/20 hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[320px]">
+                <div className="relative mb-8">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 dark:from-emerald-400 dark:via-emerald-500 dark:to-teal-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Coins className="w-8 h-8 text-white" />
+                  </div>
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">{t('home.statistics.dualLayer')}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">{t('home.statistics.dualLayerDesc')}</div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.valueProps.valuePrecipitation.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
+                    {t('home.valueProps.valuePrecipitation.description')}
+                  </p>
+                </div>
               </div>
-              
-              <div className="group text-center p-6 rounded-2xl bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:bg-white/60 dark:hover:bg-gray-800/60 transition-all duration-300 hover:scale-105">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-400 dark:to-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <Globe className="w-6 h-6 text-white" />
+            </div>
+
+            {/* Narrative Extension */}
+            <div className="group relative animate-scale-in animation-delay-300 h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-indigo-100/50 dark:border-indigo-400/20 hover:shadow-indigo-500/10 dark:hover:shadow-indigo-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[320px]">
+                <div className="relative mb-8">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 dark:from-indigo-400 dark:via-indigo-500 dark:to-violet-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Book className="w-8 h-8 text-white" />
+                  </div>
                 </div>
-                <div className="text-2xl md:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-2">{t('home.statistics.global')}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">{t('home.statistics.globalDesc')}</div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.valueProps.narrativeExtension.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
+                    {t('home.valueProps.narrativeExtension.description')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Privacy Guardian */}
+            <div className="group relative animate-scale-in animation-delay-400 h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-orange-100/50 dark:border-orange-400/20 hover:shadow-orange-500/10 dark:hover:shadow-orange-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[320px]">
+                <div className="relative mb-8">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 dark:from-orange-400 dark:via-orange-500 dark:to-amber-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Shield className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.valueProps.privacyGuardian.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
+                    {t('home.valueProps.privacyGuardian.description')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Open Composition */}
+            <div className="group relative animate-scale-in animation-delay-500 h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-red-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-rose-100/50 dark:border-rose-400/20 hover:shadow-rose-500/10 dark:hover:shadow-rose-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[320px]">
+                <div className="relative mb-8">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-rose-500 to-red-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative w-16 h-16 bg-gradient-to-br from-rose-500 via-rose-600 to-red-600 dark:from-rose-400 dark:via-rose-500 dark:to-red-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Globe className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.valueProps.openComposition.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
+                    {t('home.valueProps.openComposition.description')}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -356,13 +501,13 @@ export default function Home() {
                 <div className="relative mb-8">
                   <div className="absolute -inset-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                   <div className="relative w-20 h-20 bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 dark:from-blue-400 dark:via-blue-500 dark:to-cyan-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Shield className="w-10 h-10 text-white" />
+                    <Lock className="w-10 h-10 text-white" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.privacy.title')}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.zkVersion.title')}</h3>
                 <div className="flex-1">
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                    {t('home.features.privacy.description')}
+                    {t('home.features.zkVersion.description')}
                   </p>
                 </div>
               </div>
@@ -374,13 +519,13 @@ export default function Home() {
                 <div className="relative mb-8">
                   <div className="absolute -inset-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                   <div className="relative w-20 h-20 bg-gradient-to-br from-purple-500 via-purple-600 to-pink-600 dark:from-purple-400 dark:via-purple-500 dark:to-pink-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Coins className="w-10 h-10 text-white" />
+                    <Network className="w-10 h-10 text-white" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.nft.title')}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.versionManagement.title')}</h3>
                 <div className="flex-1">
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                    {t('home.features.nft.description')}
+                    {t('home.features.versionManagement.description')}
                   </p>
                 </div>
               </div>
@@ -395,10 +540,10 @@ export default function Home() {
                     <TrendingUp className="w-10 h-10 text-white" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.token.title')}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.endorsementEconomy.title')}</h3>
                 <div className="flex-1">
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                    {t('home.features.token.description')}
+                    {t('home.features.endorsementEconomy.description')}
                   </p>
                 </div>
               </div>
@@ -410,13 +555,13 @@ export default function Home() {
                 <div className="relative mb-8">
                   <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                   <div className="relative w-20 h-20 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 dark:from-indigo-400 dark:via-indigo-500 dark:to-violet-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Users className="w-10 h-10 text-white" />
+                    <Award className="w-10 h-10 text-white" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.endorsement.title')}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.personNFT.title')}</h3>
                 <div className="flex-1">
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                    {t('home.features.endorsement.description')}
+                    {t('home.features.personNFT.description')}
                   </p>
                 </div>
               </div>
@@ -428,13 +573,13 @@ export default function Home() {
                 <div className="relative mb-8">
                   <div className="absolute -inset-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                   <div className="relative w-20 h-20 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 dark:from-orange-400 dark:via-orange-500 dark:to-amber-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Network className="w-10 h-10 text-white" />
+                    <Book className="w-10 h-10 text-white" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.multiVersion.title')}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.storySharding.title')}</h3>
                 <div className="flex-1">
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                    {t('home.features.multiVersion.description')}
+                    {t('home.features.storySharding.description')}
                   </p>
                 </div>
               </div>
@@ -446,13 +591,13 @@ export default function Home() {
                 <div className="relative mb-8">
                   <div className="absolute -inset-2 bg-gradient-to-r from-rose-500 to-red-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                   <div className="relative w-20 h-20 bg-gradient-to-br from-rose-500 via-rose-600 to-red-600 dark:from-rose-400 dark:via-rose-500 dark:to-red-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                    <Globe className="w-10 h-10 text-white" />
+                    <Shield className="w-10 h-10 text-white" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.governance.title')}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.features.versionNotarization.title')}</h3>
                 <div className="flex-1">
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                    {t('home.features.governance.description')}
+                    {t('home.features.versionNotarization.description')}
                   </p>
                 </div>
               </div>
@@ -461,6 +606,261 @@ export default function Home() {
         </PageContainer>
       </section>
 
+      {/* Tokenomics */}
+      <section className="py-28 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900">
+        <PageContainer>
+          <div className="text-center mb-20 animate-fade-in-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 border border-emerald-200/50 dark:border-emerald-600/30 mb-8 backdrop-blur-sm">
+              <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Tokenomics</span>
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
+              <span className="bg-gradient-to-r from-slate-900 via-emerald-700 to-teal-700 dark:from-slate-100 dark:via-emerald-300 dark:to-teal-300 bg-clip-text text-transparent">
+                {t('home.tokenomics.title')}
+              </span>
+            </h2>
+            
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto leading-relaxed">
+              {t('home.tokenomics.subtitle')}
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* DEEP Token */}
+            <div className="group relative animate-scale-in">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-2xl p-8 shadow-xl border border-blue-100/50 dark:border-blue-400/20 hover:shadow-blue-500/10 dark:hover:shadow-blue-400/20 transition-all duration-500 hover:-translate-y-2 backdrop-blur-sm">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-2xl font-bold text-white">D</span>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{t('home.tokenomics.deepToken.title')}</h3>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {t('home.tokenomics.deepToken.description')}
+                </p>
+              </div>
+            </div>
+
+            {/* Token Supply */}
+            <div className="group relative animate-scale-in animation-delay-100">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-green-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-2xl p-8 shadow-xl border border-emerald-100/50 dark:border-emerald-400/20 hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/20 transition-all duration-500 hover:-translate-y-2 backdrop-blur-sm">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-2xl font-bold text-white">∞</span>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{t('home.tokenomics.supply.title')}</h3>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {t('home.tokenomics.supply.description')}
+                </p>
+              </div>
+            </div>
+
+            {/* Mining Rewards */}
+            <div className="group relative animate-scale-in animation-delay-200">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-2xl p-8 shadow-xl border border-amber-100/50 dark:border-amber-400/20 hover:shadow-amber-500/10 dark:hover:shadow-amber-400/20 transition-all duration-500 hover:-translate-y-2 backdrop-blur-sm">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-2xl font-bold text-white">⛏</span>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{t('home.tokenomics.mining.title')}</h3>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {t('home.tokenomics.mining.description')}
+                </p>
+              </div>
+            </div>
+
+            {/* Endorsement Fee */}
+            <div className="group relative animate-scale-in animation-delay-300">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-2xl p-8 shadow-xl border border-purple-100/50 dark:border-purple-400/20 hover:shadow-purple-500/10 dark:hover:shadow-purple-400/20 transition-all duration-500 hover:-translate-y-2 backdrop-blur-sm">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <Award className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{t('home.tokenomics.endorsement.title')}</h3>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {t('home.tokenomics.endorsement.description')}
+                </p>
+              </div>
+            </div>
+
+            {/* Fee Distribution */}
+            <div className="group relative animate-scale-in animation-delay-400">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-2xl p-8 shadow-xl border border-teal-100/50 dark:border-teal-400/20 hover:shadow-teal-500/10 dark:hover:shadow-teal-400/20 transition-all duration-500 hover:-translate-y-2 backdrop-blur-sm">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-2xl font-bold text-white">%</span>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{t('home.tokenomics.distribution.title')}</h3>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {t('home.tokenomics.distribution.description')}
+                </p>
+              </div>
+            </div>
+
+            {/* Economic Goal */}
+            <div className="group relative animate-scale-in animation-delay-500">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-red-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-2xl p-8 shadow-xl border border-rose-100/50 dark:border-rose-400/20 hover:shadow-rose-500/10 dark:hover:shadow-rose-400/20 transition-all duration-500 hover:-translate-y-2 backdrop-blur-sm">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-rose-500 to-red-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-2xl font-bold text-white">🎯</span>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">{t('home.tokenomics.goal.title')}</h3>
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {t('home.tokenomics.goal.description')}
+                </p>
+              </div>
+            </div>
+          </div>
+        </PageContainer>
+      </section>
+
+      {/* Audience */}
+      <section className="py-28 bg-gradient-to-b from-white via-indigo-50/50 to-white dark:from-slate-900 dark:via-indigo-950/50 dark:to-slate-900">
+        <PageContainer>
+          <div className="text-center mb-20 animate-fade-in-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-200/50 dark:border-indigo-600/30 mb-8 backdrop-blur-sm">
+              <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Target Audience</span>
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
+              <span className="bg-gradient-to-r from-slate-900 via-indigo-700 to-purple-700 dark:from-slate-100 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
+                {t('home.audience.title')}
+              </span>
+            </h2>
+            
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto leading-relaxed">
+              {t('home.audience.subtitle')}
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Data Contributors */}
+            <div className="group relative animate-scale-in col-span-1">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-blue-100/50 dark:border-blue-400/20 hover:shadow-blue-500/10 dark:hover:shadow-blue-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[400px]">
+                <div className="relative mb-8">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Users className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.audience.contributors.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg mb-6">
+                    {t('home.audience.contributors.description')}
+                  </p>
+                  <ul className="text-gray-600 dark:text-gray-300 space-y-2">
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.contributors.benefit1')}
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.contributors.benefit2')}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Family Researchers */}
+            <div className="group relative animate-scale-in animation-delay-100 col-span-1">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-emerald-100/50 dark:border-emerald-400/20 hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[400px]">
+                <div className="relative mb-8">
+                  <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Search className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.audience.researchers.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg mb-6">
+                    {t('home.audience.researchers.description')}
+                  </p>
+                  <ul className="text-gray-600 dark:text-gray-300 space-y-2">
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.researchers.benefit1')}
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.researchers.benefit2')}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Developers */}
+            <div className="group relative animate-scale-in animation-delay-200 col-span-1">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-purple-100/50 dark:border-purple-400/20 hover:shadow-purple-500/10 dark:hover:shadow-purple-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[400px]">
+                <div className="relative mb-8">
+                  <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Code className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.audience.developers.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg mb-6">
+                    {t('home.audience.developers.description')}
+                  </p>
+                  <ul className="text-gray-600 dark:text-gray-300 space-y-2">
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.developers.benefit1')}
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.developers.benefit2')}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Narrative Creators */}
+            <div className="group relative animate-scale-in animation-delay-300 col-span-1">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-red-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-rose-100/50 dark:border-rose-400/20 hover:shadow-rose-500/10 dark:hover:shadow-rose-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[400px]">
+                <div className="relative mb-8">
+                  <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-red-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <PenTool className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{t('home.audience.creators.title')}</h3>
+                <div className="flex-1">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg mb-6">
+                    {t('home.audience.creators.description')}
+                  </p>
+                  <ul className="text-gray-600 dark:text-gray-300 space-y-2">
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-rose-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.creators.benefit1')}
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-rose-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                      {t('home.audience.creators.benefit2')}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </PageContainer>
+      </section>
 
       {/* Call to Action */}
       <section className="pt-20 pb-24 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-650 dark:via-indigo-650 dark:to-purple-650 text-white" style={{width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginBottom: '-5rem'}}>
@@ -489,7 +889,7 @@ export default function Home() {
           <div className="border-t border-white/20 pt-8">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <a 
-                href="https://github.com/DeepFamily/DeepFamily"
+                href="https://github.com/deepfamilylabs/DeepFamily.git"
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="inline-flex items-center text-white/80 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600 dark:focus-visible:ring-offset-blue-700 rounded"
