@@ -3,8 +3,7 @@
     "home": "首頁",
     "visualization": "視覺化",
     "search": "搜尋",
-    "stories": "人物百科",
-    "settings": "設定"
+    "people": "人物"
   },
   "home": {
     "title": "去中心化鏈上族譜協定",
@@ -32,7 +31,7 @@
         "feature2": "關係網絡構建",
         "feature2Desc": "通過personHash → fatherHash/motherHash建立族譜關係",
         "feature3": "代幣激勵機制",
-        "feature3Desc": "TREE代幣激勵資訊貢獻，人人可參與",
+        "feature3Desc": "DEEP代幣激勵資訊貢獻，人人可參與",
         "description": "特點：低門檻參與，無隱私洩露風險"
       },
       "layer2": {
@@ -72,8 +71,8 @@
         "description": "每個人物版本只能鑄造一次NFT，核心資訊直接上鏈儲存，將族譜資料轉化為數位資產"
       },
       "token": {
-        "title": "TREE代幣挖礦",
-        "description": "每次添加人物關係可獲得TREE代幣獎勵（無預挖），漸進式減半挖礦機制，激勵資料貢獻"
+        "title": "DEEP代幣挖礦",
+        "description": "每次添加人物關係可獲得DEEP代幣獎勵（無預挖），漸進式減半挖礦機制，激勵資料貢獻"
       },
       "endorsement": {
         "title": "背書質押系統",
@@ -330,17 +329,17 @@
       "birth": "出生",
       "death": "逝世",
       "story": "事蹟",
-      "detailedStory": "詳細傳記",
+      "profile": "檔案",
       "storyChunks": "分片數量",
       "storyLength": "總長度",
       "sealed": "已封存",
       "lastUpdate": "最後更新",
-      "showFullStory": "顯示完整傳記",
-      "hideFullStory": "隱藏完整傳記",
+      "showFullStory": "顯示完整檔案",
+      "hideFullStory": "隱藏完整檔案",
       "showChunks": "顯示分片",
       "hideChunks": "隱藏分片",
-      "editStory": "編輯傳記",
-      "viewFullStory": "查看完整傳記",
+      "editStory": "編輯檔案",
+      "viewFullStory": "查看完整檔案",
       "uri": "URI",
       "loading": "NFT 資訊載入中…",
       "loadErrorPrefix": "NFT 載入失敗",
@@ -404,7 +403,7 @@
   "storyDetail": {
     "encyclopedia": "人物百科",
     "pageTitle": "傳記詳情",
-    "title": "的傳記",
+    "title": "的檔案",
     "loading": "載入傳記中...",
     "notFound": "傳記未找到",
     "chunks": "分片",
@@ -441,7 +440,10 @@
     "verified": "已校驗",
     "personHashLabel": "人物哈希：",
     "versionLabel": "版本：",
-    "viewVisualization": "族譜視圖"
+    "viewVisualization": "族譜視圖",
+    "invalidTokenId": "無效的 Token ID",
+    "nonexistentToken": "該 Token 不存在",
+    "fetchFailed": "載入 Token 失敗"
   },
   "storyPage": {
     "loading": "載入傳記中...",

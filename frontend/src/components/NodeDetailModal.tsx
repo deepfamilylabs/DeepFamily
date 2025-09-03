@@ -152,7 +152,7 @@ export default function NodeDetailModal({
                 )}
                 {(nodeData?.tokenId && nodeData.tokenId !== '0') && (
                   <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('visualization.nodeDetail.detailedStory')}</div>
+                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('visualization.nodeDetail.profile')}</div>
                     <div className="space-y-1">
                       <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
                         <button

@@ -14,6 +14,7 @@ import {
   Award,
   Book
 } from 'lucide-react'
+import PageContainer from '../components/PageContainer'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -35,7 +36,7 @@ export default function Home() {
         {/* Gradient overlay for depth */}
         <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-white/5 dark:to-slate-900/10"></div>
         
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <PageContainer className="relative text-center">
           {/* Enhanced Main Title with animations */}
           <div className="animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 border border-blue-200/50 dark:border-blue-600/30 mb-8 backdrop-blur-sm">
@@ -118,7 +119,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </PageContainer>
       </section>
 
       {/* Dual Layer Architecture */}
@@ -133,7 +134,7 @@ export default function Home() {
         {/* Enhanced grid overlay */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.1)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(71,85,105,0.3)_1px,transparent_1px),linear-gradient(to_bottom,rgba(71,85,105,0.3)_1px,transparent_1px)] bg-[size:100px_100px] opacity-30" />
         
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <PageContainer className="relative">
           <div className="text-center mb-20 animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-slate-100 to-blue-100 dark:from-slate-800 dark:to-blue-900/30 border border-slate-200 dark:border-slate-700 mb-6 backdrop-blur-sm">
               <Network className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -324,12 +325,12 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </PageContainer>
       </section>
 
       {/* Core Features */}
       <section className="py-28 bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-slate-900 dark:via-slate-850/50 dark:to-slate-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <PageContainer>
           <div className="text-center mb-20 animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-200/50 dark:border-indigo-600/30 mb-8 backdrop-blur-sm">
               <Zap className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
@@ -457,13 +458,13 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </PageContainer>
       </section>
 
 
       {/* Call to Action */}
       <section className="pt-20 pb-24 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-650 dark:via-indigo-650 dark:to-purple-650 text-white" style={{width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginBottom: '-5rem'}}>
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+        <PageContainer className="text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             {t('home.cta.title')}
           </h2>
@@ -485,8 +486,6 @@ export default function Home() {
               {t('home.cta.search', 'Search Family')}
             </NavLink>
           </div>
-          
-          {/* GitHub Open Source Info */}
           <div className="border-t border-white/20 pt-8">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <a 
@@ -516,7 +515,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </PageContainer>
       </section>
     </div>
   )

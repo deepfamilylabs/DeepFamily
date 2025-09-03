@@ -27,7 +27,7 @@ function TitleUpdater() {
         case '/search':
           return `${baseName} - ${t('navigation.search')}`
         case '/people':
-          return `${baseName} - ${t('storyPage.title', 'Family Stories Encyclopedia')}`
+          return `${baseName} - ${t('navigation.people')}`
         default:
           if (location.pathname.startsWith('/person/')) {
             return `${baseName} - ${t('storyDetail.pageTitle', 'Person Biography')}`

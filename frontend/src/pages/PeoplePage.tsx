@@ -5,6 +5,7 @@ import { NodeData } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
 import StoryChunksViewer from '../components/StoryChunksViewer'
+import PageContainer from '../components/PageContainer'
 
 interface PeoplePageData {
   people: NodeData[]
@@ -140,7 +141,7 @@ export default function PeoplePage() {
           <div className="absolute bottom-10 left-1/3 w-24 h-24 bg-gradient-to-br from-indigo-400/25 to-blue-400/20 rounded-full blur-xl animate-bounce-gentle"></div>
         </div>
 
-        <div className="relative max-w-6xl mx-auto px-4 text-center">
+        <PageContainer className="relative text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 border border-blue-200/50 dark:border-blue-600/30 mb-6 backdrop-blur-sm">
             <Book className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('storyPage.badge', 'Family Stories')}</span>
@@ -175,11 +176,11 @@ export default function PeoplePage() {
               <div className="text-sm text-gray-600 dark:text-gray-400">{t('storyPage.withNFTs', 'With NFTs')}</div>
             </div>
           </div>
-        </div>
+        </PageContainer>
       </section>
 
       {/* Search and Filter Controls */}
-      <div className="max-w-6xl mx-auto px-4 mb-8">
+      <PageContainer className="mb-8">
         <div className="bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-4">
             {/* Search */}
@@ -346,10 +347,10 @@ export default function PeoplePage() {
             {t('storyPage.resultsCount', '{{count}} results found', { count: filteredPeople.length })}
           </div>
         </div>
-      </div>
+      </PageContainer>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 pb-12">
+      <PageContainer className="pb-12">
         {filteredPeople.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
@@ -372,7 +373,7 @@ export default function PeoplePage() {
             ))}
           </div>
         )}
-      </div>
+      </PageContainer>
 
       {/* Story Chunks Viewer Modal */}
       {selectedPerson && (

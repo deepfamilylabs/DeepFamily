@@ -3,8 +3,7 @@
     "home": "首页",
     "visualization": "可视化",
     "search": "搜索",
-    "stories": "人物百科",
-    "settings": "设置"
+    "people": "人物"
   },
   "home": {
     "title": "去中心化链上族谱协议",
@@ -32,7 +31,7 @@
         "feature2": "关系网络构建",
         "feature2Desc": "通过personHash → fatherHash/motherHash建立族谱关系",
         "feature3": "代币激励机制",
-        "feature3Desc": "TREE代币激励数据贡献，人人可参与",
+        "feature3Desc": "DEEP代币激励数据贡献，人人可参与",
         "description": "特点：低门槛参与，无隐私泄露风险"
       },
       "layer2": {
@@ -72,8 +71,8 @@
         "description": "每个人物版本只能铸造一次NFT，核心信息直接上链存储，将族谱数据转化为数字资产"
       },
       "token": {
-        "title": "TREE代币挖矿",
-        "description": "每次添加人物关系可获得TREE代币奖励（无预挖），渐进式减半挖矿机制，激励数据贡献"
+        "title": "DEEP代币挖矿",
+        "description": "每次添加人物关系可获得DEEP代币奖励（无预挖），渐进式减半挖矿机制，激励数据贡献"
       },
       "endorsement": {
         "title": "背书质押系统",
@@ -331,17 +330,17 @@
       "birth": "出生",
       "death": "逝世",
       "story": "事迹",
-      "detailedStory": "详细传记",
+      "profile": "档案",
       "storyChunks": "分片数量",
       "storyLength": "总长度",
       "sealed": "已封存",
       "lastUpdate": "最后更新",
-      "showFullStory": "显示完整传记",
-      "hideFullStory": "隐藏完整传记",
+      "showFullStory": "显示完整档案",
+      "hideFullStory": "隐藏完整档案",
       "showChunks": "显示分片",
       "hideChunks": "隐藏分片",
-      "editStory": "编辑传记",
-      "viewFullStory": "查看完整传记",
+      "editStory": "编辑档案",
+      "viewFullStory": "查看完整档案",
       "uri": "URI",
       "loading": "NFT 信息加载中…",
       "loadErrorPrefix": "NFT 加载失败",
@@ -406,7 +405,7 @@
   "storyDetail": {
     "encyclopedia": "人物百科",
     "pageTitle": "传记详情",
-    "title": "的传记",
+    "title": "的档案",
     "loading": "加载传记中...",
     "notFound": "传记未找到",
     "chunks": "分片",
@@ -443,7 +442,10 @@
     "verified": "已校验",
     "personHashLabel": "人物哈希：",
     "versionLabel": "版本：",
-    "viewVisualization": "族谱视图"
+    "viewVisualization": "族谱视图",
+    "invalidTokenId": "无效的 Token ID",
+    "nonexistentToken": "该 Token 不存在",
+    "fetchFailed": "加载 Token 失败"
   },
   "storyPage": {
     "loading": "加载传记中...",
