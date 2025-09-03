@@ -157,7 +157,7 @@ export default function NodeDetailModal({
                       <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
                         <button
                           onClick={() => {
-                            const url = `/story/${nodeData.tokenId}`
+                            const url = `/person/${nodeData.tokenId}`
                             window.open(url, '_blank')
                           }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline flex items-center gap-1"
@@ -167,7 +167,7 @@ export default function NodeDetailModal({
                         </button>
                         <button
                           onClick={() => {
-                            const url = `/story/${nodeData.tokenId}?edit=1`
+                            const url = `/person/${nodeData.tokenId}?edit=1`
                             window.open(url, '_blank')
                           }}
                           className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 underline flex items-center gap-1"

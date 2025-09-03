@@ -243,7 +243,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
   // Navigate to detailed story page
   const goToDetailPage = () => {
     if (person.tokenId) {
-      navigate(`/story/${person.tokenId}`)
+      navigate(`/person/${person.tokenId}`)
       onClose()
     }
   }

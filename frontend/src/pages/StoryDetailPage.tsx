@@ -323,7 +323,7 @@ export default function StoryDetailPage() {
                 <h1 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1 leading-tight">
                   <span className="truncate max-w-[calc(100vw-120px)] sm:max-w-[calc(60vw-80px)] md:max-w-sm text-sm sm:text-base md:text-lg leading-none" title={data.fullName || `Token #${data.tokenId}`}>{data.fullName || `Token #${data.tokenId}`}</span>
                   <span className="text-gray-400 dark:text-gray-500 hidden xs:inline">/</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap text-sm sm:text-base md:text-lg leading-none">{t('storyDetail.title', "'s Story")}</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap text-sm sm:text-base md:text-lg leading-none">{t('storyDetail.title', "'s Biography")}</span>
                   {data.storyMetadata && data.storyMetadata.totalChunks > 0 && data.integrity && (() => {
                         const integ = data.integrity
                         const localOk = integ.missing.length === 0 && integ.lengthMatch && (integ.hashMatch === true)
@@ -364,8 +364,8 @@ export default function StoryDetailPage() {
                 ) : (
                   <button
                     onClick={() => setEditorOpen(true)}
-                    aria-label={t('storyDetail.edit', 'Edit Story') as string}
-                    title={t('storyDetail.edit', 'Edit Story') as string}
+                    aria-label={t('storyDetail.edit', 'Edit Biography') as string}
+                    title={t('storyDetail.edit', 'Edit Biography') as string}
                     className="flex items-center justify-center w-8 h-7 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors text-[10px]"
                   >
                     <Edit2 size={14} />
@@ -468,7 +468,7 @@ export default function StoryDetailPage() {
               
               <div className="relative flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-                  {t('storyDetail.fullStory', 'Full Story')}
+                  {t('storyDetail.fullStory', 'Biography')}
                 </h2>
                 <div className="flex items-center gap-3">
                   {data && data.fullStory && data.fullStory.length > 0 && (
@@ -509,7 +509,7 @@ export default function StoryDetailPage() {
                 <div className="font-mono text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-loose tracking-wide text-xs sm:text-sm selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30 overflow-x-auto p-4 story-content-surface dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700">{data.fullStory}</div>
               ) : (
                 <div className="text-gray-400 italic text-sm py-6 text-center">
-                  {t('storyDetail.noStory', 'No story content')}
+                  {t('storyDetail.noStory', 'No biographical content')}
                 </div>
               )}
             </div>

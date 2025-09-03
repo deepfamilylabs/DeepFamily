@@ -29,8 +29,8 @@ function TitleUpdater() {
         case '/people':
           return `${baseName} - ${t('storyPage.title', 'Family Stories Encyclopedia')}`
         default:
-          if (location.pathname.startsWith('/story/')) {
-            return `${baseName} - ${t('storyDetail.pageTitle', 'Story Details')}`
+          if (location.pathname.startsWith('/person/')) {
+            return `${baseName} - ${t('storyDetail.pageTitle', 'Person Biography')}`
           }
           return `${baseName} - ${t('home.title')}`
       }
@@ -58,7 +58,7 @@ export default function App() {
                   <Route path="search" element={<SearchPage />} />
                   <Route path="people" element={<StoryPage />} />
                 </Route>
-                <Route path="/story/:tokenId" element={<StoryDetailPage />} />
+                <Route path="/person/:tokenId" element={<StoryDetailPage />} />
               </Routes>
             </TreeDataProvider>
           </VizOptionsProvider>
