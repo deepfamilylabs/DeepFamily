@@ -5,8 +5,8 @@ import Layout from './components/Layout'
 import Home from './pages/Home'
 import VisualizationPage from './pages/VisualizationPage'
 import SearchPage from './pages/SearchPage'
-import StoryDetailPage from './pages/StoryDetailPage'
-import StoryPage from './pages/StoryPage'
+import PersonPage from './pages/PersonPage'
+import PeoplePage from './pages/PeoplePage'
 import { ConfigProvider } from './context/ConfigContext'
 import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
@@ -56,9 +56,9 @@ export default function App() {
                   <Route index element={<Home />} />
                   <Route path="visualization" element={<VisualizationPage />} />
                   <Route path="search" element={<SearchPage />} />
-                  <Route path="people" element={<StoryPage />} />
+                  <Route path="people" element={<PeoplePage />} />
                 </Route>
-                <Route path="/person/:tokenId" element={<StoryDetailPage />} />
+                <Route path="/person/:tokenId" element={<PersonPage />} />
               </Routes>
             </TreeDataProvider>
           </VizOptionsProvider>

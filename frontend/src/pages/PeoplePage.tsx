@@ -6,7 +6,7 @@ import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
 import StoryChunksViewer from '../components/StoryChunksViewer'
 
-interface StoryPageData {
+interface PeoplePageData {
   people: NodeData[]
   totalCount: number
   loading: boolean
@@ -15,7 +15,7 @@ interface StoryPageData {
 type ViewMode = 'grid' | 'list'
 type FilterType = 'all' | 'recent' | 'oldest' | 'by_name' | 'by_endorsement' | 'by_birth_year'
 
-export default function StoryPage() {
+export default function PeoplePage() {
   const { t } = useTranslation()
   const { nodesData, loading } = useTreeData()
   

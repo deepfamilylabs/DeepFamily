@@ -63,7 +63,7 @@ interface StoryDetailData {
   }
 }
 
-export default function StoryDetailPage() {
+export default function PersonPage() {
   const { tokenId } = useParams<{ tokenId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
