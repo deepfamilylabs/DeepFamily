@@ -672,35 +672,28 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 fee = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).recentReward();
 
     if (fee > 0) {
-      // Only read version and tokenId when payment is needed, reducing unnecessary SLOAD
+      // New rule:
+      // - If NOT minted: 100% -> version creator (addedBy)
+      // - If minted: 100% -> current NFT holder (even if holder == creator)
       PersonVersion storage v = personVersions[personHash][arrayIndex];
       uint256 tokenId = versionToTokenId[personHash][arrayIndex];
-
-      // Default: give all to version creator
-      address to1 = v.addedBy;
-      address to2; // Possible NFT holder
-      uint256 amt1 = fee;
-      uint256 amt2 = 0;
-
+      address recipient;
       if (tokenId != 0) {
-        address holder = _ownerOf(tokenId);
-        // Allocation condition: NFT exists and holder is valid and different from creator -> 50/50
-        if (holder != address(0) && holder != to1) {
-          uint256 half = fee / 2;
-          uint256 other = fee - half;
-          amt1 = half;
-          amt2 = other;
-          to2 = holder;
+        address holder = _ownerOf(tokenId); // _ownerOf returns address(0) if burned/nonexistent
+        if (holder != address(0)) {
+          recipient = holder; // 100% to NFT holder
+        } else {
+          recipient = v.addedBy; // Fallback safety (should not normally happen)
         }
+      } else {
+        recipient = v.addedBy; // 100% to creator before NFT exists
       }
-
-      // Execute minimum number of transfers (1 or 2 times)
-      bool ok1 = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).transferFrom(msg.sender, to1, amt1);
-      bool ok2 = true;
-      if (amt2 > 0) {
-        ok2 = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).transferFrom(msg.sender, to2, amt2);
-      }
-      if (!ok1 || !ok2) revert EndorsementFeeTransferFailed();
+      bool ok = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).transferFrom(
+        msg.sender,
+        recipient,
+        fee
+      );
+      if (!ok) revert EndorsementFeeTransferFailed();
     }
 
     // Decrease old version count (only when previously endorsed other versions)
