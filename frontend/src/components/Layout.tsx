@@ -79,7 +79,7 @@ export default function Layout() {
             <NavLink to="/search" className={navClasses}>
               <Search className="w-4 h-4" /> {t('navigation.search')}
             </NavLink>
-            <NavLink to="/stories" className={navClasses}>
+            <NavLink to="/people" className={navClasses}>
               <Book className="w-4 h-4" /> {t('navigation.stories', 'Stories')}
             </NavLink>
           </nav>

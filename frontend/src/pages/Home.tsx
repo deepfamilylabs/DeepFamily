@@ -72,7 +72,7 @@ export default function Home() {
             </NavLink>
             
             <NavLink 
-              to="/stories" 
+              to="/people" 
               className="group inline-flex items-center px-10 py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-lg border-2 border-blue-200/80 dark:border-purple-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/80 dark:hover:border-purple-400/80 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-purple-500/20 transition-all duration-300 backdrop-blur-sm"
             >
               <div className="flex items-center gap-3">

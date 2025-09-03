@@ -26,8 +26,8 @@ function TitleUpdater() {
           return `${baseName} - ${t('navigation.visualization')}`
         case '/search':
           return `${baseName} - ${t('navigation.search')}`
-        case '/stories':
-          return `${baseName} - ${t('navigation.stories', 'Stories')}`
+        case '/people':
+          return `${baseName} - ${t('storyPage.title', 'Family Stories Encyclopedia')}`
         default:
           if (location.pathname.startsWith('/story/')) {
             return `${baseName} - ${t('storyDetail.pageTitle', 'Story Details')}`
@@ -56,7 +56,7 @@ export default function App() {
                   <Route index element={<Home />} />
                   <Route path="visualization" element={<VisualizationPage />} />
                   <Route path="search" element={<SearchPage />} />
-                  <Route path="stories" element={<StoryPage />} />
+                  <Route path="people" element={<StoryPage />} />
                 </Route>
                 <Route path="/story/:tokenId" element={<StoryDetailPage />} />
               </Routes>

@@ -21,7 +21,7 @@ export default function BottomNav() {
           <Search className="w-5 h-5" />
           <span>{t('navigation.search')}</span>
         </NavLink>
-        <NavLink to="/stories" className={item}>
+        <NavLink to="/people" className={item}>
           <Book className="w-5 h-5" />
           <span>{t('navigation.stories', 'Encyclopedia')}</span>
         </NavLink>
