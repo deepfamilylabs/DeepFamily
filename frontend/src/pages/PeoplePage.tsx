@@ -124,7 +124,7 @@ export default function PeoplePage() {
       <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t('storyPage.loading', 'Loading stories...')}</p>
+          <p className="text-gray-600 dark:text-gray-400">{t('people.loading', 'Loading stories...')}</p>
         </div>
       </div>
     )
@@ -144,36 +144,36 @@ export default function PeoplePage() {
         <PageContainer className="relative text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 border border-blue-200/50 dark:border-blue-600/30 mb-6 backdrop-blur-sm">
             <Book className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('storyPage.badge', 'Family Stories')}</span>
+            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('people.badge', 'Family Stories')}</span>
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-6 leading-tight">
             <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
-              {t('storyPage.title', 'Family Stories Encyclopedia')}
+              {t('people.title', 'Family Stories Encyclopedia')}
             </span>
           </h1>
 
           <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto mb-8 leading-relaxed">
-            {t('storyPage.subtitle', 'Discover the rich narratives and biographical details of family members preserved on the blockchain')}
+            {t('people.subtitle', 'Discover the rich narratives and biographical details of family members preserved on the blockchain')}
           </p>
 
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
             <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 dark:border-gray-700/20">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">{data.totalCount}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">{t('storyPage.totalPeople', 'Total People')}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{t('people.totalPeople', 'Total People')}</div>
             </div>
             <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 dark:border-gray-700/20">
               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
                 {data.people.filter(p => p.storyMetadata && p.storyMetadata.totalChunks > 0).length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">{t('storyPage.withStories', 'With Detailed Stories')}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{t('people.withStories', 'With Detailed Stories')}</div>
             </div>
             <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 dark:border-gray-700/20">
               <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
                 {data.people.filter(p => p.tokenId && p.tokenId !== '0').length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">{t('storyPage.withNFTs', 'With NFTs')}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{t('people.withNFTs', 'With NFTs')}</div>
             </div>
           </div>
         </PageContainer>
@@ -190,7 +190,7 @@ export default function PeoplePage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={t('storyPage.searchPlaceholder', 'Search by name, location, or story content...')}
+                placeholder={t('people.searchPlaceholder', 'Search by name, location, or story content...')}
                 className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               />
             </div>
@@ -203,7 +203,7 @@ export default function PeoplePage() {
                   type="text"
                   value={addressFilter}
                   onChange={(e) => setAddressFilter(e.target.value)}
-                  placeholder={t('storyPage.filterByAddress', 'Filter by creator address...')}
+                  placeholder={t('people.filterByAddress', 'Filter by creator address...')}
                   className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 />
               </div>
@@ -213,7 +213,7 @@ export default function PeoplePage() {
                   type="text"
                   value={tagFilter}
                   onChange={(e) => setTagFilter(e.target.value)}
-                  placeholder={t('storyPage.filterByTag', 'Filter by tag...')}
+                  placeholder={t('people.filterByTag', 'Filter by tag...')}
                   className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 />
               </div>
@@ -231,7 +231,7 @@ export default function PeoplePage() {
                   }}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                 >
-                  {t('storyPage.clearFilters', 'Clear all filters')}
+                  {t('people.clearFilters', 'Clear all filters')}
                 </button>
               </div>
             )}
@@ -239,8 +239,8 @@ export default function PeoplePage() {
             <div className="flex flex-col gap-4">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 {addressFilter || tagFilter ? 
-                  t('storyPage.filteredResults', '{{count}} filtered results', { count: filteredPeople.length }) :
-                  t('storyPage.allResults', '{{count}} total results', { count: filteredPeople.length })
+                  t('people.filteredResults', '{{count}} filtered results', { count: filteredPeople.length }) :
+                  t('people.allResults', '{{count}} total results', { count: filteredPeople.length })
                 }
               </div>
 
@@ -256,7 +256,7 @@ export default function PeoplePage() {
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
                 >
-                  {t('storyPage.filterAll', 'All')}
+                  {t('people.filterAll', 'All')}
                 </button>
                 <button
                   onClick={() => setFilterType('recent')}
@@ -266,7 +266,7 @@ export default function PeoplePage() {
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
                 >
-                  {t('storyPage.filterRecent', 'Recent')}
+                  {t('people.filterRecent', 'Recent')}
                 </button>
                 <button
                   onClick={() => setFilterType('oldest')}
@@ -276,7 +276,7 @@ export default function PeoplePage() {
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
                 >
-                  {t('storyPage.filterOldest', 'Oldest')}
+                  {t('people.filterOldest', 'Oldest')}
                 </button>
                 <button
                   onClick={() => setFilterType('by_name')}
@@ -286,7 +286,7 @@ export default function PeoplePage() {
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
                 >
-                  {t('storyPage.filterByName', 'By Name')}
+                  {t('people.filterByName', 'By Name')}
                 </button>
                 <button
                   onClick={() => setFilterType('by_endorsement')}
@@ -296,7 +296,7 @@ export default function PeoplePage() {
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
                 >
-                  {t('storyPage.filterByEndorsement', 'By Endorsement')}
+                  {t('people.filterByEndorsement', 'By Endorsement')}
                 </button>
                 <button
                   onClick={() => setFilterType('by_birth_year')}
@@ -306,7 +306,7 @@ export default function PeoplePage() {
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
                 >
-                  {t('storyPage.filterByBirthYear', 'By Birth Year')}
+                  {t('people.filterByBirthYear', 'By Birth Year')}
                 </button>
               </div>
               </div>
@@ -321,7 +321,7 @@ export default function PeoplePage() {
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
-                  title={t('storyPage.gridView', 'Grid View')}
+                  title={t('people.gridView', 'Grid View')}
                 >
                   <Grid className="w-4 h-4" />
                 </button>
@@ -332,7 +332,7 @@ export default function PeoplePage() {
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
                   }`}
-                  title={t('storyPage.listView', 'List View')}
+                  title={t('people.listView', 'List View')}
                 >
                   <ListIcon className="w-4 h-4" />
                 </button>
@@ -344,7 +344,7 @@ export default function PeoplePage() {
 
           {/* Results count */}
           <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            {t('storyPage.resultsCount', '{{count}} results found', { count: filteredPeople.length })}
+            {t('people.resultsCount', '{{count}} results found', { count: filteredPeople.length })}
           </div>
         </div>
       </PageContainer>
@@ -355,10 +355,10 @@ export default function PeoplePage() {
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
             <p className="text-xl text-gray-500 dark:text-gray-400 mb-2">
-              {t('storyPage.noResults', 'No stories found')}
+              {t('people.noResults', 'No stories found')}
             </p>
             <p className="text-gray-400 dark:text-gray-500">
-              {t('storyPage.noResultsDesc', 'Try adjusting your search terms or filters')}
+              {t('people.noResultsDesc', 'Try adjusting your search terms or filters')}
             </p>
           </div>
         ) : (

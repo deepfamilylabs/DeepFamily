@@ -30,7 +30,7 @@ function TitleUpdater() {
           return `${baseName} - ${t('navigation.people')}`
         default:
           if (location.pathname.startsWith('/person/')) {
-            return `${baseName} - ${t('storyDetail.pageTitle', 'Person Biography')}`
+            return `${baseName} - ${t('person.pageTitle', 'Person Biography')}`
           }
           return `${baseName} - ${t('home.title')}`
       }

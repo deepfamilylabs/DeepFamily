@@ -114,13 +114,13 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                 {person.hasDetailedStory && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-medium">
                     <Book className="w-3 h-3" />
-                    {t('storyPage.hasStory', 'Story')}
+                    {t('people.hasStory', 'Story')}
                   </span>
                 )}
                 {person.tokenId && person.tokenId !== '0' && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs font-medium">
                     <Award className="w-3 h-3" />
-                    {t('storyPage.hasNFT', 'NFT')}
+                    {t('people.hasNFT', 'NFT')}
                   </span>
                 )}
               </div>
@@ -132,7 +132,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                 {(formatDate.birth || person.birthPlace) && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Calendar className="w-4 h-4 text-green-500" />
-                    <span>{t('storyPage.born', 'Born')}: </span>
+                    <span>{t('people.born', 'Born')}: </span>
                     <span className="font-mono text-xs">
                       {[formatDate.birth, person.birthPlace].filter(Boolean).join(' · ')}
                     </span>
@@ -141,7 +141,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                 {(formatDate.death || person.deathPlace) && (
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Calendar className="w-4 h-4 text-gray-500" />
-                    <span>{t('storyPage.died', 'Died')}: </span>
+                    <span>{t('people.died', 'Died')}: </span>
                     <span className="font-mono text-xs">
                       {[formatDate.death, person.deathPlace].filter(Boolean).join(' · ')}
                     </span>
@@ -171,7 +171,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                 {person.storyMetadata && (
                   <span className="flex items-center gap-1">
                     <FileText className="w-3 h-3" />
-                    {t('storyPage.chunks', '{{count}} chunks', { count: person.storyMetadata.totalChunks })}
+                    {t('people.chunks', '{{count}} chunks', { count: person.storyMetadata.totalChunks })}
                   </span>
                 )}
               </div>
@@ -284,7 +284,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
           
           <button className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium group-hover:gap-2 transition-all duration-200">
             <Eye className="w-3 h-3" />
-            {t('storyPage.viewDetails', 'View')}
+            {t('people.viewDetails', 'View')}
           </button>
         </div>
       </div>
