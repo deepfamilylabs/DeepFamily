@@ -271,6 +271,29 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
               const isDeathBC = coreInfo?.supplementInfo?.isDeathBC !== undefined ? Boolean(coreInfo.supplementInfo.isDeathBC) : undefined
               const story = coreInfo?.supplementInfo?.story
               const endorsementCount2 = endorsementCountBN2 !== undefined && endorsementCountBN2 !== null ? Number(endorsementCountBN2) : undefined
+              
+              // Get story metadata
+              let storyMetadata = undefined
+              try {
+                const metadata = await contract.getStoryMetadata(item.tokenId)
+                storyMetadata = {
+                  totalChunks: Number(metadata.totalChunks),
+                  totalLength: Number(metadata.totalLength),
+                  isSealed: Boolean(metadata.isSealed),
+                  lastUpdateTime: Number(metadata.lastUpdateTime),
+                  fullStoryHash: metadata.fullStoryHash
+                }
+              } catch (e) {
+                // If fetch fails, set default values
+                storyMetadata = {
+                  totalChunks: 0,
+                  totalLength: 0,
+                  isSealed: false,
+                  lastUpdateTime: 0,
+                  fullStoryHash: ''
+                }
+              }
+              
               setNodesData(prev => {
                 const cur = prev[item.id]
                 if (!cur || cur.fullName !== undefined) return prev
@@ -301,7 +324,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                     deathPlace,
                     isDeathBC,
                     story,
-                    nftTokenURI
+                    nftTokenURI,
+                    storyMetadata
                   }
                 }
               })

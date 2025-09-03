@@ -49,7 +49,7 @@ export default function ModeSwitch({ mode, onChange, labels, disabled }: ModeSwi
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex h-9 select-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm"
+      className="relative inline-flex h-9 select-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm min-w-0 flex-shrink-0"
       style={{ lineHeight: '1' }}
     >
       <div
@@ -61,9 +61,9 @@ export default function ModeSwitch({ mode, onChange, labels, disabled }: ModeSwi
         type="button"
         disabled={disabled || mode === 'subgraph'}
         onClick={() => onChange('subgraph')}
-        className={`relative z-10 inline-flex items-center justify-center gap-1 px-3 h-full transition-colors duration-150 whitespace-nowrap ${mode === 'subgraph' ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+        className={`relative z-10 inline-flex items-center justify-center gap-1 px-2 sm:px-3 h-full transition-colors duration-150 whitespace-nowrap ${mode === 'subgraph' ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
       >
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="5" cy="12" r="2" />
           <circle cx="12" cy="5" r="2" />
           <circle cx="19" cy="12" r="2" />
@@ -77,9 +77,9 @@ export default function ModeSwitch({ mode, onChange, labels, disabled }: ModeSwi
         type="button"
         disabled={disabled || mode === 'contract'}
         onClick={() => onChange('contract')}
-        className={`relative z-10 inline-flex items-center justify-center gap-1 px-3 h-full transition-colors duration-150 whitespace-nowrap ${mode === 'contract' ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+        className={`relative z-10 inline-flex items-center justify-center gap-1 px-2 sm:px-3 h-full transition-colors duration-150 whitespace-nowrap ${mode === 'contract' ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
       >
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M8 3h5l5 5v13a1 1 0 0 1 -1 1H8a1 1 0 0 1 -1-1V4a1 1 0 0 1 1-1z" />
           <path d="M13 3v5h5" />
           <circle cx="12" cy="16" r="2.2" />

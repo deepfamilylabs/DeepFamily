@@ -28,7 +28,7 @@ const getInitialLanguage = () => {
     // collapse generic zh-* to zh-CN
     if (/^zh/i.test(nav)) return 'zh-CN'
   }
-  return 'zh-CN'
+  return 'en' // Default to English
 }
 
 i18n
@@ -40,7 +40,7 @@ i18n
     fallbackLng: {
       'zh': ['zh-CN'],
       'zh-TW': ['zh-CN'],
-      'default': ['zh-CN']
+      'default': ['en']
     },
     supportedLngs: SUPPORTED,
     nonExplicitSupportedLngs: true,

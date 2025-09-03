@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Edit2, Clock, User, ChevronDown, ChevronRight, FileText, List, Moon, Sun, Copy, GitBranch, Clipboard } from 'lucide-react'
+import { Edit2, Clock, User, ChevronDown, ChevronRight, FileText, List, Copy, GitBranch, Clipboard } from 'lucide-react'
 import { StoryChunk, StoryMetadata } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
@@ -9,7 +9,7 @@ import { ethers } from 'ethers'
 import DeepFamily from '../abi/DeepFamily.json'
 import StoryChunkEditor from '../components/StoryChunkEditor'
 import Logo from '../components/Logo'
-import LanguageSwitch from '../components/LanguageSwitch'
+import HeaderControls from '../components/HeaderControls'
 
 function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex);
@@ -77,7 +77,6 @@ export default function StoryDetailPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<'paragraph' | 'raw'>('paragraph')
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (typeof window !== 'undefined' && window.localStorage.getItem('df-theme') === 'dark' ? 'dark' : 'light'))
 
   const formatDate = (ts?: number) => {
     if (!ts) return '-'
@@ -224,15 +223,6 @@ export default function StoryDetailPage() {
     fetchStoryData()
   }, [fetchStoryData])
 
-  useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'dark') root.classList.add('dark')
-    else root.classList.remove('dark')
-    window.localStorage.setItem('df-theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
-
   const copyText = useCallback(async (text: string) => {
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -295,31 +285,37 @@ export default function StoryDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="bg-white/90 dark:bg-gray-900/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/70 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-3">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900">
+      <div className="bg-gradient-to-br from-blue-400/50 via-indigo-500/55 via-purple-500/50 to-violet-600/45 dark:from-blue-500/80 dark:via-indigo-600/85 dark:via-purple-600/80 dark:to-violet-700/75 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/30 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)] sticky top-0 z-30 relative">
+        {/* Enhanced floating background shapes */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Primary floating orbs */}
+          <div className="absolute -top-3 left-1/4 w-16 h-16 bg-gradient-to-br from-blue-400/20 via-cyan-400/15 to-teal-400/12 dark:from-blue-400/35 dark:via-cyan-400/30 dark:to-teal-400/25 rounded-full blur-xl animate-pulse-soft"></div>
+          <div className="absolute -top-4 right-1/3 w-20 h-20 bg-gradient-to-br from-purple-400/15 via-violet-400/12 to-pink-400/10 dark:from-purple-400/30 dark:via-violet-400/25 dark:to-pink-400/20 rounded-full blur-2xl animate-float"></div>
+          <div className="absolute -bottom-2 left-2/3 w-12 h-12 bg-gradient-to-br from-indigo-400/25 via-blue-400/20 to-cyan-400/15 dark:from-indigo-400/40 dark:via-blue-400/35 dark:to-cyan-400/30 rounded-full blur-lg animate-bounce-gentle"></div>
+          
+          {/* Secondary accent orbs */}
+          <div className="absolute top-1 left-1/6 w-6 h-6 bg-gradient-to-br from-emerald-400/15 to-green-400/12 dark:from-emerald-400/25 dark:to-green-400/20 rounded-full blur-md animate-float delay-1000"></div>
+          <div className="absolute -bottom-1 right-1/4 w-8 h-8 bg-gradient-to-br from-rose-400/12 to-orange-400/10 dark:from-rose-400/20 dark:to-orange-400/15 rounded-full blur-lg animate-pulse-soft delay-1000"></div>
+        </div>
+        
+        {/* Multi-layer gradient overlays */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/2 to-white/5 dark:via-black/3 dark:to-black/8 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/3 via-purple-500/5 to-violet-500/4 dark:from-blue-500/12 dark:via-indigo-500/8 dark:via-purple-500/12 dark:to-violet-500/8 pointer-events-none"></div>
+        
+        <div className="relative max-w-6xl mx-auto px-4 py-3">
           {/* Header container */}
           <div className="flex flex-col gap-4">
             {/* Row 1: Logo + brand / Language + Theme */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-3 min-w-0">
                 <NavLink to="/" className="flex items-center gap-3 group flex-shrink-0">
-                  <Logo className="w-8 h-8 text-indigo-600 dark:text-indigo-400 group-hover:-rotate-90 transition-transform duration-300" />
-                  <span className="text-lg sm:text-xl font-light tracking-widest uppercase text-gray-900 dark:text-gray-100" style={{fontFamily: 'system-ui, -apple-system, \"Segoe UI\", sans-serif', letterSpacing: '0.2em'}}>DeepFamily</span>
+                  <Logo className="w-8 h-8 text-white dark:text-gray-100 group-hover:-rotate-90 transition-transform duration-300" />
+                  <span className="text-lg sm:text-xl font-light tracking-widest uppercase text-white dark:text-gray-100" style={{fontFamily: 'system-ui, -apple-system, \"Segoe UI\", sans-serif', letterSpacing: '0.2em'}}>DeepFamily</span>
                 </NavLink>
-                <span className="text-sm sm:text-base md:text-lg text-gray-500 dark:text-gray-400 font-medium tracking-wide whitespace-nowrap">{t('storyDetail.encyclopedia', 'Person Encyclopedia')}</span>
+                <span className="text-sm sm:text-base md:text-lg text-white/85 dark:text-gray-200/85 font-medium tracking-wide whitespace-nowrap">{t('storyDetail.encyclopedia', 'Person Encyclopedia')}</span>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <LanguageSwitch />
-                <button
-                  onClick={toggleTheme}
-                  aria-label={theme==='dark' ? t('theme.switchToLight','Switch to Light') as string : t('theme.switchToDark','Switch to Dark') as string}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {theme==='dark' ? <Moon size={14} className="text-indigo-300" /> : <Sun size={14} className="text-amber-500" />}
-                  <span className="hidden sm:inline">{theme==='dark' ? t('theme.dark','Dark') : t('theme.light','Light')}</span>
-                </button>
-              </div>
+              <HeaderControls variant="home" />
             </div>
             {/* Row 2: Title + stats / Actions (verify + edit) */}
             <div className="flex items-start justify-between gap-3">
@@ -381,41 +377,41 @@ export default function StoryDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-5">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
-          <div className="xl:col-span-3 space-y-3">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700/70 p-4 card-surface">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
+          <div className="xl:col-span-3 space-y-6">
+            <div className="bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-2xl shadow-gray-500/5 dark:shadow-gray-900/20 border border-gray-200/70 dark:border-gray-700/50 p-6 card-surface backdrop-blur-xl relative overflow-hidden group hover:shadow-3xl hover:shadow-gray-500/10 dark:hover:shadow-gray-900/30 transition-all duration-300">
+              {/* Subtle background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 dark:from-blue-900/10 dark:via-transparent dark:to-purple-900/5 pointer-events-none"></div>
+              
               {data && (data.fullName || data.nftCoreInfo) && (
-                <div className="mb-5 pb-5 border-b border-gray-100 dark:border-gray-700/50">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
+                <div className="relative mb-8 pb-8 border-b border-gray-100/80 dark:border-gray-700/40">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-8 tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
                     {t('storyDetail.basicInfo','Basic Info')}
                   </h3>
-                  <div className="space-y-3 font-mono text-gray-700 dark:text-gray-200 text-xs sm:text-sm leading-loose tracking-wide selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30">
-                    {(data.fullName || (data.nftCoreInfo?.gender && data.nftCoreInfo.gender > 0)) && (
-                      <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
-                        {data.fullName && (
-                          <div className="flex items-center gap-6">
-                            <span className="text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium w-12 flex-shrink-0">{t('visualization.nodeDetail.fullName', 'Full Name')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-medium leading-none">{data.fullName}</span>
-                          </div>
-                        )}
-                        {data.nftCoreInfo?.gender !== undefined && data.nftCoreInfo.gender > 0 && (
-                          <div className="flex items-center gap-6">
-                            <span className="text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium w-12 flex-shrink-0">{t('visualization.nodeDetail.gender', 'Gender')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-medium leading-none">
-                              {data.nftCoreInfo.gender === 1 ? t('visualization.nodeDetail.genders.male', 'Male') :
-                               data.nftCoreInfo.gender === 2 ? t('visualization.nodeDetail.genders.female', 'Female') :
-                               data.nftCoreInfo.gender === 3 ? t('visualization.nodeDetail.genders.other', 'Other') : '-'}
-                            </span>
-                          </div>
-                        )}
+                  <div className="space-y-5 font-mono text-gray-700 dark:text-gray-200 text-sm leading-relaxed tracking-wide selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30">
+                    {data.fullName && (
+                      <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-blue-50/50 to-cyan-50/30 dark:from-blue-900/20 dark:to-cyan-900/10 border border-blue-200/30 dark:border-blue-700/30">
+                        <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.fullName', 'Full Name')}</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-bold text-lg">{data.fullName}</span>
+                      </div>
+                    )}
+
+                    {data.nftCoreInfo?.gender !== undefined && data.nftCoreInfo.gender > 0 && (
+                      <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-purple-50/50 to-pink-50/30 dark:from-purple-900/20 dark:to-pink-900/10 border border-purple-200/30 dark:border-purple-700/30">
+                        <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.gender', 'Gender')}</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                          {data.nftCoreInfo.gender === 1 ? t('visualization.nodeDetail.genders.male', 'Male') :
+                           data.nftCoreInfo.gender === 2 ? t('visualization.nodeDetail.genders.female', 'Female') :
+                           data.nftCoreInfo.gender === 3 ? t('visualization.nodeDetail.genders.other', 'Other') : '-'}
+                        </span>
                       </div>
                     )}
 
                     {data.nftCoreInfo && (data.nftCoreInfo.birthYear || data.nftCoreInfo.birthPlace) && (
-                      <div className="flex items-center gap-6">
-                        <span className="text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium w-12 flex-shrink-0">{t('visualization.nodeDetail.birth', 'Birth')}</span>
-                        <span className="text-gray-900 dark:text-gray-100 font-medium">
+                      <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-green-50/50 to-emerald-50/30 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/30 dark:border-green-700/30">
+                        <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.birth', 'Birth')}</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {(() => {
                             const parts: string[] = []
                             if (data.nftCoreInfo!.birthYear) {
@@ -436,9 +432,9 @@ export default function StoryDetailPage() {
                     )}
 
                     {data.nftCoreInfo && (data.nftCoreInfo.deathYear || data.nftCoreInfo.deathPlace) && (
-                      <div className="flex items-center gap-6">
-                        <span className="text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium w-12 flex-shrink-0">{t('visualization.nodeDetail.death', 'Death')}</span>
-                        <span className="text-gray-900 dark:text-gray-100 font-medium">
+                      <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-slate-50/30 dark:from-gray-900/20 dark:to-slate-900/10 border border-gray-200/30 dark:border-gray-700/30">
+                        <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.death', 'Death')}</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {(() => {
                             const parts: string[] = []
                             if (data.nftCoreInfo!.deathYear) {
@@ -459,8 +455,8 @@ export default function StoryDetailPage() {
                     )}
 
                     {data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== '' && (
-                      <div className="flex items-start gap-6 flex-wrap sm:flex-nowrap">
-                        <span className="text-xs sm:text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium w-12 flex-shrink-0 pt-0.5">{t('visualization.nodeDetail.story', 'Story')}</span>
+                      <div className="flex items-start gap-8 flex-wrap sm:flex-nowrap p-4 rounded-xl bg-gradient-to-r from-amber-50/50 to-yellow-50/30 dark:from-amber-900/20 dark:to-yellow-900/10 border border-amber-200/30 dark:border-amber-700/30">
+                        <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0 pt-1">{t('visualization.nodeDetail.story', 'Story')}</span>
                         <div className="text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap font-medium flex-1 min-w-0 break-words break-all sm:break-words">
                           {data.nftCoreInfo.story}
                         </div>
@@ -470,8 +466,8 @@ export default function StoryDetailPage() {
                 </div>
               )}
               
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2">
+              <div className="relative flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
                   {t('storyDetail.fullStory', 'Full Story')}
                 </h2>
                 <div className="flex items-center gap-3">
@@ -518,8 +514,11 @@ export default function StoryDetailPage() {
               )}
             </div>
             {data && data.storyMetadata && (
-              <div className="xl:hidden bg-white dark:bg-gray-900 rounded-xl shadow-sm border p-4 space-y-4 card-surface">
-                <h3 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-2">{t('storyDetail.metadata', 'Metadata')}</h3>
+              <div className="xl:hidden bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-2xl shadow-gray-500/5 dark:shadow-gray-900/20 border border-gray-200/70 dark:border-gray-700/50 p-6 space-y-5 card-surface backdrop-blur-xl relative overflow-hidden">
+                {/* Subtle background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-cyan-50/15 dark:from-blue-900/10 dark:via-transparent dark:to-cyan-900/5 pointer-events-none rounded-2xl"></div>
+                
+                <h3 className="relative text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">{t('storyDetail.metadata', 'Metadata')}</h3>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div><dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.tokenId', 'Token ID')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">#{data.tokenId}</dd></div>
                   <div><dt className="text-gray-500 dark:text-gray-400">{t('storyDetail.totalChunks', 'Total Chunks')}</dt><dd className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalChunks}</dd></div>
@@ -584,9 +583,12 @@ export default function StoryDetailPage() {
             )}
           </div>
 
-          <div className="space-y-4 xl:sticky xl:top-20 xl:self-start">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border p-4 card-surface">
-              <h3 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-4 flex items-center justify-between">
+          <div className="space-y-6 xl:sticky xl:top-20 xl:self-start">
+            <div className="bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-2xl shadow-gray-500/5 dark:shadow-gray-900/20 border border-gray-200/70 dark:border-gray-700/50 p-5 card-surface backdrop-blur-xl relative overflow-hidden group hover:shadow-3xl hover:shadow-gray-500/10 dark:hover:shadow-gray-900/30 transition-all duration-300">
+              {/* Subtle background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-transparent to-purple-50/15 dark:from-indigo-900/10 dark:via-transparent dark:to-purple-900/5 pointer-events-none rounded-2xl"></div>
+              
+              <h3 className="relative text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-5 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                 <span>{t('storyDetail.chunkList', 'Chunk List')}</span>
                 {data && data.storyChunks && data.storyChunks.length > 0 && (
                   <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">{data.storyChunks.length}</span>
@@ -633,9 +635,12 @@ export default function StoryDetailPage() {
             </div>
 
             {data && data.storyMetadata && (
-              <div className="hidden xl:block bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4 card-surface">
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-3">{t('storyDetail.metadata', 'Metadata')}</h3>
+              <div className="hidden xl:block bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-2xl shadow-gray-500/5 dark:shadow-gray-900/20 border border-gray-200/70 dark:border-gray-700/50 p-5 space-y-5 card-surface backdrop-blur-xl relative overflow-hidden group hover:shadow-3xl hover:shadow-gray-500/10 dark:hover:shadow-gray-900/30 transition-all duration-300">
+                {/* Subtle background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-cyan-50/15 dark:from-blue-900/10 dark:via-transparent dark:to-cyan-900/5 pointer-events-none rounded-2xl"></div>
+                
+                <div className="relative">
+                  <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-4 bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">{t('storyDetail.metadata', 'Metadata')}</h3>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('storyDetail.tokenId', 'Token ID')}</span><span className="font-mono text-gray-800 dark:text-gray-200">#{data.tokenId}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">{t('storyDetail.totalChunks', 'Total Chunks')}</span><span className="font-mono text-gray-800 dark:text-gray-200">{data.storyMetadata.totalChunks}</span></div>

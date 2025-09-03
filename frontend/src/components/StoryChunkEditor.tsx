@@ -201,15 +201,15 @@ export default function StoryChunkEditor({
   return open ? createPortal(
     <div className="fixed inset-0 z-[1001] flex items-center justify-center p-2 sm:p-4" data-story-editor>
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/70 backdrop-blur-sm">
-          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <div className="relative bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-3xl w-full max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col border border-gray-200/70 dark:border-gray-700/50 backdrop-blur-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/70 dark:border-gray-700/50 bg-gradient-to-r from-blue-50/50 to-purple-50/30 dark:from-blue-900/20 dark:to-purple-900/15 backdrop-blur-sm">
+          <div className="text-lg font-bold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
             {t('storyChunkEditor.title', 'Story Chunk Editor')}
             {isSealed && <Lock className="inline ml-2 text-gray-500 dark:text-gray-400" size={16} />}
           </div>
           <button
             aria-label="close"
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+            className="p-2 rounded-xl hover:bg-white/30 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-all duration-200 hover:scale-105"
             onClick={onClose}
           >
             <X size={20} />
@@ -251,16 +251,16 @@ export default function StoryChunkEditor({
           </div>
         )}
         
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-white/60 dark:bg-transparent">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-white/60 via-blue-50/20 to-purple-50/10 dark:from-transparent dark:via-blue-900/5 dark:to-purple-900/5">
           {(error || localError) && (
-            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/40 rounded p-3 text-red-700 dark:text-red-300 text-sm">
+            <div className="bg-red-50/80 dark:bg-red-500/10 border border-red-200/50 dark:border-red-500/40 rounded-xl p-4 text-red-700 dark:text-red-300 text-sm backdrop-blur-sm">
               {error || localError}
             </div>
           )}
           
           {editingChunkIndex !== null || (editingChunkIndex === null && !isSealed) ? (
-            <div ref={formRef} className="bg-gray-50 dark:bg-gray-800/70 rounded-lg p-4 space-y-3 border border-transparent dark:border-gray-700">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div ref={formRef} className="bg-white/90 dark:bg-gray-800/80 rounded-2xl p-6 space-y-4 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-xl shadow-lg">
+              <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
                 {editingChunkIndex !== null
                   ? t('storyChunkEditor.editChunk', 'Edit Chunk #{{index}}', { index: editingChunkIndex })
                   : t('storyChunkEditor.addChunk', 'Add New Chunk')
@@ -276,7 +276,7 @@ export default function StoryChunkEditor({
                   expectedHash: e.target.value ? computeContentHash(e.target.value) : undefined
                 }))}
                 placeholder={t('storyChunkEditor.contentPlaceholderBytes', 'Enter chunk content (max 1000 bytes, approximately 1000 English characters or ~333 Chinese characters)')}
-                className="w-full h-32 p-3 border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                className="w-full h-32 p-4 border border-gray-300/50 dark:border-gray-600/50 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 bg-white/90 dark:bg-gray-900/90 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 backdrop-blur-sm transition-all duration-200"
                 disabled={submitting}
               />
               
@@ -331,13 +331,13 @@ export default function StoryChunkEditor({
           )}
           
           {sortedChunks.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                 {t('storyChunkEditor.chunks', 'Existing Chunks')}
               </h3>
               
               {sortedChunks.map((chunk) => (
-                <div key={chunk.chunkIndex} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2 bg-white/50 dark:bg-gray-800/70">
+                <div key={chunk.chunkIndex} className="border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-4 space-y-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-md transition-all duration-200">
                   <div className="flex justify-between items-center">
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       #{chunk.chunkIndex}

@@ -100,8 +100,8 @@ export default function VisualizationPage() {
           ))}
         </div>
       ) : null } catch { return null } })()}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">{t('visualization.familyTree')}</h2>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 min-w-0 flex-shrink">{t('visualization.familyTree')}</h2>
         <ModeSwitch mode={mode as any} onChange={m => setMode(m)} labels={{ subgraph: t('visualization.modes.subgraph'), contract: t('visualization.modes.contract') }} />
       </div>
       <StatusBar
