@@ -9,7 +9,9 @@
 ## Incentive Alignment
 1. Contributor adds person (with both parents) -> mining reward
 2. Endorser pays current reward amount to shift endorsement -> cost tracks issuance to stabilize inflationary pressure
-3. NFT holder shares endorsement fee (50% if different from author) -> encourages minting & curation
+3. Fee Distribution:
+   - Pre-NFT: 100% to version creator
+   - Post-NFT: 100% to current NFT holder (auto-follows transfers)
 4. Story completeness (non-monetary) drives perceived historical value.
 
 ## Economic Attack Considerations

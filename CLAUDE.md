@@ -168,3 +168,30 @@ ETHERSCAN_API_KEY=              # Contract verification
 - Synchronized test updates with new features
 - Pre-production auditing required
 - **NEVER include AI identifiers in git commits** (no "Generated with Claude", "Co-Authored-By: Claude", or similar AI references)
+
+**Git Commit Standards (Conventional Commits)**
+Follow the conventional commit format for all git commits:
+
+```
+<type>: <description>
+
+[optional body]
+```
+
+**Commit Types:**
+- `feat`: add a new feature
+- `fix`: bug fix
+- `docs`: documentation only changes
+- `style`: code style (formatting, missing semicolons, etc.)
+- `refactor`: code change that neither fixes a bug nor adds a feature
+- `perf`: performance improvement
+- `test`: add or update tests
+- `chore`: changes to build process, tools, or dependencies
+- `ci`: CI/CD related changes
+- `revert`: revert a previous commit
+
+**Examples:**
+- `feat: add zero-knowledge proof verification`
+- `fix: resolve NFT minting gas limit issue`
+- `docs: update smart contract API documentation`
+- `chore: update dependencies and contract ABI`

@@ -28,12 +28,11 @@ DeepFamily aims to build a universally shared decentralized genealogical infrast
 ## 🎯 Core Features
 
 ### 🔐 Privacy-Preserving Genealogy
-- **ZK Proofs (Planned)**: `IPersonHashVerifier` interface integrated; production verifier & circuits under development
+- **ZK Proofs **: `IPersonHashVerifier` interface integrated; production verifier & circuits under development
 - **Hash Storage**: Only hashes on-chain; raw data stays private off-chain
-- **Layered Permissions**: Planned progressive disclosure patterns
 
 ### 🎨 Person NFTs
-- **Single Mint**: Each version can mint exactly one NFT (scarcity)
+- **Single Mint**: Each version can mint exactly one NFT
 - **On-Chain Core Data**: Name, birth/death years & limited biography metadata
 - **Story Shards**: Up to 100 × 1KB chunks (contract enforced: `MAX_STORY_CHUNKS=100`, `MAX_CHUNK_CONTENT_LENGTH=1000`)
 - **Value Accrual**: More endorsements → higher perceived value / fee flow
@@ -47,12 +46,11 @@ DeepFamily aims to build a universally shared decentralized genealogical infrast
 
 ### 🤝 Staked Endorsement System
 - **Stake to Endorse**: Pay current mining reward (`recentReward`) to endorse a version
-- **Dual Distribution**: 50/50 split between version author & NFT holder if distinct; else 100% to author
+- **Incentive Shift**: Before NFT minted → 100% fee goes to version creator; After NFT minted → 100% goes to current NFT holder (transfers follow ownership)
 - **Reputation Signal**: Endorse count surfaces socially trusted version
 
-### 🗳️ Multi-Version Governance (Planned)
+### 🗳️ Multi-Version Governance
 - **Version Coexistence**: Already supported on-chain
-- **Social Selection**: Market-like endorsement dynamics
 
 ### 📊 High-Performance Visualization (Frontend WIP)
 - Planned: Tree / force-directed / table views (D3)
@@ -292,19 +290,16 @@ MIT License (see [LICENSE](LICENSE) for full text). Excerpt:
 ```
 MIT License
 
-Copyright (c) 2024-2025 DeepFamily
+Copyright (c) 2025 DeepFamily
 ```
-
-Full disclaimer ("AS IS" etc.) intentionally omitted here to reduce duplication—refer to the LICENSE file.
-
 ---
 
 <div align="center">
 
 **🌳 DeepFamily - Connect the Past, Record the Present, Preserve the Future 🌳**
 
-[![GitHub Stars](https://img.shields.io/github/stars/deepfamilylibs/DeepFamily?style=social)](https://github.com/deepfamilylibs/DeepFamily)
-[![GitHub Forks](https://img.shields.io/github/forks/deepfamilylibs/DeepFamily?style=social)](https://github.com/deepfamilylibs/DeepFamily)
+[![GitHub Stars](https://img.shields.io/github/stars/deepfamilylabs/DeepFamily?style=social)](https://github.com/deepfamilylabs/DeepFamily.git)
+[![GitHub Forks](https://img.shields.io/github/forks/deepfamilylabs/DeepFamily?style=social)](https://github.com/deepfamilylabs/DeepFamily.git)
 
 *Building a shared digital family heritage for humanity*
 

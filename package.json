@@ -30,7 +30,7 @@
     "dev:seed": "cross-env ROOT_HASH=0x0 ROOT_VERSION=1 hardhat run scripts/seed-demo.js --network localhost",
     "dev:frontend": "npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173",
     "dev:contract": "run-p dev:deploy dev:seed",
-    "dev:all": "concurrently -k -n node,web -c blue,green \"npm:dev:node\" \"sh -c 'wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run dev:frontend'\""
+    "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run dev:frontend\""
   },
   "keywords": [
     "blockchain",

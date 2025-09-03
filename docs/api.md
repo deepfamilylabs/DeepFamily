@@ -18,7 +18,7 @@ Refer to `tasks/*.js` for full parameter semantics.
 |----------|------|-------|
 | addPerson | tx | Raw add without ZK proof |
 | addPersonZK | tx | Groth16 proof path |
-| endorseVersion | tx | Shifts endorsement (pays token) |
+| endorseVersion | tx | Pays fee: pre-NFT 100% creator, post-NFT 100% current NFT holder |
 | mintPersonNFT | tx | Requires prior endorsement |
 | addStoryChunk | tx | NFT holder only |
 | updateStoryChunk | tx | NFT holder only, not sealed |
@@ -48,4 +48,4 @@ Custom errors (sample):
 - Use limit=0 probes before large pagination loops.
 
 ## Token Integration
-Endorse flow needs ERC20 allowance: user approves DeepFamilyToken for at least `recentReward`.
+Endorse flow needs ERC20 allowance for current `recentReward`. Distribution: all to creator until NFT minted; thereafter all to NFT holder.

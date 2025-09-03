@@ -19,7 +19,7 @@ Core genealogy & versioning + endorsement + NFT mint + story shards.
 
 ### Core Functions
 - `addPerson / addPersonZK` – add new version (ZK variant validates off-chain circuit proof)
-- `endorseVersion` – pay token fee to shift endorsement to specific version
+- `endorseVersion` – pay token fee to endorse; distribution: pre-mint 100% creator, post-mint 100% NFT holder
 - `mintPersonNFT` – mint NFT after endorsing the target version
 - `addStoryChunk / updateStoryChunk / sealStory` – manage biography shards
 - Query suite: `listPersonHashesByFullName`, `listPersonVersions`, `listChildren`, `getVersionDetails`, `getNFTDetails`, `listStoryChunks`, etc.
@@ -34,7 +34,7 @@ Core genealogy & versioning + endorsement + NFT mint + story shards.
 | TokenRewardDistributed | Mining reward emission |
 
 ### Access Control
-- Implicit open submission model; only NFT holder modifies story chunks.
+- Open submission model; only NFT holder modifies story chunks.
 - Endorsement requires DEEP allowance & balance.
 
 ## DeepFamilyToken.sol
