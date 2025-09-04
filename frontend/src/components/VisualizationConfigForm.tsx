@@ -104,7 +104,7 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
       return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-300/60 dark:from-amber-900/40 dark:to-orange-900/30 dark:text-amber-300 dark:border-amber-600/40 shadow-sm backdrop-blur-sm">{statusT ? statusT('visualization.status.badge.checking') : 'Loading'}</span>
     }
     if (contractMessage) {
-      return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-300/60 dark:from-red-900/40 dark:to-rose-900/30 dark:text-red-300 dark:border-red-600/40 shadow-sm backdrop-blur-sm">{statusT ? statusT('visualization.status.badge.error') : 'Error'}</span>
+      return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-300/60 dark:from-red-900/40 dark:to-rose-900/30 dark:text-red-300 dark:border-red-600/40 shadow-sm backdrop-blur-sm">{contractMessage}</span>
     }
     return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-300/60 dark:from-emerald-900/40 dark:to-green-900/30 dark:text-emerald-300 dark:border-emerald-600/40 shadow-sm backdrop-blur-sm">{statusT ? statusT('visualization.status.badge.ok') : 'OK'}</span>
   }
