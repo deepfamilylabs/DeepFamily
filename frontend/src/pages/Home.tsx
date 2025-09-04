@@ -47,7 +47,7 @@ export default function Home() {
               <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Decentralized Family Tree Protocol</span>
             </div>
             
-            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold text-gray-900 dark:text-gray-100 mb-8 leading-tight tracking-tight px-4">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold text-gray-900 dark:text-gray-100 mb-8 leading-tight tracking-tight px-4">
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 {t('home.title')}
               </span>
@@ -97,30 +97,29 @@ export default function Home() {
           
           {/* Tag Strip */}
           <div className="animate-fade-in-up animation-delay-500 mb-16">
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 max-w-6xl mx-auto px-4">
-              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-blue-200/50 dark:border-blue-600/30 backdrop-blur-sm flex-shrink-0">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.protocol')}</span>
+            <div className="flex flex-nowrap items-center justify-center gap-1 sm:gap-4 max-w-6xl mx-auto px-1 sm:px-4">
+              <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-blue-200/50 dark:border-blue-600/30 backdrop-blur-sm flex-shrink-0 min-w-0">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.protocol')}</span>
               </div>
-              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-purple-200/50 dark:border-purple-600/30 backdrop-blur-sm flex-shrink-0">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse animation-delay-200"></div>
-                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.incentive')}</span>
+              <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-purple-200/50 dark:border-purple-600/30 backdrop-blur-sm flex-shrink-0 min-w-0">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-500 rounded-full animate-pulse animation-delay-200"></div>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.incentive')}</span>
               </div>
-              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-indigo-200/50 dark:border-indigo-600/30 backdrop-blur-sm flex-shrink-0">
-                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse animation-delay-400"></div>
-                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.nft')}</span>
+              <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-indigo-200/50 dark:border-indigo-600/30 backdrop-blur-sm flex-shrink-0 min-w-0">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-indigo-500 rounded-full animate-pulse animation-delay-400"></div>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.nft')}</span>
               </div>
-              <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-emerald-200/50 dark:border-emerald-600/30 backdrop-blur-sm flex-shrink-0">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse animation-delay-600"></div>
-                <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.zk')}</span>
+              <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-emerald-200/50 dark:border-emerald-600/30 backdrop-blur-sm flex-shrink-0 min-w-0">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-500 rounded-full animate-pulse animation-delay-600"></div>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.zk')}</span>
               </div>
             </div>
           </div>
-          
           {/* Core Value Proposition */}
           <div className="animate-fade-in-up animation-delay-600 mb-16 sm:mb-20 lg:mb-0">
-            <div className="max-w-4xl mx-auto text-center px-4">
-              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-light text-gray-700 dark:text-gray-300 leading-relaxed">
+            <div className="max-w-4xl mx-auto text-center px-2 sm:px-4">
+              <p className="text-[13px] sm:text-lg md:text-xl lg:text-2xl font-light text-gray-700 dark:text-gray-300 leading-relaxed">
                 {t('home.coreValue.description')}
               </p>
             </div>
@@ -901,9 +900,9 @@ export default function Home() {
                 <div className="flex items-center">
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                  </svg>
-                  {t('home.cta.free')}
-                </div>
+                </svg>
+                {t('home.cta.free')}
+              </div>
                 <div className="flex items-center">
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"/>
