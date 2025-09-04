@@ -40,30 +40,17 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
   }, [labels.tree, labels.dag, labels.force, labels.virtual, measure])
 
   useEffect(() => {
-    const ro = new ResizeObserver(() => { setAnimate(false); measure(); const id = requestAnimationFrame(() => setAnimate(true)); return () => cancelAnimationFrame(id) })
+    const ro = new ResizeObserver(() => { setAnimate(false); measure(); requestAnimationFrame(() => setAnimate(true)) })
     if (containerRef.current) ro.observe(containerRef.current)
     btnRefs.current.forEach(b => b && ro.observe(b))
-    const onResize = () => { setAnimate(false); measure(); const id = requestAnimationFrame(() => setAnimate(true)); }
+    const onResize = () => { setAnimate(false); measure(); requestAnimationFrame(() => setAnimate(true)) }
     window.addEventListener('resize', onResize)
     if ((document as any).fonts?.ready) {
-      ;(document as any).fonts.ready.then(() => { setAnimate(false); measure(); const id = requestAnimationFrame(() => setAnimate(true)); return () => cancelAnimationFrame(id) }).catch(() => {})
+      ;(document as any).fonts.ready.then(() => { setAnimate(false); measure(); requestAnimationFrame(() => setAnimate(true)) }).catch(() => {})
     }
     return () => { ro.disconnect(); window.removeEventListener('resize', onResize) }
   }, [measure])
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, mode: ViewMode) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onChange(mode)
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      e.preventDefault()
-      const currentIdx = order.indexOf(value)
-      const nextIdx = e.key === 'ArrowRight' 
-        ? (currentIdx + 1) % order.length 
-        : (currentIdx - 1 + order.length) % order.length
-      onChange(order[nextIdx])
-    }
-  }, [onChange, value])
 
   return (
     <div
@@ -81,7 +68,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1 px-3 h-full transition-colors duration-150 whitespace-nowrap focus:outline-none ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+          className={`relative z-10 inline-flex items-center justify-center gap-1 px-2 sm:px-3 h-full transition-colors duration-150 whitespace-nowrap focus:outline-none ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
         >
           {m === 'tree' && (
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -125,7 +112,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
               <rect x="14" y="14" width="7" height="6" rx="1"/>
             </svg>
           )}
-          <span>{labels[m]}</span>
+          <span className="hidden sm:inline">{labels[m]}</span>
         </button>
       ))}
     </div>
