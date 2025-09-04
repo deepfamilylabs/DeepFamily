@@ -26,7 +26,7 @@ function buildGraph(root: GraphNode) {
 
 export interface ForceDAGViewHandle { centerOnNode: (id: string) => void }
 
-function ForceDAGViewInner({ root, height = 560 }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
+function ForceDAGViewInner({ root, height = 747 }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
   const { nodesData } = useTreeData() as any
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
@@ -143,9 +143,9 @@ function ForceDAGViewInner({ root, height = 560 }: { root: GraphNode; height?: n
   miniUpdateRef.current = update
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm" style={{ height: 560 }}>
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: 747 }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
-      <ZoomControls className="absolute top-4 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
+      <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
       <svg ref={svgRef}></svg>
     </div>
   )

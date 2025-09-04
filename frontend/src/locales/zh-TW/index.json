@@ -305,8 +305,8 @@
         "other": "其他"
       },
       "birthYearLabel": "出生年",
-      "birthMonthLabel": "出生月",
-      "birthDayLabel": "出生日",
+      "birthMonthLabel": "月",
+      "birthDayLabel": "日",
       "nameInputPlaceholder": "注意：英文名區分大小寫 (如：John Smith)",
       "toggleNo": "否",
       "toggleYes": "是",

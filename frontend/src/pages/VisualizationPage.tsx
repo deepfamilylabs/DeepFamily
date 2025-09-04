@@ -4,7 +4,6 @@ import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client'
 import { SubgraphTree, fetchSubtreeStream } from '../components/Visualization'
 import { useConfig } from '../context/ConfigContext'
 import ModeSwitch from '../components/ModeSwitch'
-import ViewModeSwitch from '../components/ViewModeSwitch'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import VisualizationConfigForm from '../components/VisualizationConfigForm'
 import ViewContainer from '../components/ViewContainer'
@@ -149,39 +148,29 @@ export default function VisualizationPage() {
             })()}
           </div>
           
-          {/* Second Row: Controls and Options */}
-          <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 sm:gap-x-4 overflow-visible">
-            {/* Left: Contract Controls (or empty space for alignment) */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs min-w-0 overflow-visible">
-              {mode === 'contract' && (
-                <>
-                  <div className="flex items-center gap-1.5 flex-shrink-0 overflow-visible">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 select-none font-medium">{t('visualization.ui.traversal')}</span>
-                    <div className="inline-flex rounded-md border border-slate-300 dark:border-slate-600 shadow-sm bg-white dark:bg-slate-800 overflow-visible">
-                      <div className="relative group">
-                        <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-2 py-1 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-md ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
-                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.traversalDFS')}</div>
-                      </div>
-                      <div className="relative group border-l border-slate-300 dark:border-slate-600">
-                        <button type="button" aria-label={t('visualization.ui.traversalBFS')} onClick={() => setTraversal('bfs')} className={`px-2 py-1 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-md ${traversal==='bfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>BFS</button>
-                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.traversalBFS')}</div>
-                      </div>
-                    </div>
+          {/* Second Row: Contract Controls */}
+          {mode === 'contract' && (
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs overflow-visible">
+              <div className="flex items-center gap-1.5 flex-shrink-0 overflow-visible">
+                <span className="text-xs text-slate-600 dark:text-slate-400 select-none font-medium">{t('visualization.ui.traversal')}</span>
+                <div className="inline-flex rounded-md border border-slate-300 dark:border-slate-600 shadow-sm bg-white dark:bg-slate-800 overflow-visible">
+                  <div className="relative group">
+                    <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-2 py-1 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-md ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
+                    <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.traversalDFS')}</div>
                   </div>
-                  <div className="relative group flex items-center gap-1 cursor-pointer select-none flex-shrink-0">
-                    <input type="checkbox" id="includeVersionDetailsToggle" className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
-                    <label htmlFor="includeVersionDetailsToggle" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
-                    <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.includeVersionDetailsDesc')}</div>
+                  <div className="relative group border-l border-slate-300 dark:border-slate-600">
+                    <button type="button" aria-label={t('visualization.ui.traversalBFS')} onClick={() => setTraversal('bfs')} className={`px-2 py-1 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-md ${traversal==='bfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>BFS</button>
+                    <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.traversalBFS')}</div>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
+              <div className="relative group flex items-center gap-1 cursor-pointer select-none flex-shrink-0">
+                <input type="checkbox" id="includeVersionDetailsToggle" className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
+                <label htmlFor="includeVersionDetailsToggle" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
+                <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.includeVersionDetailsDesc')}</div>
+              </div>
             </div>
-            
-            {/* Right: View Mode Switch */}
-            <div className="flex flex-shrink-0">
-              <ViewModeSwitch value={viewMode} onChange={m => setViewMode(m)} labels={{ tree: t('visualization.viewModes.tree'), dag: t('visualization.viewModes.dag'), force: t('visualization.viewModes.force'), virtual: t('visualization.viewModes.virtual') }} />
-            </div>
-          </div>
+          )}
         </div>
       </div>
       <ViewContainer
@@ -190,6 +179,8 @@ export default function VisualizationPage() {
         root={root}
         contractMessage={contractMessage}
         loading={mode === 'contract' ? loadingContract : sgStatus === 'checking'}
+        onViewModeChange={setViewMode}
+        viewModeLabels={{ tree: t('visualization.viewModes.tree'), dag: t('visualization.viewModes.dag'), force: t('visualization.viewModes.force'), virtual: t('visualization.viewModes.virtual') }}
         subgraphBlock={(
           sgStatus === 'checking' ? <LoadingSkeleton /> : sgStatus === 'ok' ? (
             <ApolloProvider client={client}>

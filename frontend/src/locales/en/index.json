@@ -306,8 +306,8 @@
         "other": "Other"
       },
       "birthYearLabel": "Birth Year",
-      "birthMonthLabel": "Birth Month",
-      "birthDayLabel": "Birth Day",
+      "birthMonthLabel": "Month",
+      "birthDayLabel": "Day",
       "nameInputPlaceholder": "Note: English names are case-sensitive (e.g., John Smith)",
       "toggleNo": "No",
       "toggleYes": "Yes",

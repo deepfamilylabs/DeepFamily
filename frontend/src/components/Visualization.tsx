@@ -349,7 +349,7 @@ function flattenTree(root: GraphNode, expanded: Set<string>): FlatRow[] {
   return rows
 }
 
-export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: number; rowHeight?: number }> = ({ root, height = 560, rowHeight = 40 }) => {
+export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: number; rowHeight?: number }> = ({ root, height = 747, rowHeight = 40 }) => {
   const { nodesData } = useTreeData() as any
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([root.personHash + ':' + root.versionIndex]))
   const rows = useMemo(() => flattenTree(root, expanded), [root, expanded])
@@ -412,7 +412,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
   }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
   return (
     <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm overflow-hidden" style={{ height }}>
-      <div className="p-4 h-full">
+      <div className="p-4 pt-16 h-full">
         <VirtualList height={height - 32} itemCount={rows.length} itemSize={rowHeight} width={'100%'}>{Row}</VirtualList>
       </div>
     </div>

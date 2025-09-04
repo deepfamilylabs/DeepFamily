@@ -78,10 +78,10 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   }), [idToPos, measuredWidths, centerOn])
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm" style={{ height: 560 }}>
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: 747 }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
-      <ZoomControls className="absolute top-4 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(svgWidth, 800)} ${Math.max(svgHeight, 560)}`} className="block min-w-full min-h-full select-none">
+      <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
+      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(svgWidth, 800)} ${Math.max(svgHeight, 747)}`} className="block min-w-full min-h-full select-none">
         <g ref={innerRef as any}>
           <g className="stroke-blue-300/70 dark:stroke-blue-500/60" strokeWidth={2} fill="none">
             {positioned.map(pn => (pn.data.children || []).map(child => {

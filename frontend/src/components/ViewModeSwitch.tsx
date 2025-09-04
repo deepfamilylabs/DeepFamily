@@ -55,7 +55,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex h-8 select-none rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm p-0.5 max-w-full"
+      className="relative inline-flex h-10 select-none rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm p-0 max-w-full"
     >
       <div
         className={`absolute rounded-sm bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
@@ -68,7 +68,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1 px-1.5 h-full transition-colors duration-150 focus:outline-none text-[10px] flex-shrink min-w-0 ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+          className={`relative z-10 inline-flex items-center justify-center gap-1 px-1 h-full min-h-[40px] transition-colors duration-150 focus:outline-none text-[10px] flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
         >
           {m === 'tree' && (
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -112,8 +112,8 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
               <rect x="14" y="14" width="7" height="6" rx="1"/>
             </svg>
           )}
-          <span className="hidden lg:inline">{labels[m]}</span>
-          <span className="lg:hidden truncate max-w-[4ch]">{labels[m]}</span>
+          <span className="hidden lg:inline whitespace-nowrap">{labels[m]}</span>
+          <span className="lg:hidden whitespace-nowrap">{labels[m]}</span>
         </button>
       ))}
     </div>
