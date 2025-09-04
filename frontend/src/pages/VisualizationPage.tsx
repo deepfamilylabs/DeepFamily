@@ -88,7 +88,7 @@ export default function VisualizationPage() {
   }, [mode, subgraphUrl, rootHash, rootVersionIndex, t, SUBGRAPH_TIMEOUT_MS, SUBGRAPH_RETRY_ATTEMPTS])
 
   return (
-    <div className="space-y-6 text-gray-900 dark:text-gray-100 bg-gradient-to-br from-slate-50/30 via-transparent to-blue-50/20 dark:from-slate-900/50 dark:via-transparent dark:to-slate-800/30 min-h-screen -mt-8 pt-8 px-6 -mx-6 pb-20 md:pb-6 rounded-t-3xl backdrop-blur-sm">
+    <div className="space-y-6 text-gray-900 dark:text-gray-100 bg-gradient-to-br from-slate-50/30 via-transparent to-blue-50/20 dark:from-slate-900/50 dark:via-transparent dark:to-slate-800/30 min-h-screen pt-8 px-4 pb-24 md:pb-6 rounded-t-3xl backdrop-blur-sm overflow-visible overflow-x-hidden">
       {SHOW_DEBUG && mode === 'contract' && (() => { try { const { errors } = useTreeData(); return errors.length ? (
         <div className="text-xs rounded border border-amber-300 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/30 p-2 space-y-1">
           <div className="font-medium text-amber-700 dark:text-amber-300">Debug Errors ({errors.length})</div>

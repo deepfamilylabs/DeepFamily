@@ -65,31 +65,31 @@ export default function Home() {
           <div className="animate-fade-in-up animation-delay-400 flex flex-wrap items-center justify-center gap-3 sm:gap-6 mb-16 px-4 max-w-4xl mx-auto">
             <NavLink 
               to="/people" 
-              className="group relative inline-flex items-center justify-center px-4 sm:px-10 py-3 sm:py-5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold text-sm sm:text-lg hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-600 dark:hover:from-blue-400 dark:hover:to-purple-500 transform hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-blue-500/25 dark:shadow-blue-500/10 dark:hover:shadow-blue-400/20 overflow-hidden flex-1 min-w-0 text-center"
+              className="group relative inline-flex items-center justify-center px-6 sm:px-10 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold text-xs sm:text-lg hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-600 dark:hover:from-blue-400 dark:hover:to-purple-500 transform hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-blue-500/25 dark:shadow-blue-500/10 dark:hover:shadow-blue-400/20 overflow-hidden flex-1 min-w-0 text-center"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative flex items-center gap-2 sm:gap-3 justify-center">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                <Users className="w-4 h-4 sm:w-6 sm:h-6 flex-shrink-0" />
                 <span className="truncate">{t('home.addPerson')}</span>
               </div>
             </NavLink>
             
             <NavLink 
               to="/visualization" 
-              className="group inline-flex items-center justify-center px-4 sm:px-10 py-3 sm:py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-lg border-2 border-blue-200/80 dark:border-purple-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/80 dark:hover:border-purple-400/80 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-purple-500/20 transition-all duration-300 backdrop-blur-sm flex-1 min-w-0 text-center"
+              className="group inline-flex items-center justify-center px-6 sm:px-10 py-4 sm:py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-lg border-2 border-blue-200/80 dark:border-purple-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/80 dark:hover:border-purple-400/80 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-purple-500/20 transition-all duration-300 backdrop-blur-sm flex-1 min-w-0 text-center"
             >
               <div className="flex items-center gap-2 sm:gap-3 justify-center">
-                <Network className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                <Network className="w-4 h-4 sm:w-6 sm:h-6 flex-shrink-0" />
                 <span className="truncate">{t('home.exploreVisualization')}</span>
               </div>
             </NavLink>
 
             <NavLink 
               to="/search" 
-              className="group inline-flex items-center justify-center px-4 sm:px-10 py-3 sm:py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-lg border-2 border-green-200/80 dark:border-green-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-green-400/80 dark:hover:border-green-400/80 hover:shadow-xl hover:shadow-green-500/10 dark:hover:shadow-green-500/20 transition-all duration-300 backdrop-blur-sm flex-1 min-w-0 text-center"
+              className="group inline-flex items-center justify-center px-6 sm:px-10 py-4 sm:py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-lg border-2 border-green-200/80 dark:border-green-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-green-400/80 dark:hover:border-green-400/80 hover:shadow-xl hover:shadow-green-500/10 dark:hover:shadow-green-500/20 transition-all duration-300 backdrop-blur-sm flex-1 min-w-0 text-center"
             >
               <div className="flex items-center gap-2 sm:gap-3 justify-center">
-                <Award className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                <Award className="w-4 h-4 sm:w-6 sm:h-6 flex-shrink-0" />
                 <span className="truncate">{t('home.participate')}</span>
               </div>
             </NavLink>
