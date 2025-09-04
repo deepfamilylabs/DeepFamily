@@ -293,9 +293,31 @@
       "unknown": "未知",
       "none": "无"
     },
+    "storyChunksQuery": {
+      "title": "故事分片查询",
+      "tokenId": "Token ID",
+      "placeholder": "请输入NFT Token ID",
+      "chunkIndex": "分片索引",
+      "chunkHash": "分片哈希",
+      "content": "内容",
+      "timestamp": "时间戳",
+      "lastEditor": "最后编辑者",
+      "contentPreview": "内容预览",
+      "totalChunks": "总分片数"
+    },
+    "childrenQuery": {
+      "title": "子女查询",
+      "parentHash": "父母哈希",
+      "parentVersion": "父母版本",
+      "parentHashPlaceholder": "0x1234...abcd (64位十六进制)",
+      "parentVersionPlaceholder": "请输入父母版本索引",
+      "childHash": "子女哈希",
+      "childVersion": "子女版本",
+      "totalChildren": "总子女数"
+    },
     "hashCalculator": {
       "title": "本地计算人物哈希",
-      "tip": "💡 提示：使用下面的工具计算人物哈希，然后复制到上方的查询中使用",
+      "tip": "💡 提示：使用下面的工具计算人物哈希，然后复制到下方的查询中使用",
       "name": "全名",
       "isBirthBC": "公元前",
       "birthYear": "出生年",

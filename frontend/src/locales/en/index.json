@@ -77,6 +77,7 @@
       },
       "advantages": {
         "title": "Workflow",
+        "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
         "step1Desc": "If both parents exist → receive mining rewards",
         "step2": "Community Endorsement",
@@ -85,6 +86,8 @@
         "step3Desc": "Endorsers can mint NFTs for corresponding versions",
         "step4": "Write Story Shards",
         "step4Desc": "NFT holders write/append person story fragments",
+        "step5": "Story Sealing",
+        "step5Desc": "Seal stories to form immutable on-chain historical records",
         "conclusion": "Value-Driven Collaborative Network",
         "conclusionDesc": "Through economic incentive mechanisms, achieving natural accumulation and value discovery of high-quality genealogy data"
       }
@@ -290,9 +293,31 @@
       "unknown": "Unknown",
       "none": "None"
     },
+    "storyChunksQuery": {
+      "title": "Story Chunks Query",
+      "tokenId": "Token ID",
+      "placeholder": "Enter NFT Token ID",
+      "chunkIndex": "Chunk Index",
+      "chunkHash": "Chunk Hash", 
+      "content": "Content",
+      "timestamp": "Timestamp",
+      "lastEditor": "Last Editor",
+      "contentPreview": "Content Preview",
+      "totalChunks": "Total Chunks"
+    },
+    "childrenQuery": {
+      "title": "Children Query",
+      "parentHash": "Parent Hash",
+      "parentVersion": "Parent Version",
+      "parentHashPlaceholder": "0x1234...abcd (64-character hexadecimal)",
+      "parentVersionPlaceholder": "Enter parent version index",
+      "childHash": "Child Hash",
+      "childVersion": "Child Version",
+      "totalChildren": "Total Children"
+    },
     "hashCalculator": {
       "title": "Calculate personHash Locally",
-      "tip": "💡 Tip: Use the tool below to calculate person hash, then copy it to use in the queries above",
+      "tip": "💡 Tip: Use the tool below to calculate person hash, then copy it to use in the queries below",
       "name": "Full Name",
       "isBirthBC": "Is BC",
       "birthYear": "Birth Year",
