@@ -47,7 +47,7 @@ export default function Home() {
               <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Decentralized Family Tree Protocol</span>
             </div>
             
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-gray-900 dark:text-gray-100 mb-8 leading-tight tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold text-gray-900 dark:text-gray-100 mb-8 leading-tight tracking-tight px-4">
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 {t('home.title')}
               </span>
@@ -56,49 +56,48 @@ export default function Home() {
           
           {/* Enhanced Subtitle */}
           <div className="animate-fade-in-up animation-delay-200">
-            <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 dark:text-gray-400 max-w-5xl mx-auto mb-12 leading-relaxed font-light">
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-gray-600 dark:text-gray-400 max-w-5xl mx-auto mb-12 leading-relaxed font-light px-4">
               {t('home.subtitle')}
             </p>
           </div>
           
           {/* Enhanced CTA Buttons */}
-          <div className="animate-fade-in-up animation-delay-400 flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
+          <div className="animate-fade-in-up animation-delay-400 flex flex-wrap items-center justify-center gap-3 sm:gap-6 mb-16 px-4 max-w-4xl mx-auto">
             <NavLink 
               to="/people" 
-              className="group relative inline-flex items-center px-10 py-5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold text-lg hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-600 dark:hover:from-blue-400 dark:hover:to-purple-500 transform hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-blue-500/25 dark:shadow-blue-500/10 dark:hover:shadow-blue-400/20 overflow-hidden"
+              className="group relative inline-flex items-center justify-center px-4 sm:px-10 py-3 sm:py-5 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold text-sm sm:text-lg hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-600 dark:hover:from-blue-400 dark:hover:to-purple-500 transform hover:scale-105 transition-all duration-300 shadow-2xl hover:shadow-blue-500/25 dark:shadow-blue-500/10 dark:hover:shadow-blue-400/20 overflow-hidden flex-1 min-w-0 text-center"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative flex items-center gap-3">
-                <Users className="w-6 h-6" />
-                {t('home.addPerson')}
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              <div className="relative flex items-center gap-2 sm:gap-3 justify-center">
+                <Users className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                <span className="truncate">{t('home.addPerson')}</span>
               </div>
             </NavLink>
             
             <NavLink 
               to="/visualization" 
-              className="group inline-flex items-center px-10 py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-lg border-2 border-blue-200/80 dark:border-purple-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/80 dark:hover:border-purple-400/80 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-purple-500/20 transition-all duration-300 backdrop-blur-sm"
+              className="group inline-flex items-center justify-center px-4 sm:px-10 py-3 sm:py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-lg border-2 border-blue-200/80 dark:border-purple-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-blue-400/80 dark:hover:border-purple-400/80 hover:shadow-xl hover:shadow-blue-500/10 dark:hover:shadow-purple-500/20 transition-all duration-300 backdrop-blur-sm flex-1 min-w-0 text-center"
             >
-              <div className="flex items-center gap-3">
-                <Network className="w-6 h-6" />
-                {t('home.exploreVisualization')}
+              <div className="flex items-center gap-2 sm:gap-3 justify-center">
+                <Network className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                <span className="truncate">{t('home.exploreVisualization')}</span>
               </div>
             </NavLink>
 
             <NavLink 
               to="/search" 
-              className="group inline-flex items-center px-10 py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-lg border-2 border-green-200/80 dark:border-green-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-green-400/80 dark:hover:border-green-400/80 hover:shadow-xl hover:shadow-green-500/10 dark:hover:shadow-green-500/20 transition-all duration-300 backdrop-blur-sm"
+              className="group inline-flex items-center justify-center px-4 sm:px-10 py-3 sm:py-5 rounded-2xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-lg border-2 border-green-200/80 dark:border-green-400/60 hover:bg-white dark:hover:bg-slate-800 hover:border-green-400/80 dark:hover:border-green-400/80 hover:shadow-xl hover:shadow-green-500/10 dark:hover:shadow-green-500/20 transition-all duration-300 backdrop-blur-sm flex-1 min-w-0 text-center"
             >
-              <div className="flex items-center gap-3">
-                <Award className="w-6 h-6" />
-                {t('home.participate')}
+              <div className="flex items-center gap-2 sm:gap-3 justify-center">
+                <Award className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                <span className="truncate">{t('home.participate')}</span>
               </div>
             </NavLink>
           </div>
           
           {/* Tag Strip */}
           <div className="animate-fade-in-up animation-delay-500 mb-16">
-            <div className="flex items-center justify-center gap-2 sm:gap-4 max-w-6xl mx-auto overflow-x-auto scrollbar-hide">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 max-w-6xl mx-auto px-4">
               <div className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-blue-200/50 dark:border-blue-600/30 backdrop-blur-sm flex-shrink-0">
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                 <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{t('home.tagStrip.protocol')}</span>
@@ -120,8 +119,8 @@ export default function Home() {
           
           {/* Core Value Proposition */}
           <div className="animate-fade-in-up animation-delay-600 mb-16 sm:mb-20 lg:mb-0">
-            <div className="max-w-4xl mx-auto text-center">
-              <p className="text-2xl md:text-3xl font-light text-gray-700 dark:text-gray-300 leading-relaxed">
+            <div className="max-w-4xl mx-auto text-center px-4">
+              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-light text-gray-700 dark:text-gray-300 leading-relaxed">
                 {t('home.coreValue.description')}
               </p>
             </div>
@@ -863,31 +862,30 @@ export default function Home() {
       </section>
 
       {/* Call to Action */}
-      <section className="pt-20 pb-24 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-650 dark:via-indigo-650 dark:to-purple-650 text-white" style={{width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginBottom: '-5rem'}}>
+      <section className="pt-20 pb-24 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-650 dark:via-indigo-650 dark:to-purple-650 text-white overflow-x-hidden" style={{width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginBottom: '-5rem'}}>
         <PageContainer className="text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 px-4">
             {t('home.cta.title')}
           </h2>
-          <p className="text-xl text-blue-100 dark:text-blue-200 mb-8 leading-relaxed">
+          <p className="text-lg sm:text-xl text-blue-100 dark:text-blue-200 mb-8 leading-relaxed px-4">
             {t('home.cta.subtitle')}
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-12 px-4 max-w-md mx-auto">
             <NavLink 
               to="/visualization" 
-              className="inline-flex items-center px-8 py-4 rounded-xl bg-white dark:bg-gray-50 text-blue-600 font-semibold text-lg hover:bg-gray-100 dark:hover:bg-white transition-all duration-200 shadow-xl hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600 dark:focus-visible:ring-offset-blue-700"
+              className="inline-flex items-center justify-center px-4 sm:px-8 py-3 sm:py-4 rounded-xl bg-white dark:bg-gray-50 text-blue-600 font-semibold text-sm sm:text-lg hover:bg-gray-100 dark:hover:bg-white transition-all duration-200 shadow-xl hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600 dark:focus-visible:ring-offset-blue-700 flex-1 min-w-0 text-center"
             >
-              {t('home.cta.experience')}
-              <ArrowRight className="ml-2 w-5 h-5" />
+              <span className="truncate">{t('home.cta.experience')}</span>
             </NavLink>
             <NavLink 
               to="/search" 
-              className="inline-flex items-center px-8 py-4 rounded-xl bg-blue-600 dark:bg-white/5 text-white font-semibold text-lg border-2 border-white/90 dark:border-white/70 hover:bg-blue-700 dark:hover:bg-white/15 hover:text-white active:scale-[0.97] transition-all duration-200 shadow-inner/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600 dark:focus-visible:ring-offset-blue-700 backdrop-blur-sm"
+              className="inline-flex items-center justify-center px-4 sm:px-8 py-3 sm:py-4 rounded-xl bg-blue-600 dark:bg-white/5 text-white font-semibold text-sm sm:text-lg border-2 border-white/90 dark:border-white/70 hover:bg-blue-700 dark:hover:bg-white/15 hover:text-white active:scale-[0.97] transition-all duration-200 shadow-inner/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-600 dark:focus-visible:ring-offset-blue-700 backdrop-blur-sm flex-1 min-w-0 text-center"
             >
-              {t('home.cta.search', 'Search Family')}
+              <span className="truncate">{t('home.cta.search', 'Search Family')}</span>
             </NavLink>
           </div>
-          <div className="border-t border-white/20 pt-8">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+          <div className="border-t border-white/20 pt-8 px-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
               <a 
                 href="https://github.com/deepfamilylabs/DeepFamily.git"
                 target="_blank" 
@@ -899,7 +897,7 @@ export default function Home() {
                 </svg>
                 {t('home.cta.opensource')}
               </a>
-              <div className="flex items-center gap-4 text-sm text-white/60">
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-sm text-white/60">
                 <div className="flex items-center">
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
