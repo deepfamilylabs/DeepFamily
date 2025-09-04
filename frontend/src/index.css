@@ -203,6 +203,24 @@ html { scrollbar-gutter: stable; }
 @media (max-width: 767px) {
   body {
     overflow-x: hidden;
+    /* Ensure consistent viewport height */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* Prevent bottom navigation from disappearing during scroll */
+  nav.fixed.bottom-0 {
+    position: fixed !important;
+    bottom: 0 !important;
+    z-index: 9999 !important;
+    /* Ensure it stays above visualization content */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    /* Force hardware acceleration for better performance */
+    will-change: transform;
+    /* Prevent iOS Safari from hiding the navigation */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 }
 

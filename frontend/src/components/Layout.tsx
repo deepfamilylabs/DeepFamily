@@ -16,7 +16,7 @@ export default function Layout() {
   return (
     <div className="bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900" style={{ minHeight: '100vh' }}>
       <SiteHeader />
-      <main className="pt-10 pb-16">
+      <main className="pt-10 pb-16 md:pb-6">
         <PageContainer>
           <Outlet />
         </PageContainer>
