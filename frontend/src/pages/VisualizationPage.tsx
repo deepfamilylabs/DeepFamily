@@ -99,9 +99,13 @@ export default function VisualizationPage() {
           ))}
         </div>
       ) : null } catch { return null } })()}
-      <div className="flex items-center justify-between flex-wrap gap-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/20 dark:shadow-slate-900/30">
-        <h2 className="text-2xl font-bold text-transparent bg-gradient-to-r from-slate-900 via-blue-700 to-purple-700 dark:from-slate-100 dark:via-blue-300 dark:to-purple-300 bg-clip-text min-w-0 flex-shrink">{t('visualization.familyTree')}</h2>
-        <ModeSwitch mode={mode as any} onChange={m => setMode(m)} labels={{ subgraph: t('visualization.modes.subgraph'), contract: t('visualization.modes.contract') }} />
+      <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/20 dark:shadow-slate-900/30">
+        <div className="flex flex-row items-center justify-between gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-transparent bg-gradient-to-r from-slate-900 via-blue-700 to-purple-700 dark:from-slate-100 dark:via-blue-300 dark:to-purple-300 bg-clip-text flex-shrink-0">{t('visualization.familyTree')}</h2>
+          <div className="flex-shrink-0">
+            <ModeSwitch mode={mode as any} onChange={m => setMode(m)} labels={{ subgraph: t('visualization.modes.subgraph'), contract: t('visualization.modes.contract') }} />
+          </div>
+        </div>
       </div>
       <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-200/50 dark:border-slate-700/30 shadow-lg overflow-hidden">
         <VisualizationConfigForm 
@@ -116,50 +120,64 @@ export default function VisualizationPage() {
           t={t as any}
         />
       </div>
-      <div className="flex items-center justify-between flex-wrap gap-4 bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/30 shadow-lg">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('visualization.ui.visualizationView')}</span>
-          {mode === 'contract' && (() => {
-            const createdDisplay = progress ? progress.created : (loadingContract ? '…' : 0)
-            const depthDisplay = progress ? progress.depth : (loadingContract ? '…' : 0)
-            return (
-              <span className="text-xs px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 backdrop-blur-sm shadow-sm">
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{t('visualization.ui.nodesLabelFull')}</span>
-                  <span className="font-mono tabular-nums text-blue-800 dark:text-blue-100 w-[6ch] text-right font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
+      <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/30 shadow-lg overflow-visible">
+        <div className="space-y-4 overflow-visible">
+          {/* First Row: Title and Stats */}
+          <div className="flex flex-row items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex-shrink-0">{t('visualization.ui.visualizationView')}</span>
+            {mode === 'contract' && (() => {
+              const createdDisplay = progress ? progress.created : (loadingContract ? '…' : 0)
+              const depthDisplay = progress ? progress.depth : (loadingContract ? '…' : 0)
+              return (
+                <span className="text-xs px-2 py-1.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-2 backdrop-blur-sm shadow-sm flex-shrink-0">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">{t('visualization.ui.nodesLabelFull')}</span>
+                    <span className="font-mono tabular-nums text-blue-800 dark:text-blue-100 w-[5ch] text-right font-bold min-w-[5ch]" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
+                  </span>
+                  <span className="h-3 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">{t('visualization.ui.depthLabelFull')}</span>
+                    <span className="font-mono tabular-nums text-blue-800 dark:text-blue-100 w-[3ch] text-right font-bold min-w-[3ch]" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
+                  </span>
                 </span>
-                <span className="h-3 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">{t('visualization.ui.depthLabelFull')}</span>
-                  <span className="font-mono tabular-nums text-blue-800 dark:text-blue-100 w-[4ch] text-right font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
-                </span>
-              </span>
-            )
-          })()}
-          {mode === 'contract' && (
-            <div className="flex items-center gap-6 text-xs flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-600 dark:text-slate-300 select-none font-semibold">{t('visualization.ui.traversal')}</span>
-                <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 shadow-md relative bg-white dark:bg-slate-800 backdrop-blur-sm">
-                  <div className="relative group">
-                    <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:focus-visible:ring-indigo-400/60 font-semibold rounded-l-lg ${traversal==='dfs' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/50'}`}>DFS</button>
-                    <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 dark:bg-slate-950 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-50 shadow-xl backdrop-blur-sm border border-slate-700">{t('visualization.ui.traversalDFS')}</div>
+              )
+            })()}
+          </div>
+          
+          {/* Second Row: Controls and Options */}
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 overflow-visible">
+            {/* Left: Contract Controls (or empty space for alignment) */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs min-w-0 overflow-visible">
+              {mode === 'contract' && (
+                <>
+                  <div className="flex items-center gap-2 flex-shrink-0 overflow-visible">
+                    <span className="text-slate-600 dark:text-slate-300 select-none font-semibold">{t('visualization.ui.traversal')}</span>
+                    <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 shadow-md relative bg-white dark:bg-slate-800 backdrop-blur-sm overflow-visible">
+                      <div className="relative group">
+                        <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:focus-visible:ring-indigo-400/60 font-semibold rounded-l-lg ${traversal==='dfs' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/50'}`}>DFS</button>
+                        <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900/90 dark:bg-slate-950/90 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-[9999] shadow-xl backdrop-blur-md border border-slate-700">{t('visualization.ui.traversalDFS')}</div>
+                      </div>
+                      <div className="relative group border-l border-slate-300 dark:border-slate-600">
+                        <button type="button" aria-label={t('visualization.ui.traversalBFS')} onClick={() => setTraversal('bfs')} className={`px-3 py-1.5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:focus-visible:ring-indigo-400/60 font-semibold rounded-r-lg ${traversal==='bfs' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/50'}`}>BFS</button>
+                        <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900/90 dark:bg-slate-950/90 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-[9999] shadow-xl backdrop-blur-md border border-slate-700">{t('visualization.ui.traversalBFS')}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="relative group border-l border-slate-300 dark:border-slate-600">
-                    <button type="button" aria-label={t('visualization.ui.traversalBFS')} onClick={() => setTraversal('bfs')} className={`px-3 py-1.5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:focus-visible:ring-indigo-400/60 font-semibold rounded-r-lg ${traversal==='bfs' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/50'}`}>BFS</button>
-                    <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 dark:bg-slate-950 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-50 shadow-xl backdrop-blur-sm border border-slate-700">{t('visualization.ui.traversalBFS')}</div>
+                  <div className="relative group flex items-center gap-1 cursor-pointer select-none flex-shrink-0">
+                    <input type="checkbox" id="includeVersionDetailsToggle" className="rounded-md border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400 shadow-sm" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
+                    <label htmlFor="includeVersionDetailsToggle" className="text-slate-600 dark:text-slate-300 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
+                    <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900/90 dark:bg-slate-950/90 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-xl backdrop-blur-md border border-slate-700 z-[9999]">{t('visualization.ui.includeVersionDetailsDesc')}</div>
                   </div>
-                </div>
-              </div>
-              <div className="relative group flex items-center gap-1 cursor-pointer select-none">
-                <input type="checkbox" id="includeVersionDetailsToggle" className="rounded-md border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400 shadow-sm" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
-                <label htmlFor="includeVersionDetailsToggle" className="text-slate-600 dark:text-slate-300 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
-                <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 dark:bg-slate-950 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-xl backdrop-blur-sm border border-slate-700 z-10">{t('visualization.ui.includeVersionDetailsDesc')}</div>
-              </div>
+                </>
+              )}
             </div>
-          )}
+            
+            {/* Right: View Mode Switch */}
+            <div className="flex flex-shrink-0">
+              <ViewModeSwitch value={viewMode} onChange={m => setViewMode(m)} labels={{ tree: t('visualization.viewModes.tree'), dag: t('visualization.viewModes.dag'), force: t('visualization.viewModes.force'), virtual: t('visualization.viewModes.virtual') }} />
+            </div>
+          </div>
         </div>
-        <ViewModeSwitch value={viewMode} onChange={m => setViewMode(m)} labels={{ tree: t('visualization.viewModes.tree'), dag: t('visualization.viewModes.dag'), force: t('visualization.viewModes.force'), virtual: t('visualization.viewModes.virtual') }} />
       </div>
       <ViewContainer
         mode={mode}

@@ -111,46 +111,52 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
 
   return (
     <div className="text-sm text-slate-600 dark:text-slate-300 p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <span className="text-lg font-bold text-transparent bg-gradient-to-r from-slate-800 via-blue-600 to-purple-600 dark:from-slate-200 dark:via-blue-400 dark:to-purple-400 bg-clip-text">
-          {mode === 'subgraph' ? t('visualization.ui.subgraphModeConfig') : t('visualization.ui.contractModeConfig')}
-        </span>
-        
-        {/* Status Badge */}
-        {getStatusBadge()}
-        
-        {/* Refresh Button */}
-        {onRefresh && (
-          <button
-            onClick={onRefresh}
-            className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0"
-            disabled={loading}
-            title={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
-          >
-            <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-            </svg>
-          </button>
-        )}
-        
-        {/* Spacer */}
-        <div className="flex-1"></div>
-        
-        {/* Edit/Save/Cancel Buttons */}
-        {editing ? (
-          <div className="flex gap-2">
-            <button
-              onClick={applyConfigChanges}
-              disabled={!hasDiff}
-              className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-semibold ${hasDiff ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md hover:shadow-lg' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-            >{t('settings.ui.save')}</button>
-            <button onClick={cancel} className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('settings.ui.cancel')}</button>
+      {/* Mobile-responsive header layout */}
+      <div className="mb-6">
+        {/* Header with title and edit buttons - always on same row */}
+        <div className="flex items-start justify-between gap-4 mb-4">
+          {/* Left side: Title */}
+          <div className="min-w-0 flex-1">
+            <span className="text-lg font-bold text-transparent bg-gradient-to-r from-slate-800 via-blue-600 to-purple-600 dark:from-slate-200 dark:via-blue-400 dark:to-purple-400 bg-clip-text">
+              {mode === 'subgraph' ? t('visualization.ui.subgraphModeConfig') : t('visualization.ui.contractModeConfig')}
+            </span>
           </div>
-        ) : (
-          <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('settings.ui.edit')}</button>
-        )}
+          
+          {/* Right side: Edit/Save/Cancel Buttons - always in top right */}
+          <div className="flex-shrink-0">
+            {editing ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={applyConfigChanges}
+                  disabled={!hasDiff}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-semibold ${hasDiff ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md hover:shadow-lg' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+                >{t('settings.ui.save')}</button>
+                <button onClick={cancel} className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('settings.ui.cancel')}</button>
+              </div>
+            ) : (
+              <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('settings.ui.edit')}</button>
+            )}
+          </div>
+        </div>
+        
+        {/* Status Badge and Refresh Button Row */}
+        <div className="flex items-center gap-3">
+          {getStatusBadge()}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0"
+              disabled={loading}
+              title={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
+            >
+              <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {editing ? (

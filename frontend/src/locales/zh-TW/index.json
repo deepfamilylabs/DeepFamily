@@ -365,7 +365,7 @@
       "traversalBFS": "BFS 廣度優先：按層展開更均衡",
       "traversal": "遍歷方式",
       "traversalDesc": "DFS 深度優先(快看到深層) / BFS 廣度優先(按層展開)",
-      "includeVersionDetails": "載入版本詳情",
+      "includeVersionDetails": "載入詳情",
       "includeVersionDetailsDesc": "僅影響下次重新整理時是否批次載入版本詳情（重新整理時鎖定快照）。",
       "nodesLabelFull": "節點",
       "depthLabelFull": "深度",

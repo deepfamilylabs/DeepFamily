@@ -369,7 +369,7 @@
       "traversalBFS": "BFS 广度优先：按层级展开，层结构更直观",
       "traversal": "遍历方式",
       "traversalDesc": "DFS 深度优先(快看到深层) / BFS 广度优先(按层展开)",
-      "includeVersionDetails": "加载版本详情",
+      "includeVersionDetails": "加载详情",
       "includeVersionDetailsDesc": "仅影响下一次刷新时是否批量加载版本详情（刷新时锁定快照）。",
       "progressSummary": "节点 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "节点",

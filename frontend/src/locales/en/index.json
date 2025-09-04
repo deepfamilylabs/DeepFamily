@@ -366,7 +366,7 @@
       "traversalBFS": "BFS - Breadth-First (level order)",
       "traversal": "Traversal Mode",
       "traversalDesc": "DFS depth-first (faster deep nodes) / BFS breadth-first (level-wise)",
-      "includeVersionDetails": "Load Version Details",
+      "includeVersionDetails": "Load Details",
       "includeVersionDetailsDesc": "Affects whether version detail batches are loaded on the next refresh (snapshot taken at refresh).",
       "nodesLabelFull": "Nodes",
       "depthLabelFull": "Depth",
