@@ -256,13 +256,13 @@
     "queryFailed": "Query failed",
     "totalResults": "Total results",
     "nameQuery": {
-      "title": "Query by Full Name (Paginated)",
+      "title": "Query by Full Name",
       "fullName": "Full Name",
       "pageSize": "Page Size (≤100)",
       "placeholder": "e.g., Confucius"
     },
     "endorsementQuery": {
-      "title": "Paginated Endorsement Statistics Query",
+      "title": "Endorsement Statistics Query",
       "personHash": "Person Hash",
       "placeholder": "0x1234...abcd (64-character hexadecimal)",
       "version": "Version",
@@ -270,12 +270,12 @@
       "tokenId": "Token ID"
     },
     "uriQuery": {
-      "title": "Paginated Token URI History Query",
+      "title": "Token URI History Query",
       "tokenId": "Token ID",
       "placeholder": "Enter Token ID"
     },
     "versionsQuery": {
-      "title": "Paginated Person Versions Query",
+      "title": "Person Versions Query",
       "personHash": "Person Hash",
       "placeholder": "0x1234...abcd (64-character hexadecimal)",
       "versionIndex": "Version Index",

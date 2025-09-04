@@ -259,13 +259,13 @@
     "queryFailed": "查询失败",
     "totalResults": "结果总数",
     "nameQuery": {
-      "title": "按全名分页查询",
+      "title": "按全名查询",
       "fullName": "全名",
       "pageSize": "每页数量(≤100)",
       "placeholder": "如：Confucius"
     },
     "endorsementQuery": {
-      "title": "背书统计分页查询",
+      "title": "背书统计查询",
       "personHash": "人物哈希",
       "placeholder": "0x1234...abcd (64位十六进制)",
       "version": "版本",
@@ -273,12 +273,12 @@
       "tokenId": "Token ID"
     },
     "uriQuery": {
-      "title": "Token URI历史分页查询",
+      "title": "Token历史链接查询",
       "tokenId": "Token ID",
       "placeholder": "请输入Token ID"
     },
     "versionsQuery": {
-      "title": "人物版本分页查询",
+      "title": "人物版本查询",
       "personHash": "人物哈希",
       "placeholder": "0x1234...abcd (64位十六进制)",
       "versionIndex": "版本索引",

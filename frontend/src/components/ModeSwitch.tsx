@@ -64,7 +64,7 @@ export default function ModeSwitch({ mode, onChange, labels, disabled }: ModeSwi
       style={{ lineHeight: '1' }}
     >
       <div
-        className={`absolute rounded-md bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
+        className={`absolute rounded-lg bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
         style={{ top: 4, bottom: 4, left: indicator.left + 4, width: indicator.width - 8 }}
       />
       <button

@@ -58,7 +58,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
       className="relative inline-flex h-10 select-none rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm p-0 max-w-full"
     >
       <div
-        className={`absolute rounded-sm bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
+        className={`absolute rounded-md bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
         style={{ top: 2, bottom: 2, left: indicator.left + 2, width: indicator.width - 4 }}
       />
       {order.map((m, idx) => (

@@ -255,13 +255,13 @@
     "queryFailed": "查詢失敗",
     "totalResults": "結果總數",
     "nameQuery": {
-      "title": "按全名分頁查詢",
+      "title": "按全名查詢",
       "fullName": "全名",
       "pageSize": "每頁數量(≤100)",
       "placeholder": "如：Confucius"
     },
     "endorsementQuery": {
-      "title": "背書統計分頁查詢",
+      "title": "背書統計查詢",
       "personHash": "人物哈希",
       "placeholder": "0x1234...abcd (64位十六進制)",
       "version": "版本",
@@ -269,12 +269,12 @@
       "tokenId": "Token ID"
     },
     "uriQuery": {
-      "title": "Token URI歷史分頁查詢",
+      "title": "Token歷史鏈接查詢",
       "tokenId": "Token ID",
       "placeholder": "請輸入Token ID"
     },
     "versionsQuery": {
-      "title": "人物版本分頁查詢",
+      "title": "人物版本查詢",
       "personHash": "人物哈希",
       "placeholder": "0x1234...abcd (64位十六進制)",
       "versionIndex": "版本索引",

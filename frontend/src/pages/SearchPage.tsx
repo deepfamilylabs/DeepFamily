@@ -338,24 +338,24 @@ export default function SearchPage() {
       {/* Name Query Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-blue-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('name')}>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('search.nameQuery.title')}</h3>
-          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('name') }} aria-expanded={openSections.name}>{openSections.name ? '-' : '+'}</button>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.nameQuery.title')}</h3>
+          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('name') }} aria-expanded={openSections.name}>{openSections.name ? '-' : '+'}</button>
         </div>
         {openSections.name && (
-          <div className="p-3 space-y-3">
+          <div className="p-2 space-y-2">
         <form onSubmit={hs1((d) => onQuery(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.fullName')}</label>
-            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.nameQuery.placeholder')}
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.fullName')}</label>
+            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.nameQuery.placeholder')}
               {...reg1('fullName')} />
             <FieldError message={e1.fullName?.message as any} />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg1('pageSize', { valueAsNumber: true })} />
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
+            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg1('pageSize', { valueAsNumber: true })} />
             <FieldError message={e1.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-6">
+          <div className="flex gap-2 self-start mt-1">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled={loading}>{t('search.query')}</button>
             <button type="button" onClick={onResetQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -363,9 +363,9 @@ export default function SearchPage() {
         <div className="text-xs text-gray-600 dark:text-gray-400">{t('search.totalResults')}: {total}</div>
         <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
           {rows.length === 0 ? (
-            <div className="p-3 text-sm text-gray-500 dark:text-gray-400">{t('search.noData')}</div>
+            <div className="p-2 text-sm text-gray-500 dark:text-gray-400">{t('search.noData')}</div>
           ) : rows.map((h, i) => (
-            <div key={i} className="p-3 flex items-center justify-between gap-2">
+            <div key={i} className="p-2 flex items-center justify-between gap-2">
               <span className="font-mono text-sm break-all text-gray-800 dark:text-gray-200">{h}</span>
               <button
                 className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -407,24 +407,24 @@ export default function SearchPage() {
       {/* Endorsement Stats Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-green-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('endorsement')}>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('search.endorsementQuery.title')}</h3>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.endorsementQuery.title')}</h3>
           <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('endorsement') }} aria-expanded={openSections.endorsement}>{openSections.endorsement ? '-' : '+'}</button>
         </div>
         {openSections.endorsement && (
-          <div className="p-3 space-y-3">
+          <div className="p-2 space-y-2">
         <form onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.endorsementQuery.personHash')}</label>
-            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.endorsementQuery.placeholder')}
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.endorsementQuery.personHash')}</label>
+            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.endorsementQuery.placeholder')}
               {...reg3('personHash')} />
             <FieldError message={e3.personHash?.message as any} />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg3('pageSize', { valueAsNumber: true })} />
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
+            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg3('pageSize', { valueAsNumber: true })} />
             <FieldError message={e3.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-6">
+          <div className="flex gap-2 self-start mt-1">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={endorsementLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetEndorsementQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -432,11 +432,11 @@ export default function SearchPage() {
         <div className="text-xs text-gray-600 dark:text-gray-400">{t('search.totalResults')}: {endorsementTotal}</div>
         <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
           {endorsementData.versionIndices.length === 0 ? (
-            <div className="p-3 text-sm text-gray-500 dark:text-gray-400">
+            <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
               {endorsementLoading ? t('search.loading') : t('search.noData')}
             </div>
           ) : endorsementData.versionIndices.map((versionIndex, i) => (
-            <div key={i} className="p-3">
+            <div key={i} className="p-2">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.endorsementQuery.version')}:</span> {versionIndex}</div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.endorsementQuery.endorsementCount')}:</span> {endorsementData.endorsementCounts[i]}</div>
@@ -457,24 +457,24 @@ export default function SearchPage() {
       {/* URI History Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-purple-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('uri')}>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('search.uriQuery.title')}</h3>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.uriQuery.title')}</h3>
           <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('uri') }} aria-expanded={openSections.uri}>{openSections.uri ? '-' : '+'}</button>
         </div>
         {openSections.uri && (
-          <div className="p-3 space-y-3">
+          <div className="p-2 space-y-2">
         <form onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.uriQuery.tokenId')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.uriQuery.placeholder')}
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.uriQuery.tokenId')}</label>
+            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.uriQuery.placeholder')}
               {...reg4('tokenId', { valueAsNumber: true })} />
             <FieldError message={e4.tokenId?.message as any} />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg4('pageSize', { valueAsNumber: true })} />
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
+            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg4('pageSize', { valueAsNumber: true })} />
             <FieldError message={e4.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-6">
+          <div className="flex gap-2 self-start mt-1">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={uriLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetUriQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -482,11 +482,11 @@ export default function SearchPage() {
         <div className="text-xs text-gray-600 dark:text-gray-400">{t('search.totalResults')}: {uriTotal}</div>
         <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
           {uriData.length === 0 ? (
-            <div className="p-3 text-sm text-gray-500 dark:text-gray-400">
+            <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
               {uriLoading ? t('search.loading') : t('search.noData')}
             </div>
           ) : uriData.map((uri, i) => (
-            <div key={i} className="p-3 flex items-center justify-between gap-2">
+            <div key={i} className="p-2 flex items-center justify-between gap-2">
               <span className="font-mono text-sm break-all text-gray-800 dark:text-gray-200">{uri}</span>
               <button
                 className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -528,24 +528,24 @@ export default function SearchPage() {
       {/* Versions Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('versions')}>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('search.versionsQuery.title')}</h3>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.versionsQuery.title')}</h3>
           <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('versions') }} aria-expanded={openSections.versions}>{openSections.versions ? '-' : '+'}</button>
         </div>
         {openSections.versions && (
-          <div className="p-3 space-y-3">
+          <div className="p-2 space-y-2">
         <form onSubmit={hs5((d) => onQueryPersonVersions(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.versionsQuery.personHash')}</label>
-            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.versionsQuery.placeholder')}
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.versionsQuery.personHash')}</label>
+            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.versionsQuery.placeholder')}
               {...reg5('personHash')} />
             <FieldError message={e5.personHash?.message as any} />
           </div>
           <div>
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg5('pageSize', { valueAsNumber: true })} />
+            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
+            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg5('pageSize', { valueAsNumber: true })} />
             <FieldError message={e5.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-6">
+          <div className="flex gap-2 self-start mt-1">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={versionsLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetVersionsQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -553,12 +553,12 @@ export default function SearchPage() {
         <div className="text-xs text-gray-600 dark:text-gray-400">{t('search.totalResults')}: {versionsTotal}</div>
         <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
           {versionsData.length === 0 ? (
-            <div className="p-3 text-sm text-gray-500 dark:text-gray-400">
+            <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
               {versionsLoading ? t('search.loading') : t('search.noData')}
             </div>
           ) : versionsData.map((version, i) => (
-            <div key={i} className="p-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
-              <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+            <div key={i} className="p-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+              <div className="grid grid-cols-3 gap-4 text-sm mb-2">
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionIndex')}:</span> {Number(version.versionIndex)}</div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.creator')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.addedBy || t('search.versionsQuery.unknown')}</span></div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? new Date(Number(version.timestamp) * 1000).toLocaleString() : t('search.versionsQuery.unknown')}</span></div>
@@ -583,11 +583,11 @@ export default function SearchPage() {
       {/* Hash Calculator Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-teal-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('hash')}>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t('search.hashCalculator.title')}</h3>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.hashCalculator.title')}</h3>
           <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('hash') }} aria-expanded={openSections.hash}>{openSections.hash ? '-' : '+'}</button>
         </div>
         {openSections.hash && (
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-2">
         <div className="text-xs text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800/40">
           {t('search.hashCalculator.tip')}
         </div>
