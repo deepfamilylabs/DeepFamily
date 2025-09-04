@@ -224,4 +224,52 @@ html { scrollbar-gutter: stable; }
   }
 }
 
+/* Additional multilingual text support */
+.hyphens-auto {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+}
+
+.break-words {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Chinese and CJK text wrapping support */
+[lang="zh-CN"], [lang="zh-TW"], [lang="ja"], [lang="ko"] {
+  word-break: break-all;
+  line-break: auto;
+}
+
+/* Better mobile text wrapping */
+@media (max-width: 640px) {
+  * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    -ms-hyphens: auto;
+  }
+  
+  /* Ensure no horizontal overflow */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Better button text wrapping on mobile */
+  button, .btn, a[class*="btn"] {
+    word-break: break-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+}
+
+/* Improved text rendering for all languages */
+* {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 

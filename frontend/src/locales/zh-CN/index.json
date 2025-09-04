@@ -7,16 +7,16 @@
   },
   "home": {
     "title": "去中心化链上族谱协议",
-    "subtitle": "多版本可信谱系 + 经济驱动背书 + NFT 价值归属 + 分片叙事封存 + ZK 隐私扩展的开放协作网络",
+    "subtitle": "多版本可信谱系 · 经济激励背书 · NFT 价值归属 · 分片叙事封存 · 零知识证明隐私扩展",
     "exploreVisualization": "浏览族谱",
     "addPerson": "添加人物",
     "participate": "参与背书",
     "configSettings": "配置连接设置",
     "tagStrip": {
       "protocol": "去中心化",
-      "incentive": "激励循环",
+      "incentive": "激励循环", 
       "nft": "NFT 传记",
-      "zk": "ZK 扩展"
+      "zk": "ZK 隐私"
     },
     "coreValue": {
       "title": "核心使命",
@@ -54,7 +54,7 @@
       "title": "双层网络模型",
       "subtitle": "第一层 关系层与第二层 价值层的协同设计，实现结构化数据与经济价值的有机融合",
       "layer1": {
-        "title": "第一层: 关系层",
+        "title": "关系层",
         "subtitle": "结构与时间序列",
         "feature1": "人物哈希管理",
         "feature1Desc": "基于哈希的人物标识，支持多版本并存与演化追踪",
@@ -65,7 +65,7 @@
         "description": "特性：结构化数据、时间序列、拓扑网络"
       },
       "layer2": {
-        "title": "第二层: 价值层",
+        "title": "价值层",
         "subtitle": "经济激励与资产化",
         "feature1": "NFT 资产绑定",
         "feature1Desc": "特定版本可铸造为 NFT，承载价值与收益权",
@@ -339,7 +339,7 @@
   },
   "visualization": {
     "title": "可视化",
-    "familyTree": "族谱可视化",
+    "dataFrom": "数据来源",
     "modes": {
       "subgraph": "子图模式",
       "contract": "合约模式"
@@ -363,8 +363,8 @@
     "ui": {
       "visualizationView": "可视化视图",
       "versionNumber": "版本号",
-      "subgraphModeConfig": "子图模式配置",
-      "contractModeConfig": "合约模式配置",
+      "subgraphModeConfig": "子图模式",
+      "contractModeConfig": "合约模式",
       "traversalDFS": "DFS 深度优先：快速深入，按路径向下后回溯",
       "traversalBFS": "BFS 广度优先：按层级展开，层结构更直观",
       "traversal": "遍历方式",

@@ -55,11 +55,11 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex h-9 select-none rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm p-1"
+      className="relative inline-flex h-8 select-none rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-xs font-medium overflow-hidden shadow-sm p-0.5 max-w-full"
     >
       <div
-        className={`absolute rounded-md bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
-        style={{ top: 4, bottom: 4, left: indicator.left + 4, width: indicator.width - 8 }}
+        className={`absolute rounded-sm bg-indigo-600 ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
+        style={{ top: 2, bottom: 2, left: indicator.left + 2, width: indicator.width - 4 }}
       />
       {order.map((m, idx) => (
         <button
@@ -68,17 +68,17 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1 px-2 sm:px-3 h-full transition-colors duration-150 whitespace-nowrap focus:outline-none ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+          className={`relative z-10 inline-flex items-center justify-center gap-1 px-1.5 h-full transition-colors duration-150 focus:outline-none text-[10px] flex-shrink min-w-0 ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
         >
           {m === 'tree' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v6" />
               <path d="M6 18h12" />
               <path d="M6 21v-6a6 6 0 0 1 12 0v6" />
             </svg>
           )}
           {m === 'dag' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="5" cy="5" r="2"/>
               <circle cx="19" cy="5" r="2"/>
               <circle cx="12" cy="12" r="2"/>
@@ -92,7 +92,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
             </svg>
           )}
           {m === 'force' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"/>
               <path d="M12 2v4"/>
               <path d="M12 18v4"/>
@@ -105,14 +105,15 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
             </svg>
           )}
           {m === 'virtual' && (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="7" height="6" rx="1"/>
               <rect x="14" y="4" width="7" height="6" rx="1"/>
               <rect x="3" y="14" width="7" height="6" rx="1"/>
               <rect x="14" y="14" width="7" height="6" rx="1"/>
             </svg>
           )}
-          <span className="hidden sm:inline">{labels[m]}</span>
+          <span className="hidden lg:inline">{labels[m]}</span>
+          <span className="lg:hidden truncate max-w-[4ch]">{labels[m]}</span>
         </button>
       ))}
     </div>

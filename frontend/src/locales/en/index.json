@@ -6,17 +6,17 @@
     "people": "People"
   },
   "home": {
-    "title": "Decentralized On-Chain Genealogy Protocol",
-    "subtitle": "Multi-version Trusted Genealogies + Economic-driven Endorsements + NFT Value Attribution + Sharded Story Preservation + ZK Privacy Extensions in an Open Collaborative Network",
-    "exploreVisualization": "Explore Family Tree",
-    "addPerson": "Add Person", 
-    "participate": "Participate & Endorse",
+    "title": "On-Chain Decentralized Family Tree Protocol",
+    "subtitle": "Multi-Version Trust Lineage · Economically Backed · NFT Value Ownership · Sharded Narrative Sealing · ZK Privacy Scaling",
+    "exploreVisualization": "Explore",
+    "addPerson": "Add", 
+    "participate": "Endorse",
     "configSettings": "Connection Settings",
     "tagStrip": {
       "protocol": "Decentralized",
-      "incentive": "Incentive Loop", 
-      "nft": "NFT Biography",
-      "zk": "ZK Extensions"
+      "incentive": "Incentives", 
+      "nft": "NFT Bio",
+      "zk": "ZK Privacy"
     },
     "coreValue": {
       "title": "Core Mission",
@@ -24,7 +24,7 @@
     },
     "valueProps": {
       "title": "Core Value Propositions",
-      "subtitle": "Building a multi-dimensional trusted genealogy ecosystem, enabling natural evolution from information exploration to value confirmation",
+      "subtitle": "A trusted multi-dimensional genealogy layer turning open exploration into confirmed value.",
       "trustedGenealogy": {
         "title": "Trusted Genealogies",
         "description": "Parent references + version coexistence, never overwriting history, only accumulating evidence and consensus"
@@ -51,10 +51,10 @@
       }
     },
     "architecture": {
-      "title": "Dual-Layer Network Model",
+      "title": "Dual-Layer Network",
       "subtitle": "Synergistic design of Layer 1 Relational Layer and Layer 2 Value Layer, achieving organic integration of structured data and economic value",
       "layer1": {
-        "title": "Layer 1: Relational Layer",
+        "title": "Relational Layer",
         "subtitle": "Structure & Temporal Series",
         "feature1": "Person Hash Management",
         "feature1Desc": "Hash-based person identification, supporting multi-version coexistence and evolution tracking",
@@ -65,7 +65,7 @@
         "description": "Features: Structured data, temporal series, topological networks"
       },
       "layer2": {
-        "title": "Layer 2: Value Layer",
+        "title": "Value Layer",
         "subtitle": "Economic Incentives & Assetization",
         "feature1": "NFT Asset Binding",
         "feature1Desc": "Specific versions can be minted as NFTs, carrying value and revenue rights",
@@ -76,7 +76,7 @@
         "description": "Features: Economic incentives, value discovery, verifiable narrative assetization"
       },
       "advantages": {
-        "title": "Operational Workflow",
+        "title": "Workflow",
         "step1": "Add Person Version",
         "step1Desc": "If both parents exist → receive mining rewards",
         "step2": "Community Endorsement",
@@ -91,13 +91,13 @@
     },
     "features": {
       "title": "Core Features",
-      "subtitle": "Complete feature modules supporting dual-layer network operations",
+      "subtitle": "Complete feature modules supporting dual-layer network operation",
       "zkVersion": {
         "title": "ZK Version Addition",
         "description": "Submit hash-bound versions with zero-knowledge proofs, verifying structural correctness while hiding sensitive fields"
       },
       "versionManagement": {
-        "title": "Person Version Management", 
+        "title": "Version Management", 
         "description": "Multi-version coexistence, indexable by name/parents/children, immutable with only additive alternative narratives"
       },
       "endorsementEconomy": {
@@ -336,7 +336,7 @@
   },
   "visualization": {
     "title": "Visualization",
-    "familyTree": "Family Tree Visualization",
+    "dataFrom": "Data Source",
     "modes": {
       "subgraph": "Subgraph Mode",
       "contract": "Contract Mode"
@@ -360,8 +360,8 @@
     "ui": {
       "visualizationView": "Visualization View",
       "versionNumber": "Version",
-      "subgraphModeConfig": "Subgraph Mode Configuration",
-      "contractModeConfig": "Contract Mode Configuration",
+      "subgraphModeConfig": "Subgraph Mode",
+      "contractModeConfig": "Contract Mode",
       "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
       "traversalBFS": "BFS - Breadth-First (level order)",
       "traversal": "Traversal Mode",

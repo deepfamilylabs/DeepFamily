@@ -88,7 +88,7 @@ export default function VisualizationPage() {
   }, [mode, subgraphUrl, rootHash, rootVersionIndex, t, SUBGRAPH_TIMEOUT_MS, SUBGRAPH_RETRY_ATTEMPTS])
 
   return (
-    <div className="space-y-6 text-gray-900 dark:text-gray-100 bg-gradient-to-br from-slate-50/30 via-transparent to-blue-50/20 dark:from-slate-900/50 dark:via-transparent dark:to-slate-800/30 min-h-screen pt-8 px-4 pb-24 md:pb-6 rounded-t-3xl backdrop-blur-sm overflow-visible overflow-x-hidden">
+    <div className="space-y-6 text-gray-900 dark:text-gray-100 bg-gradient-to-br from-slate-50/30 via-transparent to-blue-50/20 dark:from-slate-900/50 dark:via-transparent dark:to-slate-800/30 min-h-screen px-4 pb-24 md:pb-6 rounded-t-3xl backdrop-blur-sm overflow-visible overflow-x-hidden">
       {SHOW_DEBUG && mode === 'contract' && (() => { try { const { errors } = useTreeData(); return errors.length ? (
         <div className="text-xs rounded border border-amber-300 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/30 p-2 space-y-1">
           <div className="font-medium text-amber-700 dark:text-amber-300">Debug Errors ({errors.length})</div>
@@ -99,10 +99,13 @@ export default function VisualizationPage() {
           ))}
         </div>
       ) : null } catch { return null } })()}
-      <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-slate-200/20 dark:shadow-slate-900/30">
-        <div className="flex flex-row items-center justify-between gap-2">
-          <h2 className="text-xl sm:text-2xl font-bold text-transparent bg-gradient-to-r from-slate-900 via-blue-700 to-purple-700 dark:from-slate-100 dark:via-blue-300 dark:to-purple-300 bg-clip-text flex-shrink-0">{t('visualization.familyTree')}</h2>
-          <div className="flex-shrink-0">
+      <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/30 shadow-lg">
+        {/* Header row: try single line on mobile; wrap only when necessary */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full">
+          <h2 className="text-xl sm:text-2xl font-bold text-transparent bg-gradient-to-r from-slate-900 via-blue-700 to-purple-700 dark:from-slate-100 dark:via-blue-300 dark:to-purple-300 bg-clip-text min-w-0 flex-1 truncate" title={t('visualization.dataFrom')}>
+            {t('visualization.dataFrom')}
+          </h2>
+          <div className="flex-none flex-shrink-0">
             <ModeSwitch mode={mode as any} onChange={m => setMode(m)} labels={{ subgraph: t('visualization.modes.subgraph'), contract: t('visualization.modes.contract') }} />
           </div>
         </div>
@@ -123,20 +126,22 @@ export default function VisualizationPage() {
       <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/30 shadow-lg overflow-visible">
         <div className="space-y-4 overflow-visible">
           {/* First Row: Title and Stats */}
-          <div className="flex flex-row items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex-shrink-0">{t('visualization.ui.visualizationView')}</span>
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 sm:gap-2 w-full">
+            <h3 className="text-lg font-bold text-transparent bg-gradient-to-r from-slate-900 via-blue-700 to-purple-700 dark:from-slate-100 dark:via-blue-300 dark:to-purple-300 bg-clip-text flex-shrink-0 min-w-0 break-words">
+              {t('visualization.ui.visualizationView')}
+            </h3>
             {mode === 'contract' && (() => {
               const createdDisplay = progress ? progress.created : (loadingContract ? '…' : 0)
               const depthDisplay = progress ? progress.depth : (loadingContract ? '…' : 0)
               return (
-                <span className="text-xs px-2 py-1.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-2 backdrop-blur-sm shadow-sm flex-shrink-0">
+                <span className="text-xs px-2 py-1.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-2 backdrop-blur-sm shadow-sm flex-shrink-0 flex-wrap whitespace-nowrap">
                   <span className="inline-flex items-center gap-1">
-                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">{t('visualization.ui.nodesLabelFull')}</span>
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 truncate max-w-[9ch]">{t('visualization.ui.nodesLabelFull')}</span>
                     <span className="font-mono tabular-nums text-blue-800 dark:text-blue-100 w-[5ch] text-right font-bold min-w-[5ch]" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
                   </span>
                   <span className="h-3 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
                   <span className="inline-flex items-center gap-1">
-                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">{t('visualization.ui.depthLabelFull')}</span>
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 truncate max-w-[9ch]">{t('visualization.ui.depthLabelFull')}</span>
                     <span className="font-mono tabular-nums text-blue-800 dark:text-blue-100 w-[3ch] text-right font-bold min-w-[3ch]" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
                   </span>
                 </span>
@@ -145,28 +150,28 @@ export default function VisualizationPage() {
           </div>
           
           {/* Second Row: Controls and Options */}
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 overflow-visible">
+          <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 sm:gap-x-4 overflow-visible">
             {/* Left: Contract Controls (or empty space for alignment) */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs min-w-0 overflow-visible">
               {mode === 'contract' && (
                 <>
-                  <div className="flex items-center gap-2 flex-shrink-0 overflow-visible">
-                    <span className="text-slate-600 dark:text-slate-300 select-none font-semibold">{t('visualization.ui.traversal')}</span>
-                    <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 shadow-md relative bg-white dark:bg-slate-800 backdrop-blur-sm overflow-visible">
+                  <div className="flex items-center gap-1.5 flex-shrink-0 overflow-visible">
+                    <span className="text-xs text-slate-600 dark:text-slate-400 select-none font-medium">{t('visualization.ui.traversal')}</span>
+                    <div className="inline-flex rounded-md border border-slate-300 dark:border-slate-600 shadow-sm bg-white dark:bg-slate-800 overflow-visible">
                       <div className="relative group">
-                        <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:focus-visible:ring-indigo-400/60 font-semibold rounded-l-lg ${traversal==='dfs' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/50'}`}>DFS</button>
-                        <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900/90 dark:bg-slate-950/90 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-[9999] shadow-xl backdrop-blur-md border border-slate-700">{t('visualization.ui.traversalDFS')}</div>
+                        <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-2 py-1 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-md ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
+                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.traversalDFS')}</div>
                       </div>
                       <div className="relative group border-l border-slate-300 dark:border-slate-600">
-                        <button type="button" aria-label={t('visualization.ui.traversalBFS')} onClick={() => setTraversal('bfs')} className={`px-3 py-1.5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:focus-visible:ring-indigo-400/60 font-semibold rounded-r-lg ${traversal==='bfs' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/50'}`}>BFS</button>
-                        <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900/90 dark:bg-slate-950/90 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-[9999] shadow-xl backdrop-blur-md border border-slate-700">{t('visualization.ui.traversalBFS')}</div>
+                        <button type="button" aria-label={t('visualization.ui.traversalBFS')} onClick={() => setTraversal('bfs')} className={`px-2 py-1 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-md ${traversal==='bfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>BFS</button>
+                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.traversalBFS')}</div>
                       </div>
                     </div>
                   </div>
                   <div className="relative group flex items-center gap-1 cursor-pointer select-none flex-shrink-0">
-                    <input type="checkbox" id="includeVersionDetailsToggle" className="rounded-md border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400 shadow-sm" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
-                    <label htmlFor="includeVersionDetailsToggle" className="text-slate-600 dark:text-slate-300 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
-                    <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900/90 dark:bg-slate-950/90 text-white px-3 py-1.5 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-xl backdrop-blur-md border border-slate-700 z-[9999]">{t('visualization.ui.includeVersionDetailsDesc')}</div>
+                    <input type="checkbox" id="includeVersionDetailsToggle" className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
+                    <label htmlFor="includeVersionDetailsToggle" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
+                    <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.includeVersionDetailsDesc')}</div>
                   </div>
                 </>
               )}
@@ -196,10 +201,10 @@ export default function VisualizationPage() {
                 <div className="text-amber-800 dark:text-amber-100 font-semibold">{sgMessage || t('visualization.status.subgraphUnavailable')}</div>
                 <div className="text-xs text-amber-600 dark:text-amber-400">{t('visualization.status.developmentProxy')}</div>
                 <div className="text-xs text-amber-600 dark:text-amber-400">{t('visualization.status.currentlySubgraphMode')}</div>
-                <div className="flex gap-2">
-                  <button onClick={() => setMode('contract')} className="px-4 py-2 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('visualization.status.switchToContract')}</button>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => setMode('contract')} className="px-3 py-1.5 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 transition-colors font-medium">{t('visualization.status.switchToContract')}</button>
                   {proxyHint && (
-                    <button onClick={() => { (window as any).dispatchEvent(new CustomEvent('ft:set-subgraph-proxy')) }} className="px-4 py-2 text-xs rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60 dark:focus-visible:ring-slate-500/60 transition-all duration-200 shadow-sm hover:shadow-md font-semibold">{t('visualization.status.switchToProxy')}</button>
+                    <button onClick={() => { (window as any).dispatchEvent(new CustomEvent('ft:set-subgraph-proxy')) }} className="px-3 py-1.5 text-xs rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-400 transition-colors font-medium">{t('visualization.status.switchToProxy')}</button>
                   )}
                 </div>
               </>

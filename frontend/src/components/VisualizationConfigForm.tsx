@@ -185,36 +185,37 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
           </div>
         </div>
       ) : (
-        <div className="space-y-3 text-slate-700 dark:text-slate-300">
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800/50 dark:to-blue-900/30 p-3 rounded-lg border border-slate-200/50 dark:border-slate-700/30">
-            <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t('visualization.config.rpc')}: </span>
-            <span className="font-mono text-blue-600 dark:text-blue-400 break-all">{rpcUrl}</span>
+        <div className="space-y-2 text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.rpc')}:</span>
+            <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rpcUrl}>{rpcUrl}</span>
           </div>
-          <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800/50 dark:to-blue-900/30 p-3 rounded-lg border border-slate-200/50 dark:border-slate-700/30">
-            <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t('visualization.config.contract')}: </span>
-            <span className="font-mono text-blue-600 dark:text-blue-400 break-all">{contractAddress}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.contract')}:</span>
+            <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={contractAddress}>{contractAddress}</span>
           </div>
           {mode === 'subgraph' && subgraphUrl && (
-            <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800/50 dark:to-blue-900/30 p-3 rounded-lg border border-slate-200/50 dark:border-slate-700/30">
-              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t('visualization.config.subgraph')}: </span>
-              <span className="font-mono text-blue-600 dark:text-blue-400 break-all">{subgraphUrl}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.subgraph')}:</span>
+              <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={subgraphUrl}>{subgraphUrl}</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Responsive version controls */}
-      <div className="mt-6 pt-4 border-t border-slate-200/60 dark:border-slate-700/60 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-800/50 dark:to-blue-900/30 p-4 rounded-lg border border-slate-200/50 dark:border-slate-700/30 backdrop-blur-sm">
-        <div className="mb-3">
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{t('visualization.config.root')}: </span>
-          <span className="font-mono text-blue-600 dark:text-blue-400 break-all text-sm">{rootHash}</span>
+      {/* Compact version controls */}
+      <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.root')}:</span>
+          <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rootHash}>{rootHash}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-slate-600 dark:text-slate-300 whitespace-nowrap text-sm font-semibold">{t('visualization.ui.versionNumber')}:</span>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.ui.versionNumber')}:</span>
+          <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
             <button
-              className="w-8 h-8 rounded-lg border text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800/90 hover:bg-blue-50 dark:hover:bg-slate-700 shrink-0 transition-all duration-200 shadow-md hover:shadow-lg font-semibold flex items-center justify-center backdrop-blur-sm"
+              className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
               onClick={() => setLocalVersion(v => Math.max(1, (v || 1) - 1))}
+              aria-label="Decrease version"
             >-</button>
             <input
               type="number"
@@ -223,11 +224,12 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
               onChange={e => setLocalVersion(Math.max(1, Number(e.target.value)))}
               onBlur={applyVersion}
               onKeyDown={e => { if (e.key === 'Enter') applyVersion() }}
-              className="w-20 h-8 text-sm rounded-lg border border-slate-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/60 dark:focus:ring-blue-400/60 px-3 bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 shadow-sm backdrop-blur-sm font-semibold text-center"
+              className="w-12 h-6 text-xs text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
             />
             <button
-              className="w-8 h-8 rounded-lg border text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 hover:bg-blue-50 dark:hover:bg-slate-700 shrink-0 transition-all duration-200 shadow-sm hover:shadow-md font-semibold flex items-center justify-center backdrop-blur-sm"
+              className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
               onClick={() => setLocalVersion(v => (v || 1) + 1)}
+              aria-label="Increase version"
             >+</button>
           </div>
         </div>
