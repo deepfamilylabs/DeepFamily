@@ -44,10 +44,10 @@ export default function Home() {
           <div className="animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 border border-blue-200/50 dark:border-blue-600/30 mb-8 backdrop-blur-sm">
               <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Decentralized Family Tree Protocol</span>
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Decentralized Family Tree</span>
             </div>
             
-            <h1 className="text-2xl sm:text-2xl md:text-5xl lg:text-6xl xl:text-7xl 2xl:text-8xl font-bold text-gray-900 dark:text-gray-100 mb-8 leading-tight tracking-tight px-4 break-words hyphens-auto">
+            <h1 className="text-3xl sm:text-2xl md:text-5xl lg:text-6xl xl:text-7xl 2xl:text-8xl font-bold text-gray-900 dark:text-gray-100 mb-8 leading-tight tracking-tight px-4 break-words hyphens-auto">
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 {t('home.title')}
               </span>

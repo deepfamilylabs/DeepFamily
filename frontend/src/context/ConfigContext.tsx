@@ -23,10 +23,10 @@ const ConfigContext = createContext<AppConfig | null>(null)
 
 function getEnvDefaults(): ConfigValues {
   return {
-    rpcUrl: (import.meta as any).env.VITE_RPC_URL || 'http://127.0.0.1:8545',
+    rpcUrl: (import.meta as any).env.VITE_RPC_URL || 'https://evmtestnet.confluxrpc.com',
     subgraphUrl: (import.meta as any).env.VITE_SUBGRAPH_URL || 'http://localhost:8000/subgraphs/name/deepfamily/familytree',
-    contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000',
-    rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH || '0x0000000000000000000000000000000000000000000000000000000000000000',
+    contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS || '0x17199519B81c83641DC74700b079ABe6D9F99CD8',
+    rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH || '0x998bd09b669a42a18dace4dd87e3d754dbb7ec0b838e1e06a5a8dbddda90b1f5',
     rootVersionIndex: Number((import.meta as any).env.VITE_ROOT_VERSION_INDEX || 1),
     mode: 'contract',
   }

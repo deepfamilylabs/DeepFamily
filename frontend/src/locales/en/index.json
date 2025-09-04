@@ -15,8 +15,8 @@
     "tagStrip": {
       "protocol": "Decentralized",
       "incentive": "Incentives", 
-      "nft": "NFT Bio",
-      "zk": "ZK Privacy"
+      "nft": "NFT",
+      "zk": "ZK"
     },
     "coreValue": {
       "title": "Core Mission",

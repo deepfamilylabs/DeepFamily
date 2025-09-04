@@ -14,7 +14,14 @@ require("./tasks/update-story-chunk");
 require("./tasks/list-story-chunks");
 require("./tasks/seal-story");
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
+/**
+ * address 0x327C01dA6Da9A6818805cadB9eA8d62B10c20000
+ * deploy result：
+ * - DeepFamilyToken: 0x3472a50766E29Ae6BDf218BfcDD21aE2ad67db82
+ * - DeepFamily: 0x17199519B81c83641DC74700b079ABe6D9F99CD8
+ * - Conflux eSpace testnet (Chain ID: 71)
+ */
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x957d900730121e77ed6a51b5ce93626dbdf014778e22df7870561eccb0e3ac6e";
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
@@ -54,7 +61,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 11155111,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Holesky testnet (latest Ethereum testnet)
@@ -63,7 +70,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 17000,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Ethereum mainnet
@@ -72,7 +79,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 1,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Polygon Amoy testnet (replacement for Mumbai)
@@ -81,7 +88,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 80002,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Polygon mainnet
@@ -90,7 +97,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 137,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // BSC testnet
@@ -99,7 +106,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 97,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // BSC mainnet
@@ -108,7 +115,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 56,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Arbitrum testnet
@@ -117,7 +124,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 421614,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Arbitrum mainnet
@@ -126,7 +133,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 42161,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Optimism testnet
@@ -135,7 +142,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 11155420,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Optimism mainnet
@@ -144,7 +151,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 10,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Conflux eSpace testnet
@@ -153,7 +160,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 71,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
     
     // Conflux eSpace mainnet
@@ -162,7 +169,7 @@ module.exports = {
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 1030,
       gasPrice: "auto",
-      timeout: 120000,
+      timeout: 1200000,
     },
   },
   
@@ -269,7 +276,7 @@ module.exports = {
   
   // Mocha test configuration
   mocha: {
-    timeout: 120000,
+    timeout: 1200000,
     color: true,
     reporter: "spec",
   },

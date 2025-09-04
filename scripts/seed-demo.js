@@ -434,20 +434,46 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
 
   // Create a mother (spouse) for the root to test mother version references
   async function createMotherFor(node) {
-    if (mothersMap.has(node.hash)) return mothersMap.get(node.hash);
+    if (mothersMap.has(node.hash)) {
+      dlog(`Mother already exists for ${node.name || "Node"}, returning cached`);
+      return mothersMap.get(node.hash);
+    }
+    
     const motherBasic = basic(
       `MotherOf_${node.name || "Root"}`,
       BASE_YEAR + node.generation,
-      (BASE_YEAR + node.generation) % 2 ? 2 : 2,
+      2, // Always female
     );
-    await addPersonVersion({
+    
+    // Check if this mother already exists in blockchain
+    const motherHash = await getPersonHashFromBasicInfo(deepFamily, motherBasic);
+    try {
+      const existingVersions = await deepFamily.countPersonVersions(motherHash);
+      if (existingVersions > 0) {
+        dlog(`Mother already exists on-chain with ${existingVersions} versions, reusing`);
+        const motherObj = { hash: motherHash, ver: 1, info: motherBasic };
+        mothersMap.set(node.hash, motherObj);
+        return motherObj;
+      }
+    } catch (e) {
+      dlog(`Mother doesn't exist on-chain, proceeding to create`);
+    }
+    
+    const txRes = await addPersonVersion({
       deepFamily,
       info: motherBasic,
       tag: tagFor(1),
       cid: `QmMother_${node.name || "Root"}_v1`,
     });
-    const mh = await getPersonHashFromBasicInfo(deepFamily, motherBasic);
-    const motherObj = { hash: mh, ver: 1, info: motherBasic };
+    
+    // If error occurred, don't throw, just continue without mother
+    if (txRes.error) {
+      console.warn(`Failed to create mother for ${node.name}:`, txRes.error);
+      console.warn(`Continuing without mother for ${node.name}`);
+      return null;
+    }
+    
+    const motherObj = { hash: motherHash, ver: 1, info: motherBasic };
     mothersMap.set(node.hash, motherObj);
     return motherObj;
   }
@@ -455,14 +481,35 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
 
   async function addChildFull(name, year, fatherNode, generation) {
     dlog("addChildFull begin", { name, year, fatherNodeHash: fatherNode.hash, generation });
+    
+    // Check if child with this name already exists
+    const info = basic(name, year, (year + name.length) % 2 === 0 ? 1 : 2);
+    const childHash = await getPersonHashFromBasicInfo(deepFamily, info);
+    
+    try {
+      const existingVersions = await deepFamily.countPersonVersions(childHash);
+      if (existingVersions > 0) {
+        dlog(`Child ${name} already exists with ${existingVersions} versions, reusing`);
+        return { hash: childHash, ver: 1, info, generation, name: info.fullName };
+      }
+    } catch (e) {
+      dlog(`Child ${name} doesn't exist, proceeding to create`);
+    }
+    
     // 50% chance reference mother (if exists)
     let mother = mothersMap.get(fatherNode.hash);
     if (!mother && (fatherNode === mainChain[mainChain.length - 1] || rand() < 0.5)) {
-      mother = await createMotherFor(fatherNode);
+      try {
+        mother = await createMotherFor(fatherNode);
+      } catch (e) {
+        console.warn(`Failed to create mother for ${fatherNode.name}, continuing without mother`);
+        mother = null;
+      }
     }
-    const info = basic(name, year, (year + name.length) % 2 === 0 ? 1 : 2);
+    
     const motherHash = mother ? mother.hash : ethers.ZeroHash;
     const motherVer = mother ? mother.ver : 0;
+    
     const txRes = await addPersonVersion({
       deepFamily,
       info,
@@ -473,39 +520,71 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       tag: tagFor(1),
       cid: "QmSeedLarge_v1",
     });
-    dlog("addChildFull added", { name, personHash: txRes.personHash });
-    const h = txRes.personHash;
-    return { hash: h, ver: 1, info, generation, name: info.fullName };
+    
+    if (txRes.skipped) {
+      dlog("addChildFull skipped (already exists)", { name, personHash: txRes.personHash });
+    } else if (txRes.error) {
+      console.warn(`addChildFull failed for ${name}:`, txRes.error);
+      console.warn(`Continuing with next child...`);
+      return null; // Return null instead of throwing
+    } else {
+      dlog("addChildFull added", { name, personHash: txRes.personHash });
+    }
+    
+    return { hash: childHash, ver: 1, info, generation, name: info.fullName };
   }
 
   for (let gen = 2; gen <= TARGET_DEPTH; gen++) {
     dlog("generation loop", gen);
     const prevGenNodes = generations.get(gen - 1); // FIX: was missing causing ReferenceError
     if (!prevGenNodes || prevGenNodes.length === 0) {
-      throw new Error(`Previous generation (${gen - 1}) empty - cannot build gen ${gen}`);
+      console.warn(`Previous generation (${gen - 1}) empty - cannot build gen ${gen}, stopping`);
+      break;
     }
+    
     // Create main chain node
     const chainParent = mainChain[mainChain.length - 1];
     const chainNode = await addChildFull(`MainG${gen}`, BASE_YEAR + gen, chainParent, gen);
+    
+    if (!chainNode) {
+      console.warn(`Failed to create main chain node for generation ${gen}, stopping`);
+      break;
+    }
+    
     dlog("main chain node added", { gen, hash: chainNode.hash });
     generations.set(gen, [chainNode]);
-    // Immediately create a mother for new main chain node (for next gen / siblings)
-    mainChainMothers.push(await createMotherFor(chainNode));
+    mainChain.push(chainNode);
+    
+    // Try to create a mother for new main chain node (for next gen / siblings)
+    try {
+      const motherForChain = await createMotherFor(chainNode);
+      if (motherForChain) {
+        mainChainMothers.push(motherForChain);
+      }
+    } catch (e) {
+      console.warn(`Failed to create mother for main chain gen ${gen}, continuing`);
+    }
+    
     // 2^ expansion: total nodes this generation = 2^(gen-1) => need extra siblings = total - 1
     const totalThisGen = 2 ** (gen - 1);
     const siblingsCount = totalThisGen - 1;
+    let actualSiblingsAdded = 0;
+    
     for (let i = 0; i < siblingsCount; i++) {
       const parent = prevGenNodes[Math.floor(rand() * prevGenNodes.length)];
       try {
         const name = `G${gen}N${i}`;
         const year = BASE_YEAR + gen + (i % 5);
         const node = await addChildFull(name, year, parent, gen);
-        generations.get(gen).push(node);
+        if (node) {
+          generations.get(gen).push(node);
+          actualSiblingsAdded++;
+        }
       } catch (err) {
-        console.error(`Sibling add failed gen=${gen} i=${i}:`, err.message || err);
+        console.warn(`Sibling add failed gen=${gen} i=${i}:`, err.message || err);
       }
     }
-    console.log(`Generation ${gen} total=${totalThisGen} main=1 siblings=${siblingsCount}`);
+    console.log(`Generation ${gen}: planned=${totalThisGen}, actual=${1 + actualSiblingsAdded} (main=1, siblings=${actualSiblingsAdded})`);
   }
 
   // Collect all nodes excluding root (generation=1)
@@ -615,20 +694,51 @@ async function addPersonVersion({
   cid,
 }) {
   const personHash = await getPersonHashFromBasicInfo(deepFamily, info);
+  
+  // Check if this version already exists
+  try {
+    const versionCount = await deepFamily.countPersonVersions(personHash);
+    dlog(`Person ${info.fullName} has ${versionCount} existing versions`);
+    
+    // Check if any existing version has the same tag or basic info
+    for (let i = 1; i <= versionCount; i++) {
+      try {
+        const existingVersion = await deepFamily.getVersionDetails(personHash, i);
+        // If same tag exists, skip adding
+        if (existingVersion.tag === tag) {
+          dlog(`Version with tag "${tag}" already exists for ${info.fullName}, skipping`);
+          return { personHash, skipped: true, existingVersion: i };
+        }
+      } catch (e) {
+        // Version might not exist, continue checking
+      }
+    }
+  } catch (e) {
+    // Person doesn't exist yet, proceed with adding
+    dlog(`Person ${info.fullName} doesn't exist yet, proceeding to add`);
+  }
+  
   // nameHash = keccak256(abi.encodePacked(string))
   const nameHash = ethers.keccak256(ethers.toUtf8Bytes(info.fullName));
-  const tx = await deepFamily.addPerson(
-    personHash,
-    nameHash,
-    fatherHash,
-    motherHash,
-    fatherVersionIndex,
-    motherVersionIndex,
-    tag,
-    cid,
-  );
-  await tx.wait();
-  return { personHash };
+  
+  try {
+    const tx = await deepFamily.addPerson(
+      personHash,
+      nameHash,
+      fatherHash,
+      motherHash,
+      fatherVersionIndex,
+      motherVersionIndex,
+      tag,
+      cid,
+    );
+    await tx.wait();
+    dlog(`Successfully added person ${info.fullName} with tag "${tag}"`);
+    return { personHash, added: true };
+  } catch (error) {
+    console.warn(`Failed to add person ${info.fullName}:`, error.message?.slice(0, 100));
+    return { personHash, error: error.message };
+  }
 }
 
 // Add: attach tagFor to globalThis to avoid ReferenceError across environments

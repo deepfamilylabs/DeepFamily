@@ -29,23 +29,45 @@ export default function PeoplePage() {
 
   // Get person data from TreeDataContext, only show people with NFTs (people with stories)
   const people = useMemo(() => {
-    return Object.values(nodesData)
+    const peopleWithNFTs = Object.values(nodesData)
       .filter(person => {
         // Only people with NFT versions have stories
         const hasNFT = person.tokenId && person.tokenId !== '0'
         return hasNFT
       })
-      .map(person => ({
-        ...person,
-        hasDetailedStory: !!(person.storyMetadata && person.storyMetadata.totalChunks > 0)
-      }))
+
+    // Group by personHash to get unique people (since one person can have multiple NFT versions)
+    const uniquePeopleMap = new Map<string, NodeData>()
+    
+    peopleWithNFTs.forEach(person => {
+      const personHash = person.personHash
+      // If we haven't seen this personHash before, or if this version has more story chunks, use this version
+      const existing = uniquePeopleMap.get(personHash)
+      if (!existing || 
+          (person.storyMetadata?.totalChunks || 0) > (existing.storyMetadata?.totalChunks || 0)) {
+        uniquePeopleMap.set(personHash, person)
+      }
+    })
+
+    return Array.from(uniquePeopleMap.values()).map(person => ({
+      ...person,
+      hasDetailedStory: !!(person.storyMetadata && person.storyMetadata.totalChunks > 0)
+    }))
   }, [nodesData])
 
-  const data = useMemo(() => ({
-    people,
-    totalCount: people.length,
-    loading
-  }), [people, loading])
+  const data = useMemo(() => {
+    // Calculate total NFT count (all records with NFTs)
+    const totalNFTs = Object.values(nodesData).filter(person => 
+      person.tokenId && person.tokenId !== '0'
+    ).length
+
+    return {
+      people,
+      totalCount: people.length, // Unique people count (by personHash)
+      totalNFTs, // Total NFT count (can be more than people count)
+      loading
+    }
+  }, [people, loading, nodesData])
 
   // Search and filter logic
   const filteredPeople = useMemo(() => {
@@ -170,9 +192,7 @@ export default function PeoplePage() {
               <div className="text-sm text-gray-600 dark:text-gray-400">{t('people.withStories', 'With Detailed Stories')}</div>
             </div>
             <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 dark:border-gray-700/20">
-              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                {data.people.filter(p => p.tokenId && p.tokenId !== '0').length}
-              </div>
+              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">{data.totalNFTs}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">{t('people.withNFTs', 'With NFTs')}</div>
             </div>
           </div>

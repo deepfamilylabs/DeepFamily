@@ -68,7 +68,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1 px-1 h-full min-h-[40px] transition-colors duration-150 focus:outline-none text-[10px] flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
+          className={`relative z-10 inline-flex items-center justify-center gap-1 px-2 h-full min-h-[40px] transition-colors duration-150 focus:outline-none text-[10px] flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${value === m ? 'text-white' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'}`}
         >
           {m === 'tree' && (
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

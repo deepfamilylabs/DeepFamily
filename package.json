@@ -30,7 +30,11 @@
     "dev:seed": "cross-env ROOT_HASH=0x0 ROOT_VERSION=1 hardhat run scripts/seed-demo.js --network localhost",
     "dev:frontend": "npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173",
     "dev:contract": "run-p dev:deploy dev:seed",
-    "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run dev:frontend\""
+    "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run dev:frontend\"",
+    "seed:test": "cross-env ROOT_HASH=0x998bd09b669a42a18dace4dd87e3d754dbb7ec0b838e1e06a5a8dbddda90b1f5 ROOT_VERSION=1 TARGET_DEPTH=5 hardhat run scripts/seed-demo.js --network confluxTestnet",
+    "seed:debug": "cross-env ROOT_HASH=0x998bd09b669a42a18dace4dd87e3d754dbb7ec0b838e1e06a5a8dbddda90b1f5 ROOT_VERSION=1 TARGET_DEPTH=2 DEBUG_SEED=1 hardhat run scripts/seed-demo.js --network confluxTestnet",
+    "seed:local": "cross-env TARGET_DEPTH=3 hardhat run scripts/seed-demo.js --network localhost",
+    "check:root": "hardhat run scripts/check-root.js --network confluxTestnet"
   },
   "keywords": [
     "blockchain",
