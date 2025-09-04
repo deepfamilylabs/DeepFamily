@@ -293,7 +293,7 @@
       "title": "本地計算人物哈希",
       "tip": "💡 提示：使用下面的工具計算人物哈希，然後複製到上方的查詢中使用",
       "name": "全名",
-      "isBirthBC": "是否公元前",
+      "isBirthBC": "公元前",
       "birthYear": "出生年",
       "birthMonth": "1-12",
       "birthDay": "1-31",

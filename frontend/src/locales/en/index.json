@@ -294,7 +294,7 @@
       "title": "Calculate personHash Locally",
       "tip": "💡 Tip: Use the tool below to calculate person hash, then copy it to use in the queries above",
       "name": "Full Name",
-      "isBirthBC": "Is Birth BC",
+      "isBirthBC": "Is BC",
       "birthYear": "Birth Year",
       "birthMonth": "1-12",
       "birthDay": "1-31",

@@ -587,13 +587,13 @@ export default function SearchPage() {
           <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('hash') }} aria-expanded={openSections.hash}>{openSections.hash ? '-' : '+'}</button>
         </div>
         {openSections.hash && (
-          <div className="p-3 space-y-3">
+          <div className="p-3 space-y-2">
         <div className="text-xs text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800/40">
           {t('search.hashCalculator.tip')}
         </div>
         <form onSubmit={hs2((data: any) => onCompute(data))} className="w-full" noValidate>
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-start gap-6">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-start gap-2">
               <div className="flex-1 min-w-[240px]">
                 <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.name')}</label>
                 <input 
@@ -614,18 +614,16 @@ export default function SearchPage() {
                 <FieldError message={e2.gender?.message as any} />
               </div>
             </div>
-            <div className="flex flex-nowrap items-start gap-2">
+            <div className="flex flex-nowrap items-start gap-1">
               <div className="flex items-start gap-1">
-                <div className="w-20">
+                <div className="w-16 min-w-16">
                   <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.isBirthBC')}</label>
                   <div className="h-10 flex items-center">
-                    <label className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none group">
+                    <label className="inline-flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none group">
                       <input type="checkbox" className="sr-only" {...reg2('isBirthBC')} />
-                      <span className="relative w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-700 group-has-[:checked]:bg-blue-600 transition-colors duration-200">
+                      <span className="relative w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-700 group-has-[:checked]:bg-blue-600 transition-colors duration-200 flex-shrink-0">
                         <span className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 group-has-[:checked]:translate-x-5" />
                       </span>
-                      <span className="text-gray-600 dark:text-gray-400 group-has-[:checked]:hidden text-[11px]">{t('search.hashCalculator.toggleNo')}</span>
-                      <span className="text-blue-600 dark:text-blue-400 hidden group-has-[:checked]:block text-[11px]">{t('search.hashCalculator.toggleYes')}</span>
                     </label>
                   </div>
                   <FieldError />
@@ -647,15 +645,15 @@ export default function SearchPage() {
                 <FieldError message={e2.birthDay?.message as any} />
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-1">
               <div className="flex items-center gap-2 overflow-hidden">
                 <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 sm:px-5 h-10 text-xs sm:text-sm font-medium text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex-shrink-0">
                   {t('search.hashCalculator.compute')}
                 </button>
                 {computedHash && (
                   <div className="flex items-center gap-1 overflow-hidden">
-                    <div className="inline-block rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-2 py-0.5">
-                      <code className="font-mono text-[10px] sm:text-[11px] leading-3 break-all text-gray-700 dark:text-gray-300">{computedHash}</code>
+                    <div className="inline-block rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-2 py-0">
+                      <code className="font-mono text-[10px] sm:text-[11px] leading-none break-all text-gray-700 dark:text-gray-300 tracking-tight">{computedHash}</code>
                     </div>
                     <button
                       type="button"
