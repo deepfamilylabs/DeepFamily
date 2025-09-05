@@ -899,10 +899,10 @@ export default function SearchPage() {
             </div>
           ) : endorsementData.versionIndices.map((versionIndex, i) => (
             <div key={i} className="p-2">
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.endorsementQuery.version')}:</span> {versionIndex}</div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.endorsementQuery.endorsementCount')}:</span> {endorsementData.endorsementCounts[i]}</div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.endorsementQuery.tokenId')}:</span> {endorsementData.tokenIds[i]}</div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                <div><span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">{t('search.endorsementQuery.version')}:</span> {versionIndex}</div>
+                <div><span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">{t('search.endorsementQuery.endorsementCount')}:</span> {endorsementData.endorsementCounts[i]}</div>
+                <div><span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">{t('search.endorsementQuery.tokenId')}:</span> {endorsementData.tokenIds[i]}</div>
               </div>
             </div>
           ))}
