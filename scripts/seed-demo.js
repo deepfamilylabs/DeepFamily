@@ -438,13 +438,13 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       dlog(`Mother already exists for ${node.name || "Node"}, returning cached`);
       return mothersMap.get(node.hash);
     }
-    
+
     const motherBasic = basic(
       `MotherOf_${node.name || "Root"}`,
       BASE_YEAR + node.generation,
       2, // Always female
     );
-    
+
     // Check if this mother already exists in blockchain
     const motherHash = await getPersonHashFromBasicInfo(deepFamily, motherBasic);
     try {
@@ -458,21 +458,21 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     } catch (e) {
       dlog(`Mother doesn't exist on-chain, proceeding to create`);
     }
-    
+
     const txRes = await addPersonVersion({
       deepFamily,
       info: motherBasic,
       tag: tagFor(1),
       cid: `QmMother_${node.name || "Root"}_v1`,
     });
-    
+
     // If error occurred, don't throw, just continue without mother
     if (txRes.error) {
       console.warn(`Failed to create mother for ${node.name}:`, txRes.error);
       console.warn(`Continuing without mother for ${node.name}`);
       return null;
     }
-    
+
     const motherObj = { hash: motherHash, ver: 1, info: motherBasic };
     mothersMap.set(node.hash, motherObj);
     return motherObj;
@@ -481,11 +481,11 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
 
   async function addChildFull(name, year, fatherNode, generation) {
     dlog("addChildFull begin", { name, year, fatherNodeHash: fatherNode.hash, generation });
-    
+
     // Check if child with this name already exists
     const info = basic(name, year, (year + name.length) % 2 === 0 ? 1 : 2);
     const childHash = await getPersonHashFromBasicInfo(deepFamily, info);
-    
+
     try {
       const existingVersions = await deepFamily.countPersonVersions(childHash);
       if (existingVersions > 0) {
@@ -495,7 +495,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     } catch (e) {
       dlog(`Child ${name} doesn't exist, proceeding to create`);
     }
-    
+
     // 50% chance reference mother (if exists)
     let mother = mothersMap.get(fatherNode.hash);
     if (!mother && (fatherNode === mainChain[mainChain.length - 1] || rand() < 0.5)) {
@@ -506,10 +506,10 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
         mother = null;
       }
     }
-    
+
     const motherHash = mother ? mother.hash : ethers.ZeroHash;
     const motherVer = mother ? mother.ver : 0;
-    
+
     const txRes = await addPersonVersion({
       deepFamily,
       info,
@@ -520,7 +520,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       tag: tagFor(1),
       cid: "QmSeedLarge_v1",
     });
-    
+
     if (txRes.skipped) {
       dlog("addChildFull skipped (already exists)", { name, personHash: txRes.personHash });
     } else if (txRes.error) {
@@ -530,7 +530,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     } else {
       dlog("addChildFull added", { name, personHash: txRes.personHash });
     }
-    
+
     return { hash: childHash, ver: 1, info, generation, name: info.fullName };
   }
 
@@ -541,20 +541,20 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       console.warn(`Previous generation (${gen - 1}) empty - cannot build gen ${gen}, stopping`);
       break;
     }
-    
+
     // Create main chain node
     const chainParent = mainChain[mainChain.length - 1];
     const chainNode = await addChildFull(`MainG${gen}`, BASE_YEAR + gen, chainParent, gen);
-    
+
     if (!chainNode) {
       console.warn(`Failed to create main chain node for generation ${gen}, stopping`);
       break;
     }
-    
+
     dlog("main chain node added", { gen, hash: chainNode.hash });
     generations.set(gen, [chainNode]);
     mainChain.push(chainNode);
-    
+
     // Try to create a mother for new main chain node (for next gen / siblings)
     try {
       const motherForChain = await createMotherFor(chainNode);
@@ -564,12 +564,12 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     } catch (e) {
       console.warn(`Failed to create mother for main chain gen ${gen}, continuing`);
     }
-    
+
     // 2^ expansion: total nodes this generation = 2^(gen-1) => need extra siblings = total - 1
     const totalThisGen = 2 ** (gen - 1);
     const siblingsCount = totalThisGen - 1;
     let actualSiblingsAdded = 0;
-    
+
     for (let i = 0; i < siblingsCount; i++) {
       const parent = prevGenNodes[Math.floor(rand() * prevGenNodes.length)];
       try {
@@ -584,7 +584,9 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
         console.warn(`Sibling add failed gen=${gen} i=${i}:`, err.message || err);
       }
     }
-    console.log(`Generation ${gen}: planned=${totalThisGen}, actual=${1 + actualSiblingsAdded} (main=1, siblings=${actualSiblingsAdded})`);
+    console.log(
+      `Generation ${gen}: planned=${totalThisGen}, actual=${1 + actualSiblingsAdded} (main=1, siblings=${actualSiblingsAdded})`,
+    );
   }
 
   // Collect all nodes excluding root (generation=1)
@@ -694,12 +696,12 @@ async function addPersonVersion({
   cid,
 }) {
   const personHash = await getPersonHashFromBasicInfo(deepFamily, info);
-  
+
   // Check if this version already exists
   try {
     const versionCount = await deepFamily.countPersonVersions(personHash);
     dlog(`Person ${info.fullName} has ${versionCount} existing versions`);
-    
+
     // Check if any existing version has the same tag or basic info
     for (let i = 1; i <= versionCount; i++) {
       try {
@@ -717,10 +719,10 @@ async function addPersonVersion({
     // Person doesn't exist yet, proceed with adding
     dlog(`Person ${info.fullName} doesn't exist yet, proceeding to add`);
   }
-  
+
   // nameHash = keccak256(abi.encodePacked(string))
   const nameHash = ethers.keccak256(ethers.toUtf8Bytes(info.fullName));
-  
+
   try {
     const tx = await deepFamily.addPerson(
       personHash,

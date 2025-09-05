@@ -234,7 +234,7 @@
       "tokenId": "Token ID"
     },
     "uriQuery": {
-      "title": "Token历史链接查询",
+      "title": "URI历史查询",
       "tokenId": "Token ID",
       "placeholder": "请输入Token ID"
     },
@@ -323,7 +323,7 @@
   "visualization": {
     "title": "可视化",
     "viewModes": {
-      "tree": "树",
+      "tree": "树图",
       "dag": "有向无环图",
       "force": "力导向",
       "virtual": "虚拟化"
@@ -340,7 +340,7 @@
     "ui": {
       "visualizationView": "可视化视图",
       "versionNumber": "版本号",
-      "contractModeConfig": "合约模式",
+      "contractModeConfig": "合约配置",
       "traversalDFS": "DFS 深度优先：快速深入，按路径向下后回溯",
       "traversalBFS": "BFS 广度优先：按层级展开，层结构更直观",
       "traversal": "遍历方式",
@@ -349,6 +349,7 @@
       "includeVersionDetailsDesc": "仅影响下一次刷新时是否批量加载版本详情（刷新时锁定快照）。",
       "progressSummary": "节点 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "节点",
+      "depthLabelFull": "深度",
       "edit": "编辑",
       "save": "保存",
       "cancel": "取消"
@@ -356,7 +357,7 @@
     "status": {
       "loading": "加载中...",
       "contractModeRootNotFound": "未找到该根节点版本，请检查哈希与版本号",
-      "rootNotFound": "未找到根节点，请在设置页检查 Root 配置或等待索引",
+      "rootNotFound": "未找到根节点，请检查 Root 配置或等待索引",
       "contractOk": "合约数据加载完成",
       "badge": {
         "checking": "检查中",
@@ -519,12 +520,14 @@
     "clearFilters": "清除所有筛选",
     "filteredResults": "{{count}} 个筛选结果",
     "allResults": "共 {{count}} 个结果",
-    "filterAll": "全部",
-    "filterRecent": "最新",
-    "filterOldest": "最早",
-    "filterByName": "按姓名",
-    "filterByEndorsement": "按背书",
-    "filterByBirthYear": "按出生年",
+    "sortRules": "排序规则",
+    "filterRules": "过滤规则",
+    "viewMode": "视图模式",
+    "filterAll": "ID",
+    "filterByCreateTime": "创建时间",
+    "filterByName": "姓名",
+    "filterByEndorsement": "背书",
+    "filterByBirthYear": "出生年",
     "gridView": "网格视图",
     "listView": "列表视图",
     "resultsCount": "找到 {{count}} 个结果",
@@ -547,7 +550,7 @@
     "addedBy": "添加者",
     "tag": "标签",
     "personHash": "人物哈希",
-    "detailedStory": "详细传记",
+    "detailedStory": "传记",
     "chunks": "分片",
     "fullText": "全文",
     "integrityVerified": "传记完整性已验证",
@@ -556,7 +559,8 @@
     "chunkTitle": "分片 #{{index}}",
     "characters": "个字符",
     "noStoryData": "暂无传记数据",
-    "basicStory": "基础传记",
-    "noStory": "暂无传记内容"
+    "basicStory": "事迹",
+    "noStory": "暂无传记内容",
+    "peopleEncyclopedia": "人物百科"
   }
 }

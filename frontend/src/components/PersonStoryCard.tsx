@@ -70,39 +70,39 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
         {/* Subtle background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 dark:from-blue-900/10 dark:via-transparent dark:to-purple-900/5 pointer-events-none rounded-2xl"></div>
         
-        <div className="relative flex items-start gap-6">
+        <div className="relative flex items-start gap-4 sm:gap-6">
           {/* Avatar/Icon */}
           <div className="flex-shrink-0">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-              <User className="w-8 h-8 text-white" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
+              <User className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
             </div>
           </div>
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             {/* Header */}
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between mb-3 gap-2">
               <div className="min-w-0 flex-1">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
                   {person.fullName || `Person #${shortHash(person.personHash)}`}
                 </h3>
-                <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-normal">
                   {genderText && (
-                    <span className="flex items-center gap-1">
-                      <User className="w-4 h-4" />
+                    <span className="flex items-center gap-1 whitespace-nowrap">
+                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       {genderText}
                     </span>
                   )}
                   {person.tokenId && person.tokenId !== '0' && (
-                    <span className="flex items-center gap-1 font-mono">
-                      <Hash className="w-4 h-4" />
+                    <span className="flex items-center gap-1 font-mono whitespace-nowrap">
+                      <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       #{person.tokenId}
                       {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
-                        <>
-                          <span className="text-gray-400 mx-1">•</span>
-                          <Star className="w-4 h-4 text-yellow-500" />
+                        <span className="flex items-center gap-1 whitespace-nowrap">
+                          <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
+                          <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500" />
                           <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
-                        </>
+                        </span>
                       )}
                     </span>
                   )}
@@ -112,13 +112,13 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
               {/* Badges */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 {person.hasDetailedStory && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-medium">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
                     <Book className="w-3 h-3" />
                     {t('people.hasStory', 'Story')}
                   </span>
                 )}
                 {person.tokenId && person.tokenId !== '0' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs font-medium">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
                     <Award className="w-3 h-3" />
                     {t('people.hasNFT', 'NFT')}
                   </span>
@@ -128,21 +128,21 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
 
             {/* Dates and Locations */}
             {(formatDate.birth || formatDate.death || person.birthPlace || person.deathPlace) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
                 {(formatDate.birth || person.birthPlace) && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Calendar className="w-4 h-4 text-green-500" />
-                    <span>{t('people.born', 'Born')}: </span>
-                    <span className="font-mono text-xs">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
+                    <span className="hidden sm:inline">{t('people.born', 'Born')}: </span>
+                    <span className="font-mono text-[10px] sm:text-xs truncate">
                       {[formatDate.birth, person.birthPlace].filter(Boolean).join(' · ')}
                     </span>
                   </div>
                 )}
                 {(formatDate.death || person.deathPlace) && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <span>{t('people.died', 'Died')}: </span>
-                    <span className="font-mono text-xs">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
+                    <span className="hidden sm:inline">{t('people.died', 'Died')}: </span>
+                    <span className="font-mono text-[10px] sm:text-xs truncate">
                       {[formatDate.death, person.deathPlace].filter(Boolean).join(' · ')}
                     </span>
                   </div>
@@ -152,30 +152,29 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
 
             {/* Story Preview */}
             {storyPreview && (
-              <div className="mb-4">
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
+              <div className="mb-3 sm:mb-4">
+                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
                   {storyPreview}
                 </p>
               </div>
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-between pt-3 sm:pt-0">
+              <div className="flex items-center gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
                 {person.timestamp && (
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 whitespace-nowrap">
                     <Clock className="w-3 h-3" />
                     {new Date(person.timestamp * 1000).toLocaleDateString()}
                   </span>
                 )}
                 {person.storyMetadata && (
-                  <span className="flex items-center gap-1">
+                  <span className="hidden sm:flex items-center gap-1 whitespace-nowrap">
                     <FileText className="w-3 h-3" />
                     {t('people.chunks', '{{count}} chunks', { count: person.storyMetadata.totalChunks })}
                   </span>
                 )}
               </div>
-              
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-200" />
             </div>
           </div>

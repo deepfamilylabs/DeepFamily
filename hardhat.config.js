@@ -14,14 +14,7 @@ require("./tasks/update-story-chunk");
 require("./tasks/list-story-chunks");
 require("./tasks/seal-story");
 
-/**
- * address 0x327C01dA6Da9A6818805cadB9eA8d62B10c20000
- * deploy result：
- * - DeepFamilyToken: 0x3472a50766E29Ae6BDf218BfcDD21aE2ad67db82
- * - DeepFamily: 0x17199519B81c83641DC74700b079ABe6D9F99CD8
- * - Conflux eSpace testnet (Chain ID: 71)
- */
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x957d900730121e77ed6a51b5ce93626dbdf014778e22df7870561eccb0e3ac6e";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
@@ -247,7 +240,7 @@ module.exports = {
   
   // Gas reporter configuration
   gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
+    enabled: false, // Temporarily disabled due to provider issues
     currency: "USD",
     coinmarketcap: COINMARKETCAP_API_KEY,
     gasPrice: 20,

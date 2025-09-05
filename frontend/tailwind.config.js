@@ -17,6 +17,7 @@ export default {
         'bounce-gentle': 'bounceGentle 2s ease-in-out infinite',
         'float': 'float 6s ease-in-out infinite',
         'pulse-soft': 'pulseSoft 4s ease-in-out infinite',
+        'marquee': 'marquee 12s linear infinite'
       },
       keyframes: {
         fadeIn: {
@@ -47,6 +48,10 @@ export default {
         pulseSoft: {
           '0%, 100%': { opacity: '0.4' },
           '50%': { opacity: '0.8' },
+        },
+        marquee: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
         },
       },
       fontFamily: {

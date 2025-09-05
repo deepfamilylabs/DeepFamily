@@ -6,6 +6,7 @@ import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import { useNodeData } from '../hooks/useNodeData'
+import { useVisualizationHeight } from '../constants/layout'
 
 export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
 
@@ -77,6 +78,7 @@ function FlexibleDAGViewInner({
 
   const [hover, setHover] = useState<{ id: string; x: number; y: number; hash: string } | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const responsiveHeight = useVisualizationHeight()
   const toContainer = (svgX: number, svgY: number) => ({ left: transform.x + svgX * transform.k, top: transform.y + svgY * transform.k })
   const recomputeHoverPosition = useCallback(() => {
     const anchorId = ctxSelectedId || hover?.id
@@ -124,12 +126,12 @@ function FlexibleDAGViewInner({
   }), [positions, measuredWidths, nodeWidth, nodeHeight, centerOn])
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: 747 }}>
-      <div className="absolute bottom-3 right-3 z-10">
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16 pb-4 px-4 md:px-6" style={{ height: responsiveHeight }}>
+      <div className="absolute bottom-4 right-4 z-10">
         <MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} />
       </div>
-      <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, 747)}`} className="block min-w-full min-h-full select-none">
+      <ZoomControls className="absolute top-24 right-4 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
+      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, responsiveHeight)}`} className="block min-w-full min-h-full select-none">
         <defs>
           <marker id="ftv-arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
             <path d="M0,0 L0,6 L9,3 z" className="fill-blue-400 dark:fill-blue-500" />

@@ -234,7 +234,7 @@
       "tokenId": "Token ID"
     },
     "uriQuery": {
-      "title": "Token歷史鏈接查詢",
+      "title": "URI歷史查詢",
       "tokenId": "Token ID",
       "placeholder": "請輸入Token ID"
     },
@@ -323,7 +323,7 @@
   "visualization": {
     "title": "視覺化",
     "viewModes": {
-      "tree": "樹",
+      "tree": "樹圖",
       "dag": "有向無環圖",
       "force": "力導向",
       "virtual": "虛擬化"
@@ -340,7 +340,7 @@
     "ui": {
       "visualizationView": "視覺化視圖",
       "versionNumber": "版本號",
-      "contractModeConfig": "合約模式",
+      "contractModeConfig": "合約配置",
       "traversalDFS": "DFS 深度優先：快速深入後回溯",
       "traversalBFS": "BFS 廣度優先：按層展開更均衡",
       "traversal": "遍歷方式",
@@ -349,6 +349,7 @@
       "includeVersionDetailsDesc": "僅影響下次重新整理時是否批次載入版本詳情（重新整理時鎖定快照）。",
       "progressSummary": "節點 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "節點",
+      "depthLabelFull": "深度",
       "edit": "編輯",
       "save": "保存",
       "cancel": "取消"
@@ -356,7 +357,7 @@
     "status": {
       "loading": "加載中...",
       "contractModeRootNotFound": "未找到該根節點版本，請檢查哈希與版本號",
-      "rootNotFound": "未找到根節點，請在設定頁檢查 Root 配置或等待索引",
+      "rootNotFound": "未找到根節點，請檢查 Root 配置或等待索引",
       "contractOk": "合約資料載入完成",
       "badge": {
         "checking": "檢查中",
@@ -519,12 +520,14 @@
     "clearFilters": "清除所有篩選",
     "filteredResults": "{{count}} 個篩選結果",
     "allResults": "共 {{count}} 個結果",
-    "filterAll": "全部",
-    "filterRecent": "最新",
-    "filterOldest": "最早",
-    "filterByName": "按姓名",
-    "filterByEndorsement": "按背書",
-    "filterByBirthYear": "按出生年",
+    "sortRules": "排序規則",
+    "filterRules": "過濾規則",
+    "viewMode": "視圖模式",
+    "filterAll": "ID",
+    "filterByCreateTime": "建立時間",
+    "filterByName": "姓名",
+    "filterByEndorsement": "背書",
+    "filterByBirthYear": "出生年",
     "gridView": "網格視圖",
     "listView": "列表視圖",
     "resultsCount": "找到 {{count}} 個結果",
@@ -547,7 +550,7 @@
     "addedBy": "添加者",
     "tag": "標籤",
     "personHash": "人物雜湊",
-    "detailedStory": "詳細傳記",
+    "detailedStory": "傳記",
     "chunks": "分片",
     "fullText": "全文",
     "integrityVerified": "傳記完整性已驗證",
@@ -556,7 +559,8 @@
     "chunkTitle": "分片 #{{index}}",
     "characters": "個字元",
     "noStoryData": "暫無傳記資料",
-    "basicStory": "基礎傳記",
-    "noStory": "暫無傳記內容"
+    "basicStory": "事蹟",
+    "noStory": "暫無傳記內容",
+    "peopleEncyclopedia": "人物百科"
   }
 }

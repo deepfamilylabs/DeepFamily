@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useParams, useNavigate, useLocation, NavLink } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Edit2, Clock, User, ChevronDown, ChevronRight, FileText, List, Copy, GitBranch, Clipboard } from 'lucide-react'
 import { StoryChunk, StoryMetadata } from '../types/graph'
@@ -68,7 +68,7 @@ export default function PersonPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useTranslation()
-  const { mode, rpcUrl, contractAddress } = useConfig()
+  const { rpcUrl, contractAddress } = useConfig()
   const toast = useToast()
   
   const [data, setData] = useState<StoryDetailData | null>(null)
@@ -173,7 +173,7 @@ export default function PersonPage() {
       setLoading(false)
       return
     }
-    if (mode !== 'contract' || !rpcUrl || !contractAddress) {
+    if (!rpcUrl || !contractAddress) {
       setError('Missing required configuration')
       setLoading(false)
       return
@@ -187,7 +187,7 @@ export default function PersonPage() {
       // 可選：先用 totalSupply 粗略判斷 (忽略因 burn 或 gap 帶來的潛在偏差)
       try {
         const total = await contract.totalSupply?.()
-        if (total && BigInt(tokenId) >= BigInt(total)) {
+        if (total && BigInt(tokenId) > BigInt(total)) {
           setError(t('person.nonexistentToken', 'Token does not exist'))
           setLoading(false)
           return
@@ -259,7 +259,7 @@ export default function PersonPage() {
     } finally {
       setLoading(false)
     }
-  }, [tokenId, mode, rpcUrl, contractAddress, t])
+  }, [tokenId, rpcUrl, contractAddress, t])
 
   useEffect(() => {
     fetchStoryData()

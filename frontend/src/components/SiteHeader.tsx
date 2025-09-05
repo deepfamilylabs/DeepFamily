@@ -52,7 +52,7 @@ export default function SiteHeader() {
       )}
       <PageContainer className="relative h-16 flex items-center justify-between">
         <NavLink to="/" className={`flex items-center gap-3 font-bold transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
-          <Logo className={`w-8 h-8 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-indigo-600 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
+          <Logo className={`w-8 h-8 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-blue-500 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
           <span className={`text-xl font-light tracking-widest uppercase ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', letterSpacing: '0.2em' }}>DeepFamily</span>
         </NavLink>
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-shrink-0 min-w-0">

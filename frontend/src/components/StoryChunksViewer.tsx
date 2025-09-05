@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   X, 
@@ -11,7 +11,6 @@ import {
   ChevronDown, 
   ChevronRight,
   Copy,
-  ExternalLink,
   Layers,
   Hash,
   Check,
@@ -22,7 +21,6 @@ import { useConfig } from '../context/ConfigContext'
 import { useToast } from './ToastProvider'
 import { ethers } from 'ethers'
 import DeepFamily from '../abi/DeepFamily.json'
-import { useNavigate } from 'react-router-dom'
 
 interface StoryChunksViewerProps {
   person: NodeData
@@ -86,10 +84,12 @@ function computeStoryIntegrity(chunks: StoryChunk[], metadata: any) {
 
 export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChunksViewerProps) {
   const { t } = useTranslation()
-  const { mode, rpcUrl, contractAddress } = useConfig()
+  const { rpcUrl, contractAddress } = useConfig()
   const toast = useToast()
-  const navigate = useNavigate()
-  
+  const nameContainerRef = useRef<HTMLDivElement | null>(null)
+  const nameTextRef = useRef<HTMLSpanElement | null>(null)
+  const [marquee, setMarquee] = useState(false)
+
   const [storyData, setStoryData] = useState<StoryData>({
     chunks: [],
     fullStory: '',
@@ -163,7 +163,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
 
   // Fetch story data
   const fetchStoryData = useCallback(async () => {
-    if (!person.tokenId || !person.hasDetailedStory || mode !== 'contract' || !rpcUrl || !contractAddress) {
+    if (!person.tokenId || !person.hasDetailedStory || !rpcUrl || !contractAddress) {
       return
     }
 
@@ -218,7 +218,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
         error: err.message || t('storyChunksViewer.fetchError', 'Failed to load story data')
       }))
     }
-  }, [person.tokenId, person.hasDetailedStory, mode, rpcUrl, contractAddress, t])
+  }, [person.tokenId, person.hasDetailedStory, rpcUrl, contractAddress, t])
 
   // Load data when opened
   useEffect(() => {
@@ -240,24 +240,37 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
     })
   }
 
-  // Navigate to detailed story page
+  // Navigate to detailed story page in new tab
   const goToDetailPage = () => {
     if (person.tokenId) {
-      navigate(`/person/${person.tokenId}`)
+      window.open(`/person/${person.tokenId}`, '_blank', 'noopener,noreferrer')
       onClose()
     }
   }
 
+  // Determine if name overflows to enable marquee
+  useEffect(() => {
+    if (!isOpen) return
+    const check = () => {
+      if (nameContainerRef.current && nameTextRef.current) {
+        const need = nameTextRef.current.scrollWidth > nameContainerRef.current.clientWidth + 4
+        setMarquee(need)
+      }
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [isOpen, person.fullName])
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      
-      {/* Modal */}
-      <div className="relative min-h-screen flex items-center justify-center p-4">
-        <div className="relative w-full max-w-4xl bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
+      {/* Modal Container (flex to allow full height on mobile) */}
+      <div className="relative flex h-full w-full sm:min-h-screen sm:items-center sm:justify-center p-0 sm:p-4">
+        <div className="relative flex flex-col w-full h-full sm:h-auto sm:max-h-[90vh] max-w-none sm:max-w-4xl bg-white dark:bg-gray-900 rounded-none sm:rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
           {/* Center Hint */}
           {centerHint && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
@@ -266,61 +279,71 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
               </div>
             </div>
           )}
-          {/* Header */}
-          <div className="bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-6 border-b border-gray-200/50 dark:border-gray-700/50">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <User className="w-8 h-8 text-white" />
+          {/* Header (sticky for mobile) */}
+          <div className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-4 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                  <User className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                    {person.fullName || `Person ${person.personHash.slice(0, 8)}...`}
-                  </h2>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                <div className="min-w-0">
+                  {/* Name with conditional marquee when overflow */}
+                  <div ref={nameContainerRef} className="relative max-w-[56vw] sm:max-w-xs md:max-w-md overflow-hidden">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 whitespace-nowrap">
+                      <span
+                        ref={nameTextRef}
+                        className={`inline-block pr-8 ${marquee ? 'will-change-transform animate-[marquee_12s_linear_infinite]' : ''}`}
+                      >
+                        {person.fullName || `Person ${person.personHash.slice(0, 8)}...`}
+                      </span>
+                    </h2>
+                    {marquee && (
+                      <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white dark:from-gray-900 to-transparent" />
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     {genderText && <span>{genderText}</span>}
                     {person.tokenId && person.tokenId !== '0' && (
                       <div className="flex items-center gap-2">
                         <span className="font-mono">#{person.tokenId}</span>
                         {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
                             <span className="text-yellow-500">⭐</span>
-                            <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                            <span className="text-[10px] sm:text-xs font-medium text-yellow-700 dark:text-yellow-300">
                               {person.endorsementCount}
                             </span>
                           </div>
                         )}
+                        {/* Moved People Encyclopedia button here after endorsement info */}
+                        <button
+                          onClick={() => window.open(`/person/${person.tokenId || person.id}`, '_blank', 'noopener,noreferrer')}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] sm:text-xs font-medium rounded-full transition-colors"
+                        >
+                          <Book className="w-3.5 h-3.5" />
+                          {t('storyChunksViewer.peopleEncyclopedia', '人物百科')}
+                        </button>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                {person.tokenId && (
-                  <button
-                    onClick={goToDetailPage}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    {t('storyChunksViewer.viewDetail', 'View Details')}
-                  </button>
-                )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Removed encyclopedia button from here; now only close */}
                 <button
                   onClick={onClose}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                  aria-label={t('common.close', 'Close')}
                 >
                   <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
           </div>
-
           {/* Content */}
-          <div className="max-h-[70vh] overflow-y-auto">
-            <div className="p-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="p-4 sm:p-6 pb-24 sm:pb-6">{/* extra bottom space for safe touch area */}
               {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50/50 dark:bg-gray-800/30 rounded-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50/70 dark:bg-gray-800/30 rounded-2xl">
                 {(formatDate.birth || person.birthPlace) && (
                   <div className="flex items-center gap-3">
                     <Calendar className="w-5 h-5 text-green-500" />
@@ -441,6 +464,20 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
               {/* Story Content */}
               {person.hasDetailedStory ? (
                 <div>
+                  {/* Basic Story / Overview still visible when detailed story exists */}
+                  {person.story && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        {t('storyChunksViewer.basicStory', 'Basic Story')}
+                      </h3>
+                      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                          {person.story}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {/* View Mode Toggle */}
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -476,20 +513,16 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
 
                   {/* Integrity Status */}
                   {storyData.integrity && (
-                    <div className="mb-4 p-3 rounded-lg border">
+                    <div className="mb-4">
                       {storyData.integrity.missing.length === 0 && storyData.integrity.lengthMatch && storyData.integrity.hashMatch === true ? (
-                        <div className="flex items-center gap-2 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-500/70 dark:border-green-400/60 text-green-600 dark:text-green-300 text-xs sm:text-sm font-medium bg-transparent">
                           <Check className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            {t('storyChunksViewer.integrityVerified', 'Story integrity verified')}
-                          </span>
+                          <span>{t('storyChunksViewer.integrityVerified')}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/70 dark:border-amber-400/60 text-amber-600 dark:text-amber-300 text-xs sm:text-sm font-medium bg-transparent">
                           <AlertCircle className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            {t('storyChunksViewer.integrityWarning', 'Story integrity issues detected')}
-                          </span>
+                          <span>{t('storyChunksViewer.integrityWarning')}</span>
                         </div>
                       )}
                     </div>

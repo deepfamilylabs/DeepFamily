@@ -7,6 +7,7 @@ import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
+import { useVisualizationHeight } from '../constants/layout'
 
 // Re-add types lost during refactor
 export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
@@ -26,7 +27,9 @@ function buildGraph(root: GraphNode) {
 
 export interface ForceDAGViewHandle { centerOnNode: (id: string) => void }
 
-function ForceDAGViewInner({ root, height = 747 }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
+function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
+  const responsiveHeight = useVisualizationHeight()
+  const defaultHeight = height || responsiveHeight
   const { nodesData } = useTreeData() as any
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
@@ -52,7 +55,7 @@ function ForceDAGViewInner({ root, height = 747 }: { root: GraphNode; height?: n
     svg.selectAll('*').remove()
     const width = (svgRef.current?.clientWidth || 800)
 
-    const g = svg.attr('viewBox', `0 0 ${width} ${height}`).attr('width', '100%').attr('height', height).append('g')
+    const g = svg.attr('viewBox', `0 0 ${width} ${defaultHeight}`).attr('width', '100%').attr('height', defaultHeight).append('g')
     gRef.current = g.node() as SVGGElement
     ;(innerRef as any).current = gRef.current
 
@@ -117,7 +120,7 @@ function ForceDAGViewInner({ root, height = 747 }: { root: GraphNode; height?: n
       .force('link', d3.forceLink<SimNode, SimLink>(data.links).id((d: any) => (d as SimNode).id).distance(SPEED.linkDist).strength(SPEED.linkStrength))
       .force('charge', d3.forceManyBody().strength(SPEED.charge))
       .force('x', d3.forceX<SimNode>().x((d: any) => marginX + (d as SimNode).depth * gapX).strength(SPEED.xStrength))
-      .force('y', d3.forceY(height / 2).strength(SPEED.yStrength))
+      .force('y', d3.forceY(defaultHeight / 2).strength(SPEED.yStrength))
       .force('collide', d3.forceCollide<SimNode>(NODE_R + SPEED.collidePad))
       .on('tick', () => {
         link.attr('x1', (d: any) => d.source.x).attr('y1', (d: any) => d.source.y).attr('x2', (d: any) => d.target.x).attr('y2', (d: any) => d.target.y)
@@ -143,7 +146,7 @@ function ForceDAGViewInner({ root, height = 747 }: { root: GraphNode; height?: n
   miniUpdateRef.current = update
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: 747 }}>
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: defaultHeight }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
       <svg ref={svgRef}></svg>

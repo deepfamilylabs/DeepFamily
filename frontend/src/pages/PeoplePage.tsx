@@ -1,20 +1,16 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Filter, Users, Book, Sparkles, ArrowRight, Grid, List as ListIcon, User, Hash } from 'lucide-react'
+import { Search, Users, Book, Grid, List as ListIcon, User, Hash } from 'lucide-react'
 import { NodeData } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
 import StoryChunksViewer from '../components/StoryChunksViewer'
 import PageContainer from '../components/PageContainer'
-
-interface PeoplePageData {
-  people: NodeData[]
-  totalCount: number
-  loading: boolean
-}
+import SortButton from '../components/SortButton'
 
 type ViewMode = 'grid' | 'list'
-type FilterType = 'all' | 'recent' | 'oldest' | 'by_name' | 'by_endorsement' | 'by_birth_year'
+type FilterType = 'all' | 'by_create_time' | 'by_name' | 'by_endorsement' | 'by_birth_year'
+type SortOrder = 'asc' | 'desc'
 
 export default function PeoplePage() {
   const { t } = useTranslation()
@@ -23,6 +19,7 @@ export default function PeoplePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [filterType, setFilterType] = useState<FilterType>('all')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [selectedPerson, setSelectedPerson] = useState<NodeData | null>(null)
   const [addressFilter, setAddressFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
@@ -106,39 +103,49 @@ export default function PeoplePage() {
     // Sort and filter
     switch (filterType) {
       case 'all':
-        // Default sort by tokenId (ascending)
+        // Sort by tokenId with sort order
         filtered = filtered.sort((a, b) => {
           const aTokenId = parseInt(a.tokenId || '0')
           const bTokenId = parseInt(b.tokenId || '0')
-          return aTokenId - bTokenId
+          return sortOrder === 'desc' ? bTokenId - aTokenId : aTokenId - bTokenId
         })
         break
-      case 'recent':
-        filtered = filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 20)
-        break
-      case 'oldest':
-        filtered = filtered.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)).slice(0, 20)
+      case 'by_create_time':
+        filtered = filtered.sort((a, b) => {
+          const timeA = a.timestamp || 0
+          const timeB = b.timestamp || 0
+          return sortOrder === 'desc' ? timeB - timeA : timeA - timeB
+        })
         break
       case 'by_name':
-        filtered = filtered.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''))
+        filtered = filtered.sort((a, b) => {
+          const nameA = a.fullName || ''
+          const nameB = b.fullName || ''
+          const result = nameA.localeCompare(nameB)
+          return sortOrder === 'desc' ? -result : result
+        })
         break
       case 'by_endorsement':
-        filtered = filtered.sort((a, b) => (b.endorsementCount || 0) - (a.endorsementCount || 0))
+        filtered = filtered.sort((a, b) => {
+          const countA = a.endorsementCount || 0
+          const countB = b.endorsementCount || 0
+          return sortOrder === 'desc' ? countB - countA : countA - countB
+        })
         break
       case 'by_birth_year':
         filtered = filtered.sort((a, b) => {
           const aYear = a.birthYear || 0
           const bYear = b.birthYear || 0
           if (aYear === 0 && bYear === 0) return 0
-          if (aYear === 0) return 1  // No birth year goes to the end
-          if (bYear === 0) return -1
-          return aYear - bYear  // Sort by birth year ascending
+          if (aYear === 0) return sortOrder === 'desc' ? -1 : 1
+          if (bYear === 0) return sortOrder === 'desc' ? 1 : -1
+          return sortOrder === 'desc' ? bYear - aYear : aYear - bYear
         })
         break
     }
 
     return filtered
-  }, [data.people, searchTerm, filterType, addressFilter, tagFilter])
+  }, [data.people, searchTerm, filterType, sortOrder, addressFilter, tagFilter])
 
 
   if (data.loading) {
@@ -200,7 +207,8 @@ export default function PeoplePage() {
       </section>
 
       {/* Search and Filter Controls */}
-      <PageContainer className="mb-8">
+      {/* Removed inner PageContainer to allow full width inside outer layout container */}
+      <div className="w-full mb-8">
         <div className="bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-4">
             {/* Search */}
@@ -216,6 +224,9 @@ export default function PeoplePage() {
             </div>
 
             {/* Advanced Filters */}
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              {t('people.filterRules', '过滤规则')}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -248,6 +259,7 @@ export default function PeoplePage() {
                     setTagFilter('')
                     setSearchTerm('')
                     setFilterType('all')
+                    setSortOrder('desc')
                   }}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                 >
@@ -257,83 +269,62 @@ export default function PeoplePage() {
             )}
 
             <div className="flex flex-col gap-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {addressFilter || tagFilter ? 
-                  t('people.filteredResults', '{{count}} filtered results', { count: filteredPeople.length }) :
-                  t('people.allResults', '{{count}} total results', { count: filteredPeople.length })
-                }
-              </div>
-
               {/* Filters */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="overflow-x-auto">
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 min-w-max">
-                <button
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {t('people.sortRules', '排序规则')}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2">
+                <SortButton
+                  label={t('people.filterAll', 'ID')}
+                  isActive={filterType === 'all'}
+                  sortOrder={sortOrder}
                   onClick={() => setFilterType('all')}
-                  className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    filterType === 'all'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('people.filterAll', 'All')}
-                </button>
-                <button
-                  onClick={() => setFilterType('recent')}
-                  className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    filterType === 'recent'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('people.filterRecent', 'Recent')}
-                </button>
-                <button
-                  onClick={() => setFilterType('oldest')}
-                  className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    filterType === 'oldest'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('people.filterOldest', 'Oldest')}
-                </button>
-                <button
+                  onSortOrderChange={setSortOrder}
+                  showSortArrows={true}
+                />
+                <SortButton
+                  label={t('people.filterByCreateTime', '创建时间')}
+                  isActive={filterType === 'by_create_time'}
+                  sortOrder={sortOrder}
+                  onClick={() => setFilterType('by_create_time')}
+                  onSortOrderChange={setSortOrder}
+                  showSortArrows={true}
+                />
+                <SortButton
+                  label={t('people.filterByName', 'Name')}
+                  isActive={filterType === 'by_name'}
+                  sortOrder={sortOrder}
                   onClick={() => setFilterType('by_name')}
-                  className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    filterType === 'by_name'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('people.filterByName', 'By Name')}
-                </button>
-                <button
+                  onSortOrderChange={setSortOrder}
+                  showSortArrows={true}
+                />
+                <SortButton
+                  label={t('people.filterByEndorsement', 'Endorsements')}
+                  isActive={filterType === 'by_endorsement'}
+                  sortOrder={sortOrder}
                   onClick={() => setFilterType('by_endorsement')}
-                  className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    filterType === 'by_endorsement'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('people.filterByEndorsement', 'By Endorsement')}
-                </button>
-                <button
+                  onSortOrderChange={setSortOrder}
+                  showSortArrows={true}
+                />
+                <SortButton
+                  label={t('people.filterByBirthYear', 'Birth Year')}
+                  isActive={filterType === 'by_birth_year'}
+                  sortOrder={sortOrder}
                   onClick={() => setFilterType('by_birth_year')}
-                  className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    filterType === 'by_birth_year'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {t('people.filterByBirthYear', 'By Birth Year')}
-                </button>
+                  onSortOrderChange={setSortOrder}
+                  showSortArrows={true}
+                />
               </div>
               </div>
 
               {/* View Mode Toggle */}
               <div className="flex-shrink-0">
-                <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {t('people.viewMode', '视图模式')}
+                </div>
+                <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-2 py-2">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-colors ${
@@ -363,14 +354,20 @@ export default function PeoplePage() {
           </div>
 
           {/* Results count */}
-          <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            {t('people.resultsCount', '{{count}} results found', { count: filteredPeople.length })}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {addressFilter || tagFilter ? 
+                t('people.filteredResults', '{{count}} filtered results', { count: filteredPeople.length }) :
+                t('people.allResults', '{{count}} total results', { count: filteredPeople.length })
+              }
+            </div>
           </div>
+
         </div>
-      </PageContainer>
+      </div>
 
       {/* Main Content */}
-      <PageContainer className="pb-12">
+      <div className="w-full pb-12">
         {filteredPeople.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
@@ -382,7 +379,7 @@ export default function PeoplePage() {
             </p>
           </div>
         ) : (
-          <div className={`grid gap-6 ${viewMode === 'grid' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 max-w-4xl mx-auto'}`}>
+          <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 max-w-4xl mx-auto'}`}>
             {filteredPeople.map((person) => (
               <PersonStoryCard
                 key={person.id}
@@ -393,7 +390,7 @@ export default function PeoplePage() {
             ))}
           </div>
         )}
-      </PageContainer>
+      </div>
 
       {/* Story Chunks Viewer Modal */}
       {selectedPerson && (

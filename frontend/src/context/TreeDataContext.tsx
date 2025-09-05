@@ -35,7 +35,7 @@ const MULTICALL_ABI = [
 
 export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
-  const { mode, rpcUrl, contractAddress, rootHash, rootVersionIndex } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex } = useConfig()
   const { traversal, includeVersionDetails } = useVizOptions()
   const [root, setRoot] = useState<GraphNode | null>(null)
   const [nodesData, setNodesData] = useState<Record<string, NodeData>>({})
@@ -60,7 +60,6 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
   // Provider + contract (memoized & cached)
   const provider = useMemo(() => {
-    if (mode !== 'contract') return null
     if (!rpcUrl) return null
     if (providerCache.has(rpcUrl)) return providerCache.get(rpcUrl) as ethers.JsonRpcProvider
     try {
@@ -68,20 +67,20 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       providerCache.set(rpcUrl, p)
       return p
     } catch { return null }
-  }, [mode, rpcUrl])
+  }, [rpcUrl])
 
   const contract = useMemo(() => {
-    if (mode !== 'contract' || !provider || !contractAddress) return null
+    if (!provider || !contractAddress) return null
     try { return new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider) } catch { return null }
-  }, [mode, provider, contractAddress])
+  }, [provider, contractAddress])
 
   const fetchRunKeyRef = useRef<string | null>(null)
 
   // Root + base streaming load
   useEffect(() => {
     if (refreshTick === 0) return
-    if (mode !== 'contract' || !contract) return
-    const runKey = `${mode}-${rootHash}-${rootVersionIndex}-${refreshTick}`
+    if (!contract) return
+    const runKey = `contract-${rootHash}-${rootVersionIndex}-${refreshTick}`
     if (fetchRunKeyRef.current === runKey) return
     fetchRunKeyRef.current = runKey
     let cancelled = false
@@ -146,7 +145,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       }
     })()
     return () => { cancelled = true; controller.abort(); setLoading(l => l ? false : l) }
-  }, [mode, contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails])
+  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails])
 
   const nodePairs = useMemo(() => {
     if (!root) return [] as Array<{ h: string; v: number }>
@@ -163,7 +162,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   // Endorsement counts
   useEffect(() => {
     if (!loadOptionsSnapshot.includeVersionDetails) return
-    if (loading || mode !== 'contract' || !contract || !root) return
+    if (loading || !contract || !root) return
     const endorseEnabledSnapshot = loadOptionsSnapshot.includeVersionDetails
     let cancelled = false
     ;(async () => {
@@ -337,7 +336,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       }
     })()
     return () => { cancelled = true }
-  }, [loadOptionsSnapshot.includeVersionDetails, loading, mode, contract, root, nodePairs, contractAddress, provider, push])
+  }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, root, nodePairs, contractAddress, provider, push])
 
   const value: TreeDataValue = {
     root,

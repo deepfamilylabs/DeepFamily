@@ -234,7 +234,7 @@
       "tokenId": "Token ID"
     },
     "uriQuery": {
-      "title": "Token URI History Query",
+      "title": "URI History Query",
       "tokenId": "Token ID",
       "placeholder": "Enter Token ID"
     },
@@ -340,23 +340,24 @@
     "ui": {
       "visualizationView": "Visualization View",
       "versionNumber": "Version",
-      "contractModeConfig": "Contract Mode",
+      "contractModeConfig": "Contract Configuration",
       "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
       "traversalBFS": "BFS - Breadth-First (level order)",
       "traversal": "Traversal Mode",
       "traversalDesc": "DFS depth-first (faster deep nodes) / BFS breadth-first (level-wise)",
       "includeVersionDetails": "Load Details",
       "includeVersionDetailsDesc": "Affects whether version detail batches are loaded on the next refresh (snapshot taken at refresh).",
+      "progressSummary": "Nodes {{created}} / depth {{depth}}",
       "nodesLabelFull": "Nodes",
       "depthLabelFull": "Depth",
-      "progressSummary": "Nodes {{created}} / depth {{depth}}",
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel"
     },
     "status": {
       "loading": "Loading...",
-      "rootNotFound": "Root node not found. Please check the Root configuration in settings or wait for indexing",
+      "contractModeRootNotFound": "Root node version not found. Please check the hash and version number.",
+      "rootNotFound": "Root node not found. Please check the Root configuration or wait for indexing",
       "contractOk": "Contract data loaded",
       "badge": {
         "checking": "Checking",
@@ -519,12 +520,14 @@
     "clearFilters": "Clear all filters",
     "filteredResults": "{{count}} filtered results",
     "allResults": "Total {{count}} results",
-    "filterAll": "All",
-    "filterRecent": "Latest",
-    "filterOldest": "Earliest",
-    "filterByName": "By Name",
-    "filterByEndorsement": "By Endorsements",
-    "filterByBirthYear": "By Birth Year",
+    "sortRules": "Sort Rules",
+    "filterRules": "Filter Rules",
+    "viewMode": "View Mode",
+    "filterAll": "ID",
+    "filterByCreateTime": "Creation Time",
+    "filterByName": "Name",
+    "filterByEndorsement": "Endorsements",
+    "filterByBirthYear": "Birth Year",
     "gridView": "Grid View",
     "listView": "List View",
     "resultsCount": "Found {{count}} results",
@@ -547,7 +550,7 @@
     "addedBy": "Added By",
     "tag": "Tag",
     "personHash": "Person Hash",
-    "detailedStory": "Detailed Story",
+    "detailedStory": "Biography",
     "chunks": "Chunks",
     "fullText": "Full Text",
     "integrityVerified": "Story integrity verified",
@@ -556,7 +559,8 @@
     "chunkTitle": "Chunk #{{index}}",
     "characters": "characters",
     "noStoryData": "No story data",
-    "basicStory": "Basic Story",
-    "noStory": "No story content"
+    "basicStory": "Deeds",
+    "noStory": "No story content",
+    "peopleEncyclopedia": "Encyclopedia"
   }
 }

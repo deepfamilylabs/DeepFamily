@@ -6,8 +6,9 @@ interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
    * default: matches existing layout (max-w-7xl)
    * narrow: for forms or focused content
    * wide: for data-heavy (max-w-screen-xl)
+   * full: for full width (w-full max-w-none)
    */
-  size?: 'default' | 'narrow' | 'wide'
+  size?: 'default' | 'narrow' | 'wide' | 'full'
   /** disable horizontal padding if you want full-bleed children */
   noPadding?: boolean
 }
@@ -15,7 +16,8 @@ interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
 const sizeMap: Record<NonNullable<PageContainerProps['size']>, string> = {
   default: 'max-w-7xl',
   narrow: 'max-w-3xl',
-  wide: 'max-w-screen-xl'
+  wide: 'max-w-screen-xl',
+  full: 'w-full max-w-none'
 }
 
 export default function PageContainer({

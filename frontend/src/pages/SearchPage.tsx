@@ -132,7 +132,7 @@ export default function SearchPage() {
   })
   
   const schemas = createSchemas()
-  const { mode, rpcUrl, contractAddress } = useConfig()
+  const { rpcUrl, contractAddress } = useConfig()
   const toast = useToast()
   
   const [offset, setOffset] = useState<number>(0)
@@ -459,7 +459,7 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="space-y-4 text-gray-900 dark:text-gray-100">
+    <div className="space-y-4 text-gray-900 dark:text-gray-100 pb-4 md:pb-0">
       {/* Hash Calculator Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-teal-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('hash')}>

@@ -18,10 +18,10 @@ const ConfigContext = createContext<AppConfig | null>(null)
 
 function getEnvDefaults(): ConfigValues {
   return {
-    rpcUrl: (import.meta as any).env.VITE_RPC_URL || 'https://evmtestnet.confluxrpc.com',
-    contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS || '0x17199519B81c83641DC74700b079ABe6D9F99CD8',
-    rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH || '0x998bd09b669a42a18dace4dd87e3d754dbb7ec0b838e1e06a5a8dbddda90b1f5',
-    rootVersionIndex: Number((import.meta as any).env.VITE_ROOT_VERSION_INDEX || 1),
+    rpcUrl: (import.meta as any).env.VITE_RPC_URL,
+    contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS,
+    rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH,
+    rootVersionIndex: Number((import.meta as any).env.VITE_ROOT_VERSION_INDEX),
   }
 }
 
