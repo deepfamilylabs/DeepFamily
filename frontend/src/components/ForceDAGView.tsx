@@ -55,7 +55,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
     svg.selectAll('*').remove()
     const width = (svgRef.current?.clientWidth || 800)
 
-    const g = svg.attr('viewBox', `0 0 ${width} ${defaultHeight}`).attr('width', '100%').attr('height', defaultHeight).append('g')
+    const g = svg.append('g')
     gRef.current = g.node() as SVGGElement
     ;(innerRef as any).current = gRef.current
 
@@ -149,7 +149,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
     <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: defaultHeight }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <svg ref={svgRef}></svg>
+      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 800 ${defaultHeight}`} className="block min-w-full min-h-full select-none"></svg>
     </div>
   )
 }
