@@ -47,7 +47,7 @@
       },
       "openComposition": {
         "title": "開放組合",
-        "description": "鏈上結構 + Subgraph 索引，供社群構建應用、視覺化、研究資料庫"
+        "description": "鏈上結構供社群構建應用、視覺化、研究資料庫"
       }
     },
     "architecture": {
@@ -77,6 +77,7 @@
       },
       "advantages": {
         "title": "運作流程",
+        "subtitle": "五步式價值發現與共識形成機制",
         "step1": "新增人物版本",
         "step1Desc": "若雙親均存在 → 獲得挖礦獎勵",
         "step2": "其他使用者背書",
@@ -205,45 +206,6 @@
       "license": "MIT 許可證"
     }
   },
-  "settings": {
-    "title": "設定",
-    "rpcUrl": "RPC URL",
-    "subgraphUrl": "Subgraph URL",
-    "contractAddress": "合約地址",
-    "rootHash": "根節點哈希",
-    "rootVersionIndex": "根版本號",
-    "mode": "模式",
-    "modes": {
-      "subgraph": "子圖",
-      "contract": "合約"
-    },
-    "save": "儲存",
-    "reset": "重設為預設",
-    "messages": {
-      "saved": "設定已儲存",
-      "reset": "已恢復為預設設定",
-      "savedGoVisualConfirm": "設定已儲存，是否跳轉到視覺化頁面？"
-    },
-    "ui": {
-      "configDescription": "配置您的區塊鏈連接和族譜資料源",
-      "connectionConfig": "連接配置",
-      "connectionConfigDesc": "配置區塊鏈節點和數據源連接",
-      "genealogyConfig": "族譜數據配置",
-      "genealogyConfigDesc": "配置要顯示的族譜根節點和資料模式",
-      "subgraphMode": "子圖模式",
-      "contractMode": "合約模式",
-      "edit": "編輯",
-      "save": "儲存",
-      "cancel": "取消",
-      "saving": "儲存中..."
-    },
-    "validation": {
-      "urlRequired": "請輸入有效的 URL",
-      "required": "此字段為必填項",
-      "minLength": "長度至少10",
-      "versionMin": "必須≥1"
-    }
-  },
   "search": {
     "title": "搜尋",
     "query": "查詢",
@@ -360,11 +322,6 @@
   },
   "visualization": {
     "title": "視覺化",
-    "dataFrom": "數據來源",
-    "modes": {
-      "subgraph": "子圖模式",
-      "contract": "合約模式"
-    },
     "viewModes": {
       "tree": "樹",
       "dag": "有向無環圖",
@@ -378,13 +335,11 @@
     "config": {
       "rpc": "RPC",
       "contract": "合約",
-      "subgraph": "子圖",
       "root": "根節點"
     },
     "ui": {
       "visualizationView": "視覺化視圖",
       "versionNumber": "版本號",
-      "subgraphModeConfig": "子圖模式",
       "contractModeConfig": "合約模式",
       "traversalDFS": "DFS 深度優先：快速深入後回溯",
       "traversalBFS": "BFS 廣度優先：按層展開更均衡",
@@ -392,23 +347,16 @@
       "traversalDesc": "DFS 深度優先(快看到深層) / BFS 廣度優先(按層展開)",
       "includeVersionDetails": "載入詳情",
       "includeVersionDetailsDesc": "僅影響下次重新整理時是否批次載入版本詳情（重新整理時鎖定快照）。",
+      "progressSummary": "節點 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "節點",
-      "depthLabelFull": "深度",
-      "progressSummary": "節點 {{created}} / 深度 {{depth}}"
+      "edit": "編輯",
+      "save": "保存",
+      "cancel": "取消"
     },
     "status": {
       "loading": "加載中...",
-      "subgraphUnavailable": "子圖暫不可用（可能是端口未啟動或 CORS）",
-      "developmentProxy": "開發環境已提供代理路徑 /api/subgraph；確保 Graph Node 運行在 http://127.0.0.1:8000。",
-      "currentlySubgraphMode": "當前仍處於子圖模式。你也可以手動切換為合約模式。",
-      "switchToContract": "切換到合約模式",
-      "switchToProxy": "一鍵切換到代理",
-      "contractModeRootNotFound": "合約模式：未找到該根節點版本，請檢查哈希與版本號",
-      "subgraphTimeout": "子圖請求超時",
-      "subgraphConnectionFailed": "子圖連接失敗",
+      "contractModeRootNotFound": "未找到該根節點版本，請檢查哈希與版本號",
       "rootNotFound": "未找到根節點，請在設定頁檢查 Root 配置或等待索引",
-      "graphqlError": "GraphQL 錯誤",
-      "subgraphOk": "子圖連線正常",
       "contractOk": "合約資料載入完成",
       "badge": {
         "checking": "檢查中",
@@ -472,7 +420,6 @@
     "validation": {
       "rpc": "請輸入有效的 RPC 位址",
       "contract": "請輸入有效的合約位址 (0x + 40位16進制)",
-      "subgraph": "請輸入有效的 Subgraph URL",
       "root": "請輸入有效的根雜湊 (0x + 64位16進制)"
     }
   },
@@ -492,7 +439,6 @@
     "editChunk": "編輯分片 #{{index}}",
     "addChunk": "添加新分片",
     "contentPlaceholder": "請輸入分片內容（最多1000字元）",
-    "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）",
     "saving": "保存中...",
     "save": "保存",
     "cancel": "取消",
@@ -501,7 +447,6 @@
     "loading": "載入中...",
     "contentRequired": "內容不能為空",
     "contentTooLong": "內容不能超過1000字元",
-    "contentTooLongBytes": "內容不能超過1000位元組",
     "operationFailed": "操作失敗",
     "sealConfirm": "確定要封存傳記嗎？封存後將無法再修改。",
     "sealFailed": "封存失敗",
@@ -511,7 +456,9 @@
       "dontAskAgain": "不再詢問",
       "cancel": "取消",
       "confirm": "確認封存"
-    }
+    },
+    "contentTooLongBytes": "內容不能超過1000位元組",
+    "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）"
   },
   "person": {
     "encyclopedia": "人物百科",
@@ -541,13 +488,13 @@
     "raw": "原文",
     "viewParagraph": "段落模式",
     "viewRaw": "原文模式",
-    "integrityFrontendOk": "完整性前端已校驗",
     "integrityOk": "已校驗",
     "integrityWarn": "完整性可能不一致",
     "integrityLenDiff": "長度不匹配 本地={{local}}位元組",
     "integrityLocalHashMismatch": "本地哈希不匹配",
     "integrityChainHashMismatch": "鏈上哈希不匹配",
     "integrityMissing": "缺失索引: {{indices}}",
+    "integrityFrontendOk": "完整性前端已校驗",
     "integrityChainFail": "鏈上校驗失敗",
     "verify": "合約校驗",
     "verified": "已校驗",

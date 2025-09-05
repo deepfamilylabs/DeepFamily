@@ -7,38 +7,32 @@ interface Props {
   editing: boolean
   setEditing: (v: boolean) => void
   // Status bar props
-  mode: 'subgraph' | 'contract'
-  sgStatus?: 'checking' | 'ok' | 'root_missing' | 'error'
-  sgMessage?: string
   contractMessage?: string
   loading?: boolean
   onRefresh?: () => void
   t: any
 }
 
-export default function VisualizationConfigForm({ editing, setEditing, mode: statusMode, sgStatus, sgMessage, contractMessage, loading, onRefresh, t: statusT }: Props) {
+export default function VisualizationConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, subgraphUrl, rootHash, rootVersionIndex, update, mode } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update } = useConfig()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress)
-  const [localSubgraphUrl, setLocalSubgraphUrl] = useState(subgraphUrl)
   const [localRootHash, setLocalRootHash] = useState(rootHash)
   const [localVersion, setLocalVersion] = useState(rootVersionIndex)
-  const [errors, setErrors] = useState<{ rpc?: string; contract?: string; subgraph?: string; root?: string }>({})
+  const [errors, setErrors] = useState<{ rpc?: string; contract?: string; root?: string }>({})
 
   // sync external changes
   useEffect(() => {
     setLocalRpcUrl(rpcUrl)
     setLocalContractAddress(contractAddress)
-    setLocalSubgraphUrl(subgraphUrl)
     setLocalRootHash(rootHash)
     setLocalVersion(rootVersionIndex)
-  }, [rpcUrl, contractAddress, subgraphUrl, rootHash, rootVersionIndex])
+  }, [rpcUrl, contractAddress, rootHash, rootVersionIndex])
 
   const hasDiff = (
     localRpcUrl !== rpcUrl ||
     localContractAddress !== contractAddress ||
-    localSubgraphUrl !== subgraphUrl ||
     localRootHash !== rootHash
   )
 
@@ -47,7 +41,6 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
     update({
       rpcUrl: localRpcUrl,
       contractAddress: localContractAddress,
-      subgraphUrl: localSubgraphUrl,
       rootHash: localRootHash,
     })
     setEditing(false)
@@ -56,7 +49,6 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
   const cancel = () => {
     setLocalRpcUrl(rpcUrl)
     setLocalContractAddress(contractAddress)
-    setLocalSubgraphUrl(subgraphUrl)
     setLocalRootHash(rootHash)
     setEditing(false)
   }
@@ -72,13 +64,12 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
     const next: typeof errors = {}
     if (!isUrl(localRpcUrl)) next.rpc = 'visualization.validation.rpc'
     if (!isAddress(localContractAddress)) next.contract = 'visualization.validation.contract'
-    if (mode === 'subgraph' && !isUrl(localSubgraphUrl)) next.subgraph = 'visualization.validation.subgraph'
     if (!isHash32(localRootHash)) next.root = 'visualization.validation.root'
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
-  useEffect(() => { if (editing) validateAll() }, [editing, localRpcUrl, localContractAddress, localSubgraphUrl, localRootHash, mode])
+  useEffect(() => { if (editing) validateAll() }, [editing, localRpcUrl, localContractAddress, localRootHash])
 
   // debounce version change (auto apply after 600ms idle)
   useDebounce(localVersion, 600, v => { if (v !== rootVersionIndex) applyVersion() })
@@ -92,13 +83,6 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
   }
 
   const getStatusBadge = () => {
-    if (statusMode === 'subgraph' && sgStatus) {
-      return (
-        <span className={`inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold ${colorMap[sgStatus]}`}>
-          {statusT ? statusT(`visualization.status.badge.${sgStatus}`) : sgStatus}
-        </span>
-      )
-    }
     // Contract status inference
     if (loading) {
       return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-300/60 dark:from-amber-900/40 dark:to-orange-900/30 dark:text-amber-300 dark:border-amber-600/40 shadow-sm backdrop-blur-sm">{statusT ? statusT('visualization.status.badge.checking') : 'Loading'}</span>
@@ -118,7 +102,7 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
           {/* Left side: Title */}
           <div className="min-w-0 flex-1">
             <span className="text-lg font-bold text-transparent bg-gradient-to-r from-slate-800 via-blue-600 to-purple-600 dark:from-slate-200 dark:via-blue-400 dark:to-purple-400 bg-clip-text">
-              {mode === 'subgraph' ? t('visualization.ui.subgraphModeConfig') : t('visualization.ui.contractModeConfig')}
+              {t('visualization.ui.contractModeConfig')}
             </span>
           </div>
           
@@ -130,11 +114,11 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
                   onClick={applyConfigChanges}
                   disabled={!hasDiff}
                   className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-semibold ${hasDiff ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md hover:shadow-lg' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-                >{t('settings.ui.save')}</button>
-                <button onClick={cancel} className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('settings.ui.cancel')}</button>
+                >{t('visualization.ui.save')}</button>
+                <button onClick={cancel} className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('visualization.ui.cancel')}</button>
               </div>
             ) : (
-              <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('settings.ui.edit')}</button>
+              <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('visualization.ui.edit')}</button>
             )}
           </div>
         </div>
@@ -171,13 +155,6 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
             <input type="text" value={localContractAddress} onChange={e => setLocalContractAddress(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.contract ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
             {errors.contract && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.contract, 'Contract address format error')}</div>}
           </div>
-          {mode === 'subgraph' && (
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('visualization.config.subgraph')}:</label>
-              <input type="text" value={localSubgraphUrl} onChange={e => setLocalSubgraphUrl(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.subgraph ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
-              {errors.subgraph && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.subgraph, 'Subgraph format error')}</div>}
-            </div>
-          )}
           <div>
             <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('visualization.config.root')}:</label>
             <input type="text" value={localRootHash} onChange={e => setLocalRootHash(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
@@ -194,12 +171,6 @@ export default function VisualizationConfigForm({ editing, setEditing, mode: sta
             <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.contract')}:</span>
             <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={contractAddress}>{contractAddress}</span>
           </div>
-          {mode === 'subgraph' && subgraphUrl && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.subgraph')}:</span>
-              <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={subgraphUrl}>{subgraphUrl}</span>
-            </div>
-          )}
         </div>
       )}
 

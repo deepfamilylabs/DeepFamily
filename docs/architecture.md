@@ -6,7 +6,6 @@ DeepFamily is a modular on-chain genealogy protocol composed of:
 - Mining token `DeepFamilyToken.sol`
 - ZK verifier implementing `IPersonHashVerifier`
 - React frontend (Vite + Ethers v6)
-- The Graph subgraph for indexing events
 
 ## Dual Network Model
 Layer 1: Relationship Graph
@@ -29,7 +28,6 @@ Interplay
 
 Analytics Implications
 - Two-layer abstraction enables distinct indexing domains: structural lineage queries (ancestry, descendants) vs. economic/engagement analytics (endorsement velocity, reward decay, NFT turnover).
-- Future subgraph schemas can expose composite metrics (e.g., credibility score = f(endorsements, story completeness, lineage depth).
 
 ## Data Flow (Happy Path)
 1. User submits person version (optionally with parent versions present).
@@ -37,7 +35,7 @@ Analytics Implications
 3. Other users endorse a version by paying the current `recentReward`.
 4. Endorser can mint NFT for the endorsed version, storing core info on-chain.
 5. NFT owner adds story shards; once sealed, story becomes immutable.
-6. Subgraph indexes events for UI queries beyond on-chain pagination.
+6. Frontend queries blockchain data directly for UI display.
 
 ## Key Incentive Loop
 Accurate parent linkage -> mining reward -> endorsement cost ties to reward -> NFT holder share -> encourages consolidation on best version.

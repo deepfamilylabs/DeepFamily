@@ -1,7 +1,6 @@
 // Minimal React tree rendering demo for DeepFamily (migrated)
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import HashBadge from './HashBadge'
-import { useQuery, gql } from "@apollo/client";
 import { ethers } from 'ethers'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
@@ -48,68 +47,6 @@ const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = Re
   prev.depth === next.depth &&
   prev.isLast === next.isLast
 ))
-
-const GET_NODE = gql`
-  query GetNode($id: ID!) {
-    personVersion(id: $id) {
-      id
-      personHash
-      versionIndex
-      tag
-      childrenAsFather { child { id personHash versionIndex tag } }
-      childrenAsMother { child { id personHash versionIndex tag } }
-    }
-  }
-`;
-
-interface PersonVersionGQL {
-  id: string
-  personHash: string
-  versionIndex: number
-  tag?: string | null
-  childrenAsFather?: Array<{ child: PersonVersionGQL }>
-  childrenAsMother?: Array<{ child: PersonVersionGQL }>
-}
-
-const SubgraphNode: React.FC<{ id: string; visited: Set<string> }> = React.memo(function SubgraphNode({ id, visited }) {
-  const { data, loading, error } = useQuery<{ personVersion: PersonVersionGQL | null }>(GET_NODE, { variables: { id } })
-  const safeVisited = useMemo(() => new Set(visited).add(id), [id, visited])
-  const cfg = useConfig()
-  const { openNode } = useNodeDetail()
-  const node = data?.personVersion
-  const children = useMemo(() => !node ? [] as PersonVersionGQL[] : [
-    ...(node.childrenAsFather || []).map(e => e.child),
-    ...(node.childrenAsMother || []).map(e => e.child),
-  ], [node])
-  const open = useCallback(() => { if (!node) return; openNode({ personHash: node.personHash, versionIndex: node.versionIndex}) }, [node, openNode])
-  if (loading) return <li>Loading {id}...</li>
-  if (error || !node) return <li>Error/Not found: {id}</li>
-  return (
-    <li>
-      <div className="flex items-center gap-2 cursor-pointer" onClick={open}>
-        <HashBadge hash={node.personHash} onNavigate={open} />
-        <span className="text-sm text-gray-500 font-medium">v{node.versionIndex}</span>
-        {node.tag ? <span className="text-xs text-blue-600">({node.tag})</span> : null}
-      </div>
-      {children.length > 0 && (
-        <ul>
-          {children.map(child => (
-            safeVisited.has(child.id) ? (
-              <li key={child.id}>[cycle detected] {child.id}</li>
-            ) : (
-              <SubgraphNode key={child.id} id={child.id} visited={safeVisited} />
-            )
-          ))}
-        </ul>
-      )}
-    </li>
-  )
-}, (p, n) => p.id === n.id && p.visited.size === n.visited.size)
-
-export function SubgraphTree({ rootPersonHash, rootVersionIndex, subgraphUrl }: { rootPersonHash: string; rootVersionIndex: number; subgraphUrl?: string }) {
-  const rootId = makeNodeId(rootPersonHash.toLowerCase(), rootVersionIndex)
-  return <ul><SubgraphNode id={rootId} visited={new Set()} /></ul>
-}
 
 /**
  * Depth-first fetch Merkle / Family subtree.

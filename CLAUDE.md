@@ -88,12 +88,6 @@ DeepFamily/
 │   ├── scripts/           # Build Scripts
 │   ├── package.json       # Frontend Dependencies
 │   └── vite.config.ts     # Vite Configuration
-├── subgraph/              # The Graph Subgraph Module
-│   ├── src/
-│   │   └── mapping.ts     # Subgraph Mapping Logic
-│   ├── schema.graphql     # GraphQL Schema
-│   ├── subgraph.yaml      # Subgraph Configuration
-│   └── package.json       # Subgraph Dependencies
 ├── test/                  # Smart Contract Tests
 ├── deploy/                # Deployment Scripts
 ├── tasks/                 # Hardhat Tasks

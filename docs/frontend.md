@@ -4,7 +4,6 @@
 - React 18 + Vite + TypeScript
 - Tailwind CSS for utility styling
 - Ethers v6 for contract calls
-- (Planned) Apollo Client once subgraph operational
 
 ## ABI Sync
 Script `frontend/scripts/sync-abi.mjs` expected to pull compiled artifact ABIs from Hardhat `artifacts/` into `frontend/src/abi/`.
@@ -26,7 +25,7 @@ VITE_DEEPFAMILY_TOKEN_ADDRESS=0x...
 5. Story editing UI manages chunk sizes & sealing.
 
 ## Caching Strategy
-- Cache person/version queries locally (SWR/react-query pattern recommended) until subgraph live.
+- Cache person/version queries locally using React state and context for optimal performance.
 
 ## Error Mapping
 Map custom Solidity errors to human labels (e.g. `MustEndorseVersionFirst` -> "Endorse before minting").

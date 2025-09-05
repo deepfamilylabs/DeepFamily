@@ -1,6 +1,17 @@
 # DeepFamily - Decentralized Global On-Chain Family Tree Protocol
 
-<div align="center">
+<div a### 🏢 Repository Structure
+```
+DeepFamily/
+├── contracts/        # Smart contracts
+├── frontend/         # React dApp
+├── test/             # Hardhat tests
+├── tasks/            # Custom Hardhat tasks
+├── deploy/           # Deployment scripts
+├── scripts/          # Utility scripts (e.g. seeding)
+├── docs/             # Additional documentation
+└── hardhat.config.js # Hardhat config
+```>
 
 ![DeepFamily Logo](https://img.shields.io/badge/DeepFamily-v1.0.0-blue?style=for-the-badge&logo=ethereum)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
@@ -62,7 +73,6 @@ DeepFamily aims to build a universally shared decentralized genealogical infrast
 - **Token**: ERC20 `DeepFamilyToken` (symbol `DEEP`)
 - **NFT**: ERC721Enumerable (symbol `Family`)
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind + Ethers v6
-- **Indexing**: The Graph Subgraph (schema & mappings stub)
 
 ### ⛓️ Contracts
 ```
@@ -77,7 +87,6 @@ DeepFamily Contract System
 DeepFamily/
 ├── contracts/        # Smart contracts
 ├── frontend/         # React dApp
-├── subgraph/         # The Graph subgraph (WIP)
 ├── test/             # Hardhat tests
 ├── tasks/            # Custom Hardhat tasks
 ├── deploy/           # Deployment scripts
@@ -232,12 +241,6 @@ See detailed documents under `docs/`:
 - [Tokenomics](docs/tokenomics.md)
 - [ZK Roadmap](docs/zk-roadmap.md)
 - [Frontend Integration](docs/frontend.md)
-- [Subgraph Guide](docs/subgraph.md)
-
-## 📊 Subgraph
-Current status: scaffold (schema + mapping stub). TODO:
-1. Implement handlers for `PersonVersionAdded`, `PersonVersionEndorsed`, `PersonNFTMinted`, story events.
-2. Configure deployment: `yarn graph codegen && yarn graph build` (script to be added).
 3. Provide hosted service / decentralised index endpoints.
 
 ## 🧪 Story Sharding Constraints

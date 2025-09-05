@@ -47,7 +47,7 @@
       },
       "openComposition": {
         "title": "开放组合",
-        "description": "链上结构 + Subgraph 索引，供社区构建应用、可视化、研究数据库"
+        "description": "链上结构供社区构建应用、可视化、研究数据库"
       }
     },
     "architecture": {
@@ -206,45 +206,6 @@
       "license": "MIT 许可证"
     }
   },
-  "settings": {
-    "title": "设置",
-    "rpcUrl": "RPC URL",
-    "subgraphUrl": "Subgraph URL",
-    "contractAddress": "合约地址",
-    "rootHash": "根节点哈希",
-    "rootVersionIndex": "根版本号",
-    "mode": "模式",
-    "modes": {
-      "subgraph": "子图",
-      "contract": "合约"
-    },
-    "save": "保存",
-    "reset": "重置为默认",
-    "messages": {
-      "saved": "配置已保存",
-      "reset": "已恢复为默认配置",
-      "savedGoVisualConfirm": "配置已保存，是否跳转到可视化页面？"
-    },
-    "ui": {
-      "configDescription": "配置您的区块链连接和族谱数据源",
-      "connectionConfig": "连接配置",
-      "connectionConfigDesc": "配置区块链节点和数据源连接",
-      "genealogyConfig": "族谱数据配置",
-      "genealogyConfigDesc": "配置要显示的族谱根节点和数据模式",
-      "subgraphMode": "子图模式",
-      "contractMode": "合约模式",
-      "edit": "编辑",
-      "save": "保存",
-      "cancel": "取消",
-      "saving": "保存中..."
-    },
-    "validation": {
-      "urlRequired": "请输入有效的 URL",
-      "required": "此字段为必填项",
-      "minLength": "长度至少10",
-      "versionMin": "必须≥1"
-    }
-  },
   "search": {
     "title": "搜索",
     "query": "查询",
@@ -361,11 +322,6 @@
   },
   "visualization": {
     "title": "可视化",
-    "dataFrom": "数据来源",
-    "modes": {
-      "subgraph": "子图模式",
-      "contract": "合约模式"
-    },
     "viewModes": {
       "tree": "树",
       "dag": "有向无环图",
@@ -379,13 +335,11 @@
     "config": {
       "rpc": "RPC",
       "contract": "合约",
-      "subgraph": "子图",
       "root": "根节点"
     },
     "ui": {
       "visualizationView": "可视化视图",
       "versionNumber": "版本号",
-      "subgraphModeConfig": "子图模式",
       "contractModeConfig": "合约模式",
       "traversalDFS": "DFS 深度优先：快速深入，按路径向下后回溯",
       "traversalBFS": "BFS 广度优先：按层级展开，层结构更直观",
@@ -395,21 +349,14 @@
       "includeVersionDetailsDesc": "仅影响下一次刷新时是否批量加载版本详情（刷新时锁定快照）。",
       "progressSummary": "节点 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "节点",
-      "depthLabelFull": "深度"
+      "edit": "编辑",
+      "save": "保存",
+      "cancel": "取消"
     },
     "status": {
       "loading": "加载中...",
-      "subgraphUnavailable": "子图暂不可用（可能是端口未启动或 CORS）",
-      "developmentProxy": "开发环境已提供代理路径 /api/subgraph；确保 Graph Node 运行在 http://127.0.0.1:8000。",
-      "currentlySubgraphMode": "当前仍处于子图模式。你也可以手动切换为合约模式。",
-      "switchToContract": "切换到合约模式",
-      "switchToProxy": "一键切换到代理",
-      "contractModeRootNotFound": "合约模式：未找到该根节点版本，请检查哈希与版本号",
-      "subgraphTimeout": "子图请求超时",
-      "subgraphConnectionFailed": "子图连接失败",
+      "contractModeRootNotFound": "未找到该根节点版本，请检查哈希与版本号",
       "rootNotFound": "未找到根节点，请在设置页检查 Root 配置或等待索引",
-      "graphqlError": "GraphQL 错误",
-      "subgraphOk": "子图连接正常",
       "contractOk": "合约数据加载完成",
       "badge": {
         "checking": "检查中",
@@ -473,7 +420,6 @@
     "validation": {
       "rpc": "请输入有效的 RPC 地址",
       "contract": "请输入有效的合约地址 (0x + 40位16进制)",
-      "subgraph": "请输入有效的 Subgraph URL",
       "root": "请输入有效的根哈希 (0x + 64位16进制)"
     }
   },

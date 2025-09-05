@@ -44,7 +44,7 @@ Custom errors (sample):
 - InvalidZKProof
 
 ## Gas Tips
-- Batch reads via subgraph where possible.
+- Use pagination with appropriate limits for large data sets.
 - Use limit=0 probes before large pagination loops.
 
 ## Token Integration

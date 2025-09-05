@@ -47,7 +47,7 @@
       },
       "openComposition": {
         "title": "Open Composability",
-        "description": "On-chain structure + Subgraph indexing, enabling community to build applications, visualizations, research databases"
+        "description": "On-chain structure, enabling community to build applications, visualizations, research databases"
       }
     },
     "architecture": {
@@ -206,45 +206,6 @@
       "license": "MIT License"
     }
   },
-  "settings": {
-    "title": "Settings",
-    "rpcUrl": "RPC URL",
-    "subgraphUrl": "Subgraph URL",
-    "contractAddress": "Contract Address",
-    "rootHash": "Root Hash",
-    "rootVersionIndex": "Root Version Index",
-    "mode": "Mode",
-    "modes": {
-      "subgraph": "Subgraph",
-      "contract": "Contract"
-    },
-    "save": "Save",
-    "reset": "Reset to Defaults",
-    "messages": {
-      "saved": "Configuration saved",
-      "reset": "Reset to default settings",
-      "savedGoVisualConfirm": "Configuration saved. Go to visualization page now?"
-    },
-    "ui": {
-      "configDescription": "Configure your blockchain connection and family tree data source",
-      "connectionConfig": "Connection Configuration",
-      "connectionConfigDesc": "Configure blockchain node and data source connections",
-      "genealogyConfig": "Family Tree Data Configuration",
-      "genealogyConfigDesc": "Configure the root node and data mode to display",
-      "subgraphMode": "Subgraph Mode",
-      "contractMode": "Contract Mode",
-      "edit": "Edit",
-      "save": "Save",
-      "cancel": "Cancel",
-      "saving": "Saving..."
-    },
-    "validation": {
-      "urlRequired": "Please enter a valid URL",
-      "required": "This field is required",
-      "minLength": "Minimum length is 10",
-      "versionMin": "Must be ≥1"
-    }
-  },
   "search": {
     "title": "Search",
     "query": "Query",
@@ -361,11 +322,6 @@
   },
   "visualization": {
     "title": "Visualization",
-    "dataFrom": "Data Source",
-    "modes": {
-      "subgraph": "Subgraph Mode",
-      "contract": "Contract Mode"
-    },
     "viewModes": {
       "tree": "Tree",
       "dag": "DAG",
@@ -379,13 +335,11 @@
     "config": {
       "rpc": "RPC",
       "contract": "Contract",
-      "subgraph": "Subgraph",
       "root": "Root"
     },
     "ui": {
       "visualizationView": "Visualization View",
       "versionNumber": "Version",
-      "subgraphModeConfig": "Subgraph Mode",
       "contractModeConfig": "Contract Mode",
       "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
       "traversalBFS": "BFS - Breadth-First (level order)",
@@ -395,21 +349,14 @@
       "includeVersionDetailsDesc": "Affects whether version detail batches are loaded on the next refresh (snapshot taken at refresh).",
       "nodesLabelFull": "Nodes",
       "depthLabelFull": "Depth",
-      "progressSummary": "Nodes {{created}} / depth {{depth}}"
+      "progressSummary": "Nodes {{created}} / depth {{depth}}",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel"
     },
     "status": {
       "loading": "Loading...",
-      "subgraphUnavailable": "Subgraph temporarily unavailable (port may not be running or CORS issue)",
-      "developmentProxy": "Development environment provides proxy path /api/subgraph; ensure Graph Node is running at http://127.0.0.1:8000.",
-      "currentlySubgraphMode": "Currently in subgraph mode. You can manually switch to contract mode if needed.",
-      "switchToContract": "Switch to Contract Mode",
-      "switchToProxy": "One-click Switch to Proxy",
-      "contractModeRootNotFound": "Contract mode: Root node version not found. Please check the hash and version number",
-      "subgraphTimeout": "Subgraph request timeout",
-      "subgraphConnectionFailed": "Subgraph connection failed",
       "rootNotFound": "Root node not found. Please check the Root configuration in settings or wait for indexing",
-      "graphqlError": "GraphQL error",
-      "subgraphOk": "Subgraph reachable",
       "contractOk": "Contract data loaded",
       "badge": {
         "checking": "Checking",
@@ -473,7 +420,6 @@
     "validation": {
       "rpc": "Please enter a valid RPC URL",
       "contract": "Please enter a valid contract address (0x + 40 hex chars)",
-      "subgraph": "Please enter a valid Subgraph URL",
       "root": "Please enter a valid root hash (0x + 64 hex chars)"
     }
   },

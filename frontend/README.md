@@ -1,12 +1,11 @@
 # DeepFamily Frontend
 
-A React-based blockchain family tree visualization application with dual data sources, three visualization modes, and multi-language support.
+A React-based blockchain family tree visualization application with multiple visualization modes and multi-language support.
 
 ## Tech Stack
 
 - **React 18** + TypeScript + Vite
 - **Tailwind CSS** for styling
-- **Apollo Client** for GraphQL (subgraph data)
 - **Ethers.js v6** for blockchain interactions
 - **D3.js** for data visualization
 - **i18next** for internationalization (EN/ZH-CN/ZH-TW)
@@ -34,15 +33,15 @@ src/
 
 ## Key Features
 
-**Dual Data Sources**:
-- **Subgraph Mode**: GraphQL queries via Apollo Client (indexed data, faster queries)
-- **Contract Mode**: Direct blockchain calls via Ethers.js (authoritative data)
-- Automatic fallback when subgraph unavailable
+**Direct Blockchain Integration**:
+- Direct blockchain calls via Ethers.js for authoritative data
+- Smart contract interaction with real-time data fetching
 
-**Three Visualization Modes**:
+**Multiple Visualization Modes**:
 - **Tree View**: Traditional hierarchical layout with collapsible nodes
-- **DAG View**: Directed acyclic graph for complex family relationships
+- **DAG View**: Directed acyclic graph for complex family relationships  
 - **Force View**: D3.js physics simulation with interactive layout
+- **Virtual View**: Virtualized list for large datasets
 
 **Multi-language Support**: English, Simplified Chinese, Traditional Chinese
 
@@ -65,14 +64,11 @@ npm run dev
 
 Create `frontend/.env`:
 ```bash
-VITE_SUBGRAPH_URL=http://localhost:8000/subgraphs/name/DeepFamily/subgraph
 VITE_RPC_URL=http://127.0.0.1:8545
 VITE_CONTRACT_ADDRESS=0x...
 VITE_ROOT_PERSON_HASH=0x...
 VITE_ROOT_VERSION_INDEX=1
 ```
-
-**Dev Proxy**: `/api/subgraph` → `localhost:8000` (configured in `vite.config.ts`)
 
 ## Pages
 
@@ -85,10 +81,6 @@ VITE_ROOT_VERSION_INDEX=1
 **URL Parameters**: `/visualization?root=0x...&v=1` for direct navigation
 
 ## Common Issues
-
-**Subgraph Connection**:
-- "Failed to fetch" → Check Graph Node on port 8000 or switch to Contract mode
-- Try direct URL in settings: `http://localhost:8000/subgraphs/name/DeepFamily/subgraph`
 
 **Contract Issues**:
 - "Network Error" → Verify RPC endpoint and contract address
