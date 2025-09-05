@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useTreeData } from '../context/TreeDataContext'
 import { 
   User, 
   MapPin, 
@@ -24,6 +25,14 @@ interface PersonStoryCardProps {
 
 export default function PersonStoryCard({ person, viewMode, onClick }: PersonStoryCardProps) {
   const { t } = useTranslation()
+  const { preloadStoryData } = useTreeData()
+
+  // Preload story data on hover
+  const handleMouseEnter = useCallback(() => {
+    if (person.tokenId && person.hasDetailedStory) {
+      preloadStoryData(person.tokenId)
+    }
+  }, [person.tokenId, person.hasDetailedStory, preloadStoryData])
 
   // Format date
   const formatDate = useMemo(() => {
@@ -65,6 +74,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
     return (
       <div 
         onClick={onClick}
+        onMouseEnter={handleMouseEnter}
         className="group bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer relative overflow-hidden"
       >
         {/* Subtle background gradient */}
@@ -96,7 +106,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                   {person.tokenId && person.tokenId !== '0' && (
                     <span className="flex items-center gap-1 font-mono whitespace-nowrap">
                       <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      #{person.tokenId}
+                      {person.tokenId}
                       {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
                         <span className="flex items-center gap-1 whitespace-nowrap">
                           <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
@@ -187,6 +197,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
   return (
     <div 
       onClick={onClick}
+      onMouseEnter={handleMouseEnter}
       className="group bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer relative overflow-hidden h-full flex flex-col"
     >
       {/* Subtle background gradient */}

@@ -196,7 +196,7 @@ export default function PeoplePage() {
               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
                 {data.people.filter(p => p.storyMetadata && p.storyMetadata.totalChunks > 0).length}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">{t('people.withStories', 'With Detailed Stories')}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{t('people.withStories', 'With Detailed Stories')}</div>
             </div>
             <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-4 border border-white/20 dark:border-gray-700/20">
               <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">{data.totalNFTs}</div>
@@ -271,11 +271,11 @@ export default function PeoplePage() {
             <div className="flex flex-col gap-4">
               {/* Filters */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="flex-1">
+              <div className="sm:flex-none">
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   {t('people.sortRules', '排序规则')}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2">
+                <div className="inline-flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2 w-fit">
                 <SortButton
                   label={t('people.filterAll', 'ID')}
                   isActive={filterType === 'all'}

@@ -17,10 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { NodeData, StoryChunk } from '../types/graph'
-import { useConfig } from '../context/ConfigContext'
-import { useToast } from './ToastProvider'
-import { ethers } from 'ethers'
-import DeepFamily from '../abi/DeepFamily.json'
+import { useTreeData } from '../context/TreeDataContext'
 
 interface StoryChunksViewerProps {
   person: NodeData
@@ -42,50 +39,11 @@ interface StoryData {
   error?: string
 }
 
-function computeStoryIntegrity(chunks: StoryChunk[], metadata: any) {
-  const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex)
-  const missing: number[] = []
-  
-  if (metadata?.totalChunks) {
-    for (let i = 0; i < metadata.totalChunks; i++) {
-      if (!sorted.find(c => c.chunkIndex === i)) missing.push(i)
-    }
-  }
-  
-  const fullStory = sorted.map(c => c.content).join('')
-  const encoder = new TextEncoder()
-  const computedLength = sorted.reduce((acc, c) => acc + encoder.encode(c.content).length, 0)
-  const lengthMatch = metadata?.totalLength ? computedLength === metadata.totalLength : true
-  
-  let hashMatch: boolean | null = null
-  let computedHash: string | undefined
-  
-  if (missing.length === 0 && metadata?.totalChunks > 0 && metadata?.fullStoryHash && metadata.fullStoryHash !== ethers.ZeroHash) {
-    try {
-      const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
-      computedHash = ethers.keccak256(concatenated)
-      hashMatch = computedHash === metadata.fullStoryHash
-    } catch {
-      // ignore
-    }
-  }
-  
-  return { 
-    fullStory, 
-    integrity: { 
-      missing, 
-      lengthMatch, 
-      hashMatch, 
-      computedLength, 
-      computedHash 
-    } 
-  }
-}
+// Removed computeStoryIntegrity function as it's now handled in TreeDataContext
 
 export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChunksViewerProps) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress } = useConfig()
-  const toast = useToast()
+  const { getStoryData } = useTreeData()
   const nameContainerRef = useRef<HTMLDivElement | null>(null)
   const nameTextRef = useRef<HTMLSpanElement | null>(null)
   const [marquee, setMarquee] = useState(false)
@@ -149,6 +107,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
       document.body.appendChild(ta)
       ta.focus()
       ta.select()
+      // Using deprecated execCommand as fallback for older browsers
       const ok = document.execCommand('copy')
       document.body.removeChild(ta)
       setCenterHint(ok ? t('common.copied', 'Copied') : t('common.copyFailed', 'Failed to copy'))
@@ -161,55 +120,22 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
     }
   }, [t])
 
-  // Fetch story data
+  // Fetch story data using TreeDataContext
   const fetchStoryData = useCallback(async () => {
-    if (!person.tokenId || !person.hasDetailedStory || !rpcUrl || !contractAddress) {
+    if (!person.tokenId || !person.hasDetailedStory) {
       return
     }
 
     setStoryData(prev => ({ ...prev, loading: true, error: undefined }))
 
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
-      
-      const metadata = await contract.getStoryMetadata(person.tokenId)
-      const storyMetadata = {
-        totalChunks: Number(metadata.totalChunks),
-        totalLength: Number(metadata.totalLength),
-        isSealed: Boolean(metadata.isSealed),
-        lastUpdateTime: Number(metadata.lastUpdateTime),
-        fullStoryHash: metadata.fullStoryHash
-      }
-
-      const chunks: StoryChunk[] = []
-      if (storyMetadata.totalChunks > 0) {
-        for (let i = 0; i < storyMetadata.totalChunks; i++) {
-          try {
-            const chunk = await contract.getStoryChunk(person.tokenId, i)
-            chunks.push({
-              chunkIndex: Number(chunk.chunkIndex),
-              chunkHash: chunk.chunkHash,
-              content: chunk.content,
-              timestamp: Number(chunk.timestamp),
-              lastEditor: chunk.lastEditor
-            })
-          } catch (e) {
-            // Skip missing chunks
-            console.warn(`Missing chunk ${i} for token ${person.tokenId}`)
-          }
-        }
-      }
-
-      const { fullStory, integrity } = computeStoryIntegrity(chunks, storyMetadata)
-
+      const data = await getStoryData(person.tokenId)
       setStoryData({
-        chunks: chunks.sort((a, b) => a.chunkIndex - b.chunkIndex),
-        fullStory,
-        integrity,
+        chunks: data.chunks,
+        fullStory: data.fullStory,
+        integrity: data.integrity,
         loading: false
       })
-
     } catch (err: any) {
       console.error('Failed to fetch story chunks:', err)
       setStoryData(prev => ({
@@ -218,7 +144,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
         error: err.message || t('storyChunksViewer.fetchError', 'Failed to load story data')
       }))
     }
-  }, [person.tokenId, person.hasDetailedStory, rpcUrl, contractAddress, t])
+  }, [person.tokenId, person.hasDetailedStory, getStoryData, t])
 
   // Load data when opened
   useEffect(() => {
@@ -240,13 +166,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
     })
   }
 
-  // Navigate to detailed story page in new tab
-  const goToDetailPage = () => {
-    if (person.tokenId) {
-      window.open(`/person/${person.tokenId}`, '_blank', 'noopener,noreferrer')
-      onClose()
-    }
-  }
+  // Remove unused handlePreload function - preloading is handled in PersonStoryCard
 
   // Determine if name overflows to enable marquee
   useEffect(() => {

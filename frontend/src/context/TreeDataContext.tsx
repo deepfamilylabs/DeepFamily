@@ -25,6 +25,9 @@ interface TreeDataValue {
   includeVersionDetails: boolean
   nodesData: Record<string, NodeData>
   setNodesData?: React.Dispatch<React.SetStateAction<Record<string, NodeData>>>
+  getStoryData: (tokenId: string) => Promise<any>
+  clearStoryCache: (tokenId?: string) => void
+  preloadStoryData: (tokenId: string) => void
 }
 
 const TreeDataContext = createContext<TreeDataValue | null>(null)
@@ -40,6 +43,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const [root, setRoot] = useState<GraphNode | null>(null)
   const [nodesData, setNodesData] = useState<Record<string, NodeData>>({})
   const nodesDataRef = useRef(nodesData)
+  const storyDataCache = useRef<Map<string, any>>(new Map())
   useEffect(() => { nodesDataRef.current = nodesData }, [nodesData])
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<TreeProgress | undefined>(undefined)
@@ -144,7 +148,13 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         if (!cancelled) setLoading(false)
       }
     })()
-    return () => { cancelled = true; controller.abort(); setLoading(l => l ? false : l) }
+    return () => { 
+      cancelled = true 
+      controller.abort() 
+      setLoading(l => l ? false : l)
+      // Clear story cache when refreshing data
+      storyDataCache.current.clear()
+    }
   }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails])
 
   const nodePairs = useMemo(() => {
@@ -338,6 +348,114 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true }
   }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, root, nodePairs, contractAddress, provider, push])
 
+  // Function to get story data with caching
+  const getStoryData = useCallback(async (tokenId: string) => {
+    // Check cache first
+    if (storyDataCache.current.has(tokenId)) {
+      return storyDataCache.current.get(tokenId)
+    }
+
+    if (!provider || !contractAddress) {
+      throw new Error('Provider or contract address not available')
+    }
+
+    try {
+      const metadata = await contract!.getStoryMetadata(tokenId)
+      const storyMetadata = {
+        totalChunks: Number(metadata.totalChunks),
+        totalLength: Number(metadata.totalLength),
+        isSealed: Boolean(metadata.isSealed),
+        lastUpdateTime: Number(metadata.lastUpdateTime),
+        fullStoryHash: metadata.fullStoryHash
+      }
+
+      const chunks: any[] = []
+      if (storyMetadata.totalChunks > 0) {
+        for (let i = 0; i < storyMetadata.totalChunks; i++) {
+          try {
+            const chunk = await contract!.getStoryChunk(tokenId, i)
+            chunks.push({
+              chunkIndex: Number(chunk.chunkIndex),
+              chunkHash: chunk.chunkHash,
+              content: chunk.content,
+              timestamp: Number(chunk.timestamp),
+              lastEditor: chunk.lastEditor
+            })
+          } catch (e) {
+            console.warn(`Missing chunk ${i} for token ${tokenId}`)
+          }
+        }
+      }
+
+      // Compute story integrity
+      const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex)
+      const missing: number[] = []
+      
+      if (storyMetadata?.totalChunks) {
+        for (let i = 0; i < storyMetadata.totalChunks; i++) {
+          if (!sorted.find(c => c.chunkIndex === i)) missing.push(i)
+        }
+      }
+      
+      const fullStory = sorted.map(c => c.content).join('')
+      const encoder = new TextEncoder()
+      const computedLength = sorted.reduce((acc, c) => acc + encoder.encode(c.content).length, 0)
+      const lengthMatch = storyMetadata?.totalLength ? computedLength === storyMetadata.totalLength : true
+      
+      let hashMatch: boolean | null = null
+      let computedHash: string | undefined
+      
+      if (missing.length === 0 && storyMetadata?.totalChunks > 0 && storyMetadata?.fullStoryHash && storyMetadata.fullStoryHash !== ethers.ZeroHash) {
+        try {
+          const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
+          computedHash = ethers.keccak256(concatenated)
+          hashMatch = computedHash === storyMetadata.fullStoryHash
+        } catch {
+          // ignore
+        }
+      }
+
+      const storyData = {
+        chunks: chunks.sort((a, b) => a.chunkIndex - b.chunkIndex),
+        fullStory,
+        integrity: {
+          missing,
+          lengthMatch,
+          hashMatch,
+          computedLength,
+          computedHash
+        },
+        metadata: storyMetadata,
+        loading: false
+      }
+
+      // Cache the result
+      storyDataCache.current.set(tokenId, storyData)
+      return storyData
+    } catch (error: any) {
+      console.error('Failed to fetch story chunks:', error)
+      throw error
+    }
+  }, [provider, contractAddress, contract])
+
+  // Function to clear story cache
+  const clearStoryCache = useCallback((tokenId?: string) => {
+    if (tokenId) {
+      storyDataCache.current.delete(tokenId)
+    } else {
+      storyDataCache.current.clear()
+    }
+  }, [])
+
+  // Function to preload story data in background
+  const preloadStoryData = useCallback((tokenId: string) => {
+    if (!storyDataCache.current.has(tokenId)) {
+      getStoryData(tokenId).catch(() => {
+        // Silent fail for preloading
+      })
+    }
+  }, [getStoryData])
+
   const value: TreeDataValue = {
     root,
     loading,
@@ -347,7 +465,10 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     errors,
     includeVersionDetails,
     nodesData,
-    setNodesData
+    setNodesData,
+    getStoryData,
+    clearStoryCache,
+    preloadStoryData
   }
 
   return <TreeDataContext.Provider value={value}>{children}</TreeDataContext.Provider>
