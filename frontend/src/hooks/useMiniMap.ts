@@ -84,13 +84,18 @@ export function useMiniMap({ width = 160, height = 120, shape = 'rect', nodeSize
   }, [nodes, transform, container, width, height, shape, nodeSize])
 
   const applyPointerToCenter = useCallback((clientX: number, clientY: number) => {
-    const rect = miniSvgRef.current?.getBoundingClientRect(); if (!rect) return
-    const map = mappingRef.current; if (!map) return
+    const rect = miniSvgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    
+    const map = mappingRef.current
+    if (!map) return
+    
     const { scale, offsetX, offsetY, minX, minY } = map
     const mx = clientX - rect.left
     const my = clientY - rect.top
     const gx = (mx - offsetX) / scale + minX
     const gy = (my - offsetY) / scale + minY
+    
     onCenter(gx, gy)
   }, [onCenter])
 

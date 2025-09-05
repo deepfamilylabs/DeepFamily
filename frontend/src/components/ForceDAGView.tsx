@@ -50,17 +50,29 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
   }), [centerOn])
 
   useEffect(() => {
-    if (!svgRef.current) return
+    if (!svgRef.current || !innerRef.current) return
     const svg = d3.select(svgRef.current)
-    svg.selectAll('*').remove()
+    // Only clear inner group; keep defs etc.
+    const g = d3.select(innerRef.current)
+    g.selectAll('*').remove()
+    gRef.current = g.node() as SVGGElement
     const width = (svgRef.current?.clientWidth || 800)
 
-    const g = svg.append('g')
-    gRef.current = g.node() as SVGGElement
-    ;(innerRef as any).current = gRef.current
-
-    const defs = svg.append('defs')
-    defs.append('marker').attr('id', 'fd-arrow').attr('viewBox', '0 0 10 10').attr('refX', 10).attr('refY', 5).attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto-start-reverse').append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#60a5fa')
+    // Ensure marker defs exist once
+    let defs = svg.select('defs')
+    if (defs.empty()) defs = svg.append('defs')
+    const markerSel = defs.select('#fd-arrow')
+    if (markerSel.empty()) {
+      const m = defs.append('marker')
+        .attr('id', 'fd-arrow')
+        .attr('viewBox', '0 0 10 10')
+        .attr('refX', 10)
+        .attr('refY', 5)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto-start-reverse')
+      m.append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#60a5fa')
+    }
 
     const link = g.append('g').attr('stroke', '#93c5fd').attr('stroke-width', 2).attr('stroke-opacity', 0.7).selectAll('line').data(data.links).enter().append('line').attr('marker-end', 'url(#fd-arrow)')
 
@@ -149,12 +161,13 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
     <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: defaultHeight, touchAction: 'none' }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 800 ${defaultHeight}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}></svg>
+      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 800 ${defaultHeight}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}>
+        <g ref={innerRef as any} />
+      </svg>
     </div>
   )
 }
 
 const ForceDAGView = forwardRef(ForceDAGViewInner)
 export default ForceDAGView
-
 

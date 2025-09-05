@@ -40,6 +40,7 @@ export function useZoom(options: UseZoomOptions = {}): UseZoomReturn {
 
   useEffect(() => {
     if (!svgRef.current || !innerRef.current) return
+    
     const svg = d3.select(svgRef.current)
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([min, max])
@@ -48,31 +49,60 @@ export function useZoom(options: UseZoomOptions = {}): UseZoomReturn {
         if (innerRef.current) d3.select(innerRef.current).attr('transform', `translate(${t.x},${t.y}) scale(${t.k})`)
         setTransform({ x: t.x, y: t.y, k: t.k })
       })
+    
     zoomBehaviorRef.current = zoom
-    svg.call(zoom as any)
-    return () => { svg.on('.zoom', null) }
-  }, [min, max])
+    
+    try {
+      svg.call(zoom as any)
+      
+      // Force initial transform to ensure it's working
+      const initialTransform = d3.zoomIdentity.translate(0, 0).scale(initialScale)
+      svg.call(zoom.transform as any, initialTransform)
+    } catch (error) {
+      console.error('Failed to apply zoom behavior:', error)
+    }
+    
+    return () => { 
+      svg.on('.zoom', null)
+    }
+  }, [min, max, initialScale])
 
   const setZoom = useCallback((kTarget: number) => {
     if (!zoomBehaviorRef.current || !svgRef.current) return
+    
     const kClamped = Math.min(max, Math.max(min, kTarget))
+    
     try {
-      // Try direct approach first
+      // Try direct scaleTo approach first
       const svg = d3.select(svgRef.current)
-      const transition = svg.transition().duration(duration)
-      transition.call(zoomBehaviorRef.current.scaleTo as any, kClamped)
+      
+      if (duration > 0) {
+        const transition = svg.transition().duration(duration)
+        transition.call(zoomBehaviorRef.current.scaleTo as any, kClamped)
+      } else {
+        // No transition, direct call
+        svg.call(zoomBehaviorRef.current.scaleTo as any, kClamped)
+      }
     } catch (error) {
-      console.warn('Zoom setZoom failed:', error)
       // Fallback: try to set transform directly
       try {
         const currentTransform = d3.zoomTransform(svgRef.current)
-        const newTransform = currentTransform.scale(kClamped / currentTransform.k)
+        const scaleRatio = kClamped / currentTransform.k
+        const newTransform = currentTransform.scale(scaleRatio)
         d3.select(svgRef.current).call(zoomBehaviorRef.current.transform as any, newTransform)
       } catch (fallbackError) {
-        console.warn('Zoom fallback also failed:', fallbackError)
+        // Last resort: manual update
+        try {
+          if (innerRef.current) {
+            d3.select(innerRef.current).attr('transform', `scale(${kClamped})`)
+            setTransform({ x: 0, y: 0, k: kClamped })
+          }
+        } catch (manualError) {
+          console.error('All zoom approaches failed:', manualError)
+        }
       }
     }
-  }, [min, max, duration])
+  }, [min, max, duration, innerRef])
 
   const zoomIn = useCallback(() => setZoom(transform.k * step), [setZoom, transform.k, step])
   const zoomOut = useCallback(() => setZoom(transform.k / step), [setZoom, transform.k, step])
