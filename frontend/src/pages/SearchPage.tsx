@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { Clipboard } from 'lucide-react'
+import { Clipboard, ChevronDown } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import DeepFamily from '../abi/DeepFamily.json'
@@ -17,11 +17,82 @@ const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
 
+// Display helper: show middle-ellipsis for long hashes/addresses
+const formatHash = (val?: string): string => {
+  if (!val) return ''
+  // Only apply to hex-like values starting with 0x or obviously long tokens
+  const isHexLike = /^0x[0-9a-fA-F]+$/.test(val)
+  if (isHexLike || val.length > 34) {
+    const prefix = val.slice(0, 10)
+    const suffix = val.slice(-8)
+    return `${prefix}...${suffix}`
+  }
+  return val
+}
+
 const FieldError: React.FC<{ message?: string }> = ({ message }) => (
   <div className={`text-xs h-4 leading-4 ${message ? 'text-red-600' : 'text-transparent'}`}>
     {message || 'placeholder'}
   </div>
 )
+
+// Simple themed select (no native popup) for small option sets
+const ThemedSelect: React.FC<{
+  value: number
+  onChange: (v: number) => void
+  options: { value: number; label: string }[]
+  className?: string
+}> = ({ value, onChange, options, className = '' }) => {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current) return
+      if (!rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  const current = options.find(o => o.value === value)?.label ?? ''
+
+  return (
+    <div ref={rootRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{current}</span>
+        <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+          <ul role="listbox" className="max-h-60 overflow-auto">
+            {options.map((o) => (
+              <li
+                key={o.value}
+                role="option"
+                aria-selected={o.value === value}
+                onClick={() => { onChange(o.value); setOpen(false) }}
+                className={`px-3 py-2 text-sm cursor-pointer select-none transition-colors ${
+                  o.value === value
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    : 'text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {o.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const nameQuerySchema = z.object({
   fullName: z.string().min(1).refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
@@ -473,8 +544,8 @@ export default function SearchPage() {
         </div>
         <form onSubmit={hs2((data: any) => onCompute(data))} className="w-full" noValidate>
           <div className="space-y-1">
-            <div className="flex flex-wrap items-start gap-2">
-              <div className="flex-1 min-w-[240px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="basis-full sm:basis-[360px] md:basis-[420px] grow-0 shrink-0">
                 <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.name')}</label>
                 <input 
                   className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
@@ -485,12 +556,19 @@ export default function SearchPage() {
               </div>
               <div className="w-28">
                 <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.gender')}</label>
-                <select className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" {...reg2('gender', { valueAsNumber: true })}>
-                  <option value={0}>{t('search.hashCalculator.genderOptions.unknown')}</option>
-                  <option value={1}>{t('search.hashCalculator.genderOptions.male')}</option>
-                  <option value={2}>{t('search.hashCalculator.genderOptions.female')}</option>
-                  <option value={3}>{t('search.hashCalculator.genderOptions.other')}</option>
-                </select>
+                <ThemedSelect
+                  value={Number(w2('gender') ?? 0)}
+                  onChange={(v) => {
+                    // keep form state in sync
+                    set2('gender', v, { shouldValidate: true, shouldDirty: true })
+                  }}
+                  options={[
+                    { value: 0, label: t('search.hashCalculator.genderOptions.unknown') },
+                    { value: 1, label: t('search.hashCalculator.genderOptions.male') },
+                    { value: 2, label: t('search.hashCalculator.genderOptions.female') },
+                    { value: 3, label: t('search.hashCalculator.genderOptions.other') },
+                  ]}
+                />
                 <FieldError message={e2.gender?.message as any} />
               </div>
             </div>
@@ -532,8 +610,8 @@ export default function SearchPage() {
                 </button>
                 {computedHash && (
                   <div className="flex items-center gap-1 overflow-hidden">
-                    <div className="inline-block rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-2 py-0">
-                      <code className="font-mono text-[10px] sm:text-[11px] leading-none break-all text-gray-700 dark:text-gray-300 tracking-tight">{computedHash}</code>
+                    <div className="min-w-0 flex-1 flex items-center gap-1">
+                      <HashInline value={computedHash} className="font-mono text-[10px] sm:text-[11px] leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
                     </div>
                     <button
                       type="button"
@@ -583,19 +661,19 @@ export default function SearchPage() {
         </div>
         {openSections.name && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs1((d) => onQuery(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
-          <div>
+        <form onSubmit={hs1((d) => onQuery(d, 0))} className="flex flex-wrap gap-2 items-center">
+          <div className="basis-full sm:basis-[360px] md:basis-[420px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.fullName')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.nameQuery.placeholder')}
               {...reg1('fullName')} />
             <FieldError message={e1.fullName?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg1('pageSize', { valueAsNumber: true })} />
+            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg1('pageSize', { valueAsNumber: true })} />
             <FieldError message={e1.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-1">
+          <div className="flex gap-2 items-center self-center">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled={loading}>{t('search.query')}</button>
             <button type="button" onClick={onResetQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -605,10 +683,10 @@ export default function SearchPage() {
           {rows.length === 0 ? (
             <div className="p-2 text-sm text-gray-500 dark:text-gray-400">{t('search.noData')}</div>
           ) : rows.map((h, i) => (
-            <div key={i} className="p-2 flex items-center justify-between gap-2">
-              <span className="font-mono text-sm break-all text-gray-800 dark:text-gray-200">{h}</span>
+            <div key={i} className="p-2 flex items-center gap-1 overflow-hidden">
+              <HashInline value={h} className="font-mono text-sm text-gray-800 dark:text-gray-200" />
               <button
-                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="whitespace-nowrap text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 onClick={async () => {
                   try {
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -652,19 +730,19 @@ export default function SearchPage() {
         </div>
         {openSections.versions && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs5((d) => onQueryPersonVersions(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
-          <div>
+        <form onSubmit={hs5((d) => onQueryPersonVersions(d, 0))} className="flex flex-wrap gap-2 items-center">
+          <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.versionsQuery.personHash')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.versionsQuery.placeholder')}
               {...reg5('personHash')} />
             <FieldError message={e5.personHash?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg5('pageSize', { valueAsNumber: true })} />
+            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg5('pageSize', { valueAsNumber: true })} />
             <FieldError message={e5.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-1">
+          <div className="flex gap-2 items-center self-center">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={versionsLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetVersionsQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -677,15 +755,104 @@ export default function SearchPage() {
             </div>
           ) : versionsData.map((version, i) => (
             <div key={i} className="p-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
-              <div className="grid grid-cols-3 gap-4 text-sm mb-2">
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionIndex')}:</span> {Number(version.versionIndex)}</div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.creator')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.addedBy || t('search.versionsQuery.unknown')}</span></div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? new Date(Number(version.timestamp) * 1000).toLocaleString() : t('search.versionsQuery.unknown')}</span></div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm mb-2">
+                <div className="shrink-0"><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionIndex')}:</span> {Number(version.versionIndex)}</div>
+                <div className="flex items-center gap-1 min-w-0 max-w-full">
+                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.creator')}:</span>
+                  <HashInline value={String(version.addedBy || '')} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                  <button
+                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={async () => {
+                      const value = String(version.addedBy || '')
+                      try {
+                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                          await navigator.clipboard.writeText(value)
+                          toast.show(t('search.copied'))
+                          return
+                        }
+                      } catch {}
+                      try {
+                        const ta = document.createElement('textarea')
+                        ta.value = value
+                        ta.style.position = 'fixed'
+                        ta.style.left = '-9999px'
+                        document.body.appendChild(ta)
+                        ta.focus(); ta.select()
+                        const ok = document.execCommand('copy')
+                        document.body.removeChild(ta)
+                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                      } catch {
+                        toast.show(t('search.copyFailed'))
+                      }
+                    }}
+                  >{t('search.copy')}</button>
+                </div>
+                <div className="min-w-0"><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? new Date(Number(version.timestamp) * 1000).toLocaleString() : t('search.versionsQuery.unknown')}</span></div>
               </div>
               <div className="text-sm space-y-1">
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.fatherHash')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{version.fatherHash}</span> <span className="text-gray-600 dark:text-gray-400 ml-4">{t('search.versionsQuery.fatherVersion')}:</span> {Number(version.fatherVersionIndex)}</div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.motherHash')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{version.motherHash}</span> <span className="text-gray-600 dark:text-gray-400 ml-4">{t('search.versionsQuery.motherVersion')}:</span> {Number(version.motherVersionIndex)}</div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionTag')}:</span> {version.tag || t('search.versionsQuery.none')} {version.metadataCID && <><span className="text-gray-600 dark:text-gray-400 ml-4">{t('search.versionsQuery.metadataCID')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{version.metadataCID}</span></>}</div>
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.fatherHash')}:</span>
+                  <HashInline value={version.fatherHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                  <button
+                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={async () => {
+                      const value = String(version.fatherHash || '')
+                      try {
+                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                          await navigator.clipboard.writeText(value)
+                          toast.show(t('search.copied'))
+                          return
+                        }
+                      } catch {}
+                      try {
+                        const ta = document.createElement('textarea')
+                        ta.value = value
+                        ta.style.position = 'fixed'
+                        ta.style.left = '-9999px'
+                        document.body.appendChild(ta)
+                        ta.focus(); ta.select()
+                        const ok = document.execCommand('copy')
+                        document.body.removeChild(ta)
+                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                      } catch {
+                        toast.show(t('search.copyFailed'))
+                      }
+                    }}
+                  >{t('search.copy')}</button>
+                </div>
+                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.fatherVersion')}:</span> {Number(version.fatherVersionIndex)}</div>
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.motherHash')}:</span>
+                  <HashInline value={version.motherHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                  <button
+                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={async () => {
+                      const value = String(version.motherHash || '')
+                      try {
+                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                          await navigator.clipboard.writeText(value)
+                          toast.show(t('search.copied'))
+                          return
+                        }
+                      } catch {}
+                      try {
+                        const ta = document.createElement('textarea')
+                        ta.value = value
+                        ta.style.position = 'fixed'
+                        ta.style.left = '-9999px'
+                        document.body.appendChild(ta)
+                        ta.focus(); ta.select()
+                        const ok = document.execCommand('copy')
+                        document.body.removeChild(ta)
+                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                      } catch {
+                        toast.show(t('search.copyFailed'))
+                      }
+                    }}
+                  >{t('search.copy')}</button>
+                </div>
+                <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.motherVersion')}:</span> {Number(version.motherVersionIndex)}</div>
               </div>
             </div>
           ))}
@@ -707,19 +874,19 @@ export default function SearchPage() {
         </div>
         {openSections.endorsement && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
-          <div>
+        <form onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))} className="flex flex-wrap gap-2 items-center">
+          <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.endorsementQuery.personHash')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.endorsementQuery.placeholder')}
               {...reg3('personHash')} />
             <FieldError message={e3.personHash?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg3('pageSize', { valueAsNumber: true })} />
+            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg3('pageSize', { valueAsNumber: true })} />
             <FieldError message={e3.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-1">
+          <div className="flex gap-2 items-center self-center">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={endorsementLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetEndorsementQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -757,25 +924,25 @@ export default function SearchPage() {
         </div>
         {openSections.children && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs7((d) => onQueryChildren(d, 0))} className="grid md:grid-cols-4 gap-2 items-end">
-          <div>
+        <form onSubmit={hs7((d) => onQueryChildren(d, 0))} className="flex flex-wrap gap-2 items-center">
+          <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.childrenQuery.parentHash')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.childrenQuery.parentHashPlaceholder')}
               {...reg7('parentHash')} />
             <FieldError message={e7.parentHash?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.childrenQuery.parentVersion')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.childrenQuery.parentVersionPlaceholder')}
+            <input type="number" className="w-28 sm:w-32 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.childrenQuery.parentVersionPlaceholder')}
               {...reg7('parentVersionIndex', { valueAsNumber: true })} />
             <FieldError message={e7.parentVersionIndex?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg7('pageSize', { valueAsNumber: true })} />
+            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg7('pageSize', { valueAsNumber: true })} />
             <FieldError message={e7.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-1">
+          <div className="flex gap-2 items-center self-center">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={childrenLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetChildrenQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -787,16 +954,12 @@ export default function SearchPage() {
               {childrenLoading ? t('search.loading') : t('search.noData')}
             </div>
           ) : childrenData.childHashes.map((childHash, i) => (
-            <div key={i} className="p-2 flex items-center justify-between gap-2">
-              <div className="flex-1">
-                <div className="text-sm space-y-1">
-                  <div><span className="text-gray-600 dark:text-gray-400">{t('search.childrenQuery.childHash')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{childHash}</span></div>
-                  <div><span className="text-gray-600 dark:text-gray-400">{t('search.childrenQuery.childVersion')}:</span> {childrenData.childVersions[i]}</div>
-                </div>
-              </div>
-              <button
-                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                onClick={async () => {
+            <div key={i} className="p-2">
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-1 overflow-hidden"><span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.childrenQuery.childHash')}:</span> <HashInline value={childHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                <button
+                  className="whitespace-nowrap text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  onClick={async () => {
                   try {
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                       await navigator.clipboard.writeText(childHash)
@@ -818,7 +981,9 @@ export default function SearchPage() {
                     toast.show(t('search.copyFailed'))
                   }
                 }}
-              >{t('search.copy')}</button>
+                >{t('search.copy')}</button></div>
+                <div><span className="text-gray-600 dark:text-gray-400">{t('search.childrenQuery.childVersion')}:</span> {childrenData.childVersions[i]}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -839,19 +1004,19 @@ export default function SearchPage() {
         </div>
         {openSections.storyChunks && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs6((d) => onQueryStoryChunks(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
-          <div>
+        <form onSubmit={hs6((d) => onQueryStoryChunks(d, 0))} className="flex flex-wrap gap-2 items-center">
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.storyChunksQuery.tokenId')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.storyChunksQuery.placeholder')}
+            <input type="number" className="w-36 sm:w-40 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.storyChunksQuery.placeholder')}
               {...reg6('tokenId', { valueAsNumber: true })} />
             <FieldError message={e6.tokenId?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg6('pageSize', { valueAsNumber: true })} />
+            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg6('pageSize', { valueAsNumber: true })} />
             <FieldError message={e6.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-1">
+          <div className="flex gap-2 items-center self-center">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={storyChunksLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetStoryChunksQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -864,13 +1029,74 @@ export default function SearchPage() {
             </div>
           ) : storyChunksData.map((chunk, i) => (
             <div key={i} className="p-2">
-              <div className="grid grid-cols-2 gap-4 text-sm mb-2">
+              {/* Index then timestamp on the same line */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-2">
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.chunkIndex')}:</span> {Number(chunk.chunkIndex)}</div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.timestamp')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{chunk.timestamp ? new Date(Number(chunk.timestamp) * 1000).toLocaleString() : t('search.versionsQuery.unknown')}</span></div>
               </div>
               <div className="text-sm space-y-1">
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.chunkHash')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{chunk.chunkHash}</span></div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.lastEditor')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{chunk.lastEditor || t('search.versionsQuery.unknown')}</span></div>
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.chunkHash')}:</span>
+                  <HashInline value={chunk.chunkHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                  <button
+                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={async () => {
+                      const value = String(chunk.chunkHash || '')
+                      try {
+                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                          await navigator.clipboard.writeText(value)
+                          toast.show(t('search.copied'))
+                          return
+                        }
+                      } catch {}
+                      try {
+                        const ta = document.createElement('textarea')
+                        ta.value = value
+                        ta.style.position = 'fixed'
+                        ta.style.left = '-9999px'
+                        document.body.appendChild(ta)
+                        ta.focus(); ta.select()
+                        const ok = document.execCommand('copy')
+                        document.body.removeChild(ta)
+                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                      } catch {
+                        toast.show(t('search.copyFailed'))
+                      }
+                    }}
+                  >{t('search.copy')}</button>
+                </div>
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.lastEditor')}:</span>
+                  <HashInline value={String(chunk.lastEditor || '')} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                  {chunk.lastEditor && (
+                    <button
+                      className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      onClick={async () => {
+                        const value = String(chunk.lastEditor || '')
+                        try {
+                          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                            await navigator.clipboard.writeText(value)
+                            toast.show(t('search.copied'))
+                            return
+                          }
+                        } catch {}
+                        try {
+                          const ta = document.createElement('textarea')
+                          ta.value = value
+                          ta.style.position = 'fixed'
+                          ta.style.left = '-9999px'
+                          document.body.appendChild(ta)
+                          ta.focus(); ta.select()
+                          const ok = document.execCommand('copy')
+                          document.body.removeChild(ta)
+                          toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                        } catch {
+                          toast.show(t('search.copyFailed'))
+                        }
+                      }}
+                    >{t('search.copy')}</button>
+                  )}
+                </div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.contentPreview')}:</span></div>
                 <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded text-xs max-h-20 overflow-y-auto">{chunk.content || t('search.noData')}</div>
               </div>
@@ -894,19 +1120,19 @@ export default function SearchPage() {
         </div>
         {openSections.uri && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))} className="grid md:grid-cols-3 gap-2 items-end">
-          <div>
+        <form onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))} className="flex flex-wrap gap-2 items-center">
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.uriQuery.tokenId')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.uriQuery.placeholder')}
+            <input type="number" className="w-36 sm:w-40 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.uriQuery.placeholder')}
               {...reg4('tokenId', { valueAsNumber: true })} />
             <FieldError message={e4.tokenId?.message as any} />
           </div>
-          <div>
+          <div className="basis-auto">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg4('pageSize', { valueAsNumber: true })} />
+            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg4('pageSize', { valueAsNumber: true })} />
             <FieldError message={e4.pageSize?.message as any} />
           </div>
-          <div className="flex gap-2 self-start mt-1">
+          <div className="flex gap-2 items-center self-center">
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={uriLoading}>{t('search.query')}</button>
             <button type="button" onClick={onResetUriQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
           </div>
@@ -918,10 +1144,10 @@ export default function SearchPage() {
               {uriLoading ? t('search.loading') : t('search.noData')}
             </div>
           ) : uriData.map((uri, i) => (
-            <div key={i} className="p-2 flex items-center justify-between gap-2">
-              <span className="font-mono text-sm break-all text-gray-800 dark:text-gray-200">{uri}</span>
+            <div key={i} className="p-2 flex items-center gap-2 overflow-hidden">
+              <span className="min-w-0 flex-1 font-mono text-sm truncate text-gray-800 dark:text-gray-200" title={uri}>{uri}</span>
               <button
-                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="whitespace-nowrap text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 onClick={async () => {
                   try {
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -960,5 +1186,39 @@ export default function SearchPage() {
     </div>
   )
 }
+// Inline hash renderer: shows full when fits; otherwise 10...8 middle ellipsis
+const HashInline: React.FC<{ value: string; className?: string; titleText?: string }> = ({ value, className = '', titleText }) => {
+  const containerRef = useRef<HTMLSpanElement>(null)
+  const measureRef = useRef<HTMLSpanElement>(null)
+  const [display, setDisplay] = useState<string>(value)
 
+  const recompute = () => {
+    const container = containerRef.current
+    const meas = measureRef.current
+    if (!container || !meas) return
+    meas.textContent = value
+    const fits = meas.scrollWidth <= container.clientWidth
+    setDisplay(fits ? value : formatHash(value))
+  }
 
+  useEffect(() => {
+    recompute()
+    const ro = new ResizeObserver(() => recompute())
+    if (containerRef.current) ro.observe(containerRef.current)
+    const onResize = () => recompute()
+    window.addEventListener('resize', onResize)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', onResize)
+    }
+  }, [value])
+
+  return (
+    <>
+      <span ref={containerRef} className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${className}`} title={titleText ?? value}>
+        {display}
+      </span>
+      <span ref={measureRef} className="absolute left-[-99999px] top-0 invisible whitespace-nowrap" />
+    </>
+  )
+}
