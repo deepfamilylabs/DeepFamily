@@ -24,9 +24,26 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({ k, kToNorm, normToK,
     onSetZoom(normToK(norm))
   }, [normToK, onSetZoom])
 
-  const onPointerMove = useCallback((e: PointerEvent) => { if (draggingRef.current) handlePointerPos(e.clientY) }, [handlePointerPos])
-  const onPointerUp = useCallback(() => { draggingRef.current = false; window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp) }, [onPointerMove])
-  const onPointerDown = useCallback((e: React.PointerEvent) => { draggingRef.current = true; handlePointerPos(e.clientY); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp) }, [handlePointerPos, onPointerMove, onPointerUp])
+  const onPointerMove = useCallback((e: PointerEvent) => { 
+    if (draggingRef.current) {
+      e.preventDefault()
+      handlePointerPos(e.clientY)
+    }
+  }, [handlePointerPos])
+  const onPointerUp = useCallback((e: PointerEvent) => { 
+    e.preventDefault()
+    draggingRef.current = false
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp) 
+  }, [onPointerMove])
+  const onPointerDown = useCallback((e: React.PointerEvent) => { 
+    e.preventDefault()
+    e.stopPropagation()
+    draggingRef.current = true
+    handlePointerPos(e.clientY)
+    window.addEventListener('pointermove', onPointerMove, { passive: false })
+    window.addEventListener('pointerup', onPointerUp, { passive: false })
+  }, [handlePointerPos, onPointerMove, onPointerUp])
   useEffect(() => () => { window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp) }, [onPointerMove, onPointerUp])
 
   return (

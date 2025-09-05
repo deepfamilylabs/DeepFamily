@@ -78,7 +78,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       })
       .attr('stroke', (d: any) => {
         const id = (d as SimNode).id
-        return (nodesData?.[id]?.tokenId && nodesData[id].tokenId !== '0') ? '#06b6d4' : (id === selectedId ? '#f59e0b' : '#16a34a')
+        return (nodesData?.[id]?.tokenId && nodesData[id].tokenId !== '0') ? '#059669' : (id === selectedId ? '#f59e0b' : '#6366f1')
       })
       .attr('stroke-width', (d: any) => {
         const id = (d as SimNode).id
@@ -97,14 +97,14 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       const mintedFlag = !!(nd?.tokenId && nd.tokenId !== '0')
       const shortHash = sim.hash.replace(/0x([0-9a-fA-F]{4})[0-9a-fA-F]+/, '0x$1…')
       const width = 60
-      gtxt.append('tspan').attr('x', 18).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#0f172a').text(shortHash)
-      gtxt.append('tspan').attr('x', 20 + width).attr('y', -3).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', mintedFlag ? '#059669' : '#334155').text(`v${sim.versionIndex}`)
+      gtxt.append('tspan').attr('x', 18).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(shortHash)
+      gtxt.append('tspan').attr('x', 20 + width).attr('y', -3).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', mintedFlag ? '#059669' : '#6366f1').text(`v${sim.versionIndex}`)
       const nm = nd?.fullName
-      if (nm) gtxt.append('tspan').attr('x', 18).attr('y', 12).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#111827').text(nm)
+      if (nm) gtxt.append('tspan').attr('x', 18).attr('y', 12).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(nm)
     })
 
     node.append('text').attr('class', 'endorse-count').attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', 10)
-      .attr('fill', (d: any) => { const ndLocal = nodesData?.[(d as SimNode).id]; return (ndLocal?.tokenId && ndLocal.tokenId !== '0') ? '#047857' : '#0f172a' })
+      .attr('fill', '#ffffff')
       .text((d: any) => { const ndLocal = nodesData?.[(d as SimNode).id]; const val = ndLocal?.endorsementCount; return val === undefined ? '' : String(val) })
 
     node.on('click', (_e: any, d: any) => { const sim = d as SimNode; openNode({ personHash: sim.hash, versionIndex: sim.versionIndex}) })
@@ -146,10 +146,10 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
   miniUpdateRef.current = update
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: defaultHeight }}>
+    <div ref={containerRef} className="relative w-full overflow-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16" style={{ height: defaultHeight, touchAction: 'none' }}>
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 800 ${defaultHeight}`} className="block min-w-full min-h-full select-none"></svg>
+      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 800 ${defaultHeight}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}></svg>
     </div>
   )
 }

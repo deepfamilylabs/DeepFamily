@@ -100,11 +100,31 @@ export function useMiniMap({ width = 160, height = 120, shape = 'rect', nodeSize
   useEffect(() => {
     const vp = viewportRef.current
     if (!vp) return
-    const onDown = (e: PointerEvent) => { draggingRef.current = true; applyPointerToCenter(e.clientX, e.clientY); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp) }
-    const onMove = (e: PointerEvent) => { if (!draggingRef.current) return; applyPointerToCenter(e.clientX, e.clientY) }
-    const onUp = () => { draggingRef.current = false; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
-    vp.addEventListener('pointerdown', onDown)
-    return () => { vp.removeEventListener('pointerdown', onDown); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
+    const onDown = (e: PointerEvent) => { 
+      e.preventDefault()
+      e.stopPropagation()
+      draggingRef.current = true
+      applyPointerToCenter(e.clientX, e.clientY)
+      window.addEventListener('pointermove', onMove, { passive: false })
+      window.addEventListener('pointerup', onUp, { passive: false })
+    }
+    const onMove = (e: PointerEvent) => { 
+      if (!draggingRef.current) return
+      e.preventDefault()
+      applyPointerToCenter(e.clientX, e.clientY) 
+    }
+    const onUp = (e: PointerEvent) => { 
+      e.preventDefault()
+      draggingRef.current = false
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp) 
+    }
+    vp.addEventListener('pointerdown', onDown, { passive: false })
+    return () => { 
+      vp.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp) 
+    }
   }, [applyPointerToCenter])
 
   // update on transform & nodes change
@@ -115,7 +135,17 @@ export function useMiniMap({ width = 160, height = 120, shape = 'rect', nodeSize
   useEffect(() => { const mini = d3.select(miniSvgRef.current); if (mini.select('g.nodes').empty()) mini.append('g').attr('class', 'nodes') }, [])
 
   // attach click on svg (drag handled separately)
-  useEffect(() => { const svg = miniSvgRef.current; if (!svg) return; svg.addEventListener('click', (e: any) => { if (!draggingRef.current) handleClick(e) }) }, [handleClick])
+  useEffect(() => { 
+    const svg = miniSvgRef.current
+    if (!svg) return
+    const clickHandler = (e: any) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!draggingRef.current) handleClick(e)
+    }
+    svg.addEventListener('click', clickHandler, { passive: false })
+    return () => svg.removeEventListener('click', clickHandler)
+  }, [handleClick])
 
   return { miniSvgRef, viewportRef, update: updateNodes, dims }
 }
