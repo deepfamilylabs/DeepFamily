@@ -612,7 +612,7 @@ export default function SearchPage() {
                 {computedHash && (
                   <div className="flex items-center gap-1 overflow-hidden">
                     <div className="min-w-0 flex-1 flex items-center gap-1">
-                      <HashInline value={computedHash} className="font-mono text-[10px] sm:text-[11px] leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
+                      <HashInline value={computedHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
                     </div>
                     <button
                       type="button"
