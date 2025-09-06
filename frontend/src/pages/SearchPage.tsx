@@ -8,6 +8,7 @@ import { Clipboard, ChevronDown } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import DeepFamily from '../abi/DeepFamily.json'
+import { makeProvider } from '../utils/provider'
 
 const MAX_FULL_NAME_BYTES = 256
 const MAX_PAGE_SIZE = 100  
@@ -300,7 +301,7 @@ export default function SearchPage() {
   const onQuery = async (data: NameQueryForm, startOffset?: number) => {
     setLoading(true); setError(null)
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : offset
       const out = await contract.listPersonHashesByFullName(data.fullName, off, data.pageSize)
@@ -334,7 +335,7 @@ export default function SearchPage() {
   const onQueryEndorsementStats = async (data: EndorsementStatsForm, startOffset?: number) => {
     setEndorsementLoading(true); setEndorsementError(null)
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : endorsementOffset
       const out = await contract.listVersionsEndorsementStats(data.personHash, off, data.pageSize)
@@ -374,7 +375,7 @@ export default function SearchPage() {
   const onQueryTokenURIHistory = async (data: TokenURIHistoryForm, startOffset?: number) => {
     setUriLoading(true); setUriError(null)
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : uriOffset
       const out = await contract.listTokenURIHistory(data.tokenId, off, data.pageSize)
@@ -412,7 +413,7 @@ export default function SearchPage() {
   const onQueryPersonVersions = async (data: PersonVersionsForm, startOffset?: number) => {
     setVersionsLoading(true); setVersionsError(null)
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : versionsOffset
       const out = await contract.listPersonVersions(data.personHash, off, data.pageSize)
@@ -450,7 +451,7 @@ export default function SearchPage() {
   const onQueryStoryChunks = async (data: StoryChunksForm, startOffset?: number) => {
     setStoryChunksLoading(true); setStoryChunksError(null)
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : storyChunksOffset
       const out = await contract.listStoryChunks(data.tokenId, off, data.pageSize)
@@ -488,7 +489,7 @@ export default function SearchPage() {
   const onQueryChildren = async (data: ChildrenForm, startOffset?: number) => {
     setChildrenLoading(true); setChildrenError(null)
     try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : childrenOffset
       const out = await contract.listChildren(data.parentHash, data.parentVersionIndex, off, data.pageSize)
@@ -605,7 +606,7 @@ export default function SearchPage() {
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 overflow-hidden">
-                <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 sm:px-5 h-10 text-xs sm:text-sm font-medium text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex-shrink-0">
+                <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                   {t('search.hashCalculator.compute')}
                 </button>
                 {computedHash && (

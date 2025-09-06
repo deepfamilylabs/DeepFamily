@@ -7,9 +7,9 @@ import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import { ethers } from 'ethers'
 import DeepFamily from '../abi/DeepFamily.json'
-import StoryChunkEditor from '../components/StoryChunkEditor'
 import PageContainer from '../components/PageContainer'
 import SiteHeader from '../components/SiteHeader'
+import { makeProvider } from '../utils/provider'
 
 function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex);
@@ -74,9 +74,9 @@ export default function PersonPage() {
   const [data, setData] = useState<StoryDetailData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editorOpen, setEditorOpen] = useState(false)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<'paragraph' | 'raw'>('paragraph')
+  const prefetched = (location.state as any)?.prefetchedStory as Partial<StoryDetailData> | undefined
 
   // 动态标题：人物名 + 的档案
   useEffect(()=>{
@@ -144,22 +144,37 @@ export default function PersonPage() {
     })
   }
 
-  // New: open editor automatically if ?edit=1 present
+  // Redirect to full-screen editor when ?edit=1 is present (keep PersonPage mounted via backgroundLocation)
   useEffect(() => {
     const qs = new URLSearchParams(location.search)
     const wantEdit = qs.get('edit') === '1'
-    setEditorOpen(wantEdit)
-  }, [location.search])
-
-  const closeEditor = () => {
-    setEditorOpen(false)
-    // Remove edit param if present
-    if (location.search.includes('edit=1')) {
-      const qs = new URLSearchParams(location.search)
-      qs.delete('edit')
-      navigate({ pathname: location.pathname, search: qs.toString() ? `?${qs.toString()}` : '' }, { replace: true })
+    if (wantEdit && tokenId) {
+      const state: any = { backgroundLocation: location }
+      if (data?.storyMetadata || data?.storyChunks) {
+        state.prefetchedStory = { tokenId, storyMetadata: data?.storyMetadata, storyChunks: data?.storyChunks }
+      }
+      navigate(`/editor/${tokenId}`, { state, replace: true })
     }
-  }
+  }, [location.search, tokenId, data, navigate])
+
+  // If we navigated here with prefetched story data (from StoryChunksViewer), hydrate immediately
+  useEffect(() => {
+    if (!tokenId) return
+    if (!prefetched) return
+    if (prefetched.tokenId && String(prefetched.tokenId) !== String(tokenId)) return
+    // Only hydrate once if no existing data
+    setData(prev => prev || ({
+      tokenId,
+      fullName: prefetched.fullName,
+      storyMetadata: prefetched.storyMetadata,
+      storyChunks: prefetched.storyChunks,
+      fullStory: prefetched.storyChunks ? prefetched.storyChunks.map(c => c.content).join('') : undefined,
+    } as StoryDetailData))
+    setLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefetched?.tokenId])
+
+  // Inline editor removed; navigation handles edit flow
 
   const fetchStoryData = useCallback(async () => {
     if (!tokenId) {
@@ -181,7 +196,7 @@ export default function PersonPage() {
     try {
       setLoading(true)
       setError(null)
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
 
       // 可選：先用 totalSupply 粗略判斷 (忽略因 burn 或 gap 帶來的潛在偏差)
@@ -262,8 +277,10 @@ export default function PersonPage() {
   }, [tokenId, rpcUrl, contractAddress, t])
 
   useEffect(() => {
+    // Skip initial fetch if we already hydrated from prefetched state
+    if (prefetched && prefetched.tokenId && String(prefetched.tokenId) === String(tokenId)) return
     fetchStoryData()
-  }, [fetchStoryData])
+  }, [fetchStoryData, prefetched, tokenId])
 
   const copyText = useCallback(async (text: string) => {
     try {
@@ -386,17 +403,30 @@ export default function PersonPage() {
               </div>
               <div className="flex-shrink-0 md:pt-1">
                 {data?.storyMetadata?.isSealed ? (
-                  <div className="flex items-center justify-center px-3 h-7 bg-green-500 text-white rounded-md text-[10px] font-medium">
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-[10px] sm:text-xs font-medium bg-transparent">
                     {t('person.sealed', 'Sealed')}
-                  </div>
+                  </span>
                 ) : (
                   <button
-                    onClick={() => setEditorOpen(true)}
+                    onClick={() => {
+                      if (!tokenId) return
+                      // Navigate to full-screen editor page with optional prefetched data
+                      const prefetched = (data?.storyMetadata || data?.storyChunks)
+                        ? { tokenId, storyMetadata: data?.storyMetadata, storyChunks: data?.storyChunks }
+                        : undefined
+                      // Use backgroundLocation overlay so PersonPage stays mounted (no refetch on back)
+                      const state: any = {
+                        backgroundLocation: location,
+                        ...(prefetched ? { prefetchedStory: prefetched } : {}),
+                      }
+                      navigate(`/editor/${tokenId}`, { state })
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs font-medium transition-colors"
                     aria-label={t('person.edit', 'Edit Biography') as string}
                     title={t('person.edit', 'Edit Biography') as string}
-                    className="flex items-center justify-center w-8 h-7 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors text-[10px]"
                   >
-                    <Edit2 size={14} />
+                    <Edit2 className="w-3.5 h-3.5 mr-1" />
+                    {t('person.editable', 'Editable')}
                   </button>
                 )}
               </div>
@@ -738,61 +768,7 @@ export default function PersonPage() {
         </>
       )}
 
-      <StoryChunkEditor
-        open={editorOpen}
-        onClose={closeEditor}
-        tokenId={data?.tokenId || ''}
-        storyMetadata={data?.storyMetadata}
-        storyChunks={data?.storyChunks}
-        onAddChunk={async (chunkData) => {
-          if (!contractAddress) return
-          try {
-            const eth = (window as any).ethereum
-            if (!eth) throw new Error('No wallet')
-            const provider = new ethers.BrowserProvider(eth)
-            const signer = await provider.getSigner()
-            const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, signer)
-            const tx = await contract.addStoryChunk(chunkData.tokenId, chunkData.chunkIndex, chunkData.content, chunkData.expectedHash || ethers.ZeroHash)
-            await tx.wait()
-            await fetchStoryData()
-          } catch (e) {
-            console.error(e)
-            throw e
-          }
-        }}
-        onUpdateChunk={async (updateData) => {
-          if (!contractAddress) return
-            try {
-              const eth = (window as any).ethereum
-              if (!eth) throw new Error('No wallet')
-              const provider = new ethers.BrowserProvider(eth)
-              const signer = await provider.getSigner()
-              const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, signer)
-              const tx = await contract.updateStoryChunk(updateData.tokenId, updateData.chunkIndex, updateData.newContent, updateData.expectedHash || ethers.ZeroHash)
-              await tx.wait()
-              await fetchStoryData()
-            } catch (e) {
-              console.error(e)
-              throw e
-            }
-        }}
-        onSealStory={async (sealTokenId) => {
-          if (!contractAddress) return
-          try {
-            const eth = (window as any).ethereum
-            if (!eth) throw new Error('No wallet')
-            const provider = new ethers.BrowserProvider(eth)
-            const signer = await provider.getSigner()
-            const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, signer)
-            const tx = await contract.sealStory(sealTokenId)
-            await tx.wait()
-            await fetchStoryData()
-          } catch (e) {
-            console.error(e)
-            throw e
-          }
-        }}
-      />
+      {/* Editor moved to /editor/:tokenId */}
     </div>
   )
 }

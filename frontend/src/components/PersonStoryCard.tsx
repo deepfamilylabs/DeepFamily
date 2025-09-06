@@ -73,9 +73,8 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
   if (viewMode === 'list') {
     return (
       <div 
-        onClick={onClick}
         onMouseEnter={handleMouseEnter}
-        className="group bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer relative overflow-hidden"
+        className="group bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
       >
         {/* Subtle background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 dark:from-blue-900/10 dark:via-transparent dark:to-purple-900/5 pointer-events-none rounded-2xl"></div>
@@ -185,7 +184,17 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                   </span>
                 )}
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-200" />
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClick()
+                }}
+                className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:gap-2 transition-all duration-200 p-2 -m-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30"
+              >
+                <Eye className="w-3 h-3" />
+                {t('people.viewDetails', 'View')}
+                <ChevronRight className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </div>
@@ -196,9 +205,8 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
   // Grid view
   return (
     <div 
-      onClick={onClick}
       onMouseEnter={handleMouseEnter}
-      className="group bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer relative overflow-hidden h-full flex flex-col"
+      className="group bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-lg hover:shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-2 relative overflow-hidden h-full flex flex-col"
     >
       {/* Subtle background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 dark:from-blue-900/10 dark:via-transparent dark:to-purple-900/5 pointer-events-none rounded-2xl"></div>
@@ -292,7 +300,13 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
             )}
           </div>
           
-          <button className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium group-hover:gap-2 transition-all duration-200">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
+            className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:gap-2 transition-all duration-200 p-2 -m-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30"
+          >
             <Eye className="w-3 h-3" />
             {t('people.viewDetails', 'View')}
           </button>

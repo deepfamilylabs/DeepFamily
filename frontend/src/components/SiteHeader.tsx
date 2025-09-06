@@ -32,7 +32,7 @@ export default function SiteHeader() {
   }
 
   return (
-    <header className={`sticky top-0 z-30 relative ${isHomePage ? 'bg-gradient-to-br from-blue-400/35 via-indigo-500/40 via-purple-500/35 to-violet-600/30 dark:from-blue-500/70 dark:via-indigo-600/75 dark:via-purple-600/70 dark:to-violet-700/65 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/20 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)]' : 'bg-white/85 dark:bg-gray-950/95 backdrop-blur-2xl border-b border-gray-200/70 dark:border-gray-800/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20'}`}>
+    <header className={`sticky top-0 z-[100] relative ${isHomePage ? 'bg-gradient-to-br from-blue-400/35 via-indigo-500/40 via-purple-500/35 to-violet-600/30 dark:from-blue-500/70 dark:via-indigo-600/75 dark:via-purple-600/70 dark:to-violet-700/65 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/20 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)]' : 'bg-white/85 dark:bg-gray-950/95 backdrop-blur-2xl border-b border-gray-200/70 dark:border-gray-800/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20'}`}>
       {/* Decorative background elements for home page */}
       {isHomePage && (
         <>

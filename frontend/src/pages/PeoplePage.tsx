@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Book, Grid, List as ListIcon, User, Hash } from 'lucide-react'
+import { Search, Users, Book, Grid, List as ListIcon, User, Hash, X } from 'lucide-react'
 import { NodeData } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
@@ -14,15 +15,53 @@ type SortOrder = 'asc' | 'desc'
 
 export default function PeoplePage() {
   const { t } = useTranslation()
-  const { nodesData, loading } = useTreeData()
+  const { nodesData, loading, getNodeByTokenId } = useTreeData()
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Track whether modal was opened by clicking inside this page
+  const openedViaClickRef = useRef(false)
   
   const [searchTerm, setSearchTerm] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [selectedPerson, setSelectedPerson] = useState<NodeData | null>(null)
-  const [addressFilter, setAddressFilter] = useState('')
-  const [tagFilter, setTagFilter] = useState('')
+  const [selectedAddresses, setSelectedAddresses] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [addressInput, setAddressInput] = useState('')
+  const [tagInput, setTagInput] = useState('')
+
+  // Handle adding addresses
+  const handleAddressKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      const trimmed = addressInput.trim()
+      if (trimmed && !selectedAddresses.includes(trimmed)) {
+        setSelectedAddresses(prev => [...prev, trimmed])
+        setAddressInput('')
+      }
+    }
+  }
+
+  const removeAddress = (address: string) => {
+    setSelectedAddresses(prev => prev.filter(a => a !== address))
+  }
+
+  // Handle adding tags
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      const trimmed = tagInput.trim()
+      if (trimmed && !selectedTags.includes(trimmed)) {
+        setSelectedTags(prev => [...prev, trimmed])
+        setTagInput('')
+      }
+    }
+  }
+
+  const removeTag = (tag: string) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag))
+  }
 
   // Get person data from TreeDataContext, only show people with NFTs (people with stories)
   const people = useMemo(() => {
@@ -66,6 +105,57 @@ export default function PeoplePage() {
     }
   }, [people, loading, nodesData])
 
+  // Sync selectedPerson with URL query param (?person=tokenId|personHash|id)
+  useLayoutEffect(() => {
+    const sp = new URLSearchParams(location.search)
+    const q = sp.get('person')
+    if (!q) {
+      if (selectedPerson) setSelectedPerson(null)
+      return
+    }
+    // Prefer exact tokenId match from full nodesData (covers non-representative versions)
+    const byToken = Object.values(nodesData).find((x) => x.tokenId && String(x.tokenId) === q)
+    const p = byToken || people.find(
+      (x) => (x.tokenId && String(x.tokenId) === q) || x.personHash === q || String(x.id) === q
+    )
+    // Always sync to the latest data object for the same person
+    if (p) {
+      setSelectedPerson(p)
+    } else {
+      // Cold start for tokenId deep link: fetch minimal details
+      const isHexHash = /^0x[a-fA-F0-9]{64}$/.test(q)
+      if (!isHexHash) {
+        ;(async () => {
+          const fetched = await getNodeByTokenId(q)
+          if (fetched) setSelectedPerson(fetched)
+        })()
+      }
+    }
+  }, [location.search, people, nodesData])
+
+  // Open person: push state with ?person=...
+  const openPerson = (person: NodeData) => {
+    openedViaClickRef.current = true
+    const sp = new URLSearchParams(location.search)
+    sp.set('person', String(person.tokenId || person.personHash || person.id))
+    navigate({ pathname: location.pathname, search: sp.toString() })
+    // Optimistic local state for immediate render
+    setSelectedPerson(person)
+  }
+
+  // Close person: back if opened via click, else replace to clear query
+  const closePerson = () => {
+    const sp = new URLSearchParams(location.search)
+    sp.delete('person')
+    if (openedViaClickRef.current) {
+      openedViaClickRef.current = false
+      navigate(-1)
+    } else {
+      navigate({ pathname: location.pathname, search: sp.toString() }, { replace: true })
+    }
+    setSelectedPerson(null)
+  }
+
   // Search and filter logic
   const filteredPeople = useMemo(() => {
     let filtered = data.people
@@ -84,19 +174,21 @@ export default function PeoplePage() {
       )
     }
 
-    // Address filter
-    if (addressFilter.trim()) {
-      const addressTerm = addressFilter.toLowerCase()
+    // Address filter - match if person's address is in selected addresses
+    if (selectedAddresses.length > 0) {
       filtered = filtered.filter(person => 
-        person.addedBy?.toLowerCase().includes(addressTerm)
+        selectedAddresses.some(address => 
+          person.addedBy?.toLowerCase().includes(address.toLowerCase())
+        )
       )
     }
 
-    // Tag filter
-    if (tagFilter.trim()) {
-      const tagTerm = tagFilter.toLowerCase()
+    // Tag filter - match if person's tag is in selected tags
+    if (selectedTags.length > 0) {
       filtered = filtered.filter(person => 
-        person.tag?.toLowerCase().includes(tagTerm)
+        selectedTags.some(tag => 
+          person.tag?.toLowerCase().includes(tag.toLowerCase())
+        )
       )
     }
 
@@ -145,19 +237,10 @@ export default function PeoplePage() {
     }
 
     return filtered
-  }, [data.people, searchTerm, filterType, sortOrder, addressFilter, tagFilter])
+  }, [data.people, searchTerm, filterType, sortOrder, selectedAddresses, selectedTags])
 
 
-  if (data.loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t('people.loading', 'Loading stories...')}</p>
-        </div>
-      </div>
-    )
-  }
+  // 不再整页遮挡 Loading；改为右上角的轻提示，页面始终可交互
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900">
@@ -228,35 +311,82 @@ export default function PeoplePage() {
               {t('people.filterRules', '过滤规则')}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={addressFilter}
-                  onChange={(e) => setAddressFilter(e.target.value)}
-                  placeholder={t('people.filterByAddress', 'Filter by creator address...')}
-                  className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                />
+              {/* Creator Address Filter */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={addressInput}
+                    onChange={(e) => setAddressInput(e.target.value)}
+                    onKeyDown={handleAddressKeyDown}
+                    placeholder={t('people.filterByAddress', 'Add creator address (Enter or comma to add)...')}
+                    className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+                {selectedAddresses.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedAddresses.map((address) => (
+                      <div
+                        key={address}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm"
+                      >
+                        <span className="font-mono text-xs truncate max-w-20">{address}</span>
+                        <button
+                          onClick={() => removeAddress(address)}
+                          className="p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="relative">
-                <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  placeholder={t('people.filterByTag', 'Filter by tag...')}
-                  className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                />
+
+              {/* Tag Filter */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                    placeholder={t('people.filterByTag', 'Add tag (Enter or comma to add)...')}
+                    className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+                {selectedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTags.map((tag) => (
+                      <div
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded-full text-sm"
+                      >
+                        <span>{tag}</span>
+                        <button
+                          onClick={() => removeTag(tag)}
+                          className="p-0.5 rounded-full hover:bg-purple-200 dark:hover:bg-purple-800/50 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Clear Filters */}
-            {(addressFilter || tagFilter || searchTerm) && (
+            {(selectedAddresses.length > 0 || selectedTags.length > 0 || searchTerm) && (
               <div className="flex justify-end">
                 <button
                   onClick={() => {
-                    setAddressFilter('')
-                    setTagFilter('')
+                    setSelectedAddresses([])
+                    setSelectedTags([])
+                    setAddressInput('')
+                    setTagInput('')
                     setSearchTerm('')
                     setFilterType('all')
                     setSortOrder('desc')
@@ -277,7 +407,7 @@ export default function PeoplePage() {
                 </div>
                 <div className="inline-flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2 w-fit">
                 <SortButton
-                  label={t('people.filterAll', 'ID')}
+                  label={t('people.filterAll', 'Token ID')}
                   isActive={filterType === 'all'}
                   sortOrder={sortOrder}
                   onClick={() => setFilterType('all')}
@@ -327,7 +457,7 @@ export default function PeoplePage() {
                 <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-2 py-2">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`px-2 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 ${
                     viewMode === 'grid'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
@@ -335,10 +465,11 @@ export default function PeoplePage() {
                   title={t('people.gridView', 'Grid View')}
                 >
                   <Grid className="w-4 h-4" />
+                  <span className="text-xs">{t('people.gridView', 'Grid View')}</span>
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`px-2 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 ${
                     viewMode === 'list'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700'
@@ -346,6 +477,7 @@ export default function PeoplePage() {
                   title={t('people.listView', 'List View')}
                 >
                   <ListIcon className="w-4 h-4" />
+                  <span className="text-xs">{t('people.listView', 'List View')}</span>
                 </button>
               </div>
               </div>
@@ -355,11 +487,20 @@ export default function PeoplePage() {
 
           {/* Results count */}
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {addressFilter || tagFilter ? 
-                t('people.filteredResults', '{{count}} filtered results', { count: filteredPeople.length }) :
-                t('people.allResults', '{{count}} total results', { count: filteredPeople.length })
-              }
+            <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2" aria-live="polite">
+              {data.loading && (
+                <>
+                  <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span>{t('people.syncing', 'Syncing...')}</span>
+                  <span className="text-gray-300 dark:text-gray-600">·</span>
+                </>
+              )}
+              <span>
+                {selectedAddresses.length > 0 || selectedTags.length > 0 ? 
+                  t('people.filteredResults', '{{count}} filtered results', { count: filteredPeople.length }) :
+                  t('people.allResults', '{{count}} total results', { count: filteredPeople.length })
+                }
+              </span>
             </div>
           </div>
 
@@ -385,7 +526,7 @@ export default function PeoplePage() {
                 key={person.id}
                 person={person}
                 viewMode={viewMode}
-                onClick={() => setSelectedPerson(person)}
+                onClick={() => openPerson(person)}
               />
             ))}
           </div>
@@ -397,7 +538,7 @@ export default function PeoplePage() {
         <StoryChunksViewer
           person={selectedPerson}
           isOpen={!!selectedPerson}
-          onClose={() => setSelectedPerson(null)}
+          onClose={closePerson}
         />
       )}
     </div>

@@ -44,6 +44,8 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       rootHash: localRootHash,
     })
     setEditing(false)
+    // Proactively refresh after saving config
+    onRefresh?.()
   }
 
   const cancel = () => {
@@ -54,7 +56,11 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
   }
 
   // debounce version apply on blur or enter
-  const applyVersion = () => update({ rootVersionIndex: localVersion })
+  const applyVersion = () => {
+    update({ rootVersionIndex: localVersion })
+    // Proactively refresh after changing version
+    onRefresh?.()
+  }
 
   // validation helpers
   const isAddress = (v: string) => /^0x[a-fA-F0-9]{40}$/.test(v.trim())
@@ -129,15 +135,17 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0"
+              className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs"
               disabled={loading}
               title={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
+              aria-label={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
             >
               <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
                 <polyline points="1 20 1 14 7 14" />
                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
               </svg>
+              <span>{statusT ? statusT('visualization.actions.refresh') : 'Refresh'}</span>
             </button>
           )}
         </div>

@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Edit2, Save, Trash2, Lock, Clipboard } from 'lucide-react'
+import { X, Plus, Edit2, Save, Trash2, Lock, Clipboard, ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
 import { StoryChunk, StoryMetadata, StoryChunkCreateData, StoryChunkUpdateData } from '../types/graph'
@@ -16,6 +16,8 @@ interface StoryChunkEditorProps {
   onAddChunk?: (data: StoryChunkCreateData) => Promise<void>
   onUpdateChunk?: (data: StoryChunkUpdateData) => Promise<void>
   onSealStory?: (tokenId: string) => Promise<void>
+  layout?: 'modal' | 'page'
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 interface ChunkFormData {
@@ -34,6 +36,8 @@ export default function StoryChunkEditor({
   onAddChunk,
   onUpdateChunk,
   onSealStory,
+  layout = 'modal',
+  onDirtyChange,
 }: StoryChunkEditorProps) {
   const { t } = useTranslation()
   const [editingChunkIndex, setEditingChunkIndex] = React.useState<number | null>(null)
@@ -46,6 +50,7 @@ export default function StoryChunkEditor({
     return false
   })
   const [editSessionId, setEditSessionId] = React.useState(0)
+  const [initialEditContent, setInitialEditContent] = React.useState<string>('')
   const [copyHint, setCopyHint] = React.useState<string | null>(null)
   const [scrollContainerRef, formRef, textareaRef] = [React.useRef<HTMLDivElement | null>(null), React.useRef<HTMLDivElement | null>(null), React.useRef<HTMLTextAreaElement | null>(null)]
   const scrollToForm = React.useCallback(() => {
@@ -100,7 +105,26 @@ export default function StoryChunkEditor({
   const computeContentHash = (content: string): string => {
     return ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["string"], [content]))
   }
+
+  // Format hash as first 10 chars + ... + last 8 chars
+  const formatHash = React.useCallback((hash?: string) => {
+    if (!hash) return ''
+    const s = hash.startsWith('0x') ? hash.slice(2) : hash
+    if (s.length <= 18) return `0x${s}`
+    return `0x${s.slice(0, 10)}...${s.slice(-8)}`
+  }, [])
   
+  // Dirty detection: changed content vs initial
+  const dirty = React.useMemo(() => {
+    const trimmed = (formData.content || '').trim()
+    if (editingChunkIndex === null) {
+      return trimmed.length > 0
+    }
+    return trimmed !== (initialEditContent || '').trim()
+  }, [formData.content, editingChunkIndex, initialEditContent])
+
+  React.useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+
   const sortedChunks = React.useMemo(() => {
     return [...storyChunks].sort((a, b) => a.chunkIndex - b.chunkIndex)
   }, [storyChunks])
@@ -111,6 +135,7 @@ export default function StoryChunkEditor({
       content: initialContent,
       expectedHash: initialContent ? computeContentHash(initialContent) : undefined
     })
+    setInitialEditContent(initialContent)
     setLocalError(null)
     setEditSessionId(id => id + 1)
     scrollToForm()
@@ -197,23 +222,47 @@ export default function StoryChunkEditor({
       scrollToForm()
     }
   }, [editSessionId, open, scrollToForm])
+
+  // Do not auto-focus form on initial open for page layout; keep at top
   
-  return open ? createPortal(
-    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-2 sm:p-4" data-story-editor>
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-3xl w-full max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col border border-gray-200/70 dark:border-gray-700/50 backdrop-blur-xl">
+  if (!open) return null
+
+  const Card = (
+      <div className={`relative bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-3xl w-full ${layout === 'page' ? 'max-w-[900px]' : 'max-w-[800px] max-h-[90vh]'} overflow-hidden flex flex-col border border-gray-200/70 dark:border-gray-700/50 backdrop-blur-xl`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/70 dark:border-gray-700/50 bg-gradient-to-r from-blue-50/50 to-purple-50/30 dark:from-blue-900/20 dark:to-purple-900/15 backdrop-blur-sm">
-          <div className="text-lg font-bold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-            {t('storyChunkEditor.title', 'Story Chunk Editor')}
-            {isSealed && <Lock className="inline ml-2 text-gray-500 dark:text-gray-400" size={16} />}
+          <div className="flex items-center gap-3 min-w-0">
+            {layout === 'page' && (
+              <button
+                aria-label={t('common.back', 'Back') as string}
+                className="hidden sm:inline-flex p-2 rounded-xl hover:bg-white/30 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-all duration-200 hover:scale-105"
+                onClick={onClose}
+              >
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            <div className="text-lg font-bold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent truncate">
+              {t('storyChunkEditor.title', 'Story Chunk Editor')}
+              {isSealed && <Lock className="inline ml-2 text-gray-500 dark:text-gray-400" size={16} />}
+            </div>
           </div>
-          <button
-            aria-label="close"
-            className="p-2 rounded-xl hover:bg-white/30 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-all duration-200 hover:scale-105"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
+          {layout === 'modal' ? (
+            <button
+              aria-label={t('common.close', 'Close') as string}
+              className="p-2 rounded-xl hover:bg-white/30 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-all duration-200 hover:scale-105"
+              onClick={onClose}
+            >
+              <X size={20} />
+            </button>
+          ) : (
+            // In page layout, show a mobile-only Close (X) on the right
+            <button
+              aria-label={t('common.close', 'Close') as string}
+              className="sm:hidden p-2 rounded-xl hover:bg-white/30 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-all duration-200 hover:scale-105"
+              onClick={onClose}
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
         
         {storyMetadata && (
@@ -280,13 +329,14 @@ export default function StoryChunkEditor({
                 disabled={submitting}
               />
               
-              <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                <span>{getByteLength(formData.content)}/1000 bytes</span>
+              <div className="flex flex-wrap items-center w-full gap-x-3 gap-y-1 -mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span className="whitespace-nowrap">{getByteLength(formData.content)}/1000 bytes</span>
+                <span className="flex-1" />
                 {formData.expectedHash && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span className="text-gray-400 dark:text-gray-500">{t('storyChunkEditor.hashLabel','Hash')}:</span>
-                    <code className="font-mono text-[11px] px-1 py-0.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-gray-600 dark:text-gray-300 break-all">
-                      {formData.expectedHash}
+                    <code className="font-mono text-[11px] px-1 py-0.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                      {formatHash(formData.expectedHash)}
                     </code>
                     <button
                       type="button"
@@ -358,8 +408,8 @@ export default function StoryChunkEditor({
                     </div>
                   </div>
                   
-                  <div className="text-xs text-gray-500 dark:text-gray-400 break-all">
-                    Hash: {chunk.chunkHash}
+                  <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {t('storyChunkEditor.hashLabel','Hash')}: {formatHash(chunk.chunkHash)}
                   </div>
                   
                   <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap max-h-24 overflow-y-auto">
@@ -415,7 +465,23 @@ export default function StoryChunkEditor({
           </div>
         )}
       </div>
+  )
+
+  if (layout === 'page') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900 p-3 sm:p-6" data-story-editor-page>
+        <div className="mx-auto flex justify-center">
+          {Card}
+        </div>
+      </div>
+    )
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-2 sm:p-4" data-story-editor>
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      {Card}
     </div>,
     document.body
-  ) : null
+  )
 }
