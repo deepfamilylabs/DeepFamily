@@ -5,6 +5,7 @@ import type { GraphNode } from '../types/graph'
 import { makeNodeId } from '../types/graph'
 import DeepFamily from '../abi/DeepFamily.json'
 import { ethers } from 'ethers'
+import { makeProvider } from '../utils/provider'
 import { fetchSubtreeStream } from '../components/Visualization'
 import { getRuntimeVisualizationConfig } from '../config/visualization'
 import { useErrorMonitor } from '../hooks/useErrorMonitor'
@@ -28,6 +29,7 @@ interface TreeDataValue {
   getStoryData: (tokenId: string) => Promise<any>
   clearStoryCache: (tokenId?: string) => void
   preloadStoryData: (tokenId: string) => void
+  getNodeByTokenId: (tokenId: string) => Promise<NodeData | null>
 }
 
 const TreeDataContext = createContext<TreeDataValue | null>(null)
@@ -67,7 +69,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (!rpcUrl) return null
     if (providerCache.has(rpcUrl)) return providerCache.get(rpcUrl) as ethers.JsonRpcProvider
     try {
-      const p = new ethers.JsonRpcProvider(rpcUrl)
+      const p = makeProvider(rpcUrl)
       providerCache.set(rpcUrl, p)
       return p
     } catch { return null }
@@ -97,9 +99,62 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       setNodesData({})
       setContractMessage('')
       setProgress(undefined)
-      try { await contract.getVersionDetails(rootHash, rootVersionIndex) } catch (e) {
+      // Validate root config before touching the contract
+      const isValidHash = typeof rootHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(rootHash)
+      const isValidVersion = Number.isFinite(rootVersionIndex) && Number(rootVersionIndex) >= 1
+      if (!isValidHash || !isValidVersion) {
         if (!cancelled) {
-          setRoot(null); setContractMessage(t('visualization.status.contractModeRootNotFound'))
+          setContractMessage(t('visualization.status.rootNotFound'))
+        }
+        setLoading(false)
+        return
+      }
+      // Preflight RPC availability (helps distinguish rate-limit/network early)
+      try {
+        await (provider as any)?.send?.('eth_chainId', [])
+      } catch (e: any) {
+        if (!cancelled) {
+          const raw = String(
+            e?.message || e?.shortMessage ||
+            (e?.cause && (e.cause.message || e.cause.shortMessage)) || ''
+          ) + ' ' + JSON.stringify({ code: e?.code, cause: e?.cause?.code, err: (e?.error && e.error.code), info: (e?.info && e.info.error && e.info.error.code) })
+          const code = (e?.code ?? (e?.error && e.error.code) ?? (e?.info && e.info.error && e.info.error.code) ?? (e?.cause && e.cause.code)) as any
+          const isRateLimit = (code === -32005) || /Too\s*many\s*requests|daily\s*request\s*count\s*exceeded|rate[-\s]?limit|status\s*429/i.test(raw)
+          const isConnRefused = /ECONNREFUSED|ERR_CONNECTION_REFUSED|connection\s*refused/i.test(raw)
+          const isAbort = /AbortError|The user aborted a request/i.test(raw)
+          const isFetchFail = /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(raw)
+          const isNetwork = isConnRefused || isAbort || isFetchFail || /network|timeout|ECONN|ENET|EAI_AGAIN/i.test(raw) || String(code).includes('NETWORK')
+          if (isRateLimit) setContractMessage(t('visualization.status.rateLimited'))
+          else if (isNetwork) setContractMessage(t('visualization.status.networkError'))
+          else setContractMessage(t('visualization.status.contractModeRootNotFound'))
+        }
+        setLoading(false)
+        return
+      }
+      try { await contract.getVersionDetails(rootHash, rootVersionIndex) } catch (e: any) {
+        if (!cancelled) {
+          // Map common errors to clearer messages
+          const msg = String(
+            e?.message || e?.shortMessage ||
+            (e?.cause && (e.cause.message || e.cause.shortMessage)) ||
+            ''
+          )
+          const name = String((e as any)?.errorName || '')
+          const code = (e?.code ?? (e?.error && e.error.code) ?? (e?.info && e.info.error && e.info.error.code) ?? (e?.cause && e.cause.code)) as any
+          const isRateLimit = (code === -32005) || /Too\s*many\s*requests|daily\s*request\s*count\s*exceeded|rate[-\s]?limit|status\s*429/i.test(msg)
+          const isConnRefused = /ECONNREFUSED|ERR_CONNECTION_REFUSED|connection\s*refused/i.test(msg)
+          const isAbort = /AbortError|The user aborted a request/i.test(msg)
+          const isFetchFail = /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(msg)
+          const isNetwork = isConnRefused || isAbort || isFetchFail || /network|timeout|ECONN|ENET|EAI_AGAIN/i.test(msg) || String(code).includes('NETWORK')
+          if (isRateLimit) {
+            setContractMessage(t('visualization.status.rateLimited'))
+          } else if (name.includes('InvalidPersonHash') || name.includes('InvalidVersionIndex') || /InvalidPersonHash|InvalidVersionIndex/i.test(msg)) {
+            setContractMessage(t('visualization.status.rootNotFound'))
+          } else if (isNetwork) {
+            setContractMessage(t('visualization.status.networkError'))
+          } else {
+            setContractMessage(t('visualization.status.contractModeRootNotFound'))
+          }
           if (!stageLoggedRef.current.has('root_check')) { stageLoggedRef.current.add('root_check'); push(e as any, { stage: 'root_check' }) }
         }
         setLoading(false)
@@ -143,7 +198,26 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           return { ...rn }
         })
       } catch (e: any) {
-        if (!cancelled && e?.name !== 'AbortError') { setContractMessage(e.message || 'error'); push(e, { stage: 'stream_fetch' }) }
+        if (!cancelled && e?.name !== 'AbortError') {
+          const raw = String(
+            e?.message || e?.shortMessage ||
+            (e?.cause && (e.cause.message || e.cause.shortMessage)) || ''
+          ) + ' ' + JSON.stringify({ code: e?.code, cause: e?.cause?.code, err: (e?.error && e.error.code), info: (e?.info && e.info.error && e.info.error.code) })
+          const code = (e?.code ?? (e?.error && e.error.code) ?? (e?.info && e.info.error && e.info.error.code) ?? (e?.cause && e.cause.code)) as any
+          const isRateLimit = (code === -32005) || /Too\s*many\s*requests|daily\s*request\s*count\s*exceeded|rate[-\s]?limit|status\s*429/i.test(raw)
+          const isConnRefused = /ECONNREFUSED|ERR_CONNECTION_REFUSED|connection\s*refused/i.test(raw)
+          const isAbort = /AbortError|The user aborted a request/i.test(raw)
+          const isFetchFail = /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(raw)
+          const isNetwork = isConnRefused || isAbort || isFetchFail || /network|timeout|ECONN|ENET|EAI_AGAIN/i.test(raw) || String(code).includes('NETWORK')
+          // Don't downgrade an existing rateLimited message
+          setContractMessage(prev => {
+            if (prev && /rate/i.test(prev)) return prev
+            if (isRateLimit) return t('visualization.status.rateLimited')
+            if (isNetwork) return t('visualization.status.networkError')
+            return e.message || 'error'
+          })
+          push(e, { stage: 'stream_fetch' })
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -456,6 +530,82 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getStoryData])
 
+  // Fetch minimal NodeData by tokenId for cold-start deep links
+  const getNodeByTokenId = useCallback(async (tokenId: string): Promise<NodeData | null> => {
+    if (!contract) return null
+    try {
+      const nftRet = await contract.getNFTDetails(tokenId)
+      const personHash: string = nftRet[0]
+      const versionIndex: number = Number(nftRet[1])
+      const versionStruct: any = nftRet[2]
+      const coreInfo: any = nftRet[3]
+      const endorsementCountBN: any = nftRet[4]
+      const nftTokenURI: any = nftRet[5]
+
+      const vs = versionStruct || {}
+      const fatherHash = vs.fatherHash || vs[1]
+      const motherHash = vs.motherHash || vs[2]
+      const fatherVersionIndex = vs.fatherVersionIndex !== undefined ? Number(vs.fatherVersionIndex) : (vs[4] !== undefined ? Number(vs[4]) : undefined)
+      const motherVersionIndex = vs.motherVersionIndex !== undefined ? Number(vs.motherVersionIndex) : (vs[5] !== undefined ? Number(vs[5]) : undefined)
+      const addedBy = vs.addedBy || vs[6]
+      const timestampRaw = vs.timestamp !== undefined ? vs.timestamp : vs[7]
+      const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
+      const tag = vs.tag || vs[8]
+      const metadataCID = vs.metadataCID || vs[9]
+
+      const fullName = coreInfo?.basicInfo?.fullName
+      const gender = coreInfo?.basicInfo?.gender !== undefined ? Number(coreInfo.basicInfo.gender) : undefined
+      const birthYear = coreInfo?.basicInfo?.birthYear !== undefined ? Number(coreInfo.basicInfo.birthYear) : undefined
+      const birthMonth = coreInfo?.basicInfo?.birthMonth !== undefined ? Number(coreInfo.basicInfo.birthMonth) : undefined
+      const birthDay = coreInfo?.basicInfo?.birthDay !== undefined ? Number(coreInfo.basicInfo.birthDay) : undefined
+      const birthPlace = coreInfo?.supplementInfo?.birthPlace
+      const isBirthBC = coreInfo?.basicInfo?.isBirthBC !== undefined ? Boolean(coreInfo.basicInfo.isBirthBC) : undefined
+      const deathYear = coreInfo?.supplementInfo?.deathYear !== undefined ? Number(coreInfo.supplementInfo.deathYear) : undefined
+      const deathMonth = coreInfo?.supplementInfo?.deathMonth !== undefined ? Number(coreInfo.supplementInfo.deathMonth) : undefined
+      const deathDay = coreInfo?.supplementInfo?.deathDay !== undefined ? Number(coreInfo.supplementInfo.deathDay) : undefined
+      const deathPlace = coreInfo?.supplementInfo?.deathPlace
+      const isDeathBC = coreInfo?.supplementInfo?.isDeathBC !== undefined ? Boolean(coreInfo.supplementInfo.isDeathBC) : undefined
+      const story = coreInfo?.supplementInfo?.story
+      const endorsementCount = endorsementCountBN !== undefined && endorsementCountBN !== null ? Number(endorsementCountBN) : undefined
+
+      const id = makeNodeId(personHash, versionIndex)
+      const node: NodeData = {
+        personHash,
+        versionIndex,
+        id,
+        tokenId: String(tokenId),
+        fatherHash,
+        motherHash,
+        fatherVersionIndex,
+        motherVersionIndex,
+        addedBy,
+        timestamp,
+        tag,
+        metadataCID,
+        fullName,
+        gender,
+        birthYear,
+        birthMonth,
+        birthDay,
+        birthPlace,
+        isBirthBC,
+        deathYear,
+        deathMonth,
+        deathDay,
+        deathPlace,
+        isDeathBC,
+        story,
+        endorsementCount,
+        nftTokenURI,
+      }
+
+      setNodesData(prev => ({ ...prev, [id]: { ...(prev[id] || node), ...node } }))
+      return node
+    } catch (e) {
+      return null
+    }
+  }, [contract])
+
   const value: TreeDataValue = {
     root,
     loading,
@@ -468,7 +618,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     setNodesData,
     getStoryData,
     clearStoryCache,
-    preloadStoryData
+    preloadStoryData,
+    getNodeByTokenId
   }
 
   return <TreeDataContext.Provider value={value}>{children}</TreeDataContext.Provider>

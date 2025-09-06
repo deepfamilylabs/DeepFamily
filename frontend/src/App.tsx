@@ -7,6 +7,7 @@ import VisualizationPage from './pages/VisualizationPage'
 import SearchPage from './pages/SearchPage'
 import PersonPage from './pages/PersonPage'
 import PeoplePage from './pages/PeoplePage'
+import StoryEditorPage from './pages/StoryEditorPage'
 import { ConfigProvider } from './context/ConfigContext'
 import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
@@ -42,29 +43,46 @@ function TitleUpdater() {
   return null
 }
 
+function RouterContent() {
+  const location = useLocation()
+  const state = location.state as { backgroundLocation?: Location } | undefined
+  return (
+    <VizOptionsProvider>
+      {/* TreeDataProvider no longer needs traversal/includeX props; it reads VizOptions context directly */}
+      <TreeDataProvider>
+        {/* Base routes render either normal location or the background one if present */}
+        <Routes location={state?.backgroundLocation || location}>
+          <Route path="/" element={<Layout />}> 
+            <Route index element={<Home />} />
+            <Route path="visualization" element={<VisualizationPage />} />
+            <Route path="search" element={<SearchPage />} />
+            <Route path="people" element={<PeoplePage />} />
+          </Route>
+          <Route path="/person/:tokenId" element={<PersonPage />} />
+          <Route path="/editor/:tokenId" element={<StoryEditorPage />} />
+        </Routes>
+        {/* If there's a background location, render editor as an overlay route */}
+        {state?.backgroundLocation && (
+          <div className="fixed inset-0 z-[2000] bg-white dark:bg-gray-900">
+            <Routes>
+              <Route path="/editor/:tokenId" element={<StoryEditorPage />} />
+            </Routes>
+          </div>
+        )}
+      </TreeDataProvider>
+    </VizOptionsProvider>
+  )
+}
+
 export default function App() {
   return (
     <ConfigProvider>
       <ToastProvider>
         <BrowserRouter>
           <TitleUpdater />
-          <VizOptionsProvider>
-            {/* TreeDataProvider no longer needs traversal/includeX props; it reads VizOptions context directly */}
-            <TreeDataProvider>
-              <Routes>
-                <Route path="/" element={<Layout />}> 
-                  <Route index element={<Home />} />
-                  <Route path="visualization" element={<VisualizationPage />} />
-                  <Route path="search" element={<SearchPage />} />
-                  <Route path="people" element={<PeoplePage />} />
-                </Route>
-                <Route path="/person/:tokenId" element={<PersonPage />} />
-              </Routes>
-            </TreeDataProvider>
-          </VizOptionsProvider>
+          <RouterContent />
         </BrowserRouter>
       </ToastProvider>
     </ConfigProvider>
   )
 }
-

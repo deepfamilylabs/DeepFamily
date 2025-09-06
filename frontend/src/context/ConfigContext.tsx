@@ -17,11 +17,14 @@ const STORAGE_KEY = 'ft:config'
 const ConfigContext = createContext<AppConfig | null>(null)
 
 function getEnvDefaults(): ConfigValues {
+  const rvRaw = (import.meta as any).env.VITE_ROOT_VERSION_INDEX
+  let rv = Number(rvRaw)
+  if (!Number.isFinite(rv) || rv < 1) rv = 1
   return {
     rpcUrl: (import.meta as any).env.VITE_RPC_URL,
     contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS,
     rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH,
-    rootVersionIndex: Number((import.meta as any).env.VITE_ROOT_VERSION_INDEX),
+    rootVersionIndex: rv,
   }
 }
 
@@ -72,5 +75,4 @@ export function useConfig() {
   if (!ctx) throw new Error('useConfig must be used within ConfigProvider')
   return ctx
 }
-
 

@@ -68,6 +68,16 @@ VITE_RPC_URL=http://127.0.0.1:8545
 VITE_CONTRACT_ADDRESS=0x...
 VITE_ROOT_PERSON_HASH=0x...
 VITE_ROOT_VERSION_INDEX=1
+# Optional: pin chain id to skip network detection (ethers)
+# Local hardhat: 31337; Conflux eSpace testnet: 71; eSpace mainnet: 1030
+VITE_CHAIN_ID=31337
+
+# Optional: tune visualization RPC load (reduce rate limit risk)
+# Defaults: PARALLEL=6, PAGE_SIZE=25, ENDORSE_BATCH=40, MAX_DEPTH=30
+# Example for public RPCs
+# VITE_DF_PARALLEL=2
+# VITE_DF_PAGE_SIZE=10
+# VITE_DF_ENDORSE_BATCH=10
 ```
 
 ## Pages

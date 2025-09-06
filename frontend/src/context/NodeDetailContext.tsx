@@ -6,6 +6,7 @@ import { useVizOptions } from './VizOptionsContext'
 import { ethers } from 'ethers'
 import DeepFamily from '../abi/DeepFamily.json'
 import { useConfig } from './ConfigContext'
+import { makeProvider } from '../utils/provider'
 
 export interface NodeKeyMinimal { personHash: string; versionIndex: number }
 
@@ -46,7 +47,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
       const id = makeNodeId(selected.personHash, selected.versionIndex)
       const nd = nodesData?.[id]
       const needVersion = !nd || nd.addedBy === undefined || nd.fatherHash === undefined || nd.metadataCID === undefined
-      const provider = new ethers.JsonRpcProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       try {
         setLoading(true)

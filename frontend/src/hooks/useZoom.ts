@@ -41,7 +41,10 @@ export function useZoom(options: UseZoomOptions = {}): UseZoomReturn {
   useEffect(() => {
     if (!svgRef.current || !innerRef.current) return
     
-    const svg = d3.select(svgRef.current)
+    const svgEl = svgRef.current
+    // Prevent browser touch gestures so zoom can be passive
+    try { svgEl.style.touchAction = 'none' } catch {}
+    const svg = d3.select(svgEl)
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([min, max])
       .on('zoom', (event: any) => {
