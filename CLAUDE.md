@@ -184,8 +184,18 @@ Follow the conventional commit format for all git commits:
 - `ci`: CI/CD related changes
 - `revert`: revert a previous commit
 
+**Commit Message Guidelines:**
+- **Be PRECISE and accurate**: The description must accurately reflect the actual changes made
+- **Match scope to changes**: Small changes get small descriptions, big changes get detailed ones  
+- **Avoid overstatement**: Don't use terms like "enhance", "improve", "optimize" for minor tweaks
+- **Be specific**: Instead of "update component", write what specifically was changed
+- **Check the diff first**: Always review what actually changed before writing the message
+
 **Examples:**
-- `feat: add zero-knowledge proof verification`
-- `fix: resolve NFT minting gas limit issue`
-- `docs: update smart contract API documentation`
-- `chore: update dependencies and contract ABI`
+- ✅ `feat: add zero-knowledge proof verification` (if actually implementing ZK proofs)
+- ✅ `fix: resolve NFT minting gas limit issue` (if fixing a real gas issue)  
+- ✅ `style: adjust hash text size in SearchPage` (for a simple CSS change)
+- ✅ `fix: correct typo in error message` (for a typo fix)
+- ❌ `feat: enhance pages and component functionality` (too vague for small changes)
+- ❌ `refactor: enhance core application architecture` (overstatement for minor changes)
+- ❌ `feat: improve user experience with advanced features` (meaningless fluff)

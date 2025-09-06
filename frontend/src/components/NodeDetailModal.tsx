@@ -22,6 +22,10 @@ export default function NodeDetailModal({
   error?: string | null
 }) {
   const { t } = useTranslation()
+  // Track close origin to coordinate with history state
+  const pushedRef = React.useRef(false)
+  const closedBySelfRef = React.useRef(false)
+  const closedByPopRef = React.useRef(false)
   const copyText = React.useCallback(async (text: string) => {
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -49,11 +53,43 @@ export default function NodeDetailModal({
   const [dragOffset, setDragOffset] = React.useState(0)
   const startYRef = React.useRef<number | null>(null)
   const navigate = useNavigate()
+  const handleClose = React.useCallback(() => {
+    closedBySelfRef.current = true
+    onClose()
+  }, [onClose])
+
+  // Close on Escape
   React.useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [open, handleClose])
+
+  // Push a history state on open so mobile back closes modal first
+  React.useEffect(() => {
+    if (!open) return
+    try {
+      window.history.pushState({ __dfNodeDetailModal: true }, '')
+      pushedRef.current = true
+    } catch {}
+    const onPop = () => {
+      // Back pressed: close modal without adding another back
+      closedByPopRef.current = true
+      onClose()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      // If user closed via modal (click overlay/drag/Escape/button) and we pushed a state,
+      // consume the extra history entry so URL stays at the same route.
+      if (pushedRef.current && closedBySelfRef.current && !closedByPopRef.current) {
+        try { window.history.back() } catch {}
+      }
+      pushedRef.current = false
+      closedBySelfRef.current = false
+      closedByPopRef.current = false
+    }
   }, [open, onClose])
   // Lock background scroll
   React.useEffect(() => {
@@ -88,7 +124,7 @@ export default function NodeDetailModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm" onClick={handleClose}>
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div
           className={`relative flex flex-col w-full max-w-[720px] ${hasNFT ? 'h-[92vh]' : 'h-auto max-h-[92vh] mb-2'} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} will-change-transform`}
@@ -99,11 +135,11 @@ export default function NodeDetailModal({
             className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 px-4 py-4 pt-7 sm:pt-6 sm:px-6 border-b border-gray-200/50 dark:border-gray-700/50 z-10 relative touch-none cursor-grab active:cursor-grabbing backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60"
             onPointerDown={(e) => { (e.currentTarget as any).setPointerCapture?.(e.pointerId); startYRef.current = e.clientY; setDragging(true) }}
             onPointerMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.clientY - startYRef.current); setDragOffset(dy) }}
-            onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
+            onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
             onPointerCancel={() => { setDragging(false); setDragOffset(0) }}
             onTouchStart={(e) => { startYRef.current = e.touches[0].clientY; setDragging(true) }}
             onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy) }}
-            onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
+            onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
           >
             {/* Drag handle */}
             <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
@@ -121,7 +157,7 @@ export default function NodeDetailModal({
               <button 
                 aria-label="close" 
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors" 
-                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                onClick={(e) => { e.stopPropagation(); handleClose() }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
               >

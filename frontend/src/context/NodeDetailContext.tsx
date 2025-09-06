@@ -28,7 +28,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
   const [error, setError] = useState<string | null>(null)
   const { nodesData, setNodesData } = useTreeData() as any
   const { includeVersionDetails } = useVizOptions()
-  const { mode, rpcUrl, contractAddress } = useConfig()
+  const { rpcUrl, contractAddress } = useConfig()
 
   const openNode = useCallback((k: NodeKeyMinimal) => { setSelected(k) }, [])
   const close = useCallback(() => { setSelected(null) }, [])
@@ -41,7 +41,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (!selected) return
-    if (mode !== 'contract' || !rpcUrl || !contractAddress || !setNodesData) return
+    if (!rpcUrl || !contractAddress || !setNodesData) return
     let cancelled = false
     const run = async () => {
       const id = makeNodeId(selected.personHash, selected.versionIndex)
@@ -152,7 +152,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
     run()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, mode, rpcUrl, contractAddress])
+  }, [selected, rpcUrl, contractAddress])
   return (
     <Ctx.Provider value={{ open: !!selected, selected, selectedNodeData, loading, error, openNode, close }}>
       {children}
