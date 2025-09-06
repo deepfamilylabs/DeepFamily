@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Clipboard, ChevronRight, Edit2 } from 'lucide-react'
+import { X, Clipboard, ChevronRight, Edit2, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NodeData } from '../types/graph'
 
@@ -43,7 +43,28 @@ export default function NodeDetailModal({
     }
   }, [])
   const [centerHint, setCenterHint] = React.useState<string | null>(null)
+  const [entered, setEntered] = React.useState(false)
+  const [dragging, setDragging] = React.useState(false)
+  const [dragOffset, setDragOffset] = React.useState(0)
+  const startYRef = React.useRef<number | null>(null)
+  React.useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+  // Lock background scroll
+  React.useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [open])
+  // Enter animation
+  React.useEffect(() => { if (open) { requestAnimationFrame(() => setEntered(true)) } else { setEntered(false) } }, [open])
   if (!open) return null
+
+  const hasNFT = Boolean(nodeData?.tokenId && nodeData.tokenId !== '0')
 
   const Row: React.FC<{ label: React.ReactNode; value: React.ReactNode; copy?: string }> = ({ label, value, copy }) => (
     <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
@@ -65,17 +86,47 @@ export default function NodeDetailModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-2 sm:p-4">
-      <div className="fixed inset-0 bg-black/40 dark:bg-black/60" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl shadow-black/10 dark:shadow-black/30 w-full max-w-[560px] sm:max-w-[580px] max-h-[82vh] overflow-hidden flex flex-col text-[14px] border border-gray-100 dark:border-gray-700/60">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700/60 bg-gray-50/70 dark:bg-gray-900/60 backdrop-blur-sm sticky top-0 z-10">
-          <div className="text-[17px] font-semibold text-gray-900 dark:text-gray-100 truncate pr-2 tracking-tight">
-            {t('visualization.personVersionDetail.title')}
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div
+          className={`relative flex flex-col w-full max-w-[720px] ${hasNFT ? 'h-[92vh]' : 'h-auto max-h-[92vh] mb-2'} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} will-change-transform`}
+          style={{ transform: dragging ? `translateY(${dragOffset}px)` : undefined, transitionDuration: dragging ? '0ms' : undefined }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 px-4 py-4 pt-7 sm:pt-6 sm:px-6 border-b border-gray-200/50 dark:border-gray-700/50 z-10 relative touch-none cursor-grab active:cursor-grabbing backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60"
+            onPointerDown={(e) => { (e.currentTarget as any).setPointerCapture?.(e.pointerId); startYRef.current = e.clientY; setDragging(true) }}
+            onPointerMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.clientY - startYRef.current); setDragOffset(dy) }}
+            onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
+            onPointerCancel={() => { setDragging(false); setDragOffset(0) }}
+            onTouchStart={(e) => { startYRef.current = e.touches[0].clientY; setDragging(true) }}
+            onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy); e.preventDefault() }}
+            onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
+          >
+            {/* Drag handle */}
+            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[17px] sm:text-[18px] font-semibold text-gray-900 dark:text-gray-100 truncate pr-2 tracking-tight">
+                    {t('visualization.personVersionDetail.title')}
+                  </div>
+                </div>
+              </div>
+              <button 
+                aria-label="close" 
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors" 
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
-          <button aria-label="close" className="p-2 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors shadow-sm" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
         {centerHint && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>
@@ -190,10 +241,9 @@ export default function NodeDetailModal({
             <div className="text-center text-xs text-red-500 dark:text-red-400 py-2">{error}</div>
           )}
         </div>
+        </div>
       </div>
     </div>,
     document.body
   )
 }
-
-
