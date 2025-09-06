@@ -338,7 +338,7 @@
       "root": "Root"
     },
     "ui": {
-      "visualizationView": "Visualization View",
+      "displaySettings": "Data Options",
       "versionNumber": "Version",
       "contractModeConfig": "Contract Configuration",
       "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
@@ -365,7 +365,8 @@
         "root_missing": "Root Missing",
         "error": "Error"
       },
-      "networkError": "Network request failed"
+      "networkError": "Network request failed",
+      "rateLimited": "RPC rate limit exceeded. Please try again later."
     },
     "actions": {
       "refresh": "Refresh"
@@ -437,6 +438,7 @@
     "stats": "Chunks: {{count}}, Total Length: {{length}}",
     "sealed": "Sealed",
     "seal": "Seal",
+    "hashLabel": "Hash",
     "editChunk": "Edit Chunk #{{index}}",
     "addChunk": "Add New Chunk",
     "contentPlaceholder": "Enter chunk content (max 1000 characters)",
@@ -507,6 +509,7 @@
     "fetchFailed": "Failed to load token"
   },
   "people": {
+    "syncing": "Syncing...",
     "loading": "Loading people...",
     "badge": "People Encyclopedia",
     "title": "Family People Encyclopedia",
@@ -523,7 +526,7 @@
     "sortRules": "Sort Rules",
     "filterRules": "Filter Rules",
     "viewMode": "View Mode",
-    "filterAll": "ID",
+    "filterAll": "Token ID",
     "filterByCreateTime": "Creation Time",
     "filterByName": "Name",
     "filterByEndorsement": "Endorsements",
@@ -545,7 +548,7 @@
     "viewDetail": "View Details",
     "born": "Born",
     "died": "Died",
-    "storyInfo": "Story Info",
+    "storyInfo": "Biography Info",
     "chunksCount": "{{count}} chunks, {{length}} bytes",
     "addedBy": "Added By",
     "tag": "Tag",
@@ -553,6 +556,7 @@
     "detailedStory": "Biography",
     "chunks": "Chunks",
     "fullText": "Full Text",
+    "integrityChecking": "Checking integrity...",
     "integrityVerified": "Story integrity verified",
     "integrityWarning": "Story integrity issues detected",
     "loading": "Loading story chunks...",

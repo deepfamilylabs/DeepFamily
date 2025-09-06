@@ -338,7 +338,7 @@
       "root": "根节点"
     },
     "ui": {
-      "visualizationView": "可视化视图",
+      "displaySettings": "数据选项",
       "versionNumber": "版本号",
       "contractModeConfig": "合约配置",
       "traversalDFS": "DFS 深度优先：快速深入，按路径向下后回溯",
@@ -365,7 +365,8 @@
         "root_missing": "缺少根节点",
         "error": "错误"
       },
-      "networkError": "网络请求失败"
+      "networkError": "网络请求失败",
+      "rateLimited": "已达到每日请求上限，请稍后再试"
     },
     "actions": {
       "refresh": "刷新"
@@ -437,6 +438,7 @@
     "stats": "分片数量: {{count}}, 总长度: {{length}}",
     "sealed": "已封存",
     "seal": "封存",
+    "hashLabel": "哈希",
     "editChunk": "编辑分片 #{{index}}",
     "addChunk": "添加新分片",
     "contentPlaceholder": "请输入分片内容（最多1000字符）",
@@ -507,6 +509,7 @@
     "fetchFailed": "加载 Token 失败"
   },
   "people": {
+    "syncing": "同步中...",
     "loading": "加载人物中...",
     "badge": "人物百科",
     "title": "家族人物百科",
@@ -523,7 +526,7 @@
     "sortRules": "排序规则",
     "filterRules": "过滤规则",
     "viewMode": "视图模式",
-    "filterAll": "ID",
+    "filterAll": "Token ID",
     "filterByCreateTime": "创建时间",
     "filterByName": "姓名",
     "filterByEndorsement": "背书",
@@ -553,6 +556,7 @@
     "detailedStory": "传记",
     "chunks": "分片",
     "fullText": "全文",
+    "integrityChecking": "正在检查完整性...",
     "integrityVerified": "传记完整性已验证",
     "integrityWarning": "检测到传记完整性问题",
     "loading": "加载传记分片中...",

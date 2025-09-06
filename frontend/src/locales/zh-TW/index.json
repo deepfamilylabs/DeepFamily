@@ -338,7 +338,7 @@
       "root": "根節點"
     },
     "ui": {
-      "visualizationView": "視覺化視圖",
+      "displaySettings": "數據選項",
       "versionNumber": "版本號",
       "contractModeConfig": "合約配置",
       "traversalDFS": "DFS 深度優先：快速深入後回溯",
@@ -365,7 +365,8 @@
         "root_missing": "缺少根節點",
         "error": "錯誤"
       },
-      "networkError": "網路請求失敗"
+      "networkError": "網路請求失敗",
+      "rateLimited": "已達到每日請求上限，請稍後再試"
     },
     "actions": {
       "refresh": "重新整理"
@@ -437,6 +438,7 @@
     "stats": "分片數量: {{count}}, 總長度: {{length}}",
     "sealed": "已封存",
     "seal": "封存",
+    "hashLabel": "雜湊",
     "editChunk": "編輯分片 #{{index}}",
     "addChunk": "添加新分片",
     "contentPlaceholder": "請輸入分片內容（最多1000字元）",
@@ -507,6 +509,7 @@
     "fetchFailed": "載入 Token 失敗"
   },
   "people": {
+    "syncing": "同步中...",
     "loading": "載入人物中...",
     "badge": "人物百科",
     "title": "家族人物百科",
@@ -523,7 +526,7 @@
     "sortRules": "排序規則",
     "filterRules": "過濾規則",
     "viewMode": "視圖模式",
-    "filterAll": "ID",
+    "filterAll": "Token ID",
     "filterByCreateTime": "建立時間",
     "filterByName": "姓名",
     "filterByEndorsement": "背書",
@@ -553,6 +556,7 @@
     "detailedStory": "傳記",
     "chunks": "分片",
     "fullText": "全文",
+    "integrityChecking": "正在檢查完整性...",
     "integrityVerified": "傳記完整性已驗證",
     "integrityWarning": "檢測到傳記完整性問題",
     "loading": "載入傳記分片中...",
