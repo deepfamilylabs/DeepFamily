@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   X,
@@ -16,7 +17,8 @@ import {
   Check,
   AlertCircle,
   Wallet,
-  Link
+  Link,
+  Edit2
 } from 'lucide-react'
 import { NodeData, StoryChunk } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
@@ -54,6 +56,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
   const nameContainerRef = useRef<HTMLDivElement | null>(null)
   const nameTextRef = useRef<HTMLSpanElement | null>(null)
   const [marquee, setMarquee] = useState(false)
+  const navigate = useNavigate()
 
   const [storyData, setStoryData] = useState<StoryData>({
     chunks: [],
@@ -268,7 +271,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-3 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div
-          className={`relative flex flex-col w-full max-w-[720px] h-[92vh] sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} select-none will-change-transform`}
+          className={`relative flex flex-col w-full max-w-[860px] h-[92vh] sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} select-none will-change-transform`}
           onClick={(e) => e.stopPropagation()}
           style={{ transform: dragging ? `translateY(${dragOffset}px)` : undefined, transitionDuration: dragging ? '0ms' : undefined }}
         >
@@ -288,7 +291,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
             onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
             onPointerCancel={() => { setDragging(false); setDragOffset(0) }}
             onTouchStart={(e) => { startYRef.current = e.touches[0].clientY; setDragging(true) }}
-            onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy); e.preventDefault() }}
+            onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy) }}
             onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
           >
             {/* Drag handle (overlayed) */}
@@ -395,7 +398,23 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   </div>
                 )}
 
-                {/* Removed top-level Story Info row to avoid duplication. Detailed section below shows it. */}
+                {/* Top-level Story Info (restored) */}
+                {(person.storyMetadata || storyData.chunks.length > 0 || storyData.integrity.computedLength > 0 || storyData.fullStory) && (
+                  <div className="flex items-center gap-3">
+                    <Layers className="w-5 h-5 text-blue-500" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                        {t('storyChunksViewer.storyInfo', 'Biography')}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        {t('storyChunksViewer.chunksCount', '{{count}} chunks, {{length}} bytes', {
+                          count: chunksCount,
+                          length: lengthBytes
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {person.tag && (
                   <div className="flex items-center gap-3">
@@ -509,7 +528,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     </div>
                   </div>
                 )}
-                {(person.hasDetailedStory || person.storyMetadata || storyData.loading || storyData.chunks.length > 0 || !!storyData.fullStory || storyData.integrity.computedLength > 0) && (
+                {(person.hasDetailedStory || person.storyMetadata || storyData.loading || storyData.chunks.length > 0 || !!storyData.fullStory || storyData.integrity.computedLength > 0 || (person.tokenId && person.tokenId !== '0')) && (
                   <>
                   {/* View Mode Toggle */}
                   <div className="flex items-center justify-between mb-4">
@@ -544,15 +563,35 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     </div>
                   </div>
 
-                  {/* Story meta + integrity (single row, no icons). Hide integrity when 0 chunks */}
-                  {(person.storyMetadata || storyData.chunks.length > 0 || storyData.integrity.computedLength > 0 || storyData.fullStory) && (
-                    <div className="flex items-center justify-between -mt-2 mb-2 text-[10px] text-gray-600 dark:text-gray-400">
-                      <span>
-                        {t('storyChunksViewer.chunksCount', '{{count}} chunks, {{length}} bytes', {
-                          count: chunksCount,
-                          length: lengthBytes
-                        })}
-                      </span>
+                  {/* Status + Integrity on same row; chunks meta below — always show, even if empty */}
+                  <>
+                    <div className="flex items-center justify-between -mt-2 mb-1 text-[10px] text-gray-600 dark:text-gray-400">
+                      <div>
+                        {person.storyMetadata?.isSealed ? (
+                          <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-[10px] sm:text-xs font-medium bg-transparent">
+                            {t('person.sealed', 'Sealed')}
+                          </span>
+                        ) : (
+                          person.tokenId ? (
+                            <button
+                              onClick={() => {
+                                if (!person.tokenId) return
+                                // Navigate to full-screen editor page with prefetched data
+                                const prefetched = {
+                                  tokenId: person.tokenId,
+                                  storyMetadata: person.storyMetadata,
+                                  storyChunks: storyData.chunks,
+                                }
+                                navigate(`/editor/${person.tokenId}`, { state: { prefetchedStory: prefetched } })
+                              }}
+                              className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs font-medium transition-colors"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 mr-1" />
+                              {t('person.editable', 'Editable')}
+                            </button>
+                          ) : null
+                        )}
+                      </div>
                       {chunksCount > 0 && !storyData.loading && (
                         storyData.integrityChecking ? (
                           <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-[10px] sm:text-xs font-medium bg-transparent">
@@ -572,7 +611,13 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         )
                       )}
                     </div>
-                  )}
+                    <div className="mb-2 text-[10px] text-gray-600 dark:text-gray-400">
+                      {t('storyChunksViewer.chunksCount', '{{count}} chunks, {{length}} bytes', {
+                        count: chunksCount,
+                        length: lengthBytes
+                      })}
+                    </div>
+                  </>
 
                   {storyData.loading ? (
                     <div className="flex items-center justify-center py-12">

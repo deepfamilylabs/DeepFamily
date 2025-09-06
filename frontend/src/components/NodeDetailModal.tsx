@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, Clipboard, ChevronRight, Edit2, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NodeData } from '../types/graph'
+import { useNavigate } from 'react-router-dom'
 
 
 export default function NodeDetailModal({
@@ -47,6 +48,7 @@ export default function NodeDetailModal({
   const [dragging, setDragging] = React.useState(false)
   const [dragOffset, setDragOffset] = React.useState(0)
   const startYRef = React.useRef<number | null>(null)
+  const navigate = useNavigate()
   React.useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -100,7 +102,7 @@ export default function NodeDetailModal({
             onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
             onPointerCancel={() => { setDragging(false); setDragOffset(0) }}
             onTouchStart={(e) => { startYRef.current = e.touches[0].clientY; setDragging(true) }}
-            onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy); e.preventDefault() }}
+            onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy) }}
             onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) onClose() }}
           >
             {/* Drag handle */}
@@ -132,7 +134,7 @@ export default function NodeDetailModal({
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>
           </div>
         )}
-        <div className="px-4 pb-4 pt-2 overflow-y-auto scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100">
+        <div className="px-4 pb-24 pt-2 overflow-y-auto scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)' }}>
           <div className="space-y-1.5">
             <Row label={t('visualization.nodeDetail.hash')} value={nodeData?.personHash || fallback.hash} copy={nodeData?.personHash || fallback.hash} />
             <Row label={t('visualization.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
@@ -218,8 +220,8 @@ export default function NodeDetailModal({
                         </button>
                         <button
                           onClick={() => {
-                            const url = `/person/${nodeData.tokenId}?edit=1`
-                            window.open(url, '_blank')
+                            if (!nodeData?.tokenId) return
+                            navigate(`/editor/${nodeData.tokenId}`)
                           }}
                           className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 underline flex items-center gap-1"
                         >
@@ -234,6 +236,8 @@ export default function NodeDetailModal({
               </>
             )}
           </div>
+          {/* Bottom spacer to ensure last row (e.g., URI) is visible above rounded edge / safe area */}
+          <div className="h-3 sm:h-1" />
           {loading && (
             <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">{t('visualization.nodeDetail.loading')}</div>
           )}
