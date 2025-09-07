@@ -7,7 +7,6 @@ import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
 import { ethers } from 'ethers'
-import PageContainer from '../components/PageContainer'
 
 function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex);
@@ -324,7 +323,7 @@ export default function PersonPage() {
 
       {/* Inline error alert (content area) */}
       {error && (
-        <PageContainer className="pt-8 pb-4">
+        <div className="pb-4">
           <div
             role="alert"
             className="mb-6 flex flex-col sm:flex-row sm:items-start gap-4 rounded-xl border border-red-300 dark:border-red-700/50 bg-red-50/80 dark:bg-red-900/30 p-5 shadow-sm"
@@ -356,37 +355,38 @@ export default function PersonPage() {
               </button>
             </div>
           </div>
-        </PageContainer>
+        </div>
       )}
 
       {/* Main content only if data present and no error */}
       {!error && data && (
         <>
-          {/* Title / Meta Row below sticky header (add top spacing) */}
-          <PageContainer className="pt-8 pb-2">
+          {/* Title / Meta Row */}
+          <div className="pb-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <h1 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1 leading-tight">
-                  <span className="truncate max-w-[calc(100vw-120px)] sm:max-w-[calc(60vw-80px)] md:max-w-sm text-sm sm:text-base md:text-lg leading-none" title={data.fullName || `Token #${data.tokenId}`}>{data.fullName || `Token #${data.tokenId}`}</span>
-                  <span className="text-gray-300 dark:text-gray-600 hidden xs:inline">/</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap text-sm sm:text-base md:text-lg leading-none">{t('person.title', "'s Biography")}</span>
+                  <span className="truncate max-w-[calc(100vw-120px)] sm:max-w-[calc(60vw-80px)] md:max-w-sm text-2xl sm:text-2xl md:text-3xl leading-none" title={data.fullName || `Token #${data.tokenId}`}>{data.fullName || `Token #${data.tokenId}`}</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap text-2xl sm:text-2xl md:text-3xl leading-none">{t('person.title', "'s Biography")}</span>
                   {data.storyMetadata && data.storyMetadata.totalChunks > 0 && data.integrity && (() => {
-                        const integ = data.integrity
-                        const localOk = integ.missing.length === 0 && integ.lengthMatch && (integ.hashMatch === true)
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] leading-tight font-medium ${localOk ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300' : 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-600 dark:text-amber-300'}`}>
-                            {localOk ? t('person.integrityFrontendOk','Integrity Frontend Verified') : t('person.integrityWarn','Integrity Possibly Inconsistent')}
-                          </span>
-                        )
-                      })()}
-                  {data.personHash && (
+                    const integ = data.integrity
+                    const localOk = integ.missing.length === 0 && integ.lengthMatch && (integ.hashMatch === true)
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] leading-tight font-medium ${localOk ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300' : 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-600 dark:text-amber-300'}`}>
+                        {localOk ? t('person.integrityFrontendOk','Integrity Frontend Verified') : t('person.integrityWarn','Integrity Possibly Inconsistent')}
+                      </span>
+                    )
+                  })()}
+                </h1>
+                {data.personHash ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <HashAndIndexLine
                       personHash={data.personHash}
                       versionIndex={data.versionIndex}
                       t={t}
                     />
-                  )}
-                </h1>
+                  </div>
+                ) : null}
                 {data.integrity && data.storyMetadata && data.storyMetadata.totalChunks > 0 && (
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-500 dark:text-gray-500/70 font-mono">
                     {data.integrity.missing.length>0 && <span>{t('person.integrityMissing', 'Missing indices: {{indices}}', { indices: data.integrity.missing.join(',') })}</span>}
@@ -421,9 +421,9 @@ export default function PersonPage() {
                 )}
               </div>
             </div>
-          </PageContainer>
+          </div>
           {/* Existing body content below */}
-          <PageContainer className="py-4">
+          <div className="py-4">
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
               <div className="xl:col-span-3 space-y-6">
                 <div className="bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-2xl shadow-gray-500/5 dark:shadow-gray-900/20 border border-gray-200/70 dark:border-gray-700/50 p-6 card-surface backdrop-blur-xl relative overflow-hidden group hover:shadow-3xl hover:shadow-gray-500/10 dark:hover:shadow-gray-900/30 transition-all duration-300">
@@ -435,25 +435,25 @@ export default function PersonPage() {
                       <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-8 tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
                         {t('person.basicInfo','Basic Info')}
                       </h3>
-                      <div className="space-y-5 font-mono text-gray-700 dark:text-gray-200 text-sm leading-relaxed tracking-wide selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30">
+                      <div className="space-y-5 font-mono text-gray-700 dark:text-gray-200 text-xs leading-relaxed tracking-wide selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30">
                         {data.fullName && (
-                          <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-blue-50/50 to-cyan-50/30 dark:from-blue-900/20 dark:to-cyan-900/10 border border-blue-200/30 dark:border-blue-700/30">
-                            <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.fullName', 'Full Name')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-bold text-lg">{data.fullName}</span>
+                          <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-blue-50/50 to-cyan-50/30 dark:from-blue-900/20 dark:to-cyan-900/10 border border-blue-200/30 dark:border-blue-700/30">
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-20 whitespace-nowrap flex-shrink-0">{t('visualization.nodeDetail.fullName', 'Full Name')}</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">{data.fullName}</span>
                           </div>
                         )}
 
                         {data.nftCoreInfo?.gender !== undefined && data.nftCoreInfo.gender > 0 && (
-                          <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-purple-50/50 to-pink-50/30 dark:from-purple-900/20 dark:to-pink-900/10 border border-purple-200/30 dark:border-purple-700/30">
-                            <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.gender', 'Gender')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-semibold">{genderTextFn(data.nftCoreInfo.gender, t as any) || '-'}</span>
+                          <div className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-purple-50/50 to-pink-50/30 dark:from-purple-900/20 dark:to-pink-900/10 border border-purple-200/30 dark:border-purple-700/30">
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-20 flex-shrink-0">{t('visualization.nodeDetail.gender', 'Gender')}</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">{genderTextFn(data.nftCoreInfo.gender, t as any) || '-'}</span>
                           </div>
                         )}
 
                         {data.nftCoreInfo && (data.nftCoreInfo.birthYear || data.nftCoreInfo.birthPlace) && (
                           <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-green-50/50 to-emerald-50/30 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/30 dark:border-green-700/30">
-                            <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.birth', 'Birth')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.birth', 'Birth')}</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">
                               {(() => {
                                 const d = formatYMD(data.nftCoreInfo!.birthYear, data.nftCoreInfo!.birthMonth, data.nftCoreInfo!.birthDay, data.nftCoreInfo!.isBirthBC)
                                 const parts = [d, data.nftCoreInfo!.birthPlace].filter(Boolean)
@@ -465,8 +465,8 @@ export default function PersonPage() {
 
                         {data.nftCoreInfo && (data.nftCoreInfo.deathYear || data.nftCoreInfo.deathPlace) && (
                           <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-slate-50/30 dark:from-gray-900/20 dark:to-slate-900/10 border border-gray-200/30 dark:border-gray-700/30">
-                            <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.death', 'Death')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.death', 'Death')}</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">
                               {(() => {
                                 const d = formatYMD(data.nftCoreInfo!.deathYear, data.nftCoreInfo!.deathMonth, data.nftCoreInfo!.deathDay, data.nftCoreInfo!.isDeathBC)
                                 const parts = [d, data.nftCoreInfo!.deathPlace].filter(Boolean)
@@ -478,8 +478,8 @@ export default function PersonPage() {
 
                         {data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== '' && (
                           <div className="flex items-start gap-8 flex-wrap sm:flex-nowrap p-4 rounded-xl bg-gradient-to-r from-amber-50/50 to-yellow-50/30 dark:from-amber-900/20 dark:to-yellow-900/10 border border-amber-200/30 dark:border-amber-700/30">
-                            <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0 pt-1">{t('visualization.nodeDetail.story', 'Story')}</span>
-                            <div className="text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap font-medium flex-1 min-w-0 break-words break-all sm:break-words">
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0 pt-1">{t('visualization.nodeDetail.story', 'Story')}</span>
+                            <div className="text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap font-medium flex-1 min-w-0 break-words break-all sm:break-words text-left">
                               {data.nftCoreInfo.story}
                             </div>
                           </div>
@@ -580,7 +580,7 @@ export default function PersonPage() {
                       </div>
                       {data.personHash && (
                         <div className="col-span-2">
-                          <dt className="text-gray-500 dark:text-gray-400">{t('person.personHash', 'Person Hash')}</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t('person.personHashLabel', 'Person Hash')}</dt>
                           <dd className="mt-1 flex items-center gap-1">
                             <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
                               {formatHashMiddle(data.personHash)}
@@ -709,7 +709,7 @@ export default function PersonPage() {
                       </div>
                       {data.personHash && (
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.personHash', 'Person Hash')}</div>
+                          <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.personHashLabel', 'Person Hash')}</div>
                           <div className="flex items-center gap-0">
                             <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
                               {formatHashMiddle(data.personHash)}
@@ -730,7 +730,7 @@ export default function PersonPage() {
                 )}
               </div>
             </div>
-          </PageContainer>
+          </div>
         </>
       )}
 
@@ -756,37 +756,37 @@ function HashAndIndexLine({ personHash, versionIndex, t }: { personHash: string,
   }
   const shortHash = useMemo(() => formatHashMiddle(personHash, 7, 5), [personHash])
   return (
-    <div className="mt-1 flex items-center gap-3 font-mono text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+    <div className="flex items-center gap-3 font-mono text-xs sm:text-sm text-gray-600 dark:text-gray-400">
       <div className="flex items-center gap-2 min-w-0">
         <span className="shrink-0 text-gray-500 dark:text-gray-500/70 xs:inline">{t('person.personHashLabel','Person Hash:')}</span>
         <span
-          className="truncate max-w-[160px] sm:max-w-[260px] select-text"
+          className="whitespace-nowrap select-text"
           title={personHash}
         >{shortHash}</span>
         <button
           onClick={copy}
-          className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] transition-colors ${copied ? 'bg-green-600 border-green-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+          className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border text-xs transition-colors ${copied ? 'bg-green-600 border-green-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
           aria-label={copied ? (t('common.copied','Copied') as string) : (t('common.copy','Copy') as string)}
           title={copied ? (t('common.copied','Copied') as string) : (t('common.copy','Copy') as string)}
         >
           <Copy size={12} />
           <span className="hidden sm:inline">{copied ? t('common.copied','Copied') : t('common.copy','Copy')}</span>
         </button>
+        {versionIndex !== undefined && versionIndex > 0 && (
+          <>
+            <span className="ml-2 shrink-0 whitespace-nowrap text-gray-500 dark:text-gray-500/80">v{versionIndex}</span>
+            <button
+              onClick={goViz}
+              className="ml-2 flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30 text-xs transition-colors"
+              title={t('person.viewVisualization','View Family Tree') as string}
+              aria-label={t('person.viewVisualization','View Family Tree') as string}
+            >
+              <GitBranch size={12} />
+              <span className="hidden sm:inline">{t('person.viewVisualization','Family Tree')}</span>
+            </button>
+          </>
+        )}
       </div>
-      {versionIndex !== undefined && versionIndex > 0 && (
-        <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-          <span className="text-gray-500 dark:text-gray-500/80">{t('person.versionLabel','Version:')}v{versionIndex}</span>
-          <button
-            onClick={goViz}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30 text-[10px] transition-colors"
-            title={t('person.viewVisualization','View Family Tree') as string}
-            aria-label={t('person.viewVisualization','View Family Tree') as string}
-          >
-            <GitBranch size={12} />
-            <span className="hidden sm:inline">{t('person.viewVisualization','Family Tree')}</span>
-          </button>
-        </div>
-      )}
     </div>
   )
 }

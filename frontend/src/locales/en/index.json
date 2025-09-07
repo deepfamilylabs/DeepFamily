@@ -503,7 +503,7 @@
     "integrityLocalHashMismatch": "Local hash mismatch",
     "integrityChainHashMismatch": "On-chain hash mismatch",
     "integrityMissing": "Missing indices: {{indices}}",
-    "integrityFrontendOk": "Integrity Frontend Verified",
+    "integrityFrontendOk": "Integrity Verified",
     "integrityChainFail": "On-chain verification failed",
     "verify": "Contract Verify",
     "verified": "Verified",

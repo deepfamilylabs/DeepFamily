@@ -223,7 +223,7 @@ export default function StoryChunkEditor({
   if (!open) return null
 
   const Card = (
-      <div className={`relative bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-3xl w-full ${layout === 'page' ? 'max-w-[900px]' : 'max-w-[800px] max-h-[90vh]'} overflow-hidden flex flex-col border border-gray-200/70 dark:border-gray-700/50 backdrop-blur-xl`}>
+      <div className={`relative bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-3xl w-full ${layout === 'page' ? 'max-w-none' : 'max-w-[800px] max-h-[90vh]'} overflow-hidden flex flex-col border border-gray-200/70 dark:border-gray-700/50 backdrop-blur-xl`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/70 dark:border-gray-700/50 bg-gradient-to-r from-blue-50/50 to-purple-50/30 dark:from-blue-900/20 dark:to-purple-900/15 backdrop-blur-sm">
           <div className="flex items-center gap-3 min-w-0">
             {layout === 'page' && (
@@ -464,7 +464,7 @@ export default function StoryChunkEditor({
 
   if (layout === 'page') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900 p-3 sm:p-6" data-story-editor-page>
+      <div className="w-full" data-story-editor-page>
         <div className="mx-auto flex justify-center">
           {Card}
         </div>
