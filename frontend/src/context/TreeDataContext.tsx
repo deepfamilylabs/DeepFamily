@@ -44,7 +44,16 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly } = useConfig()
   const { traversal, includeVersionDetails } = useVizOptions()
   const [root, setRoot] = useState<GraphNode | null>(null)
-  const [nodesData, setNodesData] = useState<Record<string, NodeData>>({})
+  // Synchronous bootstrap for nodesData from localStorage (ensures details available even in strict mode on first paint)
+  const initialNodesDataRef = useRef<Record<string, NodeData> | null>(null)
+  if (initialNodesDataRef.current === null) {
+    try {
+      const ns = `df.cache.v1::${rpcUrl || 'no-rpc'}::${contractAddress || 'no-contract'}`
+      const raw = localStorage.getItem(`${ns}::nodesData`)
+      initialNodesDataRef.current = raw ? (JSON.parse(raw) as Record<string, NodeData>) : {}
+    } catch { initialNodesDataRef.current = {} }
+  }
+  const [nodesData, setNodesData] = useState<Record<string, NodeData>>(() => initialNodesDataRef.current || {})
   const nodesDataRef = useRef(nodesData)
   useEffect(() => { nodesDataRef.current = nodesData }, [nodesData])
   // nodesDataRef keeps latest snapshot for async updates
@@ -90,6 +99,13 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     return `df.cache.v1::${rpc}::${addr}`
   }, [rpcUrl, contractAddress])
 
+  // Persisted visualization root (scoped by RPC+contract+root params)
+  const vizRootKey = useMemo(() => {
+    const rh = rootHash || 'no-root'
+    const rv = Number(rootVersionIndex) || 0
+    return `${storageNS}::vizRoot::${rh}::${rv}`
+  }, [storageNS, rootHash, rootVersionIndex])
+
   const persistNodesData = useCallback((data: Record<string, NodeData>) => {
     try { localStorage.setItem(`${storageNS}::nodesData`, JSON.stringify(data)) } catch {}
   }, [storageNS])
@@ -111,6 +127,70 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     persistNodesData(nodesData)
   }, [nodesData, persistNodesData])
+
+  // Load persisted root tree first (works for both strict and non-strict)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(vizRootKey)
+      if (raw) {
+        const obj = JSON.parse(raw) as GraphNode
+        setRoot(prev => prev || obj)
+      } else if (strictCacheOnly) {
+        // In strict mode with no cached root, ensure empty state
+        setRoot(null)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [vizRootKey, strictCacheOnly])
+
+  // Persist root tree whenever it changes (non-null)
+  useEffect(() => {
+    if (!root) return
+    try { localStorage.setItem(vizRootKey, JSON.stringify(root)) } catch {}
+  }, [root, vizRootKey])
+
+  // Hydrate nodesData from localStorage snapshot for nodes present in current root (no network)
+  useEffect(() => {
+    if (!root) return
+    try {
+      const raw = localStorage.getItem(`${storageNS}::nodesData`)
+      if (!raw) return
+      const snapshot = JSON.parse(raw) as Record<string, NodeData>
+      const collectIds = (r: GraphNode | null): string[] => {
+        if (!r) return []
+        const acc: string[] = []
+        const stack: GraphNode[] = [r]
+        while (stack.length) {
+          const n = stack.pop() as GraphNode
+          acc.push(makeNodeId(n.personHash, Number(n.versionIndex)))
+          if (n.children) for (const c of n.children) stack.push(c)
+        }
+        return acc
+      }
+      const ids = collectIds(root)
+      if (!ids.length) return
+      setNodesData(prev => {
+        let changed = false
+        const next = { ...prev }
+        for (const id of ids) {
+          const fromSnap = snapshot[id]
+          if (!fromSnap) continue
+          if (!next[id]) { next[id] = fromSnap; changed = true; continue }
+          // Merge missing detailed fields without overwriting existing state
+          const cur = next[id]
+          const merged = { ...fromSnap, ...cur, id: cur.id }
+          // Prefer fields already in memory; ensure tokenId/endorsement/name等被带回
+          const final = { ...fromSnap, ...cur, ...merged }
+          // Shallow compare for minimal churn
+          const before = JSON.stringify(cur)
+          const after = JSON.stringify(final)
+          if (before !== after) { next[id] = final as any; changed = true }
+        }
+        return changed ? next : prev
+      })
+    } catch {}
+  }, [root, storageNS])
 
   // Root + base streaming load
   useEffect(() => {
@@ -273,6 +353,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
   // Endorsement counts
   useEffect(() => {
+    if (strictCacheOnly) return
     if (!loadOptionsSnapshot.includeVersionDetails) return
     if (loading || !contract || !root) return
     const endorseEnabledSnapshot = loadOptionsSnapshot.includeVersionDetails
@@ -448,7 +529,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       }
     })()
     return () => { cancelled = true }
-  }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, root, nodePairs, contractAddress, provider, push])
+  }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, root, nodePairs, contractAddress, provider, push, strictCacheOnly])
 
   // Fetch minimal NodeData by tokenId for cold-start deep links (moved above getStoryData to avoid TS hoisting issue)
   const getNodeByTokenId = useCallback(async (tokenId: string): Promise<NodeData | null> => {
@@ -710,6 +791,11 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   // Clear nodesData + story + owner caches for current namespace
   const clearAllCaches = useCallback(() => {
     setNodesData({})
+    setRoot(null)
+    try {
+      localStorage.removeItem(`${storageNS}::nodesData`)
+      localStorage.removeItem(vizRootKey)
+    } catch {}
   }, [])
 
   // Function to preload story data in background
