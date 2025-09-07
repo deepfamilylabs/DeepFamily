@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import * as d3 from 'd3'
 import type { GraphNode } from '../types/graph'
-import { makeNodeId, nodeLabel } from '../types/graph'
+import { makeNodeId, nodeLabel, isMinted, formatHashMiddle } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
@@ -90,14 +90,15 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       })
       .attr('stroke', (d: any) => {
         const id = (d as SimNode).id
-        return (nodesData?.[id]?.tokenId && nodesData[id].tokenId !== '0') ? '#059669' : (id === selectedId ? '#f59e0b' : '#6366f1')
+        const nd = nodesData?.[id]
+        return isMinted(nd) ? '#059669' : (id === selectedId ? '#f59e0b' : '#6366f1')
       })
       .attr('stroke-width', (d: any) => {
         const id = (d as SimNode).id
-        return (nodesData?.[id]?.tokenId && nodesData[id].tokenId !== '0') ? 2 : (id === selectedId ? 2 : 1)
+        return isMinted(nodesData?.[id]) ? 2 : (id === selectedId ? 2 : 1)
       }).attr('opacity', 0.95)
 
-    node.filter((d: any) => Boolean(nodesData?.[(d as SimNode).id]?.tokenId && nodesData[(d as SimNode).id].tokenId !== '0')).append('circle').attr('r', 3).attr('cx', NODE_R - 6).attr('cy', -(NODE_R - 6)).attr('fill', '#10b981').attr('stroke', '#ffffff').attr('stroke-width', 1)
+    node.filter((d: any) => Boolean(isMinted(nodesData?.[(d as SimNode).id]))).append('circle').attr('r', 3).attr('cx', NODE_R - 6).attr('cy', -(NODE_R - 6)).attr('fill', '#10b981').attr('stroke', '#ffffff').attr('stroke-width', 1)
 
     node.append('title').text((d: any) => (d as SimNode).hash)
     const lbl = node.append('text').attr('class', 'font-mono').attr('fill', '#0f172a')
@@ -106,8 +107,8 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       const sim = d as SimNode
       const id = sim.id
       const nd = nodesData?.[id]
-      const mintedFlag = !!(nd?.tokenId && nd.tokenId !== '0')
-      const shortHash = sim.hash.replace(/0x([0-9a-fA-F]{4})[0-9a-fA-F]+/, '0x$1…')
+      const mintedFlag = isMinted(nd)
+      const shortHash = formatHashMiddle(sim.hash)
       const width = 60
       gtxt.append('tspan').attr('x', 18).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(shortHash)
       gtxt.append('tspan').attr('x', 20 + width).attr('y', -3).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', mintedFlag ? '#059669' : '#6366f1').text(`v${sim.versionIndex}`)

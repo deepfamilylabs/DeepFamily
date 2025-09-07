@@ -50,6 +50,7 @@ export interface NodeData {
   metadataCID?: string
   endorsementCount?: number
   tokenId?: string
+  owner?: string
   fullName?: string // coreInfo.fullName
   gender?: number
   birthYear?: number
@@ -66,7 +67,7 @@ export interface NodeData {
   nftTokenURI?: string
   storyMetadata?: StoryMetadata
   storyChunks?: StoryChunk[]
-  hasDetailedStory?: boolean
+  storyFetchedAt?: number
 }
 
 export type NodeDataPatch = Partial<Omit<NodeData,'personHash'|'versionIndex'|'id'>>
@@ -95,4 +96,77 @@ export function nodeLabel(node: Pick<GraphNode, 'personHash' | 'versionIndex' | 
   return `${node.personHash}  v${node.versionIndex}`
 }
 
+// Derived helpers
+export function hasDetailedStory(nd: Partial<NodeData> | undefined | null): boolean {
+  if (!nd) return false
+  if (nd.story && nd.story.trim() !== '') return true
+  if (Array.isArray(nd.storyChunks) && nd.storyChunks.length > 0) return true
+  if (nd.storyMetadata && typeof nd.storyMetadata.totalChunks === 'number' && nd.storyMetadata.totalChunks > 0) return true
+  return false
+}
 
+export function isMinted(nd: Partial<NodeData> | undefined | null): boolean {
+  if (!nd) return false
+  return !!(nd.tokenId && String(nd.tokenId) !== '0')
+}
+
+export function formatYMD(year?: number, month?: number, day?: number, isBC?: boolean): string {
+  if (!year) return ''
+  let s = isBC ? `BC ${year}` : String(year)
+  if (month && month > 0) {
+    s += `-${String(month).padStart(2, '0')}`
+    if (day && day > 0) s += `-${String(day).padStart(2, '0')}`
+  }
+  return s
+}
+
+export function birthDateString(nd: Partial<NodeData> | undefined | null): string {
+  if (!nd) return ''
+  return formatYMD(nd.birthYear, nd.birthMonth, nd.birthDay, nd.isBirthBC)
+}
+
+export function deathDateString(nd: Partial<NodeData> | undefined | null): string {
+  if (!nd) return ''
+  return formatYMD(nd.deathYear, nd.deathMonth, nd.deathDay, nd.isDeathBC)
+}
+
+export function genderText(gender: number | undefined, t: (key: string, def?: string) => string): string {
+  switch (gender) {
+    case 1: return t('visualization.nodeDetail.genders.male', 'Male')
+    case 2: return t('visualization.nodeDetail.genders.female', 'Female')
+    case 3: return t('visualization.nodeDetail.genders.other', 'Other')
+    default: return ''
+  }
+}
+
+// Timestamp helpers (unix seconds -> localized string)
+export function formatUnixSeconds(sec?: number | string | bigint): string {
+  if (sec === undefined || sec === null) return '-'
+  const n = Number(sec)
+  if (!Number.isFinite(n) || n <= 0) return '-'
+  try { return new Date(n * 1000).toLocaleString() } catch { return '-' }
+}
+
+export function formatUnixDate(sec?: number | string | bigint): string {
+  if (sec === undefined || sec === null) return ''
+  const n = Number(sec)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  try { return new Date(n * 1000).toLocaleDateString() } catch { return '' }
+}
+
+// Address/Hash display helpers
+export function formatHashMiddle(val?: string, prefix = 10, suffix = 8): string {
+  if (!val) return ''
+  const isHexLike = /^0x[0-9a-fA-F]+$/.test(val)
+  if (isHexLike || val.length > prefix + suffix + 4) {
+    return `${val.slice(0, prefix)}...${val.slice(-suffix)}`
+  }
+  return val
+}
+
+export function shortAddress(addr?: string, prefix = 6, suffix = 4): string {
+  if (!addr) return ''
+  const s = addr
+  if (s.length <= prefix + suffix + 2) return s
+  return `${s.slice(0, prefix)}...${s.slice(-suffix)}`
+}

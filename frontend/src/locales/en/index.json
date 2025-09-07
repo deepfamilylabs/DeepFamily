@@ -223,7 +223,7 @@
       "title": "Query by Full Name",
       "fullName": "Full Name",
       "pageSize": "Page Size (≤100)",
-      "placeholder": "e.g., Confucius"
+      "placeholder": "e.g., John Smith"
     },
     "endorsementQuery": {
       "title": "Endorsement Statistics Query",
@@ -335,7 +335,11 @@
     "config": {
       "rpc": "RPC",
       "contract": "Contract",
-      "root": "Root"
+      "root": "Root",
+      "clearAndRefresh": "Clear & Refresh",
+      "strictCacheOnly": "Strict Cache Only",
+      "strictCacheOn": "Strict Cache: On",
+      "strictCacheOff": "Strict Cache: Off"
     },
     "ui": {
       "displaySettings": "Data Options",

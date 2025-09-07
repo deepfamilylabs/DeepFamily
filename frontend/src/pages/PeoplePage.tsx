@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, Book, Grid, List as ListIcon, User, Hash, X } from 'lucide-react'
-import { NodeData } from '../types/graph'
+import { NodeData, isMinted } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
 import StoryChunksViewer from '../components/StoryChunksViewer'
@@ -66,11 +66,7 @@ export default function PeoplePage() {
   // Get person data from TreeDataContext, only show people with NFTs (people with stories)
   const people = useMemo(() => {
     const peopleWithNFTs = Object.values(nodesData)
-      .filter(person => {
-        // Only people with NFT versions have stories
-        const hasNFT = person.tokenId && person.tokenId !== '0'
-        return hasNFT
-      })
+      .filter(person => isMinted(person))
 
     // Group by personHash to get unique people (since one person can have multiple NFT versions)
     const uniquePeopleMap = new Map<string, NodeData>()
@@ -85,17 +81,12 @@ export default function PeoplePage() {
       }
     })
 
-    return Array.from(uniquePeopleMap.values()).map(person => ({
-      ...person,
-      hasDetailedStory: !!(person.storyMetadata && person.storyMetadata.totalChunks > 0)
-    }))
+    return Array.from(uniquePeopleMap.values())
   }, [nodesData])
 
   const data = useMemo(() => {
     // Calculate total NFT count (all records with NFTs)
-    const totalNFTs = Object.values(nodesData).filter(person => 
-      person.tokenId && person.tokenId !== '0'
-    ).length
+    const totalNFTs = Object.values(nodesData).filter(person => isMinted(person)).length
 
     return {
       people,
@@ -240,7 +231,7 @@ export default function PeoplePage() {
   }, [data.people, searchTerm, filterType, sortOrder, selectedAddresses, selectedTags])
 
 
-  // 不再整页遮挡 Loading；改为右上角的轻提示，页面始终可交互
+  // No longer full-page loading overlay; changed to light hint in top-right, page always interactive
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900">
@@ -308,7 +299,7 @@ export default function PeoplePage() {
 
             {/* Advanced Filters */}
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              {t('people.filterRules', '过滤规则')}
+              {t('people.filterRules', 'Filter Rules')}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Creator Address Filter */}
@@ -403,7 +394,7 @@ export default function PeoplePage() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="sm:flex-none">
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  {t('people.sortRules', '排序规则')}
+                  {t('people.sortRules', 'Sort Rules')}
                 </div>
                 <div className="inline-flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2 w-fit">
                 <SortButton
@@ -415,7 +406,7 @@ export default function PeoplePage() {
                   showSortArrows={true}
                 />
                 <SortButton
-                  label={t('people.filterByCreateTime', '创建时间')}
+                  label={t('people.filterByCreateTime', 'Creation Time')}
                   isActive={filterType === 'by_create_time'}
                   sortOrder={sortOrder}
                   onClick={() => setFilterType('by_create_time')}
@@ -452,7 +443,7 @@ export default function PeoplePage() {
               {/* View Mode Toggle */}
               <div className="flex-shrink-0">
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  {t('people.viewMode', '视图模式')}
+                  {t('people.viewMode', 'View Mode')}
                 </div>
                 <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-2 py-2">
                 <button

@@ -223,7 +223,7 @@
       "title": "按全名查询",
       "fullName": "全名",
       "pageSize": "每页数量(≤100)",
-      "placeholder": "如：Confucius"
+      "placeholder": "如：John Smith"
     },
     "endorsementQuery": {
       "title": "背书统计查询",
@@ -335,7 +335,11 @@
     "config": {
       "rpc": "RPC",
       "contract": "合约",
-      "root": "根节点"
+      "root": "根节点",
+      "clearAndRefresh": "清空缓存并刷新",
+      "strictCacheOnly": "严格只读缓存",
+      "strictCacheOn": "严格缓存：开",
+      "strictCacheOff": "严格缓存：关"
     },
     "ui": {
       "displaySettings": "数据选项",

@@ -27,9 +27,10 @@ interface TreeDataValue {
   nodesData: Record<string, NodeData>
   setNodesData?: React.Dispatch<React.SetStateAction<Record<string, NodeData>>>
   getStoryData: (tokenId: string) => Promise<any>
-  clearStoryCache: (tokenId?: string) => void
   preloadStoryData: (tokenId: string) => void
   getNodeByTokenId: (tokenId: string) => Promise<NodeData | null>
+  getOwnerOf: (tokenId: string) => Promise<string | null>
+  clearAllCaches: () => void
 }
 
 const TreeDataContext = createContext<TreeDataValue | null>(null)
@@ -40,13 +41,13 @@ const MULTICALL_ABI = [
 
 export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly } = useConfig()
   const { traversal, includeVersionDetails } = useVizOptions()
   const [root, setRoot] = useState<GraphNode | null>(null)
   const [nodesData, setNodesData] = useState<Record<string, NodeData>>({})
   const nodesDataRef = useRef(nodesData)
-  const storyDataCache = useRef<Map<string, any>>(new Map())
   useEffect(() => { nodesDataRef.current = nodesData }, [nodesData])
+  // nodesDataRef keeps latest snapshot for async updates
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<TreeProgress | undefined>(undefined)
   const [contractMessage, setContractMessage] = useState('')
@@ -82,33 +83,62 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
   const fetchRunKeyRef = useRef<string | null>(null)
 
+  // Persistent storage namespace scoped by RPC + contract
+  const storageNS = useMemo(() => {
+    const rpc = rpcUrl || 'no-rpc'
+    const addr = contractAddress || 'no-contract'
+    return `df.cache.v1::${rpc}::${addr}`
+  }, [rpcUrl, contractAddress])
+
+  const persistNodesData = useCallback((data: Record<string, NodeData>) => {
+    try { localStorage.setItem(`${storageNS}::nodesData`, JSON.stringify(data)) } catch {}
+  }, [storageNS])
+
+  // Load persisted caches when RPC/contract changes
+  useEffect(() => {
+    try {
+      const rawNodes = localStorage.getItem(`${storageNS}::nodesData`)
+      if (rawNodes) {
+        const obj = JSON.parse(rawNodes) as Record<string, NodeData>
+        setNodesData(obj)
+      } else {
+        setNodesData({})
+      }
+    } catch { setNodesData({}) }
+  }, [storageNS])
+
+  // Persist nodesData whenever it changes (after storageNS is available)
+  useEffect(() => {
+    persistNodesData(nodesData)
+  }, [nodesData, persistNodesData])
+
   // Root + base streaming load
   useEffect(() => {
     if (refreshTick === 0) return
     if (!contract) return
+    // In strict cache mode, completely skip visualization loading (avoid network access)
+    if (strictCacheOnly) return
     const runKey = `contract-${rootHash}-${rootVersionIndex}-${refreshTick}`
     if (fetchRunKeyRef.current === runKey) return
     fetchRunKeyRef.current = runKey
     let cancelled = false
     const controller = new AbortController()
     ;(async () => {
-      setLoading(true)
-      setLoadOptionsSnapshot({ includeVersionDetails })
-      // Reset state on new load
-      setRoot(null)
-      setNodesData({})
-      setContractMessage('')
-      setProgress(undefined)
-      // Validate root config before touching the contract
+      // Validate root config before touching the contract or mutating caches
       const isValidHash = typeof rootHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(rootHash)
       const isValidVersion = Number.isFinite(rootVersionIndex) && Number(rootVersionIndex) >= 1
       if (!isValidHash || !isValidVersion) {
-        if (!cancelled) {
-          setContractMessage(t('visualization.status.rootNotFound'))
-        }
-        setLoading(false)
+        // Do not clear nodesData/localStorage here; not entering visualization mode
+        if (!cancelled) setContractMessage(t('visualization.status.rootNotFound'))
         return
       }
+      // Only now that config is valid, enter visualization loading state and clear prior viz state
+      setLoading(true)
+      setLoadOptionsSnapshot({ includeVersionDetails })
+      setRoot(null)
+      // Preserve existing nodesData cache to avoid blowing away PersonPage/story caches
+      setContractMessage('')
+      setProgress(undefined)
       // Preflight RPC availability (helps distinguish rate-limit/network early)
       try {
         await (provider as any)?.send?.('eth_chainId', [])
@@ -226,10 +256,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       cancelled = true 
       controller.abort() 
       setLoading(l => l ? false : l)
-      // Clear story cache when refreshing data
-      storyDataCache.current.clear()
     }
-  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails])
+  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails, strictCacheOnly])
 
   const nodePairs = useMemo(() => {
     if (!root) return [] as Array<{ h: string; v: number }>
@@ -422,18 +450,166 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true }
   }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, root, nodePairs, contractAddress, provider, push])
 
-  // Function to get story data with caching
-  const getStoryData = useCallback(async (tokenId: string) => {
-    // Check cache first
-    if (storyDataCache.current.has(tokenId)) {
-      return storyDataCache.current.get(tokenId)
+  // Fetch minimal NodeData by tokenId for cold-start deep links (moved above getStoryData to avoid TS hoisting issue)
+  const getNodeByTokenId = useCallback(async (tokenId: string): Promise<NodeData | null> => {
+    // 1) Prefer in-memory nodesData snapshot
+    for (const nd of Object.values(nodesDataRef.current)) {
+      if (nd.tokenId && String(nd.tokenId) === String(tokenId)) return nd
     }
 
+    // 2) Try localStorage persisted nodesData (cold start hydration race)
+    try {
+      const raw = localStorage.getItem(`${storageNS}::nodesData`)
+      if (raw) {
+        const obj = JSON.parse(raw) as Record<string, NodeData>
+        for (const [id, nd] of Object.entries(obj)) {
+          if (nd.tokenId && String(nd.tokenId) === String(tokenId)) {
+            // Backfill into state for future hits
+            setNodesData(prev => prev[id] ? prev : ({ ...prev, [id]: nd }))
+            return nd
+          }
+        }
+      }
+    } catch {}
+
+    if (!contract) return null
+    if (strictCacheOnly) return null
+    try {
+      const nftRet = await contract.getNFTDetails(tokenId)
+      const personHash: string = nftRet[0]
+      const versionIndex: number = Number(nftRet[1])
+      const versionStruct: any = nftRet[2]
+      const coreInfo: any = nftRet[3]
+      const endorsementCountBN: any = nftRet[4]
+      const nftTokenURI: any = nftRet[5]
+
+      const vs = versionStruct || {}
+      const fatherHash = vs.fatherHash || vs[1]
+      const motherHash = vs.motherHash || vs[2]
+      const fatherVersionIndex = vs.fatherVersionIndex !== undefined ? Number(vs.fatherVersionIndex) : (vs[4] !== undefined ? Number(vs[4]) : undefined)
+      const motherVersionIndex = vs.motherVersionIndex !== undefined ? Number(vs.motherVersionIndex) : (vs[5] !== undefined ? Number(vs[5]) : undefined)
+      const addedBy = vs.addedBy || vs[6]
+      const timestampRaw = vs.timestamp !== undefined ? vs.timestamp : vs[7]
+      const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
+      const tag = vs.tag || vs[8]
+      const metadataCID = vs.metadataCID || vs[9]
+
+      const fullName = coreInfo?.basicInfo?.fullName
+      const gender = coreInfo?.basicInfo?.gender !== undefined ? Number(coreInfo.basicInfo.gender) : undefined
+      const birthYear = coreInfo?.basicInfo?.birthYear !== undefined ? Number(coreInfo.basicInfo.birthYear) : undefined
+      const birthMonth = coreInfo?.basicInfo?.birthMonth !== undefined ? Number(coreInfo.basicInfo.birthMonth) : undefined
+      const birthDay = coreInfo?.basicInfo?.birthDay !== undefined ? Number(coreInfo.basicInfo.birthDay) : undefined
+      const birthPlace = coreInfo?.supplementInfo?.birthPlace
+      const isBirthBC = coreInfo?.basicInfo?.isBirthBC !== undefined ? Boolean(coreInfo.basicInfo.isBirthBC) : undefined
+      const deathYear = coreInfo?.supplementInfo?.deathYear !== undefined ? Number(coreInfo.supplementInfo.deathYear) : undefined
+      const deathMonth = coreInfo?.supplementInfo?.deathMonth !== undefined ? Number(coreInfo.supplementInfo.deathMonth) : undefined
+      const deathDay = coreInfo?.supplementInfo?.deathDay !== undefined ? Number(coreInfo.supplementInfo.deathDay) : undefined
+      const deathPlace = coreInfo?.supplementInfo?.deathPlace
+      const isDeathBC = coreInfo?.supplementInfo?.isDeathBC !== undefined ? Boolean(coreInfo.supplementInfo.isDeathBC) : undefined
+      const story = coreInfo?.supplementInfo?.story
+      const endorsementCount = endorsementCountBN !== undefined && endorsementCountBN !== null ? Number(endorsementCountBN) : undefined
+
+      const id = makeNodeId(personHash, versionIndex)
+      const node: NodeData = {
+        personHash,
+        versionIndex,
+        id,
+        tokenId: String(tokenId),
+        fatherHash,
+        motherHash,
+        fatherVersionIndex,
+        motherVersionIndex,
+        addedBy,
+        timestamp,
+        tag,
+        metadataCID,
+        owner: undefined,
+        fullName,
+        gender,
+        birthYear,
+        birthMonth,
+        birthDay,
+        birthPlace,
+        isBirthBC,
+        deathYear,
+        deathMonth,
+        deathDay,
+        deathPlace,
+        isDeathBC,
+        story,
+        endorsementCount,
+        nftTokenURI,
+      }
+
+      setNodesData(prev => ({ ...prev, [id]: { ...(prev[id] || node), ...node } }))
+      return node
+    } catch (e) {
+      return null
+    }
+  }, [contract, strictCacheOnly])
+
+  // Function to get story data (cache solely via NodesData)
+  const getStoryData = useCallback(async (tokenId: string) => {
+    // Prefer unified dataset (nodesData) if available and fresh
+    const findNodeIdByToken = (): string | undefined => {
+      for (const [id, nd] of Object.entries(nodesDataRef.current)) {
+        if (nd.tokenId && String(nd.tokenId) === String(tokenId)) return id
+      }
+      return undefined
+    }
+    let nodeId = findNodeIdByToken()
+    let ndFromLookup: NodeData | undefined
+    if (!nodeId) {
+      try { const nd = await getNodeByTokenId(tokenId); if (nd) { nodeId = nd.id; ndFromLookup = nd } } catch {}
+    }
+    if (nodeId) {
+      const nd = ndFromLookup || nodesDataRef.current[nodeId]
+      const fetchedAt = Number(nd?.storyFetchedAt || 0)
+      const isSealed = Boolean(nd?.storyMetadata?.isSealed)
+      const ttl = isSealed ? 7 * 24 * 60 * 60 * 1000 : 2 * 60 * 1000
+      const expired = !fetchedAt || (Date.now() - fetchedAt > ttl)
+      if (nd?.storyMetadata && Array.isArray(nd?.storyChunks) && (!expired || strictCacheOnly)) {
+        const sorted = [...nd.storyChunks].sort((a,b)=>a.chunkIndex-b.chunkIndex)
+        const fullStory = sorted.map(c => c.content).join('')
+        const encoder = new TextEncoder()
+        const computedLength = sorted.reduce((acc, c) => acc + encoder.encode(c.content).length, 0)
+        const missing: number[] = []
+        if (nd.storyMetadata?.totalChunks) {
+          for (let i = 0; i < nd.storyMetadata.totalChunks; i++) {
+            if (!sorted.find(c => c.chunkIndex === i)) missing.push(i)
+          }
+        }
+        let hashMatch: boolean | null = null
+        let computedHash: string | undefined
+        if (missing.length === 0 && nd.storyMetadata?.totalChunks! > 0 && nd.storyMetadata?.fullStoryHash && nd.storyMetadata.fullStoryHash !== ethers.ZeroHash) {
+          try {
+            const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
+            computedHash = ethers.keccak256(concatenated)
+            hashMatch = computedHash === nd.storyMetadata.fullStoryHash
+          } catch {}
+        }
+        return {
+          chunks: sorted,
+          fullStory,
+          integrity: { missing, lengthMatch: nd.storyMetadata ? (computedLength === nd.storyMetadata.totalLength) : true, hashMatch, computedLength, computedHash },
+          metadata: nd.storyMetadata,
+          loading: false,
+          fetchedAt
+        }
+      }
+    }
+    // legacy in-memory cache removed; rely solely on NodesData
+
     if (!provider || !contractAddress) {
+      if (strictCacheOnly) return null
       throw new Error('Provider or contract address not available')
     }
 
     try {
+      if (strictCacheOnly) {
+        // Strict cache: if memory/local cache misses above, return null directly without triggering network
+        return null
+      }
       const metadata = await contract!.getStoryMetadata(tokenId)
       const storyMetadata = {
         totalChunks: Number(metadata.totalChunks),
@@ -500,111 +676,95 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           computedHash
         },
         metadata: storyMetadata,
-        loading: false
+        loading: false,
+        fetchedAt: Date.now()
       }
 
-      // Cache the result
-      storyDataCache.current.set(tokenId, storyData)
+      // Backfill unified dataset
+      const ensureId = nodeId || findNodeIdByToken()
+      if (ensureId) {
+        setNodesData(prev => {
+          const cur = prev[ensureId!]
+          if (!cur) return prev
+          return {
+            ...prev,
+            [ensureId!]: {
+              ...cur,
+              storyMetadata,
+              storyChunks: storyData.chunks,
+              storyFetchedAt: Date.now(),
+              
+            }
+          }
+        })
+      }
       return storyData
     } catch (error: any) {
       console.error('Failed to fetch story chunks:', error)
       throw error
     }
-  }, [provider, contractAddress, contract])
+  }, [provider, contractAddress, contract, getNodeByTokenId, strictCacheOnly])
 
-  // Function to clear story cache
-  const clearStoryCache = useCallback((tokenId?: string) => {
-    if (tokenId) {
-      storyDataCache.current.delete(tokenId)
-    } else {
-      storyDataCache.current.clear()
-    }
+  // Removed helper fetchAndStoreStory; unified via getStoryData and NodesData
+
+  // Clear nodesData + story + owner caches for current namespace
+  const clearAllCaches = useCallback(() => {
+    setNodesData({})
   }, [])
 
   // Function to preload story data in background
   const preloadStoryData = useCallback((tokenId: string) => {
-    if (!storyDataCache.current.has(tokenId)) {
-      getStoryData(tokenId).catch(() => {
-        // Silent fail for preloading
-      })
-    }
+    getStoryData(tokenId).catch(() => { /* silent */ })
   }, [getStoryData])
 
-  // Fetch minimal NodeData by tokenId for cold-start deep links
-  const getNodeByTokenId = useCallback(async (tokenId: string): Promise<NodeData | null> => {
+
+  // Cached ownerOf lookup
+  const getOwnerOf = useCallback(async (tokenId: string): Promise<string | null> => {
     if (!contract) return null
-    try {
-      const nftRet = await contract.getNFTDetails(tokenId)
-      const personHash: string = nftRet[0]
-      const versionIndex: number = Number(nftRet[1])
-      const versionStruct: any = nftRet[2]
-      const coreInfo: any = nftRet[3]
-      const endorsementCountBN: any = nftRet[4]
-      const nftTokenURI: any = nftRet[5]
-
-      const vs = versionStruct || {}
-      const fatherHash = vs.fatherHash || vs[1]
-      const motherHash = vs.motherHash || vs[2]
-      const fatherVersionIndex = vs.fatherVersionIndex !== undefined ? Number(vs.fatherVersionIndex) : (vs[4] !== undefined ? Number(vs[4]) : undefined)
-      const motherVersionIndex = vs.motherVersionIndex !== undefined ? Number(vs.motherVersionIndex) : (vs[5] !== undefined ? Number(vs[5]) : undefined)
-      const addedBy = vs.addedBy || vs[6]
-      const timestampRaw = vs.timestamp !== undefined ? vs.timestamp : vs[7]
-      const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
-      const tag = vs.tag || vs[8]
-      const metadataCID = vs.metadataCID || vs[9]
-
-      const fullName = coreInfo?.basicInfo?.fullName
-      const gender = coreInfo?.basicInfo?.gender !== undefined ? Number(coreInfo.basicInfo.gender) : undefined
-      const birthYear = coreInfo?.basicInfo?.birthYear !== undefined ? Number(coreInfo.basicInfo.birthYear) : undefined
-      const birthMonth = coreInfo?.basicInfo?.birthMonth !== undefined ? Number(coreInfo.basicInfo.birthMonth) : undefined
-      const birthDay = coreInfo?.basicInfo?.birthDay !== undefined ? Number(coreInfo.basicInfo.birthDay) : undefined
-      const birthPlace = coreInfo?.supplementInfo?.birthPlace
-      const isBirthBC = coreInfo?.basicInfo?.isBirthBC !== undefined ? Boolean(coreInfo.basicInfo.isBirthBC) : undefined
-      const deathYear = coreInfo?.supplementInfo?.deathYear !== undefined ? Number(coreInfo.supplementInfo.deathYear) : undefined
-      const deathMonth = coreInfo?.supplementInfo?.deathMonth !== undefined ? Number(coreInfo.supplementInfo.deathMonth) : undefined
-      const deathDay = coreInfo?.supplementInfo?.deathDay !== undefined ? Number(coreInfo.supplementInfo.deathDay) : undefined
-      const deathPlace = coreInfo?.supplementInfo?.deathPlace
-      const isDeathBC = coreInfo?.supplementInfo?.isDeathBC !== undefined ? Boolean(coreInfo.supplementInfo.isDeathBC) : undefined
-      const story = coreInfo?.supplementInfo?.story
-      const endorsementCount = endorsementCountBN !== undefined && endorsementCountBN !== null ? Number(endorsementCountBN) : undefined
-
-      const id = makeNodeId(personHash, versionIndex)
-      const node: NodeData = {
-        personHash,
-        versionIndex,
-        id,
-        tokenId: String(tokenId),
-        fatherHash,
-        motherHash,
-        fatherVersionIndex,
-        motherVersionIndex,
-        addedBy,
-        timestamp,
-        tag,
-        metadataCID,
-        fullName,
-        gender,
-        birthYear,
-        birthMonth,
-        birthDay,
-        birthPlace,
-        isBirthBC,
-        deathYear,
-        deathMonth,
-        deathDay,
-        deathPlace,
-        isDeathBC,
-        story,
-        endorsementCount,
-        nftTokenURI,
+    // Prefer nodesData snapshot first
+    for (const nd of Object.values(nodesDataRef.current)) {
+      if (nd.tokenId && String(nd.tokenId) === String(tokenId) && nd.owner) {
+        return nd.owner
       }
-
-      setNodesData(prev => ({ ...prev, [id]: { ...(prev[id] || node), ...node } }))
-      return node
-    } catch (e) {
+    }
+    // Try localStorage snapshot (before touching network)
+    try {
+      const raw = localStorage.getItem(`${storageNS}::nodesData`)
+      if (raw) {
+        const obj = JSON.parse(raw) as Record<string, NodeData>
+        for (const [id, nd] of Object.entries(obj)) {
+          if (nd.tokenId && String(nd.tokenId) === String(tokenId) && nd.owner) {
+            // Backfill owner into state
+            setNodesData(prev => {
+              const cur = prev[id]
+              if (!cur) return { ...prev, [id]: nd }
+              if (cur.owner === nd.owner) return prev
+              return { ...prev, [id]: { ...cur, owner: nd.owner } }
+            })
+            return nd.owner
+          }
+        }
+      }
+    } catch {}
+    try {
+      if (strictCacheOnly) return null
+      const owner = await contract.ownerOf(tokenId)
+      // Backfill owner into NodeData if any node matches this tokenId
+      setNodesData(prev => {
+        let foundId: string | undefined
+        for (const [id, nd] of Object.entries(prev)) {
+          if (nd.tokenId && String(nd.tokenId) === String(tokenId)) { foundId = id; break }
+        }
+        if (!foundId) return prev
+        const cur = prev[foundId]
+        if (cur.owner === owner) return prev
+        return { ...prev, [foundId]: { ...cur, owner } }
+      })
+      return owner
+    } catch {
       return null
     }
-  }, [contract])
+  }, [contract, strictCacheOnly])
 
   const value: TreeDataValue = {
     root,
@@ -617,9 +777,10 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     nodesData,
     setNodesData,
     getStoryData,
-    clearStoryCache,
+    clearAllCaches,
     preloadStoryData,
-    getNodeByTokenId
+    getNodeByTokenId,
+    getOwnerOf
   }
 
   return <TreeDataContext.Provider value={value}>{children}</TreeDataContext.Provider>

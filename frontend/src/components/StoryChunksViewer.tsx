@@ -20,11 +20,9 @@ import {
   Link,
   Edit2
 } from 'lucide-react'
-import { NodeData, StoryChunk } from '../types/graph'
+import { NodeData, StoryChunk, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
-import { useConfig } from '../context/ConfigContext'
-import { ethers } from 'ethers'
-import DeepFamily from '../abi/DeepFamily.json'
+// owner/address will be resolved via TreeDataContext caching
 
 interface StoryChunksViewerProps {
   person: NodeData
@@ -51,8 +49,7 @@ interface StoryData {
 
 export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChunksViewerProps) {
   const { t } = useTranslation()
-  const { getStoryData } = useTreeData()
-  const { rpcUrl, contractAddress } = useConfig()
+  const { getStoryData, getOwnerOf } = useTreeData()
   const nameContainerRef = useRef<HTMLDivElement | null>(null)
   const nameTextRef = useRef<HTMLSpanElement | null>(null)
   const [marquee, setMarquee] = useState(false)
@@ -73,7 +70,14 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
-  const [owner, setOwner] = useState<string | undefined>(undefined)
+  const [owner, setOwner] = useState<string | undefined>(person.owner)
+
+  const personHasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
+
+  // Keep local owner state in sync with NodeData updates
+  useEffect(() => {
+    if (isOpen) setOwner(person.owner)
+  }, [person.owner, isOpen])
 
   // Computed meta for compact row under Detailed Story
   const chunksCount = useMemo(() => (
@@ -87,34 +91,13 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
   ), [storyData.integrity])
 
   // Format dates
-  const formatDate = useMemo(() => {
-    const formatDatePart = (year?: number, month?: number, day?: number, isBC?: boolean) => {
-      if (!year) return ''
-      let dateStr = isBC ? `BC ${year}` : year.toString()
-      if (month && month > 0) {
-        dateStr += `-${month.toString().padStart(2, '0')}`
-        if (day && day > 0) {
-          dateStr += `-${day.toString().padStart(2, '0')}`
-        }
-      }
-      return dateStr
-    }
-
-    const birth = formatDatePart(person.birthYear, person.birthMonth, person.birthDay, person.isBirthBC)
-    const death = formatDatePart(person.deathYear, person.deathMonth, person.deathDay, person.isDeathBC)
-    
-    return { birth, death }
-  }, [person])
+  const formatDate = useMemo(() => ({
+    birth: birthDateString(person),
+    death: deathDateString(person)
+  }), [person])
 
   // Gender text
-  const genderText = useMemo(() => {
-    switch (person.gender) {
-      case 1: return t('visualization.nodeDetail.genders.male', 'Male')
-      case 2: return t('visualization.nodeDetail.genders.female', 'Female')
-      case 3: return t('visualization.nodeDetail.genders.other', 'Other')
-      default: return ''
-    }
-  }, [person.gender, t])
+  const genderText = useMemo(() => genderTextFn(person.gender, t as any), [person.gender, t])
 
   // Copy function
   const copyText = useCallback(async (text: string) => {
@@ -197,24 +180,21 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
     }
   }, [isOpen, fetchStoryData])
 
-  // Fetch owner address for token when modal opens
+  // Fetch owner address for token when modal opens (uses cached getter and backfills NodeData)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         if (!isOpen) return
         if (!person.tokenId || person.tokenId === '0') return
-        if (!rpcUrl || !contractAddress) return
-        const provider = new ethers.JsonRpcProvider(rpcUrl)
-        const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
-        const addr = await contract.ownerOf(person.tokenId)
-        if (!cancelled) setOwner(addr)
+        const addr = await getOwnerOf(person.tokenId)
+        if (!cancelled) setOwner(addr || undefined)
       } catch {
         if (!cancelled) setOwner(undefined)
       }
     })()
     return () => { cancelled = true }
-  }, [isOpen, person.tokenId, rpcUrl, contractAddress])
+  }, [isOpen, person.tokenId, getOwnerOf])
 
   // Toggle chunk expansion
   const toggleChunk = (index: number) => {
@@ -318,7 +298,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                     {genderText && <span className="whitespace-nowrap">{genderText}</span>}
-                    {person.tokenId && person.tokenId !== '0' && (
+                    {isMinted(person) && (
                       <div className="flex items-center gap-2">
                         <span className="font-mono whitespace-nowrap">#{person.tokenId}</span>
                         {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
@@ -340,7 +320,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                           className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap flex-shrink-0"
                         >
                           <Book className="w-3.5 h-3.5" />
-                          {t('storyChunksViewer.peopleEncyclopedia', '人物百科')}
+                          {t('storyChunksViewer.peopleEncyclopedia', 'People Encyclopedia')}
                         </button>
                       </div>
                     )}
@@ -474,7 +454,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all">
-                          {person.personHash}
+                          {formatHashMiddle(person.personHash)}
                         </div>
                         <button
                           onClick={() => copyText(person.personHash)}
@@ -487,7 +467,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   </div>
                 )}
 
-                {(person.tokenId && person.tokenId !== '0') && (
+                {isMinted(person) && (
                   <div className="flex items-center gap-3">
                     <Wallet className="w-5 h-5 text-indigo-500" />
                     <div className="min-w-0 flex-1">
@@ -496,7 +476,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all">
-                          {owner || '-'}
+                          {shortAddress(owner) || '-'}
                         </div>
                         {owner && (
                           <button
@@ -528,7 +508,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     </div>
                   </div>
                 )}
-                {(person.hasDetailedStory || person.storyMetadata || storyData.loading || storyData.chunks.length > 0 || !!storyData.fullStory || storyData.integrity.computedLength > 0 || (person.tokenId && person.tokenId !== '0')) && (
+                {(personHasDetailedStory || person.storyMetadata || storyData.loading || storyData.chunks.length > 0 || !!storyData.fullStory || storyData.integrity.computedLength > 0 || isMinted(person)) && (
                   <>
                   {/* View Mode Toggle */}
                   <div className="flex items-center justify-between mb-4">
@@ -596,16 +576,16 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         storyData.integrityChecking ? (
                           <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-[10px] sm:text-xs font-medium bg-transparent">
                             <div className="animate-spin w-3 h-3 border border-blue-600 border-t-transparent rounded-full mr-2"></div>
-                            {t('storyChunksViewer.integrityChecking', '正在检查完整性...')}
+                            {t('storyChunksViewer.integrityChecking', 'Checking integrity...')}
                           </span>
                         ) : storyData.integrity && (
                           integrityOk ? (
                             <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-green-500/70 dark:border-green-400/60 text-green-600 dark:text-green-300 text-[10px] sm:text-xs font-medium bg-transparent">
-                              {t('storyChunksViewer.integrityVerified', '完整性验证通过')}
+                              {t('storyChunksViewer.integrityVerified', 'Integrity verified')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-amber-500/70 dark:border-amber-400/60 text-amber-600 dark:text-amber-300 text-[10px] sm:text-xs font-medium bg-transparent">
-                              {t('storyChunksViewer.integrityWarning', '完整性验证失败')}
+                              {t('storyChunksViewer.integrityWarning', 'Integrity verification failed')}
                             </span>
                           )
                         )
@@ -664,11 +644,11 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                                 <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-500 dark:text-gray-400">
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
-                                    {new Date(chunk.timestamp * 1000).toLocaleString()}
+                                    {formatUnixSeconds(chunk.timestamp)}
                                   </span>
                                   <span className="flex items-center gap-1">
                                     <User className="w-3 h-3" />
-                                    {chunk.lastEditor.slice(0, 8)}...
+                                    {shortAddress(chunk.lastEditor)}
                                   </span>
                                 </div>
                               </div>
@@ -696,7 +676,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   </>
                 )}
                 {/* Empty state only if no basic or detailed content */}
-                {!person.story && !(person.hasDetailedStory || person.storyMetadata || storyData.chunks.length > 0 || !!storyData.fullStory || storyData.integrity.computedLength > 0 || storyData.loading) && (
+                {!person.story && !(personHasDetailedStory || person.storyMetadata || storyData.chunks.length > 0 || !!storyData.fullStory || storyData.integrity.computedLength > 0 || storyData.loading) && (
                   <div className="text-center py-12">
                     <Book className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                     <p className="text-sm text-gray-500 dark:text-gray-400">

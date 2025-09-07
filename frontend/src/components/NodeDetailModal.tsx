@@ -2,8 +2,9 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, Clipboard, ChevronRight, Edit2, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { NodeData } from '../types/graph'
+import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
+import { useTreeData } from '../context/TreeDataContext'
 
 
 export default function NodeDetailModal({
@@ -53,6 +54,8 @@ export default function NodeDetailModal({
   const [dragOffset, setDragOffset] = React.useState(0)
   const startYRef = React.useRef<number | null>(null)
   const navigate = useNavigate()
+  const { getOwnerOf } = useTreeData()
+  const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner)
   const handleClose = React.useCallback(() => {
     closedBySelfRef.current = true
     onClose()
@@ -100,9 +103,26 @@ export default function NodeDetailModal({
   }, [open])
   // Enter animation
   React.useEffect(() => { if (open) { requestAnimationFrame(() => setEntered(true)) } else { setEntered(false) } }, [open])
+  // Keep local owner state in sync and fetch if missing
+  React.useEffect(() => { setOwner(nodeData?.owner) }, [nodeData?.owner])
+  React.useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        if (!open) return
+        if (!nodeData?.tokenId || nodeData.tokenId === '0') return
+        if (owner) return
+        const addr = await getOwnerOf(String(nodeData.tokenId))
+        if (!cancelled) setOwner(addr || undefined)
+      } catch {
+        if (!cancelled) setOwner(undefined)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [open, nodeData?.tokenId, owner, getOwnerOf])
   if (!open) return null
 
-  const hasNFT = Boolean(nodeData?.tokenId && nodeData.tokenId !== '0')
+  const hasNFT = isMinted(nodeData)
 
   const Row: React.FC<{ label: React.ReactNode; value: React.ReactNode; copy?: string }> = ({ label, value, copy }) => (
     <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
@@ -172,18 +192,18 @@ export default function NodeDetailModal({
         )}
         <div className="px-4 pb-24 pt-2 overflow-y-auto scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)' }}>
           <div className="space-y-1.5">
-            <Row label={t('visualization.nodeDetail.hash')} value={nodeData?.personHash || fallback.hash} copy={nodeData?.personHash || fallback.hash} />
+            <Row label={t('visualization.nodeDetail.hash')} value={formatHashMiddle(nodeData?.personHash || fallback.hash)} copy={nodeData?.personHash || fallback.hash} />
             <Row label={t('visualization.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
             <Row label={t('visualization.nodeDetail.endorsementCount')} value={nodeData?.endorsementCount ?? '-'} />
             <Row label={t('visualization.nodeDetail.father')} value={nodeData?.fatherHash || '-'} copy={nodeData?.fatherHash} />
             <Row label={t('visualization.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
             <Row label={t('visualization.nodeDetail.mother')} value={nodeData?.motherHash || '-'} copy={nodeData?.motherHash} />
             <Row label={t('visualization.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
-            <Row label={t('visualization.nodeDetail.addedBy')} value={nodeData?.addedBy || '-'} copy={nodeData?.addedBy} />
-            <Row label={t('visualization.nodeDetail.timestamp')} value={nodeData?.timestamp ? new Date((nodeData.timestamp as number) * 1000).toLocaleString() : '-'} />
+            <Row label={t('visualization.nodeDetail.addedBy')} value={shortAddress(nodeData?.addedBy) || '-'} copy={nodeData?.addedBy} />
+            <Row label={t('visualization.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
             <Row label={t('visualization.nodeDetail.tag')} value={nodeData?.tag ?? '-'} />
             <Row label={t('visualization.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
-            {((nodeData?.tokenId && nodeData.tokenId !== '0') || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
+            {(isMinted(nodeData) || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
               <div className="pt-1">
                 <div className="my-2 h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
                 <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-300 tracking-wide mb-1 flex items-center gap-2">
@@ -191,46 +211,21 @@ export default function NodeDetailModal({
                 </div>
               </div>
             )}
-            {((nodeData?.tokenId && nodeData.tokenId !== '0') || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
+            {(isMinted(nodeData) || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
               <>
-                <Row label={t('visualization.nodeDetail.tokenId')} value={nodeData?.tokenId && nodeData.tokenId !== '0' ? nodeData.tokenId : '-'} copy={nodeData?.tokenId && nodeData.tokenId !== '0' ? nodeData.tokenId : undefined} />
+                <Row label={t('visualization.nodeDetail.tokenId')} value={isMinted(nodeData) ? nodeData!.tokenId : '-'} copy={isMinted(nodeData) ? nodeData!.tokenId : undefined} />
                 {nodeData?.fullName && <Row label={t('visualization.nodeDetail.fullName')} value={nodeData.fullName} />}
                 {nodeData?.gender !== undefined && (
-                  <Row label={t('visualization.nodeDetail.gender')} value={(() => {
-                    if (nodeData.gender === 1) return t('visualization.nodeDetail.genders.male')
-                    if (nodeData.gender === 2) return t('visualization.nodeDetail.genders.female')
-                    if (nodeData.gender === 3) return t('visualization.nodeDetail.genders.other')
-                    return '-'
-                  })()} />
+                  <Row label={t('visualization.nodeDetail.gender')} value={genderTextFn(nodeData.gender, t as any) || '-'} />
                 )}
                 <Row label={t('visualization.nodeDetail.birth')} value={(() => {
-                  const parts: string[] = []
-                  if (nodeData?.birthYear) {
-                    let dateStr = `${nodeData.isBirthBC ? t('visualization.nodeDetail.bcPrefix') + ' ' : ''}${nodeData.birthYear}`
-                    if (nodeData?.birthMonth && nodeData.birthMonth > 0) {
-                      dateStr += `-${nodeData.birthMonth.toString().padStart(2, '0')}`
-                      if (nodeData?.birthDay && nodeData.birthDay > 0) {
-                        dateStr += `-${nodeData.birthDay.toString().padStart(2, '0')}`
-                      }
-                    }
-                    parts.push(dateStr)
-                  }
-                  if (nodeData?.birthPlace) parts.push(nodeData.birthPlace)
+                  const d = birthDateString(nodeData)
+                  const parts = [d, nodeData?.birthPlace].filter(Boolean)
                   return parts.length ? parts.join(' · ') : '-'
                 })()} />
                 <Row label={t('visualization.nodeDetail.death')} value={(() => {
-                  const parts: string[] = []
-                  if (nodeData?.deathYear) {
-                    let dateStr = `${nodeData.isDeathBC ? t('visualization.nodeDetail.bcPrefix') + ' ' : ''}${nodeData.deathYear}`
-                    if (nodeData?.deathMonth && nodeData.deathMonth > 0) {
-                      dateStr += `-${nodeData.deathMonth.toString().padStart(2, '0')}`
-                      if (nodeData?.deathDay && nodeData.deathDay > 0) {
-                        dateStr += `-${nodeData.deathDay.toString().padStart(2, '0')}`
-                      }
-                    }
-                    parts.push(dateStr)
-                  }
-                  if (nodeData?.deathPlace) parts.push(nodeData.deathPlace)
+                  const d = deathDateString(nodeData)
+                  const parts = [d, nodeData?.deathPlace].filter(Boolean)
                   return parts.length ? parts.join(' · ') : '-'
                 })()} />
                 {nodeData?.story && nodeData.story.trim() !== '' && (
@@ -239,7 +234,7 @@ export default function NodeDetailModal({
                     <div className="font-mono text-[11px] text-gray-800 dark:text-gray-200 leading-snug whitespace-pre-wrap break-words min-w-0">{nodeData.story}</div>
                   </div>
                 )}
-                {(nodeData?.tokenId && nodeData.tokenId !== '0') && (
+                {isMinted(nodeData) && (
                   <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
                     <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('visualization.nodeDetail.profile')}</div>
                     <div className="space-y-1">
@@ -267,6 +262,9 @@ export default function NodeDetailModal({
                       </div>
                     </div>
                   </div>
+                )}
+                {isMinted(nodeData) && (
+                  <Row label={t('person.owner', 'Owner Address')} value={shortAddress(owner) || '-'} copy={owner} />
                 )}
                 {nodeData?.nftTokenURI && <Row label={t('visualization.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
               </>

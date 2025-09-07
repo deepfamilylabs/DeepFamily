@@ -223,7 +223,7 @@
       "title": "按全名查詢",
       "fullName": "全名",
       "pageSize": "每頁數量(≤100)",
-      "placeholder": "如：Confucius"
+      "placeholder": "如：John Smith"
     },
     "endorsementQuery": {
       "title": "背書統計查詢",
@@ -335,7 +335,8 @@
     "config": {
       "rpc": "RPC",
       "contract": "合約",
-      "root": "根節點"
+      "root": "根節點",
+      "clearAndRefresh": "清空並重新整理"
     },
     "ui": {
       "displaySettings": "數據選項",

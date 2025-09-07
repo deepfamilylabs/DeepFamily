@@ -2,14 +2,12 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Edit2, Clock, User, ChevronDown, ChevronRight, FileText, List, Copy, GitBranch, Clipboard } from 'lucide-react'
-import { StoryChunk, StoryMetadata } from '../types/graph'
+import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
+import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
 import { ethers } from 'ethers'
-import DeepFamily from '../abi/DeepFamily.json'
 import PageContainer from '../components/PageContainer'
-import SiteHeader from '../components/SiteHeader'
-import { makeProvider } from '../utils/provider'
 
 function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex);
@@ -68,7 +66,9 @@ export default function PersonPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress } = useConfig()
+  // Config used in child components (HashAndIndexLine) via useConfig
+  const { getStoryData, getNodeByTokenId, getOwnerOf, nodesData } = useTreeData()
+  const { strictCacheOnly } = useConfig()
   const toast = useToast()
   
   const [data, setData] = useState<StoryDetailData | null>(null)
@@ -78,18 +78,14 @@ export default function PersonPage() {
   const [viewMode, setViewMode] = useState<'paragraph' | 'raw'>('paragraph')
   const prefetched = (location.state as any)?.prefetchedStory as Partial<StoryDetailData> | undefined
 
-  // 动态标题：人物名 + 的档案
+  // Dynamic title: person name + archive
   useEffect(()=>{
     if (data?.fullName) {
       document.title = `DeepFamily - ${t('person.pageTitle', { name: data.fullName })}`
     }
   }, [data?.fullName, t])
 
-  const formatDate = (ts?: number) => {
-    if (!ts) return '-'
-    const d = new Date(ts * 1000)
-    return d.toLocaleString()
-  }
+  const formatDate = (ts?: number) => formatUnixSeconds(ts)
 
   const fullStoryParagraphs = useMemo(() => {
     if (!data?.fullStory) return []
@@ -144,16 +140,23 @@ export default function PersonPage() {
     })
   }
 
-  // Redirect to full-screen editor when ?edit=1 is present (keep PersonPage mounted via backgroundLocation)
+  // When ?edit=1 is present, navigate to editor in the same tab with prefetched data,
+  // and clean the current URL first to avoid redirect loop on back navigation.
   useEffect(() => {
     const qs = new URLSearchParams(location.search)
     const wantEdit = qs.get('edit') === '1'
     if (wantEdit && tokenId) {
-      const state: any = { backgroundLocation: location }
+      // 1) Clean current URL (remove edit=1) in-place
+      const params = new URLSearchParams(location.search)
+      params.delete('edit')
+      const nextSearch = params.toString()
+      navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, { replace: true })
+      // 2) Push editor route with optional prefetched data
+      const state: any = {}
       if (data?.storyMetadata || data?.storyChunks) {
         state.prefetchedStory = { tokenId, storyMetadata: data?.storyMetadata, storyChunks: data?.storyChunks }
       }
-      navigate(`/editor/${tokenId}`, { state, replace: true })
+      navigate(`/editor/${tokenId}`, { state })
     }
   }, [location.search, tokenId, data, navigate])
 
@@ -182,82 +185,75 @@ export default function PersonPage() {
       setLoading(false)
       return
     }
-    // 簡單格式驗證：僅允許非負整數
+    // Simple format validation: only allow non-negative integers
     if (!/^\d+$/.test(tokenId)) {
       setError(t('person.invalidTokenId', 'Invalid token ID'))
-      setLoading(false)
-      return
-    }
-    if (!rpcUrl || !contractAddress) {
-      setError('Missing required configuration')
       setLoading(false)
       return
     }
     try {
       setLoading(true)
       setError(null)
-      const provider = makeProvider(rpcUrl)
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
-
-      // 可選：先用 totalSupply 粗略判斷 (忽略因 burn 或 gap 帶來的潛在偏差)
-      try {
-        const total = await contract.totalSupply?.()
-        if (total && BigInt(tokenId) > BigInt(total)) {
-          setError(t('person.nonexistentToken', 'Token does not exist'))
-          setLoading(false)
-          return
-        }
-      } catch { /* 忽略 totalSupply 失敗 */ }
-
-      const nftRet = await contract.getNFTDetails(tokenId)
-      const personHash = nftRet[0]
-      const versionIndex = Number(nftRet[1])
-      const coreInfo = nftRet[3]
-      const fullName = coreInfo.basicInfo.fullName
-      const nftCoreInfo = {
-        gender: Number(coreInfo.basicInfo.gender),
-        birthYear: Number(coreInfo.basicInfo.birthYear),
-        birthMonth: Number(coreInfo.basicInfo.birthMonth),
-        birthDay: Number(coreInfo.basicInfo.birthDay),
-        birthPlace: coreInfo.supplementInfo.birthPlace,
-        isBirthBC: Boolean(coreInfo.basicInfo.isBirthBC),
-        deathYear: Number(coreInfo.supplementInfo.deathYear),
-        deathMonth: Number(coreInfo.supplementInfo.deathMonth),
-        deathDay: Number(coreInfo.supplementInfo.deathDay),
-        deathPlace: coreInfo.supplementInfo.deathPlace,
-        isDeathBC: Boolean(coreInfo.supplementInfo.isDeathBC),
-        story: coreInfo.supplementInfo.story || ''
+      // 1) First try to hit in memory nodesData (no network required)
+      let node: any | null = null
+      for (const nd of Object.values(nodesData || {})) {
+        if (nd?.tokenId && String(nd.tokenId) === String(tokenId)) { node = nd; break }
       }
-      const ownerAddr = await contract.ownerOf(tokenId)
-      const metadata = await contract.getStoryMetadata(tokenId)
-      const storyMetadata: StoryMetadata = {
-        totalChunks: Number(metadata.totalChunks),
-        totalLength: Number(metadata.totalLength),
-        isSealed: Boolean(metadata.isSealed),
-        lastUpdateTime: Number(metadata.lastUpdateTime),
-        fullStoryHash: metadata.fullStoryHash
+
+      // 2) If no node found in memory, use getNodeByTokenId (internally checks local cache first, then decides whether to access network)
+      if (!node) {
+        node = await getNodeByTokenId(tokenId)
       }
-      const chunks: StoryChunk[] = []
-      if (storyMetadata.totalChunks > 0) {
-        for (let i = 0; i < storyMetadata.totalChunks; i++) {
-          try {
-            const chunk = await contract.getStoryChunk(tokenId, i)
-            chunks.push({
-              chunkIndex: Number(chunk.chunkIndex),
-              chunkHash: chunk.chunkHash,
-              content: chunk.content,
-              timestamp: Number(chunk.timestamp),
-              lastEditor: chunk.lastEditor
-            })
-          } catch (e) {
-            // skip missing
-          }
+
+      // 3) Story data: if node already has storyMetadata + storyChunks and not expired, use directly; otherwise call getStoryData
+      let story: any | null = null
+      if (node?.storyMetadata && Array.isArray(node?.storyChunks)) {
+        const fetchedAt = Number(node.storyFetchedAt || 0)
+        const isSealed = Boolean(node.storyMetadata?.isSealed)
+        const ttl = isSealed ? 7 * 24 * 60 * 60 * 1000 : 2 * 60 * 1000
+        const expired = !fetchedAt || (Date.now() - fetchedAt > ttl)
+        if (!expired || strictCacheOnly) {
+          const { fullStory, integrity } = computeStoryIntegrity(node.storyChunks, node.storyMetadata)
+          story = { metadata: node.storyMetadata, chunks: node.storyChunks, fullStory, integrity }
         }
       }
-      const { fullStory, integrity } = computeStoryIntegrity(chunks, storyMetadata);
-      setData({ tokenId, personHash, versionIndex, fullName, nftCoreInfo, storyMetadata, storyChunks: [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex), fullStory, owner: ownerAddr, integrity })
+      if (!story) {
+        story = await getStoryData(tokenId)
+      }
+
+      // 4) Owner: prefer cache, query chain if not available
+      let ownerAddr: string | undefined = node?.owner
+      if (!ownerAddr) ownerAddr = (await getOwnerOf(tokenId)) || undefined
+
+      const nftCoreInfo = node ? {
+        gender: node.gender,
+        birthYear: node.birthYear,
+        birthMonth: node.birthMonth,
+        birthDay: node.birthDay,
+        birthPlace: node.birthPlace,
+        isBirthBC: node.isBirthBC,
+        deathYear: node.deathYear,
+        deathMonth: node.deathMonth,
+        deathDay: node.deathDay,
+        deathPlace: node.deathPlace,
+        isDeathBC: node.isDeathBC,
+        story: node.story || ''
+      } : undefined
+
+      setData({
+        tokenId,
+        personHash: node?.personHash,
+        versionIndex: node?.versionIndex,
+        fullName: node?.fullName,
+        nftCoreInfo,
+        storyMetadata: story?.metadata as StoryMetadata,
+        storyChunks: story?.chunks as StoryChunk[],
+        fullStory: story?.fullStory,
+        owner: ownerAddr,
+        integrity: story?.integrity as any
+      })
     } catch (err: any) {
-      // 解析錯誤訊息
+      // Parse error message
       const raw = err?.message || err?.shortMessage || ''
       const full = (typeof err === 'object') ? JSON.stringify(err) : ''
       const lower = (raw + full).toLowerCase()
@@ -267,14 +263,14 @@ export default function PersonPage() {
       } else if (lower.includes('nonexistent token') || lower.includes('query for nonexistent token') || lower.includes('token does not exist')) {
         friendly = t('person.nonexistentToken', 'Token does not exist')
       } else if (lower.includes('execution reverted')) {
-        // 通用 revert 類型
+        // Generic revert type
         friendly = t('person.fetchFailed', 'Failed to load token')
       }
       setError(friendly || raw || 'Failed to fetch story data')
     } finally {
       setLoading(false)
     }
-  }, [tokenId, rpcUrl, contractAddress, t])
+  }, [tokenId, t, nodesData, strictCacheOnly])
 
   useEffect(() => {
     // Skip initial fetch if we already hydrated from prefetched state
@@ -324,9 +320,7 @@ export default function PersonPage() {
   // if (error || !data) { ... }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900">
-      {/* Unified site header always visible */}
-      <SiteHeader />
+    <div>
 
       {/* Inline error alert (content area) */}
       {error && (
@@ -411,14 +405,10 @@ export default function PersonPage() {
                     onClick={() => {
                       if (!tokenId) return
                       // Navigate to full-screen editor page with optional prefetched data
-                      const prefetched = (data?.storyMetadata || data?.storyChunks)
-                        ? { tokenId, storyMetadata: data?.storyMetadata, storyChunks: data?.storyChunks }
-                        : undefined
-                      // Use backgroundLocation overlay so PersonPage stays mounted (no refetch on back)
-                      const state: any = {
-                        backgroundLocation: location,
-                        ...(prefetched ? { prefetchedStory: prefetched } : {}),
-                      }
+                      // Same-tab navigation to editor with optional prefetched data
+                      const state: any = (data?.storyMetadata || data?.storyChunks)
+                        ? { prefetchedStory: { tokenId, storyMetadata: data?.storyMetadata, storyChunks: data?.storyChunks } }
+                        : {}
                       navigate(`/editor/${tokenId}`, { state })
                     }}
                     className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs font-medium transition-colors"
@@ -456,11 +446,7 @@ export default function PersonPage() {
                         {data.nftCoreInfo?.gender !== undefined && data.nftCoreInfo.gender > 0 && (
                           <div className="flex items-center gap-8 p-3 rounded-xl bg-gradient-to-r from-purple-50/50 to-pink-50/30 dark:from-purple-900/20 dark:to-pink-900/10 border border-purple-200/30 dark:border-purple-700/30">
                             <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.gender', 'Gender')}</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-semibold">
-                              {data.nftCoreInfo.gender === 1 ? t('visualization.nodeDetail.genders.male', 'Male') :
-                               data.nftCoreInfo.gender === 2 ? t('visualization.nodeDetail.genders.female', 'Female') :
-                               data.nftCoreInfo.gender === 3 ? t('visualization.nodeDetail.genders.other', 'Other') : '-'}
-                            </span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold">{genderTextFn(data.nftCoreInfo.gender, t as any) || '-'}</span>
                           </div>
                         )}
 
@@ -469,18 +455,8 @@ export default function PersonPage() {
                             <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.birth', 'Birth')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-semibold">
                               {(() => {
-                                const parts: string[] = []
-                                if (data.nftCoreInfo!.birthYear) {
-                                  let dateStr = `${data.nftCoreInfo!.isBirthBC ? t('visualization.nodeDetail.bcPrefix', 'BC') + ' ' : ''}${data.nftCoreInfo!.birthYear}`
-                                  if (data.nftCoreInfo!.birthMonth && data.nftCoreInfo!.birthMonth > 0) {
-                                    dateStr += `-${data.nftCoreInfo!.birthMonth.toString().padStart(2, '0')}`
-                                    if (data.nftCoreInfo!.birthDay && data.nftCoreInfo!.birthDay > 0) {
-                                      dateStr += `-${data.nftCoreInfo!.birthDay.toString().padStart(2, '0')}`
-                                    }
-                                  }
-                                  parts.push(dateStr)
-                                }
-                                if (data.nftCoreInfo!.birthPlace) parts.push(data.nftCoreInfo!.birthPlace)
+                                const d = formatYMD(data.nftCoreInfo!.birthYear, data.nftCoreInfo!.birthMonth, data.nftCoreInfo!.birthDay, data.nftCoreInfo!.isBirthBC)
+                                const parts = [d, data.nftCoreInfo!.birthPlace].filter(Boolean)
                                 return parts.join(' · ')
                               })()}
                             </span>
@@ -492,18 +468,8 @@ export default function PersonPage() {
                             <span className="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 flex-shrink-0">{t('visualization.nodeDetail.death', 'Death')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-semibold">
                               {(() => {
-                                const parts: string[] = []
-                                if (data.nftCoreInfo!.deathYear) {
-                                  let dateStr = `${data.nftCoreInfo!.isDeathBC ? t('visualization.nodeDetail.bcPrefix', 'BC') + ' ' : ''}${data.nftCoreInfo!.deathYear}`
-                                  if (data.nftCoreInfo!.deathMonth && data.nftCoreInfo!.deathMonth > 0) {
-                                    dateStr += `-${data.nftCoreInfo!.deathMonth.toString().padStart(2, '0')}`
-                                    if (data.nftCoreInfo!.deathDay && data.nftCoreInfo!.deathDay > 0) {
-                                      dateStr += `-${data.nftCoreInfo!.deathDay.toString().padStart(2, '0')}`
-                                    }
-                                  }
-                                  parts.push(dateStr)
-                                }
-                                if (data.nftCoreInfo!.deathPlace) parts.push(data.nftCoreInfo!.deathPlace)
+                                const d = formatYMD(data.nftCoreInfo!.deathYear, data.nftCoreInfo!.deathMonth, data.nftCoreInfo!.deathDay, data.nftCoreInfo!.isDeathBC)
+                                const parts = [d, data.nftCoreInfo!.deathPlace].filter(Boolean)
                                 return parts.join(' · ')
                               })()}
                             </span>
@@ -599,7 +565,7 @@ export default function PersonPage() {
                       <div className="col-span-2">
                         <dt className="text-gray-500 dark:text-gray-400">{t('person.owner', 'Owner Address')}</dt>
                         <dd className="mt-1 flex items-center gap-1">
-                          <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300" title={data.owner}>{data.owner || '-'}</div>
+                        <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300" title={data.owner}>{shortAddress(data.owner) || '-'}</div>
                           {data.owner && (
                             <button
                               onClick={() => copyText(data.owner!)}
@@ -617,7 +583,7 @@ export default function PersonPage() {
                           <dt className="text-gray-500 dark:text-gray-400">{t('person.personHash', 'Person Hash')}</dt>
                           <dd className="mt-1 flex items-center gap-1">
                             <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800/50 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
-                              {data.personHash}
+                              {formatHashMiddle(data.personHash)}
                             </div>
                             <button
                               onClick={() => copyText(data.personHash!)}
@@ -676,7 +642,7 @@ export default function PersonPage() {
                                 </div>
                               </button>
                               <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-gray-500 mt-2 pl-7">
-                                <span className="flex items-center gap-1"><Clock size={10} />{new Date(chunk.timestamp * 1000).toLocaleDateString()}</span>
+                        <span className="flex items-center gap-1"><Clock size={10} />{formatUnixSeconds(chunk.timestamp)}</span>
                                 <span className="flex items-center gap-1"><User size={10} />{chunk.lastEditor.slice(0, 6)}...</span>
                               </div>
                             </div>
@@ -728,7 +694,7 @@ export default function PersonPage() {
                       <div>
                         <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.owner', 'Owner Address')}</div>
                         <div className="flex items-center gap-0">
-                          <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 p-2 rounded select-all text-gray-700 dark:text-gray-300 flex-1" title={data.owner}>{data.owner || '-'}</div>
+                        <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 p-2 rounded select-all text-gray-700 dark:text-gray-300 flex-1" title={data.owner}>{shortAddress(data.owner) || '-'}</div>
                           {data.owner && (
                             <button
                               onClick={() => copyText(data.owner!)}
@@ -746,7 +712,7 @@ export default function PersonPage() {
                           <div className="text-gray-500 dark:text-gray-400 text-[11px] mb-1">{t('person.personHash', 'Person Hash')}</div>
                           <div className="flex items-center gap-0">
                             <div className="font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded select-all text-gray-700 dark:text-gray-300">
-                              {data.personHash}
+                              {formatHashMiddle(data.personHash)}
                             </div>
                             <button
                               onClick={() => copyText(data.personHash!)}
@@ -788,11 +754,7 @@ function HashAndIndexLine({ personHash, versionIndex, t }: { personHash: string,
     cfg.update({ rootHash: personHash, rootVersionIndex: versionIndex })
     navigate(`/visualization?root=${personHash}&v=${versionIndex}`)
   }
-  const shortHash = useMemo(() => {
-    if (!personHash) return ''
-    if (personHash.length <= 26) return personHash
-    return personHash.slice(0, 7) + '...' + personHash.slice(-5)
-  }, [personHash])
+  const shortHash = useMemo(() => formatHashMiddle(personHash, 7, 5), [personHash])
   return (
     <div className="mt-1 flex items-center gap-3 font-mono text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
       <div className="flex items-center gap-2 min-w-0">

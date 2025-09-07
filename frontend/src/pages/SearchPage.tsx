@@ -8,6 +8,7 @@ import { Clipboard, ChevronDown } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import DeepFamily from '../abi/DeepFamily.json'
+import { formatUnixSeconds } from '../types/graph'
 import { makeProvider } from '../utils/provider'
 
 const MAX_FULL_NAME_BYTES = 256
@@ -18,18 +19,7 @@ const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
 
-// Display helper: show middle-ellipsis for long hashes/addresses
-const formatHash = (val?: string): string => {
-  if (!val) return ''
-  // Only apply to hex-like values starting with 0x or obviously long tokens
-  const isHexLike = /^0x[0-9a-fA-F]+$/.test(val)
-  if (isHexLike || val.length > 34) {
-    const prefix = val.slice(0, 10)
-    const suffix = val.slice(-8)
-    return `${prefix}...${suffix}`
-  }
-  return val
-}
+import { formatHashMiddle } from '../types/graph'
 
 const FieldError: React.FC<{ message?: string }> = ({ message }) => (
   <div className={`text-xs h-4 leading-4 ${message ? 'text-red-600' : 'text-transparent'}`}>
@@ -788,7 +778,7 @@ export default function SearchPage() {
                     }}
                   >{t('search.copy')}</button>
                 </div>
-                <div className="min-w-0"><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? new Date(Number(version.timestamp) * 1000).toLocaleString() : t('search.versionsQuery.unknown')}</span></div>
+              <div className="min-w-0"><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? formatUnixSeconds(version.timestamp) : t('search.versionsQuery.unknown')}</span></div>
               </div>
               <div className="text-sm space-y-1">
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionTag')}:</span> {version.tag || t('search.versionsQuery.none')} {version.metadataCID && <><span className="text-gray-600 dark:text-gray-400 ml-4">{t('search.versionsQuery.metadataCID')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{version.metadataCID}</span></>}</div>
@@ -1033,7 +1023,7 @@ export default function SearchPage() {
               {/* Index then timestamp on the same line */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-2">
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.chunkIndex')}:</span> {Number(chunk.chunkIndex)}</div>
-                <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.timestamp')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{chunk.timestamp ? new Date(Number(chunk.timestamp) * 1000).toLocaleString() : t('search.versionsQuery.unknown')}</span></div>
+                <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.timestamp')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{chunk.timestamp ? formatUnixSeconds(chunk.timestamp) : t('search.versionsQuery.unknown')}</span></div>
               </div>
               <div className="text-sm space-y-1">
                 <div className="flex items-center gap-1 overflow-hidden">
@@ -1188,7 +1178,7 @@ export default function SearchPage() {
   )
 }
 // Inline hash renderer: shows full when fits; otherwise 10...8 middle ellipsis
-const HashInline: React.FC<{ value: string; className?: string; titleText?: string }> = ({ value, className = '', titleText }) => {
+const HashInline: React.FC<{ value: string; className?: string; titleText?: string; prefix?: number; suffix?: number }> = ({ value, className = '', titleText, prefix = 10, suffix = 8 }) => {
   const containerRef = useRef<HTMLSpanElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
   const [display, setDisplay] = useState<string>(value)
@@ -1199,7 +1189,7 @@ const HashInline: React.FC<{ value: string; className?: string; titleText?: stri
     if (!container || !meas) return
     meas.textContent = value
     const fits = meas.scrollWidth <= container.clientWidth
-    setDisplay(fits ? value : formatHash(value))
+    setDisplay(fits ? value : formatHashMiddle(value, prefix, suffix))
   }
 
   useEffect(() => {
@@ -1212,14 +1202,15 @@ const HashInline: React.FC<{ value: string; className?: string; titleText?: stri
       ro.disconnect()
       window.removeEventListener('resize', onResize)
     }
-  }, [value])
+  }, [value, prefix, suffix])
 
   return (
     <>
       <span ref={containerRef} className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${className}`} title={titleText ?? value}>
         {display}
       </span>
-      <span ref={measureRef} className="absolute left-[-99999px] top-0 invisible whitespace-nowrap" />
+      {/* measurement node mirrors font styles to ensure accurate width */}
+      <span ref={measureRef} className={`absolute left-[-99999px] top-0 invisible whitespace-nowrap ${className}`} />
     </>
   )
 }

@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Eye
 } from 'lucide-react'
-import { NodeData } from '../types/graph'
+import { NodeData, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, formatUnixDate, isMinted } from '../types/graph'
 import { shortHash } from '../types/graph'
 
 interface PersonStoryCardProps {
@@ -27,42 +27,23 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
   const { t } = useTranslation()
   const { preloadStoryData } = useTreeData()
 
+  const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
+
   // Preload story data on hover
   const handleMouseEnter = useCallback(() => {
-    if (person.tokenId && person.hasDetailedStory) {
+    if (person.tokenId && hasDetailedStory) {
       preloadStoryData(person.tokenId)
     }
-  }, [person.tokenId, person.hasDetailedStory, preloadStoryData])
+  }, [person.tokenId, hasDetailedStory, preloadStoryData])
 
   // Format date
-  const formatDate = useMemo(() => {
-    const formatDatePart = (year?: number, month?: number, day?: number, isBC?: boolean) => {
-      if (!year) return ''
-      let dateStr = isBC ? `BC ${year}` : year.toString()
-      if (month && month > 0) {
-        dateStr += `-${month.toString().padStart(2, '0')}`
-        if (day && day > 0) {
-          dateStr += `-${day.toString().padStart(2, '0')}`
-        }
-      }
-      return dateStr
-    }
-
-    const birth = formatDatePart(person.birthYear, person.birthMonth, person.birthDay, person.isBirthBC)
-    const death = formatDatePart(person.deathYear, person.deathMonth, person.deathDay, person.isDeathBC)
-    
-    return { birth, death }
-  }, [person])
+  const formatDate = useMemo(() => ({
+    birth: birthDateString(person),
+    death: deathDateString(person)
+  }), [person])
 
   // Gender display
-  const genderText = useMemo(() => {
-    switch (person.gender) {
-      case 1: return t('visualization.nodeDetail.genders.male', 'Male')
-      case 2: return t('visualization.nodeDetail.genders.female', 'Female')
-      case 3: return t('visualization.nodeDetail.genders.other', 'Other')
-      default: return ''
-    }
-  }, [person.gender, t])
+  const genderText = useMemo(() => genderTextFn(person.gender, t as any), [person.gender, t])
 
   // Story preview
   const storyPreview = useMemo(() => {
@@ -102,7 +83,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                       {genderText}
                     </span>
                   )}
-                  {person.tokenId && person.tokenId !== '0' && (
+                  {isMinted(person) && (
                     <span className="flex items-center gap-1 font-mono whitespace-nowrap">
                       <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       {person.tokenId}
@@ -120,13 +101,13 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
               
               {/* Badges */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                {person.hasDetailedStory && (
+                {hasDetailedStory && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
                     <Book className="w-3 h-3" />
                     {t('people.hasStory', 'Story')}
                   </span>
                 )}
-                {person.tokenId && person.tokenId !== '0' && (
+                {isMinted(person) && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
                     <Award className="w-3 h-3" />
                     {t('people.hasNFT', 'NFT')}
@@ -174,7 +155,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                 {person.timestamp && (
                   <span className="flex items-center gap-1 whitespace-nowrap">
                     <Clock className="w-3 h-3" />
-                    {new Date(person.timestamp * 1000).toLocaleDateString()}
+                    {formatUnixDate(person.timestamp)}
                   </span>
                 )}
                 {person.storyMetadata && (
@@ -222,7 +203,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
                 {person.fullName || `Person #${shortHash(person.personHash)}`}
               </h3>
-              {person.tokenId && person.tokenId !== '0' && (
+              {isMinted(person) && (
                 <div className="flex items-center gap-1 text-xs font-mono text-gray-500 dark:text-gray-400">
                   <span>#{person.tokenId}</span>
                   {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
@@ -239,12 +220,12 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
           
           {/* Status Badges */}
           <div className="flex flex-col gap-1">
-            {person.hasDetailedStory && (
+            {hasDetailedStory && (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-medium">
                 <Book className="w-3 h-3" />
               </span>
             )}
-            {person.tokenId && person.tokenId !== '0' && (
+            {isMinted(person) && (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs font-medium">
                 <Award className="w-3 h-3" />
               </span>
@@ -295,7 +276,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
             {person.timestamp && (
               <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                 <Clock className="w-3 h-3" />
-                {new Date(person.timestamp * 1000).toLocaleDateString()}
+                {formatUnixDate(person.timestamp)}
               </span>
             )}
           </div>

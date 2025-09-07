@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 import type { GraphNode } from '../types/graph'
-import { makeNodeId, nodeLabel } from '../types/graph'
+import { makeNodeId, nodeLabel, isMinted } from '../types/graph'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
@@ -158,7 +158,7 @@ function FlexibleDAGViewInner({
             const p = positions[n.id]
             const w = measuredWidths[n.id] || nodeWidth
             const nd = useNodeData(n.id)
-            const mintedFlag = !!(nd?.tokenId && nd.tokenId !== '0')
+            const mintedFlag = isMinted(nd)
             const nameDisplay = nd?.fullName ? truncateName(nd.fullName, w) : undefined
             const endorse = nd?.endorsementCount
             const hashShort = n.hash.replace(/0x([0-9a-fA-F]{4})[0-9a-fA-F]+/, '0x$1…')

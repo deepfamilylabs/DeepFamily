@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useConfig } from '../context/ConfigContext'
 import { useDebounce } from '../hooks/useDebounce'
+import { useTreeData } from '../context/TreeDataContext'
 
 interface Props {
   editing: boolean
@@ -15,7 +16,8 @@ interface Props {
 
 export default function VisualizationConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly, update } = useConfig()
+  const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress)
   const [localRootHash, setLocalRootHash] = useState(rootHash)
@@ -148,6 +150,23 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
               <span>{statusT ? statusT('visualization.actions.refresh') : 'Refresh'}</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => { clearAllCaches(); onRefresh?.() }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/30 shadow-sm flex-shrink-0"
+          >
+            {t('visualization.config.clearAndRefresh', 'Clear Cache and Refresh')}
+          </button>
+          <button
+            type="button"
+            onClick={() => update({ strictCacheOnly: !strictCacheOnly })}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 flex-shrink-0 ${strictCacheOnly ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30' : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
+            title={t('visualization.config.strictCacheOnly', 'Strict Cache Only')}
+            aria-pressed={strictCacheOnly}
+            aria-label={t('visualization.config.strictCacheOnly', 'Strict Cache Only')}
+          >
+            {strictCacheOnly ? t('visualization.config.strictCacheOn', 'Strict Cache: On') : t('visualization.config.strictCacheOff', 'Strict Cache: Off')}
+          </button>
         </div>
       </div>
 

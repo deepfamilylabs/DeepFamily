@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, Plus, Edit2, Save, Trash2, Lock, Clipboard, ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { StoryChunk, StoryMetadata, StoryChunkCreateData, StoryChunkUpdateData } from '../types/graph'
+import { StoryChunk, StoryMetadata, StoryChunkCreateData, StoryChunkUpdateData, formatUnixSeconds, formatHashMiddle } from '../types/graph'
 
 interface StoryChunkEditorProps {
   open: boolean
@@ -106,13 +106,8 @@ export default function StoryChunkEditor({
     return ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["string"], [content]))
   }
 
-  // Format hash as first 10 chars + ... + last 8 chars
-  const formatHash = React.useCallback((hash?: string) => {
-    if (!hash) return ''
-    const s = hash.startsWith('0x') ? hash.slice(2) : hash
-    if (s.length <= 18) return `0x${s}`
-    return `0x${s.slice(0, 10)}...${s.slice(-8)}`
-  }, [])
+  // Format hash (middle ellipsis)
+  const formatHash = React.useCallback((hash?: string) => formatHashMiddle(hash), [])
   
   // Dirty detection: changed content vs initial
   const dirty = React.useMemo(() => {
@@ -394,7 +389,7 @@ export default function StoryChunkEditor({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(chunk.timestamp * 1000).toLocaleString()}
+                        {formatUnixSeconds(chunk.timestamp)}
                       </span>
                       {!isSealed && (
                         <button

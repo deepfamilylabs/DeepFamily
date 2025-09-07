@@ -5,6 +5,7 @@ type ConfigValues = {
   contractAddress: string
   rootHash: string
   rootVersionIndex: number
+  strictCacheOnly: boolean
 }
 
 export type AppConfig = ConfigValues & {
@@ -25,6 +26,7 @@ function getEnvDefaults(): ConfigValues {
     contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS,
     rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH,
     rootVersionIndex: rv,
+    strictCacheOnly: String((import.meta as any).env.VITE_STRICT_CACHE_ONLY || '').toLowerCase() === 'true' || String((import.meta as any).env.VITE_STRICT_CACHE_ONLY || '').toLowerCase() === '1',
   }
 }
 
@@ -48,8 +50,8 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     setState(prev => {
       const next = { ...prev, ...partial }
       try {
-        const { rpcUrl, contractAddress, rootHash, rootVersionIndex } = next
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex }))
+        const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly } = next
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly }))
       } catch {}
       return next
     })
@@ -75,4 +77,3 @@ export function useConfig() {
   if (!ctx) throw new Error('useConfig must be used within ConfigProvider')
   return ctx
 }
-

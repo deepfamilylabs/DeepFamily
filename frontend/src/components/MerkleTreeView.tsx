@@ -6,6 +6,8 @@ import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import { useNodeData } from '../hooks/useNodeData'
+import { formatHashMiddle } from '../types/graph'
+import { isMinted } from '../types/graph'
 import { useVisualizationHeight } from '../constants/layout'
 
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
@@ -109,10 +111,10 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
             {positioned.map(pn => {
               const w = measuredWidths[pn.id] || BASE_NODE_WIDTH
               const nd = useNodeData(pn.id)
-              const mintedFlag = !!(nd?.tokenId && nd.tokenId !== '0')
+              const mintedFlag = isMinted(nd)
               const nameDisplay = (mintedFlag && nd?.fullName) ? truncateName(nd.fullName, w) : undefined
               const endorse = nd?.endorsementCount
-              const shortHash = pn.data.personHash.replace(/0x([0-9a-fA-F]{4})[0-9a-fA-F]+/, '0x$1…')
+              const shortHash = formatHashMiddle(pn.data.personHash)
               const isSel = pn.id === selectedId
               const isHover = hoverId === pn.id
               const baseRect = mintedFlag

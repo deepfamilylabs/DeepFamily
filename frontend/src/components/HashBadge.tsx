@@ -2,10 +2,11 @@ import React, { useState, useRef, useCallback } from 'react'
 import { useToast } from './ToastProvider'
 import { useLongPress } from '../lib/hooks'
 import { useTranslation } from 'react-i18next'
+import { formatHashMiddle } from '../types/graph'
 
 export function shortFirst4(hash: string): string {
   if (!hash) return ''
-  return `0x${hash.slice(2,6)}…`
+  return formatHashMiddle(hash, 6, 4)
 }
 
 export interface HashBadgeProps {

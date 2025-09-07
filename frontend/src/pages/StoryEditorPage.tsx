@@ -22,7 +22,7 @@ export default function StoryEditorPage() {
   const location = useLocation()
   const { t } = useTranslation()
   const { contractAddress } = useConfig()
-  const { getStoryData, clearStoryCache } = useTreeData()
+  const { getStoryData, setNodesData } = useTreeData()
 
   const prefetched = (location.state as PrefetchedState | undefined)?.prefetchedStory
 
@@ -68,13 +68,27 @@ export default function StoryEditorPage() {
 
   const refetch = useCallback(async () => {
     if (!validTokenId) return
-    clearStoryCache(validTokenId)
+    // Invalidate NodeData story cache for this token to force fresh fetch
+    if (setNodesData) {
+      setNodesData(prev => {
+        let foundId: string | undefined
+        for (const [id, nd] of Object.entries(prev)) {
+          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) { foundId = id; break }
+        }
+        if (!foundId) return prev
+        const cur = prev[foundId]
+        return {
+          ...prev,
+          [foundId]: { ...cur, storyFetchedAt: 0, storyMetadata: undefined, storyChunks: undefined }
+        }
+      })
+    }
     try {
       const data = await getStoryData(validTokenId)
       setMeta(data.metadata as StoryMetadata)
       setChunks(data.chunks as StoryChunk[])
     } catch {}
-  }, [validTokenId, getStoryData, clearStoryCache])
+  }, [validTokenId, getStoryData, setNodesData])
 
   const onAddChunk = useCallback(async (data: StoryChunkCreateData) => {
     if (!contractAddress) throw new Error('Missing contract')
@@ -117,8 +131,21 @@ export default function StoryEditorPage() {
       const ok = window.confirm(t('storyChunkEditor.leaveConfirm', 'Unsaved changes will be lost. Leave editor?'))
       if (!ok) return
     }
-    navigate(-1)
-  }, [dirty, navigate, t])
+    // If the tab has history, go back; otherwise try to close the tab.
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+    try {
+      window.close()
+    } catch {}
+    // Fallback: navigate to person page or home if the tab couldn't be closed
+    if (validTokenId) {
+      navigate(`/person/${validTokenId}`, { replace: true })
+    } else {
+      navigate('/', { replace: true })
+    }
+  }, [dirty, navigate, t, validTokenId])
 
   return (
     <StoryChunkEditor

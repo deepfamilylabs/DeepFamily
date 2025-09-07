@@ -4,7 +4,7 @@ import HashBadge from './HashBadge'
 import { ethers } from 'ethers'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
-import { makeNodeId, type GraphNode } from '../types/graph'
+import { makeNodeId, type GraphNode, isMinted } from '../types/graph'
 import { FixedSizeList as VirtualList, ListChildComponentProps } from 'react-window'
 import { getRuntimeVisualizationConfig } from '../config/visualization'
 import { useNodeDetail } from '../context/NodeDetailContext'
@@ -307,7 +307,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
     const cacheKey = makeNodeId(node.personHash, node.versionIndex)
     const name = nodesData?.[cacheKey]?.fullName
     const endorse = nodesData?.[cacheKey]?.endorsementCount
-    const mintedFlag = !!(nodesData?.[cacheKey]?.tokenId && nodesData[cacheKey].tokenId !== '0')
+    const mintedFlag = isMinted(nodesData?.[cacheKey])
     const isSel = selectedKey === k
     const ancestorGuides: boolean[] = []
     if (depth > 0) {

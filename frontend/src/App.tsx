@@ -33,6 +33,9 @@ function TitleUpdater() {
           if (location.pathname.startsWith('/person/')) {
             return `${baseName} - ${t('person.pageTitle', 'Person Biography')}`
           }
+          if (location.pathname.startsWith('/editor/')) {
+            return `${baseName} - ${t('storyEditor.title', 'Story Editor')}`
+          }
           return `${baseName} - ${t('home.title')}`
       }
     }
@@ -44,31 +47,22 @@ function TitleUpdater() {
 }
 
 function RouterContent() {
-  const location = useLocation()
-  const state = location.state as { backgroundLocation?: Location } | undefined
   return (
     <VizOptionsProvider>
       {/* TreeDataProvider no longer needs traversal/includeX props; it reads VizOptions context directly */}
       <TreeDataProvider>
-        {/* Base routes render either normal location or the background one if present */}
-        <Routes location={state?.backgroundLocation || location}>
+        {/* Base routes */}
+        <Routes>
           <Route path="/" element={<Layout />}> 
             <Route index element={<Home />} />
             <Route path="visualization" element={<VisualizationPage />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="people" element={<PeoplePage />} />
+            {/* Person and Editor under Layout to keep header/footer */}
+            <Route path="person/:tokenId" element={<PersonPage />} />
+            <Route path="editor/:tokenId" element={<StoryEditorPage />} />
           </Route>
-          <Route path="/person/:tokenId" element={<PersonPage />} />
-          <Route path="/editor/:tokenId" element={<StoryEditorPage />} />
         </Routes>
-        {/* If there's a background location, render editor as an overlay route */}
-        {state?.backgroundLocation && (
-          <div className="fixed inset-0 z-[2000] bg-white dark:bg-gray-900">
-            <Routes>
-              <Route path="/editor/:tokenId" element={<StoryEditorPage />} />
-            </Routes>
-          </div>
-        )}
       </TreeDataProvider>
     </VizOptionsProvider>
   )
