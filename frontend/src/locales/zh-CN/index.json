@@ -465,7 +465,8 @@
       "confirm": "确认封存"
     },
     "contentTooLongBytes": "内容不能超过1000字节",
-    "contentPlaceholderBytes": "请输入分片内容（最多1000字节，约=1000英文或≈333汉字）"
+    "contentPlaceholderBytes": "请输入分片内容（最多1000字节，约=1000英文或≈333汉字）",
+    "offlineNoData": "离线模式：本地没有缓存该传记"
   },
   "person": {
     "encyclopedia": "人物百科",

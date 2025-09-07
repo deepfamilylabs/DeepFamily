@@ -465,7 +465,8 @@
       "confirm": "確認封存"
     },
     "contentTooLongBytes": "內容不能超過1000位元組",
-    "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）"
+    "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）",
+    "offlineNoData": "離線模式：本地沒有快取該傳記"
   },
   "person": {
     "encyclopedia": "人物百科",

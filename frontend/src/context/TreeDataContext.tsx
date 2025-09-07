@@ -196,7 +196,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           // Merge missing detailed fields without overwriting existing state
           const cur = next[id]
           const merged = { ...fromSnap, ...cur, id: cur.id }
-          // Prefer fields already in memory; ensure tokenId/endorsement/name等被带回
+          // Prefer fields already in memory; ensure tokenId/endorsement/name are restored
           const final = { ...fromSnap, ...cur, ...merged }
           // Shallow compare for minimal churn
           const before = JSON.stringify(cur)
@@ -214,6 +214,37 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (!contract) return
     // In strict cache mode, completely skip visualization loading (avoid network access)
     if (strictCacheOnly) return
+    
+    // Check if we already have complete cached data (three-tier cache check)
+    const hasMemoryCache = root && 
+      typeof rootHash === 'string' && root.personHash.toLowerCase() === rootHash.toLowerCase() &&
+      Number(root.versionIndex) === Number(rootVersionIndex)
+    
+    if (hasMemoryCache) {
+      // Memory cache hit - no need to load
+      return
+    }
+    
+    // Check localStorage cache
+    try {
+      const raw = localStorage.getItem(vizRootKey)
+      if (raw) {
+        const cachedRoot = JSON.parse(raw) as GraphNode
+        const matchesKey = (
+          typeof rootHash === 'string' && cachedRoot?.personHash && 
+          cachedRoot.personHash.toLowerCase() === rootHash.toLowerCase() &&
+          Number(cachedRoot?.versionIndex) === Number(rootVersionIndex)
+        )
+        if (matchesKey) {
+          // Local storage cache hit - accept cached root (even if children may be empty)
+          // Root structure is persisted progressively during streaming; accepting it avoids
+          // unnecessary network calls on reload when cache is already present.
+          setRoot(cachedRoot)
+          return
+        }
+      }
+    } catch {}
+    
     const runKey = `contract-${rootHash}-${rootVersionIndex}-${refreshTick}`
     if (fetchRunKeyRef.current === runKey) return
     fetchRunKeyRef.current = runKey
@@ -379,10 +410,76 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       const multicallAddress = (import.meta as any).env.VITE_MULTICALL_ADDRESS
       const useMulticall = !!multicallAddress && provider
       const multicall = useMulticall ? new ethers.Contract(multicallAddress, MULTICALL_ABI, provider) : null
+
+      // Read local cache snapshot to assist with cache hits
+      let snapshot: Record<string, NodeData> | null = null
+      try {
+        const rawSnap = localStorage.getItem(`${storageNS}::nodesData`)
+        snapshot = rawSnap ? (JSON.parse(rawSnap) as Record<string, NodeData>) : null
+      } catch {}
+
+      // If all nodes already have required fields (endorsementCount and tokenId) in cache, skip network request
+      try {
+        const allSatisfied = nodePairs.every(p => {
+          const id = makeNodeId(p.h, p.v)
+          const nd = nodesDataRef.current[id] || (snapshot ? snapshot[id] : undefined)
+          return !!nd && nd.endorsementCount !== undefined && nd.tokenId !== undefined
+        })
+        if (allSatisfied) {
+          // Backfill node details missing from memory but present in local snapshot, maintain nodesData as single source of truth
+          if (snapshot) {
+            setNodesData(prev => {
+              let changed = false
+              const next = { ...prev }
+              for (const p of nodePairs) {
+                const id = makeNodeId(p.h, p.v)
+                const fromSnap = snapshot![id]
+                const cur = next[id]
+                const hasRequired = (n?: NodeData) => !!n && n.endorsementCount !== undefined && n.tokenId !== undefined
+                if (!hasRequired(cur) && hasRequired(fromSnap)) {
+                  next[id] = cur ? { ...cur, ...fromSnap, id: cur.id } : { ...fromSnap }
+                  changed = true
+                }
+              }
+              return changed ? next : prev
+            })
+          }
+          return
+        }
+      } catch {}
       for (let i = 0; i < nodePairs.length && !cancelled; i += BATCH) {
         const slice = nodePairs.slice(i, i + BATCH)
+        // Only make requests for nodes missing essential details, while backfilling available data from local snapshot
+        const backfills: Record<string, NodeData> = {}
+        const targets = slice.filter(p => {
+          const id = makeNodeId(p.h, p.v)
+          const fromMem = nodesDataRef.current[id]
+          const fromSnap = snapshot ? snapshot[id] : undefined
+          const hasRequired = (n?: NodeData) => !!n && n.endorsementCount !== undefined && n.tokenId !== undefined
+          if (hasRequired(fromMem) || hasRequired(fromSnap)) {
+            if (!hasRequired(fromMem) && fromSnap) backfills[id] = fromSnap
+            return false
+          }
+          return true
+        })
+        if (Object.keys(backfills).length > 0) {
+          setNodesData(prev => {
+            let changed = false
+            const next = { ...prev }
+            for (const [id, nd] of Object.entries(backfills)) {
+              const cur = next[id]
+              const hasRequired = (n?: NodeData) => !!n && n.endorsementCount !== undefined && n.tokenId !== undefined
+              if (!hasRequired(cur)) {
+                next[id] = cur ? { ...cur, ...nd, id: cur.id } : nd
+                changed = true
+              }
+            }
+            return changed ? next : prev
+          })
+        }
+        if (targets.length === 0) continue
         try {
-          const calls = slice.map(p => ({ target: contractAddress, callData: iface.encodeFunctionData('getVersionDetails', [p.h, p.v]) }))
+          const calls = targets.map(p => ({ target: contractAddress, callData: iface.encodeFunctionData('getVersionDetails', [p.h, p.v]) }))
           let returned: any[] = []
           if (multicall && useMulticall) {
             try { returned = await multicall.tryAggregate(false, calls) } catch (e) {
@@ -397,7 +494,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           const pendingNFTs: Array<{ id: string; tokenId: string }> = []
           returned.forEach((entry: any, idx: number) => {
             if (cancelled) return
-            const original = slice[idx]
+            const original = targets[idx]
             try {
               const success = Array.isArray(entry) ? entry[0] : entry.success
               const returnData = Array.isArray(entry) ? entry[1] : entry.returnData

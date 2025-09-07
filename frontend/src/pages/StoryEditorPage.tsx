@@ -21,7 +21,7 @@ export default function StoryEditorPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useTranslation()
-  const { contractAddress } = useConfig()
+  const { contractAddress, strictCacheOnly } = useConfig()
   const { getStoryData, setNodesData } = useTreeData()
 
   const prefetched = (location.state as PrefetchedState | undefined)?.prefetchedStory
@@ -44,6 +44,12 @@ export default function StoryEditorPage() {
     setError(null)
     try {
       const data = await getStoryData(validTokenId)
+      if (!data) {
+        setMeta(undefined)
+        setChunks(undefined)
+        setError(strictCacheOnly ? t('storyChunkEditor.offlineNoData', 'Offline mode: story not cached locally') : t('storyChunkEditor.loading', 'Loading...'))
+        return
+      }
       setMeta(data.metadata as StoryMetadata)
       setChunks(data.chunks as StoryChunk[])
     } catch (e: any) {
@@ -85,10 +91,14 @@ export default function StoryEditorPage() {
     }
     try {
       const data = await getStoryData(validTokenId)
+      if (!data) {
+        if (strictCacheOnly) setError(t('storyChunkEditor.offlineNoData', 'Offline mode: story not cached locally'))
+        return
+      }
       setMeta(data.metadata as StoryMetadata)
       setChunks(data.chunks as StoryChunk[])
     } catch {}
-  }, [validTokenId, getStoryData, setNodesData])
+  }, [validTokenId, getStoryData, setNodesData, strictCacheOnly, t])
 
   const onAddChunk = useCallback(async (data: StoryChunkCreateData) => {
     if (!contractAddress) throw new Error('Missing contract')

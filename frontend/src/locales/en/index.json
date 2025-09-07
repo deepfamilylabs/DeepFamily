@@ -465,7 +465,8 @@
       "confirm": "Confirm Seal"
     },
     "contentTooLongBytes": "Content must not exceed 1000 bytes",
-    "contentPlaceholderBytes": "Enter chunk content (max 1000 bytes ≈ 1000 ASCII or ~333 CJK chars)"
+    "contentPlaceholderBytes": "Enter chunk content (max 1000 bytes ≈ 1000 ASCII or ~333 CJK chars)",
+    "offlineNoData": "Offline mode: story not cached locally"
   },
   "person": {
     "encyclopedia": "Person Encyclopedia",
