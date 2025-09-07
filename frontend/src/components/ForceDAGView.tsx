@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import * as d3 from 'd3'
 import type { GraphNode } from '../types/graph'
-import { makeNodeId, nodeLabel, isMinted, formatHashMiddle } from '../types/graph'
+import { makeNodeId, nodeLabel, isMinted, shortHash } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
@@ -59,7 +59,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
     const width = (svgRef.current?.clientWidth || 800)
 
     // Ensure marker defs exist once
-    let defs = svg.select('defs')
+    let defs = svg.select<SVGDefsElement>('defs')
     if (defs.empty()) defs = svg.append('defs')
     const markerSel = defs.select('#fd-arrow')
     if (markerSel.empty()) {
@@ -108,9 +108,9 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       const id = sim.id
       const nd = nodesData?.[id]
       const mintedFlag = isMinted(nd)
-      const shortHash = formatHashMiddle(sim.hash)
+      const shortHashText = shortHash(sim.hash)
       const width = 60
-      gtxt.append('tspan').attr('x', 18).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(shortHash)
+      gtxt.append('tspan').attr('x', 18).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(shortHashText)
       gtxt.append('tspan').attr('x', 20 + width).attr('y', -3).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', mintedFlag ? '#059669' : '#6366f1').text(`v${sim.versionIndex}`)
       const nm = nd?.fullName
       if (nm) gtxt.append('tspan').attr('x', 18).attr('y', 12).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(nm)

@@ -1,6 +1,7 @@
 // Minimal React tree rendering demo for DeepFamily (migrated)
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import HashBadge from './HashBadge'
+import { shortHash } from '../types/graph'
 import { ethers } from 'ethers'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
@@ -339,7 +340,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
             <button onClick={(e)=>{ e.stopPropagation(); hasChildren && toggle(node) }} className={`mr-1 w-5 h-5 grid place-items-center rounded border text-[10px] ${hasChildren ? 'bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-slate-300' : 'border-transparent text-slate-400 dark:text-slate-500 cursor-default'}`}>{hasChildren ? (isOpen ? '−' : '+') : '·'}</button>
           </div>
           <div className="flex items-center gap-2 flex-wrap w-full">
-            <span className="text-slate-600 dark:text-slate-300">{node.personHash.replace(/0x([0-9a-fA-F]{4})[0-9a-fA-F]+/, '0x$1…')}</span>
+            <span className="text-slate-600 dark:text-slate-300">{shortHash(node.personHash)}</span>
             <span className="text-sky-600 dark:text-sky-400">v{node.versionIndex}</span>
             {endorse !== undefined && <span className="text-[10px] px-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700/40" title="Endorsements">{endorse}</span>}
             {mintedFlag && <span className="text-[10px] px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/40">NFT</span>}

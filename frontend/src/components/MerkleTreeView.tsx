@@ -6,7 +6,7 @@ import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import { useNodeData } from '../hooks/useNodeData'
-import { formatHashMiddle } from '../types/graph'
+import { shortHash } from '../types/graph'
 import { isMinted } from '../types/graph'
 import { useVisualizationHeight } from '../constants/layout'
 
@@ -114,7 +114,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
               const mintedFlag = isMinted(nd)
               const nameDisplay = (mintedFlag && nd?.fullName) ? truncateName(nd.fullName, w) : undefined
               const endorse = nd?.endorsementCount
-              const shortHash = formatHashMiddle(pn.data.personHash)
+              const shortHashText = shortHash(pn.data.personHash)
               const isSel = pn.id === selectedId
               const isHover = hoverId === pn.id
               const baseRect = mintedFlag
@@ -141,7 +141,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                     strokeWidth={mintedFlag || isSel ? 2 : 1}
                   />
                   <text ref={el => { textRefs.current[pn.id] = el }} className="font-mono">
-                    <tspan x={8} y={16} className={`text-[16px] ${mintedFlag ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-gray-900 dark:fill-gray-100'}`}>{shortHash}</tspan>
+                    <tspan x={8} y={16} className={`text-[16px] ${mintedFlag ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-gray-900 dark:fill-gray-100'}`}>{shortHashText}</tspan>
                     <tspan x={w - 8} y={16} textAnchor="end" className={`text-[16px] ${mintedFlag ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-700 dark:fill-slate-300'}`}>v{pn.data.versionIndex}</tspan>
                   </text>
                   <text className="font-mono">
