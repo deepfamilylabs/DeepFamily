@@ -140,6 +140,18 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
 
     try {
       const data = await getStoryData(person.tokenId)
+      // Handle offline mode with no cached data
+      if (!data) {
+        setStoryData({
+          chunks: [],
+          fullStory: '',
+          integrity: { missing: [], lengthMatch: true, hashMatch: null, computedLength: 0 },
+          loading: false,
+          integrityChecking: false,
+          error: t('storyChunksViewer.noStoryData', 'No story data available')
+        })
+        return
+      }
       
       // If there are chunks, show integrity checking status first
       if (data.chunks.length > 0) {
