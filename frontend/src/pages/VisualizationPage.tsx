@@ -4,9 +4,11 @@ import VisualizationConfigForm from '../components/VisualizationConfigForm'
 import ViewContainer from '../components/ViewContainer'
 import { useTreeData } from '../context/TreeDataContext'
 import { useVizOptions } from '../context/VizOptionsContext'
+import { useConfig } from '../context/ConfigContext'
 
 export default function VisualizationPage() {
   const { traversal, includeVersionDetails, setTraversal, setIncludeVersionDetails } = useVizOptions()
+  const { strictCacheOnly, update } = useConfig()
   const [viewMode, setViewMode] = useState<'dag' | 'tree' | 'force' | 'virtual'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('df:viewMode')
@@ -21,6 +23,7 @@ export default function VisualizationPage() {
   const SHOW_DEBUG = (import.meta as any).env.VITE_SHOW_DEBUG === '1'
 
   const triggerRefresh = useCallback(() => refresh(), [refresh])
+  useEffect(() => { triggerRefresh() }, [triggerRefresh])
 
   useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('df:viewMode', viewMode) }, [viewMode])
 
@@ -75,7 +78,18 @@ export default function VisualizationPage() {
           {/* Second Row: Contract Controls */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs overflow-visible">
             <div className="flex items-center gap-1.5 flex-shrink-0 overflow-visible">
-              <span className="text-xs text-slate-600 dark:text-slate-400 select-none font-medium">{t('visualization.ui.traversal')}</span>
+              <div className="inline-flex rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
+                <div className="relative group">
+                  <button type="button" aria-label={t('visualization.config.strictCacheOff')} onClick={() => update({ strictCacheOnly: false })} className={`px-1.5 py-0.5 text-[10px] transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l ${!strictCacheOnly ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{t('visualization.config.strictCacheOff')}</button>
+                  <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.config.strictCacheOff')}</div>
+                </div>
+                <div className="relative group border-l border-slate-300 dark:border-slate-600">
+                  <button type="button" aria-label={t('visualization.config.strictCacheOn')} onClick={() => update({ strictCacheOnly: true })} className={`px-1.5 py-0.5 text-[10px] transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r ${strictCacheOnly ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{t('visualization.config.strictCacheOn')}</button>
+                  <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.config.strictCacheOn')}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0 overflow-visible">
               <div className="inline-flex rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
                 <div className="relative group">
                   <button type="button" aria-label={t('visualization.ui.traversalDFS')} onClick={() => setTraversal('dfs')} className={`px-1.5 py-0.5 text-[10px] transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>

@@ -338,8 +338,8 @@
       "root": "根节点",
       "clearAndRefresh": "清空缓存并刷新",
       "strictCacheOnly": "严格只读缓存",
-      "strictCacheOn": "严格缓存：开",
-      "strictCacheOff": "严格缓存：关"
+      "strictCacheOn": "离线模式",
+      "strictCacheOff": "在线模式"
     },
     "ui": {
       "displaySettings": "数据选项",

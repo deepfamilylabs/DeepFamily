@@ -336,7 +336,10 @@
       "rpc": "RPC",
       "contract": "合約",
       "root": "根節點",
-      "clearAndRefresh": "清空並重新整理"
+      "clearAndRefresh": "清空並重新整理",
+      "strictCacheOnly": "嚴格只讀緩存",
+      "strictCacheOn": "離線模式",
+      "strictCacheOff": "線上模式"
     },
     "ui": {
       "displaySettings": "數據選項",

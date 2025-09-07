@@ -338,8 +338,8 @@
       "root": "Root",
       "clearAndRefresh": "Clear & Refresh",
       "strictCacheOnly": "Strict Cache Only",
-      "strictCacheOn": "Strict Cache: On",
-      "strictCacheOff": "Strict Cache: Off"
+      "strictCacheOn": "Offline Mode",
+      "strictCacheOff": "Online Mode"
     },
     "ui": {
       "displaySettings": "Data Options",

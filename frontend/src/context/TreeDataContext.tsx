@@ -62,7 +62,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const [contractMessage, setContractMessage] = useState('')
   const [refreshTick, setRefreshTick] = useState(0)
   const refresh = useCallback(() => setRefreshTick(t => t + 1), [])
-  useEffect(() => { refresh() }, [refresh])
+  // Remove auto-refresh from context; pages should call refresh() explicitly when needed
   const { errors, push } = useErrorMonitor()
   const stageLoggedRef = useRef<Set<string>>(new Set())
   const [loadOptionsSnapshot, setLoadOptionsSnapshot] = useState({ includeVersionDetails })
@@ -128,27 +128,43 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     persistNodesData(nodesData)
   }, [nodesData, persistNodesData])
 
-  // Load persisted root tree first (works for both strict and non-strict)
+  // Load persisted root tree first (scoped by rootHash+version). If no cache for current key, clear root to avoid stale display
   useEffect(() => {
     try {
       const raw = localStorage.getItem(vizRootKey)
       if (raw) {
         const obj = JSON.parse(raw) as GraphNode
-        setRoot(prev => prev || obj)
-      } else if (strictCacheOnly) {
-        // In strict mode with no cached root, ensure empty state
+        const matchesKey = (
+          typeof rootHash === 'string' && obj?.personHash && obj.personHash.toLowerCase() === rootHash.toLowerCase() &&
+          Number(obj?.versionIndex) === Number(rootVersionIndex)
+        )
+        if (matchesKey) {
+          setRoot(obj)
+        } else {
+          // Stale or mis-keyed cache -> remove and clear
+          try { localStorage.removeItem(vizRootKey) } catch {}
+          setRoot(null)
+        }
+      } else {
+        // No cache for this rootHash+version -> clear any previous root to prevent stale data
         setRoot(null)
       }
     } catch {
       /* ignore */
     }
-  }, [vizRootKey, strictCacheOnly])
+  }, [vizRootKey, rootHash, rootVersionIndex])
 
   // Persist root tree whenever it changes (non-null)
   useEffect(() => {
     if (!root) return
+    // Only persist when the in-memory root matches the current config (rootHash+version)
+    const matchesCurrentConfig = (
+      typeof rootHash === 'string' && rootHash.toLowerCase() === String(root.personHash || '').toLowerCase() &&
+      Number(rootVersionIndex) === Number(root.versionIndex)
+    )
+    if (!matchesCurrentConfig) return
     try { localStorage.setItem(vizRootKey, JSON.stringify(root)) } catch {}
-  }, [root, vizRootKey])
+  }, [root, vizRootKey, rootHash, rootVersionIndex])
 
   // Hydrate nodesData from localStorage snapshot for nodes present in current root (no network)
   useEffect(() => {
@@ -356,10 +372,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (strictCacheOnly) return
     if (!loadOptionsSnapshot.includeVersionDetails) return
     if (loading || !contract || !root) return
-    const endorseEnabledSnapshot = loadOptionsSnapshot.includeVersionDetails
     let cancelled = false
     ;(async () => {
-      if (!endorseEnabledSnapshot) return
       const BATCH = getRuntimeVisualizationConfig().ENDORSEMENT_STATS_BATCH
       const iface = new ethers.Interface((DeepFamily as any).abi)
       const multicallAddress = (import.meta as any).env.VITE_MULTICALL_ADDRESS
@@ -645,11 +659,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     }
     if (nodeId) {
       const nd = ndFromLookup || nodesDataRef.current[nodeId]
-      const fetchedAt = Number(nd?.storyFetchedAt || 0)
-      const isSealed = Boolean(nd?.storyMetadata?.isSealed)
-      const ttl = isSealed ? 7 * 24 * 60 * 60 * 1000 : 2 * 60 * 1000
-      const expired = !fetchedAt || (Date.now() - fetchedAt > ttl)
-      if (nd?.storyMetadata && Array.isArray(nd?.storyChunks) && (!expired || strictCacheOnly)) {
+      if (nd?.storyMetadata && Array.isArray(nd?.storyChunks)) {
         const sorted = [...nd.storyChunks].sort((a,b)=>a.chunkIndex-b.chunkIndex)
         const fullStory = sorted.map(c => c.content).join('')
         const encoder = new TextEncoder()
@@ -675,7 +685,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           integrity: { missing, lengthMatch: nd.storyMetadata ? (computedLength === nd.storyMetadata.totalLength) : true, hashMatch, computedLength, computedHash },
           metadata: nd.storyMetadata,
           loading: false,
-          fetchedAt
+          fetchedAt: Number(nd?.storyFetchedAt || 0)
         }
       }
     }
@@ -832,10 +842,9 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {}
+    if (strictCacheOnly) return null
     try {
-      if (strictCacheOnly) return null
       const owner = await contract.ownerOf(tokenId)
-      // Backfill owner into NodeData if any node matches this tokenId
       setNodesData(prev => {
         let foundId: string | undefined
         for (const [id, nd] of Object.entries(prev)) {
@@ -847,9 +856,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, [foundId]: { ...cur, owner } }
       })
       return owner
-    } catch {
-      return null
-    }
+    } catch { return null }
   }, [contract, strictCacheOnly])
 
   const value: TreeDataValue = {

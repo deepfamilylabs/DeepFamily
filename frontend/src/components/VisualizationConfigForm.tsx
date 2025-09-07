@@ -16,7 +16,7 @@ interface Props {
 
 export default function VisualizationConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly, update } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update } = useConfig()
   const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress)
@@ -91,14 +91,30 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
   }
 
   const getStatusBadge = () => {
-    // Contract status inference
+    let bgClass, borderClass, textClass, text
+    
     if (loading) {
-      return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-300/60 dark:from-amber-900/40 dark:to-orange-900/30 dark:text-amber-300 dark:border-amber-600/40 shadow-sm backdrop-blur-sm">{statusT ? statusT('visualization.status.badge.checking') : 'Loading'}</span>
+      bgClass = 'bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/30'
+      borderClass = 'border-amber-300/60 dark:border-amber-600/40'
+      textClass = 'text-amber-700 dark:text-amber-300'
+      text = statusT ? statusT('visualization.status.badge.checking') : 'Loading'
+    } else if (contractMessage) {
+      bgClass = 'bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-900/40 dark:to-rose-900/30'
+      borderClass = 'border-red-300/60 dark:border-red-600/40'
+      textClass = 'text-red-700 dark:text-red-300'
+      text = contractMessage
+    } else {
+      bgClass = 'bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/40 dark:to-green-900/30'
+      borderClass = 'border-emerald-300/60 dark:border-emerald-600/40'
+      textClass = 'text-emerald-700 dark:text-emerald-300'
+      text = statusT ? statusT('visualization.status.badge.ok') : 'OK'
     }
-    if (contractMessage) {
-      return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-300/60 dark:from-red-900/40 dark:to-rose-900/30 dark:text-red-300 dark:border-red-600/40 shadow-sm backdrop-blur-sm">{contractMessage}</span>
-    }
-    return <span className="inline-flex items-center px-2 py-1 rounded-md border text-xs font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-300/60 dark:from-emerald-900/40 dark:to-green-900/30 dark:text-emerald-300 dark:border-emerald-600/40 shadow-sm backdrop-blur-sm">{statusT ? statusT('visualization.status.badge.ok') : 'OK'}</span>
+
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-full border text-xs font-semibold shadow-sm backdrop-blur-sm ${bgClass} ${borderClass} ${textClass}`}>
+        {text}
+      </span>
+    )
   }
 
   return (
@@ -132,40 +148,30 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
         </div>
         
         {/* Status Badge and Refresh Button Row */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {getStatusBadge()}
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs"
+              className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs whitespace-nowrap"
               disabled={loading}
               title={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
               aria-label={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
             >
-              <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300 flex-shrink-0`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
                 <polyline points="1 20 1 14 7 14" />
                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
               </svg>
-              <span>{statusT ? statusT('visualization.actions.refresh') : 'Refresh'}</span>
+              <span className="truncate">{statusT ? statusT('visualization.actions.refresh') : 'Refresh'}</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => { clearAllCaches(); onRefresh?.() }}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/30 shadow-sm flex-shrink-0"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-300 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
           >
-            {t('visualization.config.clearAndRefresh', 'Clear Cache and Refresh')}
-          </button>
-          <button
-            type="button"
-            onClick={() => update({ strictCacheOnly: !strictCacheOnly })}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 flex-shrink-0 ${strictCacheOnly ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30' : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
-            title={t('visualization.config.strictCacheOnly', 'Strict Cache Only')}
-            aria-pressed={strictCacheOnly}
-            aria-label={t('visualization.config.strictCacheOnly', 'Strict Cache Only')}
-          >
-            {strictCacheOnly ? t('visualization.config.strictCacheOn', 'Strict Cache: On') : t('visualization.config.strictCacheOff', 'Strict Cache: Off')}
+            <span className="truncate">{t('visualization.config.clearAndRefresh', 'Clear Cache and Refresh')}</span>
           </button>
         </div>
       </div>
