@@ -911,6 +911,29 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   }, [getStoryData])
 
 
+  // Derive progress from cached/memory root for fast-path refreshes (no streaming)
+  useEffect(() => {
+    if (!root) return
+    if (loading) return
+    setProgress(prev => {
+      if (prev && prev.created > 0 && prev.depth > 0) return prev
+      // compute node count and max depth from current root
+      let count = 0
+      let maxDepth = 0
+      const stack: Array<{ node: GraphNode; depth: number }> = [{ node: root, depth: 1 }]
+      while (stack.length) {
+        const { node, depth } = stack.pop() as { node: GraphNode; depth: number }
+        count++
+        if (depth > maxDepth) maxDepth = depth
+        if (node.children && node.children.length) {
+          for (const c of node.children) stack.push({ node: c, depth: depth + 1 })
+        }
+      }
+      return { created: count, visited: count, depth: maxDepth }
+    })
+  }, [refreshTick, root, loading])
+
+
   // Cached ownerOf lookup
   const getOwnerOf = useCallback(async (tokenId: string): Promise<string | null> => {
     if (!contract) return null
