@@ -56,6 +56,29 @@ export default function NodeDetailModal({
   const navigate = useNavigate()
   const { getOwnerOf } = useTreeData()
   const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner)
+  const [isDesktop, setIsDesktop] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return window.matchMedia('(min-width: 640px)').matches
+  })
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mql = window.matchMedia('(min-width: 640px)')
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) => setIsDesktop((e as MediaQueryListEvent).matches ?? (e as MediaQueryList).matches)
+    try {
+      mql.addEventListener('change', onChange as any)
+    } catch {
+      // Safari
+      ;(mql as any).addListener(onChange)
+    }
+    onChange(mql as any)
+    return () => {
+      try {
+        mql.removeEventListener('change', onChange as any)
+      } catch {
+        ;(mql as any).removeListener(onChange)
+      }
+    }
+  }, [])
   const handleClose = React.useCallback(() => {
     closedBySelfRef.current = true
     onClose()
@@ -128,7 +151,7 @@ export default function NodeDetailModal({
     <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
       <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate whitespace-nowrap overflow-hidden text-ellipsis font-medium" title={typeof label === 'string' ? label : undefined}>{label}</div>
       <div className="flex items-start gap-1 min-w-0">
-        <div className="font-mono break-all min-w-0 text-[11px] text-gray-800 dark:text-gray-200 leading-snug">{value}</div>
+        <div className="font-mono break-all min-w-0 text-[12px] text-gray-800 dark:text-gray-200 leading-snug">{value}</div>
         {copy ? (
           <button aria-label={t('search.copy')} onClick={() => onCopy(copy)} className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]">
             <Clipboard size={14} />
@@ -137,6 +160,75 @@ export default function NodeDetailModal({
       </div>
     </div>
   )
+  const SmartHash: React.FC<{ text?: string | null }> = ({ text }) => {
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    const measureRef = React.useRef<HTMLSpanElement | null>(null)
+    const [useAbbrev, setUseAbbrev] = React.useState<boolean>(() => !isDesktop)
+    const fullText = text ?? ''
+    React.useEffect(() => {
+      if (!text) { setUseAbbrev(false); return }
+      if (!isDesktop) { setUseAbbrev(true); return }
+      const container = containerRef.current
+      const measure = measureRef.current
+      if (!container || !measure) return
+      const available = container.clientWidth
+      const needed = measure.scrollWidth
+      setUseAbbrev(needed > available + 1)
+    }, [fullText, isDesktop])
+    React.useEffect(() => {
+      if (!isDesktop) return
+      const onResize = () => {
+        const container = containerRef.current
+        const measure = measureRef.current
+        if (!container || !measure) return
+        setUseAbbrev(measure.scrollWidth > container.clientWidth + 1)
+      }
+      window.addEventListener('resize', onResize)
+      return () => window.removeEventListener('resize', onResize)
+    }, [isDesktop])
+    if (!text) return <span>-</span>
+    return (
+      <div ref={containerRef} className="relative min-w-0">
+        <span className="block whitespace-nowrap break-normal overflow-hidden text-ellipsis">{useAbbrev ? formatHashMiddle(text) : text}</span>
+        <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap break-normal">{text}</span>
+      </div>
+    )
+  }
+
+  const SmartAddress: React.FC<{ text?: string | null }> = ({ text }) => {
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    const measureRef = React.useRef<HTMLSpanElement | null>(null)
+    const [useAbbrev, setUseAbbrev] = React.useState<boolean>(() => !isDesktop)
+    const fullText = text ?? ''
+    React.useEffect(() => {
+      if (!text) { setUseAbbrev(false); return }
+      if (!isDesktop) { setUseAbbrev(true); return }
+      const container = containerRef.current
+      const measure = measureRef.current
+      if (!container || !measure) return
+      const available = container.clientWidth
+      const needed = measure.scrollWidth
+      setUseAbbrev(needed > available + 1)
+    }, [fullText, isDesktop])
+    React.useEffect(() => {
+      if (!isDesktop) return
+      const onResize = () => {
+        const container = containerRef.current
+        const measure = measureRef.current
+        if (!container || !measure) return
+        setUseAbbrev(measure.scrollWidth > container.clientWidth + 1)
+      }
+      window.addEventListener('resize', onResize)
+      return () => window.removeEventListener('resize', onResize)
+    }, [isDesktop])
+    if (!text) return <span>-</span>
+    return (
+      <div ref={containerRef} className="relative min-w-0">
+        <span className="block whitespace-nowrap overflow-hidden text-ellipsis">{useAbbrev ? shortAddress(text) : text}</span>
+        <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap">{text}</span>
+      </div>
+    )
+  }
   const onCopy = async (text: string) => {
     const ok = await copyText(text)
     setCenterHint(ok ? t('search.copied') : t('search.copyFailed'))
@@ -190,14 +282,14 @@ export default function NodeDetailModal({
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>
           </div>
         )}
-        <div className="px-4 pb-24 pt-2 overflow-y-auto scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)' }}>
+        <div className="flex-1 min-h-0 px-4 pb-24 pt-2 overflow-y-auto overscroll-contain scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)' }}>
           <div className="space-y-1.5">
-            <Row label={t('visualization.nodeDetail.hash')} value={formatHashMiddle(nodeData?.personHash || fallback.hash)} copy={nodeData?.personHash || fallback.hash} />
+            <Row label={t('visualization.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} />
             <Row label={t('visualization.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
             <Row label={t('visualization.nodeDetail.endorsementCount')} value={nodeData?.endorsementCount ?? '-'} />
-            <Row label={t('visualization.nodeDetail.father')} value={nodeData?.fatherHash || '-'} copy={nodeData?.fatherHash} />
+            <Row label={t('visualization.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} />
             <Row label={t('visualization.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
-            <Row label={t('visualization.nodeDetail.mother')} value={nodeData?.motherHash || '-'} copy={nodeData?.motherHash} />
+            <Row label={t('visualization.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} />
             <Row label={t('visualization.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
             <Row label={t('visualization.nodeDetail.addedBy')} value={shortAddress(nodeData?.addedBy) || '-'} copy={nodeData?.addedBy} />
             <Row label={t('visualization.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
@@ -241,7 +333,7 @@ export default function NodeDetailModal({
                       <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
                         <button
                           onClick={() => {
-                            const url = `/person/${nodeData.tokenId}`
+                            const url = `/person/${nodeData?.tokenId}`
                             window.open(url, '_blank')
                           }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline flex items-center gap-1"
@@ -264,7 +356,7 @@ export default function NodeDetailModal({
                   </div>
                 )}
                 {isMinted(nodeData) && (
-                  <Row label={t('person.owner', 'Owner Address')} value={shortAddress(owner) || '-'} copy={owner} />
+                  <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} />
                 )}
                 {nodeData?.nftTokenURI && <Row label={t('visualization.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
               </>

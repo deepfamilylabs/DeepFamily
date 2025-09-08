@@ -164,7 +164,7 @@ export function formatHashMiddle(val?: string, prefix = 10, suffix = 8): string 
   return val
 }
 
-export function shortAddress(addr?: string, prefix = 6, suffix = 4): string {
+export function shortAddress(addr?: string, prefix = 8, suffix = 6): string {
   if (!addr) return ''
   const s = addr
   if (s.length <= prefix + suffix + 2) return s

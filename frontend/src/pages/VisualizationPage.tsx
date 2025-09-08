@@ -101,7 +101,7 @@ export default function VisualizationPage() {
                 </div>
               </div>
             </div>
-            <div className="relative group flex items-center gap-1 cursor-pointer select-none flex-shrink-0 ml-2">
+            <div className="relative group flex items-center gap-1 cursor-pointer select-none flex-shrink-0">
               <input type="checkbox" id="includeVersionDetailsToggle" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 cursor-pointer bg-white dark:bg-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 text-blue-600 dark:text-blue-400" checked={includeVersionDetails} onChange={e => setIncludeVersionDetails(e.target.checked)} aria-describedby="includeVersionDetailsHint" />
               <label htmlFor="includeVersionDetailsToggle" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer font-medium">{t('visualization.ui.includeVersionDetails')}</label>
               <div id="includeVersionDetailsHint" className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('visualization.ui.includeVersionDetailsDesc')}</div>

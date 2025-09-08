@@ -71,6 +71,28 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
   const [owner, setOwner] = useState<string | undefined>(person.owner)
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return window.matchMedia('(min-width: 640px)').matches
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mql = window.matchMedia('(min-width: 640px)')
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) => setIsDesktop((e as MediaQueryListEvent).matches ?? (e as MediaQueryList).matches)
+    try {
+      mql.addEventListener('change', onChange as any)
+    } catch {
+      ;(mql as any).addListener(onChange)
+    }
+    onChange(mql as any)
+    return () => {
+      try {
+        mql.removeEventListener('change', onChange as any)
+      } catch {
+        ;(mql as any).removeListener(onChange)
+      }
+    }
+  }, [])
 
   const personHasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
 
@@ -129,6 +151,76 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
       return false
     }
   }, [t])
+
+  const SmartHash: React.FC<{ text?: string | null }> = ({ text }) => {
+    const containerRef = useRef<HTMLDivElement | null>(null)
+    const measureRef = useRef<HTMLSpanElement | null>(null)
+    const [useAbbrev, setUseAbbrev] = useState<boolean>(() => !isDesktop)
+    const fullText = text ?? ''
+    useEffect(() => {
+      if (!text) { setUseAbbrev(false); return }
+      if (!isDesktop) { setUseAbbrev(true); return }
+      const container = containerRef.current
+      const measure = measureRef.current
+      if (!container || !measure) return
+      const available = container.clientWidth
+      const needed = measure.scrollWidth
+      setUseAbbrev(needed > available + 1)
+    }, [fullText, isDesktop])
+    useEffect(() => {
+      if (!isDesktop) return
+      const onResize = () => {
+        const container = containerRef.current
+        const measure = measureRef.current
+        if (!container || !measure) return
+        setUseAbbrev(measure.scrollWidth > container.clientWidth + 1)
+      }
+      window.addEventListener('resize', onResize)
+      return () => window.removeEventListener('resize', onResize)
+    }, [isDesktop])
+    if (!text) return <span>-</span>
+    return (
+      <div ref={containerRef} className="relative min-w-0" title={text}>
+        <span className="block whitespace-nowrap overflow-hidden text-ellipsis">{useAbbrev ? formatHashMiddle(text) : text}</span>
+        <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap">{text}</span>
+      </div>
+    )
+  }
+
+  const SmartAddress: React.FC<{ text?: string | null }> = ({ text }) => {
+    const containerRef = useRef<HTMLDivElement | null>(null)
+    const measureRef = useRef<HTMLSpanElement | null>(null)
+    const [useAbbrev, setUseAbbrev] = useState<boolean>(() => !isDesktop)
+    const fullText = text ?? ''
+    useEffect(() => {
+      if (!text) { setUseAbbrev(false); return }
+      if (!isDesktop) { setUseAbbrev(true); return }
+      const container = containerRef.current
+      const measure = measureRef.current
+      if (!container || !measure) return
+      const available = container.clientWidth
+      const needed = measure.scrollWidth
+      setUseAbbrev(needed > available + 1)
+    }, [fullText, isDesktop])
+    useEffect(() => {
+      if (!isDesktop) return
+      const onResize = () => {
+        const container = containerRef.current
+        const measure = measureRef.current
+        if (!container || !measure) return
+        setUseAbbrev(measure.scrollWidth > container.clientWidth + 1)
+      }
+      window.addEventListener('resize', onResize)
+      return () => window.removeEventListener('resize', onResize)
+    }, [isDesktop])
+    if (!text) return <span>-</span>
+    return (
+      <div ref={containerRef} className="relative min-w-0" title={text}>
+        <span className="block whitespace-nowrap overflow-hidden text-ellipsis">{useAbbrev ? shortAddress(text) : text}</span>
+        <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap">{text}</span>
+      </div>
+    )
+  }
 
   // Fetch story data using TreeDataContext
   const fetchStoryData = useCallback(async () => {
@@ -465,8 +557,8 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all">
-                          {formatHashMiddle(person.personHash)}
+                        <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all min-w-0">
+                          <SmartHash text={person.personHash} />
                         </div>
                         <button
                           onClick={() => copyText(person.personHash)}
@@ -487,8 +579,8 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         {t('person.owner', 'Owner Address')}
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all">
-                          {shortAddress(owner) || '-'}
+                        <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all min-w-0">
+                          <SmartAddress text={owner} />
                         </div>
                         {owner && (
                           <button
