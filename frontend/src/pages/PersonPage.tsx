@@ -159,7 +159,7 @@ export default function PersonPage() {
     }
   }, [location.search, tokenId, data, navigate])
 
-  // If we navigated here with prefetched story data (from StoryChunksViewer), hydrate immediately
+  // If we navigated here with prefetched story data (from StoryChunksModal), hydrate immediately
   useEffect(() => {
     if (!tokenId) return
     if (!prefetched) return

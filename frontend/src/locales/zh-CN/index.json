@@ -552,7 +552,7 @@
     "chunks": "{{count}} 个分片",
     "viewDetails": "查看"
   },
-  "storyChunksViewer": {
+  "storyChunksModal": {
     "fetchError": "加载传记数据失败",
     "viewDetail": "查看详情",
     "born": "出生",

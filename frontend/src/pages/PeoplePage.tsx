@@ -5,7 +5,7 @@ import { Search, Users, Book, Grid, List as ListIcon, User, Hash, X } from 'luci
 import { NodeData, isMinted } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
-import StoryChunksViewer from '../components/StoryChunksViewer'
+import StoryChunksModal from '../components/StoryChunksModal'
 import PageContainer from '../components/PageContainer'
 import SortButton from '../components/SortButton'
 
@@ -526,7 +526,7 @@ export default function PeoplePage() {
 
       {/* Story Chunks Viewer Modal */}
       {selectedPerson && (
-        <StoryChunksViewer
+        <StoryChunksModal
           person={selectedPerson}
           isOpen={!!selectedPerson}
           onClose={closePerson}

@@ -552,7 +552,7 @@
     "chunks": "{{count}} chunks",
     "viewDetails": "View"
   },
-  "storyChunksViewer": {
+  "storyChunksModal": {
     "fetchError": "Failed to load story data",
     "viewDetail": "View Details",
     "born": "Born",

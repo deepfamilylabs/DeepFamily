@@ -24,7 +24,7 @@ import { NodeData, StoryChunk, hasDetailedStory as hasDetailedStoryFn, birthDate
 import { useTreeData } from '../context/TreeDataContext'
 // owner/address will be resolved via TreeDataContext caching
 
-interface StoryChunksViewerProps {
+interface StoryChunksModalProps {
   person: NodeData
   isOpen: boolean
   onClose: () => void
@@ -47,7 +47,7 @@ interface StoryData {
 
 // Removed computeStoryIntegrity function as it's now handled in TreeDataContext
 
-export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChunksViewerProps) {
+export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunksModalProps) {
   const { t } = useTranslation()
   const { getStoryData, getOwnerOf } = useTreeData()
   const nameContainerRef = useRef<HTMLDivElement | null>(null)
@@ -240,7 +240,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
           integrity: { missing: [], lengthMatch: true, hashMatch: null, computedLength: 0 },
           loading: false,
           integrityChecking: false,
-          error: t('storyChunksViewer.noStoryData', 'No story data available')
+          error: t('storyChunksModal.noStoryData', 'No story data available')
         })
         return
       }
@@ -272,7 +272,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
         ...prev,
         loading: false,
         integrityChecking: false,
-        error: err.message || t('storyChunksViewer.fetchError', 'Failed to load story data')
+        error: err.message || t('storyChunksModal.fetchError', 'Failed to load story data')
       }))
     }
   }, [person.tokenId, getStoryData, t])
@@ -351,7 +351,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
   useEffect(() => { if (isOpen) { requestAnimationFrame(() => setEntered(true)) } else { setEntered(false) } }, [isOpen])
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={onClose} style={{ touchAction: 'pan-y' }}>
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-3 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div
@@ -424,7 +424,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                           className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap flex-shrink-0"
                         >
                           <Book className="w-3.5 h-3.5" />
-                          {t('storyChunksViewer.peopleEncyclopedia', 'People Encyclopedia')}
+                          {t('storyChunksModal.peopleEncyclopedia', 'People Encyclopedia')}
                         </button>
                       </div>
                     )}
@@ -450,7 +450,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
             </div>
           </div>
           {/* Content */}
-          <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden" style={{ touchAction: 'pan-y' }}>
             <div className="p-4 sm:p-6 pb-24 sm:pb-6">{/* extra bottom space for safe touch area */}
               {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50/70 dark:bg-gray-800/30 rounded-2xl">
@@ -459,7 +459,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <Calendar className="w-5 h-5 text-green-500" />
                     <div>
                       <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                        {t('storyChunksViewer.born', 'Born')}
+                        {t('storyChunksModal.born', 'Born')}
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
                         {[formatDate.birth, person.birthPlace].filter(Boolean).join(' · ')}
@@ -473,7 +473,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <Calendar className="w-5 h-5 text-gray-500" />
                     <div>
                       <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                        {t('storyChunksViewer.died', 'Died')}
+                        {t('storyChunksModal.died', 'Died')}
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
                         {[formatDate.death, person.deathPlace].filter(Boolean).join(' · ')}
@@ -488,10 +488,10 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <Layers className="w-5 h-5 text-blue-500" />
                     <div>
                       <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                        {t('storyChunksViewer.storyInfo', 'Biography')}
+                        {t('storyChunksModal.storyInfo', 'Biography')}
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
-                        {t('storyChunksViewer.chunksCount', '{{count}} chunks, {{length}} bytes', {
+                        {t('storyChunksModal.chunksCount', '{{count}} chunks, {{length}} bytes', {
                           count: chunksCount,
                           length: lengthBytes
                         })}
@@ -505,7 +505,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <Hash className="w-5 h-5 text-emerald-500" />
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                        {t('storyChunksViewer.tag', 'Tag')}
+                        {t('storyChunksModal.tag', 'Tag')}
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-xs text-gray-600 dark:text-gray-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full">
@@ -549,7 +549,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <Hash className="w-5 h-5 text-purple-500" />
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                        {t('storyChunksViewer.personHash', 'Person Hash')}
+                        {t('storyChunksModal.personHash', 'Person Hash')}
                         {person.versionIndex && (
                           <span className="ml-2 text-[10px] font-mono text-gray-500 dark:text-gray-400">
                             v{person.versionIndex}
@@ -603,7 +603,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   <div className="mb-6">
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
                       <FileText className="w-5 h-5 text-blue-600" />
-                      {t('storyChunksViewer.basicStory', 'Basic Story')}
+                      {t('storyChunksModal.basicStory', 'Basic Story')}
                     </h3>
                     <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
                       <p className="text-xs leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
@@ -618,7 +618,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                       <Book className="w-5 h-5 text-blue-600" />
-                      {t('storyChunksViewer.detailedStory', 'Detailed Story')}
+                      {t('storyChunksModal.detailedStory', 'Detailed Story')}
                     </h3>
                     
                     <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
@@ -631,7 +631,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         }`}
                       >
                         <Layers className="w-4 h-4 inline mr-1" />
-                        {t('storyChunksViewer.chunks', 'Chunks')}
+                        {t('storyChunksModal.chunks', 'Chunks')}
                       </button>
                       <button
                         onClick={() => setViewMode('full')}
@@ -642,7 +642,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         }`}
                       >
                         <FileText className="w-4 h-4 inline mr-1" />
-                        {t('storyChunksViewer.fullText', 'Full Text')}
+                        {t('storyChunksModal.fullText', 'Full Text')}
                       </button>
                     </div>
                   </div>
@@ -680,23 +680,23 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                         storyData.integrityChecking ? (
                           <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-[10px] sm:text-xs font-medium bg-transparent">
                             <div className="animate-spin w-3 h-3 border border-blue-600 border-t-transparent rounded-full mr-2"></div>
-                            {t('storyChunksViewer.integrityChecking', 'Checking integrity...')}
+                            {t('storyChunksModal.integrityChecking', 'Checking integrity...')}
                           </span>
                         ) : storyData.integrity && (
                           integrityOk ? (
                             <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-green-500/70 dark:border-green-400/60 text-green-600 dark:text-green-300 text-[10px] sm:text-xs font-medium bg-transparent">
-                              {t('storyChunksViewer.integrityVerified', 'Integrity verified')}
+                              {t('storyChunksModal.integrityVerified', 'Integrity verified')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-3 py-1.5 rounded-full border border-amber-500/70 dark:border-amber-400/60 text-amber-600 dark:text-amber-300 text-[10px] sm:text-xs font-medium bg-transparent">
-                              {t('storyChunksViewer.integrityWarning', 'Integrity verification failed')}
+                              {t('storyChunksModal.integrityWarning', 'Integrity verification failed')}
                             </span>
                           )
                         )
                       )}
                     </div>
                     <div className="mb-2 text-[10px] text-gray-600 dark:text-gray-400">
-                      {t('storyChunksViewer.chunksCount', '{{count}} chunks, {{length}} bytes', {
+                      {t('storyChunksModal.chunksCount', '{{count}} chunks, {{length}} bytes', {
                         count: chunksCount,
                         length: lengthBytes
                       })}
@@ -707,7 +707,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <div className="flex items-center justify-center py-12">
                       <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                       <span className="ml-3 text-sm text-gray-600 dark:text-gray-400">
-                        {t('storyChunksViewer.loading', 'Loading story chunks...')}
+                        {t('storyChunksModal.loading', 'Loading story chunks...')}
                       </span>
                     </div>
                   ) : storyData.error ? (
@@ -734,10 +734,10 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="font-medium text-gray-900 dark:text-gray-100">
-                                    {t('storyChunksViewer.chunkTitle', 'Chunk #{{index}}', { index: chunk.chunkIndex })}
+                                    {t('storyChunksModal.chunkTitle', 'Chunk #{{index}}', { index: chunk.chunkIndex })}
                                   </span>
                                   <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                    {chunk.content.length} {t('storyChunksViewer.characters', 'characters')}
+                                    {chunk.content.length} {t('storyChunksModal.characters', 'characters')}
                                   </span>
                                 </div>
                                 
@@ -773,7 +773,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                     <div className="text-center py-12">
                       <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {t('storyChunksViewer.noStoryData', 'No story data available')}
+                        {t('storyChunksModal.noStoryData', 'No story data available')}
                       </p>
                     </div>
                   )}
@@ -784,7 +784,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                   <div className="text-center py-12">
                     <Book className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {t('storyChunksViewer.noStory', 'No story content available')}
+                      {t('storyChunksModal.noStory', 'No story content available')}
                     </p>
                   </div>
                 )}
