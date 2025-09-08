@@ -339,7 +339,8 @@
       "clearAndRefresh": "清空缓存并刷新",
       "strictCacheOnly": "严格只读缓存",
       "strictCacheOn": "离线模式",
-      "strictCacheOff": "在线模式"
+      "strictCacheOff": "在线模式",
+      "rootHistory": "根哈希历史"
     },
     "ui": {
       "displaySettings": "数据选项",
@@ -373,7 +374,9 @@
       "rateLimited": "已达到每日请求上限，请稍后再试"
     },
     "actions": {
-      "refresh": "刷新"
+      "refresh": "刷新",
+      "remove": "移除",
+      "clearAll": "清空历史"
     },
     "nodeDetail": {
       "title": "节点详情",

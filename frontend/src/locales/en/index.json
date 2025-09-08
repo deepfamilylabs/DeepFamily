@@ -339,7 +339,8 @@
       "clearAndRefresh": "Clear & Refresh",
       "strictCacheOnly": "Strict Cache Only",
       "strictCacheOn": "Offline Mode",
-      "strictCacheOff": "Online Mode"
+      "strictCacheOff": "Online Mode",
+      "rootHistory": "Root hash history"
     },
     "ui": {
       "displaySettings": "Data Options",
@@ -373,7 +374,9 @@
       "rateLimited": "RPC rate limit exceeded. Please try again later."
     },
     "actions": {
-      "refresh": "Refresh"
+      "refresh": "Refresh",
+      "remove": "Remove",
+      "clearAll": "Clear all"
     },
     "nodeDetail": {
       "title": "Node Detail",

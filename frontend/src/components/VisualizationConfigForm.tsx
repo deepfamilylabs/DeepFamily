@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useConfig } from '../context/ConfigContext'
 import { useDebounce } from '../hooks/useDebounce'
+import { formatHashMiddle, shortAddress } from '../types/graph'
+import { Clipboard } from 'lucide-react'
 import { useTreeData } from '../context/TreeDataContext'
+import { useToast } from '../components/ToastProvider'
 
 interface Props {
   editing: boolean
@@ -16,13 +19,34 @@ interface Props {
 
 export default function VisualizationConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory } = useConfig()
   const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress)
   const [localRootHash, setLocalRootHash] = useState(rootHash)
   const [localVersion, setLocalVersion] = useState(rootVersionIndex)
   const [errors, setErrors] = useState<{ rpc?: string; contract?: string; root?: string }>({})
+  const toast = useToast()
+  const copy = async (text: string) => {
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text)
+        try { toast.show(t('search.copied')) } catch {}
+        return
+      }
+    } catch {}
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.focus(); ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      try { toast.show(t('search.copied')) } catch {}
+    } catch {}
+  }
 
   // sync external changes
   useEffect(() => {
@@ -31,6 +55,11 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
     setLocalRootHash(rootHash)
     setLocalVersion(rootVersionIndex)
   }, [rpcUrl, contractAddress, rootHash, rootVersionIndex])
+
+  // load history when entering edit mode
+  useEffect(() => { /* history now from global context; nothing to do here */ }, [editing])
+
+  // responsive-only: small screens show shortened text; larger screens show full text
 
   const hasDiff = (
     localRpcUrl !== rpcUrl ||
@@ -192,6 +221,39 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
             <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('visualization.config.root')}:</label>
             <input type="text" value={localRootHash} onChange={e => setLocalRootHash(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
             {errors.root && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.root, 'Root Hash format error')}</div>}
+            {rootHistory.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  {t('visualization.config.rootHistory', 'Root hash history')}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {rootHistory.map(h => (
+                    <div key={h} className="inline-flex items-center gap-1 max-w-full">
+                      <button
+                        type="button"
+                        onClick={() => setLocalRootHash(h)}
+                        className="px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-600 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 hover:border-emerald-500 dark:hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors duration-150 font-mono text-[11px] shadow-sm truncate max-w-[240px]"
+                        title={h}
+                      >{formatHashMiddle(h)}</button>
+                      <button
+                        type="button"
+                        aria-label={t('visualization.actions.remove', 'Remove')}
+                        className="w-4 h-4 inline-flex items-center justify-center rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors duration-150"
+                        onClick={() => removeRootFromHistory(h)}
+                        title={t('visualization.actions.remove', 'Remove') as string}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={clearRootHistory}
+                    className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 underline"
+                  >{t('visualization.actions.clearAll', 'Clear all')}</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -202,7 +264,24 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.contract')}:</span>
-            <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={contractAddress}>{contractAddress}</span>
+            <div className="flex-1 min-w-0">
+              <div className="inline-flex items-center gap-1 max-w-full">
+                <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={contractAddress}>
+                  <span className="inline sm:hidden">{shortAddress(contractAddress)}</span>
+                  <span className="hidden sm:inline">{contractAddress}</span>
+                </span>
+                {contractAddress && (
+                  <button
+                    onClick={() => copy(contractAddress)}
+                    aria-label={t('search.copy', 'Copy')}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    title={t('search.copy', 'Copy') as string}
+                  >
+                    <Clipboard size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -211,7 +290,24 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.root')}:</span>
-          <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rootHash}>{rootHash}</span>
+          <div className="flex-1 min-w-0">
+            <div className="inline-flex items-center gap-1 max-w-full">
+              <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
+                <span className="inline sm:hidden">{formatHashMiddle(rootHash)}</span>
+                <span className="hidden sm:inline">{rootHash}</span>
+              </span>
+              {rootHash && (
+                <button
+                  onClick={() => copy(rootHash)}
+                  aria-label={t('search.copy', 'Copy')}
+                  className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  title={t('search.copy', 'Copy') as string}
+                >
+                  <Clipboard size={14} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.ui.versionNumber')}:</span>

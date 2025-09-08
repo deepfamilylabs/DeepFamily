@@ -576,7 +576,7 @@ export default function StoryChunksViewer({ person, isOpen, onClose }: StoryChun
                                 }
                                 navigate(`/editor/${person.tokenId}`, { state: { prefetchedStory: prefetched } })
                               }}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs font-medium transition-colors"
+                              className="inline-flex items-center px-3 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-medium transition-colors"
                             >
                               <Edit2 className="w-3.5 h-3.5 mr-1" />
                               {t('person.editable', 'Editable')}

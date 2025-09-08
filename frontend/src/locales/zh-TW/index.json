@@ -339,7 +339,8 @@
       "clearAndRefresh": "清空並重新整理",
       "strictCacheOnly": "嚴格只讀緩存",
       "strictCacheOn": "離線模式",
-      "strictCacheOff": "線上模式"
+      "strictCacheOff": "線上模式",
+      "rootHistory": "根雜湊歷史"
     },
     "ui": {
       "displaySettings": "數據選項",
@@ -373,7 +374,9 @@
       "rateLimited": "已達到每日請求上限，請稍後再試"
     },
     "actions": {
-      "refresh": "重新整理"
+      "refresh": "重新整理",
+      "remove": "移除",
+      "clearAll": "清空歷史"
     },
     "nodeDetail": {
       "title": "節點詳情",
