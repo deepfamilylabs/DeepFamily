@@ -30,7 +30,7 @@ export default function ViewContainer({ viewMode, root, contractMessage, loading
     <Suspense fallback={<LoadingSkeleton />}> {
       hasRoot ? (
         viewMode === 'force' ? <ForceDAGView root={root as GraphNode} />
-        : viewMode === 'dag' ? <FlexibleDAGView root={root as GraphNode} nodeWidth={100} nodeHeight={44} />
+        : viewMode === 'dag' ? <FlexibleDAGView root={root as GraphNode} />
         : viewMode === 'tree' ? <MerkleTreeView root={root as GraphNode} />
         : <VirtualizedContractTree root={root as GraphNode} height={responsiveHeight} rowHeight={LAYOUT.ROW_HEIGHT} />
       ) : (

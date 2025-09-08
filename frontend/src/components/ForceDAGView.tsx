@@ -98,7 +98,20 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
         return isMinted(nodesData?.[id]) ? 2 : (id === selectedId ? 2 : 1)
       }).attr('opacity', 0.95)
 
-    node.filter((d: any) => Boolean(isMinted(nodesData?.[(d as SimNode).id]))).append('circle').attr('r', 3).attr('cx', NODE_R - 6).attr('cy', -(NODE_R - 6)).attr('fill', '#10b981').attr('stroke', '#ffffff').attr('stroke-width', 1)
+    const isDark = document.documentElement.classList.contains('dark')
+    const strokeColor = isDark ? '#0f172a' : '#ffffff'
+    node.append('circle')
+      .attr('r', 4)
+      .attr('cx', NODE_R - 6)
+      .attr('cy', -(NODE_R - 6))
+      .attr('fill', (d: any) => {
+        const id = (d as SimNode).id
+        const nd = nodesData?.[id]
+        const g = nd?.gender as number | undefined
+        return g === 1 ? '#0ea5e9' : (g === 2 ? '#f43f5e' : (g === 3 ? '#8b5cf6' : '#94a3b8'))
+      })
+      .attr('stroke', strokeColor)
+      .attr('stroke-width', 1)
 
     node.append('title').text((d: any) => (d as SimNode).hash)
     const lbl = node.append('text').attr('class', 'font-mono').attr('fill', '#0f172a')

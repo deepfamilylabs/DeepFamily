@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 import type { GraphNode } from '../types/graph'
 import { makeNodeId, nodeLabel, isMinted, shortHash } from '../types/graph'
+import { birthDateString } from '../types/graph'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
+import NodeCard from './NodeCard'
 import { useNodeData } from '../hooks/useNodeData'
 import { useVisualizationHeight } from '../constants/layout'
 
@@ -12,8 +14,8 @@ export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
 
 function FlexibleDAGViewInner({
   root,
-  nodeWidth = 120,
-  nodeHeight = 44,
+  nodeWidth = 200,
+  nodeHeight = 120,
 }: {
   root: GraphNode
   nodeWidth?: number
@@ -44,8 +46,8 @@ function FlexibleDAGViewInner({
     let maxDepth = 0
     nodes.forEach(n => { const arr = levels.get(n.depth) || []; arr.push(n); levels.set(n.depth, arr); if (n.depth > maxDepth) maxDepth = n.depth })
     const margin = { left: 24, top: 24, right: 24, bottom: 24 }
-    const gapX = nodeWidth + 96
-    const gapY = nodeHeight + 20
+    const gapX = nodeWidth + 220
+    const gapY = nodeHeight + 12
     const width = margin.left + margin.right + (maxDepth + 1) * gapX
     const maxPerLevel = Math.max(...Array.from(levels.values()).map(a => a.length)) || 1
     const height = margin.top + margin.bottom + maxPerLevel * gapY
@@ -58,11 +60,15 @@ function FlexibleDAGViewInner({
 
   const textRefs = useRef<Record<string, SVGTextElement | null>>({})
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
+  const MAX_NODE_WIDTH = 168
   useLayoutEffect(() => {
     const next: Record<string, number> = {}
     for (const id of Object.keys(textRefs.current)) {
       const el = textRefs.current[id]
-      if (el && typeof el.getComputedTextLength === 'function') next[id] = Math.max(nodeWidth, Math.ceil(el.getComputedTextLength()) + 16)
+      if (el && typeof el.getComputedTextLength === 'function') {
+        const computed = Math.ceil(el.getComputedTextLength()) + 16
+        next[id] = Math.max(nodeWidth, Math.min(MAX_NODE_WIDTH, computed))
+      }
     }
     if (Object.keys(next).length) setMeasuredWidths(next)
   }, [nodes, nodeWidth])
@@ -171,31 +177,25 @@ function FlexibleDAGViewInner({
                  onClick={() => openNode({ personHash: n.hash, versionIndex: n.versionIndex})}
                  className="cursor-pointer">
                 <title>{n.hash}</title>
-                <rect
-                  width={w}
-                  height={nodeHeight}
-                  rx="8"
-                  ry="8"
-                  className={`${mintedFlag
-                    ? 'fill-emerald-100 dark:fill-emerald-900/30 stroke-emerald-300 dark:stroke-emerald-400'
-                    : isSelected
-                      ? 'fill-amber-100 dark:fill-amber-900/30 stroke-amber-400 dark:stroke-amber-400/70'
-                      : 'fill-gray-50 dark:fill-transparent stroke-green-600 dark:stroke-green-500'} shadow-sm transition-colors`}
-                  strokeWidth={mintedFlag || isSelected ? 2 : 1}
+                {/* Hidden text for width measurement, consistent with MerkleTreeView */}
+                <text ref={el => { textRefs.current[n.id] = el }} opacity={0} className="font-mono pointer-events-none select-none">
+                  <tspan x={8} y={14}>{(mintedFlag && nd?.fullName) ? nd.fullName : hashShort}</tspan>
+                </text>
+                <NodeCard
+                  w={w}
+                  h={nodeHeight}
+                  minted={mintedFlag}
+                  selected={isSelected}
+                  hover={Boolean(hover && hover.id === n.id)}
+                  versionText={`v${n.versionIndex}`}
+                  titleText={(mintedFlag && nd?.fullName) ? nd.fullName : hashShort}
+                  tagText={nd?.tag}
+                  gender={nd?.gender}
+                  birthPlace={nd?.birthPlace}
+                  birthDateText={mintedFlag ? birthDateString(nd) : undefined}
+                  shortHashText={hashShort}
+                  endorsementCount={endorse}
                 />
-                {mintedFlag ? (
-                  <circle cx={w - 6} cy={6} r={3} className="fill-emerald-500 stroke-white dark:stroke-gray-900" strokeWidth={1} />
-                ) : null}
-                <text ref={el => { textRefs.current[n.id] = el }} className="font-mono">
-                  <tspan x={8} y={16} className={`text-[16px] ${mintedFlag ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-gray-900 dark:fill-gray-100'}`}>{hashShort}</tspan>
-                  <tspan x={w - 8} y={16} textAnchor="end" className={`text-[16px] ${mintedFlag ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-700 dark:fill-slate-300'}`}>v{n.versionIndex}</tspan>
-                </text>
-                <text className="font-mono">
-                  {nameDisplay && (
-                    <tspan x={8} y={nodeHeight - 6} className={`text-[16px] ${mintedFlag ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-800 dark:fill-slate-200'}`}>{nameDisplay}</tspan>
-                  )}
-                  <tspan x={w - 8} y={nodeHeight - 6} textAnchor="end" className={`text-[16px] ${mintedFlag ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-700 dark:fill-slate-300'}`}>{endorse !== undefined ? endorse : ''}</tspan>
-                </text>
               </g>
             )
           })}

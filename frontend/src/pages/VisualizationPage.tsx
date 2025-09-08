@@ -14,7 +14,7 @@ export default function VisualizationPage() {
       const saved = localStorage.getItem('df:viewMode')
       if (saved === 'dag' || saved === 'tree' || saved === 'force' || saved === 'virtual') return saved as any
     }
-    return 'dag'
+    return 'tree'
   })
   const [editingConfig, setEditingConfig] = useState(false)
 

@@ -309,6 +309,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
     const name = nodesData?.[cacheKey]?.fullName
     const endorse = nodesData?.[cacheKey]?.endorsementCount
     const mintedFlag = isMinted(nodesData?.[cacheKey])
+    const gender = nodesData?.[cacheKey]?.gender as number | undefined
     const isSel = selectedKey === k
     const ancestorGuides: boolean[] = []
     if (depth > 0) {
@@ -342,8 +343,29 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
           <div className="flex items-center gap-2 flex-wrap w-full">
             <span className="text-slate-600 dark:text-slate-300">{shortHash(node.personHash)}</span>
             <span className="text-sky-600 dark:text-sky-400">v{node.versionIndex}</span>
-            {endorse !== undefined && <span className="text-[10px] px-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700/40" title="Endorsements">{endorse}</span>}
-            {mintedFlag && <span className="text-[10px] px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/40">NFT</span>}
+            {endorse !== undefined && (
+              <span className="inline-flex items-center gap-1" title="Endorsements">
+                <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" className="flex-shrink-0">
+                  <path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15l-5.2 2.8 1-5.9-4.3-4.2 5.9-.9L10 1.5z" className={mintedFlag ? 'fill-emerald-500' : 'fill-slate-500'} />
+                </svg>
+                <span className={`font-mono text-[12px] ${mintedFlag ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}`}>{endorse}</span>
+              </span>
+            )}
+            {mintedFlag && (
+              <>
+                <span className="text-[10px] px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/40">NFT</span>
+                {(() => {
+                  const genderDotClass = gender === 1
+                    ? 'bg-sky-500'
+                    : gender === 2
+                      ? 'bg-rose-500'
+                      : gender === 3
+                        ? 'bg-violet-500'
+                        : 'bg-slate-400'
+                  return <span className={`ml-1 inline-block w-2 h-2 rounded-full ${genderDotClass} ring-1 ring-white dark:ring-slate-900`} />
+                })()}
+              </>
+            )}
             {name && <span className="text-slate-700 dark:text-slate-200 text-[12px] truncate max-w-[180px]" title={name}>{name}</span>}
             {node.tag && <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/40 px-1 rounded" title={node.tag}>{node.tag}</span>}
           </div>

@@ -5,19 +5,54 @@ import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
+import NodeCard from './NodeCard'
 import { useNodeData } from '../hooks/useNodeData'
 import { shortHash } from '../types/graph'
 import { isMinted } from '../types/graph'
+import { birthDateString } from '../types/graph'
 import { useVisualizationHeight } from '../constants/layout'
 
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
 
-const BASE_NODE_WIDTH = 100
-const NODE_HEIGHT = 44
-const GAP_X = 16
-const GAP_Y = 96
+const BASE_NODE_WIDTH = 112
+const MAX_NODE_WIDTH = 168
+const NODE_HEIGHT = 160
+const GAP_X = 24
+const GAP_Y = 220
 const MARGIN_X = 24
 const MARGIN_Y = 0
+const PADDING_X = 12
+const TITLE_START_Y = 26
+const TITLE_LINE_H = 18
+const DIVIDER_GAP = 10
+const BODY_GAP = 12
+const BODY_LINE_H = 16
+const BODY_LINE_GAP = 4
+const FOOTER_BADGE_H = 16
+const FOOTER_PADDING = 12
+const SMALL_CHAR_W = 7
+const COL_GAP = 10
+const STAR_OUTER_R = 9
+const STAR_INNER_R = 4.5
+const TAG_BADGE_H = 16
+const TAG_GAP = 8
+const GENDER_DOT_R = 4
+const GENDER_DOT_GAP = 4
+
+function buildStarPath(cx: number, cy: number, spikes = 5, outerR = STAR_OUTER_R, innerR = STAR_INNER_R): string {
+  const step = Math.PI / spikes
+  let rot = -Math.PI / 2
+  let path = ''
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = (i % 2 === 0) ? outerR : innerR
+    const x = cx + Math.cos(rot) * r
+    const y = cy + Math.sin(rot) * r
+    path += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`)
+    rot += step
+  }
+  path += ' Z'
+  return path
+}
 
 type PositionedNode = { id: string; data: GraphNode; depth: number; x: number; y: number }
 
@@ -56,8 +91,10 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   const idToPos = useMemo(() => { const m = new Map<string, PositionedNode>(); for (const pn of positioned) m.set(pn.id, pn); return m }, [positioned])
   const textRefs = useRef<Record<string, SVGTextElement | null>>({})
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
-  useLayoutEffect(() => { const next: Record<string, number> = {}; for (const id of Object.keys(textRefs.current)) { const el = textRefs.current[id]; if (el?.getComputedTextLength) next[id] = Math.max(BASE_NODE_WIDTH, Math.ceil(el.getComputedTextLength()) + 16) } if (Object.keys(next).length) setMeasuredWidths(next) }, [positioned])
-  const truncateName = useCallback((name: string, width: number) => { if (!name) return ''; const charW = 8; const maxChars = Math.max(0, Math.floor((width - 16) / charW)); if (name.length <= maxChars) return name; if (maxChars <= 1) return '…'; return name.slice(0, maxChars - 1) + '…' }, [])
+  useLayoutEffect(() => { const next: Record<string, number> = {}; for (const id of Object.keys(textRefs.current)) { const el = textRefs.current[id]; if (el?.getComputedTextLength) { const computed = Math.ceil(el.getComputedTextLength()) + 16; next[id] = Math.max(BASE_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, computed)) } } if (Object.keys(next).length) setMeasuredWidths(next) }, [positioned])
+  const wrapNameTwoLines = useCallback((name: string, width: number): string[] => { if (!name) return []; const charW = 8; const pad = 16; const maxPerLine = Math.max(3, Math.floor((width - pad) / charW)); if (name.length <= maxPerLine) return [name]; const first = name.slice(0, maxPerLine); const remain = name.slice(maxPerLine); if (remain.length <= maxPerLine - 1) return [first, remain]; const second = remain.slice(0, Math.max(0, maxPerLine - 1)) + '…'; return [first, second] }, [])
+  const truncateByWidth = useCallback((text: string, maxPx: number, charW = SMALL_CHAR_W) => { if (!text) return ''; const maxChars = Math.max(0, Math.floor(maxPx / charW)); if (text.length <= maxChars) return text; if (maxChars <= 1) return '…'; return text.slice(0, maxChars - 1) + '…' }, [])
+  const truncateNoEllipsisByWidth = useCallback((text: string, maxPx: number, charW = SMALL_CHAR_W) => { if (!text) return ''; const maxChars = Math.max(0, Math.floor(maxPx / charW)); return text.slice(0, maxChars) }, [])
   const [hoverId, setHoverId] = useState<string | null>(null)
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
@@ -90,6 +127,13 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
       <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
       <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(svgWidth, 800)} ${Math.max(svgHeight, responsiveHeight)}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}>
+        <defs>
+          <linearGradient id="cardGlossGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+            <stop offset="30%" stopColor="#ffffff" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
         <g ref={innerRef as any}>
           <g className="stroke-blue-300/70 dark:stroke-blue-500/60" strokeWidth={2} fill="none">
             {positioned.map(pn => (pn.data.children || []).map(child => {
@@ -112,17 +156,16 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
               const w = measuredWidths[pn.id] || BASE_NODE_WIDTH
               const nd = useNodeData(pn.id)
               const mintedFlag = isMinted(nd)
-              const nameDisplay = (mintedFlag && nd?.fullName) ? truncateName(nd.fullName, w) : undefined
-              const endorse = nd?.endorsementCount
               const shortHashText = shortHash(pn.data.personHash)
+              const nameTextRaw = (mintedFlag && nd?.fullName) ? nd.fullName : shortHashText
+              const nameDisplaySingle = truncateNoEllipsisByWidth(nameTextRaw || '', Math.max(0, w - PADDING_X * 2), 8)
+              const nameLines = nameDisplaySingle ? [nameDisplaySingle] : []
+              const endorse = nd?.endorsementCount
               const isSel = pn.id === selectedId
               const isHover = hoverId === pn.id
-              const baseRect = mintedFlag
-                ? 'fill-emerald-100 dark:fill-emerald-900/30 stroke-emerald-300 dark:stroke-emerald-400'
-                : isSel
-                  ? 'fill-amber-100 dark:fill-amber-900/30 stroke-amber-400 dark:stroke-amber-400/70'
-                  : 'fill-gray-50 dark:fill-transparent stroke-green-600 dark:stroke-green-500'
-              const hoverStroke = (!mintedFlag && !isSel && isHover) ? 'stroke-blue-500 dark:stroke-blue-400' : ''
+              const versionText = `v${pn.data.versionIndex}`
+              const tagTextRaw = nd?.tag || ''
+              const tagText = truncateNoEllipsisByWidth(tagTextRaw, Math.max(0, w - PADDING_X * 2))
               return (
                 <g key={pn.id}
                    transform={`translate(${pn.x}, ${pn.y})`}
@@ -132,25 +175,12 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                    onDoubleClick={() => navigator.clipboard?.writeText(pn.data.personHash).catch(() => {})}
                 >
                   <title>{pn.data.personHash}</title>
-                  <rect
-                    width={w}
-                    height={NODE_HEIGHT}
-                    rx={8}
-                    ry={8}
-                    className={`${baseRect} ${hoverStroke} shadow-sm transition-colors`}
-                    strokeWidth={mintedFlag || isSel ? 2 : 1}
-                  />
-                  <text ref={el => { textRefs.current[pn.id] = el }} className="font-mono">
-                    <tspan x={8} y={16} className={`text-[16px] ${mintedFlag ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-gray-900 dark:fill-gray-100'}`}>{shortHashText}</tspan>
-                    <tspan x={w - 8} y={16} textAnchor="end" className={`text-[16px] ${mintedFlag ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-700 dark:fill-slate-300'}`}>v{pn.data.versionIndex}</tspan>
+                  {/* Hidden text for width measurement with maximum width constraint */}
+                  <text ref={el => { textRefs.current[pn.id] = el }} opacity={0} className="font-mono pointer-events-none select-none">
+                    <tspan x={8} y={14}>{(mintedFlag && nd?.fullName) ? nd.fullName : shortHashText}</tspan>
                   </text>
-                  <text className="font-mono">
-                    {nameDisplay && (
-                      <tspan x={8} y={NODE_HEIGHT - 6} className={`text-[16px] ${mintedFlag ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-800 dark:fill-slate-200'}`}>{nameDisplay}</tspan>
-                    )}
-                    <tspan x={w - 8} y={NODE_HEIGHT - 6} textAnchor="end" className={`text-[16px] ${mintedFlag ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-700 dark:fill-slate-300'}`}>{endorse !== undefined ? endorse : ''}</tspan>
-                  </text>
-                  {mintedFlag ? (<circle cx={w - 6} cy={6} r={3} className="fill-emerald-500 stroke-white dark:stroke-gray-900" strokeWidth={1} />) : null}
+
+                  <NodeCard w={w} h={NODE_HEIGHT} minted={mintedFlag} selected={isSel} hover={isHover} versionText={versionText} titleText={nameDisplaySingle} tagText={tagText} gender={nd?.gender} birthPlace={nd?.birthPlace} birthDateText={mintedFlag ? birthDateString(nd) : undefined} shortHashText={shortHashText} endorsementCount={endorse} />
                 </g>
               )
             })}
