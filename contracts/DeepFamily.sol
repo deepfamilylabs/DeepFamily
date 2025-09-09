@@ -232,7 +232,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   uint256 public constant MAX_STORY_CHUNKS = 100;
 
   // Each keccak256 hash is split into 4 64-bit limbs (big-endian: limb0 = highest 64bit)
-  uint256 private constant _LIMBS_PER_HASH = 4;
   uint256 private constant _HASH_LIMBS_REQUIRED = 16; // 4 hashes * 4 limbs
 
   /// @dev DeepFamily token contract address (immutable)
@@ -610,7 +609,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * 4..7   => nameHash limbs
    * 8..11  => fatherHash limbs
    * 12..15 => motherHash limbs
-   * Note: If parent is unknown, corresponding 4 limbs are all 0. Future extensions added after index 16.
+   * 16    => submitter address (uint160 in lower 160 bits)
+   * Note: If parent is unknown, corresponding 4 limbs are all 0.
    */
   function addPersonZK(
     uint256[2] calldata a,
@@ -622,32 +622,39 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string calldata tag,
     string calldata metadataCID
   ) external {
-    // Requires at least 16 limbs (4 hashes)
-    if (publicSignals.length < _HASH_LIMBS_REQUIRED) revert InvalidZKProof();
-    // Basic limb range validation (<2^64)
-    for (uint256 i = 0; i < _HASH_LIMBS_REQUIRED; i++) {
-      if (publicSignals[i] >> 64 != 0) revert InvalidZKProof();
+    // 16 limbs (4 hashes) + 1 submitter
+    if (publicSignals.length != _HASH_LIMBS_REQUIRED + 1) revert InvalidZKProof();
+
+    // cheap check: all limbs < 2^64 (avoid burning verify gas first)
+    unchecked {
+      for (uint256 i = 0; i < _HASH_LIMBS_REQUIRED; ++i) {
+        if (publicSignals[i] >> 64 != 0) revert InvalidZKProof();
+      }
     }
-    // Verify proof
-    bool ok = IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals);
-    if (!ok) revert InvalidZKProof();
-    // Reassemble hashes
-    bytes32 personHash = _packHashFromLimbs(publicSignals, 0);
-    bytes32 nameHash = _packHashFromLimbs(publicSignals, 4);
-    bytes32 fatherHash = _packHashFromLimbs(publicSignals, 8);
-    bytes32 motherHash = _packHashFromLimbs(publicSignals, 12);
-    // Write version
+
+    // submitter binding: prevent same-chain frontrunning
+    uint256 submitter = publicSignals[_HASH_LIMBS_REQUIRED];
+    if (submitter >> 160 != 0) revert InvalidZKProof();
+    if (submitter != uint256(uint160(msg.sender))) revert InvalidZKProof();
+
+    // verify ZK proof
+    if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals)) {
+      revert InvalidZKProof();
+    }
+
+    // business write (internal should check: personHash uniqueness, parent/mother version index matches hash, optional length limit)
     _addPersonInternal(
-      personHash,
-      nameHash,
-      fatherHash,
-      motherHash,
+      _packHashFromLimbs(publicSignals, 0), // personHash: limbs 0..3
+      _packHashFromLimbs(publicSignals, 4), // nameHash: limbs 4..7
+      _packHashFromLimbs(publicSignals, 8), // fatherHash: limbs 8..11
+      _packHashFromLimbs(publicSignals, 12), // motherHash: limbs 12..15
       fatherVersionIndex,
       motherVersionIndex,
       tag,
       metadataCID
     );
-    emit PersonHashZKVerified(personHash, msg.sender);
+
+    emit PersonHashZKVerified(_packHashFromLimbs(publicSignals, 0), msg.sender);
   }
 
   /**
