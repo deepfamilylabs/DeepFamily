@@ -1,5 +1,5 @@
 <svg
-  viewBox="0 0 32 32"
+  viewBox="0 0 64 64"
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
 >
@@ -14,15 +14,15 @@
   <rect 
     x="0" 
     y="0" 
-    width="32" 
-    height="32" 
-    rx="4" 
-    ry="4" 
+    width="64" 
+    height="64" 
+    rx="8" 
+    ry="8" 
     fill="url(#bgGradient)"
   />
   
-  <!-- Logo icon centered and scaled down -->
-  <g transform="translate(14, 16) scale(0.8) translate(-16, -16)">
+  <!-- Logo icon centered and scaled appropriately -->
+  <g transform="translate(28, 32) scale(1.6) translate(-16, -16)">
     <g
       fill="white"
       stroke="white"
