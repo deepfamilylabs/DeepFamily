@@ -231,9 +231,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Maximum number of story chunks per NFT
   uint256 public constant MAX_STORY_CHUNKS = 100;
 
-  // Each keccak256 hash is split into 4 64-bit limbs (big-endian: limb0 = highest 64bit)
-  // After optimization: public signals only include personHash(4 limbs) + nameHash(4 limbs)
-  uint256 private constant _HASH_LIMBS_REQUIRED = 8; // 2 hashes * 4 limbs
+  // Public signals include 4 hashes × 2 limbs (each limb 128-bit): person/name/father/mother
+  uint256 private constant _HASH_LIMBS_REQUIRED = 8; // 4 hashes * 2 limbs
 
   /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
@@ -427,21 +426,18 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Core Functionality Functions ==========
 
   /**
-   * @dev Reassembles 4 64-bit limbs starting from 'start' in publicSignals into bytes32 (big-endian concatenation).
+   * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into bytes32 (big-endian: hi128|lo128).
    */
-  function _packHashFromLimbs(
+  function _packHashFromTwo128(
     uint256[] calldata signals,
     uint256 start
   ) internal pure returns (bytes32 h) {
     unchecked {
-      uint256 l0 = signals[start];
-      uint256 l1 = signals[start + 1];
-      uint256 l2 = signals[start + 2];
-      uint256 l3 = signals[start + 3];
-      // Ensure each limb < 2^64
-      if ((l0 >> 64) != 0 || (l1 >> 64) != 0 || (l2 >> 64) != 0 || (l3 >> 64) != 0)
-        revert InvalidZKProof();
-      uint256 v = (l0 << 192) | (l1 << 128) | (l2 << 64) | l3; // Big-endian concatenation
+      uint256 hi = signals[start];
+      uint256 lo = signals[start + 1];
+      // Ensure each limb < 2^128
+      if ((hi >> 128) != 0 || (lo >> 128) != 0) revert InvalidZKProof();
+      uint256 v = (hi << 128) | lo; // Big-endian concatenation
       h = bytes32(v);
     }
   }
@@ -605,31 +601,30 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /**
    * @dev Zero-knowledge proof based addition entry point (limb version):
-   * publicSignals mapping (fixed order, all are 64-bit limbs, big-endian concatenation):
-   * 0..3   => personHash limbs (high -> low)
-   * 4..7   => nameHash limbs
-   * 8      => submitter address (uint160 in lower 160 bits)
-   * Parents' hashes are now provided as calldata parameters instead of public signals.
+   * publicSignals mapping (fixed order, all are 128-bit limbs, big-endian concatenation hi|lo):
+   * 0..1 => personHash limbs (hi -> lo)
+   * 2..3 => nameHash limbs (hi -> lo)
+   * 4..5 => fatherHash limbs (hi -> lo)
+   * 6..7 => motherHash limbs (hi -> lo)
+   * 8    => submitter address (uint160 in lower 160 bits)
    */
   function addPersonZK(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
     uint256[] calldata publicSignals,
-    bytes32 fatherHash,
-    bytes32 motherHash,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
     string calldata tag,
     string calldata metadataCID
   ) external {
-    // 8 limbs (2 hashes) + 1 submitter
+    // 8 limbs (4 hashes × 2 limbs) + 1 submitter
     if (publicSignals.length != _HASH_LIMBS_REQUIRED + 1) revert InvalidZKProof();
 
-    // cheap check: all limbs < 2^64 (avoid burning verify gas first)
+    // cheap check: all limbs < 2^128 (avoid burning verify gas first)
     unchecked {
       for (uint256 i = 0; i < _HASH_LIMBS_REQUIRED; ++i) {
-        if (publicSignals[i] >> 64 != 0) revert InvalidZKProof();
+        if (publicSignals[i] >> 128 != 0) revert InvalidZKProof();
       }
     }
 
@@ -645,17 +640,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
     // business write (internal should check: personHash uniqueness, parent/mother version index matches hash, optional length limit)
     _addPersonInternal(
-      _packHashFromLimbs(publicSignals, 0), // personHash: limbs 0..3
-      _packHashFromLimbs(publicSignals, 4), // nameHash: limbs 4..7
-      fatherHash,
-      motherHash,
+      _packHashFromTwo128(publicSignals, 0), // personHash: limbs 0..1
+      _packHashFromTwo128(publicSignals, 2), // nameHash: limbs 2..3
+      _packHashFromTwo128(publicSignals, 4), // fatherHash: limbs 4..5
+      _packHashFromTwo128(publicSignals, 6), // motherHash: limbs 6..7
       fatherVersionIndex,
       motherVersionIndex,
       tag,
       metadataCID
     );
 
-    emit PersonHashZKVerified(_packHashFromLimbs(publicSignals, 0), msg.sender);
+    emit PersonHashZKVerified(_packHashFromTwo128(publicSignals, 0), msg.sender);
   }
 
   /**
