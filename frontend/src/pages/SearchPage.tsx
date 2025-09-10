@@ -85,11 +85,6 @@ const ThemedSelect: React.FC<{
   )
 }
 
-const nameQuerySchema = z.object({
-  fullName: z.string().min(1).refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
-  pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-})
-type NameQueryForm = z.infer<typeof nameQuerySchema>
 
 const endorsementStatsSchema = z.object({
   personHash: z.string().min(1).regex(/^0x[a-fA-F0-9]{64}$/),
@@ -154,12 +149,6 @@ function computePersonHashLocal(input: HashForm): string {
 export default function SearchPage() {
   const { t } = useTranslation()
   const createSchemas = () => ({
-    nameQuery: z.object({
-      fullName: z.string()
-        .min(1, t('search.validation.nameRequired'))
-        .refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
-      pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-    }),
     endorsementStats: z.object({
       personHash: z.string().min(1, t('search.validation.hashRequired')).regex(/^0x[a-fA-F0-9]{64}$/, t('search.validation.hashInvalid')),
       pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
@@ -197,12 +186,6 @@ export default function SearchPage() {
   const { rpcUrl, contractAddress } = useConfig()
   const toast = useToast()
   
-  const [offset, setOffset] = useState<number>(0)
-  const [loading, setLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string | null>(null)
-  const [rows, setRows] = useState<string[]>([])
-  const [total, setTotal] = useState<number>(0)
-  const [hasMore, setHasMore] = useState<boolean>(false)
   
   const [endorsementOffset, setEndorsementOffset] = useState<number>(0)
   const [endorsementLoading, setEndorsementLoading] = useState<boolean>(false)
@@ -243,7 +226,6 @@ export default function SearchPage() {
 
   const [openSections, setOpenSections] = useState({
     hash: true,
-    name: false,
     versions: false,
     endorsement: false,
     children: false,
@@ -252,10 +234,6 @@ export default function SearchPage() {
   })
   const toggle = (k: keyof typeof openSections) => setOpenSections(s => ({ ...s, [k]: !s[k] }))
 
-  const { register: reg1, handleSubmit: hs1, formState: { errors: e1 }, watch: w1 } = useForm<NameQueryForm>({
-    resolver: zodResolver(schemas.nameQuery),
-    defaultValues: { fullName: '', pageSize: DEFAULT_PAGE_SIZE },
-  })
   const { register: reg2, handleSubmit: hs2, formState: { errors: e2 }, setValue: set2, watch: w2 } = useForm({
     resolver: zodResolver(schemas.hashForm),
     defaultValues: { fullName: '', isBirthBC: false, birthYear: '', birthMonth: '', birthDay: '', gender: 0 },
@@ -281,46 +259,12 @@ export default function SearchPage() {
     defaultValues: { parentHash: '', parentVersionIndex: 0, pageSize: DEFAULT_PAGE_SIZE },
   })
 
-  const pageSize = useMemo(() => Number(w1('pageSize') || DEFAULT_PAGE_SIZE), [w1])
   const endorsementPageSize = useMemo(() => Number(w3('pageSize') || DEFAULT_PAGE_SIZE), [w3])
   const uriPageSize = useMemo(() => Number(w4('pageSize') || DEFAULT_PAGE_SIZE), [w4])
   const versionsPageSize = useMemo(() => Number(w5('pageSize') || DEFAULT_PAGE_SIZE), [w5])
   const storyChunksPageSize = useMemo(() => Number(w6('pageSize') || DEFAULT_PAGE_SIZE), [w6])
   const childrenPageSize = useMemo(() => Number(w7('pageSize') || DEFAULT_PAGE_SIZE), [w7])
 
-  const onQuery = async (data: NameQueryForm, startOffset?: number) => {
-    setLoading(true); setError(null)
-    try {
-      const provider = makeProvider(rpcUrl)
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
-      const off = (startOffset !== undefined) ? startOffset : offset
-      const out = await contract.listPersonHashesByFullName(data.fullName, off, data.pageSize)
-      const personHashes: string[] = Array.from(out?.[0] || [])
-      const totalCount: number = Number(out?.[1] || 0)
-      const more: boolean = Boolean(out?.[2])
-      const nextOffset: number = Number(out?.[3] || 0)
-      setRows(personHashes)
-      setTotal(totalCount)
-      setHasMore(more)
-      setOffset(nextOffset)
-    } catch (e: any) {
-      setError(e?.message || t('search.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const onResetQuery = () => {
-    setRows([]); setTotal(0); setHasMore(false); setOffset(0); setError(null)
-  }
-
-  const onNext = async () => {
-    await onQuery({ fullName: w1('fullName') || '', pageSize })
-  }
-  const onPrev = async () => {
-    const prev = Math.max(0, offset - pageSize * 2)
-    await onQuery({ fullName: w1('fullName') || '', pageSize }, prev)
-  }
 
   const onQueryEndorsementStats = async (data: EndorsementStatsForm, startOffset?: number) => {
     setEndorsementLoading(true); setEndorsementError(null)
@@ -641,75 +585,6 @@ export default function SearchPage() {
           </div>
         </form>
         <p className="text-xs text-gray-500 dark:text-gray-500">{t('search.hashCalculator.description')}</p>
-          </div>
-        )}
-      </div>
-      {/* Name Query Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div className="bg-blue-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('name')}>
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.nameQuery.title')}</h3>
-          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('name') }} aria-expanded={openSections.name}>{openSections.name ? '-' : '+'}</button>
-        </div>
-        {openSections.name && (
-          <div className="p-2 space-y-2">
-        <form onSubmit={hs1((d) => onQuery(d, 0))} className="flex flex-wrap gap-2 items-center">
-          <div className="basis-full sm:basis-[360px] md:basis-[420px] grow-0 shrink-0">
-            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.fullName')}</label>
-            <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.nameQuery.placeholder')}
-              {...reg1('fullName')} />
-            <FieldError message={e1.fullName?.message as any} />
-          </div>
-          <div className="basis-auto">
-            <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.nameQuery.pageSize')}</label>
-            <input type="number" className="w-20 sm:w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" {...reg1('pageSize', { valueAsNumber: true })} />
-            <FieldError message={e1.pageSize?.message as any} />
-          </div>
-          <div className="flex gap-2 items-center self-center">
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled={loading}>{t('search.query')}</button>
-            <button type="button" onClick={onResetQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
-          </div>
-        </form>
-        <div className="text-xs text-gray-600 dark:text-gray-400">{t('search.totalResults')}: {total}</div>
-        <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
-          {rows.length === 0 ? (
-            <div className="p-2 text-sm text-gray-500 dark:text-gray-400">{t('search.noData')}</div>
-          ) : rows.map((h, i) => (
-            <div key={i} className="p-2 flex items-center gap-1 overflow-hidden">
-              <HashInline value={h} className="font-mono text-sm text-gray-800 dark:text-gray-200" />
-              <button
-                className="whitespace-nowrap text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                onClick={async () => {
-                  try {
-                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                      await navigator.clipboard.writeText(h)
-                      toast.show(t('search.copied'))
-                      return
-                    }
-                  } catch {}
-                  try {
-                    const ta = document.createElement('textarea')
-                    ta.value = h
-                    ta.style.position = 'fixed'
-                    ta.style.left = '-9999px'
-                    document.body.appendChild(ta)
-                    ta.focus(); ta.select()
-                    const ok = document.execCommand('copy')
-                    document.body.removeChild(ta)
-                    toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                  } catch {
-                    toast.show(t('search.copyFailed'))
-                  }
-                }}
-              >{t('search.copy')}</button>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={onPrev} disabled={loading || offset === 0} className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">{t('search.prev')}</button>
-          <button onClick={onNext} disabled={loading || !hasMore} className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">{t('search.next')}</button>
-          <div className="text-xs text-gray-500 dark:text-gray-500">{t('search.offset')}: {offset}</div>
-        </div>
-        {error && <div className="text-sm text-red-600 dark:text-red-400">{error}</div>}
           </div>
         )}
       </div>

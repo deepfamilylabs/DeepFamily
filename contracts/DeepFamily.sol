@@ -208,11 +208,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Person hash => version index => endorsement count, reflects version credibility
   mapping(bytes32 => mapping(uint256 => uint256)) public versionEndorsementCount;
 
-  /// @dev Full name hash => person hash array, used to find persons by name
-  mapping(bytes32 => bytes32[]) public nameToPersonHashes;
-
-  /// @dev Full name hash => person hash => whether indexed, prevents duplicate additions in array
-  mapping(bytes32 => mapping(bytes32 => bool)) public personHashIndexed;
+  // Name indexing removed for privacy
 
   /// @dev (parent person hash, parent version index) => children version reference array
   mapping(bytes32 => mapping(uint256 => ChildRef[])) public childrenOf;
@@ -231,8 +227,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Maximum number of story chunks per NFT
   uint256 public constant MAX_STORY_CHUNKS = 100;
 
-  // Public signals include 4 hashes × 2 limbs (each limb 128-bit): person/name/father/mother
-  uint256 private constant _HASH_LIMBS_REQUIRED = 8; // 4 hashes * 2 limbs
+  // Public signals include 3 hashes × 2 limbs (each limb 128-bit): person/father/mother
+  uint256 private constant _HASH_LIMBS_REQUIRED = 6; // 3 hashes * 2 limbs
 
   /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
@@ -322,12 +318,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string newURI
   );
 
-  /**
-   * @dev Person indexed event, used for discovery
-   * @param nameHash Name hash
-   * @param personHash Person hash
-   */
-  event PersonDiscoverable(bytes32 indexed nameHash, bytes32 indexed personHash);
+  // Name discovery event removed for privacy
 
   /**
    * @dev Token mining reward distribution event
@@ -485,7 +476,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /**
    * @dev Internal core function for adding person versions and establishing indices
    * @param personHash Person hash
-   * @param nameHash Name hash
    * @param fatherHash Father's hash
    * @param motherHash Mother's hash
    * @param fatherVersionIndex Father's version index (0 means unspecified)
@@ -495,7 +485,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   function _addPersonInternal(
     bytes32 personHash,
-    bytes32 nameHash,
     bytes32 fatherHash,
     bytes32 motherHash,
     uint256 fatherVersionIndex,
@@ -561,11 +550,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       motherVersionIndex,
       tag
     );
-    if (!personHashIndexed[nameHash][personHash]) {
-      personHashIndexed[nameHash][personHash] = true;
-      nameToPersonHashes[nameHash].push(personHash);
-      emit PersonDiscoverable(nameHash, personHash);
-    }
+    // Name indexing removed
     if (_personExists(fatherHash) && _personExists(motherHash)) {
       uint256 reward = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).mint(msg.sender);
       if (reward > 0) {
@@ -579,7 +564,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   function addPerson(
     bytes32 personHash,
-    bytes32 nameHash,
     bytes32 fatherHash,
     bytes32 motherHash,
     uint256 fatherVersionIndex,
@@ -589,7 +573,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   ) public {
     _addPersonInternal(
       personHash,
-      nameHash,
       fatherHash,
       motherHash,
       fatherVersionIndex,
@@ -603,10 +586,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Zero-knowledge proof based addition entry point (limb version):
    * publicSignals mapping (fixed order, all are 128-bit limbs, big-endian concatenation hi|lo):
    * 0..1 => personHash limbs (hi -> lo)
-   * 2..3 => nameHash limbs (hi -> lo)
-   * 4..5 => fatherHash limbs (hi -> lo)
-   * 6..7 => motherHash limbs (hi -> lo)
-   * 8    => submitter address (uint160 in lower 160 bits)
+   * 2..3 => fatherHash limbs (hi -> lo)
+   * 4..5 => motherHash limbs (hi -> lo)
+   * 6    => submitter address (uint160 in lower 160 bits)
    */
   function addPersonZK(
     uint256[2] calldata a,
@@ -618,7 +600,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string calldata tag,
     string calldata metadataCID
   ) external {
-    // 8 limbs (4 hashes × 2 limbs) + 1 submitter
+    // 6 limbs (3 hashes × 2 limbs) + 1 submitter
     if (publicSignals.length != _HASH_LIMBS_REQUIRED + 1) revert InvalidZKProof();
 
     // cheap check: all limbs < 2^128 (avoid burning verify gas first)
@@ -641,9 +623,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     // business write (internal should check: personHash uniqueness, parent/mother version index matches hash, optional length limit)
     _addPersonInternal(
       _packHashFromTwo128(publicSignals, 0), // personHash: limbs 0..1
-      _packHashFromTwo128(publicSignals, 2), // nameHash: limbs 2..3
-      _packHashFromTwo128(publicSignals, 4), // fatherHash: limbs 4..5
-      _packHashFromTwo128(publicSignals, 6), // motherHash: limbs 6..7
+      _packHashFromTwo128(publicSignals, 2), // fatherHash: limbs 2..3
+      _packHashFromTwo128(publicSignals, 4), // motherHash: limbs 4..5
       fatherVersionIndex,
       motherVersionIndex,
       tag,
@@ -950,64 +931,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   // ========== Query Functions ==========
-
-  /**
-   * @notice Query person hashes by full name (supports efficient pagination with custom starting position)
-   * @dev Supports offset+limit mode to avoid gas explosion; when limit=0, only returns totalCount
-   * @param fullName Full name
-   * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (1-50)
-   * @return personHashes Query result person hash array
-   * @return totalCount Total number of people with this name
-   * @return hasMore Whether there is more data
-   * @return nextOffset Suggested starting position for next query
-   */
-  function listPersonHashesByFullName(
-    string calldata fullName,
-    uint256 offset,
-    uint256 limit
-  )
-    external
-    view
-    returns (bytes32[] memory personHashes, uint256 totalCount, bool hasMore, uint256 nextOffset)
-  {
-    // Input validation
-    if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
-
-    bytes32 nameHash = _hashString(fullName);
-    bytes32[] storage allHashes = nameToPersonHashes[nameHash];
-    totalCount = allHashes.length;
-
-    // limit=0: only return totalCount, no array allocation
-    if (limit == 0) {
-      return (new bytes32[](0), totalCount, false, offset);
-    }
-
-    // If starting position exceeds range, return empty result
-    if (offset >= totalCount) {
-      return (new bytes32[](0), totalCount, false, totalCount);
-    }
-
-    // Calculate actual return quantity
-    uint256 endIndex = offset + limit;
-    if (endIndex > totalCount) {
-      endIndex = totalCount;
-    }
-
-    uint256 resultLength = endIndex - offset;
-    personHashes = new bytes32[](resultLength);
-
-    // Fill result array
-    for (uint256 i = 0; i < resultLength; i++) {
-      personHashes[i] = allHashes[offset + i];
-    }
-
-    // Calculate next query starting position and whether there is more data
-    nextOffset = endIndex;
-    hasMore = endIndex < totalCount;
-
-    return (personHashes, totalCount, hasMore, nextOffset);
-  }
 
   /**
    * @notice Get total version count of specified person (lightweight query)

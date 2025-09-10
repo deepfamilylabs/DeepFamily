@@ -3,7 +3,7 @@
 // - Assembles byte stream according to contract getPersonHash serialization rules and computes keccak256(personPreimage)
 // - Also computes nameHash = keccak256(fullNameBytes)
 // - Also computes fatherHash/motherHash = keccak256(father/mother basic info)
-// - Outputs publicSignals consistent with addPersonZK: 4 hashes × 2×128-bit limbs (big-endian) + submitter
+// - Outputs publicSignals consistent with addPersonZK: 3 hashes × 2×128-bit limbs (person/father/mother, big-endian) + submitter
 
 pragma circom 2.1.5;
 
@@ -163,13 +163,11 @@ template PersonHashWithKeccak() {
     // ===== Outputs (publicSignals) =====
     signal output person_limb0; // 0 (hi128)
     signal output person_limb1; // 1 (lo128)
-    signal output name_limb0;   // 2 (hi128)
-    signal output name_limb1;   // 3 (lo128)
-    signal output father_limb0; // 4 (hi128)
-    signal output father_limb1; // 5 (lo128)
-    signal output mother_limb0; // 6 (hi128)
-    signal output mother_limb1; // 7 (lo128)
-    signal output submitter_out; // 8
+    signal output father_limb0; // 2 (hi128)
+    signal output father_limb1; // 3 (lo128)
+    signal output mother_limb0; // 4 (hi128)
+    signal output mother_limb1; // 5 (lo128)
+    signal output submitter_out; // 6
 
     // ===== Range checks =====
     // nameLen < 2^16 (bit width) + enforce 1..256 to exactly match contract getPersonHash
@@ -329,9 +327,7 @@ template PersonHashWithKeccak() {
     }
 
     // name-only keccak: directly reuse first nameLen bytes of nameBytes
-    component kName = Keccak256Var(256);
-    kName.len <== nameLen;
-    for (var u = 0; u < 256; u++) { kName.in[u] <== nameBytes[u]; }
+    // name-only keccak removed from public outputs to avoid name enumeration on-chain
 
     // ===== father preimage & keccak =====
     signal fPersonPreLen; fPersonPreLen <== father_nameLen + 8;
@@ -404,11 +400,6 @@ template PersonHashWithKeccak() {
     for (var a = 0; a < 32; a++) { p.hashBytes[a] <== kPerson.out[a]; }
     person_limb0 <== p.limbs[0];
     person_limb1 <== p.limbs[1];
-
-    component n = Hash32ToTwoLimbsBE();
-    for (var b = 0; b < 32; b++) { n.hashBytes[b] <== kName.out[b]; }
-    name_limb0 <== n.limbs[0];
-    name_limb1 <== n.limbs[1];
 
     component fh = Hash32ToTwoLimbsBE();
     for (var c = 0; c < 32; c++) { fh.hashBytes[c] <== kFather.out[c]; }

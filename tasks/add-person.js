@@ -67,17 +67,12 @@ task("add-person", "Add a person version (basic info only; birthPlace removed)")
 
     // Compute hashes
     const personHash = await deepFamily.getPersonHash(basicInfo);
-    // IMPORTANT: Contract internally derives name hash with abi.encodePacked (see _hashString), so we must mirror that.
-    // Previous implementation used abi.encode (via defaultAbiCoder) which produced a different hash and broke name queries.
-    const nameHash = ethers.keccak256(ethers.toUtf8Bytes(args.fullname));
-
+    
     console.log("DeepFamily address:", deep.address);
     console.log("Computed personHash:", personHash);
-    console.log("Name hash:", nameHash, "(packed keccak256 utf8 bytes)");
 
     const tx = await deepFamily.addPerson(
       personHash,
-      nameHash,
       args.father,
       args.mother,
       Number(args.fatherversion),
