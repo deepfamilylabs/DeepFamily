@@ -36,11 +36,18 @@
     "seed:local": "cross-env TARGET_DEPTH=3 hardhat run scripts/seed-demo.js --network localhost",
     "check:root": "hardhat run scripts/check-root.js --network confluxTestnet",
     "circuits:fetch": "bash -lc 'set -e; mkdir -p bin; curl -sSL -o bin/circom https://github.com/iden3/circom/releases/download/v2.1.6/circom-linux-amd64 && chmod +x bin/circom && bin/circom --version'",
-    "circuits:build": "bash -lc 'set -e; mkdir -p artifacts/circuits && ./bin/circom circuits/person_hash_keccak.circom --r1cs --wasm --sym -l node_modules -l node_modules/circomlib/circuits -l node_modules/keccak256-circom/circuits -l node_modules/keccak256-circom/circuit -o artifacts/circuits'",
-    "circuits:ptau": "snarkjs powersoftau new bn128 14 tmp/pot14_0000.ptau -v && snarkjs powersoftau contribute tmp/pot14_0000.ptau tmp/pot14_0001.ptau --name=\"init\" -v -e=\"entropy1\" && snarkjs powersoftau prepare phase2 tmp/pot14_0001.ptau tmp/pot14_final.ptau -v",
-    "circuits:setup": "snarkjs groth16 setup artifacts/circuits/person_hash_keccak.r1cs tmp/pot14_final.ptau artifacts/circuits/person_hash_keccak_0000.zkey && snarkjs zkey contribute artifacts/circuits/person_hash_keccak_0000.zkey artifacts/circuits/person_hash_keccak_final.zkey --name=\"1st\" -v -e=\"entropy2\" && snarkjs zkey export verificationkey artifacts/circuits/person_hash_keccak_final.zkey artifacts/circuits/person_hash_keccak.vkey.json",
-    "circuits:prove": "snarkjs groth16 fullprove tmp/input.json artifacts/circuits/person_hash_keccak_js/person_hash_keccak.wasm artifacts/circuits/person_hash_keccak_final.zkey tmp/proof.json tmp/public.json",
-    "circuits:check": "node tasks/zk-limbs-check.js --wasm ./artifacts/circuits/person_hash_keccak_js/person_hash_keccak.wasm --zkey ./artifacts/circuits/person_hash_keccak_final.zkey --input ./tmp/input.json --submitter $SUBMITTER"
+    "circuits:build": "bash -lc 'set -e; mkdir -p artifacts/circuits && ./bin/circom circuits/person_hash_zk.circom --r1cs --wasm --sym -l node_modules -l node_modules/circomlib/circuits -l node_modules/keccak256-circom/circuits -l node_modules/keccak256-circom/circuit -o artifacts/circuits'",
+    "circuits:ptau-quick": "snarkjs powersoftau new bn128 16 tmp/pot16_0000.ptau -v && snarkjs powersoftau contribute tmp/pot16_0000.ptau tmp/pot16_0001.ptau --name=\"init\" -v -e=\"entropy1\" && snarkjs powersoftau prepare phase2 tmp/pot16_0001.ptau tmp/pot16_final.ptau -v",
+    "circuits:ptau": "snarkjs powersoftau new bn128 19 tmp/pot19_0000.ptau -v && snarkjs powersoftau contribute tmp/pot19_0000.ptau tmp/pot19_0001.ptau --name=\"init\" -v -e=\"entropy1\" && snarkjs powersoftau prepare phase2 tmp/pot19_0001.ptau tmp/pot19_final.ptau -v",
+    "circuits:setup": "snarkjs groth16 setup artifacts/circuits/person_hash_zk.r1cs tmp/pot19_final.ptau artifacts/circuits/person_hash_zk_0000.zkey && snarkjs zkey contribute artifacts/circuits/person_hash_zk_0000.zkey artifacts/circuits/person_hash_zk_final.zkey --name=\"1st\" -v -e=\"entropy2\" && snarkjs zkey export verificationkey artifacts/circuits/person_hash_zk_final.zkey artifacts/circuits/person_hash_zk.vkey.json",
+    "circuits:check": "node tasks/zk-limbs-check.js --wasm ./artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm --zkey ./artifacts/circuits/person_hash_zk_final.zkey --input ./circuits/test/variable_length_input.json --submitter $SUBMITTER",
+    "circuits:test": "node circuits/test/validate_person_hash.js",
+    "circuits:witness": "node -e \"const snarkjs = require('snarkjs'); snarkjs.wtns.calculate(require('./circuits/test/fixed_length_input.json'), 'artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm', 'circuits/test/witness.wtns')\";",
+    "circuits:export": "snarkjs wtns export json circuits/test/witness.wtns circuits/test/public.json",
+    "circuits:prove": "snarkjs groth16 fullprove circuits/test/variable_length_input.json artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm artifacts/circuits/person_hash_zk_final.zkey tmp/proof.json tmp/public.json",
+    "circuits:verify": "snarkjs groth16 verify artifacts/circuits/person_hash_zk.vkey.json circuits/test/public.json tmp/proof.json",
+    "circuits:full-test": "npm run circuits:build && npm run circuits:test && npm run circuits:witness && npm run circuits:export",
+    "circuits:verifier": "snarkjs zkey export solidityverifier artifacts/circuits/person_hash_zk_final.zkey contracts/PersonHashVerifier.sol"
   },
   "keywords": [
     "blockchain",
