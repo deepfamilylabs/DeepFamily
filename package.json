@@ -34,7 +34,13 @@
     "seed:test": "cross-env ROOT_HASH=0x998bd09b669a42a18dace4dd87e3d754dbb7ec0b838e1e06a5a8dbddda90b1f5 ROOT_VERSION=1 TARGET_DEPTH=5 hardhat run scripts/seed-demo.js --network confluxTestnet",
     "seed:debug": "cross-env ROOT_HASH=0x998bd09b669a42a18dace4dd87e3d754dbb7ec0b838e1e06a5a8dbddda90b1f5 ROOT_VERSION=1 TARGET_DEPTH=2 DEBUG_SEED=1 hardhat run scripts/seed-demo.js --network confluxTestnet",
     "seed:local": "cross-env TARGET_DEPTH=3 hardhat run scripts/seed-demo.js --network localhost",
-    "check:root": "hardhat run scripts/check-root.js --network confluxTestnet"
+    "check:root": "hardhat run scripts/check-root.js --network confluxTestnet",
+    "circuits:fetch": "bash -lc 'set -e; mkdir -p bin; curl -sSL -o bin/circom https://github.com/iden3/circom/releases/download/v2.1.6/circom-linux-amd64 && chmod +x bin/circom && bin/circom --version'",
+    "circuits:build": "bash -lc 'set -e; mkdir -p artifacts/circuits && ./bin/circom circuits/person_hash_keccak.circom --r1cs --wasm --sym -l node_modules -l node_modules/circomlib/circuits -l node_modules/keccak256-circom/circuits -l node_modules/keccak256-circom/circuit -o artifacts/circuits'",
+    "circuits:ptau": "snarkjs powersoftau new bn128 14 tmp/pot14_0000.ptau -v && snarkjs powersoftau contribute tmp/pot14_0000.ptau tmp/pot14_0001.ptau --name=\"init\" -v -e=\"entropy1\" && snarkjs powersoftau prepare phase2 tmp/pot14_0001.ptau tmp/pot14_final.ptau -v",
+    "circuits:setup": "snarkjs groth16 setup artifacts/circuits/person_hash_keccak.r1cs tmp/pot14_final.ptau artifacts/circuits/person_hash_keccak_0000.zkey && snarkjs zkey contribute artifacts/circuits/person_hash_keccak_0000.zkey artifacts/circuits/person_hash_keccak_final.zkey --name=\"1st\" -v -e=\"entropy2\" && snarkjs zkey export verificationkey artifacts/circuits/person_hash_keccak_final.zkey artifacts/circuits/person_hash_keccak.vkey.json",
+    "circuits:prove": "snarkjs groth16 fullprove tmp/input.json artifacts/circuits/person_hash_keccak_js/person_hash_keccak.wasm artifacts/circuits/person_hash_keccak_final.zkey tmp/proof.json tmp/public.json",
+    "circuits:check": "node tasks/zk-limbs-check.js --wasm ./artifacts/circuits/person_hash_keccak_js/person_hash_keccak.wasm --zkey ./artifacts/circuits/person_hash_keccak_final.zkey --input ./tmp/input.json --submitter $SUBMITTER"
   },
   "keywords": [
     "blockchain",
@@ -60,6 +66,7 @@
     "@types/mocha": ">=9.1.0",
     "@types/node": ">=18.0.0",
     "chai": "^4.2.0",
+    "circomlib": "^2.0.5",
     "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "ethers": "^6.4.0",
@@ -72,12 +79,14 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.0.0",
     "prettier-plugin-solidity": "^1.1.0",
+    "snarkjs": "^0.7.4",
     "solhint": "^4.0.0",
     "solidity-coverage": "^0.8.1",
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.0",
     "typescript": ">=4.5.0",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "keccak256-circom": "git+https://github.com/vocdoni/keccak256-circom.git"
   },
   "lint-staged": {
     "contracts/**/*.sol": [
