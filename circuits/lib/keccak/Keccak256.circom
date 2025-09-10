@@ -2,7 +2,7 @@ pragma circom 2.1.6;
 
 include "circomlib/circuits/bitify.circom";       // Num2Bits
 include "circomlib/circuits/comparators.circom";  // LessThan
-include "circomlib/circuits/keccak.circom";       // Keccak256(N)
+include "keccak256-circom/circuits/keccak.circom"; // from keccak256-circom
 
 template Keccak256Var(N) {
     signal input in[N];   // bytes (0..255)
