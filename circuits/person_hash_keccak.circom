@@ -2,14 +2,13 @@
 // Keccak constraint integration version:
 // - Assembles byte stream according to contract getPersonHash serialization rules and computes keccak256(personPreimage)
 // - Also computes nameHash = keccak256(fullNameBytes)
-// - Outputs publicSignals consistent with addPersonZK: 16×64-bit limbs (big-endian) + submitter
+// - Outputs publicSignals consistent with addPersonZK: 8×64-bit limbs (person & name, big-endian) + submitter
 
 pragma circom 2.1.5;
 
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
-// Need to place Keccak variable-length input components in circuits/lib/keccak/, see README guide
-include "lib/keccak/Keccak256.circom"; // Expected to provide template: Keccak256Var(MAX_LEN)
+include "lib/keccak/Keccak256.circom";
 
 // 8-bit range check, pass-through value
 template RangeCheck8() {
@@ -92,22 +91,21 @@ template Bytes8ToUint64BE() {
 
 // Main circuit (with Keccak):
 // Inputs:
-//  - nameLen (0..256), nameBytes[256] (only first nameLen effective)
-//  - isBirthBC (0/1), birthYear (uint16), birthMonth (uint8), birthDay (uint8), gender (uint8)
+//  - nameLen (1..256), nameBytes[256] (only first nameLen effective)
+//  - isBirthBC (0/1), birthYear (uint16), birthMonth (0..12), birthDay (0..31), gender (uint8)
 //  - fatherHashBytes[32], motherHashBytes[32]
 //  - submitter (uint160 low bits used)
 // Outputs: see contract publicSignals mapping
 template PersonHashWithKeccak() {
     // ===== Inputs =====
-    signal input nameLen;               // 0..256 (contract requires >0 && <=256; guaranteed separately on-chain/frontend)
+    signal input nameLen;               // 1..256 (contract requires >0 && <=256)
     signal input nameBytes[256];        // bytes, 0..255
     signal input isBirthBC;             // 0/1
     signal input birthYear;             // < 2^16
-    signal input birthMonth;            // 0..255 (on-chain limited to 0..12)
-    signal input birthDay;              // 0..255 (on-chain limited to 0..31)
+    signal input birthMonth;            // 0..12 (contract enforced)
+    signal input birthDay;              // 0..31 (contract enforced)
     signal input gender;                // 0..255 (product semantics 0..3)
-    signal input fatherHashBytes[32];   // big-endian 32 bytes
-    signal input motherHashBytes[32];   // big-endian 32 bytes
+    // Removed parent hashes from public signals; not used in circuit
     signal input submitter;             // only pass-through, on-chain validates low 160 bits
 
     // ===== Outputs (publicSignals) =====
@@ -119,20 +117,23 @@ template PersonHashWithKeccak() {
     signal output name_limb1;   // 5
     signal output name_limb2;   // 6
     signal output name_limb3;   // 7
-    signal output father_limb0; // 8
-    signal output father_limb1; // 9
-    signal output father_limb2; // 10
-    signal output father_limb3; // 11
-    signal output mother_limb0; // 12
-    signal output mother_limb1; // 13
-    signal output mother_limb2; // 14
-    signal output mother_limb3; // 15
-    signal output submitter_out; // 16
+    signal output submitter_out; // 8+1 index in public signals
 
     // ===== Range checks =====
-    // nameLen < 2^16 (not enforcing <=256, only bit width constraint here; stricter range on frontend/on-chain)
+    // nameLen < 2^16 (bit width) + enforce 1..256 to exactly match contract getPersonHash
     component rcNameLen = RangeCheck16();
     rcNameLen.in <== nameLen;
+
+    // Enforce nameLen <= 256
+    component ltNameMax = LessThan(16);
+    ltNameMax.in[0] <== nameLen;
+    ltNameMax.in[1] <== 257; // nameLen < 257  => nameLen <= 256
+    ltNameMax.out == 1;
+
+    // Enforce nameLen != 0  (i.e., >=1)
+    component isNameZero = IsZero();
+    isNameZero.in <== nameLen;
+    isNameZero.out == 0;
 
     // Each nameBytes[i] is in 0..255
     component rcNameBytes[256];
@@ -149,10 +150,22 @@ template PersonHashWithKeccak() {
     component rcBY = RangeCheck16();
     rcBY.in <== birthYear;
 
-    // Other fields 8 bits
+    // Other fields 8 bits (+ contract domain constraints)
     component rcBM = RangeCheck8(); rcBM.in <== birthMonth;
     component rcBD = RangeCheck8(); rcBD.in <== birthDay;
     component rcG  = RangeCheck8(); rcG.in  <== gender;
+
+    // Enforce birthMonth <= 12
+    component ltBM = LessThan(8);
+    ltBM.in[0] <== birthMonth;
+    ltBM.in[1] <== 13; // birthMonth < 13 => <= 12
+    ltBM.out == 1;
+
+    // Enforce birthDay <= 31
+    component ltBD = LessThan(8);
+    ltBD.in[0] <== birthDay;
+    ltBD.in[1] <== 32; // birthDay < 32 => <= 31
+    ltBD.out == 1;
 
     // ===== personPreimage assembly (variable length, max 264 bytes), directly construct Keccak input by position =====
     // personPreLen = nameLen + 8
@@ -169,7 +182,7 @@ template PersonHashWithKeccak() {
 
     // Input construction for keccak(personPre[0..personPreLen-1]):
     component kPerson = Keccak256Var(264);
-    kPerson.msgLen <== personPreLen;
+    kPerson.len <== personPreLen;
 
     // Construct input bytes for each position t:
     for (var t = 0; t < 264; t++) {
@@ -237,7 +250,7 @@ template PersonHashWithKeccak() {
 
     // name-only keccak: directly reuse first nameLen bytes of nameBytes
     component kName = Keccak256Var(256);
-    kName.msgLen <== nameLen;
+    kName.len <== nameLen;
     for (var u = 0; u < 256; u++) { kName.in[u] <== nameBytes[u]; }
 
     // ===== limbs splitting and output =====
@@ -254,20 +267,6 @@ template PersonHashWithKeccak() {
     name_limb1 <== n.limbs[1];
     name_limb2 <== n.limbs[2];
     name_limb3 <== n.limbs[3];
-
-    component f = Hash32ToFourLimbsBE();
-    for (var c = 0; c < 32; c++) { f.hashBytes[c] <== fatherHashBytes[c]; }
-    father_limb0 <== f.limbs[0];
-    father_limb1 <== f.limbs[1];
-    father_limb2 <== f.limbs[2];
-    father_limb3 <== f.limbs[3];
-
-    component m = Hash32ToFourLimbsBE();
-    for (var d = 0; d < 32; d++) { m.hashBytes[d] <== motherHashBytes[d]; }
-    mother_limb0 <== m.limbs[0];
-    mother_limb1 <== m.limbs[1];
-    mother_limb2 <== m.limbs[2];
-    mother_limb3 <== m.limbs[3];
 
     submitter_out <== submitter;
 }

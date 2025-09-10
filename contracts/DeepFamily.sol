@@ -232,7 +232,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   uint256 public constant MAX_STORY_CHUNKS = 100;
 
   // Each keccak256 hash is split into 4 64-bit limbs (big-endian: limb0 = highest 64bit)
-  uint256 private constant _HASH_LIMBS_REQUIRED = 16; // 4 hashes * 4 limbs
+  // After optimization: public signals only include personHash(4 limbs) + nameHash(4 limbs)
+  uint256 private constant _HASH_LIMBS_REQUIRED = 8; // 2 hashes * 4 limbs
 
   /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
@@ -607,22 +608,22 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * publicSignals mapping (fixed order, all are 64-bit limbs, big-endian concatenation):
    * 0..3   => personHash limbs (high -> low)
    * 4..7   => nameHash limbs
-   * 8..11  => fatherHash limbs
-   * 12..15 => motherHash limbs
-   * 16    => submitter address (uint160 in lower 160 bits)
-   * Note: If parent is unknown, corresponding 4 limbs are all 0.
+   * 8      => submitter address (uint160 in lower 160 bits)
+   * Parents' hashes are now provided as calldata parameters instead of public signals.
    */
   function addPersonZK(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
     uint256[] calldata publicSignals,
+    bytes32 fatherHash,
+    bytes32 motherHash,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
     string calldata tag,
     string calldata metadataCID
   ) external {
-    // 16 limbs (4 hashes) + 1 submitter
+    // 8 limbs (2 hashes) + 1 submitter
     if (publicSignals.length != _HASH_LIMBS_REQUIRED + 1) revert InvalidZKProof();
 
     // cheap check: all limbs < 2^64 (avoid burning verify gas first)
@@ -646,8 +647,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     _addPersonInternal(
       _packHashFromLimbs(publicSignals, 0), // personHash: limbs 0..3
       _packHashFromLimbs(publicSignals, 4), // nameHash: limbs 4..7
-      _packHashFromLimbs(publicSignals, 8), // fatherHash: limbs 8..11
-      _packHashFromLimbs(publicSignals, 12), // motherHash: limbs 12..15
+      fatherHash,
+      motherHash,
       fatherVersionIndex,
       motherVersionIndex,
       tag,
