@@ -124,18 +124,7 @@ export default function ActionsPage() {
           </p>
         </div>
 
-        {/* Wallet Status */}
-        <div className="mb-8 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                {t('actions.walletConnected', 'Wallet Connected')}
-              </span>
-            </div>
-            <WalletConnectButton showBalance={true} />
-          </div>
-        </div>
+        {/* Wallet Status removed to avoid duplication with top header */}
 
         {/* Tab Navigation */}
         <div className="mb-8">
