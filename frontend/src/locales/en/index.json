@@ -3,15 +3,17 @@
     "home": "Home",
     "visualization": "Visualization",
     "search": "Search",
-    "people": "People"
+    "people": "People",
+    "actions": "Actions"
   },
   "home": {
     "title": "On-Chain Decentralized Family Tree Protocol",
     "subtitle": "Multi-Version Trust Lineage · Economically Backed · NFT Value Ownership · Sharded Narrative Sealing · ZK Privacy Scaling",
-    "exploreVisualization": "Explore",
-    "addPerson": "Add", 
-    "participate": "Endorse",
-    "configSettings": "Connection Settings",
+    "exploreVisualization": "Family Tree",
+    "addPerson": "Add Person", 
+    "participate": "Search",
+    "searchGenealogy": "Search Family",
+    "blockchainActions": "Add Person",
     "tagStrip": {
       "protocol": "Decentralized",
       "incentive": "Incentives", 
@@ -441,6 +443,31 @@
     "copy": "Copy",
     "copied": "Copied"
   },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "connecting": "Connecting...",
+    "disconnect": "Disconnect",
+    "wrongNetwork": "Wrong Network",
+    "noMetaMask": "Please install MetaMask or Conflux Portal",
+    "connected": "Wallet connected successfully",
+    "rejected": "Connection rejected by user",
+    "pending": "Connection request already pending",
+    "connectionFailed": "Failed to connect wallet",
+    "disconnected": "Wallet disconnected",
+    "chainSwitched": "Chain switched successfully",
+    "chainNotAdded": "Chain not added to wallet",
+    "chainSwitchFailed": "Failed to switch chain"
+  },
+  "theme": {
+    "switchToLight": "Switch to Light",
+    "switchToDark": "Switch to Dark",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "settings": {
+    "theme": "Theme",
+    "language": "Language"
+  },
   "storyChunkEditor": {
     "title": "Biography Chunk Editor",
     "stats": "Chunks: {{count}}, Total Length: {{length}}",
@@ -575,5 +602,27 @@
     "basicStory": "Deeds",
     "noStory": "No story content",
     "peopleEncyclopedia": "Encyclopedia"
+  },
+  "actions": {
+    "title": "Blockchain Actions",
+    "subtitle": "Interact with the DeepFamily protocol using your connected wallet",
+    "walletRequired": "Wallet Connection Required",
+    "walletRequiredDesc": "Connect your wallet to access blockchain features like adding versions, minting NFTs, and endorsing.",
+    "walletConnected": "Wallet Connected",
+    "whatYouCanDo": "What you can do after connecting:",
+    "feature1": "Add new person versions (earn DEEP tokens)",
+    "feature2": "Mint person versions as NFT collectibles",
+    "feature3": "Endorse quality versions (requires DEEP tokens)",
+    "addVersion": "Add Version",
+    "addVersionDesc": "Add a new version of person data with zero-knowledge proofs",
+    "mintNFT": "Mint NFT",
+    "mintNFTDesc": "Convert endorsed person data into valuable NFT collectibles",
+    "endorse": "Endorse",
+    "endorseDesc": "Support quality data by endorsing versions with DEEP tokens",
+    "startAddVersion": "Start Adding Version",
+    "mintNFTHint": "First search for a person and version to mint as NFT",
+    "openMintNFT": "Open NFT Minting",
+    "endorseHint": "Search for person versions to endorse",
+    "openEndorse": "Open Endorsement"
   }
 }

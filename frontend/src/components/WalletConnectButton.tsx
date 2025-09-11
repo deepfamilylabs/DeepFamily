@@ -1,15 +1,18 @@
 import { useWallet } from '../context/WalletContext'
 import { useTranslation } from 'react-i18next'
-import { Wallet, LogOut, AlertCircle } from 'lucide-react'
+import { Wallet, LogOut, AlertCircle, ExternalLink } from 'lucide-react'
+import { detectWallets, isWalletConnectionSafe } from '../utils/walletUtils'
 
 interface WalletConnectButtonProps {
   className?: string
   showBalance?: boolean
+  variant?: 'home' | 'normal'
 }
 
 export default function WalletConnectButton({ 
   className = '', 
-  showBalance = true 
+  showBalance = true,
+  variant = 'normal'
 }: WalletConnectButtonProps) {
   const { 
     address, 
@@ -21,6 +24,7 @@ export default function WalletConnectButton({
   } = useWallet()
   
   const { t } = useTranslation()
+  const isHomePage = variant === 'home'
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -32,52 +36,116 @@ export default function WalletConnectButton({
     return `${num.toFixed(3)} ETH`
   }
 
+  const walletDetection = detectWallets()
+  const canConnect = isWalletConnectionSafe()
+
   if (!address) {
+    // No wallet installed
+    if (!walletDetection.hasWallet) {
+      return (
+        <div className={`inline-flex items-center gap-2 ${className}`}>
+          <button
+            onClick={() => window.open('https://metamask.io/download/', '_blank')}
+            className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
+              isHomePage 
+                ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span className="hidden lg:inline">Install Wallet</span>
+          </button>
+        </div>
+      )
+    }
+
+    // Wallet detected but connection not safe
+    if (!canConnect) {
+      return (
+        <div className={`inline-flex items-center gap-2 ${className}`}>
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${
+            isHomePage
+              ? 'bg-red-400/20 dark:bg-red-500/20 text-red-100 dark:text-red-200 border border-red-400/30 dark:border-red-500/30'
+              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700'
+          }`}>
+            <AlertCircle className="w-3 h-3" />
+            <span>Wallet Conflict</span>
+          </div>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
+              isHomePage 
+                ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            <span className="hidden lg:inline">Reload Page</span>
+            <span className="lg:hidden">Reload</span>
+          </button>
+        </div>
+      )
+    }
+
     return (
       <button
         onClick={connect}
         disabled={isConnecting}
-        className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${className}`}
+        className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
+          isHomePage 
+            ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
+            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
+        } ${className}`}
       >
         {isConnecting ? (
           <>
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <span className="text-sm font-medium">{t('wallet.connecting', 'Connecting...')}</span>
+            <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+            <span className="hidden lg:inline">{t('wallet.connecting', 'Connecting...')}</span>
           </>
         ) : (
           <>
             <Wallet className="w-4 h-4" />
-            <span className="text-sm font-medium">{t('wallet.connect', 'Connect Wallet')}</span>
+            <span className="hidden lg:inline">{t('wallet.connect', 'Connect Wallet')}</span>
           </>
         )}
       </button>
     )
   }
 
-  // Wrong network indicator
+  // Wrong network indicator - update with consistent colors
   const isWrongNetwork = chainId && ![1, 5, 11155111, 17000].includes(chainId) // Mainnet, Goerli, Sepolia, Holesky
 
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
       {isWrongNetwork && (
-        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${
+          isHomePage
+            ? 'bg-yellow-400/20 dark:bg-yellow-500/20 text-yellow-100 dark:text-yellow-200 border border-yellow-400/30 dark:border-yellow-500/30'
+            : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700'
+        }`}>
           <AlertCircle className="w-3 h-3" />
-          <span className="text-xs">{t('wallet.wrongNetwork', 'Wrong Network')}</span>
+          <span>{t('wallet.wrongNetwork', 'Wrong Network')}</span>
         </div>
       )}
       
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700">
-        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+      <div className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm ${
+        isHomePage 
+          ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
+          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
+      }`}>
+        <div className={`w-2 h-2 rounded-full ${
+          isHomePage ? 'bg-green-300 dark:bg-green-400' : 'bg-green-500'
+        }`}></div>
         
-        <div className="flex flex-col items-start gap-0.5">
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 font-mono">
-              {formatAddress(address)}
-            </span>
-          </div>
+        <div className="flex flex-col items-start gap-0.5 min-w-0">
+          <span className="text-xs lg:text-sm font-mono truncate max-w-20 lg:max-w-24">
+            {formatAddress(address)}
+          </span>
           
           {showBalance && balance && (
-            <span className="text-xs text-gray-600 dark:text-gray-400">
+            <span className={`text-xs opacity-75 ${
+              isHomePage ? 'text-white/80 dark:text-gray-300/80' : 'text-gray-600 dark:text-gray-400'
+            }`}>
               {formatBalance(balance)}
             </span>
           )}
@@ -85,10 +153,18 @@ export default function WalletConnectButton({
         
         <button
           onClick={disconnect}
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          className={`p-1 rounded transition-colors ${
+            isHomePage 
+              ? 'hover:bg-white/20 dark:hover:bg-white/15' 
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
           title={t('wallet.disconnect', 'Disconnect')}
         >
-          <LogOut className="w-3 h-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+          <LogOut className={`w-3 h-3 ${
+            isHomePage 
+              ? 'text-white/70 hover:text-white dark:text-gray-300/70 dark:hover:text-gray-200' 
+              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          }`} />
         </button>
       </div>
     </div>
