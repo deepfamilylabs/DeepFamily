@@ -4,7 +4,7 @@ const hre = require("hardhat");
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
   // First compute fullNameHash from fullName
   const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
-  
+
   return await deepFamily.getPersonHash({
     fullNameHash: fullNameHash,
     isBirthBC: basicInfo.isBirthBC,

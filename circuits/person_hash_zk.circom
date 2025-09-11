@@ -62,12 +62,12 @@ template PersonHasher() {
     signal output hashBytes[32];
     
     // Constraint checks
-    component birthMonthCheck = LessEqThan(4);
+    component birthMonthCheck = LessEqThan(8); // 8 bits can handle values up to 255
     birthMonthCheck.in[0] <== birthMonth;
     birthMonthCheck.in[1] <== 12;
     birthMonthCheck.out === 1;
     
-    component birthDayCheck = LessEqThan(5);
+    component birthDayCheck = LessEqThan(8); // 8 bits can handle values up to 255
     birthDayCheck.in[0] <== birthDay;
     birthDayCheck.in[1] <== 31;
     birthDayCheck.out === 1;
