@@ -63,7 +63,9 @@ task("add-person-zk", "Submit Groth16 proof to addPersonZK")
     const submitter = publicSignals[16];
     const senderUint160 = BigInt(sender);
     if (submitter !== senderUint160) {
-      throw new Error(`submitter mismatch: publicSignals[16]=${submitter} expected ${senderUint160} (from ${sender})`);
+      throw new Error(
+        `submitter mismatch: publicSignals[16]=${submitter} expected ${senderUint160} (from ${sender})`,
+      );
     }
 
     // Reformat proof for Solidity verifier signature (a,b,c)
@@ -120,5 +122,3 @@ task("add-person-zk", "Submit Groth16 proof to addPersonZK")
       }
     } catch (_) {}
   });
-
-

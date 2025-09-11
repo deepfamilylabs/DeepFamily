@@ -89,7 +89,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
           const timestamp = Number(timestampRaw)
           const tag = versionStruct2.tag || versionStruct2[8]
           const metadataCID = versionStruct2.metadataCID || versionStruct2[9]
-          const fullName = coreInfo.basicInfo.fullName
+          const fullName = coreInfo.supplementInfo.fullName
           const gender = Number(coreInfo.basicInfo.gender)
           const birthYear = Number(coreInfo.basicInfo.birthYear)
           const birthMonth = Number(coreInfo.basicInfo.birthMonth)

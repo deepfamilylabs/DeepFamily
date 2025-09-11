@@ -24,7 +24,8 @@ describe('Person Version (add-person) Tests', function () {
         ipfs: 'QmCID1'
       })
     ).to.not.be.reverted;
-    const basicInfo = { fullName: 'John Doe', isBirthBC: false, birthYear: 1990, birthMonth: 0, birthDay: 0, gender: 1 };
+    const fullNameHash = await deepFamily.getFullNameHash('John Doe');
+    const basicInfo = { fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1990, birthMonth: 0, birthDay: 0, gender: 1 };
     const personHash = await deepFamily.getPersonHash(basicInfo);
     const count = await deepFamily.countPersonVersions(personHash);
     expect(count).to.equal(1n);
@@ -40,11 +41,12 @@ describe('Person Version (add-person) Tests', function () {
   it('reverts on invalid birthMonth / birthDay via direct call (solidity validation)', async () => {
     const { deepFamily } = await baseSetup();
     // Construct invalid basic info to call pure getPersonHash (will revert)
+    const fullNameHash = await deepFamily.getFullNameHash('A');
     await expect(
-      deepFamily.getPersonHash({ fullName: 'A', isBirthBC: false, birthYear: 1000, birthMonth: 13, birthDay: 0, gender: 1 })
+      deepFamily.getPersonHash({ fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1000, birthMonth: 13, birthDay: 0, gender: 1 })
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidBirthMonth');
     await expect(
-      deepFamily.getPersonHash({ fullName: 'A', isBirthBC: false, birthYear: 1000, birthMonth: 12, birthDay: 32, gender: 1 })
+      deepFamily.getPersonHash({ fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1000, birthMonth: 12, birthDay: 32, gender: 1 })
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidBirthDay');
   });
 

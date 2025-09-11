@@ -1,7 +1,7 @@
 const { task } = require("hardhat/config");
 
 // PersonBasicInfo {
-//   string fullName;
+//   bytes32 fullNameHash;
 //   bool isBirthBC;
 //   uint16 birthYear;
 //   uint8 birthMonth;
@@ -56,8 +56,11 @@ task("add-person", "Add a person version (basic info only; birthPlace removed)")
     if (birthDayNum < 0 || birthDayNum > 31) throw new Error("birthDay must be 0-31");
     if (genderNum < 0 || genderNum > 3) throw new Error("gender must be 0-3");
 
+    // Get fullNameHash first
+    const fullNameHash = await deepFamily.getFullNameHash(args.fullname);
+
     const basicInfo = {
-      fullName: args.fullname,
+      fullNameHash: fullNameHash,
       isBirthBC: String(args.birthbc).toLowerCase() === "true",
       birthYear: birthYearNum,
       birthMonth: birthMonthNum,
@@ -67,7 +70,7 @@ task("add-person", "Add a person version (basic info only; birthPlace removed)")
 
     // Compute hashes
     const personHash = await deepFamily.getPersonHash(basicInfo);
-    
+
     console.log("DeepFamily address:", deep.address);
     console.log("Computed personHash:", personHash);
 

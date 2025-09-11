@@ -81,7 +81,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Basic identity information structure
    */
   struct PersonBasicInfo {
-    string fullName; // Full name
+    bytes32 fullNameHash; // Hash of the full name (keccak256)
     bool isBirthBC; // Whether birth is BC (Before Christ)
     uint16 birthYear; // Birth year(0=unknown)
     uint8 birthMonth; // Birth month (1-12, 0=unknown)
@@ -109,6 +109,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev NFT supplementary information structure
    */
   struct PersonSupplementInfo {
+    string fullName; // Full name
     string birthPlace; // Birth place
     bool isDeathBC; // Whether death is BC (Before Christ)
     uint16 deathYear; // Death year(0=unknown)
@@ -443,19 +444,27 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
+   * @notice Calculate fullNameHash from full name string
+   * @dev Helper function to convert string to hash for PersonBasicInfo
+   */
+  function getFullNameHash(string memory fullName) public pure returns (bytes32) {
+    bytes memory nameBytes = bytes(fullName);
+    if (nameBytes.length == 0 || nameBytes.length > MAX_LONG_TEXT_LENGTH) revert InvalidFullName();
+    return keccak256(nameBytes);
+  }
+
+  /**
    * @notice Calculate unique person hash value
-   * @dev Uses length-prefix + abi.encodePacked serialization, convenient for ZK circuit byte-by-byte constraints.
+   * @dev Uses fullNameHash + abi.encodePacked serialization with fixed 38-byte preimage, convenient for ZK circuit constraints.
    */
   function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
-    bytes memory nameBytes = bytes(basicInfo.fullName);
-    if (nameBytes.length == 0 || nameBytes.length > MAX_LONG_TEXT_LENGTH) revert InvalidFullName();
+    if (basicInfo.fullNameHash == bytes32(0)) revert InvalidFullName();
     if (basicInfo.birthMonth > 12) revert InvalidBirthMonth();
     if (basicInfo.birthDay > 31) revert InvalidBirthDay();
     return
       keccak256(
         abi.encodePacked(
-          uint16(nameBytes.length),
-          nameBytes,
+          basicInfo.fullNameHash,
           uint8(basicInfo.isBirthBC ? 1 : 0),
           basicInfo.birthYear,
           basicInfo.birthMonth,
@@ -729,6 +738,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert InvalidBirthPlace();
     if (bytes(coreInfo.supplementInfo.deathPlace).length > MAX_LONG_TEXT_LENGTH)
       revert InvalidDeathPlace();
+
+    // Validate if fullName matches fullNameHash (getFullNameHash will validate fullName length)
+    bytes32 computedFullNameHash = getFullNameHash(coreInfo.supplementInfo.fullName);
+    if (computedFullNameHash != coreInfo.basicInfo.fullNameHash) revert BasicInfoMismatch();
 
     // Validate if core information matches personHash
     bytes32 computedHash = getPersonHash(coreInfo.basicInfo);

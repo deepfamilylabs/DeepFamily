@@ -129,21 +129,43 @@ type HashForm = z.infer<typeof hashFormSchema>
 
 function computePersonHashLocal(input: HashForm): string {
   const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
+  
+  // First compute fullNameHash exactly like the contract
   const nameBytes = new TextEncoder().encode(fullName)
-  // uint16 length (big-endian) + name bytes + flags and numbers in minimal big-endian per solidity abi.encodePacked rules
-  // Build a hex string mimicking abi.encodePacked(uint16,len,name,uint8,isBirthBC?1:0,uint16,birthYear,uint8,birthMonth,uint8,birthDay,uint8,gender)
-  const view = [] as string[]
-  const pushU16 = (v:number)=>{ const b1 = (v>>8)&0xff; const b2 = v & 0xff; view.push(b1.toString(16).padStart(2,'0'), b2.toString(16).padStart(2,'0')) }
-  const pushU8 = (v:number)=>{ view.push(v.toString(16).padStart(2,'0')) }
-  pushU16(nameBytes.length)
-  for (const b of nameBytes) pushU8(b)
-  pushU8(isBirthBC ? 1 : 0)
-  pushU16(birthYear)
-  pushU8(birthMonth)
-  pushU8(birthDay)
-  pushU8(gender)
-  const hex = '0x' + view.join('')
-  return ethers.keccak256(hex)
+  const fullNameHash = ethers.keccak256(nameBytes)
+  
+  // Now build PersonBasicInfo hash exactly matching the contract's abi.encodePacked:
+  // abi.encodePacked(fullNameHash, uint8(isBirthBC), birthYear, birthMonth, birthDay, gender)
+  // Total: 32 + 1 + 2 + 1 + 1 + 1 = 38 bytes
+  const buffer = new Uint8Array(38)
+  let offset = 0
+  
+  // fullNameHash (32 bytes)
+  const hashBytes = ethers.getBytes(fullNameHash)
+  buffer.set(hashBytes, offset)
+  offset += 32
+  
+  // isBirthBC as uint8 (1 byte)
+  buffer[offset] = isBirthBC ? 1 : 0
+  offset += 1
+  
+  // birthYear as uint16 big-endian (2 bytes)
+  buffer[offset] = (birthYear >> 8) & 0xff
+  buffer[offset + 1] = birthYear & 0xff
+  offset += 2
+  
+  // birthMonth as uint8 (1 byte)
+  buffer[offset] = birthMonth & 0xff
+  offset += 1
+  
+  // birthDay as uint8 (1 byte)
+  buffer[offset] = birthDay & 0xff
+  offset += 1
+  
+  // gender as uint8 (1 byte)
+  buffer[offset] = gender & 0xff
+  
+  return ethers.keccak256(buffer)
 }
 
 export default function SearchPage() {

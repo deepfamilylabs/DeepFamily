@@ -73,9 +73,12 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
       );
     }
 
+    // Get fullNameHash first
+    const fullNameHash = await deepFamily.getFullNameHash(args.fullname);
+
     // Construct nested core info
     const basicInfo = {
-      fullName: args.fullname,
+      fullNameHash: fullNameHash,
       isBirthBC: String(args.birthbc).toLowerCase() === "true",
       birthYear,
       birthMonth,
@@ -92,6 +95,7 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
     }
 
     const supplementInfo = {
+      fullName: args.fullname,
       birthPlace: args.birthplace,
       isDeathBC: String(args.deathbc).toLowerCase() === "true",
       deathYear,

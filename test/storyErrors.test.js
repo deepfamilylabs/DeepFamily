@@ -24,8 +24,9 @@ describe('Story Sharding - Error & Edge Cases', function () {
       tag: 'edge',
       ipfs: 'QmEdgeMeta'
     });
+    const fullNameHash = await deepFamily.getFullNameHash(FULLNAME);
     const basicInfo = {
-      fullName: FULLNAME,
+      fullNameHash: fullNameHash,
       isBirthBC: false,
       birthYear: parseInt(BIRTH_YEAR, 10),
       birthMonth: 0,

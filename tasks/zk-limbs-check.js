@@ -49,15 +49,7 @@ function getPersonHashJS(basic) {
 
   // abi.encodePacked(uint16(len), bytes(name), uint8(isBC), uint16(year), uint8(m), uint8(d), uint8(g))
   const hashHex = solidityPackedKeccak(
-    [
-      "uint16",
-      "bytes",
-      "uint8",
-      "uint16",
-      "uint8",
-      "uint8",
-      "uint8",
-    ],
+    ["uint16", "bytes", "uint8", "uint16", "uint8", "uint8", "uint8"],
     [
       nameLen,
       nameBytes,
@@ -66,7 +58,7 @@ function getPersonHashJS(basic) {
       basic.birthMonth,
       basic.birthDay,
       basic.gender,
-    ]
+    ],
   );
   return hashHex;
 }
@@ -137,14 +129,12 @@ async function main() {
       // Ensure submitter matches
       input.submitter = expected[6].toString();
 
-      const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-        input,
-        opts.wasm,
-        opts.zkey
-      );
+      const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, opts.wasm, opts.zkey);
       console.log("Circuit publicSignals (decimal):", publicSignals);
 
-      const ok = publicSignals.length === expected.length && publicSignals.every((v, i) => BigInt(v) === expected[i]);
+      const ok =
+        publicSignals.length === expected.length &&
+        publicSignals.every((v, i) => BigInt(v) === expected[i]);
       console.log("Match:", ok);
       if (!ok) process.exitCode = 1;
     } catch (e) {
@@ -157,5 +147,3 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-
-
