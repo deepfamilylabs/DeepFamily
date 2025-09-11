@@ -3,15 +3,18 @@
     "home": "首页",
     "visualization": "可视化",
     "search": "搜索",
-    "people": "人物"
+    "people": "人物",
+    "actions": "交互"
   },
   "home": {
     "title": "去中心化链上族谱协议",
     "subtitle": "多版本可信谱系 · 经济激励背书 · NFT 价值归属 · 分片叙事封存 · 零知识证明隐私扩展",
-    "exploreVisualization": "浏览族谱",
+    "exploreVisualization": "族谱图",
     "addPerson": "添加人物",
-    "participate": "参与背书",
+    "participate": "搜索",
+    "searchGenealogy": "搜索族谱",
     "configSettings": "配置连接设置",
+    "blockchainActions": "添加人物",
     "tagStrip": {
       "protocol": "去中心化",
       "incentive": "激励循环", 
@@ -441,6 +444,22 @@
     "copy": "复制",
     "copied": "已复制"
   },
+  "wallet": {
+    "connect": "连接钱包",
+    "connecting": "连接中...",
+    "disconnect": "断开连接",
+    "wrongNetwork": "网络错误"
+  },
+  "theme": {
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式", 
+    "light": "浅色",
+    "dark": "深色"
+  },
+  "settings": {
+    "theme": "主题",
+    "language": "语言"
+  },
   "storyChunkEditor": {
     "title": "传记内容编辑器",
     "stats": "分片数量: {{count}}, 总长度: {{length}}",
@@ -575,5 +594,27 @@
     "basicStory": "事迹",
     "noStory": "暂无传记内容",
     "peopleEncyclopedia": "人物百科"
+  },
+  "actions": {
+    "title": "区块链交互",
+    "subtitle": "使用您的连接钱包与 DeepFamily 协议进行交互",
+    "walletRequired": "需要连接钱包",
+    "walletRequiredDesc": "连接您的钱包以访问区块链功能，如添加版本、铸造 NFT 和参与背书。",
+    "walletConnected": "钱包已连接",
+    "whatYouCanDo": "连接后您可以：",
+    "feature1": "添加新的人物版本（可获得 DEEP 代币奖励）",
+    "feature2": "将人物版本铸造为 NFT 收藏品",
+    "feature3": "背书优质版本（需要消耗 DEEP 代币）",
+    "addVersion": "添加版本",
+    "addVersionDesc": "使用零知识证明添加新的人物数据版本",
+    "mintNFT": "铸造 NFT",
+    "mintNFTDesc": "将背书的人物数据转换为有价值的 NFT 收藏品",
+    "endorse": "背书",
+    "endorseDesc": "使用 DEEP 代币支持优质数据版本",
+    "startAddVersion": "开始添加版本",
+    "mintNFTHint": "首先搜索要铸造为 NFT 的人物和版本",
+    "openMintNFT": "打开 NFT 铸造",
+    "endorseHint": "搜索要背书的人物版本",
+    "openEndorse": "打开背书"
   }
 }

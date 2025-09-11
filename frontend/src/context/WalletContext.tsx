@@ -2,6 +2,13 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { ethers } from 'ethers'
 import { useToast } from '../components/ToastProvider'
 import { useTranslation } from 'react-i18next'
+import { 
+  detectWallets, 
+  getWalletProvider, 
+  isWalletConnectionSafe,
+  safeAddWalletListener,
+  getWalletDebugInfo
+} from '../utils/walletUtils'
 
 interface WalletState {
   address: string | null
@@ -57,16 +64,28 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [walletState.provider, walletState.address])
 
   const connect = useCallback(async () => {
-    if (typeof window.ethereum === 'undefined') {
-      toast.show(t('wallet.noMetaMask', 'Please install MetaMask'))
+    // Check wallet safety first
+    if (!isWalletConnectionSafe()) {
+      console.warn('Wallet connection not safe:', getWalletDebugInfo())
+      toast.show(t('wallet.noMetaMask', 'Please install MetaMask or Conflux Portal'))
       return
     }
 
     setWalletState(prev => ({ ...prev, isConnecting: true }))
 
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      await provider.send('eth_requestAccounts', [])
+      const walletProvider = getWalletProvider()
+      if (!walletProvider) {
+        throw new Error('No wallet provider available')
+      }
+
+      const provider = new ethers.BrowserProvider(walletProvider)
+      
+      // Request account access
+      const accounts = await provider.send('eth_requestAccounts', [])
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts returned')
+      }
       
       const signer = await provider.getSigner()
       const address = await signer.getAddress()
@@ -84,21 +103,28 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setWalletState(newState)
       
       // Refresh balance after connection
-      const balance = await provider.getBalance(address)
-      setWalletState(prev => ({
-        ...prev,
-        balance: ethers.formatEther(balance)
-      }))
+      try {
+        const balance = await provider.getBalance(address)
+        setWalletState(prev => ({
+          ...prev,
+          balance: ethers.formatEther(balance)
+        }))
+      } catch (balanceError) {
+        console.warn('Failed to fetch balance:', balanceError)
+      }
       
       toast.show(t('wallet.connected', 'Wallet connected successfully'))
     } catch (error: any) {
       console.error('Failed to connect wallet:', error)
+      console.error('Wallet debug info:', getWalletDebugInfo())
       setWalletState(prev => ({ ...prev, isConnecting: false }))
       
       if (error.code === 4001) {
         toast.show(t('wallet.rejected', 'Connection rejected by user'))
+      } else if (error.code === -32002) {
+        toast.show(t('wallet.pending', 'Connection request already pending'))
       } else {
-        toast.show(t('wallet.connectionFailed', 'Failed to connect wallet'))
+        toast.show(t('wallet.connectionFailed', `Failed to connect wallet: ${error.message || 'Unknown error'}`))
       }
     }
   }, [t, toast])
@@ -116,13 +142,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [t, toast])
 
   const switchChain = useCallback(async (targetChainId: number) => {
-    if (!window.ethereum) {
-      toast.show(t('wallet.noMetaMask', 'Please install MetaMask'))
+    if (!isWalletConnectionSafe()) {
+      toast.show(t('wallet.noMetaMask', 'Please install MetaMask or Conflux Portal'))
       return
     }
 
     try {
-      await window.ethereum.request({
+      const walletProvider = getWalletProvider()
+      if (!walletProvider) {
+        throw new Error('No wallet provider available')
+      }
+
+      await walletProvider.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${targetChainId.toString(16)}` }],
       })
@@ -146,7 +177,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Listen to account and chain changes
   useEffect(() => {
-    if (!window.ethereum) return
+    if (!isWalletConnectionSafe()) return
 
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts.length === 0) {
@@ -172,14 +203,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       disconnect()
     }
 
-    window.ethereum.on('accountsChanged', handleAccountsChanged)
-    window.ethereum.on('chainChanged', handleChainChanged)
-    window.ethereum.on('disconnect', handleDisconnect)
+    // Use safe event listeners
+    const cleanupAccountsChanged = safeAddWalletListener('accountsChanged', handleAccountsChanged)
+    const cleanupChainChanged = safeAddWalletListener('chainChanged', handleChainChanged)
+    const cleanupDisconnect = safeAddWalletListener('disconnect', handleDisconnect)
 
     return () => {
-      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged)
-      window.ethereum?.removeListener('chainChanged', handleChainChanged)
-      window.ethereum?.removeListener('disconnect', handleDisconnect)
+      cleanupAccountsChanged()
+      cleanupChainChanged()
+      cleanupDisconnect()
     }
   }, [walletState.address, connect, disconnect, refreshBalance])
 
@@ -189,21 +221,33 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (isAutoConnectDone.current) return
     
     const autoConnect = async () => {
-      if (typeof window.ethereum === 'undefined') return
+      if (!isWalletConnectionSafe()) {
+        isAutoConnectDone.current = true
+        return
+      }
       
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' })
-        if (accounts.length > 0) {
+        const walletProvider = getWalletProvider()
+        if (!walletProvider) {
+          isAutoConnectDone.current = true
+          return
+        }
+
+        const accounts = await walletProvider.request({ method: 'eth_accounts' })
+        if (accounts && accounts.length > 0) {
           await connect()
         }
         isAutoConnectDone.current = true
       } catch (error) {
-        console.error('Auto-connect failed:', error)
+        console.warn('Auto-connect failed:', error)
+        console.warn('Wallet debug info:', getWalletDebugInfo())
         isAutoConnectDone.current = true
       }
     }
 
-    autoConnect()
+    // Add a small delay to ensure the page is fully loaded
+    const timer = setTimeout(autoConnect, 100)
+    return () => clearTimeout(timer)
   }, [connect])
 
   const contextValue: WalletContextValue = {

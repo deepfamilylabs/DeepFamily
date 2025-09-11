@@ -14,6 +14,7 @@ import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
 import { TreeDataProvider } from './context/TreeDataContext'
 import { WalletProvider } from './context/WalletContext'
+import WalletErrorBoundary from './components/WalletErrorBoundary'
 
 function TitleUpdater() {
   const { t, i18n } = useTranslation()
@@ -77,12 +78,14 @@ export default function App() {
   return (
     <ConfigProvider>
       <ToastProvider>
-        <WalletProvider>
-          <BrowserRouter>
-            <TitleUpdater />
-            <RouterContent />
-          </BrowserRouter>
-        </WalletProvider>
+        <WalletErrorBoundary>
+          <WalletProvider>
+            <BrowserRouter>
+              <TitleUpdater />
+              <RouterContent />
+            </BrowserRouter>
+          </WalletProvider>
+        </WalletErrorBoundary>
       </ToastProvider>
     </ConfigProvider>
   )

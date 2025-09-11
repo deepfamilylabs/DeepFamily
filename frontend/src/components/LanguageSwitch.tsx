@@ -61,9 +61,12 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
         <Globe className={`w-4 h-4 flex-shrink-0 ${
           isHomePage ? 'text-white/80 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
         }`} />
-        <span className="text-sm truncate max-w-16 lg:max-w-20 font-medium hidden sm:inline">{currentLanguage.nativeName}</span>
+        {/* 在小屏幕时隐藏文字，只显示图标 */}
+        <span className="text-sm font-medium hidden lg:inline truncate max-w-16 lg:max-w-20">
+          {currentLanguage.nativeName}
+        </span>
         <svg 
-          className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${
+          className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 hidden lg:inline ${isOpen ? 'rotate-180' : ''} ${
             isHomePage ? 'text-white/70 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'
           }`} 
           fill="none" 
@@ -74,7 +77,7 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
         </svg>
       </button>
 
-      <div className={`absolute right-0 z-[9999] mt-2 w-48 origin-top-right rounded-2xl shadow-xl backdrop-blur-xl transition-all duration-200 ${
+      <div className={`absolute right-0 z-[9999] mt-2 w-40 sm:w-48 origin-top-right rounded-2xl shadow-xl backdrop-blur-xl transition-all duration-200 ${
         isOpen 
           ? 'opacity-100 visible transform translate-y-0 scale-100' 
           : 'opacity-0 invisible transform -translate-y-2 scale-95'
@@ -88,7 +91,7 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
             <button
               key={language.code}
               onClick={() => handleLanguageChange(language.code)}
-              className={`flex items-center justify-between w-full px-4 py-3 text-sm text-left transition-all duration-200 hover:scale-[1.02] ${
+              className={`flex items-center justify-between w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-left transition-all duration-200 hover:scale-[1.02] ${
                 index === 0 ? 'rounded-t-2xl mt-1' : index === languages.length - 1 ? 'rounded-b-2xl mb-1' : ''
               } ${
                 i18n.language === language.code
@@ -98,12 +101,12 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
             >
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="font-semibold text-sm truncate">{language.nativeName}</span>
-                <span className="text-xs truncate opacity-75">{language.name}</span>
+                <span className="text-xs truncate opacity-75 hidden sm:block">{language.name}</span>
               </div>
               {i18n.language === language.code && (
-                <div className="flex-shrink-0 ml-3">
-                  <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex-shrink-0 ml-2 sm:ml-3">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>

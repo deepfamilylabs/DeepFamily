@@ -64,6 +64,10 @@ export default function SiteHeader() {
             <Eye className="w-4 h-4" /> 
             <span className="hidden lg:inline">{t('navigation.visualization')}</span>
           </NavLink>
+          <NavLink to="/actions" className={navClasses}>
+            <Zap className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.actions', 'Actions')}</span>
+          </NavLink>
           <NavLink to="/search" className={navClasses}>
             <Search className="w-4 h-4" /> 
             <span className="hidden lg:inline">{t('navigation.search')}</span>
@@ -71,10 +75,6 @@ export default function SiteHeader() {
           <NavLink to="/people" className={navClasses}>
             <Book className="w-4 h-4" /> 
             <span className="hidden lg:inline">{t('navigation.people')}</span>
-          </NavLink>
-          <NavLink to="/actions" className={navClasses}>
-            <Zap className="w-4 h-4" /> 
-            <span className="hidden lg:inline">{t('navigation.actions', 'Actions')}</span>
           </NavLink>
         </nav>
         <HeaderControls variant={isHomePage ? 'home' : 'normal'} />
