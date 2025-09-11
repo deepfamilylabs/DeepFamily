@@ -1,7 +1,6 @@
 import { useWallet } from '../context/WalletContext'
 import { useTranslation } from 'react-i18next'
 import { Wallet, LogOut, AlertCircle, ExternalLink } from 'lucide-react'
-import { detectWallets, isWalletConnectionSafe } from '../utils/walletUtils'
 
 interface WalletConnectButtonProps {
   className?: string
@@ -27,7 +26,7 @@ export default function WalletConnectButton({
   const isHomePage = variant === 'home'
 
   const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+    return `${addr.slice(0, 6)}...`
   }
 
   const formatBalance = (bal: string) => {
@@ -36,12 +35,11 @@ export default function WalletConnectButton({
     return `${num.toFixed(3)} ETH`
   }
 
-  const walletDetection = detectWallets()
-  const canConnect = isWalletConnectionSafe()
+  const hasEthereum = typeof window !== 'undefined' && !!(window as any).ethereum
 
   if (!address) {
     // No wallet installed
-    if (!walletDetection.hasWallet) {
+    if (!hasEthereum) {
       return (
         <div className={`inline-flex items-center gap-2 ${className}`}>
           <button
@@ -54,34 +52,6 @@ export default function WalletConnectButton({
           >
             <ExternalLink className="w-4 h-4" />
             <span className="hidden lg:inline">Install Wallet</span>
-          </button>
-        </div>
-      )
-    }
-
-    // Wallet detected but connection not safe
-    if (!canConnect) {
-      return (
-        <div className={`inline-flex items-center gap-2 ${className}`}>
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${
-            isHomePage
-              ? 'bg-red-400/20 dark:bg-red-500/20 text-red-100 dark:text-red-200 border border-red-400/30 dark:border-red-500/30'
-              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700'
-          }`}>
-            <AlertCircle className="w-3 h-3" />
-            <span>Wallet Conflict</span>
-          </div>
-          
-          <button
-            onClick={() => window.location.reload()}
-            className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
-              isHomePage 
-                ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
-                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
-            }`}
-          >
-            <span className="hidden lg:inline">Reload Page</span>
-            <span className="lg:hidden">Reload</span>
           </button>
         </div>
       )
@@ -112,8 +82,24 @@ export default function WalletConnectButton({
     )
   }
 
-  // Wrong network indicator - update with consistent colors
-  const isWrongNetwork = chainId && ![1, 5, 11155111, 17000].includes(chainId) // Mainnet, Goerli, Sepolia, Holesky
+  // Wrong network indicator - support project deployed networks
+  const supportedChainIds = [
+    1,         // Ethereum Mainnet
+    11155111,  // Sepolia
+    17000,     // Holesky
+    31337,     // Localhost/Hardhat
+    71,        // Conflux eSpace Testnet
+    1030,      // Conflux eSpace Mainnet
+    137,       // Polygon Mainnet
+    80002,     // Polygon Amoy Testnet
+    56,        // BSC Mainnet
+    97,        // BSC Testnet
+    42161,     // Arbitrum Mainnet
+    421614,    // Arbitrum Sepolia
+    10,        // Optimism Mainnet
+    11155420,  // Optimism Sepolia
+  ]
+  const isWrongNetwork = chainId && !supportedChainIds.includes(chainId)
 
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
