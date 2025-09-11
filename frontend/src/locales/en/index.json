@@ -448,7 +448,7 @@
     "connecting": "Connecting...",
     "disconnect": "Disconnect",
     "wrongNetwork": "Wrong Network",
-    "noMetaMask": "Please install MetaMask or Conflux Portal",
+    "noMetaMask": "Please install MetaMask",
     "connected": "Wallet connected successfully",
     "rejected": "Connection rejected by user",
     "pending": "Connection request already pending",

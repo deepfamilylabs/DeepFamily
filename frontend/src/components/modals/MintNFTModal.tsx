@@ -60,7 +60,6 @@ export default function MintNFTModal({
   const { address } = useWallet()
   const { mintPersonNFT, getVersionDetails } = useContract()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [mintingFee, setMintingFee] = useState<string>('0')
   const [isEndorsed, setIsEndorsed] = useState(false)
 
   const {
@@ -397,19 +396,6 @@ export default function MintNFTModal({
                 <p className="mt-1 text-sm text-red-600">{errors.tokenURI.message}</p>
               )}
             </div>
-          </div>
-
-          {/* Minting Fee */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <Coins className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {t('mintNFT.mintingFee', 'Minting Fee')}: {mintingFee} ETH
-              </span>
-            </div>
-            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-              {t('mintNFT.feeDescription', 'Fee will be distributed to endorsers and version contributors')}
-            </p>
           </div>
 
           {/* Submit Button */}
