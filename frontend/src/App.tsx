@@ -8,10 +8,12 @@ import SearchPage from './pages/SearchPage'
 import PersonPage from './pages/PersonPage'
 import PeoplePage from './pages/PeoplePage'
 import StoryEditorPage from './pages/StoryEditorPage'
+import ActionsPage from './pages/ActionsPage'
 import { ConfigProvider } from './context/ConfigContext'
 import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
 import { TreeDataProvider } from './context/TreeDataContext'
+import { WalletProvider } from './context/WalletContext'
 
 function TitleUpdater() {
   const { t, i18n } = useTranslation()
@@ -29,6 +31,8 @@ function TitleUpdater() {
           return `${baseName} - ${t('navigation.search')}`
         case '/people':
           return `${baseName} - ${t('navigation.people')}`
+        case '/actions':
+          return `${baseName} - ${t('navigation.actions', 'Actions')}`
         default:
           if (location.pathname.startsWith('/person/')) {
             return `${baseName} - ${t('person.pageTitle', 'Person Biography')}`
@@ -58,6 +62,7 @@ function RouterContent() {
             <Route path="visualization" element={<VisualizationPage />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="people" element={<PeoplePage />} />
+            <Route path="actions" element={<ActionsPage />} />
             {/* Person and Editor under Layout to keep header/footer */}
             <Route path="person/:tokenId" element={<PersonPage />} />
             <Route path="editor/:tokenId" element={<StoryEditorPage />} />
@@ -72,10 +77,12 @@ export default function App() {
   return (
     <ConfigProvider>
       <ToastProvider>
-        <BrowserRouter>
-          <TitleUpdater />
-          <RouterContent />
-        </BrowserRouter>
+        <WalletProvider>
+          <BrowserRouter>
+            <TitleUpdater />
+            <RouterContent />
+          </BrowserRouter>
+        </WalletProvider>
       </ToastProvider>
     </ConfigProvider>
   )
