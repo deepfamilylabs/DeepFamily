@@ -42,7 +42,7 @@ function solidityStringHash(s) {
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
   // First compute fullNameHash from fullName
   const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
-  
+
   return await deepFamily.getPersonHash({
     fullNameHash: fullNameHash,
     isBirthBC: basicInfo.isBirthBC,
@@ -617,7 +617,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     const coreFromInfo = async (b) => {
       // Get fullNameHash for basicInfo
       const fullNameHash = await deepFamily.getFullNameHash(b.fullName);
-      
+
       return {
         basicInfo: {
           fullNameHash: fullNameHash,

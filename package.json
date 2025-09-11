@@ -19,7 +19,7 @@
     "size": "hardhat size-contracts",
     "lint": "solhint 'contracts/**/*.sol'",
     "lint:fix": "solhint 'contracts/**/*.sol' --fix",
-    "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.js' 'deploy/**/*.js' 'tasks/**/*.js'",
+    "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.js' 'deploy/**/*.js' 'tasks/**/*.js' 'circuits/**/*.js'",
     "prepare": "husky",
     "frontend:seed-demo": "node scripts/seed-demo.js",
     "frontend:dev": "npm run dev --prefix frontend",
