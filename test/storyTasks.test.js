@@ -33,8 +33,9 @@ describe('Story Tasks Integration', function () {
     });
 
     // Compute personHash to use in later tasks
+    const fullNameHash = await deepFamily.getFullNameHash(FULLNAME);
     const basicInfo = {
-      fullName: FULLNAME,
+      fullNameHash: fullNameHash,
       isBirthBC: false,
       birthYear: parseInt(BIRTH_YEAR, 10),
       birthMonth: 0,

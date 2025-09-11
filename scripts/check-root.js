@@ -1,9 +1,12 @@
 const hre = require("hardhat");
 
-// Helper: call new getPersonHash (using PersonBasicInfo struct)
+// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
+  // First compute fullNameHash from fullName
+  const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
+  
   return await deepFamily.getPersonHash({
-    fullName: basicInfo.fullName,
+    fullNameHash: fullNameHash,
     isBirthBC: basicInfo.isBirthBC,
     birthYear: basicInfo.birthYear,
     birthMonth: basicInfo.birthMonth,

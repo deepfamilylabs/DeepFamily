@@ -1,5 +1,5 @@
 // person_hash_zk.circom
-// Test version, only supports nameLen=5 (Alice, Bob, etc.)
+// Production version using fullNameHash (32 bytes) - solves variable length problem completely
 pragma circom 2.1.6;
 
 include "circomlib/circuits/bitify.circom";
@@ -50,9 +50,9 @@ template HashToLimbs() {
     limb1 <== acc1[16];
 }
 
-// Fixed-length PersonHasher (nameLen=5)
-template PersonHasherFixed5() {
-    signal input nameBytes[5];  // Only accepts 5-byte names
+// Fixed-length PersonHasher using fullNameHash (32 bytes)
+template PersonHasher() {
+    signal input fullNameHash[32];  // 32-byte hash of the full name
     signal input isBirthBC;
     signal input birthYear;
     signal input birthMonth;
@@ -62,49 +62,46 @@ template PersonHasherFixed5() {
     signal output hashBytes[32];
     
     // Constraint checks
-    component birthMonthCheck = LessThan(8);
+    component birthMonthCheck = LessEqThan(4);
     birthMonthCheck.in[0] <== birthMonth;
-    birthMonthCheck.in[1] <== 13;
+    birthMonthCheck.in[1] <== 12;
     birthMonthCheck.out === 1;
     
-    component birthDayCheck = LessThan(8);
+    component birthDayCheck = LessEqThan(5);
     birthDayCheck.in[0] <== birthDay;
-    birthDayCheck.in[1] <== 32;
+    birthDayCheck.in[1] <== 31;
     birthDayCheck.out === 1;
     
     component bcBit = Num2Bits(1);
     bcBit.in <== isBirthBC;
     
-    component nameByteCheck[5];
-    for (var i = 0; i < 5; i++) {
-        nameByteCheck[i] = Num2Bits(8);
-        nameByteCheck[i].in <== nameBytes[i];
+    // Validate all fullNameHash bytes
+    component hashByteCheck[32];
+    for (var i = 0; i < 32; i++) {
+        hashByteCheck[i] = Num2Bits(8);
+        hashByteCheck[i].in <== fullNameHash[i];
     }
-    
-    // Construct byte conversions
-    component nameLenToBytes = Uint16ToBytes();
-    nameLenToBytes.v <== 5; // Fixed length 5
     
     component yearToBytes = Uint16ToBytes();
     yearToBytes.v <== birthYear;
     
-    // Construct preimage: uint16(5) + nameBytes[5] + uint8(isBirthBC) + uint16(birthYear) + uint8(birthMonth) + uint8(birthDay) + uint8(gender)
-    // Total length: 2 + 5 + 1 + 2 + 1 + 1 + 1 = 13 bytes
+    // Construct preimage: fullNameHash[32] + uint8(isBirthBC) + uint16(birthYear) + uint8(birthMonth) + uint8(birthDay) + uint8(gender)
+    // Total length: 32 + 1 + 2 + 1 + 1 + 1 = 38 bytes
     
-    component keccak = SimpleKeccak(13);
-    keccak.in[0] <== nameLenToBytes.b0;  // nameLen high byte
-    keccak.in[1] <== nameLenToBytes.b1;  // nameLen low byte
-    keccak.in[2] <== nameBytes[0];       // name[0]
-    keccak.in[3] <== nameBytes[1];       // name[1]
-    keccak.in[4] <== nameBytes[2];       // name[2]
-    keccak.in[5] <== nameBytes[3];       // name[3]
-    keccak.in[6] <== nameBytes[4];       // name[4]
-    keccak.in[7] <== isBirthBC;          // isBirthBC
-    keccak.in[8] <== yearToBytes.b0;     // birthYear high byte
-    keccak.in[9] <== yearToBytes.b1;     // birthYear low byte
-    keccak.in[10] <== birthMonth;        // birthMonth
-    keccak.in[11] <== birthDay;          // birthDay
-    keccak.in[12] <== gender;            // gender
+    component keccak = SimpleKeccak(38);
+    
+    // fullNameHash (32 bytes)
+    for (var i = 0; i < 32; i++) {
+        keccak.in[i] <== fullNameHash[i];
+    }
+    
+    // Other fields (6 bytes)
+    keccak.in[32] <== isBirthBC;
+    keccak.in[33] <== yearToBytes.b0;     // birthYear high byte
+    keccak.in[34] <== yearToBytes.b1;     // birthYear low byte
+    keccak.in[35] <== birthMonth;
+    keccak.in[36] <== birthDay;
+    keccak.in[37] <== gender;
     
     for (var i = 0; i < 32; i++) {
         hashBytes[i] <== keccak.out[i];
@@ -113,24 +110,24 @@ template PersonHasherFixed5() {
 
 // Main test circuit
 template PersonHashTest() {
-    // Member to be added (fixed nameLen=5)
-    signal input nameBytes[5];
+    // Person to be added
+    signal input fullNameHash[32];
     signal input isBirthBC;
     signal input birthYear;
     signal input birthMonth;
     signal input birthDay;
     signal input gender;
     
-    // Father (fixed nameLen=3, Bob)
-    signal input father_nameBytes[3];
+    // Father
+    signal input father_fullNameHash[32];
     signal input father_isBirthBC;
     signal input father_birthYear;
     signal input father_birthMonth;
     signal input father_birthDay;
     signal input father_gender;
     
-    // Mother (fixed nameLen=5, Carol)
-    signal input mother_nameBytes[5];
+    // Mother
+    signal input mother_fullNameHash[32];
     signal input mother_isBirthBC;
     signal input mother_birthYear;
     signal input mother_birthMonth;
@@ -149,10 +146,10 @@ template PersonHashTest() {
     signal output mother_limb1;
     signal output submitter_out;
     
-    // Calculate hash of member to be added (nameLen=5)
-    component personHasher = PersonHasherFixed5();
-    for (var i = 0; i < 5; i++) {
-        personHasher.nameBytes[i] <== nameBytes[i];
+    // Calculate hash of person to be added
+    component personHasher = PersonHasher();
+    for (var i = 0; i < 32; i++) {
+        personHasher.fullNameHash[i] <== fullNameHash[i];
     }
     personHasher.isBirthBC <== isBirthBC;
     personHasher.birthYear <== birthYear;
@@ -160,29 +157,21 @@ template PersonHashTest() {
     personHasher.birthDay <== birthDay;
     personHasher.gender <== gender;
     
-    // Calculate father hash (nameLen=3, needs a Fixed3 version)
-    component fatherKeccak = SimpleKeccak(11); // 2+3+6=11
-    component fNameLenToBytes = Uint16ToBytes();
-    fNameLenToBytes.v <== 3;
-    component fYearToBytes = Uint16ToBytes();
-    fYearToBytes.v <== father_birthYear;
+    // Calculate father hash using PersonHasher
+    component fatherHasher = PersonHasher();
+    for (var i = 0; i < 32; i++) {
+        fatherHasher.fullNameHash[i] <== father_fullNameHash[i];
+    }
+    fatherHasher.isBirthBC <== father_isBirthBC;
+    fatherHasher.birthYear <== father_birthYear;
+    fatherHasher.birthMonth <== father_birthMonth;
+    fatherHasher.birthDay <== father_birthDay;
+    fatherHasher.gender <== father_gender;
     
-    fatherKeccak.in[0] <== fNameLenToBytes.b0;
-    fatherKeccak.in[1] <== fNameLenToBytes.b1;
-    fatherKeccak.in[2] <== father_nameBytes[0];
-    fatherKeccak.in[3] <== father_nameBytes[1];
-    fatherKeccak.in[4] <== father_nameBytes[2];
-    fatherKeccak.in[5] <== father_isBirthBC;
-    fatherKeccak.in[6] <== fYearToBytes.b0;
-    fatherKeccak.in[7] <== fYearToBytes.b1;
-    fatherKeccak.in[8] <== father_birthMonth;
-    fatherKeccak.in[9] <== father_birthDay;
-    fatherKeccak.in[10] <== father_gender;
-    
-    // Calculate mother hash (nameLen=5)
-    component motherHasher = PersonHasherFixed5();
-    for (var i = 0; i < 5; i++) {
-        motherHasher.nameBytes[i] <== mother_nameBytes[i];
+    // Calculate mother hash using PersonHasher
+    component motherHasher = PersonHasher();
+    for (var i = 0; i < 32; i++) {
+        motherHasher.fullNameHash[i] <== mother_fullNameHash[i];
     }
     motherHasher.isBirthBC <== mother_isBirthBC;
     motherHasher.birthYear <== mother_birthYear;
@@ -197,7 +186,7 @@ template PersonHashTest() {
     
     for (var i = 0; i < 32; i++) {
         personLimbs.hashBytes[i] <== personHasher.hashBytes[i];
-        fatherLimbs.hashBytes[i] <== fatherKeccak.out[i];
+        fatherLimbs.hashBytes[i] <== fatherHasher.hashBytes[i];
         motherLimbs.hashBytes[i] <== motherHasher.hashBytes[i];
     }
     

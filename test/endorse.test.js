@@ -12,7 +12,8 @@ describe('Endorse Tests', function () {
     const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
     const p = { fullname: 'Eva Sample', birthyear: '1985', gender: '2', tag: 'v1', ipfs: 'QmEva1' };
     await hre.run('add-person', p);
-    const basicInfo = { fullName: p.fullname, isBirthBC: false, birthYear: 1985, birthMonth: 0, birthDay: 0, gender: 2 };
+    const fullNameHash = await deepFamily.getFullNameHash(p.fullname);
+    const basicInfo = { fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1985, birthMonth: 0, birthDay: 0, gender: 2 };
     const personHash = await deepFamily.getPersonHash(basicInfo);
     return { deepFamily, personHash };
   }

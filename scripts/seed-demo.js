@@ -38,10 +38,13 @@ function solidityStringHash(s) {
   return ethers.keccak256(ethers.toUtf8Bytes(s));
 }
 
-// Helper: call new getPersonHash (using PersonBasicInfo struct)
+// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
+  // First compute fullNameHash from fullName
+  const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
+  
   return await deepFamily.getPersonHash({
-    fullName: basicInfo.fullName,
+    fullNameHash: fullNameHash,
     isBirthBC: basicInfo.isBirthBC,
     birthYear: basicInfo.birthYear,
     birthMonth: basicInfo.birthMonth,
@@ -611,25 +614,31 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       const j = Math.floor(rand() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    const coreFromInfo = (b) => ({
-      basicInfo: {
-        fullName: b.fullName,
-        isBirthBC: b.isBirthBC,
-        birthYear: b.birthYear,
-        birthMonth: b.birthMonth || 1,
-        birthDay: b.birthDay || 1,
-        gender: b.gender,
-      },
-      supplementInfo: {
-        birthPlace: PLACE,
-        isDeathBC: false,
-        deathYear: randomDeathYear(b.birthYear),
-        deathMonth: 12,
-        deathDay: 31,
-        deathPlace: PLACE,
-        story: LONG_STORY,
-      },
-    });
+    const coreFromInfo = async (b) => {
+      // Get fullNameHash for basicInfo
+      const fullNameHash = await deepFamily.getFullNameHash(b.fullName);
+      
+      return {
+        basicInfo: {
+          fullNameHash: fullNameHash,
+          isBirthBC: b.isBirthBC,
+          birthYear: b.birthYear,
+          birthMonth: b.birthMonth || 1,
+          birthDay: b.birthDay || 1,
+          gender: b.gender,
+        },
+        supplementInfo: {
+          fullName: b.fullName, // fullName now goes in supplementInfo
+          birthPlace: PLACE,
+          isDeathBC: false,
+          deathYear: randomDeathYear(b.birthYear),
+          deathMonth: 12,
+          deathDay: 31,
+          deathPlace: PLACE,
+          story: LONG_STORY,
+        },
+      };
+    };
     let minted = 0;
     for (let i = 0; i < TARGET_NFTS && i < shuffled.length; i++) {
       const n = shuffled[i];
@@ -658,7 +667,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
         }
         let t1 = await deepFamily.endorseVersion(n.hash, n.ver);
         await t1.wait();
-        const core = coreFromInfo(n.info);
+        const core = await coreFromInfo(n.info);
         let t2 = await deepFamily.mintPersonNFT(n.hash, n.ver, `ipfs://seed/${i}`, core);
         await t2.wait();
         minted++;
@@ -720,13 +729,9 @@ async function addPersonVersion({
     dlog(`Person ${info.fullName} doesn't exist yet, proceeding to add`);
   }
 
-  // nameHash = keccak256(abi.encodePacked(string))
-  const nameHash = ethers.keccak256(ethers.toUtf8Bytes(info.fullName));
-
   try {
     const tx = await deepFamily.addPerson(
       personHash,
-      nameHash,
       fatherHash,
       motherHash,
       fatherVersionIndex,

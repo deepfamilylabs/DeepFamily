@@ -560,7 +560,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
               const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
               const tag = vs2.tag || vs2[8]
               const metadataCID = vs2.metadataCID || vs2[9]
-              const fullName = coreInfo?.basicInfo?.fullName
+              const fullName = coreInfo?.supplementInfo?.fullName
               const gender = coreInfo?.basicInfo?.gender !== undefined ? Number(coreInfo.basicInfo.gender) : undefined
               const birthYear = coreInfo?.basicInfo?.birthYear !== undefined ? Number(coreInfo.basicInfo.birthYear) : undefined
               const birthMonth = coreInfo?.basicInfo?.birthMonth !== undefined ? Number(coreInfo.basicInfo.birthMonth) : undefined
@@ -686,7 +686,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       const tag = vs.tag || vs[8]
       const metadataCID = vs.metadataCID || vs[9]
 
-      const fullName = coreInfo?.basicInfo?.fullName
+      const fullName = coreInfo?.supplementInfo?.fullName
       const gender = coreInfo?.basicInfo?.gender !== undefined ? Number(coreInfo.basicInfo.gender) : undefined
       const birthYear = coreInfo?.basicInfo?.birthYear !== undefined ? Number(coreInfo.basicInfo.birthYear) : undefined
       const birthMonth = coreInfo?.basicInfo?.birthMonth !== undefined ? Number(coreInfo.basicInfo.birthMonth) : undefined

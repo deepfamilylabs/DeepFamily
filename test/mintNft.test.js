@@ -13,12 +13,13 @@ describe('Mint NFT Tests', function () {
     const FULLNAME = 'Mint Subject';
     const params = { fullname: FULLNAME, birthyear: '1999', gender: '1', tag: 'v1', ipfs: 'QmMint1' };
     await hre.run('add-person', params);
-    const basicInfo = { fullName: FULLNAME, isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 };
+    const fullNameHash = await deepFamily.getFullNameHash(FULLNAME);
+    const basicInfo = { fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 };
     const personHash = await deepFamily.getPersonHash(basicInfo);
     if (endorsed) {
       await hre.run('endorse', { person: personHash, vindex: '1' });
     }
-    return { deepFamily, personHash, FULLNAME };
+    return { deepFamily, personHash, FULLNAME, fullNameHash, basicInfo };
   }
 
   it('fails mint through task before endorsement (task layer error)', async () => {
@@ -73,5 +74,98 @@ describe('Mint NFT Tests', function () {
     };
     await hre.run('mint-nft', commonArgs);
     await expect(hre.run('mint-nft', commonArgs)).to.be.rejectedWith(/VersionAlreadyMinted/);
+  });
+
+  it('rejects empty fullName in supplementInfo via direct contract call', async () => {
+    const { deepFamily, personHash, fullNameHash, basicInfo } = await prepare(true);
+    
+    const coreInfo = {
+      basicInfo: basicInfo,
+      supplementInfo: {
+        fullName: '', // Empty fullName should fail
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story'
+      }
+    };
+
+    await expect(
+      deepFamily.mintPersonNFT(personHash, 1, 'ipfs://meta', coreInfo)
+    ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName');
+  });
+
+  it('rejects oversized fullName in supplementInfo via direct contract call', async () => {
+    const { deepFamily, personHash, fullNameHash, basicInfo } = await prepare(true);
+    
+    const longName = 'A'.repeat(1001); // Exceeds MAX_LONG_TEXT_LENGTH
+    const coreInfo = {
+      basicInfo: basicInfo,
+      supplementInfo: {
+        fullName: longName,
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story'
+      }
+    };
+
+    await expect(
+      deepFamily.mintPersonNFT(personHash, 1, 'ipfs://meta', coreInfo)
+    ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName');
+  });
+
+  it('rejects mismatched fullName and fullNameHash via direct contract call', async () => {
+    const { deepFamily, personHash, fullNameHash, basicInfo } = await prepare(true);
+    
+    const coreInfo = {
+      basicInfo: basicInfo,
+      supplementInfo: {
+        fullName: 'Different Name', // Doesn't match the hash in basicInfo
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story'
+      }
+    };
+
+    await expect(
+      deepFamily.mintPersonNFT(personHash, 1, 'ipfs://meta', coreInfo)
+    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
+  });
+
+  it('accepts valid fullName that matches fullNameHash via direct contract call', async () => {
+    const { deepFamily, personHash, FULLNAME, fullNameHash, basicInfo } = await prepare(true);
+    
+    const coreInfo = {
+      basicInfo: basicInfo,
+      supplementInfo: {
+        fullName: FULLNAME, // Matches the hash in basicInfo
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story'
+      }
+    };
+
+    await expect(
+      deepFamily.mintPersonNFT(personHash, 1, 'ipfs://meta', coreInfo)
+    ).to.not.be.reverted;
+
+    // Verify the NFT was minted
+    const tokenCounter = await deepFamily.tokenCounter();
+    expect(tokenCounter).to.equal(1n);
   });
 });
