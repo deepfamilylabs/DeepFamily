@@ -64,13 +64,13 @@ export default function Home() {
           {/* Enhanced CTA Buttons */}
           <div className="animate-fade-in-up animation-delay-400 flex flex-row flex-wrap items-center justify-center gap-2 sm:gap-3 lg:gap-6 mb-16 px-2 sm:px-4 max-w-6xl mx-auto">
             <NavLink 
-              to="/people" 
+              to="/actions" 
               className="group relative inline-flex items-center justify-center px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 py-2.5 sm:py-3 md:py-4 lg:py-5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold text-xs sm:text-sm md:text-base lg:text-lg hover:from-blue-700 hover:to-purple-700 dark:from-blue-500 dark:to-purple-600 dark:hover:from-blue-400 dark:hover:to-purple-500 transform hover:scale-105 transition-all duration-300 shadow-xl sm:shadow-2xl hover:shadow-blue-500/25 dark:shadow-blue-500/10 dark:hover:shadow-blue-400/20 overflow-hidden whitespace-nowrap flex-shrink-0"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative flex items-center gap-1.5 sm:gap-2 lg:gap-3 justify-center">
-                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 flex-shrink-0" />
-                <span className="text-xs sm:text-sm md:text-base lg:text-lg">{t('home.addPerson')}</span>
+                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 flex-shrink-0" />
+                <span className="text-xs sm:text-sm md:text-base lg:text-lg">{t('home.blockchainActions', 'Blockchain Actions')}</span>
               </div>
             </NavLink>
             

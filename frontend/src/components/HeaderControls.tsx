@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Moon, Sun } from 'lucide-react'
 import LanguageSwitch from './LanguageSwitch'
+import WalletConnectButton from './WalletConnectButton'
 
 interface HeaderControlsProps {
   variant?: 'home' | 'normal'
@@ -26,6 +27,10 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
 
   return (
     <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+      <WalletConnectButton 
+        className="hidden sm:inline-flex"
+        showBalance={false}
+      />
       <LanguageSwitch variant={variant} />
       <button
         onClick={toggleTheme}
