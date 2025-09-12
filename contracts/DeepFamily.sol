@@ -22,7 +22,7 @@ interface IPersonHashVerifier {
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[] calldata publicSignals
+    uint256[7] calldata publicSignals
   ) external view returns (bool);
 }
 
@@ -624,8 +624,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (submitter >> 160 != 0) revert InvalidZKProof();
     if (submitter != uint256(uint160(msg.sender))) revert InvalidZKProof();
 
-    // verify ZK proof
-    if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals)) {
+    // verify ZK proof (verifier expects fixed-size [7] array)
+    uint256[7] memory fixedSignals;
+    unchecked {
+      for (uint256 i = 0; i < 7; ++i) fixedSignals[i] = publicSignals[i];
+    }
+    if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, fixedSignals)) {
       revert InvalidZKProof();
     }
 
