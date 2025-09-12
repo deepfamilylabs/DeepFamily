@@ -39,6 +39,9 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337,
+      gas: 30000000, // 30M gas limit for ZK proof verification
+      gasPrice: "auto",
+      timeout: 1200000,
     },
     
     // Built-in Hardhat network - allow large contracts
@@ -46,6 +49,9 @@ module.exports = {
       chainId: 31337,
       // Allow unlimited contract size locally; can be controlled via env UNLIMITED_SIZE
       allowUnlimitedContractSize: (process.env.UNLIMITED_SIZE || "true") === "true",
+      gas: 30000000, // 30M gas limit for ZK proof verification
+      gasPrice: "auto",
+      blockGasLimit: 30000000, // Block gas limit
     },
     
     // Ethereum test network
@@ -249,11 +255,11 @@ module.exports = {
     maxMethodDiff: 10,
   },
   
-  // Contract size checker
+  // Contract size checker - temporarily disabled due to JSON parsing issue
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: true,
+    runOnCompile: false, // Disabled to avoid JSON parsing errors
     strict: process.env.CONTRACT_SIZER_STRICT === "true",
   },
   

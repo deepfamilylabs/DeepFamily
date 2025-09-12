@@ -16,17 +16,25 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     waitConfirmations: network.live ? 2 : 1,
   });
 
-  // 2) Deploy DeepFamily with the DeepFamilyToken address and fake verifier address
-  // Using a fake non-zero verifier address for testing purposes
-  const fakeVerifierAddress = "0x1111111111111111111111111111111111111111";
-  const deepFamilyDeployment = await deploy("DeepFamily", {
+  // 2) Deploy PersonHashVerifier (ZK proof verifier contract)
+  const verifierDeployment = await deploy("PersonHashVerifier", {
     from: deployer,
-    args: [tokenDeployment.address, fakeVerifierAddress],
+    args: [],
     log: true,
     waitConfirmations: network.live ? 2 : 1,
   });
 
-  // 3) Initialize the DeepFamilyToken contract (set DeepFamily address)
+  log(`PersonHashVerifier deployed at: ${verifierDeployment.address}`);
+
+  // 3) Deploy DeepFamily with the DeepFamilyToken address and real verifier address
+  const deepFamilyDeployment = await deploy("DeepFamily", {
+    from: deployer,
+    args: [tokenDeployment.address, verifierDeployment.address],
+    log: true,
+    waitConfirmations: network.live ? 2 : 1,
+  });
+
+  // 4) Initialize the DeepFamilyToken contract (set DeepFamily address)
   const deepFamilyToken = await ethers.getContractAt("DeepFamilyToken", tokenDeployment.address);
   const initialized = (await deepFamilyToken.totalAdditions()) !== undefined; // Read-only to avoid call revert
   // initialize can be called only once; read deepFamilyContract and initialize if zero address
@@ -47,4 +55,4 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 };
 
 module.exports = func;
-module.exports.tags = ["DeepFamily", "DeepFamilyToken", "Integrated"];
+module.exports.tags = ["DeepFamily", "DeepFamilyToken", "PersonHashVerifier", "Integrated"];

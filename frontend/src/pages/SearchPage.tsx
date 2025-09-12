@@ -422,7 +422,7 @@ export default function SearchPage() {
 
   const handleHashFormChange = useCallback((formData: HashForm) => {
     setCurrentHashForm(formData)
-    // 不自动计算，保持原有的手动计算行为
+    // Don't auto-calculate, maintain original manual calculation behavior
   }, [])
 
   const handleComputeHash = () => {

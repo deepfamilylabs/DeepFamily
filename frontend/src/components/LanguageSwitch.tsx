@@ -10,8 +10,8 @@ interface Language {
 
 const languages: Language[] = [
   { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文' },
-  { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: '繁體中文' }
+  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: 'Simplified Chinese' },
+  { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: 'Traditional Chinese' }
 ]
 
 interface LanguageSwitchProps {
@@ -61,7 +61,7 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
         <Globe className={`w-4 h-4 flex-shrink-0 ${
           isHomePage ? 'text-white/80 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
         }`} />
-        {/* 在小屏幕时隐藏文字，只显示图标 */}
+        {/* Hide text on small screens, only show icon */}
         <span className="text-sm font-medium hidden lg:inline truncate max-w-16 lg:max-w-20">
           {currentLanguage.nativeName}
         </span>

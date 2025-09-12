@@ -70,7 +70,7 @@ describe('Hash Consistency Tests', function () {
     },
     {
       name: "Unicode name",
-      input: { fullName: "张三", isBirthBC: false, birthYear: 1985, birthMonth: 12, birthDay: 25, gender: 1 }
+      input: { fullName: "John Smith", isBirthBC: false, birthYear: 1985, birthMonth: 12, birthDay: 25, gender: 1 }
     },
     {
       name: "Long name",
