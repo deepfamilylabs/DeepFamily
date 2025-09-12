@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, Search, Eye, Book, Zap } from 'lucide-react'
+import { Home, Search, Network, Book } from 'lucide-react'
 import HeaderControls from './HeaderControls'
 import Logo from './Logo'
 import PageContainer from './PageContainer'
@@ -61,20 +61,16 @@ export default function SiteHeader() {
             <span className="hidden lg:inline">{t('navigation.home')}</span>
           </NavLink>
           <NavLink to="/visualization" className={navClasses}>
-            <Eye className="w-4 h-4" /> 
-            <span className="hidden lg:inline">{t('navigation.visualization')}</span>
-          </NavLink>
-          <NavLink to="/actions" className={navClasses}>
-            <Zap className="w-4 h-4" /> 
-            <span className="hidden lg:inline">{t('navigation.actions', 'Actions')}</span>
-          </NavLink>
-          <NavLink to="/search" className={navClasses}>
-            <Search className="w-4 h-4" /> 
-            <span className="hidden lg:inline">{t('navigation.search')}</span>
+            <Network className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.genealogy', '族谱')}</span>
           </NavLink>
           <NavLink to="/people" className={navClasses}>
             <Book className="w-4 h-4" /> 
             <span className="hidden lg:inline">{t('navigation.people')}</span>
+          </NavLink>
+          <NavLink to="/search" className={navClasses}>
+            <Search className="w-4 h-4" /> 
+            <span className="hidden lg:inline">{t('navigation.search')}</span>
           </NavLink>
         </nav>
         <HeaderControls variant={isHomePage ? 'home' : 'normal'} />

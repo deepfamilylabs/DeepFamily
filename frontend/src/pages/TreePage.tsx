@@ -6,7 +6,7 @@ import { useTreeData } from '../context/TreeDataContext'
 import { useVizOptions } from '../context/VizOptionsContext'
 import { useConfig } from '../context/ConfigContext'
 
-export default function VisualizationPage() {
+export default function TreePage() {
   const { traversal, includeVersionDetails, setTraversal, setIncludeVersionDetails } = useVizOptions()
   const { strictCacheOnly, update } = useConfig()
   const [viewMode, setViewMode] = useState<'dag' | 'tree' | 'force' | 'virtual'>(() => {
