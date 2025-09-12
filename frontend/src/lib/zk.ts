@@ -74,9 +74,12 @@ export async function submitAddPersonZK(
   const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer)
   // Convert snarkjs format to contract format (take first 2 elements)
   const a = [toBigInt(proof.pi_a[0]), toBigInt(proof.pi_a[1])]
+  // Note: snarkjs outputs G2 points as [[bx1, bx2], [by1, by2]] but Solidity verifier expects
+  // the pairs in swapped order per limb for bn128 (see common Groth16 mappings).
+  // Use [[b00, b01], [b10, b11]] = [[pi_b[0][1], pi_b[0][0]], [pi_b[1][1], pi_b[1][0]]]
   const b = [
-    [toBigInt(proof.pi_b[0][0]), toBigInt(proof.pi_b[0][1])],
-    [toBigInt(proof.pi_b[1][0]), toBigInt(proof.pi_b[1][1])],
+    [toBigInt(proof.pi_b[0][1]), toBigInt(proof.pi_b[0][0])],
+    [toBigInt(proof.pi_b[1][1]), toBigInt(proof.pi_b[1][0])],
   ]
   const c = [toBigInt(proof.pi_c[0]), toBigInt(proof.pi_c[1])]
   const pub = publicSignals.map(toBigInt)
@@ -265,5 +268,4 @@ export async function verifyProof(
     return false
   }
 }
-
 
