@@ -623,6 +623,14 @@
     "mintNFTHint": "First search for a person and version to mint as NFT",
     "openMintNFT": "Open NFT Minting",
     "endorseHint": "Search for person versions to endorse",
-    "openEndorse": "Open Endorsement"
+    "openEndorse": "Open Endorsement",
+    "zkTest": "ZK Proof Test",
+    "zkTestDesc": "Test zero-knowledge proof generation with parent existence flags",
+    "zkTestHint": "Test the improved ZK proof generation with parent existence flags",
+    "testFeatures": "Test Features",
+    "testParentExists": "Generate proof with existing parents",
+    "testNoParents": "Generate proof with no parents (outputs bytes32(0))",
+    "testVerification": "Verify proof validity in browser",
+    "testCompatibility": "Test smart contract compatibility"
   }
 }

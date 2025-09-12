@@ -4,6 +4,7 @@ pragma circom 2.1.6;
 
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
+include "circomlib/circuits/mux1.circom";
 include "lib/keccak256.circom";
 
 // Convert uint16 to big-endian bytes
@@ -134,6 +135,10 @@ template PersonHashTest() {
     signal input mother_birthDay;
     signal input mother_gender;
     
+    // Parent existence flags
+    signal input hasFather;
+    signal input hasMother;
+    
     // Submitter
     signal input submitter;
     
@@ -190,12 +195,41 @@ template PersonHashTest() {
         motherLimbs.hashBytes[i] <== motherHasher.hashBytes[i];
     }
     
+    // Validate parent existence flags are 0 or 1
+    component fatherBitCheck = Num2Bits(1);
+    component motherBitCheck = Num2Bits(1);
+    fatherBitCheck.in <== hasFather;
+    motherBitCheck.in <== hasMother;
+    
+    // Use Mux1 to conditionally output parent hashes
+    component fatherSelect0 = Mux1();
+    component fatherSelect1 = Mux1();
+    component motherSelect0 = Mux1();
+    component motherSelect1 = Mux1();
+    
+    fatherSelect0.c[0] <== 0;  // Output 0 if father doesn't exist
+    fatherSelect0.c[1] <== fatherLimbs.limb0;  // Output computed hash if father exists
+    fatherSelect0.s <== hasFather;
+    
+    fatherSelect1.c[0] <== 0;
+    fatherSelect1.c[1] <== fatherLimbs.limb1;
+    fatherSelect1.s <== hasFather;
+    
+    motherSelect0.c[0] <== 0;  // Output 0 if mother doesn't exist
+    motherSelect0.c[1] <== motherLimbs.limb0;  // Output computed hash if mother exists
+    motherSelect0.s <== hasMother;
+    
+    motherSelect1.c[0] <== 0;
+    motherSelect1.c[1] <== motherLimbs.limb1;
+    motherSelect1.s <== hasMother;
+    
+    // Final outputs
     person_limb0 <== personLimbs.limb0;
     person_limb1 <== personLimbs.limb1;
-    father_limb0 <== fatherLimbs.limb0;
-    father_limb1 <== fatherLimbs.limb1;
-    mother_limb0 <== motherLimbs.limb0;
-    mother_limb1 <== motherLimbs.limb1;
+    father_limb0 <== fatherSelect0.out;
+    father_limb1 <== fatherSelect1.out;
+    mother_limb0 <== motherSelect0.out;
+    mother_limb1 <== motherSelect1.out;
     submitter_out <== submitter;
 }
 

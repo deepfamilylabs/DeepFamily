@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,6 +10,7 @@ import { useToast } from '../components/ToastProvider'
 import DeepFamily from '../abi/DeepFamily.json'
 import { formatUnixSeconds } from '../types/graph'
 import { makeProvider } from '../utils/provider'
+import PersonHashCalculator, { HashForm, computePersonHashLocal } from '../components/PersonHashCalculator'
 
 const MAX_FULL_NAME_BYTES = 256
 const MAX_PAGE_SIZE = 100  
@@ -85,87 +86,31 @@ const ThemedSelect: React.FC<{
   )
 }
 
+// Type definitions for forms
+type EndorsementStatsForm = {
+  personHash: string
+  pageSize: number
+}
 
-const endorsementStatsSchema = z.object({
-  personHash: z.string().min(1).regex(/^0x[a-fA-F0-9]{64}$/),
-  pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-})
-type EndorsementStatsForm = z.infer<typeof endorsementStatsSchema>
+type TokenURIHistoryForm = {
+  tokenId: number
+  pageSize: number
+}
 
-const tokenURIHistorySchema = z.object({
-  tokenId: z.number().int().min(1),
-  pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-})
-type TokenURIHistoryForm = z.infer<typeof tokenURIHistorySchema>
+type PersonVersionsForm = {
+  personHash: string
+  pageSize: number
+}
 
-const personVersionsSchema = z.object({
-  personHash: z.string().min(1).regex(/^0x[a-fA-F0-9]{64}$/),
-  pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-})
-type PersonVersionsForm = z.infer<typeof personVersionsSchema>
+type StoryChunksForm = {
+  tokenId: number
+  pageSize: number
+}
 
-const storyChunksSchema = z.object({
-  tokenId: z.number().int().min(1),
-  pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-})
-type StoryChunksForm = z.infer<typeof storyChunksSchema>
-
-const childrenSchema = z.object({
-  parentHash: z.string().min(1).regex(/^0x[a-fA-F0-9]{64}$/),
-  parentVersionIndex: z.number().int().min(1),
-  pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
-})
-type ChildrenForm = z.infer<typeof childrenSchema>
-
-const hashFormSchema = z.object({
-  fullName: z.string().min(1).refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
-  isBirthBC: z.boolean(),
-  birthYear: z.union([z.number().int().min(0).max(10000), z.literal('')]).transform(val => val === '' ? 0 : val),
-  birthMonth: z.union([z.number().int().min(0).max(12), z.literal('')]).transform(val => val === '' ? 0 : val),
-  birthDay: z.union([z.number().int().min(0).max(31), z.literal('')]).transform(val => val === '' ? 0 : val),
-  gender: z.number().int().min(0).max(3),
-})
-type HashForm = z.infer<typeof hashFormSchema>
-
-function computePersonHashLocal(input: HashForm): string {
-  const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
-  
-  // First compute fullNameHash exactly like the contract
-  const nameBytes = new TextEncoder().encode(fullName)
-  const fullNameHash = ethers.keccak256(nameBytes)
-  
-  // Now build PersonBasicInfo hash exactly matching the contract's abi.encodePacked:
-  // abi.encodePacked(fullNameHash, uint8(isBirthBC), birthYear, birthMonth, birthDay, gender)
-  // Total: 32 + 1 + 2 + 1 + 1 + 1 = 38 bytes
-  const buffer = new Uint8Array(38)
-  let offset = 0
-  
-  // fullNameHash (32 bytes)
-  const hashBytes = ethers.getBytes(fullNameHash)
-  buffer.set(hashBytes, offset)
-  offset += 32
-  
-  // isBirthBC as uint8 (1 byte)
-  buffer[offset] = isBirthBC ? 1 : 0
-  offset += 1
-  
-  // birthYear as uint16 big-endian (2 bytes)
-  buffer[offset] = (birthYear >> 8) & 0xff
-  buffer[offset + 1] = birthYear & 0xff
-  offset += 2
-  
-  // birthMonth as uint8 (1 byte)
-  buffer[offset] = birthMonth & 0xff
-  offset += 1
-  
-  // birthDay as uint8 (1 byte)
-  buffer[offset] = birthDay & 0xff
-  offset += 1
-  
-  // gender as uint8 (1 byte)
-  buffer[offset] = gender & 0xff
-  
-  return ethers.keccak256(buffer)
+type ChildrenForm = {
+  parentHash: string
+  parentVersionIndex: number
+  pageSize: number
 }
 
 export default function SearchPage() {
@@ -192,16 +137,6 @@ export default function SearchPage() {
       parentVersionIndex: z.number().int().min(1, t('search.validation.tokenIdRequired')),
       pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
     }),
-    hashForm: z.object({
-      fullName: z.string()
-        .min(1, t('search.validation.required'))
-        .refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
-      isBirthBC: z.boolean(),
-      birthYear: z.number().int().min(0, t('search.validation.yearRange')).max(10000, t('search.validation.yearRange')).optional().or(z.literal('')).transform(val => val === '' ? 0 : val),
-      birthMonth: z.number().int().min(0, t('search.validation.monthRange')).max(12, t('search.validation.monthRange')).optional().or(z.literal('')).transform(val => val === '' ? 0 : val),
-      birthDay: z.number().int().min(0, t('search.validation.dayRange')).max(31, t('search.validation.dayRange')).optional().or(z.literal('')).transform(val => val === '' ? 0 : val),
-      gender: z.number().int().min(0).max(3),
-    })
   })
   
   const schemas = createSchemas()
@@ -245,6 +180,14 @@ export default function SearchPage() {
   const [childrenHasMore, setChildrenHasMore] = useState<boolean>(false)
   
   const [computedHash, setComputedHash] = useState<string>('')
+  const [currentHashForm, setCurrentHashForm] = useState<HashForm>({
+    fullName: '',
+    isBirthBC: false,
+    birthYear: 0,
+    birthMonth: 0,
+    birthDay: 0,
+    gender: 0,
+  })
 
   const [openSections, setOpenSections] = useState({
     hash: true,
@@ -256,10 +199,6 @@ export default function SearchPage() {
   })
   const toggle = (k: keyof typeof openSections) => setOpenSections(s => ({ ...s, [k]: !s[k] }))
 
-  const { register: reg2, handleSubmit: hs2, formState: { errors: e2 }, setValue: set2, watch: w2 } = useForm({
-    resolver: zodResolver(schemas.hashForm),
-    defaultValues: { fullName: '', isBirthBC: false, birthYear: '', birthMonth: '', birthDay: '', gender: 0 },
-  })
   const { register: reg3, handleSubmit: hs3, formState: { errors: e3 }, watch: w3 } = useForm<EndorsementStatsForm>({
     resolver: zodResolver(schemas.endorsementStats),
     defaultValues: { personHash: '', pageSize: DEFAULT_PAGE_SIZE },
@@ -481,9 +420,16 @@ export default function SearchPage() {
     await onQueryChildren({ parentHash: w7('parentHash') || '', parentVersionIndex: w7('parentVersionIndex') || 1, pageSize: childrenPageSize }, prev)
   }
 
-  const onCompute = (data: HashForm) => {
-    const h = computePersonHashLocal(data)
-    setComputedHash(h)
+  const handleHashFormChange = useCallback((formData: HashForm) => {
+    setCurrentHashForm(formData)
+    // 不自动计算，保持原有的手动计算行为
+  }, [])
+
+  const handleComputeHash = () => {
+    if (currentHashForm.fullName.trim()) {
+      const hash = computePersonHashLocal(currentHashForm)
+      setComputedHash(hash)
+    }
   }
 
   return (
@@ -496,73 +442,24 @@ export default function SearchPage() {
         </div>
         {openSections.hash && (
           <div className="p-2 space-y-2">
-        <div className="text-xs text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800/40">
-          {t('search.hashCalculator.tip')}
-        </div>
-        <form onSubmit={hs2((data: any) => onCompute(data))} className="w-full" noValidate>
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="basis-full sm:basis-[360px] md:basis-[420px] grow-0 shrink-0">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.name')}</label>
-                <input 
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
-                  placeholder={t('search.hashCalculator.nameInputPlaceholder')}
-                  {...reg2('fullName')} 
-                />
-                <FieldError message={e2.fullName?.message as any} />
-              </div>
-              <div className="w-28">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.gender')}</label>
-                <ThemedSelect
-                  value={Number(w2('gender') ?? 0)}
-                  onChange={(v) => {
-                    // keep form state in sync
-                    set2('gender', v, { shouldValidate: true, shouldDirty: true })
-                  }}
-                  options={[
-                    { value: 0, label: t('search.hashCalculator.genderOptions.unknown') },
-                    { value: 1, label: t('search.hashCalculator.genderOptions.male') },
-                    { value: 2, label: t('search.hashCalculator.genderOptions.female') },
-                    { value: 3, label: t('search.hashCalculator.genderOptions.other') },
-                  ]}
-                />
-                <FieldError message={e2.gender?.message as any} />
-              </div>
+            <div className="text-xs text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800/40">
+              {t('search.hashCalculator.tip')}
             </div>
-            <div className="flex flex-nowrap items-start gap-1">
-              <div className="flex items-start gap-1">
-                <div className="w-16 min-w-16">
-                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.isBirthBC')}</label>
-                  <div className="h-10 flex items-center">
-                    <label className="inline-flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none group">
-                      <input type="checkbox" className="sr-only" {...reg2('isBirthBC')} />
-                      <span className="relative w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-700 group-has-[:checked]:bg-blue-600 transition-colors duration-200 flex-shrink-0">
-                        <span className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 group-has-[:checked]:translate-x-5" />
-                      </span>
-                    </label>
-                  </div>
-                  <FieldError />
-                </div>
-                <div className="w-25">
-                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.birthYearLabel')}</label>
-                  <input type="number" placeholder={t('search.hashCalculator.birthYear')} className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" {...reg2('birthYear', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })} />
-                  <FieldError message={e2.birthYear?.message as any} />
-                </div>
-              </div>
-              <div className="w-24">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.birthMonthLabel')}</label>
-                <input type="number" min="0" max="12" placeholder={t('search.hashCalculator.birthMonth')} className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" {...reg2('birthMonth', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })} />
-                <FieldError message={e2.birthMonth?.message as any} />
-              </div>
-              <div className="w-24">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">{t('search.hashCalculator.birthDayLabel')}</label>
-                <input type="number" min="0" max="31" placeholder={t('search.hashCalculator.birthDay')} className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" {...reg2('birthDay', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })} />
-                <FieldError message={e2.birthDay?.message as any} />
-              </div>
+            <div className="w-full">
+              <PersonHashCalculator
+                showTitle={false}
+                collapsible={false}
+                onFormChange={handleHashFormChange}
+                className="border-0 shadow-none bg-transparent"
+              />
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 overflow-hidden">
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                <button 
+                  type="button"
+                  onClick={handleComputeHash}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
                   {t('search.hashCalculator.compute')}
                 </button>
                 {computedHash && (
@@ -604,9 +501,7 @@ export default function SearchPage() {
                 )}
               </div>
             </div>
-          </div>
-        </form>
-        <p className="text-xs text-gray-500 dark:text-gray-500">{t('search.hashCalculator.description')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">{t('search.hashCalculator.description')}</p>
           </div>
         )}
       </div>

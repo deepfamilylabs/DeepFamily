@@ -1,39 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Upload, AlertCircle, User, Users } from 'lucide-react'
-import { useContract } from '../../hooks/useContract'
+import { X, Upload, AlertCircle, User, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle } from 'lucide-react'
 import { useWallet } from '../../context/WalletContext'
 import { submitAddPersonZK } from '../../lib/zk'
 import { useConfig } from '../../context/ConfigContext'
+import PersonHashCalculator from '../PersonHashCalculator'
 
 const addVersionSchema = z.object({
-  // Person being added
-  fullName: z.string().min(1, 'Full name is required').max(100, 'Name too long'),
-  gender: z.number().min(0).max(3),
-  birthYear: z.number().min(0).max(9999),
-  birthMonth: z.number().min(0).max(12),
-  birthDay: z.number().min(0).max(31),
-  isBirthBC: z.boolean(),
-  
-  // Father information
-  fatherFullName: z.string().optional(),
-  fatherGender: z.number().min(0).max(3),
-  fatherBirthYear: z.number().min(0).max(9999),
-  fatherBirthMonth: z.number().min(0).max(12),
-  fatherBirthDay: z.number().min(0).max(31),
-  fatherIsBirthBC: z.boolean(),
+  // Father and mother version indexes only
   fatherVersionIndex: z.number().min(0),
-  
-  // Mother information
-  motherFullName: z.string().optional(),
-  motherGender: z.number().min(0).max(3),
-  motherBirthYear: z.number().min(0).max(9999),
-  motherBirthMonth: z.number().min(0).max(12),
-  motherBirthDay: z.number().min(0).max(31),
-  motherIsBirthBC: z.boolean(),
   motherVersionIndex: z.number().min(0),
   
   // Metadata
@@ -71,6 +49,78 @@ export default function AddVersionModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [zkProof, setZkProof] = useState<any>(null)
   const [publicSignals, setPublicSignals] = useState<any[]>([])
+  
+  // Person hash and info from PersonHashCalculator
+  const [personInfo, setPersonInfo] = useState<{
+    fullName: string
+    gender: number
+    birthYear: number
+    birthMonth: number
+    birthDay: number
+    isBirthBC: boolean
+  } | null>(null)
+
+  // Father and mother info from PersonHashCalculator components
+  const [fatherInfo, setFatherInfo] = useState<{
+    fullName: string
+    gender: number
+    birthYear: number
+    birthMonth: number
+    birthDay: number
+    isBirthBC: boolean
+  } | null>(null)
+
+  const [motherInfo, setMotherInfo] = useState<{
+    fullName: string
+    gender: number
+    birthYear: number
+    birthMonth: number
+    birthDay: number
+    isBirthBC: boolean
+  } | null>(null)
+  
+  const [entered, setEntered] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+  const startYRef = useRef<number | null>(null)
+  
+  // Parent info collapse states
+  const [fatherExpanded, setFatherExpanded] = useState(false)
+  const [motherExpanded, setMotherExpanded] = useState(false)
+
+  // Desktop/mobile detection
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return window.matchMedia('(min-width: 640px)').matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mql = window.matchMedia('(min-width: 640px)')
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) => setIsDesktop((e as MediaQueryListEvent).matches ?? (e as MediaQueryList).matches)
+    try {
+      mql.addEventListener('change', onChange as any)
+    } catch {
+      ;(mql as any).addListener(onChange)
+    }
+    onChange(mql as any)
+    return () => {
+      try {
+        mql.removeEventListener('change', onChange as any)
+      } catch {
+        ;(mql as any).removeListener(onChange)
+      }
+    }
+  }, [])
+
+  // Enter animation for mobile bottom sheet
+  useEffect(() => { 
+    if (isOpen) { 
+      requestAnimationFrame(() => setEntered(true)) 
+    } else { 
+      setEntered(false) 
+    } 
+  }, [isOpen])
 
   const {
     register,
@@ -81,30 +131,8 @@ export default function AddVersionModal({
   } = useForm<AddVersionForm>({
     resolver: zodResolver(addVersionSchema),
     defaultValues: {
-      // Person being added
-      fullName: existingPersonData?.fullName || '',
-      gender: existingPersonData?.gender || 0,
-      birthYear: existingPersonData?.birthYear || 0,
-      birthMonth: existingPersonData?.birthMonth || 0,
-      birthDay: existingPersonData?.birthDay || 0,
-      isBirthBC: existingPersonData?.isBirthBC || false,
-      
-      // Father defaults
-      fatherFullName: '',
-      fatherGender: 1, // Default to male
-      fatherBirthYear: 0,
-      fatherBirthMonth: 0,
-      fatherBirthDay: 0,
-      fatherIsBirthBC: false,
+      // Parent version indexes only
       fatherVersionIndex: 0,
-      
-      // Mother defaults
-      motherFullName: '',
-      motherGender: 2, // Default to female
-      motherBirthYear: 0,
-      motherBirthMonth: 0,
-      motherBirthDay: 0,
-      motherIsBirthBC: false,
       motherVersionIndex: 0,
       
       tag: '',
@@ -112,11 +140,48 @@ export default function AddVersionModal({
     }
   })
 
+  // Watch form values for version indexes
+  const watchedValues = watch()
+  
+  // Helper function to check if parent info has content
+  const getParentInfoStatus = (parentType: 'father' | 'mother') => {
+    const info = parentType === 'father' ? fatherInfo : motherInfo
+    const versionIndex = parentType === 'father' ? watchedValues.fatherVersionIndex : watchedValues.motherVersionIndex
+    
+    if (!info || !info.fullName.trim()) return 'empty'
+    if (info.fullName.trim() && versionIndex > 0) return 'complete'
+    return 'partial'
+  }
+  
+  const fatherStatus = getParentInfoStatus('father')
+  const motherStatus = getParentInfoStatus('mother')
+
+  // Initialize states if existing data is provided
+  useEffect(() => {
+    if (personHash && existingPersonData) {
+      setPersonInfo({
+        fullName: existingPersonData.fullName || '',
+        gender: existingPersonData.gender || 0,
+        birthYear: existingPersonData.birthYear || 0,
+        birthMonth: existingPersonData.birthMonth || 0,
+        birthDay: existingPersonData.birthDay || 0,
+        isBirthBC: existingPersonData.isBirthBC || false
+      })
+    }
+  }, [personHash, existingPersonData])
+
   const handleClose = () => {
     reset()
     setZkProof(null)
     setPublicSignals([])
+    setPersonInfo(null)
+    setFatherInfo(null)
+    setMotherInfo(null)
     setIsSubmitting(false)
+    setFatherExpanded(false)
+    setMotherExpanded(false)
+    setDragging(false)
+    setDragOffset(0)
     onClose()
   }
 
@@ -183,327 +248,249 @@ export default function AddVersionModal({
     }
   }
 
+  // Helper component for status indicator
+  const StatusIndicator = ({ status }: { status: 'empty' | 'partial' | 'complete' }) => {
+    const config = {
+      empty: { icon: UserPlus, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700' },
+      partial: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+      complete: { icon: Check, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' }
+    }
+    
+    const { icon: Icon, color, bg } = config[status]
+    
+    return (
+      <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${bg}`}>
+        <Icon className={`w-4 h-4 ${color}`} />
+      </div>
+    )
+  }
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
+      {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
+      <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
+        <div
+          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} select-none will-change-transform`}
+          onClick={(e) => e.stopPropagation()}
+          style={{ transform: dragging ? `translateY(${dragOffset}px)` : undefined, transitionDuration: dragging ? '0ms' : undefined }}
+        >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {personHash ? 
-              t('addVersion.addNewVersion', 'Add New Version') : 
-              t('addVersion.addPerson', 'Add Person')
-            }
-          </h2>
-          <button
-            onClick={handleClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        <div 
+          className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-4 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing"
+          onPointerDown={(e) => { (e.currentTarget as any).setPointerCapture?.(e.pointerId); startYRef.current = e.clientY; setDragging(true) }}
+          onPointerMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.clientY - startYRef.current); setDragOffset(dy) }}
+          onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
+          onPointerCancel={() => { setDragging(false); setDragOffset(0) }}
+          onTouchStart={(e) => { startYRef.current = e.touches[0].clientY; setDragging(true) }}
+          onTouchMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.touches[0].clientY - startYRef.current); setDragOffset(dy) }}
+          onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
+        >
+          {/* Drag handle (mobile only) */}
+          <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
+          
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                <UserPlus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                  {personHash ? 
+                    t('addVersion.addNewVersion', 'Add New Version') : 
+                    t('addVersion.addPerson', 'Add Person')
+                  }
+                </h2>
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  <span className="whitespace-nowrap">{t('addVersion.description', 'Add person with zero-knowledge proof')}</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                handleClose()
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors flex-shrink-0"
+              aria-label={t('common.close', 'Close')}
+            >
+              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            </button>
+          </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8">
+        {/* Form Content */}
+        <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0" style={{ touchAction: 'pan-y' }}>
+          <form id="add-version-form" onSubmit={handleSubmit(onSubmit)} className="min-h-full flex flex-col">
+            <div className="flex-1 p-4 sm:p-6 space-y-6">
           
-          {/* Person Being Added */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <User className="w-5 h-5 text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {t('addVersion.personInfo', 'Person Information')}
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.fullName', 'Full Name')} *
-                </label>
-                <input
-                  {...register('fullName')}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder={t('addVersion.fullNamePlaceholder', 'Enter full name')}
-                />
-                {errors.fullName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.fullName.message}</p>
+          {/* Person Being Added - Using PersonHashCalculator */}
+          <PersonHashCalculator
+            showTitle={false}
+            collapsible={false}
+            initialValues={existingPersonData}
+            onFormChange={(formData) => {
+              setPersonInfo({
+                fullName: formData.fullName,
+                gender: formData.gender,
+                birthYear: formData.birthYear,
+                birthMonth: formData.birthMonth,
+                birthDay: formData.birthDay,
+                isBirthBC: formData.isBirthBC
+              })
+            }}
+          />
+          {/* Father Information - Using PersonHashCalculator */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setFatherExpanded(!fatherExpanded)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-green-600" />
+                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  {t('addVersion.fatherInfo', 'Father Information')}
+                </h3>
+                <StatusIndicator status={fatherStatus} />
+                {fatherStatus !== 'empty' && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded">
+                    {fatherStatus === 'partial' ? t('addVersion.partial', 'Partial') : t('addVersion.complete', 'Complete')}
+                  </span>
                 )}
               </div>
+              {fatherExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.gender', 'Gender')}
-                </label>
-                <select
-                  {...register('gender', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                >
-                  <option value={0}>{t('addVersion.genderUnknown', 'Unknown')}</option>
-                  <option value={1}>{t('addVersion.genderMale', 'Male')}</option>
-                  <option value={2}>{t('addVersion.genderFemale', 'Female')}</option>
-                  <option value={3}>{t('addVersion.genderOther', 'Other')}</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthYear', 'Birth Year')}
-                </label>
-                <input
-                  type="number"
-                  {...register('birthYear', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="1990"
+            {fatherExpanded && (
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
+                <PersonHashCalculator
+                  showTitle={false}
+                  collapsible={false}
+                  className="border-0 shadow-none"
+                  initialValues={{
+                    fullName: '',
+                    gender: 1, // Default to male
+                    birthYear: 0,
+                    birthMonth: 0,
+                    birthDay: 0,
+                    isBirthBC: false
+                  }}
+                  onFormChange={(formData) => {
+                    setFatherInfo(formData)
+                  }}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthMonth', 'Birth Month')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="12"
-                  {...register('birthMonth', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="6"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthDay', 'Birth Day')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="31"
-                  {...register('birthDay', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="15"
-                />
-              </div>
-
-              <div className="flex items-center">
-                <label className="flex items-center space-x-2 mt-6">
+                
+                <div className="w-32">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t('addVersion.versionIndex', 'Version Index')}
+                  </label>
                   <input
-                    type="checkbox"
-                    {...register('isBirthBC')}
-                    className="rounded border-gray-300 dark:border-gray-600"
+                    type="number"
+                    min="0"
+                    {...register('fatherVersionIndex', { valueAsNumber: true })}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+                    placeholder="1"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {t('addVersion.isBirthBC', 'Birth BC')}
-                  </span>
-                </label>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Father Information */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-green-600" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {t('addVersion.fatherInfo', 'Father Information')}
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.fatherFullName', 'Father Full Name')}
-                </label>
-                <input
-                  {...register('fatherFullName')}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder={t('addVersion.fatherNamePlaceholder', 'Enter father name')}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.versionIndex', 'Version Index')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  {...register('fatherVersionIndex', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="1"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthYear', 'Birth Year')}
-                </label>
-                <input
-                  type="number"
-                  {...register('fatherBirthYear', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="1960"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthMonth', 'Birth Month')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="12"
-                  {...register('fatherBirthMonth', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="3"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthDay', 'Birth Day')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="31"
-                  {...register('fatherBirthDay', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="20"
-                />
-              </div>
-
-              <div className="flex items-center">
-                <label className="flex items-center space-x-2 mt-6">
-                  <input
-                    type="checkbox"
-                    {...register('fatherIsBirthBC')}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {t('addVersion.isBirthBC', 'Birth BC')}
+          {/* Mother Information - Using PersonHashCalculator */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setMotherExpanded(!motherExpanded)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-pink-600" />
+                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  {t('addVersion.motherInfo', 'Mother Information')}
+                </h3>
+                <StatusIndicator status={motherStatus} />
+                {motherStatus !== 'empty' && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded">
+                    {motherStatus === 'partial' ? t('addVersion.partial', 'Partial') : t('addVersion.complete', 'Complete')}
                   </span>
-                </label>
+                )}
               </div>
-            </div>
-          </div>
+              {motherExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
 
-          {/* Mother Information */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-pink-600" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {t('addVersion.motherInfo', 'Mother Information')}
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.motherFullName', 'Mother Full Name')}
-                </label>
-                <input
-                  {...register('motherFullName')}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder={t('addVersion.motherNamePlaceholder', 'Enter mother name')}
+            {motherExpanded && (
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
+                <PersonHashCalculator
+                  showTitle={false}
+                  collapsible={false}
+                  className="border-0 shadow-none"
+                  initialValues={{
+                    fullName: '',
+                    gender: 2, // Default to female
+                    birthYear: 0,
+                    birthMonth: 0,
+                    birthDay: 0,
+                    isBirthBC: false
+                  }}
+                  onFormChange={(formData) => {
+                    setMotherInfo(formData)
+                  }}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.versionIndex', 'Version Index')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  {...register('motherVersionIndex', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="1"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthYear', 'Birth Year')}
-                </label>
-                <input
-                  type="number"
-                  {...register('motherBirthYear', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="1965"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthMonth', 'Birth Month')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="12"
-                  {...register('motherBirthMonth', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="8"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('addVersion.birthDay', 'Birth Day')}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="31"
-                  {...register('motherBirthDay', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
-                  placeholder="12"
-                />
-              </div>
-
-              <div className="flex items-center">
-                <label className="flex items-center space-x-2 mt-6">
+                
+                <div className="w-32">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t('addVersion.versionIndex', 'Version Index')}
+                  </label>
                   <input
-                    type="checkbox"
-                    {...register('motherIsBirthBC')}
-                    className="rounded border-gray-300 dark:border-gray-600"
+                    type="number"
+                    min="0"
+                    {...register('motherVersionIndex', { valueAsNumber: true })}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+                    placeholder="1"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {t('addVersion.isBirthBC', 'Birth BC')}
-                  </span>
-                </label>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Metadata */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {t('addVersion.metadata', 'Metadata')}
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('addVersion.tag', 'Tag')}
                 </label>
                 <input
                   {...register('tag')}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
                   placeholder={t('addVersion.tagPlaceholder', 'Optional tag')}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('addVersion.metadataCID', 'Metadata CID')}
                 </label>
                 <input
                   {...register('metadataCID')}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100"
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
                   placeholder="QmXXX..."
                 />
               </div>
@@ -511,15 +498,15 @@ export default function AddVersionModal({
           </div>
 
           {/* ZK Proof Upload */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {t('addVersion.zkProof', 'Zero-Knowledge Proof')}
             </h3>
 
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6">
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md p-4">
               <div className="text-center">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <div className="mt-4">
+                <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                <div className="mt-3">
                   <label className="cursor-pointer">
                     <span className="mt-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       {zkProof ? 
@@ -534,7 +521,7 @@ export default function AddVersionModal({
                       className="sr-only"
                     />
                   </label>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {t('addVersion.proofHint', 'JSON file containing ZK proof and public signals')}
                   </p>
                 </div>
@@ -550,28 +537,31 @@ export default function AddVersionModal({
               </div>
             )}
           </div>
+            </div>
 
-          {/* Submit Button */}
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              {t('common.cancel', 'Cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !zkProof}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSubmitting ? 
-                t('addVersion.submitting', 'Submitting...') :
-                t('addVersion.submit', 'Add Version')
-              }
-            </button>
-          </div>
-        </form>
+            {/* Submit Buttons */}
+            <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+              >
+                {t('common.cancel', 'Cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || !zkProof}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+              >
+                {isSubmitting ? 
+                  t('addVersion.submitting', 'Submitting...') :
+                  t('addVersion.submit', 'Add Version')
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+        </div>
       </div>
     </div>
   )
