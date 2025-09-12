@@ -1,15 +1,14 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Image, ThumbsUp, Wallet, AlertCircle, TestTube } from 'lucide-react'
+import { Plus, Image, ThumbsUp, Wallet, AlertCircle } from 'lucide-react'
 import { useWallet } from '../context/WalletContext'
 import WalletConnectButton from '../components/WalletConnectButton'
 import AddVersionModal from '../components/modals/AddVersionModal'
 import MintNFTModal from '../components/modals/MintNFTModal'
 import EndorseModal from '../components/modals/EndorseModal'
-import ZKProofTest from '../components/ZKProofTest'
 import PageContainer from '../components/PageContainer'
 
-type ActionTab = 'add-version' | 'mint-nft' | 'endorse' | 'zk-test'
+type ActionTab = 'add-version' | 'mint-nft' | 'endorse'
 
 export default function ActionsPage() {
   const { t } = useTranslation()
@@ -58,13 +57,6 @@ export default function ActionsPage() {
       icon: ThumbsUp,
       description: t('actions.endorseDesc', 'Support quality data by endorsing versions with DEEP tokens'),
       color: 'green'
-    },
-    {
-      id: 'zk-test' as ActionTab,
-      name: t('actions.zkTest', 'ZK Proof Test'),
-      icon: TestTube,
-      description: t('actions.zkTestDesc', 'Test zero-knowledge proof generation with parent existence flags'),
-      color: 'orange'
     }
   ]
 
@@ -225,36 +217,12 @@ export default function ActionsPage() {
                     </div>
                   )}
 
-                  {tab.id === 'zk-test' && (
-                    <div className="text-center">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                        {t('actions.zkTestHint', 'Test the improved ZK proof generation with parent existence flags')}
-                      </p>
-                      <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg p-4 mb-4">
-                        <h4 className="text-sm font-medium text-orange-900 dark:text-orange-100 mb-2">
-                          🧪 {t('actions.testFeatures', 'Test Features')}
-                        </h4>
-                        <ul className="text-xs text-orange-700 dark:text-orange-200 space-y-1">
-                          <li>• {t('actions.testParentExists', 'Generate proof with existing parents')}</li>
-                          <li>• {t('actions.testNoParents', 'Generate proof with no parents (outputs bytes32(0))')}</li>
-                          <li>• {t('actions.testVerification', 'Verify proof validity in browser')}</li>
-                          <li>• {t('actions.testCompatibility', 'Test smart contract compatibility')}</li>
-                        </ul>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )
           })}
         </div>
 
-        {/* ZK Proof Test Component */}
-        {activeTab === 'zk-test' && (
-          <div className="mt-8">
-            <ZKProofTest />
-          </div>
-        )}
 
         {/* Modals */}
         <AddVersionModal
