@@ -3,7 +3,7 @@ import React from 'react'
 
 export const LAYOUT = {
   // FamilyTree view dimensions - responsive heights
-  FAMILLY_TREE_HEIGHT_MOBILE: 580,
+  FAMILLY_TREE_HEIGHT_MOBILE: 520,
   FAMILLY_TREE_HEIGHT_DESKTOP: 680,
   
   // Node dimensions
