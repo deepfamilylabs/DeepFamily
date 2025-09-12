@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Image, ThumbsUp, Wallet, AlertCircle } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Plus, Image, Star, Wallet, AlertCircle } from 'lucide-react'
 import { useWallet } from '../context/WalletContext'
 import WalletConnectButton from '../components/WalletConnectButton'
 import AddVersionModal from '../components/modals/AddVersionModal'
@@ -13,7 +14,16 @@ type ActionTab = 'add-version' | 'mint-nft' | 'endorse'
 export default function ActionsPage() {
   const { t } = useTranslation()
   const { address, isConnecting } = useWallet()
+  const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<ActionTab>('add-version')
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as ActionTab
+    if (tabParam && ['add-version', 'mint-nft', 'endorse'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams])
   
   // Modal states
   const [addVersionModal, setAddVersionModal] = useState<{
@@ -39,14 +49,16 @@ export default function ActionsPage() {
   const tabs = [
     {
       id: 'add-version' as ActionTab,
-      name: t('actions.addVersion', 'Add Version'),
+      name: t('actions.add', 'Add'),
+      subtitle: t('actions.addVersion', 'Add Version'),
       icon: Plus,
       description: t('actions.addVersionDesc', 'Add a new version of person data with zero-knowledge proofs'),
       color: 'blue'
     },
     {
       id: 'mint-nft' as ActionTab,
-      name: t('actions.mintNFT', 'Mint NFT'),
+      name: t('actions.mint', 'Mint'),
+      subtitle: t('actions.mintNFT', 'Mint NFT'),
       icon: Image,
       description: t('actions.mintNFTDesc', 'Convert endorsed person data into valuable NFT collectibles'),
       color: 'purple'
@@ -54,7 +66,8 @@ export default function ActionsPage() {
     {
       id: 'endorse' as ActionTab,
       name: t('actions.endorse', 'Endorse'),
-      icon: ThumbsUp,
+      subtitle: t('actions.endorsement', 'Endorsement'),
+      icon: Star,
       description: t('actions.endorseDesc', 'Support quality data by endorsing versions with DEEP tokens'),
       color: 'green'
     }
@@ -97,7 +110,7 @@ export default function ActionsPage() {
                       {t('actions.feature2', 'Mint NFTs from endorsed data')}
                     </li>
                     <li className="flex items-center gap-2">
-                      <ThumbsUp className="w-4 h-4" />
+                      <Star className="w-4 h-4" />
                       {t('actions.feature3', 'Endorse quality data and earn rewards')}
                     </li>
                   </ul>
@@ -136,14 +149,14 @@ export default function ActionsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
                       ? `text-${tab.color}-700 dark:text-${tab.color}-300 bg-white dark:bg-gray-700 shadow-sm`
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
-                  {tab.name}
+                  <span className="whitespace-nowrap">{tab.name}</span>
                 </button>
               )
             })}
@@ -164,7 +177,7 @@ export default function ActionsPage() {
                     <Icon className={`w-8 h-8 text-${tab.color}-600 dark:text-${tab.color}-400`} />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {tab.name}
+                    {tab.subtitle}
                   </h2>
                   <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
                     {tab.description}
@@ -183,9 +196,6 @@ export default function ActionsPage() {
 
                   {tab.id === 'mint-nft' && (
                     <div className="text-center">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                        {t('actions.mintNFTHint', 'First search for a person and version to mint as NFT')}
-                      </p>
                       <button
                         onClick={() => setMintNFTModal({ 
                           isOpen: true,
@@ -201,9 +211,6 @@ export default function ActionsPage() {
 
                   {tab.id === 'endorse' && (
                     <div className="text-center">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                        {t('actions.endorseHint', 'Search for person versions to endorse')}
-                      </p>
                       <button
                         onClick={() => setEndorseModal({ 
                           isOpen: true,

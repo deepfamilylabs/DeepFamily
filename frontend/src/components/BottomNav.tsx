@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, Eye, Search, Book, Zap } from 'lucide-react'
+import { Home, Network, Search, Book } from 'lucide-react'
 
 export default function BottomNav() {
   const { t } = useTranslation()
@@ -39,37 +39,9 @@ export default function BottomNav() {
                   ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm'
                   : 'hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30'
               }`}>
-                <Eye className="w-4 h-4" />
+                <Network className="w-4 h-4" />
               </div>
-              <span className="mt-1 text-[10px] leading-tight">{t('navigation.visualization')}</span>
-            </>
-          )}
-        </NavLink>
-        <NavLink to="/actions" className={navItemClasses}>
-          {({ isActive }) => (
-            <>
-              <div className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                isActive 
-                  ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm'
-                  : 'hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30'
-              }`}>
-                <Zap className="w-4 h-4" />
-              </div>
-              <span className="mt-1 text-[10px] leading-tight">{t('navigation.actions', 'Actions')}</span>
-            </>
-          )}
-        </NavLink>
-        <NavLink to="/search" className={navItemClasses}>
-          {({ isActive }) => (
-            <>
-              <div className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                isActive 
-                  ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm'
-                  : 'hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30'
-              }`}>
-                <Search className="w-4 h-4" />
-              </div>
-              <span className="mt-1 text-[10px] leading-tight">{t('navigation.search')}</span>
+              <span className="mt-1 text-[10px] leading-tight">{t('navigation.genealogy', '族谱')}</span>
             </>
           )}
         </NavLink>
@@ -84,6 +56,20 @@ export default function BottomNav() {
                 <Book className="w-4 h-4" />
               </div>
               <span className="mt-1 text-[10px] leading-tight">{t('navigation.people')}</span>
+            </>
+          )}
+        </NavLink>
+        <NavLink to="/search" className={navItemClasses}>
+          {({ isActive }) => (
+            <>
+              <div className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
+                isActive 
+                  ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm'
+                  : 'hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30'
+              }`}>
+                <Search className="w-4 h-4" />
+              </div>
+              <span className="mt-1 text-[10px] leading-tight">{t('navigation.search')}</span>
             </>
           )}
         </NavLink>

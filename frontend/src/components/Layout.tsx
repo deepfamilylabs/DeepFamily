@@ -11,6 +11,7 @@ import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import PageContainer from './PageContainer'
 import SiteHeader from './SiteHeader'
+import FloatingActionButton from './FloatingActionButton'
 
 export default function Layout() {
   return (
@@ -22,6 +23,7 @@ export default function Layout() {
         </PageContainer>
       </main>
       <div className="md:hidden"><BottomNav /></div>
+      <FloatingActionButton />
     </div>
   )
 }

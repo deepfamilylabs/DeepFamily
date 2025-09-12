@@ -2,9 +2,10 @@
   "navigation": {
     "home": "首页",
     "visualization": "可视化",
+    "genealogy": "族谱",
     "search": "搜索",
     "people": "人物",
-    "actions": "交互"
+    "actions": "操作"
   },
   "home": {
     "title": "去中心化链上族谱协议",
@@ -596,8 +597,8 @@
     "peopleEncyclopedia": "人物百科"
   },
   "actions": {
-    "title": "区块链交互",
-    "subtitle": "使用您的连接钱包与 DeepFamily 协议进行交互",
+    "title": "链上操作",
+    "subtitle": "使用已连接的钱包操作 DeepFamily 协议",
     "walletRequired": "需要连接钱包",
     "walletRequiredDesc": "连接您的钱包以访问区块链功能，如添加版本、铸造 NFT 和参与背书。",
     "walletConnected": "钱包已连接",
@@ -606,10 +607,13 @@
     "feature2": "将人物版本铸造为 NFT 收藏品",
     "feature3": "背书优质版本（需要消耗 DEEP 代币）",
     "addVersion": "添加版本",
+    "add": "添加",
     "addVersionDesc": "使用零知识证明添加新的人物数据版本",
     "mintNFT": "铸造 NFT",
+    "mint": "铸造",
     "mintNFTDesc": "将背书的人物数据转换为有价值的 NFT 收藏品",
     "endorse": "背书",
+    "endorsement": "参与背书",
     "endorseDesc": "使用 DEEP 代币支持优质数据版本",
     "startAddVersion": "开始添加版本",
     "mintNFTHint": "首先搜索要铸造为 NFT 的人物和版本",

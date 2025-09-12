@@ -2,6 +2,7 @@
   "navigation": {
     "home": "Home",
     "visualization": "Visualization",
+    "genealogy": "Tree",
     "search": "Search",
     "people": "People",
     "actions": "Actions"
@@ -614,10 +615,13 @@
     "feature2": "Mint person versions as NFT collectibles",
     "feature3": "Endorse quality versions (requires DEEP tokens)",
     "addVersion": "Add Version",
+    "add": "Add",
     "addVersionDesc": "Add a new version of person data with zero-knowledge proofs",
     "mintNFT": "Mint NFT",
+    "mint": "Mint",
     "mintNFTDesc": "Convert endorsed person data into valuable NFT collectibles",
     "endorse": "Endorse",
+    "endorsement": "Endorsement",
     "endorseDesc": "Support quality data by endorsing versions with DEEP tokens",
     "startAddVersion": "Start Adding Version",
     "mintNFTHint": "First search for a person and version to mint as NFT",

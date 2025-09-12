@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, ThumbsUp, Coins, AlertCircle, Users } from 'lucide-react'
+import { X, Star, Coins, AlertCircle, Users } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
@@ -228,7 +228,7 @@ export default function EndorseModal({
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                <ThumbsUp className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                <Star className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
@@ -422,7 +422,7 @@ export default function EndorseModal({
           {hasEndorsed && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
               <div className="flex items-center gap-2">
-                <ThumbsUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
                 <span className="text-sm font-medium text-green-800 dark:text-green-200">
                   {t('endorse.successMessage', 'You have successfully endorsed this version!')}
                 </span>
@@ -455,7 +455,7 @@ export default function EndorseModal({
                 t('endorse.endorsed', 'Endorsed!')
               ) : (
                 <div className="flex items-center justify-center gap-2">
-                  <ThumbsUp className="w-4 h-4" />
+                  <Star className="w-4 h-4" />
                   {t('endorse.endorse', 'Endorse')}
                 </div>
               )}

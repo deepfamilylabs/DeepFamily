@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from './components/Layout'
 import Home from './pages/Home'
-import VisualizationPage from './pages/VisualizationPage'
+import TreePage from './pages/TreePage'
 import SearchPage from './pages/SearchPage'
 import PersonPage from './pages/PersonPage'
 import PeoplePage from './pages/PeoplePage'
@@ -59,7 +59,7 @@ function RouterContent() {
         <Routes>
           <Route path="/" element={<Layout />}> 
             <Route index element={<Home />} />
-            <Route path="visualization" element={<VisualizationPage />} />
+            <Route path="visualization" element={<TreePage />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="people" element={<PeoplePage />} />
             <Route path="actions" element={<ActionsPage />} />
