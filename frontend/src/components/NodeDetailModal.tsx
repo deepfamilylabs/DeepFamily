@@ -262,7 +262,7 @@ export default function NodeDetailModal({
                 </div>
                 <div className="min-w-0">
                   <div className="text-[17px] sm:text-[18px] font-semibold text-gray-900 dark:text-gray-100 truncate pr-2 tracking-tight">
-                    {t('visualization.personVersionDetail.title')}
+                    {t('familyTree.personVersionDetail.title')}
                   </div>
                 </div>
               </div>
@@ -284,51 +284,51 @@ export default function NodeDetailModal({
         )}
         <div className="flex-1 min-h-0 px-4 pb-24 pt-2 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)', touchAction: 'pan-y' }}>
           <div className="space-y-1.5">
-            <Row label={t('visualization.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} />
-            <Row label={t('visualization.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
-            <Row label={t('visualization.nodeDetail.endorsementCount')} value={nodeData?.endorsementCount ?? '-'} />
-            <Row label={t('visualization.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} />
-            <Row label={t('visualization.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
-            <Row label={t('visualization.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} />
-            <Row label={t('visualization.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
-            <Row label={t('visualization.nodeDetail.addedBy')} value={shortAddress(nodeData?.addedBy) || '-'} copy={nodeData?.addedBy} />
-            <Row label={t('visualization.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
-            <Row label={t('visualization.nodeDetail.tag')} value={nodeData?.tag ?? '-'} />
-            <Row label={t('visualization.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
+            <Row label={t('familyTree.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} />
+            <Row label={t('familyTree.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
+            <Row label={t('familyTree.nodeDetail.endorsementCount')} value={nodeData?.endorsementCount ?? '-'} />
+            <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} />
+            <Row label={t('familyTree.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
+            <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} />
+            <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
+            <Row label={t('familyTree.nodeDetail.addedBy')} value={shortAddress(nodeData?.addedBy) || '-'} copy={nodeData?.addedBy} />
+            <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
+            <Row label={t('familyTree.nodeDetail.tag')} value={nodeData?.tag ?? '-'} />
+            <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
             {(isMinted(nodeData) || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
               <div className="pt-1">
                 <div className="my-2 h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
                 <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-300 tracking-wide mb-1 flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-sm bg-gray-400 dark:bg-gray-500" />{t('visualization.nodeDetail.nft')}
+                  <span className="h-1.5 w-1.5 rounded-sm bg-gray-400 dark:bg-gray-500" />{t('familyTree.nodeDetail.nft')}
                 </div>
               </div>
             )}
             {(isMinted(nodeData) || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
               <>
-                <Row label={t('visualization.nodeDetail.tokenId')} value={isMinted(nodeData) ? nodeData!.tokenId : '-'} copy={isMinted(nodeData) ? nodeData!.tokenId : undefined} />
-                {nodeData?.fullName && <Row label={t('visualization.nodeDetail.fullName')} value={nodeData.fullName} />}
+                <Row label={t('familyTree.nodeDetail.tokenId')} value={isMinted(nodeData) ? nodeData!.tokenId : '-'} copy={isMinted(nodeData) ? nodeData!.tokenId : undefined} />
+                {nodeData?.fullName && <Row label={t('familyTree.nodeDetail.fullName')} value={nodeData.fullName} />}
                 {nodeData?.gender !== undefined && (
-                  <Row label={t('visualization.nodeDetail.gender')} value={genderTextFn(nodeData.gender, t as any) || '-'} />
+                  <Row label={t('familyTree.nodeDetail.gender')} value={genderTextFn(nodeData.gender, t as any) || '-'} />
                 )}
-                <Row label={t('visualization.nodeDetail.birth')} value={(() => {
+                <Row label={t('familyTree.nodeDetail.birth')} value={(() => {
                   const d = birthDateString(nodeData)
                   const parts = [d, nodeData?.birthPlace].filter(Boolean)
                   return parts.length ? parts.join(' · ') : '-'
                 })()} />
-                <Row label={t('visualization.nodeDetail.death')} value={(() => {
+                <Row label={t('familyTree.nodeDetail.death')} value={(() => {
                   const d = deathDateString(nodeData)
                   const parts = [d, nodeData?.deathPlace].filter(Boolean)
                   return parts.length ? parts.join(' · ') : '-'
                 })()} />
                 {nodeData?.story && nodeData.story.trim() !== '' && (
                   <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('visualization.nodeDetail.story')}</div>
+                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('familyTree.nodeDetail.story')}</div>
                     <div className="font-mono text-[11px] text-gray-800 dark:text-gray-200 leading-snug whitespace-pre-wrap break-words min-w-0">{nodeData.story}</div>
                   </div>
                 )}
                 {isMinted(nodeData) && (
                   <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('visualization.nodeDetail.profile')}</div>
+                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('familyTree.nodeDetail.profile')}</div>
                     <div className="space-y-1">
                       <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
                         <button
@@ -339,7 +339,7 @@ export default function NodeDetailModal({
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline flex items-center gap-1"
                         >
                           <ChevronRight size={11} />
-                          {t('visualization.nodeDetail.viewFullStory')}
+                          {t('familyTree.nodeDetail.viewFullStory')}
                         </button>
                         <button
                           onClick={() => {
@@ -349,7 +349,7 @@ export default function NodeDetailModal({
                           className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 underline flex items-center gap-1"
                         >
                           <Edit2 size={11} />
-                          {t('visualization.nodeDetail.editStory')}
+                          {t('familyTree.nodeDetail.editStory')}
                         </button>
                       </div>
                     </div>
@@ -358,14 +358,14 @@ export default function NodeDetailModal({
                 {isMinted(nodeData) && (
                   <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} />
                 )}
-                {nodeData?.nftTokenURI && <Row label={t('visualization.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
+                {nodeData?.nftTokenURI && <Row label={t('familyTree.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
               </>
             )}
           </div>
           {/* Bottom spacer to ensure last row (e.g., URI) is visible above rounded edge / safe area */}
           <div className="h-3 sm:h-1" />
           {loading && (
-            <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">{t('visualization.nodeDetail.loading')}</div>
+            <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">{t('familyTree.nodeDetail.loading')}</div>
           )}
           {error && (
             <div className="text-center text-xs text-red-500 dark:text-red-400 py-2">{error}</div>

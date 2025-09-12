@@ -63,7 +63,7 @@ DeepFamily aims to build a universally shared decentralized genealogical infrast
 ### 🗳️ Multi-Version Governance
 - **Version Coexistence**: Already supported on-chain
 
-### 📊 High-Performance Visualization (Frontend WIP)
+### 📊 High-Performance FamilyTree (Frontend WIP)
 - Planned: Tree / force-directed / table views (D3)
 
 ## 🏗️ Architecture

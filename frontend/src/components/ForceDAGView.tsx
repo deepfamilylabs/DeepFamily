@@ -7,7 +7,7 @@ import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
-import { useVisualizationHeight } from '../constants/layout'
+import { useFamilyTreeHeight } from '../constants/layout'
 
 // Re-add types lost during refactor
 export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
@@ -28,7 +28,7 @@ function buildGraph(root: GraphNode) {
 export interface ForceDAGViewHandle { centerOnNode: (id: string) => void }
 
 function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
-  const responsiveHeight = useVisualizationHeight()
+  const responsiveHeight = useFamilyTreeHeight()
   const defaultHeight = height || responsiveHeight
   const { nodesData } = useTreeData() as any
   const { openNode, selected: ctxSelected } = useNodeDetail()

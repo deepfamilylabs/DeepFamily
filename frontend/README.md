@@ -37,7 +37,7 @@ src/
 - Direct blockchain calls via Ethers.js for authoritative data
 - Smart contract interaction with real-time data fetching
 
-**Multiple Visualization Modes**:
+**Multiple FamilyTree Modes**:
 - **Tree View**: Traditional hierarchical layout with collapsible nodes
 - **DAG View**: Directed acyclic graph for complex family relationships  
 - **Force View**: D3.js physics simulation with interactive layout
@@ -72,7 +72,7 @@ VITE_ROOT_VERSION_INDEX=1
 # Local hardhat: 31337; Conflux eSpace testnet: 71; eSpace mainnet: 1030
 VITE_CHAIN_ID=31337
 
-# Optional: tune visualization RPC load (reduce rate limit risk)
+# Optional: tune familyTree RPC load (reduce rate limit risk)
 # Defaults: PARALLEL=6, PAGE_SIZE=25, ENDORSE_BATCH=40, MAX_DEPTH=30
 # Example for public RPCs
 # VITE_DF_PARALLEL=2
@@ -83,12 +83,12 @@ VITE_CHAIN_ID=31337
 ## Pages
 
 - **/** - Homepage with project introduction
-- **/visualization** - Main visualization page with 3 view modes
+- **/familyTree** - Main familyTree page with 3 view modes
 - **/settings** - Configuration management
 - **/search** - Multi-dimensional search
 - **/story/:tokenId** - Story shard editing
 
-**URL Parameters**: `/visualization?root=0x...&v=1` for direct navigation
+**URL Parameters**: `/familyTree?root=0x...&v=1` for direct navigation
 
 ## Common Issues
 

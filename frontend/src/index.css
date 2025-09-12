@@ -213,7 +213,7 @@ html { scrollbar-gutter: stable; }
     position: fixed !important;
     bottom: 0 !important;
     z-index: 9999 !important;
-    /* Ensure it stays above visualization content */
+    /* Ensure it stays above familyTree content */
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
     /* Force hardware acceleration for better performance */

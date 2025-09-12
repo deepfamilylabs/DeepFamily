@@ -1,7 +1,7 @@
 {
   "navigation": {
     "home": "Home",
-    "visualization": "Visualization",
+    "familyTree": "FamilyTree",
     "genealogy": "Tree",
     "search": "Search",
     "people": "People",
@@ -10,7 +10,7 @@
   "home": {
     "title": "On-Chain Decentralized Family Tree Protocol",
     "subtitle": "Multi-Version Trust Lineage · Economically Backed · NFT Value Ownership · Sharded Narrative Sealing · ZK Privacy Scaling",
-    "exploreVisualization": "Family Tree",
+    "exploreFamilyTree": "Family Tree",
     "addPerson": "Add Person", 
     "participate": "Search",
     "searchGenealogy": "Search Family",
@@ -50,7 +50,7 @@
       },
       "openComposition": {
         "title": "Open Composability",
-        "description": "On-chain structure, enabling community to build applications, visualizations, research databases"
+        "description": "On-chain structure, enabling community to build applications, familyTrees, research databases"
       }
     },
     "architecture": {
@@ -323,8 +323,8 @@
     },
     "offset": "offset"
   },
-  "visualization": {
-    "title": "Visualization",
+  "familyTree": {
+    "title": "FamilyTree",
     "viewModes": {
       "tree": "Tree",
       "dag": "DAG",
@@ -436,7 +436,7 @@
     }
   },
   "common": {
-    "confirm": "Go to Visualization",
+    "confirm": "Go to FamilyTree",
     "cancel": "Cancel",
     "goBack": "Go Back",
     "close": "Close",
@@ -540,7 +540,7 @@
     "verified": "Verified",
     "personHashLabel": "Person Hash:",
     "versionLabel": "Version:",
-    "viewVisualization": "Visualization View",
+    "viewFamilyTree": "FamilyTree View",
     "invalidTokenId": "Invalid Token ID",
     "nonexistentToken": "Token does not exist",
     "fetchFailed": "Failed to load token"

@@ -60,7 +60,7 @@ export default function SiteHeader() {
             <Home className="w-4 h-4" /> 
             <span className="hidden lg:inline">{t('navigation.home')}</span>
           </NavLink>
-          <NavLink to="/visualization" className={navClasses}>
+          <NavLink to="/familyTree" className={navClasses}>
             <Network className="w-4 h-4" /> 
             <span className="hidden lg:inline">{t('navigation.genealogy', '族谱')}</span>
           </NavLink>

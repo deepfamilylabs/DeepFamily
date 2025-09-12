@@ -2,10 +2,10 @@ import React, { Suspense } from 'react'
 import LoadingSkeleton from './LoadingSkeleton'
 import ViewModeSwitch from './ViewModeSwitch'
 import type { GraphNode } from '../types/graph'
-import { VirtualizedContractTree } from './Visualization'
+import { VirtualizedContractTree } from './FamilyTree'
 import { NodeDetailProvider } from '../context/NodeDetailContext'
 import { useTreeData } from '../context/TreeDataContext'
-import { LAYOUT, useVisualizationHeight } from '../constants/layout'
+import { LAYOUT, useFamilyTreeHeight } from '../constants/layout'
 
 const ForceDAGView = React.lazy(() => import('./ForceDAGView'))
 const FlexibleDAGView = React.lazy(() => import('./FlexibleDAGView'))
@@ -24,7 +24,7 @@ interface ViewContainerProps {
 export default function ViewContainer({ viewMode, root, contractMessage, loading, onViewModeChange, viewModeLabels }: ViewContainerProps) {
   const hasRoot = !!root
   const { nodesData } = useTreeData()
-  const responsiveHeight = useVisualizationHeight()
+  const responsiveHeight = useFamilyTreeHeight()
   // useVizOptions internally inside views / contexts
   const content = (
     <Suspense fallback={<LoadingSkeleton />}> {

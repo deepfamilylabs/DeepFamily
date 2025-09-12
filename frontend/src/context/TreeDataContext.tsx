@@ -6,8 +6,8 @@ import { makeNodeId } from '../types/graph'
 import DeepFamily from '../abi/DeepFamily.json'
 import { ethers } from 'ethers'
 import { makeProvider } from '../utils/provider'
-import { fetchSubtreeStream } from '../components/Visualization'
-import { getRuntimeVisualizationConfig } from '../config/visualization'
+import { fetchSubtreeStream } from '../components/FamilyTree'
+import { getRuntimeFamilyTreeConfig } from '../config/familyTreeConfig'
 import { useErrorMonitor } from '../hooks/useErrorMonitor'
 import { useVizOptions } from './VizOptionsContext'
 import { NodeData } from '../types/graph'
@@ -99,7 +99,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     return `df.cache.v1::${rpc}::${addr}`
   }, [rpcUrl, contractAddress])
 
-  // Persisted visualization root (scoped by RPC+contract+root params)
+  // Persisted familyTree root (scoped by RPC+contract+root params)
   const vizRootKey = useMemo(() => {
     const rh = rootHash || 'no-root'
     const rv = Number(rootVersionIndex) || 0
@@ -212,7 +212,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (refreshTick === 0) return
     if (!contract) return
-    // In strict cache mode, completely skip visualization loading (avoid network access)
+    // In strict cache mode, completely skip familyTree loading (avoid network access)
     if (strictCacheOnly) return
     
     // Check if we already have complete cached data (three-tier cache check)
@@ -255,11 +255,11 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       const isValidHash = typeof rootHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(rootHash)
       const isValidVersion = Number.isFinite(rootVersionIndex) && Number(rootVersionIndex) >= 1
       if (!isValidHash || !isValidVersion) {
-        // Do not clear nodesData/localStorage here; not entering visualization mode
-        if (!cancelled) setContractMessage(t('visualization.status.rootNotFound'))
+        // Do not clear nodesData/localStorage here; not entering familyTree mode
+        if (!cancelled) setContractMessage(t('familyTree.status.rootNotFound'))
         return
       }
-      // Only now that config is valid, enter visualization loading state and clear prior viz state
+      // Only now that config is valid, enter familyTree loading state and clear prior viz state
       setLoading(true)
       setLoadOptionsSnapshot({ includeVersionDetails })
       setRoot(null)
@@ -281,9 +281,9 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           const isAbort = /AbortError|The user aborted a request/i.test(raw)
           const isFetchFail = /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(raw)
           const isNetwork = isConnRefused || isAbort || isFetchFail || /network|timeout|ECONN|ENET|EAI_AGAIN/i.test(raw) || String(code).includes('NETWORK')
-          if (isRateLimit) setContractMessage(t('visualization.status.rateLimited'))
-          else if (isNetwork) setContractMessage(t('visualization.status.networkError'))
-          else setContractMessage(t('visualization.status.contractModeRootNotFound'))
+          if (isRateLimit) setContractMessage(t('familyTree.status.rateLimited'))
+          else if (isNetwork) setContractMessage(t('familyTree.status.networkError'))
+          else setContractMessage(t('familyTree.status.contractModeRootNotFound'))
         }
         setLoading(false)
         return
@@ -304,13 +304,13 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           const isFetchFail = /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(msg)
           const isNetwork = isConnRefused || isAbort || isFetchFail || /network|timeout|ECONN|ENET|EAI_AGAIN/i.test(msg) || String(code).includes('NETWORK')
           if (isRateLimit) {
-            setContractMessage(t('visualization.status.rateLimited'))
+            setContractMessage(t('familyTree.status.rateLimited'))
           } else if (name.includes('InvalidPersonHash') || name.includes('InvalidVersionIndex') || /InvalidPersonHash|InvalidVersionIndex/i.test(msg)) {
-            setContractMessage(t('visualization.status.rootNotFound'))
+            setContractMessage(t('familyTree.status.rootNotFound'))
           } else if (isNetwork) {
-            setContractMessage(t('visualization.status.networkError'))
+            setContractMessage(t('familyTree.status.networkError'))
           } else {
-            setContractMessage(t('visualization.status.contractModeRootNotFound'))
+            setContractMessage(t('familyTree.status.contractModeRootNotFound'))
           }
           if (!stageLoggedRef.current.has('root_check')) { stageLoggedRef.current.add('root_check'); push(e as any, { stage: 'root_check' }) }
         }
@@ -325,8 +325,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         for await (const _ of fetchSubtreeStream(contract, rootHash, rootVersionIndex, {
           signal: controller.signal,
           traversal: trv,
-          maxDepth: getRuntimeVisualizationConfig().DEFAULT_MAX_DEPTH,
-          hardNodeLimit: getRuntimeVisualizationConfig().DEFAULT_HARD_NODE_LIMIT,
+          maxDepth: getRuntimeFamilyTreeConfig().DEFAULT_MAX_DEPTH,
+          hardNodeLimit: getRuntimeFamilyTreeConfig().DEFAULT_HARD_NODE_LIMIT,
           onProgress: stats => { if (!cancelled) setProgress(stats) },
           onNode: n => {
             if (!rootNode) rootNode = n
@@ -369,8 +369,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           // Don't downgrade an existing rateLimited message
           setContractMessage(prev => {
             if (prev && /rate/i.test(prev)) return prev
-            if (isRateLimit) return t('visualization.status.rateLimited')
-            if (isNetwork) return t('visualization.status.networkError')
+            if (isRateLimit) return t('familyTree.status.rateLimited')
+            if (isNetwork) return t('familyTree.status.networkError')
             return e.message || 'error'
           })
           push(e, { stage: 'stream_fetch' })
@@ -405,7 +405,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (loading || !contract || !root) return
     let cancelled = false
     ;(async () => {
-      const BATCH = getRuntimeVisualizationConfig().ENDORSEMENT_STATS_BATCH
+      const BATCH = getRuntimeFamilyTreeConfig().ENDORSEMENT_STATS_BATCH
       const iface = new ethers.Interface((DeepFamily as any).abi)
       const multicallAddress = (import.meta as any).env.VITE_MULTICALL_ADDRESS
       const useMulticall = !!multicallAddress && provider

@@ -25,8 +25,8 @@ function TitleUpdater() {
       switch (location.pathname) {
         case '/':
           return `${baseName} - ${t('home.title')}`
-        case '/visualization':
-          return `${baseName} - ${t('navigation.visualization')}`
+        case '/familyTree':
+          return `${baseName} - ${t('navigation.familyTree')}`
         case '/search':
           return `${baseName} - ${t('navigation.search')}`
         case '/people':
@@ -52,24 +52,19 @@ function TitleUpdater() {
 
 function RouterContent() {
   return (
-    <VizOptionsProvider>
-      {/* TreeDataProvider no longer needs traversal/includeX props; it reads VizOptions context directly */}
-      <TreeDataProvider>
-        {/* Base routes */}
-        <Routes>
-          <Route path="/" element={<Layout />}> 
-            <Route index element={<Home />} />
-            <Route path="visualization" element={<TreePage />} />
-            <Route path="search" element={<SearchPage />} />
-            <Route path="people" element={<PeoplePage />} />
-            <Route path="actions" element={<ActionsPage />} />
-            {/* Person and Editor under Layout to keep header/footer */}
-            <Route path="person/:tokenId" element={<PersonPage />} />
-            <Route path="editor/:tokenId" element={<StoryEditorPage />} />
-          </Route>
-        </Routes>
-      </TreeDataProvider>
-    </VizOptionsProvider>
+    // Base routes only; providers are applied at App root
+    <Routes>
+      <Route path="/" element={<Layout />}> 
+        <Route index element={<Home />} />
+        <Route path="familyTree" element={<TreePage />} />
+        <Route path="search" element={<SearchPage />} />
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="actions" element={<ActionsPage />} />
+        {/* Person and Editor under Layout to keep header/footer */}
+        <Route path="person/:tokenId" element={<PersonPage />} />
+        <Route path="editor/:tokenId" element={<StoryEditorPage />} />
+      </Route>
+    </Routes>
   )
 }
 
@@ -78,10 +73,14 @@ export default function App() {
     <ConfigProvider>
       <ToastProvider>
         <WalletProvider>
-          <BrowserRouter>
-            <TitleUpdater />
-            <RouterContent />
-          </BrowserRouter>
+          <VizOptionsProvider>
+            <TreeDataProvider>
+              <BrowserRouter>
+                <TitleUpdater />
+                <RouterContent />
+              </BrowserRouter>
+            </TreeDataProvider>
+          </VizOptionsProvider>
         </WalletProvider>
       </ToastProvider>
     </ConfigProvider>

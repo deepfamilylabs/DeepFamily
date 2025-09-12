@@ -5,7 +5,7 @@ import { useDebounce } from '../hooks/useDebounce'
 import { formatHashMiddle, shortAddress } from '../types/graph'
 import { Clipboard } from 'lucide-react'
 import { useTreeData } from '../context/TreeDataContext'
-import { useToast } from '../components/ToastProvider'
+import { useToast } from './ToastProvider'
 
 interface Props {
   editing: boolean
@@ -17,7 +17,7 @@ interface Props {
   t: any
 }
 
-export default function VisualizationConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
+export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
   const { t } = useTranslation()
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory } = useConfig()
   const { clearAllCaches } = useTreeData()
@@ -99,9 +99,9 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
   const isUrl = (v: string) => /^https?:\/\//i.test(v) || v.startsWith('/')
   const validateAll = () => {
     const next: typeof errors = {}
-    if (!isUrl(localRpcUrl)) next.rpc = 'visualization.validation.rpc'
-    if (!isAddress(localContractAddress)) next.contract = 'visualization.validation.contract'
-    if (!isHash32(localRootHash)) next.root = 'visualization.validation.root'
+    if (!isUrl(localRpcUrl)) next.rpc = 'familyTree.validation.rpc'
+    if (!isAddress(localContractAddress)) next.contract = 'familyTree.validation.contract'
+    if (!isHash32(localRootHash)) next.root = 'familyTree.validation.root'
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -126,7 +126,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       bgClass = 'bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/30'
       borderClass = 'border-amber-300/60 dark:border-amber-600/40'
       textClass = 'text-amber-700 dark:text-amber-300'
-      text = statusT ? statusT('visualization.status.badge.checking') : 'Loading'
+      text = statusT ? statusT('familyTree.status.badge.checking') : 'Loading'
     } else if (contractMessage) {
       bgClass = 'bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-900/40 dark:to-rose-900/30'
       borderClass = 'border-red-300/60 dark:border-red-600/40'
@@ -136,7 +136,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       bgClass = 'bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/40 dark:to-green-900/30'
       borderClass = 'border-emerald-300/60 dark:border-emerald-600/40'
       textClass = 'text-emerald-700 dark:text-emerald-300'
-      text = statusT ? statusT('visualization.status.badge.ok') : 'OK'
+      text = statusT ? statusT('familyTree.status.badge.ok') : 'OK'
     }
 
     return (
@@ -155,7 +155,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
           {/* Left side: Title */}
           <div className="min-w-0 flex-1">
             <span className="text-lg font-bold text-transparent bg-gradient-to-r from-slate-800 via-blue-600 to-purple-600 dark:from-slate-200 dark:via-blue-400 dark:to-purple-400 bg-clip-text">
-              {t('visualization.ui.contractModeConfig')}
+              {t('familyTree.ui.contractModeConfig')}
             </span>
           </div>
           
@@ -167,11 +167,11 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
                   onClick={applyConfigChanges}
                   disabled={!hasDiff}
                   className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-semibold ${hasDiff ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md hover:shadow-lg' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-                >{t('visualization.ui.save')}</button>
-                <button onClick={cancel} className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('visualization.ui.cancel')}</button>
+                >{t('familyTree.ui.save')}</button>
+                <button onClick={cancel} className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('familyTree.ui.cancel')}</button>
               </div>
             ) : (
-              <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('visualization.ui.edit')}</button>
+              <button onClick={() => setEditing(true)} className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">{t('familyTree.ui.edit')}</button>
             )}
           </div>
         </div>
@@ -184,15 +184,15 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
               onClick={onRefresh}
               className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs whitespace-nowrap"
               disabled={loading}
-              title={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
-              aria-label={statusT ? statusT('visualization.actions.refresh') : 'Refresh'}
+              title={statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}
+              aria-label={statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}
             >
               <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300 flex-shrink-0`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
                 <polyline points="1 20 1 14 7 14" />
                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
               </svg>
-              <span className="truncate">{statusT ? statusT('visualization.actions.refresh') : 'Refresh'}</span>
+              <span className="truncate">{statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}</span>
             </button>
           )}
           <button
@@ -200,7 +200,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
             onClick={() => { clearAllCaches(); onRefresh?.() }}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-300 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
           >
-            <span className="truncate">{t('visualization.config.clearAndRefresh', 'Clear Cache and Refresh')}</span>
+            <span className="truncate">{t('familyTree.config.clearAndRefresh', 'Clear Cache and Refresh')}</span>
           </button>
         </div>
       </div>
@@ -208,23 +208,23 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       {editing ? (
         <div className="space-y-4">
           <div>
-            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('visualization.config.rpc')}:</label>
+            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.rpc')}:</label>
             <input type="text" value={localRpcUrl} onChange={e => setLocalRpcUrl(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
             {errors.rpc && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.rpc, 'RPC format error')}</div>}
           </div>
           <div>
-            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('visualization.config.contract')}:</label>
+            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.contract')}:</label>
             <input type="text" value={localContractAddress} onChange={e => setLocalContractAddress(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.contract ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
             {errors.contract && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.contract, 'Contract address format error')}</div>}
           </div>
           <div>
-            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('visualization.config.root')}:</label>
+            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.root')}:</label>
             <input type="text" value={localRootHash} onChange={e => setLocalRootHash(e.target.value)} className={`w-full px-4 py-3 text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
             {errors.root && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.root, 'Root Hash format error')}</div>}
             {rootHistory.length > 0 && (
               <div className="mt-2">
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  {t('visualization.config.rootHistory', 'Root hash history')}
+                  {t('familyTree.config.rootHistory', 'Root hash history')}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {rootHistory.map(h => (
@@ -237,10 +237,10 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
                       >{formatHashMiddle(h)}</button>
                       <button
                         type="button"
-                        aria-label={t('visualization.actions.remove', 'Remove')}
+                        aria-label={t('familyTree.actions.remove', 'Remove')}
                         className="w-4 h-4 inline-flex items-center justify-center rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors duration-150"
                         onClick={() => removeRootFromHistory(h)}
-                        title={t('visualization.actions.remove', 'Remove') as string}
+                        title={t('familyTree.actions.remove', 'Remove') as string}
                       >×</button>
                     </div>
                   ))}
@@ -250,7 +250,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
                     type="button"
                     onClick={clearRootHistory}
                     className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 underline"
-                  >{t('visualization.actions.clearAll', 'Clear all')}</button>
+                  >{t('familyTree.actions.clearAll', 'Clear all')}</button>
                 </div>
               </div>
             )}
@@ -259,11 +259,11 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       ) : (
         <div className="space-y-2 text-slate-700 dark:text-slate-300">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.rpc')}:</span>
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.rpc')}:</span>
             <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rpcUrl}>{rpcUrl}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.contract')}:</span>
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.contract')}:</span>
             <div className="flex-1 min-w-0">
               <div className="inline-flex items-center gap-1 max-w-full">
                 <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={contractAddress}>
@@ -289,7 +289,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
       {/* Compact version controls */}
       <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.config.root')}:</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.root')}:</span>
           <div className="flex-1 min-w-0">
             <div className="inline-flex items-center gap-1 max-w-full">
               <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
@@ -310,7 +310,7 @@ export default function VisualizationConfigForm({ editing, setEditing, contractM
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('visualization.ui.versionNumber')}:</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.ui.versionNumber')}:</span>
           <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
             <button
               className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
