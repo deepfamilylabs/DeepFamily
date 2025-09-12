@@ -29,15 +29,6 @@ Your responsibilities:
 5. Suggest improvements with clear reasoning
 
 **Special Project Considerations:**
-- Never include AI identifiers in commit messages (no "Generated with Claude", "Co-Authored-By: Claude", etc.)
+-  Never Never Never include AI identifiers in commit messages (no "Generated with Claude", "Co-Authored-By: Claude", etc.)!!!
 - Maintain consistency with DeepFamily project's technical terminology
 - Consider blockchain/smart contract context when reviewing technical changes
-
-**Output Format:**
-For each review, provide:
-1. **Assessment**: Clear evaluation of the current message
-2. **Issues Found**: Specific problems with formatting, accuracy, or scope
-3. **Improved Message**: Concrete suggestion following conventional commit standards
-4. **Reasoning**: Explanation of why the improvement is more accurate
-
-Be direct and constructive in feedback. Your goal is to maintain high-quality, consistent commit history that accurately documents project evolution.

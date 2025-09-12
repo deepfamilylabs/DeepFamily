@@ -1,7 +1,7 @@
 {
   "navigation": {
     "home": "首页",
-    "visualization": "可视化",
+    "familyTree": "可视化",
     "genealogy": "族谱",
     "search": "搜索",
     "people": "人物",
@@ -10,7 +10,7 @@
   "home": {
     "title": "去中心化链上族谱协议",
     "subtitle": "多版本可信谱系 · 经济激励背书 · NFT 价值归属 · 分片叙事封存 · 零知识证明隐私扩展",
-    "exploreVisualization": "族谱图",
+    "exploreFamilyTree": "族谱图",
     "addPerson": "添加人物",
     "participate": "搜索",
     "searchGenealogy": "搜索族谱",
@@ -324,7 +324,7 @@
     },
     "offset": "offset"
   },
-  "visualization": {
+  "familyTree": {
     "title": "可视化",
     "viewModes": {
       "tree": "树图",
@@ -532,7 +532,7 @@
     "verified": "已校验",
     "personHashLabel": "人物哈希:",
     "versionLabel": "版本：",
-    "viewVisualization": "族谱视图",
+    "viewFamilyTree": "族谱视图",
     "invalidTokenId": "无效的 Token ID",
     "nonexistentToken": "该 Token 不存在",
     "fetchFailed": "加载 Token 失败"

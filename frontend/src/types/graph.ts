@@ -132,9 +132,9 @@ export function deathDateString(nd: Partial<NodeData> | undefined | null): strin
 
 export function genderText(gender: number | undefined, t: (key: string, def?: string) => string): string {
   switch (gender) {
-    case 1: return t('visualization.nodeDetail.genders.male', 'Male')
-    case 2: return t('visualization.nodeDetail.genders.female', 'Female')
-    case 3: return t('visualization.nodeDetail.genders.other', 'Other')
+    case 1: return t('familyTree.nodeDetail.genders.male', 'Male')
+    case 2: return t('familyTree.nodeDetail.genders.female', 'Female')
+    case 3: return t('familyTree.nodeDetail.genders.other', 'Other')
     default: return ''
   }
 }

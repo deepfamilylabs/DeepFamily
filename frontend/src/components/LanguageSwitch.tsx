@@ -10,8 +10,8 @@ interface Language {
 
 const languages: Language[] = [
   { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: 'Simplified Chinese' },
-  { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: 'Traditional Chinese' }
+  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文' },
+  { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: '繁體中文' }
 ]
 
 interface LanguageSwitchProps {

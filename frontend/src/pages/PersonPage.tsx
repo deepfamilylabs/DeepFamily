@@ -438,21 +438,21 @@ export default function PersonPage() {
                       <div className="space-y-5 font-mono text-gray-700 dark:text-gray-200 text-xs leading-relaxed tracking-wide selection:bg-indigo-100/70 dark:selection:bg-indigo-800/30">
                         {data.fullName && (
                           <div className="flex items-start gap-2 sm:gap-4 p-3 rounded-xl bg-gradient-to-r from-blue-50/50 to-cyan-50/30 dark:from-blue-900/20 dark:to-cyan-900/10 border border-blue-200/30 dark:border-blue-700/30">
-                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 whitespace-nowrap flex-shrink-0">{t('visualization.nodeDetail.fullName', 'Full Name')}</span>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 whitespace-nowrap flex-shrink-0">{t('familyTree.nodeDetail.fullName', 'Full Name')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">{data.fullName}</span>
                           </div>
                         )}
 
                         {data.nftCoreInfo?.gender !== undefined && data.nftCoreInfo.gender > 0 && (
                           <div className="flex items-start gap-2 sm:gap-4 p-3 rounded-xl bg-gradient-to-r from-purple-50/50 to-pink-50/30 dark:from-purple-900/20 dark:to-pink-900/10 border border-purple-200/30 dark:border-purple-700/30">
-                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0">{t('visualization.nodeDetail.gender', 'Gender')}</span>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0">{t('familyTree.nodeDetail.gender', 'Gender')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">{genderTextFn(data.nftCoreInfo.gender, t as any) || '-'}</span>
                           </div>
                         )}
 
                         {data.nftCoreInfo && (data.nftCoreInfo.birthYear || data.nftCoreInfo.birthPlace) && (
                           <div className="flex items-start gap-2 sm:gap-4 p-3 rounded-xl bg-gradient-to-r from-green-50/50 to-emerald-50/30 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/30 dark:border-green-700/30">
-                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0">{t('visualization.nodeDetail.birth', 'Birth')}</span>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0">{t('familyTree.nodeDetail.birth', 'Birth')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">
                               {(() => {
                                 const d = formatYMD(data.nftCoreInfo!.birthYear, data.nftCoreInfo!.birthMonth, data.nftCoreInfo!.birthDay, data.nftCoreInfo!.isBirthBC)
@@ -465,7 +465,7 @@ export default function PersonPage() {
 
                         {data.nftCoreInfo && (data.nftCoreInfo.deathYear || data.nftCoreInfo.deathPlace) && (
                           <div className="flex items-start gap-2 sm:gap-4 p-3 rounded-xl bg-gradient-to-r from-gray-50/50 to-slate-50/30 dark:from-gray-900/20 dark:to-slate-900/10 border border-gray-200/30 dark:border-gray-700/30">
-                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0">{t('visualization.nodeDetail.death', 'Death')}</span>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0">{t('familyTree.nodeDetail.death', 'Death')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-semibold text-left">
                               {(() => {
                                 const d = formatYMD(data.nftCoreInfo!.deathYear, data.nftCoreInfo!.deathMonth, data.nftCoreInfo!.deathDay, data.nftCoreInfo!.isDeathBC)
@@ -478,7 +478,7 @@ export default function PersonPage() {
 
                         {data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== '' && (
                           <div className="flex items-start gap-2 sm:gap-4 flex-wrap sm:flex-nowrap p-4 rounded-xl bg-gradient-to-r from-amber-50/50 to-yellow-50/30 dark:from-amber-900/20 dark:to-yellow-900/10 border border-amber-200/30 dark:border-amber-700/30">
-                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0 pt-1">{t('visualization.nodeDetail.story', 'Story')}</span>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold w-16 sm:w-20 flex-shrink-0 pt-1">{t('familyTree.nodeDetail.story', 'Story')}</span>
                             <div className="text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap font-medium flex-1 min-w-0 break-words break-all sm:break-words text-left">
                               {data.nftCoreInfo.story}
                             </div>
@@ -752,7 +752,7 @@ function HashAndIndexLine({ personHash, versionIndex, t }: { personHash: string,
   const goViz = () => {
     if (!versionIndex || versionIndex <= 0) return
     cfg.update({ rootHash: personHash, rootVersionIndex: versionIndex })
-    navigate(`/visualization?root=${personHash}&v=${versionIndex}`)
+    navigate(`/familyTree?root=${personHash}&v=${versionIndex}`)
   }
   const shortHash = useMemo(() => formatHashMiddle(personHash, 7, 5), [personHash])
   return (
@@ -778,11 +778,11 @@ function HashAndIndexLine({ personHash, versionIndex, t }: { personHash: string,
             <button
               onClick={goViz}
               className="ml-2 flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30 text-xs transition-colors"
-              title={t('person.viewVisualization','View Family Tree') as string}
-              aria-label={t('person.viewVisualization','View Family Tree') as string}
+              title={t('person.viewFamilyTree','View Family Tree') as string}
+              aria-label={t('person.viewFamilyTree','View Family Tree') as string}
             >
               <GitBranch size={12} />
-              <span className="hidden sm:inline">{t('person.viewVisualization','Family Tree')}</span>
+              <span className="hidden sm:inline">{t('person.viewFamilyTree','Family Tree')}</span>
             </button>
           </>
         )}

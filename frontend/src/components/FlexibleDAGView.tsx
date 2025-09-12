@@ -8,7 +8,7 @@ import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import NodeCard from './NodeCard'
 import { useNodeData } from '../hooks/useNodeData'
-import { useVisualizationHeight } from '../constants/layout'
+import { useFamilyTreeHeight } from '../constants/layout'
 
 export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
 
@@ -84,7 +84,7 @@ function FlexibleDAGViewInner({
 
   const [hover, setHover] = useState<{ id: string; x: number; y: number; hash: string } | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const responsiveHeight = useVisualizationHeight()
+  const responsiveHeight = useFamilyTreeHeight()
   const toContainer = (svgX: number, svgY: number) => ({ left: transform.x + svgX * transform.k, top: transform.y + svgY * transform.k })
   const recomputeHoverPosition = useCallback(() => {
     const anchorId = ctxSelectedId || hover?.id

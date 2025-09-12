@@ -75,9 +75,9 @@ DeepFamily/
 ├── frontend/               # React Frontend Application
 │   ├── src/
 │   │   ├── components/     # React Components
-│   │   │   ├── FlexibleDAGView.tsx   # Flexible DAG Visualization
-│   │   │   ├── ForceDAGView.tsx      # Force-Directed Visualization
-│   │   │   ├── MerkleTreeView.tsx    # Merkle Tree Visualization
+│   │   │   ├── FlexibleDAGView.tsx   # Flexible DAG FamilyTree
+│   │   │   ├── ForceDAGView.tsx      # Force-Directed FamilyTree
+│   │   │   ├── MerkleTreeView.tsx    # Merkle Tree FamilyTree
 │   │   │   ├── NodeDetailModal.tsx   # Node Detail Modal
 │   │   │   └── ...                   # Other UI Components
 │   │   ├── pages/          # Route Pages
@@ -104,7 +104,7 @@ DeepFamily/
 - OpenZeppelin v5.0, Hardhat, Ethers v6, Solidity coverage & linting
 
 **Frontend (React + Vite)**
-- React 18, TypeScript, Vite, TailwindCSS, D3 visualization
+- React 18, TypeScript, Vite, TailwindCSS, D3 familyTree
 - Multi-DAG views, wallet integration, responsive design
 
 **Indexing (The Graph)**

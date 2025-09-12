@@ -10,7 +10,7 @@ import { useNodeData } from '../hooks/useNodeData'
 import { shortHash } from '../types/graph'
 import { isMinted } from '../types/graph'
 import { birthDateString } from '../types/graph'
-import { useVisualizationHeight } from '../constants/layout'
+import { useFamilyTreeHeight } from '../constants/layout'
 
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
 
@@ -100,7 +100,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const responsiveHeight = useVisualizationHeight()
+  const responsiveHeight = useFamilyTreeHeight()
 
   const miniNodes = useMemo(() => positioned.map(pn => ({ id: pn.id, x: pn.x, y: pn.y, w: measuredWidths[pn.id] || BASE_NODE_WIDTH, h: NODE_HEIGHT })), [positioned, measuredWidths])
   const { miniSvgRef, viewportRef, dims } = useMiniMap({}, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {

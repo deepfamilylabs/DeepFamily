@@ -1,7 +1,7 @@
 {
   "navigation": {
     "home": "首頁",
-    "visualization": "視覺化",
+    "familyTree": "視覺化",
     "genealogy": "族譜",
     "search": "搜尋",
     "people": "人物",
@@ -10,7 +10,7 @@
   "home": {
     "title": "去中心化鏈上族譜協定",
     "subtitle": "多版本可信譜系 · 經濟激勵背書 · NFT 價值歸屬 · 分片敘事封存 · 零知識證明隱私擴展",
-    "exploreVisualization": "族譜圖",
+    "exploreFamilyTree": "族譜圖",
     "addPerson": "添加人物",
     "participate": "搜尋",
     "blockchainActions": "添加人物",
@@ -323,7 +323,7 @@
     },
     "offset": "offset"
   },
-  "visualization": {
+  "familyTree": {
     "title": "視覺化",
     "viewModes": {
       "tree": "樹圖",
@@ -531,7 +531,7 @@
     "verified": "已校驗",
     "personHashLabel": "人物哈希:",
     "versionLabel": "版本：",
-    "viewVisualization": "族譜視圖",
+    "viewFamilyTree": "族譜視圖",
     "invalidTokenId": "無效的 Token ID",
     "nonexistentToken": "該 Token 不存在",
     "fetchFailed": "載入 Token 失敗"

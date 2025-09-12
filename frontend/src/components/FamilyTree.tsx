@@ -7,10 +7,10 @@ import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { makeNodeId, type GraphNode, isMinted } from '../types/graph'
 import { FixedSizeList as VirtualList, ListChildComponentProps } from 'react-window'
-import { getRuntimeVisualizationConfig } from '../config/visualization'
+import { getRuntimeFamilyTreeConfig } from '../config/familyTreeConfig'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import { useTreeData } from '../context/TreeDataContext'
-import { LAYOUT, useVisualizationHeight } from '../constants/layout'
+import { LAYOUT, useFamilyTreeHeight } from '../constants/layout'
 
 const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = React.memo(function Node({ node, depth = 0, isLast = true }) {
   const indentPx = depth * 16
@@ -19,7 +19,7 @@ const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = Re
   const hasChildren = !!(node.children && node.children.length > 0)
   const navigate = useNavigate()
   const cfg = useConfig()
-  const goDetail = useCallback(() => { cfg.update({ rootHash: node.personHash, rootVersionIndex: node.versionIndex }); navigate(`/visualization?root=${node.personHash}&v=${node.versionIndex}`) }, [cfg, navigate, node.personHash, node.versionIndex])
+  const goDetail = useCallback(() => { cfg.update({ rootHash: node.personHash, rootVersionIndex: node.versionIndex }); navigate(`/familyTree?root=${node.personHash}&v=${node.versionIndex}`) }, [cfg, navigate, node.personHash, node.versionIndex])
   const toggle = useCallback(() => setOpen(o => !o), [])
   return (
     <li>
@@ -143,7 +143,7 @@ async function* walkSubtree(
   versionIndex: number,
   options?: FetchSubtreeOptions
 ): AsyncGenerator<GraphNode, GraphNode, void> {
-  const runtimeCfg = getRuntimeVisualizationConfig()
+  const runtimeCfg = getRuntimeFamilyTreeConfig()
   const maxDepth = options?.maxDepth ?? runtimeCfg.DEFAULT_MAX_DEPTH
   const pageSize = options?.pageSize ?? 25
   let parallel = Math.max(1, options?.parallel ?? 6)
@@ -289,8 +289,8 @@ function flattenTree(root: GraphNode, expanded: Set<string>): FlatRow[] {
 }
 
 export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: number; rowHeight?: number }> = ({ root, height, rowHeight = LAYOUT.ROW_HEIGHT }) => {
-  const responsiveHeight = useVisualizationHeight()
-  const visualizationHeight = height || responsiveHeight
+  const responsiveHeight = useFamilyTreeHeight()
+  const familyTreeHeight = height || responsiveHeight
   const { nodesData } = useTreeData() as any
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([root.personHash + ':' + root.versionIndex]))
   const rows = useMemo(() => flattenTree(root, expanded), [root, expanded])
@@ -374,9 +374,9 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
     )
   }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
   return (
-    <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm overflow-hidden" style={{ height: visualizationHeight }}>
+    <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm overflow-hidden" style={{ height: familyTreeHeight }}>
       <div className="p-4 pt-16 h-full">
-        <VirtualList height={visualizationHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'100%'}>{Row}</VirtualList>
+        <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'100%'}>{Row}</VirtualList>
       </div>
     </div>
   )

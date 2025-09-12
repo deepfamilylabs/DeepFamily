@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Wallet,
   Link,
-  Edit2
+  Edit2,
+  Star
 } from 'lucide-react'
 import { NodeData, StoryChunk, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
@@ -407,7 +408,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                         <span className="font-mono whitespace-nowrap">#{person.tokenId}</span>
                         {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
                           <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-full whitespace-nowrap">
-                            <span className="text-yellow-500">⭐</span>
+                            <Star className="w-3 h-3 text-yellow-500" />
                             <span className="text-[9px] sm:text-[10px] font-medium text-yellow-700 dark:text-yellow-300">
                               {person.endorsementCount}
                             </span>
@@ -527,7 +528,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                     <Link className="w-5 h-5 text-blue-500" />
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                        {t('visualization.nodeDetail.uri', 'URI')}
+                        {t('familyTree.nodeDetail.uri', 'URI')}
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-[10px] text-gray-600 dark:text-gray-400 font-mono break-all">
