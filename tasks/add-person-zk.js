@@ -47,24 +47,24 @@ task("add-person-zk", "Submit Groth16 proof to addPersonZK")
     const proof = proofJson.proof || proofJson;
     const publicSignals = toBigIntArray(pubJson.publicSignals || pubJson);
 
-    if (publicSignals.length !== 17n) {
-      throw new Error(`publicSignals length must be 17, got ${publicSignals.length}`);
+    if (publicSignals.length !== 7n) {
+      throw new Error(`publicSignals length must be 7, got ${publicSignals.length}`);
     }
 
-    // Check limbs < 2^64 for first 16 signals (mirror contract's cheap check)
-    const TWO_POW_64 = 1n << 64n;
-    for (let i = 0; i < 16; i++) {
-      if (publicSignals[i] < 0 || publicSignals[i] >= TWO_POW_64) {
-        throw new Error(`publicSignals[${i}] not in [0, 2^64)`);
+    // Check limbs < 2^128 for first 6 signals (mirror contract's cheap check)
+    const TWO_POW_128 = 1n << 128n;
+    for (let i = 0; i < 6; i++) {
+      if (publicSignals[i] < 0 || publicSignals[i] >= TWO_POW_128) {
+        throw new Error(`publicSignals[${i}] not in [0, 2^128)`);
       }
     }
 
     // Submitter binding check: last element must equal uint160(sender)
-    const submitter = publicSignals[16];
+    const submitter = publicSignals[6];
     const senderUint160 = BigInt(sender);
     if (submitter !== senderUint160) {
       throw new Error(
-        `submitter mismatch: publicSignals[16]=${submitter} expected ${senderUint160} (from ${sender})`,
+        `submitter mismatch: publicSignals[6]=${submitter} expected ${senderUint160} (from ${sender})`,
       );
     }
 

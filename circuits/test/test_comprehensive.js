@@ -36,6 +36,8 @@ async function validateCircuit() {
       mother_birthMonth: 8,
       mother_birthDay: 20,
       mother_gender: 2,
+      hasFather: 1,
+      hasMother: 1,
       submitter: "1234567890123456789012345678901234567890"
     };
 
