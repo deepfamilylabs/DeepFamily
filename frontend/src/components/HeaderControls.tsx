@@ -59,13 +59,13 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
 
   return (
     <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
-      {/* 钱包连接按钮 - 始终显示 */}
+      {/* Wallet connect button - always show */}
       <WalletConnectButton 
         showBalance={false}
         variant={variant}
       />
       
-      {/* 大屏幕显示所有按钮 */}
+      {/* Show all buttons on large screens */}
       <div className="hidden md:flex items-center gap-2 lg:gap-3">
         <LanguageSwitch variant={variant} />
         <button
@@ -85,7 +85,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
         </button>
       </div>
 
-      {/* 小屏幕的更多按钮 */}
+      {/* More button for small screens */}
       <div className="md:hidden relative" ref={settingsRef}>
         <button
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
@@ -98,7 +98,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
           <Menu className="w-4 h-4" />
         </button>
 
-        {/* 更多选项下拉菜单 */}
+        {/* More options dropdown menu */}
         <div className={`absolute right-0 z-[9999] mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-xl transition-all duration-200 ${
           isSettingsOpen 
             ? 'opacity-100 visible transform translate-y-0 scale-100' 
@@ -109,7 +109,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
             : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600'
         }`}>
           <div className="py-1">
-            {/* 主题切换 */}
+            {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               className={`flex items-center justify-between w-full px-4 py-3 text-sm transition-all duration-200 rounded-lg mx-1 ${
@@ -130,18 +130,18 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
               </span>
             </button>
 
-            {/* 分割线 */}
+            {/* Divider */}
             <div className={`mx-4 my-2 h-px ${
               isHomePage ? 'bg-gray-200/50 dark:bg-gray-600/50' : 'bg-gray-200 dark:bg-gray-600'
             }`}></div>
 
-            {/* 语言切换部分 */}
+            {/* Language switching section */}
             <div className="px-2">
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 {t('settings.language', 'Language')}
               </div>
               
-              {/* 语言选项 */}
+              {/* Language options */}
               <div className="space-y-1">
                 {languages.map((language) => (
                   <button

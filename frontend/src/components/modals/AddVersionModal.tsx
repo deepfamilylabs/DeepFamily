@@ -3,9 +3,9 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Upload, AlertCircle, User, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle } from 'lucide-react'
+import { X, User, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle } from 'lucide-react'
 import { useWallet } from '../../context/WalletContext'
-import { submitAddPersonZK } from '../../lib/zk'
+import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
 import { useConfig } from '../../context/ConfigContext'
 import PersonHashCalculator from '../PersonHashCalculator'
 
@@ -47,8 +47,7 @@ export default function AddVersionModal({
   const { signer } = useWallet()
   const { contractAddress } = useConfig()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [zkProof, setZkProof] = useState<any>(null)
-  const [publicSignals, setPublicSignals] = useState<any[]>([])
+  const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
   
   // Person hash and info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<{
@@ -172,12 +171,11 @@ export default function AddVersionModal({
 
   const handleClose = () => {
     reset()
-    setZkProof(null)
-    setPublicSignals([])
     setPersonInfo(null)
     setFatherInfo(null)
     setMotherInfo(null)
     setIsSubmitting(false)
+    setProofGenerationStep('')
     setFatherExpanded(false)
     setMotherExpanded(false)
     setDragging(false)
@@ -185,26 +183,6 @@ export default function AddVersionModal({
     onClose()
   }
 
-  const handleZKProofUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string)
-        if (data.proof && data.publicSignals) {
-          setZkProof(data.proof)
-          setPublicSignals(data.publicSignals)
-        } else {
-          alert(t('addVersion.invalidProofFile', 'Invalid proof file format'))
-        }
-      } catch (error) {
-        alert(t('addVersion.proofFileError', 'Error reading proof file'))
-      }
-    }
-    reader.readAsText(file)
-  }
 
   const onSubmit = async (data: AddVersionForm) => {
     if (!signer) {
@@ -217,18 +195,55 @@ export default function AddVersionModal({
       return
     }
 
-    if (!zkProof || !publicSignals.length) {
-      alert(t('addVersion.proofRequired', 'Please upload ZK proof file'))
+    if (!personInfo || !personInfo.fullName.trim()) {
+      alert(t('addVersion.personInfoRequired', 'Please fill in person information'))
       return
     }
 
     setIsSubmitting(true)
+    setProofGenerationStep(t('addVersion.preparingData', 'Preparing data...'))
 
     try {
+      console.log('🔄 Starting ZK proof generation for person:', personInfo.fullName)
+      
+      // Get submitter address
+      const submitterAddress = await signer.getAddress()
+      console.log('📝 Submitter address:', submitterAddress)
+      
+      setProofGenerationStep(t('addVersion.generatingProof', 'Generating zero-knowledge proof... (this may take 30-60 seconds)'))
+      
+      // Generate ZK proof automatically
+      console.log('🔍 Person info:', personInfo)
+      console.log('🔍 Father info:', fatherInfo)
+      console.log('🔍 Mother info:', motherInfo)
+      console.log('🔍 Submitter address:', submitterAddress)
+      
+      const { proof, publicSignals } = await generatePersonProof(
+        personInfo,
+        fatherInfo && fatherInfo.fullName.trim() ? fatherInfo : null,
+        motherInfo && motherInfo.fullName.trim() ? motherInfo : null,
+        submitterAddress
+      )
+      
+      console.log('✅ Proof generated successfully')
+      console.log('📊 Public signals:', publicSignals)
+      
+      setProofGenerationStep(t('addVersion.verifyingProof', 'Verifying proof...'))
+      
+      // Verify the generated proof
+      const isValid = await verifyProof(proof, publicSignals)
+      if (!isValid) {
+        throw new Error(t('addVersion.proofVerificationFailed', 'Generated proof verification failed'))
+      }
+      
+      console.log('🔍 Proof verification: VALID')
+      
+      setProofGenerationStep(t('addVersion.submittingToBlockchain', 'Submitting to blockchain...'))
+      
       const result = await submitAddPersonZK(
         signer,
         contractAddress,
-        zkProof,
+        proof,
         publicSignals,
         data.fatherVersionIndex,
         data.motherVersionIndex,
@@ -237,14 +252,27 @@ export default function AddVersionModal({
       )
 
       if (result) {
+        console.log('🎉 Person added successfully:', result.hash)
         onSuccess?.(result)
         handleClose()
       }
     } catch (error: any) {
-      console.error('Add version failed:', error)
-      alert(error.message || t('addVersion.submitFailed', 'Failed to add version'))
+      console.error('❌ Add version failed:', error)
+      
+      let errorMessage = t('addVersion.submitFailed', 'Failed to add version')
+      
+      if (error.message?.includes('proof')) {
+        errorMessage = t('addVersion.proofGenerationFailed', 'Failed to generate or verify proof')
+      } else if (error.message?.includes('transaction')) {
+        errorMessage = t('addVersion.transactionFailed', 'Blockchain transaction failed')
+      } else if (error.message?.includes('wallet')) {
+        errorMessage = t('addVersion.walletError', 'Wallet connection error')
+      }
+      
+      alert(`${errorMessage}: ${error.message}`)
     } finally {
       setIsSubmitting(false)
+      setProofGenerationStep('')
     }
   }
 
@@ -496,47 +524,29 @@ export default function AddVersionModal({
               </div>
             </div>
           </div>
-
-          {/* ZK Proof Upload */}
-          <div className="space-y-3">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              {t('addVersion.zkProof', 'Zero-Knowledge Proof')}
-            </h3>
-
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md p-4">
-              <div className="text-center">
-                <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                <div className="mt-3">
-                  <label className="cursor-pointer">
-                    <span className="mt-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {zkProof ? 
-                        t('addVersion.proofUploaded', 'Proof uploaded successfully') :
-                        t('addVersion.uploadProof', 'Upload proof.json file')
-                      }
-                    </span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleZKProofUpload}
-                      className="sr-only"
-                    />
-                  </label>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {t('addVersion.proofHint', 'JSON file containing ZK proof and public signals')}
+          
+          {/* Progress Indicator */}
+          {isSubmitting && proofGenerationStep && (
+            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    {t('addVersion.processing', 'Processing...')}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    {proofGenerationStep}
                   </p>
                 </div>
               </div>
+              {proofGenerationStep.includes('30-60 seconds') && (
+                <div className="mt-3 text-xs text-blue-600 dark:text-blue-400">
+                  {t('addVersion.proofGenerationNote', 'ZK proof generation requires complex cryptographic calculations. Please wait...')}
+                </div>
+              )}
             </div>
+          )}
 
-            {!zkProof && (
-              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                <AlertCircle className="w-4 h-4" />
-                <span className="text-sm">
-                  {t('addVersion.proofWarning', 'ZK proof is required to submit')}
-                </span>
-              </div>
-            )}
-          </div>
             </div>
 
             {/* Submit Buttons */}
@@ -550,11 +560,11 @@ export default function AddVersionModal({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !zkProof}
+                disabled={isSubmitting || !personInfo?.fullName.trim()}
                 className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
               >
                 {isSubmitting ? 
-                  t('addVersion.submitting', 'Submitting...') :
+                  t('addVersion.processing', 'Processing...') :
                   t('addVersion.submit', 'Add Version')
                 }
               </button>

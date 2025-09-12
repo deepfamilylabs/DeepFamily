@@ -334,7 +334,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   )
 
   if (!collapsible) {
-    // 如果className包含无边框样式，则直接返回内容
+    // If className contains borderless styles, return content directly
     if (className.includes('border-0') || className.includes('shadow-none')) {
       return (
         <div className={className}>

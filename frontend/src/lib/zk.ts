@@ -4,9 +4,11 @@ import DeepFamilyAbi from '../abi/DeepFamily.json'
 import * as snarkjs from 'snarkjs'
 
 type Groth16Proof = {
-  a: [string | bigint, string | bigint]
-  b: [[string | bigint, string | bigint], [string | bigint, string | bigint]]
-  c: [string | bigint, string | bigint]
+  pi_a: [string | bigint, string | bigint, string | bigint]
+  pi_b: [[string | bigint, string | bigint], [string | bigint, string | bigint], [string | bigint, string | bigint]]
+  pi_c: [string | bigint, string | bigint, string | bigint]
+  protocol: string
+  curve: string
 }
 
 function toBigInt(v: string | number | bigint): bigint {
@@ -45,17 +47,107 @@ export async function submitAddPersonZK(
 ) {
   ensurePublicSignalsShape(publicSignals)
 
-  const contract = new Contract(contractAddress, DeepFamilyAbi as any, signer)
-  const a = [toBigInt(proof.a[0]), toBigInt(proof.a[1])]
+  // Debug: Check proof structure
+  console.log('🔍 Proof structure:', proof)
+  console.log('🔍 Proof keys:', Object.keys(proof))
+  console.log('🔍 Proof.pi_a:', proof.pi_a)
+  console.log('🔍 Proof.pi_b:', proof.pi_b)
+  console.log('🔍 Proof.pi_c:', proof.pi_c)
+
+  // Validate proof structure (snarkjs format uses pi_a, pi_b, pi_c)
+  if (!proof || !proof.pi_a || !proof.pi_b || !proof.pi_c) {
+    throw new Error('Invalid proof structure: missing pi_a, pi_b, or pi_c components')
+  }
+  
+  if (!Array.isArray(proof.pi_a) || proof.pi_a.length !== 3) {
+    throw new Error('Invalid proof.pi_a: expected array of length 3')
+  }
+  
+  if (!Array.isArray(proof.pi_b) || proof.pi_b.length !== 3 || !Array.isArray(proof.pi_b[0]) || !Array.isArray(proof.pi_b[1]) || !Array.isArray(proof.pi_b[2])) {
+    throw new Error('Invalid proof.pi_b: expected 3x2 array structure')
+  }
+  
+  if (!Array.isArray(proof.pi_c) || proof.pi_c.length !== 3) {
+    throw new Error('Invalid proof.pi_c: expected array of length 3')
+  }
+
+  const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer)
+  // Convert snarkjs format to contract format (take first 2 elements)
+  const a = [toBigInt(proof.pi_a[0]), toBigInt(proof.pi_a[1])]
   const b = [
-    [toBigInt(proof.b[0][0]), toBigInt(proof.b[0][1])],
-    [toBigInt(proof.b[1][0]), toBigInt(proof.b[1][1])],
+    [toBigInt(proof.pi_b[0][0]), toBigInt(proof.pi_b[0][1])],
+    [toBigInt(proof.pi_b[1][0]), toBigInt(proof.pi_b[1][1])],
   ]
-  const c = [toBigInt(proof.c[0]), toBigInt(proof.c[1])]
+  const c = [toBigInt(proof.pi_c[0]), toBigInt(proof.pi_c[1])]
   const pub = publicSignals.map(toBigInt)
 
-  const tx = await contract.addPersonZK(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tag, metadataCID)
-  return tx
+  // Debug: Log contract call parameters
+  console.log('🔍 Contract call parameters:')
+  console.log('  a:', a.map(x => x.toString()))
+  console.log('  b:', b.map(row => row.map(x => x.toString())))
+  console.log('  c:', c.map(x => x.toString()))
+  console.log('  publicSignals:', pub.map(x => x.toString()))
+  console.log('  fatherVersionIndex:', fatherVersionIndex)
+  console.log('  motherVersionIndex:', motherVersionIndex)
+  console.log('  tag:', tag)
+  console.log('  metadataCID:', metadataCID)
+  
+  // Check public signals length
+  console.log('🔍 Public signals validation:')
+  console.log('  Length:', pub.length, '(expected: 7)')
+  
+  // Check limbs are in valid range (< 2^128)
+  const TWO_POW_128 = 1n << 128n
+  for (let i = 0; i < 6; i++) {
+    const inRange = pub[i] < TWO_POW_128
+    console.log(`  Limb[${i}]:`, pub[i].toString(), inRange ? '✅' : '❌ OUT OF RANGE')
+  }
+  
+  // Check submitter
+  const TWO_POW_160 = 1n << 160n
+  const submitter = pub[6]
+  const submitterInRange = submitter < TWO_POW_160
+  console.log('  Submitter:', submitter.toString(), submitterInRange ? '✅' : '❌ OUT OF RANGE')
+  
+  // Get actual sender address for comparison
+  const senderAddress = await signer.getAddress()
+  const expectedSubmitter = BigInt(senderAddress)
+  console.log('  Expected submitter:', expectedSubmitter.toString())
+  console.log('  Submitter match:', submitter === expectedSubmitter ? '✅' : '❌ MISMATCH')
+
+  try {
+    console.log('🚀 Estimating gas for contract.addPersonZK...')
+    
+    // First estimate gas
+    const gasEstimate = await contract.addPersonZK.estimateGas(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tag, metadataCID)
+    console.log('⛽ Estimated gas:', gasEstimate.toString())
+    
+    // Add 20% buffer to gas estimate
+    const gasLimit = gasEstimate * 120n / 100n
+    console.log('⛽ Gas limit (with buffer):', gasLimit.toString())
+    
+    console.log('🚀 Calling contract.addPersonZK...')
+    const tx = await contract.addPersonZK(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tag, metadataCID, {
+      gasLimit: gasLimit
+    })
+    console.log('✅ Transaction sent successfully:', tx.hash)
+    return tx
+  } catch (contractError: any) {
+    console.error('❌ Contract call failed:', contractError)
+    
+    // Check for specific error types
+    if (contractError?.message?.includes('gas')) {
+      throw new Error(`Gas related error: ${contractError.message}`)
+    } else if (contractError?.message?.includes('out of gas')) {
+      throw new Error('Transaction ran out of gas - ZK proof verification requires high gas limit')
+    } else if (contractError?.reason) {
+      throw new Error(`Contract error: ${contractError.reason}`)
+    } else if (contractError?.code === 'CALL_EXCEPTION') {
+      throw new Error('Contract call failed - likely a require() condition failed in the smart contract')
+    } else {
+      throw contractError
+    }
+  }
 }
 
 // Person data input interface
@@ -122,9 +214,9 @@ export async function generatePersonProof(
       mother_birthDay: motherData.birthDay,
       mother_gender: motherData.gender,
       
-      hasFather: father ? 1 : 0,
-      hasMother: mother ? 1 : 0,
-      submitter: submitterAddress.replace('0x', '')
+      hasFather: father && father.fullName.trim() ? 1 : 0,
+      hasMother: mother && mother.fullName.trim() ? 1 : 0,
+      submitter: BigInt(submitterAddress).toString()
     }
 
     console.log('📊 Circuit input prepared:', {
@@ -144,6 +236,11 @@ export async function generatePersonProof(
       `/zk/person_hash_zk.wasm?t=${timestamp}`,
       `/zk/person_hash_zk_final.zkey?t=${timestamp}`
     )
+
+    console.log('🔍 Generated proof object:', proof)
+    console.log('🔍 Generated publicSignals:', publicSignals)
+    console.log('🔍 Proof type:', typeof proof)
+    console.log('🔍 Proof keys:', Object.keys(proof || {}))
 
     return { proof, publicSignals }
   } catch (error) {
