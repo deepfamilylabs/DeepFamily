@@ -8,19 +8,37 @@ import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
 import PersonHashCalculator from '../PersonHashCalculator'
+import EndorseModal from './EndorseModal'
+
+// Helper: accept http/https URLs or ipfs:// URIs (or empty)
+const isValidTokenUri = (v: string) => {
+  if (v === '') return true
+  if (v.startsWith('ipfs://')) return v.length > 'ipfs://'.length
+  try {
+    const u = new URL(v)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
 
 const mintNFTSchema = z.object({
   // PersonSupplementInfo
-  birthPlace: z.string().max(200, 'Birth place too long'),
+  birthPlace: z.string().max(256, 'Birth place too long'),
   isDeathBC: z.boolean(),
   deathYear: z.number().min(0).max(9999),
   deathMonth: z.number().min(0).max(12),
   deathDay: z.number().min(0).max(31),
-  deathPlace: z.string().max(200, 'Death place too long'),
-  story: z.string().max(1000, 'Story too long'),
+  deathPlace: z.string().max(256, 'Death place too long'),
+  story: z.string().max(256, 'Story too long'),
   
   // NFT Metadata
-  tokenURI: z.string().url('Invalid URL').optional().or(z.literal(''))
+  tokenURI: z
+    .string()
+    .max(256, 'Token URI too long')
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => isValidTokenUri(v ?? ''), 'Invalid URL or IPFS URI')
 })
 
 type MintNFTForm = z.infer<typeof mintNFTSchema>
@@ -55,7 +73,7 @@ export default function MintNFTModal({
 }: MintNFTModalProps) {
   const { t } = useTranslation()
   const { address } = useWallet()
-  const { mintPersonNFT, getVersionDetails } = useContract()
+  const { mintPersonNFT, getVersionDetails, contract, getFullNameHash, getPersonHash } = useContract()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEndorsed, setIsEndorsed] = useState(false)
   const [isAlreadyMinted, setIsAlreadyMinted] = useState(false)
@@ -64,6 +82,10 @@ export default function MintNFTModal({
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
+  const [showEndorseModal, setShowEndorseModal] = useState(false)
+  const [targetPersonHash, setTargetPersonHash] = useState<string | undefined>(undefined)
+  const [targetVersionIndex, setTargetVersionIndex] = useState<number | undefined>(undefined)
+  const [showEndorseConfirm, setShowEndorseConfirm] = useState(false)
   
   // Person basic info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<{
@@ -151,23 +173,20 @@ export default function MintNFTModal({
   // Check endorsement and NFT minting status
   useEffect(() => {
     const checkStatus = async () => {
-      if (!address || !getVersionDetails || !isViewMode) return
+      if (!address || !getVersionDetails || !isViewMode || !contract) return
       
       setIsCheckingStatus(true)
       
       try {
         const details = await getVersionDetails(personHash!, versionIndex!)
-        
-        // Check if current user has endorsed this version
-        // This would need to be implemented in the contract
-        // For now, we'll check if the version exists and has endorsements
-        const userHasEndorsed = false // TODO: Implement actual endorsement check
-        setIsEndorsed(userHasEndorsed)
-        
-        // Check if NFT has already been minted for this version
-        // This would need to be implemented in the contract
-        const nftAlreadyMinted = false // TODO: Implement actual NFT minting check
-        setIsAlreadyMinted(nftAlreadyMinted)
+
+        // Endorsement: check user's endorsed version index for this person
+        const endorsedIdx = await contract.endorsedVersionIndex(personHash!, address)
+        setIsEndorsed(Number(endorsedIdx) === Number(versionIndex))
+
+        // Minted: tokenId > 0 in getVersionDetails
+        const tokenId = Number(details?.tokenId ?? 0)
+        setIsAlreadyMinted(tokenId > 0)
         
       } catch (error) {
         console.error('Failed to check status:', error)
@@ -181,7 +200,7 @@ export default function MintNFTModal({
     if (isOpen && isViewMode) {
       checkStatus()
     }
-  }, [isOpen, address, personHash, versionIndex, getVersionDetails, isViewMode])
+  }, [isOpen, address, personHash, versionIndex, getVersionDetails, contract, isViewMode])
 
   const handleClose = () => {
     reset()
@@ -210,10 +229,12 @@ export default function MintNFTModal({
     // In view mode, check if user has endorsed and NFT hasn't been minted
     if (isViewMode) {
       if (!isEndorsed) {
-        alert(t('mintNFT.endorsementRequired', 'You must endorse this version before minting NFT'))
+        // Friendly confirm to jump to endorsement
+        setTargetPersonHash(personHash!)
+        setTargetVersionIndex(versionIndex!)
+        setShowEndorseConfirm(true)
         return
       }
-      
       if (isAlreadyMinted) {
         alert(t('mintNFT.alreadyMinted', 'NFT has already been minted for this version'))
         return
@@ -224,41 +245,73 @@ export default function MintNFTModal({
 
     try {
       // Construct PersonCoreInfo object matching the contract structure
+      // PersonBasicInfo
+      const fullNameHash = getFullNameHash
+        ? await getFullNameHash(personInfo.fullName)
+        : ethers.keccak256(ethers.toUtf8Bytes(personInfo.fullName))
+
       const coreInfo = {
-        // PersonBasicInfo - hash is computed from fullName
-        fullNameHash: ethers.keccak256(ethers.toUtf8Bytes(personInfo.fullName)),
-        isBirthBC: personInfo.isBirthBC,
-        birthYear: personInfo.birthYear,
-        birthMonth: personInfo.birthMonth,
-        birthDay: personInfo.birthDay,
-        gender: personInfo.gender,
-        
-        // PersonSupplementInfo - fullName is stored as string here
-        fullName: personInfo.fullName,
-        birthPlace: data.birthPlace,
-        isDeathBC: data.isDeathBC,
-        deathYear: data.deathYear,
-        deathMonth: data.deathMonth,
-        deathDay: data.deathDay,
-        deathPlace: data.deathPlace,
-        story: data.story
+        basicInfo: {
+          fullNameHash,
+          isBirthBC: personInfo.isBirthBC,
+          birthYear: personInfo.birthYear,
+          birthMonth: personInfo.birthMonth,
+          birthDay: personInfo.birthDay,
+          gender: personInfo.gender
+        },
+        supplementInfo: {
+          fullName: personInfo.fullName,
+          birthPlace: data.birthPlace,
+          isDeathBC: data.isDeathBC,
+          deathYear: data.deathYear,
+          deathMonth: data.deathMonth,
+          deathDay: data.deathDay,
+          deathPlace: data.deathPlace,
+          story: data.story
+        }
       }
 
-      // Use provided personHash and versionIndex, or generate from personInfo
-      const finalPersonHash = personHash || ethers.keccak256(ethers.toUtf8Bytes(personInfo.fullName))
-      const finalVersionIndex = versionIndex || 1 // Default to version 1 for new entries
+      // Determine personHash/versionIndex
+      let finalPersonHash = personHash as string | undefined
+      if (!finalPersonHash && getPersonHash) {
+        // Compute on-chain consistent person hash
+        finalPersonHash = await getPersonHash(coreInfo.basicInfo as any)
+      }
+      if (!finalPersonHash) {
+        alert(t('mintNFT.personHashRequired', 'Unable to compute person hash'))
+        return
+      }
+      const finalVersionIndex = versionIndex || 1 // Default to version 1 if not provided
 
-      const result = await mintPersonNFT(
+      // Preflight: ensure endorsement matches target version
+      try {
+        if (contract) {
+          const endorsedIdx = await contract.endorsedVersionIndex(finalPersonHash, address)
+          if (Number(endorsedIdx) !== Number(finalVersionIndex)) {
+            setTargetPersonHash(finalPersonHash)
+            setTargetVersionIndex(finalVersionIndex)
+            setShowEndorseConfirm(true)
+            setIsSubmitting(false)
+            return
+          }
+        }
+      } catch {}
+
+      const receipt = await mintPersonNFT(
         finalPersonHash,
         finalVersionIndex,
         data.tokenURI || '',
-        coreInfo
+        coreInfo as any
       )
 
-      if (result) {
-        // Extract token ID from transaction receipt if available
-        const tokenId = 1 // This would need to be extracted from the transaction logs
-        onSuccess?.(tokenId)
+      if (receipt) {
+        // Prefer querying tokenId from contract after mint
+        let tokenId = 0
+        try {
+          const details = await getVersionDetails?.(finalPersonHash, finalVersionIndex)
+          tokenId = Number(details?.tokenId ?? 0)
+        } catch {}
+        if (tokenId > 0) onSuccess?.(tokenId)
         handleClose()
       }
     } catch (error: any) {
@@ -410,8 +463,8 @@ export default function MintNFTModal({
                       </div>
                     </div>
                     
-                    <div className="space-y-4">
-                      <div>
+                    <div className="space-y-4 sm:space-y-0 sm:flex sm:items-start sm:gap-4">
+                      <div className="sm:flex-1">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           {t('mintNFT.personHash', 'Person Hash')} <span className="text-red-500">*</span>
                         </label>
@@ -419,12 +472,9 @@ export default function MintNFTModal({
                           type="text"
                           value={personHash || ''}
                           onChange={(e) => onPersonHashChange?.(e.target.value)}
-                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors font-mono"
-                          placeholder="0x..."
+                          className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition font-mono"
+                          placeholder={t('search.versionsQuery.placeholder')}
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {t('mintNFT.personHashHint', 'The unique hash identifier for the person')}
-                        </p>
                       </div>
                       
                       <div className="w-32">
@@ -436,12 +486,9 @@ export default function MintNFTModal({
                           min="1"
                           value={versionIndex || 1}
                           onChange={(e) => onVersionIndexChange?.(parseInt(e.target.value) || 1)}
-                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
+                          className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                           placeholder="1"
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {t('mintNFT.versionIndexHint', 'Version number to mint')}
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -493,7 +540,7 @@ export default function MintNFTModal({
                   </label>
                   <input
                     {...register('birthPlace')}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
+                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                     placeholder={t('mintNFT.birthPlacePlaceholder', 'Enter birth place')}
                   />
                 </div>
@@ -504,7 +551,7 @@ export default function MintNFTModal({
                   </label>
                   <input
                     {...register('deathPlace')}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
+                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                     placeholder={t('mintNFT.deathPlacePlaceholder', 'Enter death place (if applicable)')}
                   />
                 </div>
@@ -540,7 +587,7 @@ export default function MintNFTModal({
                       <input 
                         type="number" 
                         placeholder="0" 
-                        className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/30 dark:focus:ring-purple-400/30 outline-none transition" 
+                        className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
                         {...register('deathYear', { setValueAs: (v) => v === '' ? 0 : parseInt(v, 10) })} 
                       />
                     </div>
@@ -555,7 +602,7 @@ export default function MintNFTModal({
                       min="0" 
                       max="12" 
                       placeholder="0" 
-                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/30 dark:focus:ring-purple-400/30 outline-none transition" 
+                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
                       {...register('deathMonth', { setValueAs: (v) => v === '' ? 0 : parseInt(v, 10) })} 
                     />
                   </div>
@@ -569,7 +616,7 @@ export default function MintNFTModal({
                       min="0" 
                       max="31" 
                       placeholder="0" 
-                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-500/30 dark:focus:ring-purple-400/30 outline-none transition" 
+                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
                       {...register('deathDay', { setValueAs: (v) => v === '' ? 0 : parseInt(v, 10) })} 
                     />
                   </div>
@@ -583,7 +630,7 @@ export default function MintNFTModal({
                 <textarea
                   {...register('story')}
                   rows={4}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors resize-none"
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition resize-none"
                   placeholder={t('mintNFT.storyPlaceholder', 'Enter a brief life story summary...')}
                 />
                 {errors.story && (
@@ -605,7 +652,7 @@ export default function MintNFTModal({
               </label>
               <input
                 {...register('tokenURI')}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                 placeholder="https://... or ipfs://..."
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -647,21 +694,78 @@ export default function MintNFTModal({
               
               {/* Only show mint button if NFT hasn't been minted */}
               {!isAlreadyMinted && (
-                <button
-                  type="submit"
-                  disabled={isSubmitting || (isViewMode && (!isEndorsed || isCheckingStatus))}
-                  className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                >
-                  {isSubmitting ? 
-                    t('mintNFT.minting', 'Minting...') :
-                    t('mintNFT.mint', 'Mint NFT')
-                  }
-                </button>
+                <>
+                  {isViewMode && !isEndorsed ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowEndorseModal(true)}
+                      disabled={isCheckingStatus}
+                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    >
+                      {t('mintNFT.goEndorse', 'Go Endorse')}
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || isCheckingStatus}
+                      className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    >
+                      {isSubmitting ? 
+                        t('mintNFT.minting', 'Minting...') :
+                        t('mintNFT.mint', 'Mint NFT')
+                      }
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </form>
         </div>
         </div>
+        {/* Quick Endorse Modal */}
+        {(isViewMode || (!!targetPersonHash && !!targetVersionIndex)) && (
+          <EndorseModal
+            isOpen={showEndorseModal}
+            onClose={() => setShowEndorseModal(false)}
+            onSuccess={() => {
+              setIsEndorsed(true)
+              setShowEndorseModal(false)
+            }}
+            personHash={targetPersonHash || personHash}
+            versionIndex={targetVersionIndex || versionIndex}
+            versionData={versionData}
+          />
+        )}
+
+        {/* Confirm to jump to endorse */}
+        {showEndorseConfirm && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowEndorseConfirm(false)}>
+            <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                {t('mintNFT.endorsementRequiredTitle', 'Endorsement Required')}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                {t('mintNFT.endorsementRequiredDesc', 'You must endorse this version before minting. Would you like to go endorse now?')}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEndorseConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+                >
+                  {t('common.cancel', 'Cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowEndorseConfirm(false); setShowEndorseModal(true) }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  {t('mintNFT.goEndorse', 'Go Endorse')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -24,6 +24,19 @@ export default function ActionsPage() {
       setActiveTab(tabParam)
     }
   }, [searchParams])
+
+  // Auto-open Endorse modal if URL carries target hash/index
+  useEffect(() => {
+    if (!address) return
+    const tabParam = searchParams.get('tab') as ActionTab
+    if (tabParam !== 'endorse') return
+    const qHash = searchParams.get('hash') || searchParams.get('personHash') || ''
+    const qIndexStr = searchParams.get('vi') || searchParams.get('version') || searchParams.get('versionIndex') || ''
+    const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN
+    if (qHash && Number.isFinite(qIndex) && qIndex > 0) {
+      setEndorseModal({ isOpen: true, personHash: qHash, versionIndex: qIndex })
+    }
+  }, [address, searchParams])
   
   // Modal states
   const [addVersionModal, setAddVersionModal] = useState<{

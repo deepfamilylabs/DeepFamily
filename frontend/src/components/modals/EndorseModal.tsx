@@ -4,6 +4,7 @@ import { X, Star, Coins, AlertCircle, Users } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
+import { useSearchParams } from 'react-router-dom'
 
 interface EndorseModalProps {
   isOpen: boolean
@@ -35,20 +36,39 @@ export default function EndorseModal({
   versionData
 }: EndorseModalProps) {
   const { t } = useTranslation()
-  const { address } = useWallet()
+  const { address, signer } = useWallet()
   const { endorseVersion, getVersionDetails, contract } = useContract()
+  const [searchParams] = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deepTokenFee, setDeepTokenFee] = useState<string>('0')
+  const [deepTokenFeeRaw, setDeepTokenFeeRaw] = useState<bigint>(0n)
   const [currentEndorsementCount, setCurrentEndorsementCount] = useState(versionData?.endorsementCount || 0)
   const [hasEndorsed, setHasEndorsed] = useState(false)
   const [feeRecipient, setFeeRecipient] = useState<string>('')
   const [userDeepBalance, setUserDeepBalance] = useState<string>('0')
+  const [deepTokenAddress, setDeepTokenAddress] = useState<string>('')
+  const [deepTokenDecimals, setDeepTokenDecimals] = useState<number>(18)
+  const [deepTokenSymbol, setDeepTokenSymbol] = useState<string>('DEEP')
+  const [isApproving, setIsApproving] = useState(false)
   const [entered, setEntered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
+  const [isTargetValidOnChain, setIsTargetValidOnChain] = useState<boolean>(false)
+  const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim())
+  // Local fallback state when parent does not control inputs
+  const [localPersonHash, setLocalPersonHash] = useState<string>('')
+  // Default to 1 so typing only the hash enables the action
+  const [localVersionIndex, setLocalVersionIndex] = useState<number>(1)
+
+  // Unified target values: prefer props if provided, otherwise local state
+  const targetPersonHash = (personHash ?? localPersonHash)?.trim()
+  const targetVersionIndex = (versionIndex ?? localVersionIndex)  
+  const isPersonHashFormatValid = isBytes32(targetPersonHash)
   
-  // Determine if we're in "view mode" (valid personHash provided) or "input mode" (no valid personHash)
+  // Determine modes and validity
+  const hasValidTarget = Boolean(targetPersonHash && targetPersonHash !== '' && targetVersionIndex !== undefined && targetVersionIndex > 0)
+  // View mode only when target provided via parent props (navigation/use elsewhere)
   const isViewMode = Boolean(personHash && personHash.trim() !== '' && versionIndex !== undefined && versionIndex > 0)
 
   // Desktop/mobile detection
@@ -85,61 +105,94 @@ export default function EndorseModal({
     } 
   }, [isOpen])
 
-  // Load endorsement details when modal opens (only in view mode)
+  // Load endorsement details when modal opens (when target is valid)
   useEffect(() => {
     const loadEndorsementData = async () => {
-      if (!isOpen || !address || !contract || !isViewMode) return
-      
+      if (!isOpen || !address || !contract) return
+      // Always attempt to load token basics (fee + balance), even if target not set yet
+      // Then load target-specific details if hash/index are ready
       try {
         // Get current DEEP token fee (recentReward)
         const deepTokenContract = await contract.DEEP_FAMILY_TOKEN_CONTRACT()
+        setDeepTokenAddress(deepTokenContract)
         const tokenContract = new ethers.Contract(
           deepTokenContract,
           [
             'function recentReward() view returns (uint256)',
             'function balanceOf(address) view returns (uint256)',
-            'function decimals() view returns (uint8)'
+            'function decimals() view returns (uint8)',
+            'function allowance(address,address) view returns (uint256)',
+            'function symbol() view returns (string)'
           ],
           contract.runner
         )
         
         const fee = await tokenContract.recentReward()
         const decimals = await tokenContract.decimals()
+        try {
+          const sym = await tokenContract.symbol()
+          if (sym) setDeepTokenSymbol(sym)
+        } catch {}
+        setDeepTokenDecimals(Number(decimals))
         const balance = await tokenContract.balanceOf(address)
-        
         setDeepTokenFee(ethers.formatUnits(fee, decimals))
+        setDeepTokenFeeRaw(fee)
         setUserDeepBalance(ethers.formatUnits(balance, decimals))
 
-        // Get current version details
-        if (getVersionDetails && personHash && versionIndex !== undefined) {
-          const details = await getVersionDetails(personHash, versionIndex)
-          if (details) {
-            setCurrentEndorsementCount(Number(details.endorsementCount))
-            
-            // Determine fee recipient
-            const tokenId = Number(details.tokenId)
-            if (tokenId > 0) {
-              // NFT exists, fee goes to NFT holder
-              const nftHolder = await contract.ownerOf(tokenId)
-              setFeeRecipient(nftHolder)
+        // Target-specific loads
+        if (hasValidTarget && getVersionDetails && targetPersonHash && targetVersionIndex !== undefined) {
+          try {
+            const details = await getVersionDetails(targetPersonHash, targetVersionIndex)
+            if (details) {
+              setCurrentEndorsementCount(Number(details.endorsementCount))
+              // Determine fee recipient
+              const tokenId = Number(details.tokenId)
+              if (tokenId > 0) {
+                // NFT exists, fee goes to NFT holder
+                const nftHolder = await contract.ownerOf(tokenId)
+                setFeeRecipient(nftHolder)
+              } else {
+                // No NFT, fee goes to version creator
+                const versionDetail = details.version
+                setFeeRecipient(versionDetail.addedBy)
+              }
+              setIsTargetValidOnChain(true)
             } else {
-              // No NFT, fee goes to version creator
-              const versionDetail = details.version
-              setFeeRecipient(versionDetail.addedBy)
+              setIsTargetValidOnChain(false)
             }
+          } catch (e) {
+            setIsTargetValidOnChain(false)
+          }
+          // Check if current user has already endorsed this version (placeholder)
+          try {
+            const endorsedIdx = await contract.endorsedVersionIndex(targetPersonHash, address)
+            setHasEndorsed(Number(endorsedIdx) === Number(targetVersionIndex))
+          } catch {
+            setHasEndorsed(false)
           }
         }
-
-        // Check if current user has already endorsed this version
-        // This would need additional contract method to check user's endorsement status
-        setHasEndorsed(false)
       } catch (error) {
         console.error('Failed to load endorsement data:', error)
       }
     }
-
     loadEndorsementData()
-  }, [isOpen, address, personHash, versionIndex, getVersionDetails, contract, isViewMode])
+  }, [isOpen, address, getVersionDetails, contract, hasValidTarget, targetPersonHash, targetVersionIndex])
+
+  // Initialize from URL parameters on open if parent didn't pass values
+  useEffect(() => {
+    if (!isOpen) return
+    // Only set local state if props are not provided/controlled
+    const hasPropHash = typeof personHash === 'string' && personHash.trim() !== ''
+    const hasPropIndex = typeof versionIndex === 'number' && versionIndex > 0
+    if (hasPropHash && hasPropIndex) return
+    try {
+      const qHash = searchParams.get('hash') || searchParams.get('personHash') || ''
+      const qIndexStr = searchParams.get('vi') || searchParams.get('version') || searchParams.get('versionIndex') || ''
+      const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN
+      if (!hasPropHash && qHash) setLocalPersonHash(qHash)
+      if (!hasPropIndex && Number.isFinite(qIndex) && qIndex > 0) setLocalVersionIndex(qIndex)
+    } catch {}
+  }, [isOpen, personHash, versionIndex, searchParams])
 
   const handleClose = () => {
     setIsSubmitting(false)
@@ -155,7 +208,7 @@ export default function EndorseModal({
       return
     }
 
-    if (!isViewMode) {
+    if (!hasValidTarget) {
       alert(t('endorse.personHashRequired', 'Please provide valid person hash and version index'))
       return
     }
@@ -168,7 +221,82 @@ export default function EndorseModal({
     setIsSubmitting(true)
 
     try {
-      const result = await endorseVersion(personHash!, versionIndex!)
+      // Ensure ERC20 allowance for endorsement fee
+      if (!contract || !deepTokenAddress || !signer) throw new Error('Contract not ready')
+      const spender = await contract.getAddress()
+      const tokenContract = new ethers.Contract(
+        deepTokenAddress,
+        [
+          'function allowance(address,address) view returns (uint256)',
+          'function approve(address,uint256) returns (bool)',
+          'function recentReward() view returns (uint256)',
+          'function increaseAllowance(address,uint256) returns (bool)'
+        ],
+        signer
+      )
+      // Re-fetch latest fee (it may change dynamically)
+      const latestFee: bigint = await tokenContract.recentReward()
+      const required: bigint = latestFee > 0n ? latestFee : deepTokenFeeRaw
+      const currentAllowance: bigint = await tokenContract.allowance(address, spender)
+      if (currentAllowance < required) {
+        setIsApproving(true)
+        // Prefer increasing by delta to avoid resetting allowance downwards
+        const delta = required - currentAllowance
+        let tx
+        try {
+          tx = await tokenContract.increaseAllowance(spender, delta)
+        } catch {
+          tx = await tokenContract.approve(spender, required)
+        }
+        await tx.wait()
+        setIsApproving(false)
+      }
+
+      // Early success if already endorsed the same version (contract would early-return too)
+      try {
+        const endorsedIdx = await contract.endorsedVersionIndex(targetPersonHash!, address)
+        if (Number(endorsedIdx) === Number(targetVersionIndex)) {
+          setHasEndorsed(true)
+          onSuccess?.({ alreadyEndorsed: true })
+          setIsSubmitting(false)
+          return
+        }
+      } catch {}
+
+      // Preflight: staticCall to catch reverts before wallet pops (ethers v6)
+      try {
+        const fn: any = (contract as any)?.endorseVersion?.staticCall
+        if (typeof fn === 'function') {
+          await fn(targetPersonHash!, targetVersionIndex!)
+        }
+      } catch (simErr: any) {
+        const msg = String(simErr?.message || '')
+        if (/InvalidVersionIndex|InvalidPersonHash/i.test(msg)) {
+          alert(t('endorse.invalidTarget', 'Invalid person hash or version index'))
+        } else if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) {
+          alert(t('endorse.needApprove', 'Allowance too low, please approve DEEP tokens again'))
+        } else if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) {
+          alert(t('endorse.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement'))
+        } else {
+          alert(msg || t('endorse.endorseFailed', 'Failed to endorse version'))
+        }
+        throw simErr
+      }
+
+      // Gas estimate with safety margin to avoid wallet estimation quirks
+      let overrides: any = {}
+      try {
+        const estFn: any = (contract as any)?.endorseVersion?.estimateGas
+        if (typeof estFn === 'function') {
+          const est: bigint = await estFn(targetPersonHash!, targetVersionIndex!)
+          if (typeof est === 'bigint') {
+            const padded = (est * 12n) / 10n + 30000n
+            overrides.gasLimit = padded
+          }
+        }
+      } catch {}
+
+      const result = await endorseVersion(targetPersonHash!, targetVersionIndex!, overrides)
 
       if (result) {
         setCurrentEndorsementCount(prev => prev + 1)
@@ -187,8 +315,19 @@ export default function EndorseModal({
       }
     } catch (error: any) {
       console.error('Endorse failed:', error)
-      alert(error.message || t('endorse.endorseFailed', 'Failed to endorse version'))
+      const msg = String(error?.message || '')
+      // Provide clearer hints for common cases
+      if (/InvalidVersionIndex|InvalidPersonHash/i.test(msg)) {
+        alert(t('endorse.invalidTarget', 'Invalid person hash or version index'))
+      } else if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) {
+        alert(t('endorse.needApprove', 'Allowance too low, please approve DEEP tokens again'))
+      } else if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) {
+        alert(t('endorse.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement'))
+      } else {
+        alert(msg || t('endorse.endorseFailed', 'Failed to endorse version'))
+      }
     } finally {
+      setIsApproving(false)
       setIsSubmitting(false)
     }
   }
@@ -200,7 +339,7 @@ export default function EndorseModal({
 
   const canAffordEndorsement = parseFloat(userDeepBalance) >= parseFloat(deepTokenFee)
 
-  if (!isOpen) return null
+    if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
@@ -279,21 +418,21 @@ export default function EndorseModal({
                   </div>
                 </div>
                 
-                <div className="space-y-4">
-                  <div>
+                <div className="space-y-4 sm:space-y-0 sm:flex sm:items-start sm:gap-4">
+                  <div className="sm:flex-1">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       {t('endorse.personHash', 'Person Hash')} <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={personHash || ''}
-                      onChange={(e) => onPersonHashChange?.(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors font-mono"
-                      placeholder="0x..."
+                      value={targetPersonHash || ''}
+                      onChange={(e) => {
+                        if (onPersonHashChange) onPersonHashChange(e.target.value)
+                        else setLocalPersonHash(e.target.value)
+                      }}
+                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition font-mono"
+                      placeholder={t('search.versionsQuery.placeholder')}
                     />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {t('endorse.personHashHint', 'The unique hash identifier for the person')}
-                    </p>
                   </div>
                   
                   <div className="w-32">
@@ -303,14 +442,15 @@ export default function EndorseModal({
                     <input
                       type="number"
                       min="1"
-                      value={versionIndex || 1}
-                      onChange={(e) => onVersionIndexChange?.(parseInt(e.target.value) || 1)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
+                      value={targetVersionIndex || 1}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1
+                        if (onVersionIndexChange) onVersionIndexChange(val)
+                        else setLocalVersionIndex(val)
+                      }}
+                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                       placeholder="1"
                     />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {t('endorse.versionIndexHint', 'Version number to endorse')}
-                    </p>
                   </div>
                 </div>
               </div>
@@ -333,10 +473,10 @@ export default function EndorseModal({
                     </div>
                   )}
                   <div>
-                      <span className="font-medium">{t('endorse.personHash', 'Person Hash')}:</span> {formatAddress(personHash || '')}
+                      <span className="font-medium">{t('endorse.personHash', 'Person Hash')}:</span> {formatAddress(targetPersonHash || '')}
                   </div>
                   <div>
-                    <span className="font-medium">{t('endorse.versionIndex', 'Version')}:</span> {versionIndex}
+                    <span className="font-medium">{t('endorse.versionIndex', 'Version')}:</span> {targetVersionIndex}
                   </div>
                   <div>
                     <span className="font-medium">{t('endorse.currentEndorsements', 'Current Endorsements')}:</span> {currentEndorsementCount}
@@ -405,6 +545,33 @@ export default function EndorseModal({
             </div>
           )}
 
+          {/* Invalid target warning */}
+          {hasValidTarget && isPersonHashFormatValid && !isTargetValidOnChain && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {t('endorse.invalidTarget', 'Invalid person hash or version index')}
+                </span>
+              </div>
+              <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                {t('endorse.invalidTargetDesc', 'Please verify the hash and index refer to an existing version')}
+              </p>
+            </div>
+          )}
+
+          {/* Invalid hash format warning */}
+          {targetPersonHash && !isPersonHashFormatValid && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {t('search.validation.hashInvalid', 'Please enter a valid 64-character hexadecimal hash')}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Endorsement Benefits */}
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
             <h3 className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
@@ -443,10 +610,15 @@ export default function EndorseModal({
             </button>
             <button
               onClick={handleEndorse}
-              disabled={isSubmitting || !canAffordEndorsement || hasEndorsed || !isViewMode}
+              disabled={isSubmitting || isApproving || !canAffordEndorsement || hasEndorsed || !hasValidTarget || !isTargetValidOnChain || !isPersonHashFormatValid}
               className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
-              {isSubmitting ? (
+              {isApproving ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {t('endorse.approving', 'Approving...')}
+                </div>
+              ) : isSubmitting ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   {t('endorse.endorsing', 'Endorsing...')}

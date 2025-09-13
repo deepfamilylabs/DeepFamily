@@ -408,7 +408,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             </h3>
           </div>
         )}
-        <div className="p-2">
+        <div className="py-6 px-3">
           {content}
         </div>
       </div>
@@ -436,7 +436,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
         </button>
       </div>
       {currentOpen && (
-        <div className="p-2">
+        <div className="py-4 px-3">
           {content}
         </div>
       )}
