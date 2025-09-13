@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Star, Coins, AlertCircle, Users } from 'lucide-react'
+import { X, Star, Coins, AlertCircle, Users, Check, AlertTriangle } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
@@ -39,6 +39,11 @@ export default function EndorseModal({
   const { address, signer } = useWallet()
   const { endorseVersion, getVersionDetails, contract } = useContract()
   const [searchParams] = useSearchParams()
+  // Track history push/pop to close on mobile back like NodeDetailModal
+  const pushedRef = useRef(false)
+  const closedBySelfRef = useRef(false)
+  const closedByPopRef = useRef(false)
+  const historyMarkerRef = useRef<{ __dfModal: string; id: string } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deepTokenFee, setDeepTokenFee] = useState<string>('0')
   const [deepTokenFeeRaw, setDeepTokenFeeRaw] = useState<bigint>(0n)
@@ -50,6 +55,7 @@ export default function EndorseModal({
   const [deepTokenDecimals, setDeepTokenDecimals] = useState<number>(18)
   const [deepTokenSymbol, setDeepTokenSymbol] = useState<string>('DEEP')
   const [isApproving, setIsApproving] = useState(false)
+  const [approveUnlimited, setApproveUnlimited] = useState(false)
   const [entered, setEntered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
@@ -60,6 +66,22 @@ export default function EndorseModal({
   const [localPersonHash, setLocalPersonHash] = useState<string>('')
   // Default to 1 so typing only the hash enables the action
   const [localVersionIndex, setLocalVersionIndex] = useState<number>(1)
+  const [successResult, setSuccessResult] = useState<{
+    personHash: string
+    versionIndex: number
+    endorsementFee: string
+    feeRecipient: string
+    transactionHash: string
+    blockNumber: number
+    events: {
+      PersonVersionEndorsed: any
+    }
+  } | null>(null)
+  const [errorResult, setErrorResult] = useState<{
+    type: string
+    message: string
+    details: string
+  } | null>(null)
 
   // Unified target values: prefer props if provided, otherwise local state
   const targetPersonHash = (personHash ?? localPersonHash)?.trim()
@@ -195,11 +217,80 @@ export default function EndorseModal({
   }, [isOpen, personHash, versionIndex, searchParams])
 
   const handleClose = () => {
+    closedBySelfRef.current = true
     setIsSubmitting(false)
+    setSuccessResult(null)
+    setErrorResult(null)
     setEntered(false)
     setDragging(false)
     setDragOffset(0)
     onClose()
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen])
+
+  // Push history state on open so mobile back closes the modal first
+  useEffect(() => {
+    if (!isOpen) return
+    const marker = { __dfModal: 'EndorseModal', id: Math.random().toString(36).slice(2) }
+    historyMarkerRef.current = marker
+    try {
+      window.history.pushState(marker, '')
+      pushedRef.current = true
+    } catch {}
+    const onPop = () => {
+      // Only close if our pushed entry was popped (i.e., new state is not our marker)
+      const st: any = window.history.state
+      if (!st || st.id !== historyMarkerRef.current?.id) {
+        closedByPopRef.current = true
+        onClose()
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      // If closed by self and we pushed a state, consume the extra history entry
+      if (pushedRef.current && closedBySelfRef.current && !closedByPopRef.current) {
+        try { window.history.back() } catch {}
+      }
+      pushedRef.current = false
+      closedBySelfRef.current = false
+      closedByPopRef.current = false
+      historyMarkerRef.current = null
+    }
+  }, [isOpen, onClose])
+
+  const handleContinueEndorsing = () => {
+    // Reset form and states for new endorsement
+    setIsSubmitting(false)
+    setIsApproving(false)
+    setSuccessResult(null)
+    setErrorResult(null)
+    setHasEndorsed(false)
+    setCurrentEndorsementCount(0)
+    setIsTargetValidOnChain(false)
+    
+    // Reset inputs
+    if (onPersonHashChange) onPersonHashChange('')
+    if (onVersionIndexChange) onVersionIndexChange(1)
+    // Also reset local state for uncontrolled usage
+    setLocalPersonHash('')
+    setLocalVersionIndex(1)
+    
+    // Reset other states that might affect the UI
+    setFeeRecipient('')
+    setDeepTokenFee('0')
+    setDeepTokenFeeRaw(0n)
+    setUserDeepBalance('0')
+    
+    // Keep modal open for continued use
+    console.log('🔄 Ready for next endorsement')
   }
 
   const handleEndorse = async () => {
@@ -218,12 +309,34 @@ export default function EndorseModal({
       return
     }
 
+    // Clear old results
+    setSuccessResult(null)
+    setErrorResult(null)
     setIsSubmitting(true)
 
     try {
+      console.log('🔄 Starting endorsement process for:', targetPersonHash, 'version:', targetVersionIndex)
+      
+      // Early success if already endorsed the same version; skip approvals entirely
+      try {
+        if (contract && address && targetPersonHash) {
+          const endorsedIdx = await contract.endorsedVersionIndex(targetPersonHash, address)
+          if (Number(endorsedIdx) === Number(targetVersionIndex)) {
+            setHasEndorsed(true)
+            onSuccess?.({ alreadyEndorsed: true })
+            setIsSubmitting(false)
+            return
+          }
+        }
+      } catch {}
+
       // Ensure ERC20 allowance for endorsement fee
-      if (!contract || !deepTokenAddress || !signer) throw new Error('Contract not ready')
+      if (!contract || !deepTokenAddress || !signer) {
+        console.error('❌ Contract not ready:', { contract: !!contract, deepTokenAddress, signer: !!signer })
+        throw new Error('Contract not ready')
+      }
       const spender = await contract.getAddress()
+      console.log('📝 Spender address:', spender)
       const tokenContract = new ethers.Contract(
         deepTokenAddress,
         [
@@ -237,49 +350,78 @@ export default function EndorseModal({
       // Re-fetch latest fee (it may change dynamically)
       const latestFee: bigint = await tokenContract.recentReward()
       const required: bigint = latestFee > 0n ? latestFee : deepTokenFeeRaw
+      console.log('💰 Fee details:', { latestFee: latestFee.toString(), required: required.toString(), deepTokenFeeRaw: deepTokenFeeRaw.toString() })
+      
       const currentAllowance: bigint = await tokenContract.allowance(address, spender)
+      console.log('🔐 Allowance check:', { currentAllowance: currentAllowance.toString(), required: required.toString(), needsApproval: currentAllowance < required })
       if (currentAllowance < required) {
         setIsApproving(true)
-        // Prefer increasing by delta to avoid resetting allowance downwards
-        const delta = required - currentAllowance
         let tx
         try {
-          tx = await tokenContract.increaseAllowance(spender, delta)
-        } catch {
-          tx = await tokenContract.approve(spender, required)
+          if (approveUnlimited) {
+            // Preflight simulate approve for unlimited
+            try {
+              const fn: any = (tokenContract as any)?.approve?.staticCall
+              if (typeof fn === 'function') {
+                await fn(spender, ethers.MaxUint256)
+              }
+            } catch (preErr) {
+              console.warn('approve(unlimited) preflight failed, will fallback to minimal approval:', preErr)
+            }
+            tx = await tokenContract.approve(spender, ethers.MaxUint256)
+          } else {
+            // Prefer increasing by delta to avoid resetting allowance downwards
+            const delta = required - currentAllowance
+            try {
+              tx = await tokenContract.increaseAllowance(spender, delta)
+            } catch {
+              tx = await tokenContract.approve(spender, required)
+            }
+          }
+        } catch (approveError: any) {
+          setIsApproving(false)
+          if (approveError.code === 'ACTION_REJECTED' || approveError.message?.includes('user rejected')) {
+            throw new Error('User rejected token approval')
+          }
+          throw approveError
         }
-        await tx.wait()
+        try {
+          await tx.wait()
+        } catch (waitError: any) {
+          setIsApproving(false)
+          throw waitError
+        }
+        // Small delay + recheck to avoid race where allowance is not yet visible
+        try {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        } catch {}
+        let postAllowance: bigint = currentAllowance
+        try {
+          postAllowance = await tokenContract.allowance(address, spender)
+        } catch {}
+        if (postAllowance < required && !approveUnlimited) {
+          // Try a couple of quick retries before proceeding
+          for (let i = 0; i < 3 && postAllowance < required; i++) {
+            try { await new Promise(r => setTimeout(r, 300)) } catch {}
+            try { postAllowance = await tokenContract.allowance(address, spender) } catch {}
+          }
+        }
         setIsApproving(false)
       }
 
-      // Early success if already endorsed the same version (contract would early-return too)
-      try {
-        const endorsedIdx = await contract.endorsedVersionIndex(targetPersonHash!, address)
-        if (Number(endorsedIdx) === Number(targetVersionIndex)) {
-          setHasEndorsed(true)
-          onSuccess?.({ alreadyEndorsed: true })
-          setIsSubmitting(false)
-          return
-        }
-      } catch {}
-
       // Preflight: staticCall to catch reverts before wallet pops (ethers v6)
+      console.log('🔍 Running preflight check...')
       try {
         const fn: any = (contract as any)?.endorseVersion?.staticCall
         if (typeof fn === 'function') {
           await fn(targetPersonHash!, targetVersionIndex!)
+          console.log('✅ Preflight check passed')
+        } else {
+          console.warn('⚠️ staticCall not available, skipping preflight check')
         }
       } catch (simErr: any) {
-        const msg = String(simErr?.message || '')
-        if (/InvalidVersionIndex|InvalidPersonHash/i.test(msg)) {
-          alert(t('endorse.invalidTarget', 'Invalid person hash or version index'))
-        } else if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) {
-          alert(t('endorse.needApprove', 'Allowance too low, please approve DEEP tokens again'))
-        } else if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) {
-          alert(t('endorse.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement'))
-        } else {
-          alert(msg || t('endorse.endorseFailed', 'Failed to endorse version'))
-        }
+        console.error('❌ Preflight check failed:', simErr)
+        // Handle preflight errors through our error display system instead of alert
         throw simErr
       }
 
@@ -296,36 +438,151 @@ export default function EndorseModal({
         }
       } catch {}
 
-      const result = await endorseVersion(targetPersonHash!, targetVersionIndex!, overrides)
+      // Helper to apply success state from a mined receipt
+      const applySuccessFromReceipt = (result: any) => {
+        if (!result) return
+        try {
+          // Clear any pending/pseudo-error state
+          setErrorResult(null)
+          console.log('📋 endorseVersion result:', result)
+          // Extract event data from receipt
+          let endorsedEvent: any = null
+          try {
+            const endorsedEvents = result.logs?.filter((log: any) => {
+              try {
+                const parsedLog = contract?.interface.parseLog(log)
+                return parsedLog?.name === 'PersonVersionEndorsed'
+              } catch {
+                return false
+              }
+            }) || []
+            if (endorsedEvents.length > 0) {
+              endorsedEvent = contract?.interface.parseLog(endorsedEvents[0])
+            }
+          } catch (e) {
+            console.warn('Failed to parse endorsement event:', e)
+            endorsedEvent = {
+              args: {
+                personHash: targetPersonHash!,
+                endorser: address,
+                versionIndex: targetVersionIndex!,
+                endorsementFee: deepTokenFeeRaw.toString(),
+                timestamp: Math.floor(Date.now() / 1000)
+              }
+            }
+          }
+
+          setCurrentEndorsementCount(prev => prev + 1)
+          setHasEndorsed(true)
+          // Update user balance (best effort UI hint)
+          const newBalance = parseFloat(userDeepBalance) - parseFloat(deepTokenFee)
+          if (!Number.isNaN(newBalance)) setUserDeepBalance(newBalance.toString())
+
+          setSuccessResult(prev => prev ?? ({
+            personHash: targetPersonHash!,
+            versionIndex: targetVersionIndex!,
+            endorsementFee: deepTokenFee,
+            feeRecipient: feeRecipient,
+            transactionHash: result.hash || result.transactionHash || '',
+            blockNumber: result.blockNumber || 0,
+            events: {
+              PersonVersionEndorsed: endorsedEvent ? {
+                personHash: endorsedEvent.args?.personHash || targetPersonHash!,
+                endorser: endorsedEvent.args?.endorser || address,
+                versionIndex: endorsedEvent.args?.versionIndex || targetVersionIndex!,
+                endorsementFee: endorsedEvent.args?.endorsementFee || deepTokenFeeRaw.toString(),
+                timestamp: endorsedEvent.args?.timestamp || Math.floor(Date.now() / 1000)
+              } : null
+            }
+          }))
+        } catch (e) {
+          console.warn('Failed to apply endorsement success from receipt:', e)
+        }
+      }
+
+      console.log('🚀 Calling endorseVersion with overrides:', overrides)
+      const endorsePromise = endorseVersion(targetPersonHash!, targetVersionIndex!, overrides)
+
+      // Prevent indefinite spinner if wallet/provider never resolves. Fallback after 40s.
+      let timedOut = false
+      const timeoutMs = 40_000
+      const timeout = setTimeout(() => {
+        timedOut = true
+        console.warn('⏳ Endorse transaction still pending after timeout; keeping UI responsive')
+        setIsSubmitting(false)
+        // Provide a gentle hint in the UI without marking as an error
+        setErrorResult(prev => prev ?? ({
+          type: 'PENDING_CONFIRMATION',
+          message: t('transaction.pending', 'Transaction pending confirmation...'),
+          details: t('transaction.pendingDetails', 'The transaction is submitted or awaiting wallet confirmation. You can keep using the app; we will update once it confirms.')
+        }))
+      }, timeoutMs)
+
+      let result: any = null
+      try {
+        result = await endorsePromise
+      } finally {
+        clearTimeout(timeout)
+      }
+
+      if (timedOut) {
+        // Receipt arrived later; apply success now without re-enabling spinner
+        if (result) applySuccessFromReceipt(result)
+        return
+      }
+
+      console.log('📋 endorseVersion result:', result)
 
       if (result) {
-        setCurrentEndorsementCount(prev => prev + 1)
-        setHasEndorsed(true)
+        console.log('🎉 Endorsement successful:', result)
+        applySuccessFromReceipt(result)
         
-        // Update user balance
-        const newBalance = parseFloat(userDeepBalance) - parseFloat(deepTokenFee)
-        setUserDeepBalance(newBalance.toString())
-        
-        onSuccess?.(result)
-        
-        // Auto-close after successful endorsement
-        setTimeout(() => {
-          handleClose()
-        }, 2000)
+        // Don't call onSuccess automatically to prevent modal from closing
+        // onSuccess?.(result)
+      } else {
+        // endorseVersion returned null, meaning the transaction failed
+        // The error was already handled by executeTransaction and shown via toast
+        // We should show our error UI as well
+        setErrorResult({
+          type: 'TRANSACTION_FAILED',
+          message: t('endorse.transactionFailed', 'Transaction failed. Please check the error message and try again.'),
+          details: t('endorse.transactionFailedDetails', 'The transaction was submitted but failed to complete successfully.')
+        })
       }
     } catch (error: any) {
-      console.error('Endorse failed:', error)
-      const msg = String(error?.message || '')
-      // Provide clearer hints for common cases
-      if (/InvalidVersionIndex|InvalidPersonHash/i.test(msg)) {
-        alert(t('endorse.invalidTarget', 'Invalid person hash or version index'))
-      } else if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) {
-        alert(t('endorse.needApprove', 'Allowance too low, please approve DEEP tokens again'))
-      } else if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) {
-        alert(t('endorse.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement'))
-      } else {
-        alert(msg || t('endorse.endorseFailed', 'Failed to endorse version'))
+      console.error('❌ Endorse failed:', error)
+      
+      // Parse error for better user feedback
+      let errorType = 'UNKNOWN_ERROR'
+      let errorMessage = error.message || 'An unexpected error occurred'
+      let errorDetails = error.message || 'Unknown error'
+
+      // Check for specific contract errors
+      if (/InvalidVersionIndex|InvalidPersonHash/i.test(errorMessage)) {
+        errorType = 'INVALID_TARGET'
+        errorMessage = t('endorse.errors.invalidTarget', 'Invalid person hash or version index')
+      } else if (/insufficient allowance|ERC20InsufficientAllowance/i.test(errorMessage)) {
+        errorType = 'INSUFFICIENT_ALLOWANCE'
+        errorMessage = t('endorse.errors.needApprove', 'Allowance too low, please approve DEEP tokens again')
+      } else if (/insufficient funds|ERC20InsufficientBalance/i.test(errorMessage)) {
+        errorType = 'INSUFFICIENT_BALANCE'
+        errorMessage = t('endorse.errors.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement')
+      } else if (/EndorsementFeeTransferFailed/i.test(errorMessage)) {
+        errorType = 'FEE_TRANSFER_FAILED'
+        errorMessage = t('endorse.errors.feeTransferFailed', 'Failed to transfer endorsement fee')
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        errorType = 'INSUFFICIENT_FUNDS'
+        errorMessage = t('endorse.errors.insufficientFunds', 'Insufficient funds for transaction')
+      } else if (error.code === 'USER_REJECTED') {
+        errorType = 'USER_REJECTED'
+        errorMessage = t('endorse.errors.userRejected', 'Transaction was rejected by user')
       }
+
+      setErrorResult({
+        type: errorType,
+        message: errorMessage,
+        details: errorDetails
+      })
     } finally {
       setIsApproving(false)
       setIsSubmitting(false)
@@ -506,6 +763,18 @@ export default function EndorseModal({
                 <span>{t('endorse.feeRecipient', 'Fee Recipient')}:</span>
                 <span className="font-mono">{formatAddress(feeRecipient)}</span>
               </div>
+              <div className="flex items-center gap-2 pt-2 border-t border-purple-200/50 dark:border-purple-800/50">
+                <input
+                  id="approve-unlimited"
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-purple-300 dark:border-purple-700 text-purple-600 focus:ring-purple-500"
+                  checked={approveUnlimited}
+                  onChange={(e) => setApproveUnlimited(e.target.checked)}
+                />
+                <label htmlFor="approve-unlimited" className="text-xs select-none cursor-pointer">
+                  {t('endorse.approveUnlimited', 'Approve unlimited DEEP allowance to avoid future approvals')}
+                </label>
+              </div>
             </div>
           </div>
 
@@ -585,8 +854,191 @@ export default function EndorseModal({
             </ul>
           </div>
 
+          {/* Progress Indicator */}
+          {(isSubmitting || isApproving) && !successResult && !errorResult && (
+            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
+                    {isApproving ? 
+                      t('endorse.approving', 'Approving DEEP tokens...') : 
+                      t('endorse.endorsing', 'Endorsing version...')
+                    }
+                  </p>
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    {isApproving ? 
+                      t('endorse.approvingDesc', 'Please confirm the token approval in your wallet') :
+                      t('endorse.endorsingDesc', 'Processing endorsement on the blockchain...')
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Success Message */}
-          {hasEndorsed && (
+          {successResult && (
+            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
+              {/* Main Success Message */}
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                      {t('endorse.endorsedSuccessfully', 'Version endorsed successfully!')}
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      {t('endorse.canContinueEndorsing', 'You can now continue to endorse other versions or close this dialog.')}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 text-xs text-green-700 dark:text-green-300">
+                  {/* Person Hash */}
+                  <div>
+                    <span className="font-medium">{t('endorse.personHash', 'Person Hash')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.personHash}
+                    </code>
+                  </div>
+                  
+                  {/* Version Index */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('endorse.versionIndex', 'Version Index')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.versionIndex}
+                    </code>
+                  </div>
+                  
+                  {/* Endorsement Fee */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('endorse.feePaid', 'Fee Paid')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.endorsementFee} DEEP
+                    </code>
+                  </div>
+                  
+                  {/* Fee Recipient */}
+                  <div>
+                    <span className="font-medium">{t('endorse.feeRecipient', 'Fee Recipient')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.feeRecipient}
+                    </code>
+                  </div>
+                  
+                  {/* Transaction Hash */}
+                  <div>
+                    <span className="font-medium">{t('endorse.transactionHash', 'Transaction Hash')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.transactionHash}
+                    </code>
+                  </div>
+                  
+                  {/* Block Number */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('endorse.blockNumber', 'Block Number')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.blockNumber}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Information */}
+              {successResult.events.PersonVersionEndorsed && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {t('endorse.eventDetails', 'Event Details')}:
+                  </h4>
+                  
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                      <span className="text-xs font-medium text-green-900 dark:text-green-100">
+                        {t('endorse.versionEndorsedEvent', 'PersonVersionEndorsed Event')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300 mb-3">
+                      {t('endorse.versionEndorsedEventDesc', 'Endorsement was successfully recorded on-chain')}
+                    </p>
+                    
+                    {/* Complete Event Details */}
+                    <div className="space-y-2 text-xs">
+                      {/* Endorser */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('endorse.endorser', 'Endorser')}:
+                        </span>
+                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.PersonVersionEndorsed.endorser}
+                        </code>
+                      </div>
+                      
+                      {/* Fee Amount */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('endorse.feeAmount', 'Fee Amount')}:
+                        </span>
+                        <span className="col-span-2 text-green-700 dark:text-green-300 font-mono">
+                          {(Number(successResult.events.PersonVersionEndorsed.endorsementFee) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
+                        </span>
+                      </div>
+                      
+                      {/* Timestamp */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('endorse.timestamp', 'Timestamp')}:
+                        </span>
+                        <span className="col-span-2 text-green-700 dark:text-green-300">
+                          {new Date(Number(successResult.events.PersonVersionEndorsed.timestamp) * 1000).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorResult && (
+            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                    {t('endorse.endorseFailed', 'Endorsement Failed')}
+                  </p>
+                  <div className="space-y-2 text-xs text-red-700 dark:text-red-300">
+                    <div>
+                      <span className="font-medium">{t('endorse.errorType', 'Error Type')}:</span>
+                      <code className="ml-2 bg-red-100 dark:bg-red-800 px-1.5 py-0.5 rounded">
+                        {errorResult.type}
+                      </code>
+                    </div>
+                    <div>
+                      <span className="font-medium">{t('endorse.errorMessage', 'Message')}:</span>
+                      <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded">
+                        {errorResult.message}
+                      </p>
+                    </div>
+                    {errorResult.details !== errorResult.message && (
+                      <div>
+                        <span className="font-medium">{t('endorse.errorDetails', 'Details')}:</span>
+                        <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded text-xs">
+                          {errorResult.details}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Legacy Success Message (for backwards compatibility) */}
+          {hasEndorsed && !successResult && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
@@ -601,37 +1053,61 @@ export default function EndorseModal({
 
           {/* Submit Buttons */}
           <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
-            >
-              {t('common.cancel', 'Cancel')}
-            </button>
-            <button
-              onClick={handleEndorse}
-              disabled={isSubmitting || isApproving || !canAffordEndorsement || hasEndorsed || !hasValidTarget || !isTargetValidOnChain || !isPersonHashFormatValid}
-              className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
-              {isApproving ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {t('endorse.approving', 'Approving...')}
-                </div>
-              ) : isSubmitting ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {t('endorse.endorsing', 'Endorsing...')}
-                </div>
-              ) : hasEndorsed ? (
-                t('endorse.endorsed', 'Endorsed!')
-              ) : (
-                <div className="flex items-center justify-center gap-2">
+            {successResult ? (
+              // Success state: Show Continue Endorsing and Close buttons
+              <>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                >
+                  {t('common.close', 'Close')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinueEndorsing}
+                  className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
                   <Star className="w-4 h-4" />
-                  {t('endorse.endorse', 'Endorse')}
-                </div>
-              )}
-            </button>
+                  {t('endorse.continueEndorsing', 'Continue Endorsing')}
+                </button>
+              </>
+            ) : (
+              // Normal state: Show Cancel and Endorse buttons
+              <>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                >
+                  {t('common.cancel', 'Cancel')}
+                </button>
+                <button
+                  onClick={handleEndorse}
+                  disabled={isSubmitting || isApproving || !canAffordEndorsement || hasEndorsed || !hasValidTarget || !isTargetValidOnChain || !isPersonHashFormatValid}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isApproving ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {t('endorse.approving', 'Approving...')}
+                    </div>
+                  ) : isSubmitting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {t('endorse.endorsing', 'Endorsing...')}
+                    </div>
+                  ) : hasEndorsed ? (
+                    t('endorse.endorsed', 'Endorsed!')
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <Star className="w-4 h-4" />
+                      {t('endorse.endorse', 'Endorse')}
+                    </div>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
         </div>

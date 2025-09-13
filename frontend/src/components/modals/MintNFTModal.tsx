@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Coins, AlertCircle, Image } from 'lucide-react'
+import { X, Coins, AlertCircle, Image, Check, AlertTriangle } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
@@ -86,6 +86,28 @@ export default function MintNFTModal({
   const [targetPersonHash, setTargetPersonHash] = useState<string | undefined>(undefined)
   const [targetVersionIndex, setTargetVersionIndex] = useState<number | undefined>(undefined)
   const [showEndorseConfirm, setShowEndorseConfirm] = useState(false)
+  const [successResult, setSuccessResult] = useState<{
+    tokenId: number
+    personHash: string
+    versionIndex: number
+    tokenURI: string
+    transactionHash: string
+    blockNumber: number
+    events: {
+      PersonNFTMinted: any
+    }
+  } | null>(null)
+  const [errorResult, setErrorResult] = useState<{
+    type: string
+    message: string
+    details: string
+  } | null>(null)
+  const [contractError, setContractError] = useState<any>(null)
+  // Track history push/pop to close on mobile back like NodeDetailModal
+  const pushedRef = useRef(false)
+  const closedBySelfRef = useRef(false)
+  const closedByPopRef = useRef(false)
+  const historyMarkerRef = useRef<{ __dfModal: string; id: string } | null>(null)
   
   // Person basic info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<{
@@ -203,16 +225,71 @@ export default function MintNFTModal({
   }, [isOpen, address, personHash, versionIndex, getVersionDetails, contract, isViewMode])
 
   const handleClose = () => {
+    closedBySelfRef.current = true
     reset()
     setIsSubmitting(false)
     setPersonInfo(null)
     setIsEndorsed(false)
     setIsAlreadyMinted(false)
     setIsCheckingStatus(false)
+    setSuccessResult(null)
+    setErrorResult(null)
+    setContractError(null)
     setEntered(false)
     setDragging(false)
     setDragOffset(0)
     onClose()
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen])
+
+  // Push history state on open so mobile back closes the modal first
+  useEffect(() => {
+    if (!isOpen) return
+    const marker = { __dfModal: 'MintNFTModal', id: Math.random().toString(36).slice(2) }
+    historyMarkerRef.current = marker
+    try {
+      window.history.pushState(marker, '')
+      pushedRef.current = true
+    } catch {}
+    const onPop = () => {
+      const st: any = window.history.state
+      if (!st || st.id !== historyMarkerRef.current?.id) {
+        closedByPopRef.current = true
+        onClose()
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (pushedRef.current && closedBySelfRef.current && !closedByPopRef.current) {
+        try { window.history.back() } catch {}
+      }
+      pushedRef.current = false
+      closedBySelfRef.current = false
+      closedByPopRef.current = false
+      historyMarkerRef.current = null
+    }
+  }, [isOpen, onClose])
+
+  const handleContinueMinting = () => {
+    // Reset form and states for new minting
+    reset()
+    setPersonInfo(null)
+    setIsSubmitting(false)
+    setSuccessResult(null)
+    setErrorResult(null)
+    setContractError(null)
+    setIsEndorsed(false)
+    setIsAlreadyMinted(false)
+    setIsCheckingStatus(false)
+    // Keep modal open for continued use
   }
 
   const onSubmit = async (data: MintNFTForm) => {
@@ -241,7 +318,13 @@ export default function MintNFTModal({
       }
     }
 
+    // Clear old results
+    setSuccessResult(null)
+    setErrorResult(null)
+    setContractError(null)
     setIsSubmitting(true)
+
+    console.log('🚀 Starting mint NFT process...')
 
     try {
       // Construct PersonCoreInfo object matching the contract structure
@@ -297,6 +380,13 @@ export default function MintNFTModal({
         }
       } catch {}
 
+      console.log('📞 Calling mintPersonNFT with:', {
+        personHash: finalPersonHash,
+        versionIndex: finalVersionIndex,
+        tokenURI: data.tokenURI || '',
+        coreInfo
+      })
+
       const receipt = await mintPersonNFT(
         finalPersonHash,
         finalVersionIndex,
@@ -304,19 +394,157 @@ export default function MintNFTModal({
         coreInfo as any
       )
 
+      console.log('✅ mintPersonNFT returned:', receipt)
+
       if (receipt) {
-        // Prefer querying tokenId from contract after mint
+        console.log('🎉 NFT minted successfully:', receipt)
+        
+        // Extract event data from receipt
+        let mintedEvent = null
+        try {
+          // Find PersonNFTMinted event in receipt logs
+          const mintedEvents = receipt.logs?.filter((log: any) => 
+            log.topics?.[0] && contract?.interface.parseLog(log)?.name === 'PersonNFTMinted'
+          ) || []
+          
+          if (mintedEvents.length > 0) {
+            mintedEvent = contract?.interface.parseLog(mintedEvents[0])
+          }
+        } catch (e) {
+          console.warn('Failed to parse mint event:', e)
+        }
+
+        // Get tokenId from contract or event
         let tokenId = 0
         try {
           const details = await getVersionDetails?.(finalPersonHash, finalVersionIndex)
           tokenId = Number(details?.tokenId ?? 0)
         } catch {}
+        
+        if (mintedEvent && tokenId === 0) {
+          tokenId = Number(mintedEvent.args?.tokenId ?? 0)
+        }
+
+        setSuccessResult({
+          tokenId,
+          personHash: finalPersonHash,
+          versionIndex: finalVersionIndex,
+          tokenURI: data.tokenURI || '',
+          transactionHash: receipt.hash || receipt.transactionHash || '',
+          blockNumber: receipt.blockNumber || 0,
+          events: {
+            PersonNFTMinted: mintedEvent ? {
+              personHash: mintedEvent.args?.personHash || finalPersonHash,
+              tokenId: mintedEvent.args?.tokenId || tokenId,
+              owner: mintedEvent.args?.owner || address,
+              versionIndex: mintedEvent.args?.versionIndex || finalVersionIndex,
+              tokenURI: mintedEvent.args?.tokenURI || data.tokenURI || '',
+              timestamp: mintedEvent.args?.timestamp || Math.floor(Date.now() / 1000)
+            } : null
+          }
+        })
+        
         if (tokenId > 0) onSuccess?.(tokenId)
-        handleClose()
       }
     } catch (error: any) {
-      console.error('Mint NFT failed:', error)
-      alert(error.message || t('mintNFT.mintFailed', 'Failed to mint NFT'))
+      console.error('❌ Mint NFT failed:', error)
+      console.log('🔍 Error details:', {
+        message: error?.message,
+        parsedMessage: error?.parsedMessage,
+        code: error?.code,
+        data: error?.data,
+        reason: error?.reason,
+        errorName: error?.errorName,
+        customError: error?.customError,
+        info: error?.info,
+        shortMessage: error?.shortMessage,
+        toString: error?.toString?.()
+      })
+
+      // Parse error for better user feedback
+      let errorType = 'UNKNOWN_ERROR'
+      // Prefer parsedMessage from useContract.executeTransaction if available
+      const baseMsg =
+        error?.parsedMessage ||
+        error?.shortMessage ||
+        error?.reason ||
+        error?.data?.message ||
+        error?.error?.message ||
+        error?.message ||
+        'An unexpected error occurred'
+
+      // Extract a custom error name if available
+      let customName: string | undefined =
+        error?.customError ||
+        error?.errorName ||
+        error?.data?.errorName ||
+        error?.info?.error?.name
+
+      if (!customName && typeof baseMsg === 'string') {
+        const m = baseMsg.match(/reverted with custom error '([^']+)'/)
+        if (m) customName = m[1].replace('()', '')
+      }
+
+      // Map known custom errors to friendly messages
+      let errorMessage = baseMsg
+      if (customName) {
+        if (customName.includes('VersionAlreadyMinted')) {
+          errorType = 'VERSION_ALREADY_MINTED'
+          errorMessage = t('mintNFT.errors.versionAlreadyMinted', 'This version has already been minted as NFT')
+        } else if (customName.includes('MustEndorseVersionFirst')) {
+          errorType = 'MUST_ENDORSE_FIRST'
+          errorMessage = t('mintNFT.errors.mustEndorseFirst', 'You must endorse this version before minting')
+        } else if (customName.includes('BasicInfoMismatch')) {
+          errorType = 'BASIC_INFO_MISMATCH'
+          errorMessage = t('mintNFT.errors.basicInfoMismatch', 'Person information does not match the version data')
+        } else if (customName.includes('InvalidTokenURI')) {
+          errorType = 'INVALID_TOKEN_URI'
+          errorMessage = t('mintNFT.errors.invalidTokenURI', 'Invalid token URI format')
+        } else if (customName.includes('InvalidStory')) {
+          errorType = 'INVALID_STORY'
+          errorMessage = t('mintNFT.errors.invalidStory', 'Story content is too long')
+        } else if (customName.includes('InvalidBirthPlace')) {
+          errorType = 'INVALID_BIRTH_PLACE'
+          errorMessage = t('mintNFT.errors.invalidBirthPlace', 'Birth place is too long')
+        } else if (customName.includes('InvalidDeathPlace')) {
+          errorType = 'INVALID_DEATH_PLACE'
+          errorMessage = t('mintNFT.errors.invalidDeathPlace', 'Death place is too long')
+        } else {
+          // If we have a custom error name but no mapping, surface it
+          errorType = customName
+          errorMessage = customName
+        }
+      } else if (error?.code === 'INSUFFICIENT_FUNDS') {
+        errorType = 'INSUFFICIENT_FUNDS'
+        errorMessage = t('mintNFT.errors.insufficientFunds', 'Insufficient funds for transaction')
+      } else if (
+        error?.code === 'USER_REJECTED' ||
+        error?.code === 'ACTION_REJECTED' ||
+        (typeof baseMsg === 'string' && baseMsg.toLowerCase().includes('user rejected'))
+      ) {
+        errorType = 'USER_REJECTED'
+        errorMessage = t('mintNFT.errors.userRejected', 'Transaction was rejected by user')
+      }
+
+      const errorDetails = [
+        customName ? `Custom: ${customName}` : null,
+        error?.code ? `Code: ${error.code}` : null,
+        typeof baseMsg === 'string' ? `Message: ${baseMsg}` : null
+      ]
+        .filter(Boolean)
+        .join('\n') || 'Unknown error'
+
+      console.log('🚨 Setting error result:', {
+        type: errorType,
+        message: errorMessage,
+        details: errorDetails
+      })
+
+      setErrorResult({
+        type: errorType,
+        message: errorMessage,
+        details: errorDetails
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -680,41 +908,228 @@ export default function MintNFTModal({
               </p>
             </div>
           )}
+
+          {/* Progress Indicator */}
+          {isSubmitting && !successResult && !errorResult && (
+            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-1">
+                    {t('mintNFT.minting', 'Minting NFT...')}
+                  </p>
+                  <p className="text-xs text-purple-700 dark:text-purple-300">
+                    {t('mintNFT.mintingDesc', 'Creating your unique NFT on the blockchain...')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successResult && (
+            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
+              {/* Main Success Message */}
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                    {t('mintNFT.mintedSuccessfully', 'NFT minted successfully!')}
+                  </p>
+                </div>
+                
+                <div className="space-y-2 text-xs text-green-700 dark:text-green-300">
+                  {/* Token ID */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('mintNFT.tokenId', 'Token ID')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      #{successResult.tokenId}
+                    </code>
+                  </div>
+                  
+                  {/* Person Hash */}
+                  <div>
+                    <span className="font-medium">{t('mintNFT.personHash', 'Person Hash')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.personHash}
+                    </code>
+                  </div>
+                  
+                  {/* Version Index */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('mintNFT.versionIndex', 'Version Index')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.versionIndex}
+                    </code>
+                  </div>
+                  
+                  {/* Token URI */}
+                  {successResult.tokenURI && (
+                    <div>
+                      <span className="font-medium">{t('mintNFT.tokenURI', 'Token URI')}:</span>
+                      <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                        {successResult.tokenURI}
+                      </code>
+                    </div>
+                  )}
+                  
+                  {/* Transaction Hash */}
+                  <div>
+                    <span className="font-medium">{t('mintNFT.transactionHash', 'Transaction Hash')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.transactionHash}
+                    </code>
+                  </div>
+                  
+                  {/* Block Number */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('mintNFT.blockNumber', 'Block Number')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.blockNumber}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Information */}
+              {successResult.events.PersonNFTMinted && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {t('mintNFT.eventDetails', 'Event Details')}:
+                  </h4>
+                  
+                  <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                      <span className="text-xs font-medium text-purple-900 dark:text-purple-100">
+                        {t('mintNFT.nftMintedEvent', 'PersonNFTMinted Event')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
+                      {t('mintNFT.nftMintedEventDesc', 'NFT was successfully minted and recorded on-chain')}
+                    </p>
+                    
+                    {/* Complete Event Details */}
+                    <div className="space-y-2 text-xs">
+                      {/* Owner */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-purple-800 dark:text-purple-200">
+                          {t('mintNFT.owner', 'Owner')}:
+                        </span>
+                        <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.PersonNFTMinted.owner}
+                        </code>
+                      </div>
+                      
+                      {/* Timestamp */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-purple-800 dark:text-purple-200">
+                          {t('mintNFT.timestamp', 'Timestamp')}:
+                        </span>
+                        <span className="col-span-2 text-purple-700 dark:text-purple-300">
+                          {new Date(Number(successResult.events.PersonNFTMinted.timestamp) * 1000).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorResult && (
+            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                    {t('mintNFT.mintFailed', 'NFT Minting Failed')}
+                  </p>
+                  <div className="space-y-2 text-xs text-red-700 dark:text-red-300">
+                    <div>
+                      <span className="font-medium">{t('mintNFT.errorType', 'Error Type')}:</span>
+                      <code className="ml-2 bg-red-100 dark:bg-red-800 px-1.5 py-0.5 rounded">
+                        {errorResult.type}
+                      </code>
+                    </div>
+                    <div>
+                      <span className="font-medium">{t('mintNFT.errorMessage', 'Message')}:</span>
+                      <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded">
+                        {errorResult.message}
+                      </p>
+                    </div>
+                    {errorResult.details !== errorResult.message && (
+                      <div>
+                        <span className="font-medium">{t('mintNFT.errorDetails', 'Details')}:</span>
+                        <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded text-xs">
+                          {errorResult.details}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
             </div>
 
             {/* Submit Buttons */}
             <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
-              >
-                {t('common.cancel', 'Cancel')}
-              </button>
-              
-              {/* Only show mint button if NFT hasn't been minted */}
-              {!isAlreadyMinted && (
+              {successResult ? (
+                // Success state: Show Continue Minting and Close buttons
                 <>
-                  {isViewMode && !isEndorsed ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowEndorseModal(true)}
-                      disabled={isCheckingStatus}
-                      className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                    >
-                      {t('mintNFT.goEndorse', 'Go Endorse')}
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || isCheckingStatus}
-                      className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                    >
-                      {isSubmitting ? 
-                        t('mintNFT.minting', 'Minting...') :
-                        t('mintNFT.mint', 'Mint NFT')
-                      }
-                    </button>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    {t('common.close', 'Close')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinueMinting}
+                    className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    {t('mintNFT.continueMinting', 'Continue Minting')}
+                  </button>
+                </>
+              ) : (
+                // Normal state: Show Cancel and Mint buttons
+                <>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    {t('common.cancel', 'Cancel')}
+                  </button>
+                  
+                  {/* Only show mint button if NFT hasn't been minted */}
+                  {!isAlreadyMinted && (
+                    <>
+                      {isViewMode && !isEndorsed ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowEndorseModal(true)}
+                          disabled={isCheckingStatus}
+                          className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                        >
+                          {t('mintNFT.goEndorse', 'Go Endorse')}
+                        </button>
+                      ) : (
+                        <button
+                          type="submit"
+                          disabled={isSubmitting || isCheckingStatus}
+                          className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                        >
+                          {isSubmitting ? 
+                            t('mintNFT.minting', 'Minting...') :
+                            t('mintNFT.mint', 'Mint NFT')
+                          }
+                        </button>
+                      )}
+                    </>
                   )}
                 </>
               )}

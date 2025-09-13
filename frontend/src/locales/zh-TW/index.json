@@ -710,9 +710,33 @@
     "endorsementRequiredDesc": "您必須先背書此版本才能鑄造。是否前往背書？",
     "personInfoRequired": "請填寫人物資訊",
     "personHashRequired": "無法計算人物雜湊",
-    "mintFailed": "鑄造 NFT 失敗"
-  }
-  ,
+    "mintFailed": "鑄造 NFT 失敗",
+    "mintedSuccessfully": "NFT 鑄造成功！",
+    "tokenId": "Token ID",
+    "mintingDesc": "正在區塊鏈上創建您的獨特 NFT...",
+    "eventDetails": "事件詳情",
+    "nftMintedEvent": "PersonNFTMinted 事件",
+    "nftMintedEventDesc": "NFT 已成功鑄造並記錄在鏈上",
+    "owner": "所有者",
+    "timestamp": "時間戳",
+    "blockNumber": "區塊號",
+    "transactionHash": "交易雜湊",
+    "errorType": "錯誤類型",
+    "errorMessage": "錯誤訊息",
+    "errorDetails": "詳細資訊",
+    "continueMinting": "繼續鑄造",
+    "errors": {
+      "versionAlreadyMinted": "此版本已被鑄造為 NFT",
+      "mustEndorseFirst": "您必須先背書此版本才能鑄造",
+      "basicInfoMismatch": "人物資訊與版本資料不匹配",
+      "invalidTokenURI": "無效的 Token URI 格式",
+      "invalidStory": "故事內容過長",
+      "invalidBirthPlace": "出生地過長",
+      "invalidDeathPlace": "死亡地過長",
+      "insufficientFunds": "交易手續費不足",
+      "userRejected": "用戶拒絕交易"
+    }
+  },
   "endorse": {
     "title": "背書版本",
     "description": "以 DEEP 代幣背書高品質版本",
@@ -747,6 +771,38 @@
     "endorse": "背書",
     "invalidTarget": "人物雜湊或版本索引無效",
     "invalidTargetDesc": "請確認雜湊與索引對應鏈上已存在的版本",
-    "needApprove": "授權額度不足，請重新授權 DEEP"
+    "needApprove": "授權額度不足，請重新授權 DEEP",
+    "approvingDesc": "請在錢包中確認代幣授權",
+    "endorsingDesc": "正在區塊鏈上處理背書...",
+    "endorsedSuccessfully": "版本背書成功！",
+    "feePaid": "已支付費用",
+    "transactionHash": "交易雜湊",
+    "blockNumber": "區塊號",
+    "eventDetails": "事件詳情",
+    "versionEndorsedEvent": "PersonVersionEndorsed 事件",
+    "versionEndorsedEventDesc": "背書已成功記錄在鏈上",
+    "endorser": "背書者",
+    "feeAmount": "費用金額",
+    "timestamp": "時間戳",
+    "endorseFailed": "背書失敗",
+    "errorType": "錯誤類型",
+    "errorMessage": "錯誤訊息",
+    "errorDetails": "詳細資訊",
+    "continueEndorsing": "繼續背書",
+    "canContinueEndorsing": "您現在可以繼續背書其他版本或關閉此對話框。",
+    "transactionFailed": "交易失敗。請檢查錯誤訊息後重試。",
+    "transactionFailedDetails": "交易已提交但未能成功完成。",
+    "errors": {
+      "invalidTarget": "無效的人物雜湊或版本索引",
+      "needApprove": "授權額度不足，請重新授權 DEEP 代幣",
+      "insufficientDeepTokens": "DEEP 代幣餘額不足",
+      "feeTransferFailed": "背書費用轉帳失敗",
+      "insufficientFunds": "交易手續費不足",
+      "userRejected": "用戶拒絕交易"
+    }
+  },
+  "contract": {
+    "endorseSuccess": "背書提交成功",
+    "endorseFailed": "背書版本失敗"
   }
 }

@@ -33,6 +33,7 @@ export function useContract() {
       onError?: (error: any) => void
       successMessage?: string
       errorMessage?: string
+      suppressErrorToast?: boolean
     } = {}
   ) => {
     if (!contract || !signer) {
@@ -57,18 +58,68 @@ export function useContract() {
       let errorMsg = options.errorMessage || t('transaction.failed', 'Transaction failed')
       
       // Parse specific error messages
-      const nestedMsg = error?.shortMessage || error?.info?.error?.message || error?.data?.message || error?.error?.message
-      const errorName = error?.errorName || error?.info?.error?.name
+      let nestedMsg = error?.shortMessage || error?.info?.error?.message || error?.data?.message || error?.error?.message
+      let errorName = error?.errorName || error?.info?.error?.name
       const baseMsg = error?.message || ''
-      if (errorName) {
+
+      // Attempt to decode revert data via ABI for custom errors
+      let customError = errorName as string | undefined
+      const iface = contract?.interface as any
+      const candidates: string[] = []
+      const pushHex = (v: any) => {
+        if (typeof v === 'string' && v.startsWith('0x') && v.length >= 10) candidates.push(v)
+      }
+      try {
+        pushHex(error?.data)
+        pushHex(error?.data?.data)
+        pushHex(error?.info?.error?.data)
+        pushHex(error?.error?.data)
+      } catch {}
+      if (iface && candidates.length > 0) {
+        for (const data of candidates) {
+          try {
+            const desc = iface.parseError(data)
+            if (desc) {
+              customError = String(desc.name)
+              // Handle Error(string) to extract message
+              if (!nestedMsg && desc.name === 'Error' && desc.args && desc.args.length > 0) {
+                nestedMsg = String(desc.args[0])
+              }
+              break
+            }
+          } catch {}
+        }
+      }
+
+      // Extract custom error from message if still unknown
+      if (!customError && baseMsg) {
+        const customErrorMatch = baseMsg.match(/reverted with custom error '([^']+)'/)
+        if (customErrorMatch) customError = customErrorMatch[1].replace('()', '')
+      }
+
+      if (customError) {
         // Map known custom errors to friendly text
-        const name = String(errorName)
+        const name = String(customError)
         if (/InvalidPersonHash|InvalidVersionIndex/.test(name)) {
           errorMsg = t('endorse.invalidTarget', 'Invalid person hash or version index')
         } else if (/EndorsementFeeTransferFailed|ERC20InsufficientAllowance/.test(name)) {
           errorMsg = t('endorse.needApprove', 'Allowance too low, please approve DEEP tokens again')
         } else if (/ERC20InsufficientBalance/.test(name)) {
           errorMsg = t('endorse.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement')
+        } else if (/VersionAlreadyMinted/.test(name)) {
+          errorMsg = t('mintNFT.errors.versionAlreadyMinted', 'This version has already been minted as NFT')
+        } else if (/MustEndorseVersionFirst/.test(name)) {
+          errorMsg = t('mintNFT.errors.mustEndorseFirst', 'You must endorse this version before minting')
+        } else if (/BasicInfoMismatch/.test(name)) {
+          errorMsg = t('mintNFT.errors.basicInfoMismatch', 'Person information does not match the version data')
+        } else if (/InvalidTokenURI/.test(name)) {
+          errorMsg = t('mintNFT.errors.invalidTokenURI', 'Invalid token URI format')
+        } else if (/InvalidStory/.test(name)) {
+          errorMsg = t('mintNFT.errors.invalidStory', 'Story content is too long')
+        } else if (/InvalidBirthPlace/.test(name)) {
+          errorMsg = t('mintNFT.errors.invalidBirthPlace', 'Birth place is too long')
+        } else if (/InvalidDeathPlace/.test(name)) {
+          errorMsg = t('mintNFT.errors.invalidDeathPlace', 'Death place is too long')
         } else {
           errorMsg = name
         }
@@ -85,8 +136,19 @@ export function useContract() {
       }
       
       toast.show(errorMsg)
-      options.onError?.(error)
-      return null
+
+      // Create enhanced error with parsed info
+      const enhancedError = {
+        ...error,
+        parsedMessage: errorMsg,
+        customError: customError,
+        errorName: customError || errorName
+      }
+
+      options.onError?.(enhancedError)
+
+      // Throw enhanced error so calling code can catch it
+      throw enhancedError
     }
   }, [contract, signer, toast, t])
 
@@ -134,13 +196,19 @@ export function useContract() {
         deathPlace: string
         story: string
       }
+    },
+    options?: {
+      onSuccess?: (result: any) => void
+      onError?: (error: any) => void
     }
   ) => {
     return executeTransaction(
       () => contract!.mintPersonNFT(personHash, versionIndex, tokenURI, coreInfo),
       {
         successMessage: t('contract.mintSuccess', 'NFT minted successfully'),
-        errorMessage: t('contract.mintFailed', 'Failed to mint NFT')
+        errorMessage: t('contract.mintFailed', 'Failed to mint NFT'),
+        onSuccess: options?.onSuccess,
+        onError: options?.onError
       }
     )
   }, [executeTransaction, t, contract])
@@ -151,7 +219,13 @@ export function useContract() {
     overrides?: any
   ) => {
     return executeTransaction(
-      () => contract!.endorseVersion(personHash, versionIndex, overrides ?? {}),
+      async () => {
+        if (overrides && Object.keys(overrides).length > 0) {
+          return await contract!.endorseVersion(personHash, versionIndex, overrides)
+        } else {
+          return await contract!.endorseVersion(personHash, versionIndex)
+        }
+      },
       {
         successMessage: t('contract.endorseSuccess', 'Endorsement submitted successfully'),
         errorMessage: t('contract.endorseFailed', 'Failed to endorse version')

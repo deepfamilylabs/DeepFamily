@@ -261,7 +261,7 @@ export default function ActionsPage() {
           onClose={() => setMintNFTModal({ isOpen: false })}
           onSuccess={(tokenId) => {
             console.log('NFT minted:', tokenId)
-            setMintNFTModal({ isOpen: false })
+            // Modal will show success message and user can continue minting or close manually
           }}
           personHash={mintNFTModal.personHash}
           versionIndex={mintNFTModal.versionIndex}
