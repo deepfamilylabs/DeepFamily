@@ -7,9 +7,17 @@ function dlog(...args) {
   if (DEBUG_ENABLED) console.log("[DEBUG]", ...args);
 }
 // Added: periodic heartbeat so user sees script still alive
+// Keep a handle so we can clear it when the script finishes
+let HEARTBEAT;
 if (DEBUG_ENABLED) {
-  setInterval(() => console.log(`[DEBUG][heartbeat] ${new Date().toISOString()}`), 15000);
+  HEARTBEAT = setInterval(
+    () => console.log(`[DEBUG][heartbeat] ${new Date().toISOString()}`),
+    15000,
+  );
 }
+
+// Global flag: if token isn't initialized/bound correctly, avoid reward mint
+let DISABLE_REWARD_MINT = false;
 
 // --- Added: helper functions and constants for maximizing tag/story length ---
 const MAX_TAG_LEN = 64; // Align with contract MAX_SHORT_TEXT_LENGTH
@@ -228,6 +236,28 @@ async function ensureEndorsementReady({ deepFamily, rootHash, rootVer, basic, et
   const deepFamilyAddr = deepFamily.target || deepFamily.address;
   dlog("deepFamilyAddr", deepFamilyAddr);
 
+  // Check token binding; if not initialized or bound to a different DeepFamily, disable reward-dependent paths
+  try {
+    const bound = await token.deepFamilyContract();
+    const isUnbound = !bound || bound === ethers.ZeroAddress;
+    const mismatch = String(bound).toLowerCase() !== String(deepFamilyAddr).toLowerCase();
+    if (isUnbound || mismatch) {
+      DISABLE_REWARD_MINT = true;
+      console.warn(
+        `DeepFamilyToken not initialized or bound to different DeepFamily (bound=${bound}, expected=${deepFamilyAddr}).` +
+          " Seeding will omit mother references to bypass reward mint path.",
+      );
+    } else {
+      dlog("Token binding OK:", bound);
+    }
+  } catch (e) {
+    // Some older ABIs may not expose deepFamilyContract; be cautious
+    console.warn(
+      "Cannot read token.deepFamilyContract() (older ABI or network error). Proceeding without reward-dependent paths.",
+    );
+    DISABLE_REWARD_MINT = true;
+  }
+
   let recentReward = await token.recentReward();
   let balance = await token.balanceOf(signerAddr);
   let allowance = await token.allowance(signerAddr, deepFamilyAddr);
@@ -437,6 +467,10 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
 
   // Create a mother (spouse) for the root to test mother version references
   async function createMotherFor(node) {
+    if (DISABLE_REWARD_MINT) {
+      dlog("DISABLE_REWARD_MINT is true; skip creating mother to avoid token.mint path");
+      return null;
+    }
     if (mothersMap.has(node.hash)) {
       dlog(`Mother already exists for ${node.name || "Node"}, returning cached`);
       return mothersMap.get(node.hash);
@@ -489,6 +523,20 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     const info = basic(name, year, (year + name.length) % 2 === 0 ? 1 : 2);
     const childHash = await getPersonHashFromBasicInfo(deepFamily, info);
 
+    // Proactively validate parent version indices on-chain to avoid opaque reverts
+    try {
+      const fatherCount = await deepFamily.countPersonVersions(fatherNode.hash);
+      if (Number(fatherNode.ver) === 0 || Number(fatherNode.ver) > Number(fatherCount)) {
+        console.warn(
+          `Invalid father reference for ${name}: ver=${fatherNode.ver} > on-chain count=${fatherCount}`,
+        );
+        return null;
+      }
+    } catch (e) {
+      console.warn(`Failed to query father versions for ${name}:`, e.message || e);
+      return null;
+    }
+
     try {
       const existingVersions = await deepFamily.countPersonVersions(childHash);
       if (existingVersions > 0) {
@@ -499,9 +547,9 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       dlog(`Child ${name} doesn't exist, proceeding to create`);
     }
 
-    // 50% chance reference mother (if exists)
-    let mother = mothersMap.get(fatherNode.hash);
-    if (!mother && (fatherNode === mainChain[mainChain.length - 1] || rand() < 0.5)) {
+    // 50% chance reference mother (if exists) unless reward mint disabled
+    let mother = DISABLE_REWARD_MINT ? null : mothersMap.get(fatherNode.hash);
+    if (!DISABLE_REWARD_MINT && !mother && (fatherNode === mainChain[mainChain.length - 1] || rand() < 0.5)) {
       try {
         mother = await createMotherFor(fatherNode);
       } catch (e) {
@@ -511,7 +559,23 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     }
 
     const motherHash = mother ? mother.hash : ethers.ZeroHash;
-    const motherVer = mother ? mother.ver : 0;
+    let motherVer = mother ? mother.ver : 0;
+
+    // If a mother is referenced, validate her version too
+    if (mother) {
+      try {
+        const motherCount = await deepFamily.countPersonVersions(motherHash);
+        if (Number(motherVer) === 0 || Number(motherVer) > Number(motherCount)) {
+          console.warn(
+            `Invalid mother reference for ${name}: ver=${motherVer} > on-chain count=${motherCount}`,
+          );
+          // Continue without mother to avoid revert
+          motherVer = 0;
+        }
+      } catch (e) {
+        console.warn(`Failed to query mother versions for ${name}:`, e.message || e);
+      }
+    }
 
     const txRes = await addPersonVersion({
       deepFamily,
@@ -691,6 +755,8 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     `Large seed complete: depth=${TARGET_DEPTH}, total nodes=${allNodes.length}, NFT ratio=${TARGET_NFT_RATIO}`,
   );
   console.log("Root person:", rootHash, "v", rootVer);
+  // Stop heartbeat so the process can exit cleanly in debug mode
+  if (DEBUG_ENABLED && HEARTBEAT) clearInterval(HEARTBEAT);
 }
 
 // Unified helper to add person version (contract addPerson)
@@ -744,6 +810,30 @@ async function addPersonVersion({
     return { personHash, added: true };
   } catch (error) {
     console.warn(`Failed to add person ${info.fullName}:`, error.message?.slice(0, 100));
+    // If it looks like a sticky duplicate (possible from prior partial tx), try once with a unique CID
+    try {
+      const existingCount = await deepFamily.countPersonVersions(personHash);
+      if (Number(existingCount) === 0) {
+        const uniqueCid = `${cid}_${Date.now()}`;
+        console.warn(
+          `  Retrying once with unique CID to bypass potential stale DuplicateVersion: ${uniqueCid}`,
+        );
+        const retryTx = await deepFamily.addPerson(
+          personHash,
+          fatherHash,
+          motherHash,
+          fatherVersionIndex,
+          motherVersionIndex,
+          tag,
+          uniqueCid,
+        );
+        await retryTx.wait();
+        dlog(`Retry succeeded for ${info.fullName} with unique CID`);
+        return { personHash, added: true };
+      }
+    } catch (_) {
+      // ignore and fall through
+    }
     return { personHash, error: error.message };
   }
 }
@@ -758,5 +848,6 @@ if (typeof globalThis !== "undefined" && typeof globalThis.tagFor === "undefined
 
 main().catch((e) => {
   console.error(e);
+  if (DEBUG_ENABLED && HEARTBEAT) clearInterval(HEARTBEAT);
   process.exit(1);
 });
