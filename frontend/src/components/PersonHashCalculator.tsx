@@ -4,7 +4,9 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Clipboard } from 'lucide-react'
+import { useToast } from './ToastProvider'
+import { formatHashMiddle } from '../types/graph'
 
 const MAX_FULL_NAME_BYTES = 256
 
@@ -170,6 +172,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
 }) => {
   const { t } = useTranslation()
   const [internalOpen, setInternalOpen] = useState(true)
+  const toast = useToast()
 
   // Use external state if provided, otherwise use internal state
   const currentOpen = collapsible ? (onToggle ? isOpen : internalOpen) : true
@@ -212,6 +215,19 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const birthMonth = watch('birthMonth')
   const birthDay = watch('birthDay')
   const gender = watch('gender')
+  
+  const computedHash = useMemo(() => {
+    const transformedData: HashForm = {
+      fullName: fullName || '',
+      isBirthBC: isBirthBC || false,
+      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
+      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
+      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
+      gender: Number(gender || 0),
+    }
+    if (!transformedData.fullName.trim()) return ''
+    return computePersonHashLocal(transformedData)
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
   
   const onFormChangeRef = useRef(onFormChange)
   
@@ -330,6 +346,46 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
           </div>
         </div>
       </div>
+      {computedHash && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1 overflow-hidden">
+            <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
+              {t('search.hashCalculator.hashLabel')}
+            </span>
+            <HashInline value={computedHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    await navigator.clipboard.writeText(computedHash)
+                    toast.show(t('search.copied'))
+                    return
+                  }
+                } catch {}
+                try {
+                  const ta = document.createElement('textarea')
+                  ta.value = computedHash
+                  ta.style.position = 'fixed'
+                  ta.style.left = '-9999px'
+                  document.body.appendChild(ta)
+                  ta.focus(); ta.select()
+                  const ok = document.execCommand('copy')
+                  document.body.removeChild(ta)
+                  toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                } catch {
+                  toast.show(t('search.copyFailed'))
+                }
+              }}
+              aria-label={t('search.copy')}
+              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              title={t('search.copy')}
+            >
+              <Clipboard size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -389,3 +445,41 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
 }
 
 export default PersonHashCalculator
+
+// Inline hash renderer: shows full when fits; otherwise 10...8 middle ellipsis
+const HashInline: React.FC<{ value: string; className?: string; titleText?: string; prefix?: number; suffix?: number }> = ({ value, className = '', titleText, prefix = 10, suffix = 8 }) => {
+  const containerRef = useRef<HTMLSpanElement>(null)
+  const measureRef = useRef<HTMLSpanElement>(null)
+  const [display, setDisplay] = useState<string>(value)
+
+  const recompute = () => {
+    const container = containerRef.current
+    const meas = measureRef.current
+    if (!container || !meas) return
+    meas.textContent = value
+    const fits = meas.scrollWidth <= container.clientWidth
+    setDisplay(fits ? value : formatHashMiddle(value, prefix, suffix))
+  }
+
+  useEffect(() => {
+    recompute()
+    const ro = new ResizeObserver(() => recompute())
+    if (containerRef.current) ro.observe(containerRef.current)
+    const onResize = () => recompute()
+    window.addEventListener('resize', onResize)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', onResize)
+    }
+  }, [value, prefix, suffix])
+
+  return (
+    <>
+      <span ref={containerRef} className={`min-w-0 overflow-hidden whitespace-nowrap ${className}`} title={titleText ?? value}>
+        {display}
+      </span>
+      {/* measurement node mirrors font styles to ensure accurate width */}
+      <span ref={measureRef} className={`absolute left-[-99999px] top-0 invisible whitespace-nowrap ${className}`} />
+    </>
+  )
+}

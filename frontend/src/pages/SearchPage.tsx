@@ -4,13 +4,13 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { Clipboard, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import DeepFamily from '../abi/DeepFamily.json'
 import { formatUnixSeconds } from '../types/graph'
 import { makeProvider } from '../utils/provider'
-import PersonHashCalculator, { HashForm, computePersonHashLocal } from '../components/PersonHashCalculator'
+import PersonHashCalculator from '../components/PersonHashCalculator'
 
 const MAX_FULL_NAME_BYTES = 256
 const MAX_PAGE_SIZE = 100  
@@ -179,15 +179,7 @@ export default function SearchPage() {
   const [childrenTotal, setChildrenTotal] = useState<number>(0)
   const [childrenHasMore, setChildrenHasMore] = useState<boolean>(false)
   
-  const [computedHash, setComputedHash] = useState<string>('')
-  const [currentHashForm, setCurrentHashForm] = useState<HashForm>({
-    fullName: '',
-    isBirthBC: false,
-    birthYear: 0,
-    birthMonth: 0,
-    birthDay: 0,
-    gender: 0,
-  })
+  
 
   const [openSections, setOpenSections] = useState({
     hash: true,
@@ -420,17 +412,7 @@ export default function SearchPage() {
     await onQueryChildren({ parentHash: w7('parentHash') || '', parentVersionIndex: w7('parentVersionIndex') || 1, pageSize: childrenPageSize }, prev)
   }
 
-  const handleHashFormChange = useCallback((formData: HashForm) => {
-    setCurrentHashForm(formData)
-    // Don't auto-calculate, maintain original manual calculation behavior
-  }, [])
-
-  const handleComputeHash = () => {
-    if (currentHashForm.fullName.trim()) {
-      const hash = computePersonHashLocal(currentHashForm)
-      setComputedHash(hash)
-    }
-  }
+  
 
   return (
     <div className="space-y-4 text-gray-900 dark:text-gray-100 pb-4 md:pb-0">
@@ -449,58 +431,10 @@ export default function SearchPage() {
               <PersonHashCalculator
                 showTitle={false}
                 collapsible={false}
-                onFormChange={handleHashFormChange}
                 className="border-0 shadow-none bg-transparent"
               />
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <button 
-                  type="button"
-                  onClick={handleComputeHash}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {t('search.hashCalculator.compute')}
-                </button>
-                {computedHash && (
-                  <div className="flex items-center gap-1 overflow-hidden">
-                    <div className="min-w-0 flex-1 flex items-center gap-1">
-                      <HashInline value={computedHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                            await navigator.clipboard.writeText(computedHash)
-                            toast.show(t('search.copied'))
-                            return
-                          }
-                        } catch {}
-                        try {
-                          const ta = document.createElement('textarea')
-                          ta.value = computedHash
-                          ta.style.position = 'fixed'
-                          ta.style.left = '-9999px'
-                          document.body.appendChild(ta)
-                          ta.focus(); ta.select()
-                          const ok = document.execCommand('copy')
-                          document.body.removeChild(ta)
-                          toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                        } catch {
-                          toast.show(t('search.copyFailed'))
-                        }
-                      }}
-                      aria-label={t('search.copy')}
-                      className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                      title={t('search.copy')}
-                    >
-                      <Clipboard size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            
             <p className="text-xs text-gray-500 dark:text-gray-500">{t('search.hashCalculator.description')}</p>
           </div>
         )}

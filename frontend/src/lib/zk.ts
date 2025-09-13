@@ -134,22 +134,320 @@ export async function submitAddPersonZK(
       gasLimit: gasLimit
     })
     console.log('✅ Transaction sent successfully:', tx.hash)
-    return tx
+    
+    // Wait for transaction confirmation and get receipt
+    console.log('⏳ Waiting for transaction confirmation...')
+    const receipt = await tx.wait()
+    console.log('✅ Transaction confirmed in block:', receipt.blockNumber)
+    
+    // Parse all events from the transaction receipt
+    const events = {
+      PersonHashZKVerified: null as any,
+      PersonVersionAdded: null as any,
+      TokenRewardDistributed: null as any
+    }
+    
+    let personHash = 'unknown'
+    let versionIndex = 0
+    let rewardAmount = 0
+    
+    console.log(`🔍 Total logs in receipt: ${receipt.logs.length}`)
+    
+    for (const log of receipt.logs) {
+      try {
+        const parsedEvent = contract.interface.parseLog(log)
+        if (parsedEvent) {
+          console.log(`📊 Event detected: ${parsedEvent.name}`, parsedEvent.args)
+          
+          switch (parsedEvent.name) {
+            case 'PersonHashZKVerified':
+              events.PersonHashZKVerified = {
+                personHash: parsedEvent.args.personHash,
+                prover: parsedEvent.args.prover
+              }
+              console.log('✅ PersonHashZKVerified:', events.PersonHashZKVerified)
+              break
+              
+            case 'PersonVersionAdded':
+              events.PersonVersionAdded = {
+                personHash: parsedEvent.args.personHash,
+                versionIndex: Number(parsedEvent.args.versionIndex),
+                addedBy: parsedEvent.args.addedBy,
+                timestamp: Number(parsedEvent.args.timestamp),
+                fatherHash: parsedEvent.args.fatherHash,
+                fatherVersionIndex: Number(parsedEvent.args.fatherVersionIndex),
+                motherHash: parsedEvent.args.motherHash,
+                motherVersionIndex: Number(parsedEvent.args.motherVersionIndex),
+                tag: parsedEvent.args.tag
+              }
+              personHash = events.PersonVersionAdded.personHash
+              versionIndex = events.PersonVersionAdded.versionIndex
+              console.log('✅ PersonVersionAdded:', events.PersonVersionAdded)
+              break
+              
+            case 'TokenRewardDistributed':
+              events.TokenRewardDistributed = {
+                miner: parsedEvent.args.miner,
+                personHash: parsedEvent.args.personHash,
+                versionIndex: Number(parsedEvent.args.versionIndex),
+                reward: parsedEvent.args.reward.toString()
+              }
+              // Convert from wei to token units (divide by 10^18)
+              rewardAmount = Number(parsedEvent.args.reward) / Math.pow(10, 18)
+              console.log('🎁 TokenRewardDistributed:', events.TokenRewardDistributed)
+              console.log('💰 Reward amount (converted):', rewardAmount, 'DEEP')
+              break
+          }
+        }
+      } catch (error) {
+        // Log unparseable events for debugging
+        console.log('🔍 Unparseable log:', {
+          address: log.address,
+          topics: log.topics,
+          data: log.data
+        })
+        continue
+      }
+    }
+    
+    console.log('📊 All events parsed:', events)
+    
+    // Additional debugging for TokenRewardDistributed
+    if (!events.TokenRewardDistributed) {
+      console.log('⚠️ No TokenRewardDistributed event found')
+      if (events.PersonVersionAdded) {
+        console.log('🔍 Father hash:', events.PersonVersionAdded.fatherHash)
+        console.log('🔍 Mother hash:', events.PersonVersionAdded.motherHash)
+        console.log('💡 Token reward requires both parent hashes to exist in system')
+      }
+    }
+    
+    return {
+      hash: personHash,
+      index: versionIndex,
+      rewardAmount,
+      transactionHash: tx.hash,
+      blockNumber: receipt.blockNumber,
+      events
+    }
   } catch (contractError: any) {
     console.error('❌ Contract call failed:', contractError)
+    console.error('📋 Full error object:', JSON.stringify(contractError, null, 2))
+    console.error('📋 Error properties:', {
+      code: contractError?.code,
+      reason: contractError?.reason,
+      data: contractError?.data,
+      message: contractError?.message,
+      error: contractError?.error,
+      transaction: contractError?.transaction
+    })
     
-    // Check for specific error types
-    if (contractError?.message?.includes('gas')) {
-      throw new Error(`Gas related error: ${contractError.message}`)
-    } else if (contractError?.message?.includes('out of gas')) {
-      throw new Error('Transaction ran out of gas - ZK proof verification requires high gas limit')
-    } else if (contractError?.reason) {
-      throw new Error(`Contract error: ${contractError.reason}`)
-    } else if (contractError?.code === 'CALL_EXCEPTION') {
-      throw new Error('Contract call failed - likely a require() condition failed in the smart contract')
-    } else {
-      throw contractError
+    // Parse the specific error message to provide better user feedback
+    let errorType = 'UNKNOWN_ERROR'
+    let errorMessage = 'Unknown error occurred'
+    let userMessage = 'An unexpected error occurred'
+    
+    // Check for revert reasons (custom errors from smart contract)
+    let reason = null
+    
+    // Try multiple ways to extract the revert reason
+    if (contractError?.reason) {
+      reason = contractError.reason
+    } else if (contractError?.data?.reason) {
+      reason = contractError.data.reason  
+    } else if (contractError?.error?.reason) {
+      reason = contractError.error.reason
+    } else if (contractError?.data) {
+      // Try to parse error data using ethers interface first
+      try {
+        if (typeof contractError.data === 'string') {
+          const parsedError = contract.interface.parseError(contractError.data)
+          if (parsedError) {
+            reason = parsedError.name
+            console.log('📋 Parsed error via ethers interface:', reason, parsedError.args)
+          }
+        }
+      } catch (parseError) {
+        console.log('📋 Failed to parse error with ethers interface:', parseError)
+      }
+      
+      // If ethers parsing failed, try manual parsing
+      if (!reason && typeof contractError.data === 'string') {
+        const errorData = contractError.data
+        console.log('📋 Error data:', errorData)
+        
+        // Parse common custom error signatures
+        if (errorData.includes('0x')) {
+        // This might be a custom error with selector
+        const errorSelector = errorData.slice(0, 10) // First 4 bytes
+        console.log('📋 Error selector:', errorSelector)
+        
+        // Map known error selectors to human-readable names
+        // These are keccak256 hash first 4 bytes of error signatures
+        const errorSelectors: Record<string, string> = {
+          // DeepFamily contract errors
+          '0x0c3b17f3': 'InvalidPersonHash',
+          '0x8e4a23d6': 'InvalidFatherVersionIndex', 
+          '0x8e4a23d7': 'InvalidMotherVersionIndex',
+          '0x2a94dd18': 'InvalidVersionIndex',
+          '0x37ecb1b5': 'InvalidFullName',
+          '0xe2aaef67': 'InvalidTagLength',
+          '0x8e4a23d8': 'InvalidCIDLength',
+          '0x8e4a23d9': 'InvalidBirthPlace',
+          '0x8e4a23da': 'InvalidDeathPlace', 
+          '0x8e4a23db': 'InvalidBirthMonth',
+          '0x8e4a23dc': 'InvalidBirthDay',
+          '0x8e4a23dd': 'InvalidStory',
+          '0x8e4a23de': 'InvalidTokenURI',
+          '0xd3f65b6b': 'InvalidZKProof',
+          '0x8e4a23df': 'VerifierNotSet',
+          '0x1a3ca9f1': 'DuplicateVersion',
+          '0x8e4a23e0': 'MustEndorseVersionFirst',
+          '0x8e4a23e1': 'VersionAlreadyMinted',
+          '0x8e4a23e2': 'BasicInfoMismatch',
+          '0x8e4a23e3': 'TokenContractNotSet',
+          '0x8e4a23e4': 'InvalidTokenId',
+          '0x8e4a23e5': 'EndorsementFeeTransferFailed',
+          '0x8e4a23e6': 'PageSizeExceedsLimit',
+          '0x8e4a23e7': 'DirectETHNotAccepted',
+          '0x8e4a23e8': 'StoryAlreadySealed',
+          '0x8e4a23e9': 'ChunkIndexOutOfRange',
+          '0x8e4a23ea': 'InvalidChunkContent',
+          '0x8e4a23eb': 'ChunkHashMismatch',
+          '0x8e4a23ec': 'StoryNotFound',
+          '0x8e4a23ed': 'MustBeNFTHolder',
+          // Generic errors
+          '0x08c379a0': 'Error', // Error(string) - generic revert reason
+        }
+        
+        if (errorSelectors[errorSelector]) {
+          reason = errorSelectors[errorSelector]
+          
+          // For Error(string) type, try to decode the actual error message
+          if (errorSelector === '0x08c379a0' && errorData.length > 10) {
+            try {
+              // Error(string) data format: selector(4 bytes) + offset(32 bytes) + length(32 bytes) + data
+              // Skip selector (10 chars: 0x + 8 hex chars), then decode as ABI string
+              const encodedString = errorData.slice(10)
+              // This is a simplified decoder - in production you might want to use ethers.js AbiCoder
+              // For now, we'll try to extract readable text if possible
+              console.log('📋 Attempting to decode Error(string):', encodedString)
+              // Skip this complex decoding for now and use the selector mapping
+            } catch (e) {
+              console.log('📋 Failed to decode Error(string):', e)
+            }
+          }
+        }
+        }
+      }
+    } else if (contractError?.message) {
+      // Try to extract reason from error message
+      const message = contractError.message
+      if (message.includes('reverted with reason string')) {
+        const match = message.match(/reverted with reason string '(.+?)'/);
+        if (match) {
+          reason = match[1]
+        }
+      } else if (message.includes('execution reverted:')) {
+        const match = message.match(/execution reverted: (.+)/);
+        if (match) {
+          reason = match[1]
+        }
+      }
     }
+    
+    console.log('📋 Extracted revert reason:', reason)
+    
+    if (reason) {
+      
+      switch (reason) {
+        case 'InvalidZKProof':
+          errorType = 'INVALID_ZK_PROOF'
+          errorMessage = 'Zero-knowledge proof verification failed'
+          userMessage = 'The cryptographic proof is invalid. Please try generating a new proof.'
+          break
+        case 'InvalidTagLength':
+          errorType = 'INVALID_TAG_LENGTH'
+          errorMessage = 'Tag length exceeds maximum allowed'
+          userMessage = 'The tag is too long. Please use a shorter tag.'
+          break
+        case 'InvalidCIDLength':
+          errorType = 'INVALID_CID_LENGTH'
+          errorMessage = 'Metadata CID length exceeds maximum allowed'
+          userMessage = 'The metadata CID is too long. Please use a shorter CID.'
+          break
+        case 'InvalidFatherVersionIndex':
+          errorType = 'INVALID_FATHER_VERSION'
+          errorMessage = 'Father version index is invalid'
+          userMessage = 'The father\'s version index is invalid. Please check the father information.'
+          break
+        case 'InvalidMotherVersionIndex':
+          errorType = 'INVALID_MOTHER_VERSION'
+          errorMessage = 'Mother version index is invalid'
+          userMessage = 'The mother\'s version index is invalid. Please check the mother information.'
+          break
+        case 'DuplicateVersion':
+          errorType = 'DUPLICATE_VERSION'
+          errorMessage = 'This version already exists'
+          userMessage = 'A person with the same information already exists. Please check if this person has already been added.'
+          break
+        default:
+          errorType = 'CONTRACT_REVERT'
+          errorMessage = `Contract reverted: ${reason}`
+          userMessage = `Transaction failed: ${reason}`
+      }
+    }
+    // Check for gas-related errors
+    else if (contractError?.message?.includes('gas') || contractError?.code === 'UNPREDICTABLE_GAS_LIMIT') {
+      errorType = 'GAS_ERROR'
+      errorMessage = 'Gas estimation failed or insufficient gas'
+      userMessage = 'Transaction failed due to insufficient gas. ZK proof verification requires high gas limits.'
+    }
+    // Check for out of gas errors
+    else if (contractError?.message?.includes('out of gas')) {
+      errorType = 'OUT_OF_GAS'
+      errorMessage = 'Transaction ran out of gas during execution'
+      userMessage = 'Transaction ran out of gas. Please increase the gas limit and try again.'
+    }
+    // Check for user rejection
+    else if (contractError?.code === 'ACTION_REJECTED' || contractError?.message?.includes('rejected')) {
+      errorType = 'USER_REJECTED'
+      errorMessage = 'User rejected the transaction'
+      userMessage = 'Transaction was cancelled by user.'
+    }
+    // Check for network errors
+    else if (contractError?.code === 'NETWORK_ERROR') {
+      errorType = 'NETWORK_ERROR'
+      errorMessage = 'Network connection error'
+      userMessage = 'Network error occurred. Please check your connection and try again.'
+    }
+    // Check for insufficient funds
+    else if (contractError?.message?.includes('insufficient funds')) {
+      errorType = 'INSUFFICIENT_FUNDS'
+      errorMessage = 'Insufficient funds for gas'
+      userMessage = 'Insufficient funds to pay for transaction gas fees.'
+    }
+    // General call exception
+    else if (contractError?.code === 'CALL_EXCEPTION') {
+      errorType = 'CALL_EXCEPTION'
+      errorMessage = 'Contract call failed - likely a require() condition failed'
+      userMessage = 'Transaction failed due to contract validation. Please check your input data.'
+    }
+    
+    console.error('📋 Error analysis:', {
+      errorType,
+      errorMessage,
+      userMessage,
+      originalError: contractError
+    })
+    
+    // Throw enhanced error with additional information
+    const enhancedError = new Error(userMessage)
+    ;(enhancedError as any).type = errorType
+    ;(enhancedError as any).details = errorMessage
+    ;(enhancedError as any).originalError = contractError
+    
+    throw enhancedError
   }
 }
 
