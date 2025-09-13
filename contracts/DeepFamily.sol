@@ -633,6 +633,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert InvalidZKProof();
     }
 
+    emit PersonHashZKVerified(_packHashFromTwo128(publicSignals, 0), msg.sender);
+
     // business write (internal should check: personHash uniqueness, parent/mother version index matches hash, optional length limit)
     _addPersonInternal(
       _packHashFromTwo128(publicSignals, 0), // personHash: limbs 0..1
@@ -643,8 +645,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       tag,
       metadataCID
     );
-
-    emit PersonHashZKVerified(_packHashFromTwo128(publicSignals, 0), msg.sender);
   }
 
   /**

@@ -304,6 +304,7 @@
       "birthPlacePlaceholder": "e.g., US-CA-Los Angeles",
       "compute": "Calculate",
       "result": "Result",
+      "hashLabel": "Hash:",
       "description": "Note: Calculation logic is completely consistent with the contract getPersonHash.",
       "bcOptions": {
         "no": "No",

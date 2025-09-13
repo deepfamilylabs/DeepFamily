@@ -237,7 +237,7 @@ export default function ActionsPage() {
           onClose={() => setAddVersionModal({ isOpen: false })}
           onSuccess={(result) => {
             console.log('Version added:', result)
-            setAddVersionModal({ isOpen: false })
+            // Modal will show success message and user can close manually
           }}
           personHash={addVersionModal.personHash}
           existingPersonData={addVersionModal.existingPersonData}

@@ -48,6 +48,23 @@ export default function AddVersionModal({
   const { contractAddress } = useConfig()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
+  const [successResult, setSuccessResult] = useState<{
+    hash: string
+    index: number
+    rewardAmount: number
+    transactionHash: string
+    blockNumber: number
+    events: {
+      PersonHashZKVerified: any
+      PersonVersionAdded: any
+      TokenRewardDistributed: any
+    }
+  } | null>(null)
+  const [errorResult, setErrorResult] = useState<{
+    type: string
+    message: string
+    details: string
+  } | null>(null)
   
   // Person hash and info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<{
@@ -176,11 +193,28 @@ export default function AddVersionModal({
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
+    setSuccessResult(null)
+    setErrorResult(null)
     setFatherExpanded(false)
     setMotherExpanded(false)
     setDragging(false)
     setDragOffset(0)
     onClose()
+  }
+
+  const handleContinueAdding = () => {
+    // Reset form and states for new addition
+    reset()
+    setPersonInfo(null)
+    setFatherInfo(null)
+    setMotherInfo(null)
+    setIsSubmitting(false)
+    setProofGenerationStep('')
+    setSuccessResult(null)
+    setErrorResult(null)
+    setFatherExpanded(false)
+    setMotherExpanded(false)
+    // Keep modal open for continued use
   }
 
 
@@ -200,6 +234,10 @@ export default function AddVersionModal({
       return
     }
 
+    // Clear old prompt information
+    setSuccessResult(null)
+    setErrorResult(null)
+    
     setIsSubmitting(true)
     setProofGenerationStep(t('addVersion.preparingData', 'Preparing data...'))
 
@@ -252,27 +290,30 @@ export default function AddVersionModal({
       )
 
       if (result) {
-        console.log('🎉 Person added successfully:', result.hash)
+        console.log('🎉 Person added successfully:', result)
+        setSuccessResult({
+          hash: result.hash,
+          index: result.index,
+          rewardAmount: result.rewardAmount,
+          transactionHash: result.transactionHash,
+          blockNumber: result.blockNumber,
+          events: result.events
+        })
+        setProofGenerationStep('')
         onSuccess?.(result)
-        handleClose()
       }
     } catch (error: any) {
       console.error('❌ Add version failed:', error)
       
-      let errorMessage = t('addVersion.submitFailed', 'Failed to add version')
-      
-      if (error.message?.includes('proof')) {
-        errorMessage = t('addVersion.proofGenerationFailed', 'Failed to generate or verify proof')
-      } else if (error.message?.includes('transaction')) {
-        errorMessage = t('addVersion.transactionFailed', 'Blockchain transaction failed')
-      } else if (error.message?.includes('wallet')) {
-        errorMessage = t('addVersion.walletError', 'Wallet connection error')
-      }
-      
-      alert(`${errorMessage}: ${error.message}`)
+      // Set error result for display in UI
+      setErrorResult({
+        type: error.type || 'UNKNOWN_ERROR',
+        message: error.message || 'An unexpected error occurred',
+        details: error.details || error.message || 'Unknown error'
+      })
+      setProofGenerationStep('')
     } finally {
       setIsSubmitting(false)
-      setProofGenerationStep('')
     }
   }
 
@@ -300,13 +341,13 @@ export default function AddVersionModal({
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
-          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} select-none will-change-transform`}
+          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} will-change-transform`}
           onClick={(e) => e.stopPropagation()}
           style={{ transform: dragging ? `translateY(${dragOffset}px)` : undefined, transitionDuration: dragging ? '0ms' : undefined }}
         >
         {/* Header */}
         <div 
-          className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-4 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing"
+          className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-4 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
           onPointerDown={(e) => { (e.currentTarget as any).setPointerCapture?.(e.pointerId); startYRef.current = e.clientY; setDragging(true) }}
           onPointerMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.clientY - startYRef.current); setDragOffset(dy) }}
           onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
@@ -526,7 +567,7 @@ export default function AddVersionModal({
           </div>
           
           {/* Progress Indicator */}
-          {isSubmitting && proofGenerationStep && (
+          {isSubmitting && proofGenerationStep && !successResult && !errorResult && (
             <div className="mx-4 sm:mx-6 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
@@ -547,27 +588,368 @@ export default function AddVersionModal({
             </div>
           )}
 
+          {/* Success Message */}
+          {successResult && (
+            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
+              {/* Main Success Message */}
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div className="flex items-center gap-3 mb-3">
+                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                    {t('addVersion.addedSuccessfully', 'Person added successfully!')}
+                  </p>
+                </div>
+                
+                <div className="space-y-2 text-xs text-green-700 dark:text-green-300">
+                  {/* Person Hash */}
+                  <div>
+                    <span className="font-medium">{t('addVersion.personHash', 'Person Hash')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.hash}
+                    </code>
+                  </div>
+                  
+                  {/* Version Index */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('addVersion.versionIndex', 'Version Index')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.index}
+                    </code>
+                  </div>
+                  
+                  {/* Transaction Hash */}
+                  <div>
+                    <span className="font-medium">{t('addVersion.transactionHash', 'Transaction Hash')}:</span>
+                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
+                      {successResult.transactionHash}
+                    </code>
+                  </div>
+                  
+                  {/* Block Number */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{t('addVersion.blockNumber', 'Block Number')}:</span>
+                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
+                      {successResult.blockNumber}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
+              {/* Events Information */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {t('addVersion.eventsTriggered', 'Events Triggered')}:
+                </h4>
+                
+                {/* ZK Proof Verified */}
+                {successResult.events.PersonHashZKVerified && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                      <span className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                        {t('addVersion.zkProofVerified', 'ZK Proof Verified')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                      {t('addVersion.zkProofVerifiedDesc', 'Zero-knowledge proof was successfully verified on-chain')}
+                    </p>
+                    
+                    {/* Complete Event Details */}
+                    <div className="space-y-2 text-xs">
+                      {/* Person Hash */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-blue-800 dark:text-blue-200">
+                          {t('addVersion.hashPrefix', 'Hash')}:
+                        </span>
+                        <code className="col-span-2 bg-blue-100 dark:bg-blue-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.PersonHashZKVerified.personHash}
+                        </code>
+                      </div>
+                      
+                      {/* Prover */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-blue-800 dark:text-blue-200">
+                          {t('addVersion.prover', 'Prover')}:
+                        </span>
+                        <code className="col-span-2 bg-blue-100 dark:bg-blue-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.PersonHashZKVerified.prover}
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Version Added */}
+                {successResult.events.PersonVersionAdded && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                      <span className="text-xs font-medium text-green-900 dark:text-green-100">
+                        {t('addVersion.versionAdded', 'Person Version Added')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300 mb-3">
+                      {t('addVersion.versionAddedDesc', 'Person version was successfully added to the family tree')}
+                    </p>
+                    
+                    {/* Complete Event Details */}
+                    <div className="space-y-2 text-xs">
+                      {/* Person Hash */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('addVersion.hashPrefix', 'Hash')}:
+                        </span>
+                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.PersonVersionAdded.personHash}
+                        </code>
+                      </div>
+                      
+                      {/* Version Index */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('addVersion.versionIndex', 'Version Index')}:
+                        </span>
+                        <code className="bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                          {successResult.events.PersonVersionAdded.versionIndex}
+                        </code>
+                      </div>
+                      
+                      {/* Added By */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('addVersion.addedBy', 'Added By')}:
+                        </span>
+                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.PersonVersionAdded.addedBy}
+                        </code>
+                      </div>
+                      
+                      {/* Timestamp */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          {t('addVersion.timestamp', 'Timestamp')}:
+                        </span>
+                        <span className="col-span-2 text-green-700 dark:text-green-300">
+                          {new Date(successResult.events.PersonVersionAdded.timestamp * 1000).toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      {/* Father Info */}
+                      {successResult.events.PersonVersionAdded.fatherHash && successResult.events.PersonVersionAdded.fatherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                        <>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="font-medium text-green-800 dark:text-green-200">
+                              {t('addVersion.fatherHash', 'Father Hash')}:
+                            </span>
+                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                              {successResult.events.PersonVersionAdded.fatherHash}
+                            </code>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="font-medium text-green-800 dark:text-green-200">
+                              {t('addVersion.fatherVersionIndex', 'Father Version')}:
+                            </span>
+                            <code className="bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                              {successResult.events.PersonVersionAdded.fatherVersionIndex}
+                            </code>
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Mother Info */}
+                      {successResult.events.PersonVersionAdded.motherHash && successResult.events.PersonVersionAdded.motherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                        <>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="font-medium text-green-800 dark:text-green-200">
+                              {t('addVersion.motherHash', 'Mother Hash')}:
+                            </span>
+                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                              {successResult.events.PersonVersionAdded.motherHash}
+                            </code>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="font-medium text-green-800 dark:text-green-200">
+                              {t('addVersion.motherVersionIndex', 'Mother Version')}:
+                            </span>
+                            <code className="bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                              {successResult.events.PersonVersionAdded.motherVersionIndex}
+                            </code>
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Tag */}
+                      {successResult.events.PersonVersionAdded.tag && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {t('addVersion.tag', 'Tag')}:
+                          </span>
+                          <span className="col-span-2 text-green-700 dark:text-green-300">
+                            "{successResult.events.PersonVersionAdded.tag}"
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Token Reward */}
+                {successResult.events.TokenRewardDistributed ? (
+                  <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
+                      <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">
+                        {t('addVersion.tokenReward', 'Token Reward Distributed')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
+                      {t('addVersion.familyComplete', 'Complete family data bonus - both parents exist in the system')}
+                    </p>
+                    
+                    {/* Complete Event Details */}
+                    <div className="space-y-2 text-xs">
+                      {/* Miner (Recipient) */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                          {t('addVersion.miner', 'Miner')}:
+                        </span>
+                        <code className="col-span-2 bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.TokenRewardDistributed.miner}
+                        </code>
+                      </div>
+                      
+                      {/* Person Hash */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                          {t('addVersion.hashPrefix', 'Hash')}:
+                        </span>
+                        <code className="col-span-2 bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                          {successResult.events.TokenRewardDistributed.personHash}
+                        </code>
+                      </div>
+                      
+                      {/* Version Index */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                          {t('addVersion.versionIndex', 'Version Index')}:
+                        </span>
+                        <code className="bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                          {successResult.events.TokenRewardDistributed.versionIndex}
+                        </code>
+                      </div>
+                      
+                      {/* Reward Amount */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                          {t('addVersion.rewardAmount', 'Reward Amount')}:
+                        </span>
+                        <span className="col-span-2 text-yellow-700 dark:text-yellow-300 font-mono">
+                          {(Number(successResult.events.TokenRewardDistributed.reward) / Math.pow(10, 18)).toLocaleString()} DEEP
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Show explanation when no token reward was distributed
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {t('addVersion.noTokenReward', 'No Token Reward')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {t('addVersion.tokenRewardCondition', 'Token rewards are only distributed when both parents already exist in the system')}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      {t('addVersion.tokenRewardTip', 'Add the parents first to earn DEEP token rewards for complete family data')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {errorResult && (
+            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                    {t('addVersion.failed', 'Transaction Failed')}
+                  </p>
+                  <div className="space-y-2 text-xs text-red-700 dark:text-red-300">
+                    <div>
+                      <span className="font-medium">{t('addVersion.errorType', 'Error Type')}:</span>
+                      <code className="ml-2 bg-red-100 dark:bg-red-800 px-1.5 py-0.5 rounded">
+                        {errorResult.type}
+                      </code>
+                    </div>
+                    <div>
+                      <span className="font-medium">{t('addVersion.errorMessage', 'Message')}:</span>
+                      <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded">
+                        {errorResult.message}
+                      </p>
+                    </div>
+                    {errorResult.details !== errorResult.message && (
+                      <div>
+                        <span className="font-medium">{t('addVersion.errorDetails', 'Details')}:</span>
+                        <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded text-xs">
+                          {errorResult.details}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
             </div>
 
             {/* Submit Buttons */}
             <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
-              >
-                {t('common.cancel', 'Cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting || !personInfo?.fullName.trim()}
-                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                {isSubmitting ? 
-                  t('addVersion.processing', 'Processing...') :
-                  t('addVersion.submit', 'Add Version')
-                }
-              </button>
+              {successResult ? (
+                // Success state: Show Continue Adding and Close buttons
+                <>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    {t('common.close', 'Close')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinueAdding}
+                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    {t('addVersion.continueAdding', 'Continue Adding')}
+                  </button>
+                </>
+              ) : (
+                // Normal state: Show Cancel and Submit buttons
+                <>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    {t('common.cancel', 'Cancel')}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !personInfo?.fullName.trim()}
+                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    {isSubmitting ? 
+                      t('addVersion.processing', 'Processing...') :
+                      t('addVersion.submit', 'Add Version')
+                    }
+                  </button>
+                </>
+              )}
             </div>
           </form>
         </div>
