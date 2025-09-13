@@ -103,6 +103,11 @@ export default function AddVersionModal({
   // Parent info collapse states
   const [fatherExpanded, setFatherExpanded] = useState(false)
   const [motherExpanded, setMotherExpanded] = useState(false)
+  // Track history push/pop to close on mobile back like NodeDetailModal
+  const pushedRef = useRef(false)
+  const closedBySelfRef = useRef(false)
+  const closedByPopRef = useRef(false)
+  const historyMarkerRef = useRef<{ __dfModal: string; id: string } | null>(null)
 
   // Desktop/mobile detection
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
@@ -187,6 +192,7 @@ export default function AddVersionModal({
   }, [personHash, existingPersonData])
 
   const handleClose = () => {
+    closedBySelfRef.current = true
     reset()
     setPersonInfo(null)
     setFatherInfo(null)
@@ -201,6 +207,43 @@ export default function AddVersionModal({
     setDragOffset(0)
     onClose()
   }
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen])
+
+  // Push history state on open so mobile back closes the modal first
+  useEffect(() => {
+    if (!isOpen) return
+    const marker = { __dfModal: 'AddVersionModal', id: Math.random().toString(36).slice(2) }
+    historyMarkerRef.current = marker
+    try {
+      window.history.pushState(marker, '')
+      pushedRef.current = true
+    } catch {}
+    const onPop = () => {
+      const st: any = window.history.state
+      if (!st || st.id !== historyMarkerRef.current?.id) {
+        closedByPopRef.current = true
+        onClose()
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (pushedRef.current && closedBySelfRef.current && !closedByPopRef.current) {
+        try { window.history.back() } catch {}
+      }
+      pushedRef.current = false
+      closedBySelfRef.current = false
+      closedByPopRef.current = false
+      historyMarkerRef.current = null
+    }
+  }, [isOpen, onClose])
 
   const handleContinueAdding = () => {
     // Reset form and states for new addition

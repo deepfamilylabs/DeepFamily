@@ -727,7 +727,37 @@
     "endorse": "Endorse",
     "invalidTarget": "Invalid person hash or version index",
     "invalidTargetDesc": "Please verify the hash and index refer to an existing version",
-    "needApprove": "Allowance too low, please approve DEEP tokens again"
+    "needApprove": "Allowance too low, please approve DEEP tokens again",
+    "personHashRequired": "Please provide valid person hash and version index",
+    "insufficientDeepTokens": "Insufficient DEEP tokens for endorsement",
+    "endorsedSuccessfully": "Version endorsed successfully!",
+    "feePaid": "Fee Paid",
+    "transactionHash": "Transaction Hash",
+    "blockNumber": "Block Number",
+    "eventDetails": "Event Details",
+    "versionEndorsedEvent": "PersonVersionEndorsed Event",
+    "versionEndorsedEventDesc": "Endorsement was successfully recorded on-chain",
+    "endorser": "Endorser",
+    "feeAmount": "Fee Amount",
+    "timestamp": "Timestamp",
+    "endorseFailed": "Endorsement Failed",
+    "errorType": "Error Type",
+    "errorMessage": "Message",
+    "errorDetails": "Details",
+    "continueEndorsing": "Continue Endorsing",
+    "canContinueEndorsing": "You can now continue to endorse other versions or close this dialog.",
+    "transactionFailed": "Transaction failed. Please check the error message and try again.",
+    "transactionFailedDetails": "The transaction was submitted but failed to complete successfully.",
+    "approvingDesc": "Please confirm the token approval in your wallet",
+    "endorsingDesc": "Processing endorsement on the blockchain...",
+    "errors": {
+      "invalidTarget": "Invalid person hash or version index",
+      "needApprove": "Allowance too low, please approve DEEP tokens again",
+      "insufficientDeepTokens": "Insufficient DEEP tokens for endorsement",
+      "feeTransferFailed": "Failed to transfer endorsement fee",
+      "insufficientFunds": "Insufficient funds for transaction",
+      "userRejected": "Transaction was rejected by user"
+    }
   },
   "mintNFT": {
     "title": "Mint NFT",
@@ -764,6 +794,31 @@
     "endorsementRequiredDesc": "You must endorse this version before minting. Would you like to go endorse now?",
     "personInfoRequired": "Please fill in person information",
     "personHashRequired": "Unable to compute person hash",
-    "mintFailed": "Failed to mint NFT"
+    "mintFailed": "Failed to mint NFT",
+    "mintedSuccessfully": "NFT minted successfully!",
+    "tokenId": "Token ID",
+    "owner": "Owner",
+    "mintingDesc": "Creating your unique NFT on the blockchain...",
+    "nftMintedEvent": "PersonNFTMinted Event",
+    "nftMintedEventDesc": "NFT was successfully minted and recorded on-chain",
+    "continueMinting": "Continue Minting",
+    "errorType": "Error Type",
+    "errorMessage": "Message",
+    "errorDetails": "Details",
+    "errors": {
+      "versionAlreadyMinted": "This version has already been minted as NFT",
+      "mustEndorseFirst": "You must endorse this version before minting",
+      "basicInfoMismatch": "Person information does not match the version data",
+      "invalidTokenURI": "Invalid token URI format",
+      "invalidStory": "Story content is too long",
+      "invalidBirthPlace": "Birth place is too long",
+      "invalidDeathPlace": "Death place is too long",
+      "insufficientFunds": "Insufficient funds for transaction",
+      "userRejected": "Transaction was rejected by user"
+    }
+  },
+  "contract": {
+    "endorseSuccess": "endorse success",
+    "endorseFailed": "endorse failed"
   }
 }
