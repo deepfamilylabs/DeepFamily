@@ -69,20 +69,20 @@ export default function ActionsPage() {
       color: 'blue'
     },
     {
-      id: 'mint-nft' as ActionTab,
-      name: t('actions.mint', 'Mint'),
-      subtitle: t('actions.mintNFT', 'Mint NFT'),
-      icon: Image,
-      description: t('actions.mintNFTDesc', 'Convert endorsed person data into valuable NFT collectibles'),
-      color: 'purple'
-    },
-    {
       id: 'endorse' as ActionTab,
       name: t('actions.endorse', 'Endorse'),
       subtitle: t('actions.endorsement', 'Endorsement'),
       icon: Star,
       description: t('actions.endorseDesc', 'Support quality data by endorsing versions with DEEP tokens'),
       color: 'green'
+    },
+    {
+      id: 'mint-nft' as ActionTab,
+      name: t('actions.mint', 'Mint'),
+      subtitle: t('actions.mintNFT', 'Mint NFT'),
+      icon: Image,
+      description: t('actions.mintNFTDesc', 'Convert endorsed person data into valuable NFT collectibles'),
+      color: 'purple'
     }
   ]
 

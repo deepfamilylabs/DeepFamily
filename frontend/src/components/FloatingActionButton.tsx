@@ -28,20 +28,20 @@ export default function FloatingActionButton({ className = '' }: FloatingActionB
       tab: 'add-version'
     },
     {
-      id: 'mint-nft',
-      label: t('actions.mintNFT', 'Mint NFT'),
-      icon: Image,
-      color: 'bg-purple-600 hover:bg-purple-700',
-      textColor: 'text-purple-700 dark:text-purple-300',
-      tab: 'mint-nft'
-    },
-    {
       id: 'endorse',
       label: t('actions.endorsement', 'Endorsement'),
       icon: Star,
       color: 'bg-green-600 hover:bg-green-700',
       textColor: 'text-green-700 dark:text-green-300',
       tab: 'endorse'
+    },
+    {
+      id: 'mint-nft',
+      label: t('actions.mintNFT', 'Mint NFT'),
+      icon: Image,
+      color: 'bg-purple-600 hover:bg-purple-700',
+      textColor: 'text-purple-700 dark:text-purple-300',
+      tab: 'mint-nft'
     }
   ]
 
