@@ -418,7 +418,7 @@ export default function AddVersionModal({
             <button
               type="button"
               onClick={() => setFatherExpanded(!fatherExpanded)}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-green-600" />
@@ -440,7 +440,7 @@ export default function AddVersionModal({
             </button>
 
             {fatherExpanded && (
-              <div className="p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
+              <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
                 <PersonHashCalculator
                   showTitle={false}
                   collapsible={false}
@@ -466,7 +466,7 @@ export default function AddVersionModal({
                     type="number"
                     min="0"
                     {...register('fatherVersionIndex', { valueAsNumber: true })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                     placeholder="1"
                   />
                 </div>
@@ -479,7 +479,7 @@ export default function AddVersionModal({
             <button
               type="button"
               onClick={() => setMotherExpanded(!motherExpanded)}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-pink-600" />
@@ -501,7 +501,7 @@ export default function AddVersionModal({
             </button>
 
             {motherExpanded && (
-              <div className="p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
+              <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
                 <PersonHashCalculator
                   showTitle={false}
                   collapsible={false}
@@ -527,7 +527,7 @@ export default function AddVersionModal({
                     type="number"
                     min="0"
                     {...register('motherVersionIndex', { valueAsNumber: true })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                     placeholder="1"
                   />
                 </div>
@@ -548,7 +548,7 @@ export default function AddVersionModal({
                 </label>
                 <input
                   {...register('tag')}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                   placeholder={t('addVersion.tagPlaceholder', 'Optional tag')}
                 />
               </div>
@@ -559,7 +559,7 @@ export default function AddVersionModal({
                 </label>
                 <input
                   {...register('metadataCID')}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                   placeholder="QmXXX..."
                 />
               </div>

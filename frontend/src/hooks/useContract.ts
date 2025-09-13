@@ -44,9 +44,8 @@ export function useContract() {
       const tx = await contractMethod()
       
       toast.show(t('transaction.submitted', 'Transaction submitted...'))
-      
       const receipt = await tx.wait()
-      
+
       const successMsg = options.successMessage || t('transaction.success', 'Transaction successful')
       toast.show(successMsg)
       
@@ -58,15 +57,30 @@ export function useContract() {
       let errorMsg = options.errorMessage || t('transaction.failed', 'Transaction failed')
       
       // Parse specific error messages
-      if (error.reason) {
-        errorMsg = error.reason
-      } else if (error.data?.message) {
-        errorMsg = error.data.message
-      } else if (error.message) {
-        if (error.message.includes('user rejected')) {
+      const nestedMsg = error?.shortMessage || error?.info?.error?.message || error?.data?.message || error?.error?.message
+      const errorName = error?.errorName || error?.info?.error?.name
+      const baseMsg = error?.message || ''
+      if (errorName) {
+        // Map known custom errors to friendly text
+        const name = String(errorName)
+        if (/InvalidPersonHash|InvalidVersionIndex/.test(name)) {
+          errorMsg = t('endorse.invalidTarget', 'Invalid person hash or version index')
+        } else if (/EndorsementFeeTransferFailed|ERC20InsufficientAllowance/.test(name)) {
+          errorMsg = t('endorse.needApprove', 'Allowance too low, please approve DEEP tokens again')
+        } else if (/ERC20InsufficientBalance/.test(name)) {
+          errorMsg = t('endorse.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement')
+        } else {
+          errorMsg = name
+        }
+      } else if (nestedMsg) {
+        errorMsg = nestedMsg
+      } else if (baseMsg) {
+        if (baseMsg.includes('user rejected') || baseMsg.includes('ACTION_REJECTED')) {
           errorMsg = t('transaction.rejected', 'Transaction rejected by user')
-        } else if (error.message.includes('insufficient funds')) {
+        } else if (baseMsg.includes('insufficient funds')) {
           errorMsg = t('transaction.insufficientFunds', 'Insufficient funds')
+        } else {
+          errorMsg = baseMsg
         }
       }
       
@@ -102,17 +116,24 @@ export function useContract() {
     versionIndex: number,
     tokenURI: string,
     coreInfo: {
-      gender: number
-      birthYear: number
-      birthMonth: number
-      birthDay: number
-      birthPlace: string
-      isBirthBC: boolean
-      deathYear: number
-      deathMonth: number
-      deathDay: number
-      deathPlace: string
-      isDeathBC: boolean
+      basicInfo: {
+        fullNameHash: string
+        isBirthBC: boolean
+        birthYear: number
+        birthMonth: number
+        birthDay: number
+        gender: number
+      }
+      supplementInfo: {
+        fullName: string
+        birthPlace: string
+        isDeathBC: boolean
+        deathYear: number
+        deathMonth: number
+        deathDay: number
+        deathPlace: string
+        story: string
+      }
     }
   ) => {
     return executeTransaction(
@@ -126,10 +147,11 @@ export function useContract() {
 
   const endorseVersion = useCallback(async (
     personHash: string,
-    versionIndex: number
+    versionIndex: number,
+    overrides?: any
   ) => {
     return executeTransaction(
-      () => contract!.endorseVersion(personHash, versionIndex),
+      () => contract!.endorseVersion(personHash, versionIndex, overrides ?? {}),
       {
         successMessage: t('contract.endorseSuccess', 'Endorsement submitted successfully'),
         errorMessage: t('contract.endorseFailed', 'Failed to endorse version')
