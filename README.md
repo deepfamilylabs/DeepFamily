@@ -1,155 +1,218 @@
 # DeepFamily - Decentralized Global On-Chain Family Tree Protocol
 
-<div a### 🏢 Repository Structure
-```
-DeepFamily/
-├── contracts/        # Smart contracts
-├── frontend/         # React dApp
-├── test/             # Hardhat tests
-├── tasks/            # Custom Hardhat tasks
-├── deploy/           # Deployment scripts
-├── scripts/          # Utility scripts (e.g. seeding)
-├── docs/             # Additional documentation
-└── hardhat.config.js # Hardhat config
-```>
+<div align="center">
 
 ![DeepFamily Logo](https://img.shields.io/badge/DeepFamily-v1.0.0-blue?style=for-the-badge&logo=ethereum)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-red?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
+[![Node](https://img.shields.io/badge/Node.js-18+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
-**A decentralized global family history infrastructure for all humanity**
+**A blockchain-based decentralized global digital genealogy protocol**
+*Leveraging NFTs, ERC20 tokenomics, and community governance for collaborative family history*
 
-[🚀 Quick Start](#-quick-start) • [📖 Docs](#-core-docs) • [🎯 Features](#-core-features) • [🔧 Deployment](#-deployment-guide) • [🤝 Contributing](#-contributing)
+[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Core Features](#-core-features) • [🏗️ Architecture](#️-architecture) • [🚀 Deployment](#-deployment) • [🤝 Contributing](#-contributing)
 
 </div>
 
 ---
 
-## 🌟 Vision
+## 🌟 Vision & Mission
 
-DeepFamily aims to build a universally shared decentralized genealogical infrastructure. Using blockchain we achieve permanence, privacy protection and community governance so every family story becomes part of humanity’s digital heritage.
+DeepFamily creates the world's first decentralized genealogy infrastructure, combining blockchain immutability with privacy-preserving technology to build a collaborative, verifiable, and perpetual family history recording system.
 
-### 🎯 Core Mission
-- 🔒 **Privacy First**: Zero-knowledge proofs protect sensitive info *(current on-chain contract exposes an interface placeholder; full verifier integration WIP)*
-- 🌍 **Global Sharing**: Remove geographic barriers and connect families worldwide
-- 💎 **Permanent Storage**: Blockchain guarantees data immutability
-- 💰 **Economic Incentives**: DEEP token rewards for quality data contribution
+### 🎯 Core Principles
+- 🔐 **Privacy-Preserving**: Dual-layer architecture with hash-based storage and zero-knowledge proofs
+- 🌍 **Globally Accessible**: Borderless family connections powered by blockchain technology
+- 💎 **Immutable Heritage**: Permanent on-chain storage ensures data preservation across generations
+- 💰 **Incentivized Participation**: DEEP token rewards encourage quality contributions and family completeness
+- 🤝 **Community-Driven**: Endorsement-based governance validates information quality and builds trust
+- 🏗️ **Scalable Design**: Multi-version data model supports diverse cultural genealogy traditions
 
 ## 🎯 Core Features
 
-### 🔐 Privacy-Preserving Genealogy
-- **ZK Proofs **: `IPersonHashVerifier` interface integrated; production verifier & circuits under development
-- **Hash Storage**: Only hashes on-chain; raw data stays private off-chain
+### 🔐 Privacy & Security
+- **Zero-Knowledge Proofs**: Groth16-based privacy-preserving data submission via `IPersonHashVerifier` interface
+- **Hash-Only Storage**: Personal data stored as keccak256 hashes on-chain, with raw PII kept off-chain
+- **Multi-Version Support**: Each person can have multiple verified versions with parent relationship tracking
+- **Comprehensive Security**: 50+ custom errors, reentrancy protection, and access control mechanisms
 
-### 🎨 Person NFTs
-- **Single Mint**: Each version can mint exactly one NFT
-- **On-Chain Core Data**: Name, birth/death years & limited biography metadata
-- **Story Shards**: Up to 100 × 1KB chunks (contract enforced: `MAX_STORY_CHUNKS=100`, `MAX_CHUNK_CONTENT_LENGTH=1000`)
-- **Value Accrual**: More endorsements → higher perceived value / fee flow
+### 🎨 NFT Ecosystem
+- **Unique NFTs**: Each person version can mint exactly one ERC721 token with on-chain core metadata
+- **Story Sharding**: Biographical data stored in up to 100 shards × 1KB each with immutable sealing
+- **Value Recognition**: Endorsement-driven value accrual and fee distribution system
+- **Rich Metadata**: On-chain name, birth/death years, and story hash with off-chain detailed content
 
-### 💰 DEEP Token Mining
-- **Conditional Rewards**: Only when both parents exist at addition
-- **Progressive Halving**: Custom variable-length cycles (1,10,100,1k,10k,100k,1M,10M,100M then fixed 100M) with binary halving per cycle
-- **Initial Reward**: 113,777 DEEP (constant `INITIAL_REWARD`)
-- **Minimum Reward Cutoff**: Stops when halved reward < 0.1 DEEP (`MIN_REWARD`)
-- **Target Supply**: Capped at 100B (`MAX_SUPPLY`)
+### 💰 DEEP Token Economics
+- **Smart Mining**: Rewards only granted when both parent relationships exist (complete family data)
+- **Progressive Halving**: Advanced tokenomics with variable-length cycles and binary halving
+  - Initial: 113,777 DEEP → Final: 0.1 DEEP minimum
+  - Cycles: 1→10→100→1k→10k→100k→1M→10M→100M→fixed 100M
+- **Capped Supply**: Maximum 100 billion DEEP tokens
+- **Mining Incentives**: Encourages family tree completeness over isolated entries
 
-### 🤝 Staked Endorsement System
-- **Stake to Endorse**: Pay current mining reward (`recentReward`) to endorse a version
-- **Incentive Shift**: Before NFT minted → 100% fee goes to version creator; After NFT minted → 100% goes to current NFT holder (transfers follow ownership)
-- **Reputation Signal**: Endorse count surfaces socially trusted version
+### 🤝 Community Governance
+- **Staked Endorsements**: Pay current mining reward to endorse trusted versions
+- **Dynamic Fee Distribution**:
+  - Pre-NFT: 100% to version creator
+  - Post-NFT: 100% to current NFT holder
+- **Quality Signaling**: Community endorsement count indicates version trustworthiness
+- **Reputation System**: Build trust through verified contributions and endorsements
 
-### 🗳️ Multi-Version Governance
-- **Version Coexistence**: Already supported on-chain
-
-### 📊 High-Performance FamilyTree (Frontend WIP)
-- Planned: Tree / force-directed / table views (D3)
+### 📊 Advanced Data Management
+- **Name Indexing**: Hash-based reverse lookup for efficient person discovery
+- **Paginated Queries**: Gas-optimized queries with 100-record limits
+- **Composite APIs**: Single-call functions return complete relationship data
+- **Version Control**: Full history preservation with immutable parent references
 
 ## 🏗️ Architecture
 
-### 📱 Stack Overview
-- **Contracts**: Solidity 0.8.20 (Hardhat + hardhat-deploy)
-- **Token**: ERC20 `DeepFamilyToken` (symbol `DEEP`)
-- **NFT**: ERC721Enumerable (symbol `Family`)
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind + Ethers v6
+### 🔄 Dual-Layer Design
 
-### ⛓️ Contracts
+The system implements a sophisticated dual-layer architecture that balances privacy protection with value creation:
+
+#### **Layer 1: Privacy Protection (Hash-Based Relationships)**
+- **Hash Storage**: Only keccak256 hashes of personal information stored on-chain
+- **Relationship Networks**: Build genealogical connections through `personHash`, `fatherHash`, `motherHash`
+- **Low-Barrier Entry**: Safe participation without privacy risks
+- **Token Incentives**: DEEP rewards for complete family data contributions
+
+#### **Layer 2: Value Confirmation (NFT Assets)**
+- **Selective Disclosure**: Community-endorsed information can be minted as NFTs
+- **Value Solidification**: NFTs represent recognition of high-quality, verified data
+- **Progressive Evolution**: Natural progression from private data → community validation → asset creation
+
+### 📱 Technology Stack
+- **Smart Contracts**: Solidity ^0.8.20, Hardhat, hardhat-deploy
+- **Blockchain Layer**: ERC20 (DEEP token) + ERC721Enumerable (Family NFTs)
+- **Frontend**: React 18 + TypeScript + Vite + TailwindCSS + D3.js
+- **Development**: Ethers v6, Hardhat testing, OpenZeppelin security primitives
+- **Privacy**: Zero-knowledge proofs (Groth16), hash-based identity protection
+
+### ⛓️ Smart Contract System
+
 ```
-DeepFamily Contract System
-├── 📄 DeepFamily.sol          # Core genealogy + endorsements + NFT mint gate + sharded stories
-├── 🪙 DeepFamilyToken.sol     # DEEP ERC20 mining reward token
-└── 🔐 IPersonHashVerifier     # ZK verifier interface (implementation pending)
+DeepFamily Contract Ecosystem
+├── 📄 DeepFamily.sol 
+│   ├── Multi-version person data management
+│   ├── Community endorsement & fee distribution
+│   ├── NFT minting with on-chain metadata
+│   ├── Story sharding system (100×1KB chunks)
+│   ├── Mining rewards for complete families
+│   └── Paginated queries & gas optimization
+│
+├── 🪙 DeepFamilyToken.sol
+│   ├── ERC20 with progressive halving
+│   ├── 100 billion supply cap, 10 halving cycles
+│   └── Authorized minting by DeepFamily contract only
+│
+└── 🔐 PersonHashVerifier.sol
+    ├── Groth16 zero-knowledge proof verification
+    ├── 7-limb hash validation for privacy
+    └── Integration ready for production ZK circuits
 ```
 
-### 🏢 Repository Structure
+### 🏗️ Project Structure
 ```
 DeepFamily/
-├── contracts/        # Smart contracts
-├── frontend/         # React dApp
-├── test/             # Hardhat tests
-├── tasks/            # Custom Hardhat tasks
-├── deploy/           # Deployment scripts
-├── scripts/          # Utility scripts (e.g. seeding)
-├── docs/             # Additional documentation
-└── hardhat.config.js # Hardhat config
+├── contracts/              # Smart Contracts (Solidity)
+│   ├── DeepFamily.sol         # Main genealogy contract
+│   ├── DeepFamilyToken.sol    # DEEP ERC20 token
+│   └── PersonHashVerifier.sol # ZK proof verifier
+├── frontend/               # React dApp
+│   ├── src/
+│   │   ├── components/        # UI components (33 files)
+│   │   │   ├── FlexibleDAGView.tsx    # Flexible family tree
+│   │   │   ├── ForceDAGView.tsx       # Force-directed tree
+│   │   │   ├── NodeDetailModal.tsx    # Person details
+│   │   │   └── ...
+│   │   ├── pages/            # Application routes (9 pages)
+│   │   ├── hooks/            # React hooks (8 hooks)
+│   │   ├── context/          # State management (7 contexts)
+│   │   ├── abi/              # Contract ABIs
+│   │   └── utils/            # Helper utilities
+├── test/                   # Hardhat Tests (8 test suites)
+├── tasks/                  # Hardhat Tasks (16 custom tasks)
+├── deploy/                 # Deployment Scripts
+├── scripts/                # Utility Scripts
+│   ├── seed-demo.js          # Demo data seeding
+│   └── check-root.js         # Root node validation
+├── docs/                   # Documentation (7 guides)
+└── circuits/               # ZK Circuit Development
 ```
 
 ## 🚀 Quick Start
 
 ### 📋 Prerequisites
-- **Node.js** >= 18 (aligns with `package.json engines`)
-- **npm** (or yarn/pnpm)
-- **Git**
+- **Node.js** >= 18.0.0 (required by package.json engines)
+- **npm** or **yarn** package manager
+- **Git** version control
 
-### 🔧 Environment
-Provide a `.env` (root) with (example):
-```
-ALCHEMY_API_KEY=...
-ETHERSCAN_API_KEY=...
-# Optional network deployer keys
-PRIVATE_KEY=0xabc...
-```
-If missing, create manually (no `.env.example` yet).
+### 🔧 Environment Setup
 
-### ⚡ Install & Run
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/deepfamilylabs/DeepFamily.git
+   cd DeepFamily
+   ```
+
+2. **Create environment file:**
+   Copy `.env.example` to `.env` and configure:
+   ```bash
+   cp .env.example .env
+   ```
+
+   Add your API keys to `.env`:
+   ```bash
+   # Required for deployment and verification
+   PRIVATE_KEY=0x... # Your deployer wallet private key
+
+### ⚡ Development Setup
+
+#### 🚀 One-Command Full Stack
 ```bash
-# Clone
-git clone https://github.com/deepfamilylibs/DeepFamily.git
-cd DeepFamily
-
-# Install backend deps
+# Install all dependencies
 npm install
 
-# Compile contracts
+# Compile smart contracts
 npm run build
 
-# Start local dev full stack (node + deploy + seed + frontend)
+# Start complete development environment
 npm run dev:all
-# (Or run steps manually below)
+# This starts: local node + contract deployment + demo data seeding + frontend
+```
 
-# Manual: local node only (no auto deploy)
+#### 🔧 Manual Step-by-Step
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Compile contracts
+npm run build
+
+# 3. Start local Hardhat node
 npm run dev:node
-# In another terminal deploy + seed
+
+# 4. Deploy contracts
 npm run dev:deploy
+
+# 5. Seed demo data
 npm run dev:seed
 
-# Frontend (alternative manual launch)
+# 6. Start frontend development server
 npm run frontend:dev
 ```
 
-### 🌐 Access
-- **Frontend**: http://localhost:5173
-- **Local RPC**: http://localhost:8545
-- **Hardhat Console**: `npx hardhat console --network localhost`
+### 🌐 Access Points
+- **Frontend dApp**: http://localhost:5173
+- **Local Blockchain RPC**: http://localhost:8545
+- **Contract Deployment**: Check terminal output for deployed addresses
 
 ## 🧪 Testing
 
 ### 🔬 Run Tests
 ```bash
 npm test              # All tests
-npm run test:coverage # Solidity coverage (output: coverage/)
-npm run test:gas      # Gas reporter (stdout)
 ```
 
 ### 🎭 Demo Data
@@ -158,79 +221,34 @@ npx hardhat run scripts/seed-demo.js --network localhost
 ```
 Creates sample persons, versions & endorsements (see script for specifics).
 
-### ⚙️ Key Tasks (Parameters)
+## 🚀 Deployment Guide
+
+### 🌐 Supported Networks
+**Ethereum Family:**
+- Mainnet, Sepolia, Holesky 
+
+**Layer 2 Solutions:**
+- Polygon: Mainnet, Amoy Testnet
+- Arbitrum: Mainnet , Sepolia Testnet
+- Optimism: Mainnet, Sepolia Testnet
+
+**Alternative Chains:**
+- BSC: Mainnet, Testnet
+- Conflux eSpace: Mainnet, Testnet
+
+### 📦 Multi-Network Deployment
 ```bash
-# Add person version (pre-hashed values expected by task script)
-npx hardhat add-person \
-  --fullname "Alice Smith" \
-  --birthyear 1990 \
-  --network localhost
+# Deploy to specific network
+npm run deploy:net --net=holesky
+npm run deploy:net --net=polygonAmoy
+npm run deploy:net --net=confluxTestnet
 
-# Endorse (requires DEEP allowance & recentReward payment)
-npx hardhat endorse --person 0xPERSONHASH --vindex 1 --network localhost
-
-# Mint NFT (must have endorsed the same version)
-npx hardhat mint-nft --person 0xPERSONHASH --vindex 1 --network localhost
-
-# Story shard operations
-npx hardhat add-story-chunk --token 1 --index 0 --content "First 1KB" --network localhost
-npx hardhat seal-story --token 1 --network localhost
-
-# Listing / diagnostics
-npx hardhat networks-list
-```
-Refer to `tasks/*.js` for full argument definitions & validations.
-
-## 🔧 Deployment Guide
-
-### 🏠 Local
-```bash
-npx hardhat node
+# Local development
 npm run deploy:local
+
+# Verify deployed contracts
+npm run verify:net --net=holesky
 ```
-
-### 🌐 Testnet / Mainnet
-```bash
-# Deploy (select net via npm_config_net)
-npm run deploy:net --net=sepolia
-
-# Verify (example: DeepFamily contract)
-# Requires ETHERSCAN_API_KEY in .env (or explorer equivalent for chain)
-npm run verify:net --net=sepolia -- <CONTRACT_ADDRESS>
-```
-
-### 🌍 Mainnet
-```bash
-npm run deploy:net --net=mainnet
-npm run verify:net --net=mainnet -- <CONTRACT_ADDRESS>
-```
-
-### 🔗 Supported / Target Networks
-- **Ethereum**: Mainnet, Sepolia, Holesky
-- **Polygon**: Mainnet, Amoy
-- **Arbitrum**: Mainnet, Sepolia
-- **Optimism**: Mainnet, Sepolia
-- **BSC**: Mainnet, Testnet
-- **Conflux**: eSpace, eSpace Testnet
-
-## 🛡️ Security
-
-### 🔒 Contract Safety
-- OpenZeppelin audited primitives (ERC20, ERC721Enumerable, Ownable, ReentrancyGuard)
-- Custom errors for explicit revert reasons
-- Read/write separation to minimize accidental state change
-- Reentrancy guard on mutative external entry points involving transfers
-- Rejection of direct ETH transfers (receive/fallback reverts)
-
-### 🔐 Privacy
-- Person identity hashed (keccak256 over normalized structured input)
-- ZK interface integrated (circuits & verifier deployment pending)
-- Off-chain storage of raw PII recommended (IPFS / encrypted backend)
-
-### 💰 Economic Safety
-- Reward only when both parent hashes already exist
-- Endorsement fee equals current mining reward (prevents spam & aligns incentives)
-- Dual payout model incentivizes NFT minting & accurate submissions
 
 ## 📚 Core Docs
 See detailed documents under `docs/`:
@@ -242,11 +260,6 @@ See detailed documents under `docs/`:
 - [ZK Roadmap](docs/zk-roadmap.md)
 - [Frontend Integration](docs/frontend.md)
 3. Provide hosted service / decentralised index endpoints.
-
-## 🧪 Story Sharding Constraints
-- Max chunks per NFT: 100
-- Max bytes per chunk: 1000
-- Sealed stories immutable (contract enforced)
 
 ## 📘 Glossary
 | Term | Meaning |
@@ -282,10 +295,7 @@ See detailed documents under `docs/`:
 ## 🌍 Community
 
 Links are placeholders until launch:
-- **GitHub**: https://github.com/deepfamilylibs/DeepFamily
-- **Discord**: (TBD)
-- **Twitter/X**: (TBD)
-- **Telegram**: (TBD)
+- **GitHub**: https://github.com/deepfamilylabs/DeepFamily
 
 ## 📄 License
 
