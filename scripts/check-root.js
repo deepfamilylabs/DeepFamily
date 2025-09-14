@@ -25,8 +25,16 @@ async function main() {
     await deployments.fixture(["Integrated"]);
     dep = await get("DeepFamily");
   }
-  const ft = await ethers.getContractAt("DeepFamily", dep.address);
+  // Fetch other related deployments as well
+  const depToken = await get("DeepFamilyToken");
+  const depVerifier = await get("PersonHashVerifier");
+
+  // Log addresses for three contracts
   console.log("DeepFamily contract:", dep.address);
+  console.log("DeepFamilyToken contract:", depToken.address);
+  console.log("PersonHashVerifier contract:", depVerifier.address);
+
+  const ft = await ethers.getContractAt("DeepFamily", dep.address);
 
   const demo = {
     fullName: "DemoRoot",
