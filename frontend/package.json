@@ -8,7 +8,9 @@
     "dev": "vite",
     "prebuild": "node ./scripts/sync-abi.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "config:local": "node ./scripts/update-local-config.mjs",
+    "dev:local": "npm run config:local && npm run dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

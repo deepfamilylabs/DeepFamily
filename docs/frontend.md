@@ -58,33 +58,10 @@ frontend/src/
 ```
 
 ### **React Application Flow**
-```tsx
-// App.tsx - Main application component
-function App() {
-  return (
-    <BrowserRouter>
-      <WalletProvider>
-        <TreeDataProvider>
-          <ConfigProvider>
-            <VizOptionsProvider>
-              <ToastProvider>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/familyTree" element={<TreePage />} />
-                  <Route path="/search" element={<SearchPage />} />
-                  <Route path="/person/:hash" element={<PersonPage />} />
-                  <Route path="/editor/:tokenId" element={<StoryEditorPage />} />
-                  {/* Additional routes */}
-                </Routes>
-              </ToastProvider>
-            </VizOptionsProvider>
-          </ConfigProvider>
-        </TreeDataProvider>
-      </WalletProvider>
-    </BrowserRouter>
-  );
-}
-```
+- Multi-provider architecture with nested context providers
+- Route-based navigation with React Router
+- Global state management for wallet, tree data, and configuration
+- Toast notifications and visualization options
 
 ## 🔧 Development Setup
 
@@ -129,6 +106,15 @@ VITE_ROOT_VERSION_INDEX=1
 # VITE_STRICT_CACHE_ONLY=true     # Enable strict cache-only mode
 ```
 
+### **ZK Artifacts Setup**
+- The frontend requires Groth16 artifacts for proof generation and verification. Two files are already included:
+  - `frontend/public/zk/person_hash_zk.wasm`
+  - `frontend/public/zk/person_hash_zk.vkey.json`
+- Due to its large size, the proving key is not checked in or hosted on the online demo. Download it and place it locally:
+  - Download: https://github.com/deepfamilylabs/DeepFamily/releases/download/v1.0.0/person_hash_zk_final.zkey
+  - Place at: `frontend/public/zk/person_hash_zk_final.zkey`
+- Once present, UI actions that require ZK proofs (e.g., “Add Version”) are enabled locally.
+
 ### **ABI Synchronization System**
 The frontend automatically syncs contract ABIs from Hardhat compilation:
 
@@ -167,531 +153,55 @@ export function syncABIs() {
 
 ### **Family Tree Visualization**
 
-**FlexibleDAGView.tsx** - Customizable Tree Layout
-```tsx
-interface FlexibleDAGViewProps {
-  data: TreeNode[];
-  layout: 'horizontal' | 'vertical' | 'radial';
-  nodeSpacing: number;
-  levelSpacing: number;
-  onNodeClick: (node: TreeNode) => void;
-  onNodeHover: (node: TreeNode | null) => void;
-}
-
-// Supports multiple layout algorithms with smooth transitions
-const FlexibleDAGView: React.FC<FlexibleDAGViewProps> = ({
-  data, layout, nodeSpacing, levelSpacing, onNodeClick, onNodeHover
-}) => {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const { calculateLayout, renderNodes, renderEdges } = useTreeLayout(layout);
-
-  useEffect(() => {
-    const svg = d3.select(svgRef.current);
-    const { nodes, edges } = calculateLayout(data, nodeSpacing, levelSpacing);
-
-    renderNodes(svg, nodes, onNodeClick, onNodeHover);
-    renderEdges(svg, edges);
-  }, [data, layout, nodeSpacing, levelSpacing]);
-
-  return <svg ref={svgRef} className="w-full h-full" />;
-};
-```
-
-**ForceDAGView.tsx** - Physics-Based Tree
-```tsx
-// Uses D3 force simulation for dynamic, interactive family trees
-const ForceDAGView: React.FC<ForceDAGViewProps> = ({ data, onNodeClick }) => {
-  const simulation = d3.forceSimulation(data.nodes)
-    .force('link', d3.forceLink(data.edges).distance(100))
-    .force('charge', d3.forceManyBody().strength(-300))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(30));
-
-  // Real-time physics simulation with user interaction
-  return (
-    <svg>
-      {/* Render nodes with physics-based positioning */}
-      {/* Interactive drag and zoom functionality */}
-    </svg>
-  );
-};
-```
+**FlexibleDAGView.tsx** - Customizable tree layout with multiple algorithms (horizontal/vertical/radial)
+**ForceDAGView.tsx** - Physics-based tree using D3 force simulation with interactive drag and zoom
 
 ### **Blockchain Integration Components**
 
-**WalletConnectButton.tsx** - Web3 Wallet Integration
-```tsx
-const WalletConnectButton: React.FC = () => {
-  const { isConnected, address, connect, disconnect, balance } = useWallet();
-  const { t } = useTranslation();
-
-  return (
-    <button
-      onClick={isConnected ? disconnect : connect}
-      className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700"
-    >
-      <Wallet className="w-4 h-4" />
-      <span>
-        {isConnected
-          ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
-          : t('wallet.connect')
-        }
-      </span>
-    </button>
-  );
-};
-```
-
-**NodeDetailModal.tsx** - Person Information Display
-```tsx
-interface NodeDetailModalProps {
-  personHash: string;
-  versionIndex: number;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
-  personHash, versionIndex, isOpen, onClose
-}) => {
-  const { data: versionDetails, loading, error } = usePersonVersion(personHash, versionIndex);
-  const { endorseVersion, mintNFT } = useDeepFamilyActions();
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="p-6 space-y-4">
-        <PersonInfo person={versionDetails?.person} />
-        <EndorsementSection
-          endorsements={versionDetails?.endorsements}
-          onEndorse={() => endorseVersion(personHash, versionIndex)}
-        />
-        <NFTSection
-          tokenId={versionDetails?.tokenId}
-          onMint={() => mintNFT(personHash, versionIndex)}
-        />
-      </div>
-    </Modal>
-  );
-};
-```
+**WalletConnectButton.tsx** - Web3 wallet connection with address display and i18n support
+**NodeDetailModal.tsx** - Person detail modal with endorsement and NFT minting functionality
 
 ## 🔄 State Management
 
 ### **Context Providers**
 
-**WalletContext.tsx** - Web3 Wallet State
-```tsx
-interface WalletContextType {
-  isConnected: boolean;
-  address: string | null;
-  balance: string | null;
-  chainId: number | null;
-  connect: () => Promise<void>;
-  disconnect: () => void;
-  switchNetwork: (chainId: number) => Promise<void>;
-}
-
-export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<WalletState>(initialState);
-
-  // Automatic wallet detection and connection persistence
-  useEffect(() => {
-    detectWallet();
-    restoreConnection();
-  }, []);
-
-  return (
-    <WalletContext.Provider value={{ ...state, connect, disconnect, switchNetwork }}>
-      {children}
-    </WalletContext.Provider>
-  );
-};
-```
-
-**TreeDataContext.tsx** - Family Tree Data Management
-```tsx
-interface TreeDataContextType {
-  treeData: TreeNode[];
-  loading: boolean;
-  error: string | null;
-  refreshTree: () => Promise<void>;
-  updateNode: (hash: string, data: Partial<TreeNode>) => void;
-  addNode: (node: TreeNode) => void;
-}
-
-export const TreeDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [treeData, setTreeData] = useState<TreeNode[]>([]);
-  const { address } = useWallet();
-
-  // Automatic data fetching and caching
-  const fetchTreeData = useCallback(async () => {
-    if (!address) return;
-
-    const data = await fetchUserFamilyTree(address);
-    setTreeData(data);
-  }, [address]);
-
-  // Real-time updates via blockchain events
-  useEffect(() => {
-    const unsubscribe = subscribeToTreeUpdates(address, (update) => {
-      setTreeData(prev => applyTreeUpdate(prev, update));
-    });
-
-    return unsubscribe;
-  }, [address]);
-
-  return (
-    <TreeDataContext.Provider value={{ treeData, loading, error, refreshTree, updateNode, addNode }}>
-      {children}
-    </TreeDataContext.Provider>
-  );
-};
-```
+**WalletContext.tsx** - Web3 wallet state with connection persistence and network switching
+**TreeDataContext.tsx** - Family tree data management with real-time blockchain event updates
 
 ### **Custom Hooks**
 
-**useContract.ts** - Smart Contract Interaction
-```tsx
-export function useContract() {
-  const { signer, provider } = useWallet()
-  const { contractAddress } = useConfig()
-  const toast = useToast()
-  const { t } = useTranslation()
-
-  const contract = useMemo(() => {
-    if (!contractAddress) return null
-
-    if (signer) {
-      // Write operations with signer
-      return new ethers.Contract(contractAddress, DeepFamily.abi, signer)
-    } else if (provider) {
-      // Read-only operations with provider
-      return new ethers.Contract(contractAddress, DeepFamily.abi, provider)
-    }
-
-    return null
-  }, [contractAddress, signer, provider])
-
-  // Transaction execution with comprehensive error handling
-  const executeTransaction = useCallback(async (
-    contractMethod: () => Promise<any>,
-    options: {
-      onSuccess?: (result: any) => void
-      onError?: (error: any) => void
-      successMessage?: string
-      errorMessage?: string
-    } = {}
-  ) => {
-    if (!contract || !signer) {
-      toast.show(t('wallet.notConnected', 'Please connect your wallet'))
-      return null
-    }
-
-    try {
-      const tx = await contractMethod()
-      toast.show(t('transaction.submitted', 'Transaction submitted...'))
-      const receipt = await tx.wait()
-
-      const successMsg = options.successMessage || t('transaction.success', 'Transaction successful')
-      toast.show(successMsg)
-      options.onSuccess?.(receipt)
-      return receipt
-    } catch (error: any) {
-      // Custom error parsing and user-friendly messages
-      const errorMsg = parseContractError(error, t)
-      toast.show(errorMsg)
-      options.onError?.(error)
-      throw error
-    }
-  }, [contract, signer, toast, t])
-
-  return {
-    contract,
-    isContractReady: !!contract && !!signer,
-    executeTransaction,
-    addPersonZK,
-    mintPersonNFT,
-    endorseVersion,
-    listPersonVersions,
-    getVersionDetails,
-    getNFTDetails
-  }
-}
-```
-
-**usePersonData.ts** - Person Data Fetching
-```tsx
-export const usePersonData = (personHash: string, versionIndex?: number) => {
-  const contract = useContract('DeepFamily');
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchPersonData = useCallback(async () => {
-    if (!contract || !personHash) return;
-
-    setLoading(true);
-    try {
-      const versionDetails = await contract.getVersionDetails(personHash, versionIndex || 1);
-      const nftDetails = versionDetails.tokenId > 0
-        ? await contract.getNFTDetails(versionDetails.tokenId)
-        : null;
-
-      setData({ versionDetails, nftDetails });
-    } catch (error) {
-      console.error('Error fetching person data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [contract, personHash, versionIndex]);
-
-  useEffect(() => {
-    fetchPersonData();
-  }, [fetchPersonData]);
-
-  return { data, loading, refetch: fetchPersonData };
-};
-```
+**useContract.ts** - Smart contract interaction with transaction execution and error handling
+**usePersonData.ts** - Person data fetching with version details and NFT information
 
 ## 🌐 User Experience Flow
 
-### **Complete User Journey**
+### **User Journey Flow**
 
-1. **Landing & Connection**
-   ```tsx
-   // Home.tsx - Landing page with wallet connection
-   const Home = () => {
-     return (
-       <div>
-         <WelcomeSection />
-         <WalletConnectButton />
-         <RecentFamiliesPreview />
-       </div>
-     );
-   };
-   ```
-
-2. **Family Tree Exploration**
-   ```tsx
-   // TreePage.tsx - Interactive family tree visualization
-   const TreePage = () => {
-     const { treeData } = useTreeData();
-     const [selectedNode, setSelectedNode] = useState(null);
-
-     return (
-       <div className="h-screen flex">
-         <TreeSidebar />
-         <FlexibleDAGView
-           data={treeData}
-           onNodeClick={setSelectedNode}
-         />
-         <NodeDetailModal
-           node={selectedNode}
-           onClose={() => setSelectedNode(null)}
-         />
-       </div>
-     );
-   };
-   ```
-
-3. **Person Management**
-   ```tsx
-   // PersonPage.tsx - Individual person details and actions
-   const PersonPage = () => {
-     const { hash } = useParams();
-     const { data: personData } = usePersonData(hash);
-
-     return (
-       <PersonProfile>
-         <PersonDetails person={personData} />
-         <VersionTabs versions={personData.versions} />
-         <ActionButtons>
-           <EndorseButton />
-           <MintNFTButton />
-           <EditStoryButton />
-         </ActionButtons>
-       </PersonProfile>
-     );
-   };
-   ```
-
-4. **Story Creation & Editing**
-   ```tsx
-   // StoryEditorPage.tsx - Biography content management
-   const StoryEditorPage = () => {
-     const { tokenId } = useParams();
-     const { chunks, addChunk, updateChunk, sealStory } = useStoryManagement(tokenId);
-
-     return (
-       <StoryEditor>
-         <ChunkList chunks={chunks} />
-         <RichTextEditor onSave={addChunk} />
-         <SealButton onClick={sealStory} />
-       </StoryEditor>
-     );
-   };
-   ```
+1. **Landing & Connection** - Welcome page with wallet connection and recent families preview
+2. **Family Tree Exploration** - Interactive visualization with sidebar controls and node details
+3. **Person Management** - Individual profiles with version tabs and action buttons
+4. **Story Creation & Editing** - Rich text editor with chunk-based content management
 
 ## 🔒 Security & Validation
 
-### **Client-Side Validation**
-```tsx
-// Form validation with Zod schemas
-const PersonInfoSchema = z.object({
-  fullName: z.string().min(1).max(256),
-  birthYear: z.number().min(0).max(9999),
-  birthMonth: z.number().min(0).max(12),
-  birthDay: z.number().min(0).max(31),
-  gender: z.number().min(0).max(3),
-});
-
-// Story chunk validation
-const StoryChunkSchema = z.object({
-  content: z.string().max(1000, 'Story chunk must be ≤1KB'),
-  chunkIndex: z.number().min(0).max(99),
-});
-
-const validateStoryChunk = (content: string): boolean => {
-  const byteSize = new TextEncoder().encode(content).length;
-  return byteSize <= 1000;
-};
-```
-
-### **Error Handling**
-```tsx
-// Comprehensive error mapping for user-friendly messages
-const ERROR_MESSAGES = {
-  'MustEndorseVersionFirst': 'Please endorse this version before minting NFT',
-  'VersionAlreadyMinted': 'This version already has an NFT',
-  'StoryAlreadySealed': 'This story is permanently sealed and cannot be edited',
-  'InsufficientAllowance': 'Please approve DEEP token spending first',
-  'InvalidChunkContent': 'Story chunk content is invalid or too large',
-  'MustBeNFTHolder': 'Only the NFT holder can edit this story',
-};
-
-export const handleContractError = (error: Error): string => {
-  const errorMessage = error.message;
-
-  for (const [contractError, userMessage] of Object.entries(ERROR_MESSAGES)) {
-    if (errorMessage.includes(contractError)) {
-      return userMessage;
-    }
-  }
-
-  return 'Transaction failed. Please try again.';
-};
-```
+### **Validation & Error Handling**
+- **Client-Side Validation**: Zod schemas for person info and story chunks with size limits
+- **Error Mapping**: User-friendly messages for contract errors and transaction failures
+- **Input Validation**: Form validation with comprehensive error feedback
 
 ## 🚀 Performance Optimization
 
-### **Data Caching Strategy**
-```tsx
-// React Query integration for smart caching
-import { useQuery } from '@tanstack/react-query';
-
-export const usePersonVersions = (personHash: string) => {
-  const contract = useContract('DeepFamily');
-
-  return useQuery({
-    queryKey: ['personVersions', personHash],
-    queryFn: async () => {
-      const { items } = await contract.listPersonVersions(personHash, 0, 100);
-      return items;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!personHash && !!contract,
-  });
-};
-```
-
-### **Lazy Loading & Code Splitting**
-```tsx
-// Route-based code splitting
-const TreePage = lazy(() => import('./pages/TreePage'));
-const StoryEditor = lazy(() => import('./pages/StoryEditorPage'));
-
-// Component-based code splitting
-const D3TreeVisualization = lazy(() => import('./components/D3TreeVisualization'));
-
-// Usage with Suspense
-<Suspense fallback={<LoadingSpinner />}>
-  <TreePage />
-</Suspense>
-```
-
-### **Event-Driven Updates**
-```tsx
-// Real-time blockchain event monitoring
-export const useBlockchainEvents = () => {
-  const contract = useContract('DeepFamily');
-  const { address } = useWallet();
-
-  useEffect(() => {
-    if (!contract || !address) return;
-
-    const filters = {
-      personVersionAdded: contract.filters.PersonVersionAdded(),
-      personVersionEndorsed: contract.filters.PersonVersionEndorsed(),
-      personNFTMinted: contract.filters.PersonNFTMinted(),
-    };
-
-    const handleEvent = (event: any) => {
-      // Update local state based on blockchain events
-      queryClient.invalidateQueries(['treeData', address]);
-    };
-
-    // Subscribe to events
-    contract.on(filters.personVersionAdded, handleEvent);
-    contract.on(filters.personVersionEndorsed, handleEvent);
-    contract.on(filters.personNFTMinted, handleEvent);
-
-    return () => {
-      contract.removeAllListeners();
-    };
-  }, [contract, address]);
-};
-```
+### **Performance Optimization**
+- **Data Caching**: React Query integration with 5-10 minute cache times
+- **Code Splitting**: Route and component-based lazy loading with Suspense
+- **Event-Driven Updates**: Real-time blockchain event monitoring with query invalidation
 
 ## 🌍 Internationalization
 
-### **i18n Configuration**
-```tsx
-// i18n/index.ts
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
-
-import en from '../locales/en.json';
-import zh from '../locales/zh.json';
-import es from '../locales/es.json';
-
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources: { en: { translation: en }, zh: { translation: zh }, es: { translation: es } },
-    fallbackLng: 'en',
-    interpolation: { escapeValue: false },
-  });
-
-export default i18n;
-```
-
-### **Multilingual Component Usage**
-```tsx
-const PersonCard: React.FC<{ person: PersonData }> = ({ person }) => {
-  const { t, i18n } = useTranslation();
-
-  return (
-    <div className="person-card">
-      <h3>{person.fullName}</h3>
-      <p>{t('person.born')}: {formatDate(person.birthYear, i18n.language)}</p>
-      <p>{t('person.endorsements')}: {person.endorsementCount}</p>
-      <button>{t('actions.endorse')}</button>
-    </div>
-  );
-};
-```
+### **Internationalization**
+- **Multi-language Support**: English, Chinese, Spanish with automatic language detection
+- **Component Integration**: useTranslation hook with dynamic text and date formatting
+- **Fallback Strategy**: English as default with graceful degradation
 
 ---
 
