@@ -149,30 +149,69 @@ DeepFamily/
 - **Git** version control
 
 ### 🔧 Environment Setup
-
-1. **Clone the repository:**
+1. Clone the repository
    ```bash
    git clone https://github.com/deepfamilylabs/DeepFamily.git
    cd DeepFamily
    ```
+2. ZK Proving Key (.zkey) for Local Use
 
-2. **Create environment file:**
-   Copy `.env.example` to `.env` and configure:
+- Download `.zkey` (Groth16 proving key):
+  https://github.com/deepfamilylabs/DeepFamily/releases/download/v1.0.0/person_hash_zk_final.zkey
+- Place the file at: `frontend/public/zk/person_hash_zk_final.zkey`
+  - The frontend loads artifacts from `frontend/public/zk/` and expects the exact filenames:
+    - `person_hash_zk.wasm` (already included)
+    - `person_hash_zk.vkey.json` (already included)
+    - `person_hash_zk_final.zkey` (you need to download)
+
+3. Install dependencies
    ```bash
-   cp .env.example .env
+   npm run setup
+   # Installs root + frontend dependencies
    ```
 
-   Add your API keys to `.env`:
+4. Configure environment
    ```bash
+   cp .env.example .env
    # Required for deployment and verification
    PRIVATE_KEY=0x... # Your deployer wallet private key
+   ```
 
-### ⚡ Development Setup
+5. Compile smart contracts
+   ```bash
+   npm run build
+   ```
 
-#### 🚀 One-Command Full Stack
+6. Run complete development environment
+   ```bash
+   npm run dev:all
+   # This starts: local node + contract deployment + demo data + frontend
+   ```
+
+### 🧪 Testing
+```bash
+# Run all contract tests
+npm test
+
+# Run with gas reporting
+npm run test:gas
+
+# Generate coverage report
+npm run test:coverage
+
+# Run specific test suites
+npx hardhat test test/personVersion.test.js
+npx hardhat test test/endorse.test.js
+npx hardhat test test/mintNft.test.js
+```
+
+## Usage
+
+### Complete Development Workflow
+#### One-Command Full Stack
 ```bash
 # Install all dependencies
-npm install
+npm run setup
 
 # Compile smart contracts
 npm run build
@@ -182,10 +221,10 @@ npm run dev:all
 # This starts: local node + contract deployment + demo data seeding + frontend
 ```
 
-#### 🔧 Manual Step-by-Step
+#### Manual Step-by-Step
 ```bash
 # 1. Install dependencies
-npm install
+npm run setup
 
 # 2. Compile contracts
 npm run build
@@ -203,23 +242,12 @@ npm run dev:seed
 npm run frontend:dev
 ```
 
+
 ### 🌐 Access Points
 - **Frontend dApp**: http://localhost:5173
 - **Local Blockchain RPC**: http://localhost:8545
 - **Contract Deployment**: Check terminal output for deployed addresses
 
-## 🧪 Testing
-
-### 🔬 Run Tests
-```bash
-npm test              # All tests
-```
-
-### 🎭 Demo Data
-```bash
-npx hardhat run scripts/seed-demo.js --network localhost
-```
-Creates sample persons, versions & endorsements (see script for specifics).
 
 ## 🚀 Deployment Guide
 
