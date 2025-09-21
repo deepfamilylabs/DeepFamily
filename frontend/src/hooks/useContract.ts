@@ -42,18 +42,94 @@ export function useContract() {
     }
 
     try {
-      const tx = await contractMethod()
-      
+      console.log('🔄 Calling contract method...')
+
+      // Debug wallet and network state
+      if (signer && signer.provider) {
+        try {
+          const network = await signer.provider.getNetwork()
+          const signerAddress = await signer.getAddress()
+          const balance = await signer.provider.getBalance(signerAddress)
+          console.log('🔍 Wallet state:', {
+            network: network.name || `Chain ID: ${network.chainId}`,
+            signerAddress,
+            balance: ethers.formatEther(balance),
+            providerConnected: !!signer.provider
+          })
+        } catch (walletStateError) {
+          console.warn('Failed to get wallet state:', walletStateError)
+        }
+      }
+
+      // Add a small delay to prevent nonce conflicts with rapid successive transactions
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Add timeout for wallet popup interaction (30 seconds)
+      const walletTimeout = 30000
+      console.log(`⏰ Setting ${walletTimeout/1000}s timeout for wallet confirmation...`)
+
+      const contractPromise = contractMethod()
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('WALLET_POPUP_TIMEOUT: Wallet confirmation timed out. Please check if the wallet popup was closed or hidden.'))
+        }, walletTimeout)
+      })
+
+      console.log('🏁 Racing between contract call and timeout...')
+
+      // Add window focus detection to catch when user switches away
+      let windowBlurred = false
+      const onBlur = () => {
+        windowBlurred = true
+        console.warn('🔍 Window lost focus - user may have switched to wallet or other app')
+      }
+      const onFocus = () => {
+        if (windowBlurred) {
+          console.log('✅ Window regained focus - user returned')
+          windowBlurred = false
+        }
+      }
+
+      window.addEventListener('blur', onBlur)
+      window.addEventListener('focus', onFocus)
+
+      let tx
+      try {
+        tx = await Promise.race([contractPromise, timeoutPromise])
+        console.log('📤 Transaction sent:', { hash: tx.hash, nonce: tx.nonce })
+      } finally {
+        window.removeEventListener('blur', onBlur)
+        window.removeEventListener('focus', onFocus)
+      }
+
       toast.show(t('transaction.submitted', 'Transaction submitted...'))
+
+      console.log('⏳ Waiting for transaction confirmation...')
       const receipt = await tx.wait()
+      console.log('✅ Transaction confirmed:', { hash: receipt.hash, blockNumber: receipt.blockNumber, status: receipt.status })
 
       const successMsg = options.successMessage || t('transaction.success', 'Transaction successful')
       toast.show(successMsg)
-      
+
       options.onSuccess?.(receipt)
       return receipt
     } catch (error: any) {
       console.error('Transaction failed:', error)
+
+      // Log detailed error information for debugging wallet hang issues
+      console.log('Error details:', {
+        code: error.code,
+        action: error.action,
+        reason: error.reason,
+        message: error.message,
+        shortMessage: error.shortMessage,
+        isUserRejection: error.code === 'ACTION_REJECTED' || error.code === 4001 ||
+                        error.message?.includes('user rejected') ||
+                        error.message?.includes('User denied'),
+        errorInfo: error.info,
+        errorData: error.data
+      })
       
       let errorMsg = options.errorMessage || t('transaction.failed', 'Transaction failed')
       
@@ -130,6 +206,8 @@ export function useContract() {
           errorMsg = t('transaction.rejected', 'Transaction rejected by user')
         } else if (baseMsg.includes('insufficient funds')) {
           errorMsg = t('transaction.insufficientFunds', 'Insufficient funds')
+        } else if (baseMsg.includes('WALLET_POPUP_TIMEOUT')) {
+          errorMsg = t('transaction.walletTimeout', 'Wallet confirmation timed out. Please try again and make sure to confirm in the wallet popup.')
         } else {
           errorMsg = baseMsg
         }
@@ -220,10 +298,47 @@ export function useContract() {
   ) => {
     return executeTransaction(
       async () => {
+        console.log('🎯 About to call contract.endorseVersion with:', {
+          personHash,
+          versionIndex,
+          overrides,
+          hasContract: !!contract,
+          contractAddress: contract?.target || contract?.address,
+          signerAddress: (contract?.runner as any)?.address || 'unknown'
+        })
+
+        // Check if we can call view functions first
+        try {
+          console.log('🔍 Testing contract connectivity...')
+          const testReward = await contract!.DEEP_FAMILY_TOKEN_CONTRACT()
+          console.log('✅ Contract connectivity test passed:', testReward)
+        } catch (connectivityError) {
+          console.error('❌ Contract connectivity test failed:', connectivityError)
+          throw new Error(`Contract connectivity issue: ${(connectivityError as any)?.message || connectivityError}`)
+        }
+
         if (overrides && Object.keys(overrides).length > 0) {
-          return await contract!.endorseVersion(personHash, versionIndex, overrides)
+          console.log('📋 Calling endorseVersion with overrides:', overrides)
+
+          // Try to estimate gas first to catch issues early
+          try {
+            console.log('⛽ Estimating gas for endorseVersion...')
+            const gasEst = await contract!.endorseVersion.estimateGas(personHash, versionIndex, overrides)
+            console.log('⛽ Gas estimation successful:', gasEst.toString())
+          } catch (gasError) {
+            console.error('❌ Gas estimation failed:', gasError)
+            // Don't throw here, just log - sometimes gas estimation fails but actual call works
+          }
+
+          console.log('🚀 Making actual endorseVersion call...')
+          const result = await contract!.endorseVersion(personHash, versionIndex, overrides)
+          console.log('✅ endorseVersion with overrides completed')
+          return result
         } else {
-          return await contract!.endorseVersion(personHash, versionIndex)
+          console.log('📋 Calling endorseVersion without overrides...')
+          const result = await contract!.endorseVersion(personHash, versionIndex)
+          console.log('✅ endorseVersion without overrides completed')
+          return result
         }
       },
       {
