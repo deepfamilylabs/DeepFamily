@@ -193,8 +193,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev (person hash, version index) => TokenID, ensures each version can only be minted once
   mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;
 
-  // ========== Story Sharding Storage Mappings ==========
+  /// @dev Indicates whether a specific (personHash, versionIndex) was added via ZK proof (Poseidon commitment)
+  mapping(bytes32 => mapping(uint256 => bool)) public isVersionZKProofed;
 
+  // ========== Story Sharding Storage Mappings ==========
+  
   /// @dev tokenId => story metadata
   mapping(uint256 => StoryMetadata) public storyMetadata;
 
@@ -633,18 +636,30 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert InvalidZKProof();
     }
 
-    emit PersonHashZKVerified(_packHashFromTwo128(publicSignals, 0), msg.sender);
+    // Extract hashes from limbs once
+    bytes32 personHash_ = _packHashFromTwo128(publicSignals, 0);
+    bytes32 fatherHash_ = _packHashFromTwo128(publicSignals, 2);
+    bytes32 motherHash_ = _packHashFromTwo128(publicSignals, 4);
+
+    emit PersonHashZKVerified(personHash_, msg.sender);
+
+    // Record ZK version flag after adding version
+    uint256 lenBefore = personVersions[personHash_].length;
 
     // business write (internal should check: personHash uniqueness, parent/mother version index matches hash, optional length limit)
     _addPersonInternal(
-      _packHashFromTwo128(publicSignals, 0), // personHash: limbs 0..1
-      _packHashFromTwo128(publicSignals, 2), // fatherHash: limbs 2..3
-      _packHashFromTwo128(publicSignals, 4), // motherHash: limbs 4..5
+      personHash_,
+      fatherHash_,
+      motherHash_,
       fatherVersionIndex,
       motherVersionIndex,
       tag,
       metadataCID
     );
+
+    // Mark this newly added version as ZK-proofed (Poseidon commitment based)
+    uint256 newVersionIndex = lenBefore + 1;
+    isVersionZKProofed[personHash_][newVersionIndex] = true;
   }
 
   /**
@@ -748,8 +763,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (computedFullNameHash != coreInfo.basicInfo.fullNameHash) revert BasicInfoMismatch();
 
     // Validate if core information matches personHash
-    bytes32 computedHash = getPersonHash(coreInfo.basicInfo);
-    if (computedHash != personHash) revert BasicInfoMismatch();
+    // For ZK-added versions (Poseidon commitment), skip keccak-based equality check
+    bool isZK = isVersionZKProofed[personHash][versionIndex];
+    if (!isZK) {
+      bytes32 computedHash = getPersonHash(coreInfo.basicInfo);
+      if (computedHash != personHash) revert BasicInfoMismatch();
+    }
 
     // Generate new tokenId
     uint256 newTokenId = ++tokenCounter;
