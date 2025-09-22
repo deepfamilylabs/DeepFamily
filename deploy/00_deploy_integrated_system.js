@@ -16,7 +16,17 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     waitConfirmations: network.live ? 2 : 1,
   });
 
-  // 2) Deploy PersonHashVerifier (ZK proof verifier contract)
+  // 2) Deploy PoseidonT4 library first
+  const poseidonT4Deployment = await deploy("PoseidonT4", {
+    from: deployer,
+    args: [],
+    log: true,
+    waitConfirmations: network.live ? 2 : 1,
+  });
+
+  log(`PoseidonT4 library deployed at: ${poseidonT4Deployment.address}`);
+
+  // 3) Deploy PersonHashVerifier (ZK proof verifier contract)
   const verifierDeployment = await deploy("PersonHashVerifier", {
     from: deployer,
     args: [],
@@ -26,15 +36,18 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 
   log(`PersonHashVerifier deployed at: ${verifierDeployment.address}`);
 
-  // 3) Deploy DeepFamily with the DeepFamilyToken address and real verifier address
+  // 4) Deploy DeepFamily with PoseidonT4 library linked
   const deepFamilyDeployment = await deploy("DeepFamily", {
     from: deployer,
     args: [tokenDeployment.address, verifierDeployment.address],
+    libraries: {
+      PoseidonT4: poseidonT4Deployment.address,
+    },
     log: true,
     waitConfirmations: network.live ? 2 : 1,
   });
 
-  // 4) Initialize the DeepFamilyToken contract (set DeepFamily address)
+  // 5) Initialize the DeepFamilyToken contract (set DeepFamily address)
   const deepFamilyToken = await ethers.getContractAt("DeepFamilyToken", tokenDeployment.address);
   const initialized = (await deepFamilyToken.totalAdditions()) !== undefined; // Read-only to avoid call revert
   // initialize can be called only once; read deepFamilyContract and initialize if zero address
@@ -55,4 +68,4 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 };
 
 module.exports = func;
-module.exports.tags = ["DeepFamily", "DeepFamilyToken", "PersonHashVerifier", "Integrated"];
+module.exports.tags = ["DeepFamily", "DeepFamilyToken", "PersonHashVerifier", "PoseidonT4", "Integrated"];

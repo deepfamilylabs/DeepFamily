@@ -20,7 +20,7 @@
     "lint": "solhint 'contracts/**/*.sol'",
     "lint:fix": "solhint 'contracts/**/*.sol' --fix",
     "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.js' 'deploy/**/*.js' 'tasks/**/*.js' 'circuits/**/*.js'",
-    "prepare": "husky",   
+    "prepare": "husky",
     "frontend:config": "npm run config:local --prefix frontend",
     "frontend:dev": "npm run dev --prefix frontend",
     "frontend:build": "npm run build --prefix frontend",
@@ -28,7 +28,7 @@
     "dev:node": "HARDHAT_DEPLOY_NO_DEPLOY=true hardhat node --hostname 127.0.0.1 --port 8545",
     "dev:deploy": "hardhat deploy --network localhost",
     "dev:seed": "cross-env ROOT_HASH=0x0 ROOT_VERSION=1 hardhat run scripts/seed-demo.js --network localhost",
-    "dev:fund": "npx hardhat test scripts/fund-wallet.js --network $npm_config_net", 
+    "dev:fund": "npx hardhat test scripts/fund-wallet.js --network $npm_config_net",
     "dev:frontend": "npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173",
     "dev:contract": "run-p dev:deploy dev:seed",
     "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run frontend:config && npm run dev:frontend\"",
@@ -71,6 +71,7 @@
     "@types/node": ">=18.0.0",
     "chai": "^4.2.0",
     "circomlib": "^2.0.5",
+    "circomlibjs": "^0.0.8",
     "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "ethers": "^6.4.0",
@@ -79,6 +80,7 @@
     "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^1.0.8",
     "husky": "^9.0.0",
+    "keccak256-circom": "git+https://github.com/vocdoni/keccak256-circom.git",
     "lint-staged": "^15.0.0",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.0.0",
@@ -89,8 +91,7 @@
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.0",
     "typescript": ">=4.5.0",
-    "wait-on": "^7.2.0",
-    "keccak256-circom": "git+https://github.com/vocdoni/keccak256-circom.git"
+    "wait-on": "^7.2.0"
   },
   "lint-staged": {
     "contracts/**/*.sol": [
@@ -103,7 +104,9 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.0",
-    "dotenv": "^16.0.0"
+    "big-integer": "^1.6.52",
+    "dotenv": "^16.0.0",
+    "poseidon-solidity": "^0.0.5"
   },
   "engines": {
     "node": ">=18.0.0"

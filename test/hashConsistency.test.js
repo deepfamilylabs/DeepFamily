@@ -13,46 +13,33 @@ describe('Hash Consistency Tests', function () {
     return { deepFamily };
   }
 
-  // Frontend hash calculation function (copied from SearchPage.tsx)
-  function computePersonHashLocal(input) {
-    const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
-    
-    // First compute fullNameHash exactly like the contract
-    const nameBytes = new TextEncoder().encode(fullName)
-    const fullNameHash = hre.ethers.keccak256(nameBytes)
-    
-    // Now build PersonBasicInfo hash exactly matching the contract's abi.encodePacked:
-    // abi.encodePacked(fullNameHash, uint8(isBirthBC), birthYear, birthMonth, birthDay, gender)
-    // Total: 32 + 1 + 2 + 1 + 1 + 1 = 38 bytes
-    const buffer = new Uint8Array(38)
-    let offset = 0
-    
-    // fullNameHash (32 bytes)
-    const hashBytes = hre.ethers.getBytes(fullNameHash)
-    buffer.set(hashBytes, offset)
-    offset += 32
-    
-    // isBirthBC as uint8 (1 byte)
-    buffer[offset] = isBirthBC ? 1 : 0
-    offset += 1
-    
-    // birthYear as uint16 big-endian (2 bytes)
-    buffer[offset] = (birthYear >> 8) & 0xff
-    buffer[offset + 1] = birthYear & 0xff
-    offset += 2
-    
-    // birthMonth as uint8 (1 byte)
-    buffer[offset] = birthMonth & 0xff
-    offset += 1
-    
-    // birthDay as uint8 (1 byte)
-    buffer[offset] = birthDay & 0xff
-    offset += 1
-    
-    // gender as uint8 (1 byte)
-    buffer[offset] = gender & 0xff
-    
-    return hre.ethers.keccak256(buffer)
+  // Frontend hash calculation function – now mirrors Poseidon(3) + packedData
+  async function computePersonHashLocal(input) {
+    const { poseidon } = require('circomlibjs');
+
+    const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input;
+
+    // Compute fullNameHash exactly like the contract
+    const nameBytes = new TextEncoder().encode(fullName);
+    const fullNameHash = hre.ethers.keccak256(nameBytes);
+
+    // Split bytes32 to two 128-bit limbs (big-endian)
+    const hashBytes = hre.ethers.getBytes(fullNameHash);
+    let acc = 0n;
+    for (let i = 0; i < 32; i++) acc = (acc << 8n) + BigInt(hashBytes[i]);
+    const nameHi = acc >> 128n;
+    const nameLo = acc & ((1n << 128n) - 1n);
+
+    // Pack small fields: (year<<24) | (month<<16) | (day<<8) | (gender<<1) | isBirthBC
+    const packedData = (BigInt(birthYear) << 24n)
+      | (BigInt(birthMonth) << 16n)
+      | (BigInt(birthDay) << 8n)
+      | (BigInt(gender) << 1n)
+      | (isBirthBC ? 1n : 0n);
+
+    const h = poseidon([nameHi, nameLo, packedData]);
+    const hex = '0x' + h.toString(16).padStart(64, '0');
+    return hex;
   }
 
   const testCases = [
@@ -81,13 +68,13 @@ describe('Hash Consistency Tests', function () {
   testCases.forEach(({ name, input }) => {
     it(`verifies hash consistency for: ${name}`, async () => {
       const { deepFamily } = await setup();
-      
-      // Calculate hash using frontend function
-      const frontendHash = computePersonHashLocal(input);
-      
+
+      // Calculate hash using frontend-like function
+      const frontendHash = await computePersonHashLocal(input);
+
       // Calculate fullNameHash for contract call
       const fullNameHash = await deepFamily.getFullNameHash(input.fullName);
-      
+
       // Prepare basicInfo for contract call
       const basicInfo = {
         fullNameHash: fullNameHash,
@@ -97,14 +84,14 @@ describe('Hash Consistency Tests', function () {
         birthDay: input.birthDay,
         gender: input.gender
       };
-      
+
       // Calculate hash using contract function
       const contractHash = await deepFamily.getPersonHash(basicInfo);
-      
+
       console.log(`Frontend hash: ${frontendHash}`);
       console.log(`Contract hash:  ${contractHash}`);
       console.log(`FullNameHash:   ${fullNameHash}`);
-      
+
       // They should be identical
       expect(frontendHash).to.equal(contractHash);
     });
