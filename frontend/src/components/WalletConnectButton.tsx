@@ -13,13 +13,13 @@ export default function WalletConnectButton({
   showBalance = true,
   variant = 'normal'
 }: WalletConnectButtonProps) {
-  const { 
-    address, 
-    balance, 
-    isConnecting, 
-    chainId, 
-    connect, 
-    disconnect 
+  const {
+    address,
+    balance,
+    isConnecting,
+    chainId,
+    connect,
+    disconnect
   } = useWallet()
   
   const { t } = useTranslation()
@@ -45,8 +45,8 @@ export default function WalletConnectButton({
           <button
             onClick={() => window.open('https://metamask.io/download/', '_blank')}
             className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
-              isHomePage 
-                ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
+              isHomePage
+                ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15'
                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
@@ -58,27 +58,29 @@ export default function WalletConnectButton({
     }
 
     return (
-      <button
-        onClick={connect}
-        disabled={isConnecting}
-        className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
-          isHomePage 
-            ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
-            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
-        } ${className}`}
-      >
-        {isConnecting ? (
-          <>
-            <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-            <span className="hidden lg:inline">{t('wallet.connecting', 'Connecting...')}</span>
-          </>
-        ) : (
-          <>
-            <Wallet className="w-4 h-4" />
-            <span className="hidden lg:inline">{t('wallet.connect', 'Connect Wallet')}</span>
-          </>
-        )}
-      </button>
+      <>
+        <button
+          onClick={connect}
+          disabled={isConnecting}
+          className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
+            isHomePage
+              ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15'
+              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
+          } ${className}`}
+        >
+          {isConnecting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+              <span className="hidden lg:inline">{t('wallet.connecting', 'Connecting...')}</span>
+            </>
+          ) : (
+            <>
+              <Wallet className="w-4 h-4" />
+              <span className="hidden lg:inline">{t('wallet.connect', 'Connect Wallet')}</span>
+            </>
+          )}
+        </button>
+      </>
     )
   }
 

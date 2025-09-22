@@ -14,6 +14,7 @@ import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
 import { TreeDataProvider } from './context/TreeDataContext'
 import { WalletProvider } from './context/WalletContext'
+import WalletSelectionLayer from './components/WalletSelectionLayer'
 
 function TitleUpdater() {
   const { t, i18n } = useTranslation()
@@ -73,6 +74,7 @@ export default function App() {
     <ConfigProvider>
       <ToastProvider>
         <WalletProvider>
+          <WalletSelectionLayer />
           <VizOptionsProvider>
             <TreeDataProvider>
               <BrowserRouter>
