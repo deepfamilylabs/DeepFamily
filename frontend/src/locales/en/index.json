@@ -458,7 +458,13 @@
     "disconnected": "Wallet disconnected",
     "chainSwitched": "Chain switched successfully",
     "chainNotAdded": "Chain not added to wallet",
-    "chainSwitchFailed": "Failed to switch chain"
+    "chainSwitchFailed": "Failed to switch chain",
+    "notConnected": "Please connect your wallet",
+    "keepVisible": "Keep wallet popup visible:",
+    "dontClickOutside": "Don't click outside the wallet popup",
+    "checkTaskbar": "Check taskbar if popup disappears",
+    "useAltTab": "Use Alt+Tab to find hidden wallet window",
+    "waitForConfirm": "Wait for transaction confirmation before closing"
   },
   "theme": {
     "switchToLight": "Switch to Light",
@@ -756,8 +762,17 @@
       "insufficientDeepTokens": "Insufficient DEEP tokens for endorsement",
       "feeTransferFailed": "Failed to transfer endorsement fee",
       "insufficientFunds": "Insufficient funds for transaction",
-      "userRejected": "Transaction was rejected by user"
-    }
+      "userRejected": "Transaction was rejected by user",
+      "walletTimeout": "Wallet confirmation timed out. The wallet popup may have been closed or hidden.",
+      "walletTimeoutDetails": "Please try again and make sure to confirm the transaction in your wallet popup window."
+    },
+    "approveUnlimited": "Approve unlimited DEEP allowance to avoid future approvals",
+    "approveUnlimitedHint": "Recommended: Each endorsement consumes allowance, unlimited approval avoids repeated authorizations",
+    "retryTransaction": "Retry Transaction"
+  },
+  "transaction": {
+    "pending": "Transaction pending confirmation...",
+    "pendingDetails": "The transaction is submitted or awaiting wallet confirmation. You can keep using the app; we will update once it confirms."
   },
   "mintNFT": {
     "title": "Mint NFT",

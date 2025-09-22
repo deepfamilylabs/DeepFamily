@@ -55,7 +55,7 @@ export default function EndorseModal({
   const [deepTokenDecimals, setDeepTokenDecimals] = useState<number>(18)
   const [deepTokenSymbol, setDeepTokenSymbol] = useState<string>('DEEP')
   const [isApproving, setIsApproving] = useState(false)
-  const [approveUnlimited, setApproveUnlimited] = useState(true) // Default to unlimited for better UX
+  // Removed unlimited approval for user safety - always use exact amount approval
   const [entered, setEntered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
@@ -356,7 +356,8 @@ export default function EndorseModal({
           'function allowance(address,address) view returns (uint256)',
           'function approve(address,uint256) returns (bool)',
           'function recentReward() view returns (uint256)',
-          'function increaseAllowance(address,uint256) returns (bool)'
+          'function increaseAllowance(address,uint256) returns (bool)',
+          'function balanceOf(address) view returns (uint256)'
         ],
         signer
       )
@@ -373,22 +374,30 @@ export default function EndorseModal({
         requiredFormatted: ethers.formatUnits(required, deepTokenDecimals),
         needsApproval: currentAllowance < required,
         spender: spender,
-        tokenHolder: address,
-        unlimitedMode: approveUnlimited,
-        isMaxUint256: currentAllowance.toString() === ethers.MaxUint256.toString(),
-        maxUint256Value: ethers.MaxUint256.toString()
+        tokenHolder: address
       })
+
+      // Check user's DEEP token balance before proceeding
+      let userBalance: bigint = 0n
+      try {
+        userBalance = await tokenContract.balanceOf(address)
+        console.log('💰 Current token balance:', {
+          balance: userBalance.toString(),
+          formatted: ethers.formatUnits(userBalance, deepTokenDecimals),
+          required: ethers.formatUnits(required, deepTokenDecimals),
+          sufficient: userBalance >= required
+        })
+      } catch (balanceError) {
+        console.warn('Failed to check token balance:', balanceError)
+      }
 
       // If allowance was reset unexpectedly, log more details
       if (currentAllowance === 0n) {
         console.warn('⚠️ Allowance is 0 - this may indicate allowance was consumed or reset after previous transaction')
-        try {
-          const balance = await tokenContract.balanceOf(address)
-          console.log('💰 Current token balance:', ethers.formatUnits(balance, deepTokenDecimals))
-          console.log('🔍 Analysis: Previous endorsement likely consumed all allowance. This is normal ERC20 behavior.')
-        } catch (e) {
-          console.warn('Failed to check token balance:', e)
+        if (userBalance < required) {
+          throw new Error(`Insufficient DEEP token balance: have ${ethers.formatUnits(userBalance, deepTokenDecimals)}, need ${ethers.formatUnits(required, deepTokenDecimals)}`)
         }
+        console.log('🔍 Analysis: Previous endorsement likely consumed all allowance. This is normal ERC20 behavior.')
       } else if (currentAllowance > 0n) {
         console.log('✅ Existing allowance found:', {
           allowance: ethers.formatUnits(currentAllowance, deepTokenDecimals),
@@ -414,7 +423,6 @@ export default function EndorseModal({
           tokenAddress: deepTokenAddress,
           currentAllowance: currentAllowance.toString(),
           requiredAmount: required.toString(),
-          approveUnlimited: approveUnlimited,
           approver: address,
           timestamp: new Date().toISOString()
         }
@@ -436,37 +444,27 @@ export default function EndorseModal({
 
         let tx
         try {
-          if (approveUnlimited) {
-            // Preflight simulate approve for unlimited
-            try {
-              const fn: any = (tokenContract as any)?.approve?.staticCall
-              if (typeof fn === 'function') {
-                await fn(spender, ethers.MaxUint256)
-              }
-            } catch (preErr) {
-              console.warn('approve(unlimited) preflight failed, will fallback to minimal approval:', preErr)
-            }
-            tx = await tokenContract.approve(spender, ethers.MaxUint256)
-          } else {
-            // Prefer increasing by delta to avoid resetting allowance downwards
-            const delta = required - currentAllowance
-            console.log('📊 Delta calculation for increaseAllowance:', {
+          {
+            // Use direct approve for exact amount (safer than unlimited approval)
+            // This is more reliable than increaseAllowance for precise amount approval
+            console.log('📝 Using direct approve for exact amount:', {
               required: required.toString(),
+              requiredFormatted: ethers.formatUnits(required, deepTokenDecimals),
               currentAllowance: currentAllowance.toString(),
-              delta: delta.toString(),
-              deltaFormatted: ethers.formatUnits(delta, deepTokenDecimals)
+              reason: 'Exact amount approval for user safety'
             })
 
-            if (delta <= 0n) {
-              console.warn('⚠️ Delta is 0 or negative, using direct approve instead')
+            try {
               tx = await tokenContract.approve(spender, required)
-            } else {
-              try {
-                console.log('📈 Using increaseAllowance with delta:', delta.toString())
+            } catch (approveError) {
+              console.error('❌ Direct approve failed:', approveError)
+              // Fallback: try increaseAllowance if approve fails
+              const delta = required - currentAllowance
+              if (delta > 0n) {
+                console.log('📈 Fallback: Using increaseAllowance with delta:', delta.toString())
                 tx = await tokenContract.increaseAllowance(spender, delta)
-              } catch {
-                console.log('📝 increaseAllowance failed, falling back to approve')
-                tx = await tokenContract.approve(spender, required)
+              } else {
+                throw approveError
               }
             }
           }
@@ -483,7 +481,7 @@ export default function EndorseModal({
           // Log complete approval transaction details including receipt data
           const completeApprovalLog = {
             ...approvalData,
-            actualApprovalAmount: approveUnlimited ? ethers.MaxUint256.toString() :
+            actualApprovalAmount:
               (tx.data?.includes('increaseAllowance') ? (required - currentAllowance).toString() : required.toString()),
             receipt: {
               transactionHash: receipt.hash || receipt.transactionHash,
@@ -517,7 +515,7 @@ export default function EndorseModal({
             console.log('📊 Immediate post-approval allowance:', {
               allowance: immediateAllowance.toString(),
               formatted: ethers.formatUnits(immediateAllowance, deepTokenDecimals),
-              expected: approveUnlimited ? 'MaxUint256' : required.toString(),
+              expected: required.toString(),
               matches: immediateAllowance >= required
             })
           } catch (immediateCheckError) {
@@ -527,20 +525,31 @@ export default function EndorseModal({
           setIsApproving(false)
           throw waitError
         }
-        // Small delay + recheck to avoid race where allowance is not yet visible
-        try {
-          await new Promise(resolve => setTimeout(resolve, 500))
-        } catch {}
+        // Wait for blockchain state to be updated after approval transaction
+        // This is crucial for the final allowance check to pass
+        console.log('⏳ Waiting for blockchain state to update after approval...')
         let postAllowance: bigint = currentAllowance
-        try {
-          postAllowance = await tokenContract.allowance(address, spender)
-        } catch {}
-        if (postAllowance < required && !approveUnlimited) {
-          // Try a couple of quick retries before proceeding
-          for (let i = 0; i < 3 && postAllowance < required; i++) {
-            try { await new Promise(r => setTimeout(r, 300)) } catch {}
-            try { postAllowance = await tokenContract.allowance(address, spender) } catch {}
+        let retryCount = 0
+        const maxRetries = 8
+
+        while (retryCount < maxRetries && postAllowance < required) {
+          const waitTime = Math.min(500 + (retryCount * 300), 2000) // 500ms, 800ms, 1100ms, 1400ms, 1700ms, 2000ms...
+          console.log(`🔍 Post-approval check attempt ${retryCount + 1}/${maxRetries}, waiting ${waitTime}ms...`)
+
+          try {
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+            postAllowance = await tokenContract.allowance(address, spender)
+            console.log(`📊 Post-approval allowance attempt ${retryCount + 1}: ${ethers.formatUnits(postAllowance, deepTokenDecimals)} (need: ${ethers.formatUnits(required, deepTokenDecimals)})`)
+
+            if (postAllowance >= required) {
+              console.log(`✅ Post-approval allowance sufficient after ${retryCount + 1} attempts`)
+              break
+            }
+          } catch (error) {
+            console.warn(`❌ Post-approval allowance check failed on attempt ${retryCount + 1}:`, error)
           }
+
+          retryCount++
         }
         console.log('✅ APPROVAL FLOW COMPLETED')
         setIsApproving(false)
@@ -550,9 +559,13 @@ export default function EndorseModal({
 
       // Final allowance check before endorseVersion call
       console.log('🔍 Final allowance check before endorseVersion...')
+      let finalAllowance: bigint = 0n
+      let finalRequired: bigint = 0n
+
       try {
-        const finalAllowance = await tokenContract.allowance(address, spender)
-        const finalRequired = await tokenContract.recentReward()
+        finalAllowance = await tokenContract.allowance(address, spender)
+        finalRequired = await tokenContract.recentReward()
+
         console.log('🔐 Final allowance status:', {
           finalAllowance: ethers.formatUnits(finalAllowance, deepTokenDecimals),
           finalRequired: ethers.formatUnits(finalRequired, deepTokenDecimals),
@@ -560,11 +573,15 @@ export default function EndorseModal({
         })
 
         if (finalAllowance < finalRequired) {
-          throw new Error(`Insufficient allowance after approval: have ${ethers.formatUnits(finalAllowance, deepTokenDecimals)}, need ${ethers.formatUnits(finalRequired, deepTokenDecimals)}`)
+          const errorMsg = `Final allowance check failed: have ${ethers.formatUnits(finalAllowance, deepTokenDecimals)}, need ${ethers.formatUnits(finalRequired, deepTokenDecimals)}`
+          console.error('❌ Final allowance insufficient:', errorMsg)
+          throw new Error(errorMsg)
         }
-      } catch (finalCheckError) {
-        console.error('❌ Final allowance check failed:', finalCheckError)
-        throw finalCheckError
+
+        console.log('✅ Final allowance check passed')
+      } catch (checkError) {
+        console.error('❌ Final allowance check failed:', checkError)
+        throw checkError
       }
 
       // Preflight: staticCall to catch reverts before wallet pops (ethers v6)
@@ -1014,23 +1031,6 @@ export default function EndorseModal({
                 <span>{t('endorse.feeRecipient', 'Fee Recipient')}:</span>
                 <span className="font-mono">{formatAddress(feeRecipient)}</span>
               </div>
-              <div className="pt-2 border-t border-purple-200/50 dark:border-purple-800/50">
-                <div className="flex items-center gap-2">
-                  <input
-                    id="approve-unlimited"
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-purple-300 dark:border-purple-700 text-purple-600 focus:ring-purple-500"
-                    checked={approveUnlimited}
-                    onChange={(e) => setApproveUnlimited(e.target.checked)}
-                  />
-                  <label htmlFor="approve-unlimited" className="text-xs select-none cursor-pointer">
-                    {t('endorse.approveUnlimited', 'Approve unlimited DEEP allowance to avoid future approvals')}
-                  </label>
-                </div>
-                <div className="text-xs text-purple-600 dark:text-purple-400 mt-1 italic">
-                  💡 {t('endorse.approveUnlimitedHint', 'Recommended: Each endorsement consumes allowance, unlimited approval avoids repeated authorizations')}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -1134,23 +1134,6 @@ export default function EndorseModal({
                 </div>
               </div>
 
-              {/* Wallet Guidance */}
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
-                <div className="flex items-start gap-2">
-                  <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-xs font-bold">!</span>
-                  </div>
-                  <div className="text-xs text-blue-800 dark:text-blue-200">
-                    <p className="font-medium mb-1">{t('wallet.keepVisible', 'Keep wallet popup visible:')}</p>
-                    <ul className="space-y-0.5 text-xs">
-                      <li>• {t('wallet.dontClickOutside', 'Don\'t click outside the wallet popup')}</li>
-                      <li>• {t('wallet.checkTaskbar', 'Check taskbar if popup disappears')}</li>
-                      <li>• {t('wallet.useAltTab', 'Use Alt+Tab to find hidden wallet window')}</li>
-                      <li>• {t('wallet.waitForConfirm', 'Wait for transaction confirmation before closing')}</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 

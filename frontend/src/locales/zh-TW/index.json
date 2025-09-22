@@ -449,7 +449,22 @@
     "connect": "連接錢包",
     "connecting": "連接中...",
     "disconnect": "斷開連接",
-    "wrongNetwork": "網路錯誤"
+    "wrongNetwork": "網路錯誤",
+    "noMetaMask": "請安裝 MetaMask",
+    "connected": "錢包連接成功",
+    "rejected": "用戶拒絕連接",
+    "pending": "連接請求待處理",
+    "connectionFailed": "錢包連接失敗",
+    "disconnected": "錢包已斷開",
+    "chainSwitched": "網路切換成功",
+    "chainNotAdded": "網路未添加到錢包",
+    "chainSwitchFailed": "網路切換失敗",
+    "notConnected": "請連接錢包",
+    "keepVisible": "保持錢包彈窗可見:",
+    "dontClickOutside": "不要點擊錢包彈窗外部",
+    "checkTaskbar": "如果彈窗消失請檢查任務欄",
+    "useAltTab": "使用 Alt+Tab 查找隱藏的錢包窗口",
+    "waitForConfirm": "等待交易確認後再關閉"
   },
   "theme": {
     "switchToLight": "切換到淺色模式",
@@ -798,11 +813,20 @@
       "insufficientDeepTokens": "DEEP 代幣餘額不足",
       "feeTransferFailed": "背書費用轉帳失敗",
       "insufficientFunds": "交易手續費不足",
-      "userRejected": "用戶拒絕交易"
-    }
+      "userRejected": "用戶拒絕交易",
+      "walletTimeout": "錢包確認超時。錢包彈窗可能已被關閉或隱藏。",
+      "walletTimeoutDetails": "請重試並確保在錢包彈窗中確認交易。"
+    },
+    "approveUnlimited": "授權無限制 DEEP 額度以避免重複授權",
+    "approveUnlimitedHint": "推薦：每次背書都會消耗授權額度，無限制授權避免重複操作",
+    "retryTransaction": "重試交易"
   },
   "contract": {
     "endorseSuccess": "背書提交成功",
     "endorseFailed": "背書版本失敗"
+  },
+  "transaction": {
+    "pending": "交易等待確認中...",
+    "pendingDetails": "交易已提交或等待錢包確認。您可以繼續使用應用，我們會在確認後更新。"
   }
 }
