@@ -1,9 +1,10 @@
 /*
-Minimal limbs endianness/mapping check for PersonHashWithKeccak circuit and DeepFamily.addPersonZK
+Poseidon limbs endianness/mapping check for PersonHash (Keccak removed)
 
 What it does
-- Computes person/father/mother hashes from basic info following Solidity getPersonHash rules
-- Splits each bytes32 into 2×128-bit limbs in big-endian order: [hi128, lo128]
+- Reads input JSON (same as circuit inputs) to fetch 32-byte fullNameHash arrays and scalar fields
+- Computes Poseidon commitment over [name_hi128, name_lo128, isBirthBC, birthYear, birthMonth, birthDay, gender]
+- Splits each commitment into 2×128-bit limbs in big-endian order: [hi128, lo128]
 - Prints expected publicSignals order for the current circuit/contract mapping:
   publicSignals = [
     person_hi128, person_lo128,
@@ -13,62 +14,72 @@ What it does
   ]
 
 Optional
-- If snarkjs is installed and you provide --wasm and --zkey and --input, it will also try to compute proof and compare produced publicSignals with expected.
+- If snarkjs is installed and you provide --wasm and --zkey and --input, it will also compute proof and compare produced publicSignals with expected.
 
 Usage examples
-  node tasks/zk-limbs-check.js
-  node tasks/zk-limbs-check.js --submitter 0xYourEOA
-  node tasks/zk-limbs-check.js --wasm ./artifacts/circuits/person_hash_keccak_js/person_hash_keccak.wasm \
-    --zkey ./artifacts/circuits/person_hash_keccak_final.zkey --input ./tmp/input.json --submitter 0xYourEOA
+  node tasks/zk-limbs-check.js --input ./circuits/test/fullname_hash_input.json
+  node tasks/zk-limbs-check.js --wasm ./artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm \
+    --zkey ./artifacts/circuits/person_hash_zk_final.zkey --input ./circuits/test/fullname_hash_input.json --submitter 0xYourEOA
 */
 
-const { keccak256, toUtf8Bytes, getAddress, ZeroAddress } = require("ethers");
+const { getAddress, ZeroAddress } = require("ethers");
 
-function solidityPackedKeccak(types, values) {
-  // Lazy import to support ethers v6 API
-  const { solidityPacked } = require("ethers");
-  return keccak256(solidityPacked(types, values));
+function split128FromBigInt(x) {
+  const hi = x >> 128n;
+  const lo = x & ((1n << 128n) - 1n);
+  return [hi, lo];
 }
 
-function split128BE(hashHex) {
-  const h = hashHex.toLowerCase();
-  if (!h.startsWith("0x") || h.length !== 66) {
-    throw new Error(`Invalid bytes32 hex: ${hashHex}`);
+function bytesToBigIntBE(bytes) {
+  if (!Array.isArray(bytes) || bytes.length !== 32) {
+    throw new Error("fullNameHash must be 32-byte array");
   }
-  const hiHex = "0x" + h.slice(2, 34);
-  const loHex = "0x" + h.slice(34);
-  return [BigInt(hiHex), BigInt(loHex)];
+  let acc = 0n;
+  for (let i = 0; i < 32; i++) {
+    const b = BigInt(bytes[i] >>> 0);
+    if (b < 0n || b > 255n) throw new Error("byte out of range");
+    acc = (acc << 8n) + b;
+  }
+  return acc;
 }
 
-function getPersonHashJS(basic) {
-  const nameBytes = toUtf8Bytes(basic.fullName);
-  const nameLen = nameBytes.length;
-  if (nameLen === 0 || nameLen > 256) throw new Error("fullName length must be 1..256");
-  if (basic.birthMonth > 12) throw new Error("birthMonth <= 12");
-  if (basic.birthDay > 31) throw new Error("birthDay <= 31");
-
-  // abi.encodePacked(uint16(len), bytes(name), uint8(isBC), uint16(year), uint8(m), uint8(d), uint8(g))
-  const hashHex = solidityPackedKeccak(
-    ["uint16", "bytes", "uint8", "uint16", "uint8", "uint8", "uint8"],
-    [
-      nameLen,
-      nameBytes,
-      basic.isBirthBC ? 1 : 0,
-      basic.birthYear,
-      basic.birthMonth,
-      basic.birthDay,
-      basic.gender,
-    ],
-  );
-  return hashHex;
+function be128HiLoFromBytes32(bytes) {
+  // Big-endian split to hi/lo 128 bits
+  const hi = bytes.slice(0, 16);
+  const lo = bytes.slice(16, 32);
+  const hiVal = bytesToBigIntBE([...hi, ...new Array(16).fill(0)].slice(0, 16).concat()); // not used directly
+  // Simpler: compute BigInt once and split
+  const big = bytesToBigIntBE(bytes);
+  return [big >> 128n, big & ((1n << 128n) - 1n)];
 }
 
-function buildExpectedSignals(person, father, mother, submitter) {
-  const p = split128BE(getPersonHashJS(person));
-  const f = split128BE(getPersonHashJS(father));
-  const m = split128BE(getPersonHashJS(mother));
-  const s = BigInt(getAddress(submitter)); // address → 160-bit value in lower bits
-  return [p[0], p[1], f[0], f[1], m[0], m[1], s];
+async function buildExpectedSignalsFromInput(input) {
+  const { buildPoseidon } = require("circomlibjs");
+  const poseidon = await buildPoseidon();
+  const F = poseidon.F;
+
+  function personCommitmentFrom(inputPrefix) {
+    const nameBytes = input[`${inputPrefix}fullNameHash`];
+    const isBirthBC = BigInt(input[`${inputPrefix}isBirthBC`]);
+    const birthYear = BigInt(input[`${inputPrefix}birthYear`]);
+    const birthMonth = BigInt(input[`${inputPrefix}birthMonth`]);
+    const birthDay = BigInt(input[`${inputPrefix}birthDay`]);
+    const gender = BigInt(input[`${inputPrefix}gender`]);
+
+    const [nameHi, nameLo] = be128HiLoFromBytes32(nameBytes);
+    const h = poseidon([nameHi, nameLo, isBirthBC, birthYear, birthMonth, birthDay, gender]);
+    const hv = BigInt(F.toObject(h));
+    const [hi, lo] = split128FromBigInt(hv);
+    return [hi, lo];
+  }
+
+  const person = personCommitmentFrom("");
+  const father = personCommitmentFrom("father_");
+  const mother = personCommitmentFrom("mother_");
+
+  const submitter = input.submitter ? BigInt(getAddress(input.submitter)) : BigInt(getAddress(ZeroAddress));
+
+  return [person[0], person[1], father[0], father[1], mother[0], mother[1], submitter];
 }
 
 function parseArgs() {
@@ -87,35 +98,16 @@ function parseArgs() {
 
 async function main() {
   const opts = parseArgs();
-  const submitter = opts.submitter || ZeroAddress; // default 0x000..00
+  if (!opts.input) {
+    console.log("Please provide --input pointing to the circuit input JSON (with 32-byte fullNameHash arrays).");
+    process.exit(1);
+  }
 
-  // Fixed sample data (you can adjust)
-  const person = {
-    fullName: "Alice",
-    isBirthBC: false,
-    birthYear: 1990,
-    birthMonth: 12,
-    birthDay: 31,
-    gender: 1,
-  };
-  const father = {
-    fullName: "Bob",
-    isBirthBC: false,
-    birthYear: 1960,
-    birthMonth: 6,
-    birthDay: 15,
-    gender: 1,
-  };
-  const mother = {
-    fullName: "Carol",
-    isBirthBC: false,
-    birthYear: 1962,
-    birthMonth: 7,
-    birthDay: 20,
-    gender: 2,
-  };
+  const fs = require("fs");
+  const input = JSON.parse(fs.readFileSync(opts.input, "utf8"));
+  if (opts.submitter) input.submitter = opts.submitter;
 
-  const expected = buildExpectedSignals(person, father, mother, submitter);
+  const expected = await buildExpectedSignalsFromInput(input);
   console.log("Expected publicSignals (decimal):");
   console.log(expected.map((x) => x.toString()));
 
@@ -123,18 +115,13 @@ async function main() {
   if (opts.wasm && opts.zkey && opts.input) {
     try {
       const snarkjs = require("snarkjs");
-      const fs = require("fs");
-
-      const input = JSON.parse(fs.readFileSync(opts.input, "utf8"));
       // Ensure submitter matches
       input.submitter = expected[6].toString();
 
       const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, opts.wasm, opts.zkey);
       console.log("Circuit publicSignals (decimal):", publicSignals);
 
-      const ok =
-        publicSignals.length === expected.length &&
-        publicSignals.every((v, i) => BigInt(v) === expected[i]);
+      const ok = publicSignals.length === expected.length && publicSignals.every((v, i) => BigInt(v) === expected[i]);
       console.log("Match:", ok);
       if (!ok) process.exitCode = 1;
     } catch (e) {
