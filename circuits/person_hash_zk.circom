@@ -4,51 +4,41 @@ pragma circom 2.1.6;
 
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
-include "circomlib/circuits/mux1.circom";
 include "circomlib/circuits/poseidon.circom";
 
-// Convert uint16 to big-endian bytes
-template Uint16ToBytes() {
-    signal input v;
-    signal output b0; // High byte
-    signal output b1; // Low byte
-    
-    component bits = Num2Bits(16);
-    bits.in <== v;
-    
-    b1 <== bits.out[0] + bits.out[1]*2 + bits.out[2]*4 + bits.out[3]*8 +
-           bits.out[4]*16 + bits.out[5]*32 + bits.out[6]*64 + bits.out[7]*128;
-    b0 <== bits.out[8] + bits.out[9]*2 + bits.out[10]*4 + bits.out[11]*8 +
-           bits.out[12]*16 + bits.out[13]*32 + bits.out[14]*64 + bits.out[15]*128;
-}
 
-// Convert 32-byte hash to 2 128-bit limbs
+// Convert 32-byte hash to 2 128-bit limbs (secure)
 template HashToLimbs() {
     signal input hashBytes[32];
     signal output limb0;
     signal output limb1;
-    
+
+    // Constrain each byte to 8-bit range to prevent commitment breaking attacks
     component byteCheck[32];
     for (var i = 0; i < 32; i++) {
         byteCheck[i] = Num2Bits(8);
         byteCheck[i].in <== hashBytes[i];
     }
-    
-    // High 128 bits
-    signal acc0[17];
-    acc0[0] <== 0;
+
+    // Build limbs directly from validated byte bits (reuse byteCheck results)
+    component limb0Bits = Bits2Num(128);
+    component limb1Bits = Bits2Num(128);
+
+    // High 128 bits (bytes 0-15) - big-endian to match contract
     for (var i = 0; i < 16; i++) {
-        acc0[i+1] <== acc0[i] * 256 + hashBytes[i];
+        for (var j = 0; j < 8; j++) {
+            limb0Bits.in[(15-i)*8 + (7-j)] <== byteCheck[i].out[j];
+        }
     }
-    limb0 <== acc0[16];
-    
-    // Low 128 bits
-    signal acc1[17];
-    acc1[0] <== 0;
-    for (var j = 0; j < 16; j++) {
-        acc1[j+1] <== acc1[j] * 256 + hashBytes[16 + j];
+    limb0 <== limb0Bits.out;
+
+    // Low 128 bits (bytes 16-31) - big-endian to match contract
+    for (var i = 0; i < 16; i++) {
+        for (var j = 0; j < 8; j++) {
+            limb1Bits.in[(15-i)*8 + (7-j)] <== byteCheck[16+i].out[j];
+        }
     }
-    limb1 <== acc1[16];
+    limb1 <== limb1Bits.out;
 }
 
 // Fixed-length PersonHasher using fullNameHash (32 bytes)
@@ -64,18 +54,27 @@ template PersonHasher() {
     signal output limb1; // low 128 bits of Poseidon(out)
     
     // Constraint checks
-    component birthMonthCheck = LessEqThan(8); // 8 bits can handle values up to 255
+    // Birth year constrained to 16 bits (0-65535) to prevent packing overflow
+    component birthYearCheck = Num2Bits(16);
+    birthYearCheck.in <== birthYear;
+
+    // Month: Must be 0-12 (using LessEqThan with 4 bits)
+    component birthMonthCheck = LessEqThan(4);  // 4 bits sufficient for comparing with 12
     birthMonthCheck.in[0] <== birthMonth;
     birthMonthCheck.in[1] <== 12;
     birthMonthCheck.out === 1;
+
+    // Day: 5 bits allows exactly 0-31
+    component birthDayCheck = Num2Bits(5);
+    birthDayCheck.in <== birthDay;
     
-    component birthDayCheck = LessEqThan(8); // 8 bits can handle values up to 255
-    birthDayCheck.in[0] <== birthDay;
-    birthDayCheck.in[1] <== 31;
-    birthDayCheck.out === 1;
-    
+    // Validate binary and range constraints
     component bcBit = Num2Bits(1);
     bcBit.in <== isBirthBC;
+
+    // Gender constrained to 3 bits (0-7)
+    component genderCheck = Num2Bits(3);
+    genderCheck.in <== gender;
     
     // Convert fullNameHash bytes to two 128-bit field limbs (also validates bytes)
     component nameLimbs = HashToLimbs();
@@ -83,32 +82,30 @@ template PersonHasher() {
         nameLimbs.hashBytes[i] <== fullNameHash[i];
     }
     
-    // Poseidon commitment over SNARK-friendly field elements
-    component poseidon = Poseidon(7);
+    // Pack small fields into single field element (saves 4 Poseidon inputs)
+    // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
+    signal packedData <== birthYear * 16777216 + birthMonth * 65536 + birthDay * 256 + gender * 2 + isBirthBC;
+
+    // Poseidon commitment over SNARK-friendly field elements (reduced from 7 to 3 inputs)
+    component poseidon = Poseidon(3);
     poseidon.inputs[0] <== nameLimbs.limb0; // high 128 bits of fullNameHash
     poseidon.inputs[1] <== nameLimbs.limb1; // low 128 bits of fullNameHash
-    poseidon.inputs[2] <== isBirthBC;
-    poseidon.inputs[3] <== birthYear;
-    poseidon.inputs[4] <== birthMonth;
-    poseidon.inputs[5] <== birthDay;
-    poseidon.inputs[6] <== gender;
+    poseidon.inputs[2] <== packedData;
 
-    // Split Poseidon output into two 128-bit limbs for public signals
-    component outBits = Num2Bits(256);
-    outBits.in <== poseidon.out;
+    // Split Poseidon output into two 128-bit limbs (optimized)
+    // Extract low 128 bits using bit decomposition
+    component fullBits = Num2Bits(256);
+    fullBits.in <== poseidon.out;
 
-    component lowNum = Bits2Num(128);
+    // Extract low 128 bits
+    component limb1Bits = Bits2Num(128);
     for (var k = 0; k < 128; k++) {
-        lowNum.in[k] <== outBits.out[k]; // LSB first
+        limb1Bits.in[k] <== fullBits.out[k];
     }
+    limb1 <== limb1Bits.out;
 
-    component highNum = Bits2Num(128);
-    for (var m = 0; m < 128; m++) {
-        highNum.in[m] <== outBits.out[128 + m];
-    }
-
-    limb0 <== highNum.out;
-    limb1 <== lowNum.out;
+    // Calculate high 128 bits using constraint
+    limb0 <== (poseidon.out - limb1) / (1 << 128);
 }
 
 // Main test circuit
@@ -192,35 +189,22 @@ template PersonHashTest() {
     fatherBitCheck.in <== hasFather;
     motherBitCheck.in <== hasMother;
     
-    // Use Mux1 to conditionally output parent commitments (limbs)
-    component fatherSelect0 = Mux1();
-    component fatherSelect1 = Mux1();
-    component motherSelect0 = Mux1();
-    component motherSelect1 = Mux1();
-    
-    fatherSelect0.c[0] <== 0;  // Output 0 if father doesn't exist
-    fatherSelect0.c[1] <== fatherHasher.limb0;  // Output computed if father exists
-    fatherSelect0.s <== hasFather;
-    
-    fatherSelect1.c[0] <== 0;
-    fatherSelect1.c[1] <== fatherHasher.limb1;
-    fatherSelect1.s <== hasFather;
-    
-    motherSelect0.c[0] <== 0;  // Output 0 if mother doesn't exist
-    motherSelect0.c[1] <== motherHasher.limb0;  // Output computed if mother exists
-    motherSelect0.s <== hasMother;
-    
-    motherSelect1.c[0] <== 0;
-    motherSelect1.c[1] <== motherHasher.limb1;
-    motherSelect1.s <== hasMother;
-    
+    // Use arithmetic constraints for conditional parent output (more efficient than Mux1)
+    // If hasFather = 1, output fatherHasher limbs; if hasFather = 0, output 0
+    signal father_limb0_selected <== hasFather * fatherHasher.limb0;
+    signal father_limb1_selected <== hasFather * fatherHasher.limb1;
+
+    // If hasMother = 1, output motherHasher limbs; if hasMother = 0, output 0
+    signal mother_limb0_selected <== hasMother * motherHasher.limb0;
+    signal mother_limb1_selected <== hasMother * motherHasher.limb1;
+
     // Final outputs
     person_limb0 <== personHasher.limb0;
     person_limb1 <== personHasher.limb1;
-    father_limb0 <== fatherSelect0.out;
-    father_limb1 <== fatherSelect1.out;
-    mother_limb0 <== motherSelect0.out;
-    mother_limb1 <== motherSelect1.out;
+    father_limb0 <== father_limb0_selected;
+    father_limb1 <== father_limb1_selected;
+    mother_limb0 <== mother_limb0_selected;
+    mother_limb1 <== mother_limb1_selected;
     submitter_out <== submitter;
 }
 

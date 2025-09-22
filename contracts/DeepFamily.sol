@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "poseidon-solidity/PoseidonT4.sol";
 
 /**
  * @dev DeepFamily Token Contract Interface
@@ -197,7 +198,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   mapping(bytes32 => mapping(uint256 => bool)) public isVersionZKProofed;
 
   // ========== Story Sharding Storage Mappings ==========
-  
+
   /// @dev tokenId => story metadata
   mapping(uint256 => StoryMetadata) public storyMetadata;
 
@@ -458,23 +459,34 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /**
    * @notice Calculate unique person hash value
-   * @dev Uses fullNameHash + abi.encodePacked serialization with fixed 38-byte preimage, convenient for ZK circuit constraints.
+   * @dev Uses Poseidon hash to match ZK circuit implementation exactly
    */
   function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
     if (basicInfo.fullNameHash == bytes32(0)) revert InvalidFullName();
     if (basicInfo.birthMonth > 12) revert InvalidBirthMonth();
     if (basicInfo.birthDay > 31) revert InvalidBirthDay();
-    return
-      keccak256(
-        abi.encodePacked(
-          basicInfo.fullNameHash,
-          uint8(basicInfo.isBirthBC ? 1 : 0),
-          basicInfo.birthYear,
-          basicInfo.birthMonth,
-          basicInfo.birthDay,
-          basicInfo.gender
-        )
-      );
+
+    // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
+    uint256 limb0 = uint256(basicInfo.fullNameHash) >> 128; // High 128 bits
+    uint256 limb1 = uint256(basicInfo.fullNameHash) & ((1 << 128) - 1); // Low 128 bits
+
+    // Pack small fields into a single field element to match circuit's packedData
+    // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
+    uint256 packedData = (uint256(basicInfo.birthYear) << 24) |
+      (uint256(basicInfo.birthMonth) << 16) |
+      (uint256(basicInfo.birthDay) << 8) |
+      (uint256(basicInfo.gender) << 1) |
+      (basicInfo.isBirthBC ? 1 : 0);
+
+    // Poseidon(3) commitment over SNARK-friendly field elements
+    uint[3] memory inputs;
+    inputs[0] = limb0; // name hi128
+    inputs[1] = limb1; // name lo128
+    inputs[2] = packedData;
+
+    uint256 poseidonResult = PoseidonT4.hash(inputs);
+
+    return bytes32(poseidonResult);
   }
 
   /**

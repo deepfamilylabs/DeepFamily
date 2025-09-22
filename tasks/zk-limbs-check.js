@@ -1,9 +1,10 @@
 /*
-Poseidon limbs endianness/mapping check for PersonHash (Keccak removed)
+Poseidon limbs endianness/mapping check for PersonHash (3-input with packedData)
 
 What it does
 - Reads input JSON (same as circuit inputs) to fetch 32-byte fullNameHash arrays and scalar fields
-- Computes Poseidon commitment over [name_hi128, name_lo128, isBirthBC, birthYear, birthMonth, birthDay, gender]
+- Computes Poseidon commitment over [name_hi128, name_lo128, packedData] where:
+  packedData = (birthYear << 24) | (birthMonth << 16) | (birthDay << 8) | (gender << 1) | isBirthBC
 - Splits each commitment into 2×128-bit limbs in big-endian order: [hi128, lo128]
 - Prints expected publicSignals order for the current circuit/contract mapping:
   publicSignals = [
@@ -45,10 +46,6 @@ function bytesToBigIntBE(bytes) {
 
 function be128HiLoFromBytes32(bytes) {
   // Big-endian split to hi/lo 128 bits
-  const hi = bytes.slice(0, 16);
-  const lo = bytes.slice(16, 32);
-  const hiVal = bytesToBigIntBE([...hi, ...new Array(16).fill(0)].slice(0, 16).concat()); // not used directly
-  // Simpler: compute BigInt once and split
   const big = bytesToBigIntBE(bytes);
   return [big >> 128n, big & ((1n << 128n) - 1n)];
 }
@@ -67,7 +64,13 @@ async function buildExpectedSignalsFromInput(input) {
     const gender = BigInt(input[`${inputPrefix}gender`]);
 
     const [nameHi, nameLo] = be128HiLoFromBytes32(nameBytes);
-    const h = poseidon([nameHi, nameLo, isBirthBC, birthYear, birthMonth, birthDay, gender]);
+    const packedData =
+      (birthYear << 24n) |
+      (birthMonth << 16n) |
+      (birthDay << 8n) |
+      (gender << 1n) |
+      (isBirthBC & 1n);
+    const h = poseidon([nameHi, nameLo, packedData]);
     const hv = BigInt(F.toObject(h));
     const [hi, lo] = split128FromBigInt(hv);
     return [hi, lo];
@@ -77,7 +80,9 @@ async function buildExpectedSignalsFromInput(input) {
   const father = personCommitmentFrom("father_");
   const mother = personCommitmentFrom("mother_");
 
-  const submitter = input.submitter ? BigInt(getAddress(input.submitter)) : BigInt(getAddress(ZeroAddress));
+  const submitter = input.submitter
+    ? BigInt(getAddress(input.submitter))
+    : BigInt(getAddress(ZeroAddress));
 
   return [person[0], person[1], father[0], father[1], mother[0], mother[1], submitter];
 }
@@ -99,7 +104,9 @@ function parseArgs() {
 async function main() {
   const opts = parseArgs();
   if (!opts.input) {
-    console.log("Please provide --input pointing to the circuit input JSON (with 32-byte fullNameHash arrays).");
+    console.log(
+      "Please provide --input pointing to the circuit input JSON (with 32-byte fullNameHash arrays).",
+    );
     process.exit(1);
   }
 
@@ -121,7 +128,9 @@ async function main() {
       const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, opts.wasm, opts.zkey);
       console.log("Circuit publicSignals (decimal):", publicSignals);
 
-      const ok = publicSignals.length === expected.length && publicSignals.every((v, i) => BigInt(v) === expected[i]);
+      const ok =
+        publicSignals.length === expected.length &&
+        publicSignals.every((v, i) => BigInt(v) === expected[i]);
       console.log("Match:", ok);
       if (!ok) process.exitCode = 1;
     } catch (e) {

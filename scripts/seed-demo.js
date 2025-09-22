@@ -549,7 +549,11 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
 
     // 50% chance reference mother (if exists) unless reward mint disabled
     let mother = DISABLE_REWARD_MINT ? null : mothersMap.get(fatherNode.hash);
-    if (!DISABLE_REWARD_MINT && !mother && (fatherNode === mainChain[mainChain.length - 1] || rand() < 0.5)) {
+    if (
+      !DISABLE_REWARD_MINT &&
+      !mother &&
+      (fatherNode === mainChain[mainChain.length - 1] || rand() < 0.5)
+    ) {
       try {
         mother = await createMotherFor(fatherNode);
       } catch (e) {
