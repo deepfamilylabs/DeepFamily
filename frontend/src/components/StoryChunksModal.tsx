@@ -407,12 +407,25 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                       <div className="flex items-center gap-2">
                         <span className="font-mono whitespace-nowrap">#{person.tokenId}</span>
                         {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-full whitespace-nowrap">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Navigate to endorse page with person hash and version index
+                              const params = new URLSearchParams()
+                              if (person.personHash) params.set('hash', person.personHash)
+                              if (person.versionIndex) params.set('vi', person.versionIndex.toString())
+                              navigate(`/actions?tab=endorse&${params.toString()}`)
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 rounded-full whitespace-nowrap transition-colors cursor-pointer"
+                            title={t('storyChunksModal.clickToEndorse', 'Click to endorse this version')}
+                          >
                             <Star className="w-3 h-3 text-yellow-500" />
                             <span className="text-[9px] sm:text-[10px] font-medium text-yellow-700 dark:text-yellow-300">
                               {person.endorsementCount}
                             </span>
-                          </div>
+                          </button>
                         )}
                         {/* Moved People Encyclopedia button here after endorsement info */}
                         <button

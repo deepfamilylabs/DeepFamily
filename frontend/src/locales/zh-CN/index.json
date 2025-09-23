@@ -308,9 +308,13 @@
       "hashLabel": "哈希:",
       "description": "说明：计算逻辑与合约getPersonHash完全一致。",
       "bcOptions": {
-        "no": "否",
-        "yes": "是"
-      }
+        "ad": "公元",
+        "bc": "公元前"
+      },
+      "calculatedHash": "计算的哈希",
+      "contractHash": "合约哈希",
+      "hashesMatch": "哈希匹配",
+      "hashesNoMatch": "哈希不匹配"
     },
     "validation": {
       "nameRequired": "请输入姓名",
@@ -510,7 +514,24 @@
     },
     "contentTooLongBytes": "内容不能超过1000字节",
     "contentPlaceholderBytes": "请输入分片内容（最多1000字节，约=1000英文或≈333汉字）",
-    "offlineNoData": "离线模式：本地没有缓存该传记"
+    "offlineNoData": "离线模式：本地没有缓存该传记",
+    "errors": {
+      "mustBeNFTHolder": "您必须拥有此NFT才能编辑其传记",
+      "unauthorized": "无权限执行此操作",
+      "onlyOwner": "仅所有者可以执行此操作",
+      "storySealed": "传记已封存，无法修改",
+      "chunkIndexExists": "此索引位置的分片已存在",
+      "invalidChunkIndex": "无效的分片索引",
+      "contentTooLong": "内容超过最大长度限制",
+      "expectedHashMismatch": "预期哈希值不匹配",
+      "chunkHashMismatch": "分片内容与预期哈希值不匹配",
+      "chunkIndexOutOfRange": "分片索引超出有效范围",
+      "customError": "合约错误：{{error}}",
+      "transactionReverted": "交易失败：执行被回退",
+      "userRejected": "用户拒绝了交易",
+      "insufficientFunds": "Gas费不足",
+      "unknown": "发生未知错误"
+    }
   },
   "person": {
     "encyclopedia": "人物百科",
@@ -555,7 +576,8 @@
     "viewFamilyTree": "族谱视图",
     "invalidTokenId": "无效的 Token ID",
     "nonexistentToken": "该 Token 不存在",
-    "fetchFailed": "加载 Token 失败"
+    "fetchFailed": "加载 Token 失败",
+    "tokenId": "Token ID"
   },
   "people": {
     "syncing": "同步中...",

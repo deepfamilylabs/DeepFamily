@@ -37,6 +37,19 @@ export default function ActionsPage() {
       setEndorseModal({ isOpen: true, personHash: qHash, versionIndex: qIndex })
     }
   }, [address, searchParams])
+
+  // Auto-open MintNFT modal if URL carries target hash/index
+  useEffect(() => {
+    if (!address) return
+    const tabParam = searchParams.get('tab') as ActionTab
+    if (tabParam !== 'mint-nft') return
+    const qHash = searchParams.get('hash') || searchParams.get('personHash') || ''
+    const qIndexStr = searchParams.get('vi') || searchParams.get('version') || searchParams.get('versionIndex') || ''
+    const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN
+    if (qHash && Number.isFinite(qIndex) && qIndex > 0) {
+      setMintNFTModal({ isOpen: true, personHash: qHash, versionIndex: qIndex })
+    }
+  }, [address, searchParams])
   
   // Modal states
   const [addVersionModal, setAddVersionModal] = useState<{
@@ -104,7 +117,7 @@ export default function ActionsPage() {
           </p>
           
           <div className="space-y-6">
-            <WalletConnectButton className="mx-auto" />
+            <WalletConnectButton className="mx-auto" alwaysShowLabel />
             
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
               <div className="flex items-start gap-3">
