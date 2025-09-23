@@ -24,18 +24,18 @@ template HashToLimbs() {
     component limb0Bits = Bits2Num(128);
     component limb1Bits = Bits2Num(128);
 
-    // High 128 bits (bytes 0-15) - big-endian to match contract
+    // High 128 bits (bytes 0-15) - match contract: simple big-endian
     for (var i = 0; i < 16; i++) {
         for (var j = 0; j < 8; j++) {
-            limb0Bits.in[(15-i)*8 + (7-j)] <== byteCheck[i].out[j];
+            limb0Bits.in[i * 8 + (7 - j)] <== byteCheck[i].out[j];
         }
     }
     limb0 <== limb0Bits.out;
 
-    // Low 128 bits (bytes 16-31) - big-endian to match contract
+    // Low 128 bits (bytes 16-31) - match contract: simple big-endian
     for (var i = 0; i < 16; i++) {
         for (var j = 0; j < 8; j++) {
-            limb1Bits.in[(15-i)*8 + (7-j)] <== byteCheck[16+i].out[j];
+            limb1Bits.in[i * 8 + (7 - j)] <== byteCheck[16 + i].out[j];
         }
     }
     limb1 <== limb1Bits.out;
@@ -92,20 +92,22 @@ template PersonHasher() {
     poseidon.inputs[1] <== nameLimbs.limb1; // low 128 bits of fullNameHash
     poseidon.inputs[2] <== packedData;
 
-    // Split Poseidon output into two 128-bit limbs (optimized)
-    // Extract low 128 bits using bit decomposition
-    component fullBits = Num2Bits(256);
-    fullBits.in <== poseidon.out;
+    // Split Poseidon output into two 128-bit limbs for public signals
+    component outBits = Num2Bits(256);
+    outBits.in <== poseidon.out;
 
-    // Extract low 128 bits
-    component limb1Bits = Bits2Num(128);
+    component lowNum = Bits2Num(128);
     for (var k = 0; k < 128; k++) {
-        limb1Bits.in[k] <== fullBits.out[k];
+        lowNum.in[k] <== outBits.out[k]; // LSB first
     }
-    limb1 <== limb1Bits.out;
 
-    // Calculate high 128 bits using constraint
-    limb0 <== (poseidon.out - limb1) / (1 << 128);
+    component highNum = Bits2Num(128);
+    for (var k = 0; k < 128; k++) {
+        highNum.in[k] <== outBits.out[128 + k];
+    }
+
+    limb0 <== highNum.out;
+    limb1 <== lowNum.out;
 }
 
 // Main test circuit
