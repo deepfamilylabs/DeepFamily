@@ -96,12 +96,11 @@ const hashFormSchema = z.object({
 export type HashForm = z.infer<typeof hashFormSchema>
 
 // Hash calculation function using Poseidon (matches circuit and contract)
-export function computePersonHashLocal(input: HashForm): string {
+export function computePersonHash(input: HashForm): string {
   const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
 
-  // First compute fullNameHash exactly like the contract (still using Keccak256)
-  const nameBytes = new TextEncoder().encode(fullName)
-  const fullNameHash = ethers.keccak256(nameBytes)
+  // Compute fullNameHash exactly like the contract
+  const fullNameHash = ethers.keccak256(ethers.toUtf8Bytes(fullName))
 
   // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
   const fullNameHashBN = BigInt(fullNameHash)
@@ -117,46 +116,10 @@ export function computePersonHashLocal(input: HashForm): string {
     (isBirthBC ? 1n : 0n)
 
   // Poseidon(3) commitment over SNARK-friendly field elements
-  // Matching contract's uint[3] memory inputs
   const poseidonResult = poseidon3([limb0, limb1, packedData])
 
-  // Convert result to bytes32 format - this matches contract getPersonHash
+  // Convert result to bytes32 format
   return '0x' + poseidonResult.toString(16).padStart(64, '0')
-}
-
-// Circuit-exact hash calculation (matches actual ZK circuit behavior)
-export function computePersonHashCircuit(input: HashForm): string {
-  const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
-
-  // Generate fullNameHash as byte array like the ZK system does
-  const hash = ethers.keccak256(ethers.toUtf8Bytes(fullName))
-  const hashBN = BigInt(hash)
-  const limb0 = hashBN >> 128n
-  const limb1 = hashBN & ((1n << 128n) - 1n)
-
-  // Pack small fields into a single field element to match circuit's packedData
-  // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
-  const packedData = (BigInt(birthYear) << 24n) |
-    (BigInt(birthMonth) << 16n) |
-    (BigInt(birthDay) << 8n) |
-    (BigInt(gender) << 1n) |
-    (isBirthBC ? 1n : 0n)
-
-  // Poseidon(3) commitment over SNARK-friendly field elements
-  const poseidonResult = poseidon3([limb0, limb1, packedData])
-
-  // Convert result to bytes32 format - this should match actual Person Hash
-  return '0x' + poseidonResult.toString(16).padStart(64, '0')
-}
-
-// Raw form input type (before transformation)
-type HashFormInput = {
-  fullName: string
-  isBirthBC: boolean
-  birthYear: number | ''
-  birthMonth: number | ''
-  birthDay: number | ''
-  gender: number
 }
 
 // Component props interface
@@ -218,7 +181,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     gender: z.number().int().min(0).max(3),
   }), [t])
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm({
+  const { register, formState: { errors }, setValue, watch } = useForm({
     resolver: zodResolver(hashFormSchema),
     defaultValues: { 
       fullName: initialValues?.fullName || '', 
@@ -248,20 +211,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       gender: Number(gender || 0),
     }
     if (!transformedData.fullName.trim()) return ''
-    return computePersonHashLocal(transformedData)
-  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
-
-  const computedCircuitHash = useMemo(() => {
-    const transformedData: HashForm = {
-      fullName: fullName || '',
-      isBirthBC: isBirthBC || false,
-      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
-      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
-      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
-      gender: Number(gender || 0),
-    }
-    if (!transformedData.fullName.trim()) return ''
-    return computePersonHashCircuit(transformedData)
+    return computePersonHash(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
 
   // Function to call contract getPersonHash
@@ -343,7 +293,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <div className="basis-full sm:basis-[360px] md:basis-[420px] grow-0 shrink-0">
             <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
-              {t('search.hashCalculator.name')}
+              {t('search.hashCalculator.name')} <span className="text-red-500">*</span>
             </label>
             <input 
               className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
@@ -373,18 +323,18 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
         
         <div className="flex flex-nowrap items-start gap-1">
           <div className="flex items-start gap-1">
-            <div className="w-16 min-w-16">
+            <div className="w-35">
               <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                 {t('search.hashCalculator.isBirthBC')}
               </label>
-              <div className="h-10 flex items-center">
-                <label className="inline-flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none group">
-                  <input type="checkbox" className="sr-only" {...register('isBirthBC')} />
-                  <span className="relative w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-700 group-has-[:checked]:bg-blue-600 transition-colors duration-200 flex-shrink-0">
-                    <span className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 group-has-[:checked]:translate-x-5" />
-                  </span>
-                </label>
-              </div>
+              <ThemedSelect
+                value={isBirthBC ? 1 : 0}
+                onChange={(v) => setValue('isBirthBC', v === 1, { shouldValidate: true, shouldDirty: true })}
+                options={[
+                  { value: 0, label: t('search.hashCalculator.bcOptions.ad') },
+                  { value: 1, label: t('search.hashCalculator.bcOptions.bc') },
+                ]}
+              />
               <FieldError />
             </div>
             
@@ -438,7 +388,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
           {/* Local calculation result */}
           <div className="flex items-center gap-1 overflow-hidden">
             <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
-              Contract Style:
+              {t('search.hashCalculator.calculatedHash')}:
             </span>
             <HashInline value={computedHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
             <button
@@ -473,48 +423,10 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             </button>
           </div>
 
-          {/* Circuit-exact calculation result */}
+          {/* Contract verification result */}
           <div className="flex items-center gap-1 overflow-hidden">
             <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
-              Circuit Exact:
-            </span>
-            <HashInline value={computedCircuitHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                    await navigator.clipboard.writeText(computedCircuitHash)
-                    toast.show(t('search.copied'))
-                    return
-                  }
-                } catch {}
-                try {
-                  const ta = document.createElement('textarea')
-                  ta.value = computedCircuitHash
-                  ta.style.position = 'fixed'
-                  ta.style.left = '-9999px'
-                  document.body.appendChild(ta)
-                  ta.focus(); ta.select()
-                  const ok = document.execCommand('copy')
-                  document.body.removeChild(ta)
-                  toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                } catch {
-                  toast.show(t('search.copyFailed'))
-                }
-              }}
-              aria-label={t('search.copy')}
-              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-              title={t('search.copy')}
-            >
-              <Clipboard size={14} />
-            </button>
-          </div>
-
-          {/* Contract calculation result */}
-          <div className="flex items-center gap-1 overflow-hidden">
-            <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
-              Contract getPersonHash:
+              {t('search.hashCalculator.contractHash')}:
             </span>
             {contractLoading ? (
               <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
@@ -570,9 +482,9 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
           {contractHash && computedHash && (
             <div className="text-xs">
               {contractHash === computedHash ? (
-                <span className="text-green-600 dark:text-green-400">✓ Hashes match</span>
+                <span className="text-green-600 dark:text-green-400">✓ {t('search.hashCalculator.hashesMatch')}</span>
               ) : (
-                <span className="text-red-600 dark:text-red-400">✗ Hashes don't match</span>
+                <span className="text-red-600 dark:text-red-400">✗ {t('search.hashCalculator.hashesNoMatch')}</span>
               )}
             </div>
           )}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Clipboard, ChevronRight, Edit2, User } from 'lucide-react'
+import { X, Clipboard, ChevronRight, Edit2, User, Image, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
@@ -239,7 +239,7 @@ export default function NodeDetailModal({
     <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div
-          className={`relative flex flex-col w-full max-w-[680px] ${hasNFT ? 'h-[92vh]' : 'h-auto max-h-[92vh] mb-2'} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} will-change-transform`}
+          className={`relative flex flex-col w-full max-w-[720px] ${hasNFT ? 'h-[92vh]' : 'h-auto max-h-[92vh] mb-2'} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} will-change-transform`}
           style={{ transform: dragging ? `translateY(${dragOffset}px)` : undefined, transitionDuration: dragging ? '0ms' : undefined }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -286,26 +286,70 @@ export default function NodeDetailModal({
           <div className="space-y-1.5">
             <Row label={t('familyTree.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} />
             <Row label={t('familyTree.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
-            <Row label={t('familyTree.nodeDetail.endorsementCount')} value={nodeData?.endorsementCount ?? '-'} />
+            <Row
+              label={t('familyTree.nodeDetail.endorsementCount')}
+              value={
+                nodeData?.personHash && nodeData?.versionIndex ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Navigate to endorse page with person hash and version index
+                      const params = new URLSearchParams()
+                      if (nodeData?.personHash) params.set('hash', nodeData.personHash)
+                      if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
+                      navigate(`/actions?tab=endorse&${params.toString()}`)
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 rounded-full whitespace-nowrap transition-colors cursor-pointer text-[12px]"
+                    title={t('nodeDetail.clickToEndorse', 'Click to endorse this version')}
+                  >
+                    <Star className="w-3 h-3 text-yellow-500" />
+                    <span className="font-medium text-yellow-700 dark:text-yellow-300">
+                      {nodeData.endorsementCount ?? 0}
+                    </span>
+                  </button>
+                ) : (
+                  nodeData?.endorsementCount ?? '-'
+                )
+              }
+            />
             <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} />
             <Row label={t('familyTree.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
             <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} />
             <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
-            <Row label={t('familyTree.nodeDetail.addedBy')} value={shortAddress(nodeData?.addedBy) || '-'} copy={nodeData?.addedBy} />
+            <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} />
             <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
             <Row label={t('familyTree.nodeDetail.tag')} value={nodeData?.tag ?? '-'} />
             <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
-            {(isMinted(nodeData) || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
-              <div className="pt-1">
-                <div className="my-2 h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
-                <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-300 tracking-wide mb-1 flex items-center gap-2">
+            {/* NFT Section - show for all nodes */}
+            <div className="pt-1">
+              <div className="my-2 h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
+              <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-center text-[12px] leading-[1.15rem] mb-1">
+                <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-300 tracking-wide flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-sm bg-gray-400 dark:bg-gray-500" />{t('familyTree.nodeDetail.nft')}
                 </div>
+                {!isMinted(nodeData) && (
+                  <div className="flex gap-3 text-[11px] flex-wrap">
+                    <button
+                      onClick={() => {
+                        // Navigate to actions page with mint-nft tab and parameters
+                        const params = new URLSearchParams()
+                        if (nodeData?.personHash) params.set('hash', nodeData.personHash)
+                        if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
+                        navigate(`/actions?tab=mint-nft&${params.toString()}`)
+                      }}
+                      className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 underline flex items-center gap-1"
+                    >
+                      <Image size={11} />
+                      {t('actions.mintNFT')}
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-            {(isMinted(nodeData) || nodeData?.fullName || nodeData?.nftTokenURI || nodeData?.story) && (
+            </div>
+            {isMinted(nodeData) ? (
+              /* Already minted NFT - show NFT info */
               <>
-                <Row label={t('familyTree.nodeDetail.tokenId')} value={isMinted(nodeData) ? nodeData!.tokenId : '-'} copy={isMinted(nodeData) ? nodeData!.tokenId : undefined} />
+                <Row label={t('familyTree.nodeDetail.tokenId')} value={nodeData!.tokenId} copy={nodeData!.tokenId} />
                 {nodeData?.fullName && <Row label={t('familyTree.nodeDetail.fullName')} value={nodeData.fullName} />}
                 {nodeData?.gender !== undefined && (
                   <Row label={t('familyTree.nodeDetail.gender')} value={genderTextFn(nodeData.gender, t as any) || '-'} />
@@ -326,41 +370,37 @@ export default function NodeDetailModal({
                     <div className="font-mono text-[11px] text-gray-800 dark:text-gray-200 leading-snug whitespace-pre-wrap break-words min-w-0">{nodeData.story}</div>
                   </div>
                 )}
-                {isMinted(nodeData) && (
-                  <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('familyTree.nodeDetail.profile')}</div>
-                    <div className="space-y-1">
-                      <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
-                        <button
-                          onClick={() => {
-                            const url = `/person/${nodeData?.tokenId}`
-                            window.open(url, '_blank')
-                          }}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline flex items-center gap-1"
-                        >
-                          <ChevronRight size={11} />
-                          {t('familyTree.nodeDetail.viewFullStory')}
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (!nodeData?.tokenId) return
-                            navigate(`/editor/${nodeData.tokenId}`)
-                          }}
-                          className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 underline flex items-center gap-1"
-                        >
-                          <Edit2 size={11} />
-                          {t('familyTree.nodeDetail.editStory')}
-                        </button>
-                      </div>
+                <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
+                  <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('familyTree.nodeDetail.profile')}</div>
+                  <div className="space-y-1">
+                    <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
+                      <button
+                        onClick={() => {
+                          const url = `/person/${nodeData?.tokenId}`
+                          window.open(url, '_blank')
+                        }}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline flex items-center gap-1"
+                      >
+                        <ChevronRight size={11} />
+                        {t('familyTree.nodeDetail.viewFullStory')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!nodeData?.tokenId) return
+                          navigate(`/editor/${nodeData.tokenId}`)
+                        }}
+                        className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 underline flex items-center gap-1"
+                      >
+                        <Edit2 size={11} />
+                        {t('familyTree.nodeDetail.editStory')}
+                      </button>
                     </div>
                   </div>
-                )}
-                {isMinted(nodeData) && (
-                  <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} />
-                )}
+                </div>
+                <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} />
                 {nodeData?.nftTokenURI && <Row label={t('familyTree.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
               </>
-            )}
+            ) : null}
           </div>
           {/* Bottom spacer to ensure last row (e.g., URI) is visible above rounded edge / safe area */}
           <div className="h-3 sm:h-1" />

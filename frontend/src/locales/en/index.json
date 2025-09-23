@@ -307,9 +307,13 @@
       "hashLabel": "Hash:",
       "description": "Note: Calculation logic is completely consistent with the contract getPersonHash.",
       "bcOptions": {
-        "no": "No",
-        "yes": "Yes"
-      }
+        "ad": "AD",
+        "bc": "BC"
+      },
+      "calculatedHash": "Calculated Hash",
+      "contractHash": "Contract Hash",
+      "hashesMatch": "Hashes match",
+      "hashesNoMatch": "Hashes don't match"
     },
     "validation": {
       "nameRequired": "Please enter name",
@@ -509,7 +513,24 @@
     },
     "contentTooLongBytes": "Content must not exceed 1000 bytes",
     "contentPlaceholderBytes": "Enter chunk content (max 1000 bytes ≈ 1000 ASCII or ~333 CJK chars)",
-    "offlineNoData": "Offline mode: story not cached locally"
+    "offlineNoData": "Offline mode: story not cached locally",
+    "errors": {
+      "mustBeNFTHolder": "You must own this NFT to edit its story",
+      "unauthorized": "Not authorized to perform this action",
+      "onlyOwner": "Only the owner can perform this action",
+      "storySealed": "Story is sealed and cannot be modified",
+      "chunkIndexExists": "Chunk at this index already exists",
+      "invalidChunkIndex": "Invalid chunk index",
+      "contentTooLong": "Content exceeds maximum length",
+      "expectedHashMismatch": "Expected hash does not match",
+      "chunkHashMismatch": "Chunk content does not match expected hash",
+      "chunkIndexOutOfRange": "Chunk index is out of valid range",
+      "customError": "Contract error: {{error}}",
+      "transactionReverted": "Transaction failed: execution reverted",
+      "userRejected": "Transaction was rejected by user",
+      "insufficientFunds": "Insufficient funds for gas",
+      "unknown": "An unknown error occurred"
+    }
   },
   "person": {
     "encyclopedia": "Person Encyclopedia",

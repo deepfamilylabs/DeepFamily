@@ -307,9 +307,13 @@
       "hashLabel": "哈希:",
       "description": "說明：計算邏輯與合約getPersonHash完全一致。",
       "bcOptions": {
-        "no": "否",
-        "yes": "是"
-      }
+        "ad": "公元",
+        "bc": "公元前"
+      },
+      "calculatedHash": "計算的雜湊",
+      "contractHash": "合約雜湊",
+      "hashesMatch": "雜湊匹配",
+      "hashesNoMatch": "雜湊不匹配"
     },
     "validation": {
       "nameRequired": "請輸入姓名",
@@ -505,7 +509,24 @@
     },
     "contentTooLongBytes": "內容不能超過1000位元組",
     "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）",
-    "offlineNoData": "離線模式：本地沒有快取該傳記"
+    "offlineNoData": "離線模式：本地沒有快取該傳記",
+    "errors": {
+      "mustBeNFTHolder": "您必須擁有此NFT才能編輯其傳記",
+      "unauthorized": "無權限執行此操作",
+      "onlyOwner": "僅擁有者可以執行此操作",
+      "storySealed": "傳記已封存，無法修改",
+      "chunkIndexExists": "此索引位置的分片已存在",
+      "invalidChunkIndex": "無效的分片索引",
+      "contentTooLong": "內容超過最大長度限制",
+      "expectedHashMismatch": "預期雜湊值不匹配",
+      "chunkHashMismatch": "分片內容與預期雜湊值不匹配",
+      "chunkIndexOutOfRange": "分片索引超出有效範圍",
+      "customError": "合約錯誤：{{error}}",
+      "transactionReverted": "交易失敗：執行被回退",
+      "userRejected": "用戶拒絕了交易",
+      "insufficientFunds": "Gas費不足",
+      "unknown": "發生未知錯誤"
+    }
   },
   "person": {
     "encyclopedia": "人物百科",
@@ -550,7 +571,8 @@
     "viewFamilyTree": "族譜視圖",
     "invalidTokenId": "無效的 Token ID",
     "nonexistentToken": "該 Token 不存在",
-    "fetchFailed": "載入 Token 失敗"
+    "fetchFailed": "載入 Token 失敗",
+    "tokenId": "Token ID"
   },
   "people": {
     "syncing": "同步中...",

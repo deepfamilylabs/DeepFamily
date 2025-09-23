@@ -103,7 +103,8 @@ export default function StoryChunkEditor({
   }
   
   const computeContentHash = (content: string): string => {
-    return ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["string"], [content]))
+    // Use encodePacked to match the contract's _hashString function
+    return ethers.keccak256(ethers.toUtf8Bytes(content))
   }
 
   // Format hash (middle ellipsis)

@@ -85,14 +85,11 @@ export default function EndorseModal({
 
   // Unified target values: prefer props if provided, otherwise local state
   const targetPersonHash = (personHash ?? localPersonHash)?.trim()
-  const targetVersionIndex = (versionIndex ?? localVersionIndex)  
+  const targetVersionIndex = (versionIndex ?? localVersionIndex)
   const isPersonHashFormatValid = isBytes32(targetPersonHash)
-  
+
   // Determine modes and validity
   const hasValidTarget = Boolean(targetPersonHash && targetPersonHash !== '' && targetVersionIndex !== undefined && targetVersionIndex > 0)
-  // View mode only when target provided via parent props (navigation/use elsewhere)
-  const isViewMode = Boolean(personHash && personHash.trim() !== '' && versionIndex !== undefined && versionIndex > 0)
-
   // Desktop/mobile detection
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
@@ -200,19 +197,27 @@ export default function EndorseModal({
     loadEndorsementData()
   }, [isOpen, address, getVersionDetails, contract, hasValidTarget, targetPersonHash, targetVersionIndex])
 
-  // Initialize from URL parameters on open if parent didn't pass values
+  // Initialize from URL parameters and props on open
   useEffect(() => {
     if (!isOpen) return
-    // Only set local state if props are not provided/controlled
-    const hasPropHash = typeof personHash === 'string' && personHash.trim() !== ''
-    const hasPropIndex = typeof versionIndex === 'number' && versionIndex > 0
-    if (hasPropHash && hasPropIndex) return
     try {
+      // Get values from URL parameters
       const qHash = searchParams.get('hash') || searchParams.get('personHash') || ''
       const qIndexStr = searchParams.get('vi') || searchParams.get('version') || searchParams.get('versionIndex') || ''
       const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN
-      if (!hasPropHash && qHash) setLocalPersonHash(qHash)
-      if (!hasPropIndex && Number.isFinite(qIndex) && qIndex > 0) setLocalVersionIndex(qIndex)
+
+      // Prefer props, then URL params, then keep current local state
+      if (typeof personHash === 'string' && personHash.trim() !== '') {
+        setLocalPersonHash(personHash.trim())
+      } else if (qHash) {
+        setLocalPersonHash(qHash)
+      }
+
+      if (typeof versionIndex === 'number' && versionIndex > 0) {
+        setLocalVersionIndex(versionIndex)
+      } else if (Number.isFinite(qIndex) && qIndex > 0) {
+        setLocalVersionIndex(qIndex)
+      }
     } catch {}
   }, [isOpen, personHash, versionIndex, searchParams])
 
@@ -530,7 +535,7 @@ export default function EndorseModal({
         console.log('⏳ Waiting for blockchain state to update after approval...')
         let postAllowance: bigint = currentAllowance
         let retryCount = 0
-        const maxRetries = 8
+        const maxRetries = 16
 
         while (retryCount < maxRetries && postAllowance < required) {
           const waitTime = Math.min(500 + (retryCount * 300), 2000) // 500ms, 800ms, 1100ms, 1400ms, 1700ms, 2000ms...
@@ -923,8 +928,7 @@ export default function EndorseModal({
         <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0" style={{ touchAction: 'pan-y' }}>
           <div className="flex-1 p-4 sm:p-6 space-y-6">
           
-          {/* Person Hash and Version Input (when not in view mode) */}
-          {!isViewMode && (
+          {/* Person Hash and Version Input (always shown as editable) */}
             <div className="space-y-4">
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                 {t('endorse.targetVersion', 'Target Version')}
@@ -980,10 +984,9 @@ export default function EndorseModal({
                 </div>
               </div>
             </div>
-          )}
-          
-          {/* Version Info (when in view mode) */}
-          {isViewMode && (
+
+          {/* Version Info - now always displayed for reference */}
+          {hasValidTarget && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <Users className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />

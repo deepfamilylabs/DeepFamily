@@ -6,12 +6,14 @@ interface WalletConnectButtonProps {
   className?: string
   showBalance?: boolean
   variant?: 'home' | 'normal'
+  alwaysShowLabel?: boolean
 }
 
 export default function WalletConnectButton({ 
   className = '', 
   showBalance = true,
-  variant = 'normal'
+  variant = 'normal',
+  alwaysShowLabel = false
 }: WalletConnectButtonProps) {
   const {
     address,
@@ -51,7 +53,7 @@ export default function WalletConnectButton({
             }`}
           >
             <ExternalLink className="w-4 h-4" />
-            <span className="hidden lg:inline">Install Wallet</span>
+            <span className={alwaysShowLabel ? '' : 'hidden lg:inline'}>Install Wallet</span>
           </button>
         </div>
       )
@@ -71,12 +73,12 @@ export default function WalletConnectButton({
           {isConnecting ? (
             <>
               <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-              <span className="hidden lg:inline">{t('wallet.connecting', 'Connecting...')}</span>
+              <span className={alwaysShowLabel ? '' : 'hidden lg:inline'}>{t('wallet.connecting', 'Connecting...')}</span>
             </>
           ) : (
             <>
               <Wallet className="w-4 h-4" />
-              <span className="hidden lg:inline">{t('wallet.connect', 'Connect Wallet')}</span>
+              <span className={alwaysShowLabel ? '' : 'hidden lg:inline'}>{t('wallet.connect', 'Connect Wallet')}</span>
             </>
           )}
         </button>

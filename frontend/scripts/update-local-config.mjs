@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ethers } from 'ethers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +16,21 @@ const FRONTEND_DIR = path.dirname(__dirname);
 const PROJECT_ROOT = path.dirname(FRONTEND_DIR);
 const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, 'deployments', 'localhost');
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, '.env.local');
+
+// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
+async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
+  // First compute fullNameHash from fullName
+  const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
+
+  return await deepFamily.getPersonHash({
+    fullNameHash: fullNameHash,
+    isBirthBC: basicInfo.isBirthBC,
+    birthYear: basicInfo.birthYear,
+    birthMonth: basicInfo.birthMonth,
+    birthDay: basicInfo.birthDay,
+    gender: basicInfo.gender,
+  });
+}
 
 async function updateLocalConfig() {
   try {
@@ -36,6 +52,24 @@ async function updateLocalConfig() {
 
     console.log(`📄 Found DeepFamily contract at: ${contractAddress}`);
 
+    // Connect to contract and get root person hash
+    const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+    const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
+
+    // Demo root person info (same as in check-root.js)
+    const demo = {
+      fullName: "DemoRoot",
+      isBirthBC: false,
+      birthYear: 1970,
+      birthMonth: 1,
+      birthDay: 1,
+      gender: 1,
+      birthPlace: "US-CA-Los Angeles",
+    };
+
+    const rootPersonHash = await getPersonHashFromBasicInfo(deepFamily, demo);
+    console.log(`🔑 DemoRoot hash: ${rootPersonHash}`);
+
     // Read current .env.local or create from template
     let envContent = '';
     let isNewFile = false;
@@ -48,17 +82,6 @@ async function updateLocalConfig() {
       const envExamplePath = path.join(FRONTEND_DIR, '.env.example');
       if (fs.existsSync(envExamplePath)) {
         envContent = fs.readFileSync(envExamplePath, 'utf8');
-        // Remove comments and uncomment local development lines
-        envContent = envContent
-          .split('\\n')
-          .map(line => {
-            // Remove comment markers for local development
-            if (line.includes('VITE_CHAIN_ID=31337')) {
-              return 'VITE_CHAIN_ID=31337';
-            }
-            return line;
-          })
-          .join('\n');
         console.log('📄 Creating .env.local from .env.example');
         isNewFile = true;
       } else {
@@ -74,8 +97,7 @@ async function updateLocalConfig() {
     const updates = {
       'VITE_RPC_URL': 'http://127.0.0.1:8545',
       'VITE_CONTRACT_ADDRESS': contractAddress,
-      'VITE_CHAIN_ID': '31337',
-      'VITE_ROOT_PERSON_HASH': '0x82ed8e6e1fd21e3dd5413b80e81d2606ae07c16e3372a41468c76178478e1942',
+      'VITE_ROOT_PERSON_HASH': rootPersonHash,
       'VITE_ROOT_VERSION_INDEX': '1'
     };
 
@@ -104,7 +126,7 @@ async function updateLocalConfig() {
     console.log('\n📋 Current configuration:');
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Contract: ${contractAddress}`);
-    console.log(`   Chain ID: 31337`);
+    console.log(`   Root Hash: ${rootPersonHash}`);
     
     console.log('\n🚀 You can now start the frontend with: npm run dev');
 

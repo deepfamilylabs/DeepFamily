@@ -13,24 +13,23 @@ type ViewMode = 'grid' | 'list'
 type FilterType = 'all' | 'by_create_time' | 'by_name' | 'by_endorsement' | 'by_birth_year'
 type SortOrder = 'asc' | 'desc'
 
-// Helper function to get all descendant nodes from a root GraphNode
-const getSubtreeNodeIds = (root: GraphNode | null): string[] => {
+// Helper function to collect all nodes from root GraphNode tree structure
+const collectAllNodesFromTree = (root: GraphNode | null): GraphNode[] => {
   if (!root) return []
 
-  const nodeIds: string[] = []
+  const nodes: GraphNode[] = []
   const stack: GraphNode[] = [root]
 
   while (stack.length > 0) {
     const node = stack.pop()!
-    const nodeId = makeNodeId(node.personHash, Number(node.versionIndex))
-    nodeIds.push(nodeId)
+    nodes.push(node)
 
     if (node.children) {
       stack.push(...node.children)
     }
   }
 
-  return nodeIds
+  return nodes
 }
 
 export default function PeoplePage() {
@@ -85,12 +84,15 @@ export default function PeoplePage() {
 
   // Get person data from TreeDataContext, only show people from root subtree with NFTs
   const people = useMemo(() => {
-    // Get all node IDs in the current root's subtree
-    const subtreeNodeIds = getSubtreeNodeIds(root)
+    // Get all GraphNode instances from the root tree structure
+    const allTreeNodes = collectAllNodesFromTree(root)
 
-    // Only include nodes that are in the subtree and have NFTs
-    const subtreePeopleWithNFTs = subtreeNodeIds
-      .map(nodeId => nodesData[nodeId])
+    // Convert GraphNodes to NodeData format and filter for those with NFTs
+    const subtreePeopleWithNFTs = allTreeNodes
+      .map(graphNode => {
+        const nodeId = makeNodeId(graphNode.personHash, Number(graphNode.versionIndex))
+        return nodesData[nodeId]
+      })
       .filter(person => person && isMinted(person))
 
     // Group by personHash to get unique people (since one person can have multiple NFT versions)
@@ -111,9 +113,12 @@ export default function PeoplePage() {
 
   const data = useMemo(() => {
     // Calculate total NFT count from subtree only
-    const subtreeNodeIds = getSubtreeNodeIds(root)
-    const totalNFTs = subtreeNodeIds
-      .map(nodeId => nodesData[nodeId])
+    const allTreeNodes = collectAllNodesFromTree(root)
+    const totalNFTs = allTreeNodes
+      .map(graphNode => {
+        const nodeId = makeNodeId(graphNode.personHash, Number(graphNode.versionIndex))
+        return nodesData[nodeId]
+      })
       .filter(person => person && isMinted(person)).length
 
     return {
