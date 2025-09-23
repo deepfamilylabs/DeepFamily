@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, Book, Grid, List as ListIcon, User, Hash, X } from 'lucide-react'
-import { NodeData, isMinted } from '../types/graph'
+import { NodeData, isMinted, GraphNode, makeNodeId } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import PersonStoryCard from '../components/PersonStoryCard'
 import StoryChunksModal from '../components/StoryChunksModal'
@@ -13,9 +13,29 @@ type ViewMode = 'grid' | 'list'
 type FilterType = 'all' | 'by_create_time' | 'by_name' | 'by_endorsement' | 'by_birth_year'
 type SortOrder = 'asc' | 'desc'
 
+// Helper function to get all descendant nodes from a root GraphNode
+const getSubtreeNodeIds = (root: GraphNode | null): string[] => {
+  if (!root) return []
+
+  const nodeIds: string[] = []
+  const stack: GraphNode[] = [root]
+
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    const nodeId = makeNodeId(node.personHash, Number(node.versionIndex))
+    nodeIds.push(nodeId)
+
+    if (node.children) {
+      stack.push(...node.children)
+    }
+  }
+
+  return nodeIds
+}
+
 export default function PeoplePage() {
   const { t } = useTranslation()
-  const { nodesData, loading, getNodeByTokenId } = useTreeData()
+  const { nodesData, loading, getNodeByTokenId, root } = useTreeData()
   const location = useLocation()
   const navigate = useNavigate()
   // Track whether modal was opened by clicking inside this page
@@ -63,30 +83,38 @@ export default function PeoplePage() {
     setSelectedTags(prev => prev.filter(t => t !== tag))
   }
 
-  // Get person data from TreeDataContext, only show people with NFTs (people with stories)
+  // Get person data from TreeDataContext, only show people from root subtree with NFTs
   const people = useMemo(() => {
-    const peopleWithNFTs = Object.values(nodesData)
-      .filter(person => isMinted(person))
+    // Get all node IDs in the current root's subtree
+    const subtreeNodeIds = getSubtreeNodeIds(root)
+
+    // Only include nodes that are in the subtree and have NFTs
+    const subtreePeopleWithNFTs = subtreeNodeIds
+      .map(nodeId => nodesData[nodeId])
+      .filter(person => person && isMinted(person))
 
     // Group by personHash to get unique people (since one person can have multiple NFT versions)
     const uniquePeopleMap = new Map<string, NodeData>()
-    
-    peopleWithNFTs.forEach(person => {
+
+    subtreePeopleWithNFTs.forEach(person => {
       const personHash = person.personHash
       // If we haven't seen this personHash before, or if this version has more story chunks, use this version
       const existing = uniquePeopleMap.get(personHash)
-      if (!existing || 
+      if (!existing ||
           (person.storyMetadata?.totalChunks || 0) > (existing.storyMetadata?.totalChunks || 0)) {
         uniquePeopleMap.set(personHash, person)
       }
     })
 
     return Array.from(uniquePeopleMap.values())
-  }, [nodesData])
+  }, [nodesData, root])
 
   const data = useMemo(() => {
-    // Calculate total NFT count (all records with NFTs)
-    const totalNFTs = Object.values(nodesData).filter(person => isMinted(person)).length
+    // Calculate total NFT count from subtree only
+    const subtreeNodeIds = getSubtreeNodeIds(root)
+    const totalNFTs = subtreeNodeIds
+      .map(nodeId => nodesData[nodeId])
+      .filter(person => person && isMinted(person)).length
 
     return {
       people,
@@ -94,7 +122,7 @@ export default function PeoplePage() {
       totalNFTs, // Total NFT count (can be more than people count)
       loading
     }
-  }, [people, loading, nodesData])
+  }, [people, loading, nodesData, root])
 
   // Sync selectedPerson with URL query param (?person=tokenId|personHash|id)
   useLayoutEffect(() => {
