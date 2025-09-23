@@ -1055,8 +1055,8 @@ export default function EndorseModal({
             </div>
           </div>
 
-          {/* Insufficient Balance Warning */}
-          {!canAffordEndorsement && (
+          {/* Insufficient Balance Warning - only show if user hasn't endorsed yet */}
+          {!canAffordEndorsement && !hasEndorsed && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -1066,6 +1066,21 @@ export default function EndorseModal({
               </div>
               <p className="text-xs text-red-700 dark:text-red-300 mt-1">
                 {t('endorse.needMoreTokens', 'You need more DEEP tokens to endorse this version')}
+              </p>
+            </div>
+          )}
+
+          {/* Post-endorsement balance info */}
+          {!canAffordEndorsement && hasEndorsed && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  {t('endorse.endorsementComplete', 'Endorsement Complete')}
+                </span>
+              </div>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                {t('endorse.needMoreForNext', 'You need more DEEP tokens for additional endorsements')}
               </p>
             </div>
           )}

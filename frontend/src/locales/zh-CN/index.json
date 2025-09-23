@@ -773,6 +773,8 @@
       "feeNote": "DEEP 费用随当前挖矿奖励动态变化",
       "insufficientBalance": "DEEP 余额不足",
       "needMoreTokens": "余额不足，无法背书该版本",
+      "endorsementComplete": "背书完成",
+      "needMoreForNext": "需要更多 DEEP 代币以进行额外背书",
       "benefits": "背书的好处",
       "benefitQuality": "帮助验证与提升数据质量",
       "benefitPriority": "被背书版本在搜索中优先级更高",

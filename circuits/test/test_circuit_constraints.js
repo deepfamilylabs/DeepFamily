@@ -1,11 +1,11 @@
-const fs = require("fs");
-const path = require("path");
+const { calculateWitnessIsolated } = require("./witness_helper");
 
-async function basicValidation() {
+async function runCircuitConstraintTests() {
   try {
-    console.log("🔍 Basic Circuit Validation Test");
-    console.log("=================================\n");
+    console.log("🔍 Circuit Constraint Validation Tests");
+    console.log("=====================================\n");
 
+    // Common valid input for all tests
     const validInput = {
       fullNameHash: [
         27, 77, 65, 183, 140, 87, 191, 241, 252, 146, 63, 223, 38, 102, 117, 91, 194, 250, 225, 142,
@@ -34,17 +34,19 @@ async function basicValidation() {
       mother_birthMonth: 8,
       mother_birthDay: 20,
       mother_gender: 2,
+      hasFather: 1,
+      hasMother: 1,
       submitter: "1234567890123456789012345678901234567890",
     };
 
     let passedTests = 0;
     let totalTests = 0;
 
-    // Test 1: Basic functionality
+    // Test 1: Basic circuit execution
     totalTests++;
     console.log("1. Testing basic circuit execution...");
     try {
-      const result = await testInput(validInput);
+      const result = await calculateWitnessIsolated(validInput);
       console.log("✅ Circuit executes successfully");
       console.log(`   Person hash: ${result.publicSignals[0]}, ${result.publicSignals[1]}`);
       console.log(`   Father hash: ${result.publicSignals[2]}, ${result.publicSignals[3]}`);
@@ -55,25 +57,25 @@ async function basicValidation() {
       console.log("❌ Basic execution failed:", error.message);
     }
 
-    // Test 2: Invalid month constraint
+    // Test 2: Invalid birth month constraint
     totalTests++;
-    console.log("\n2. Testing invalid birth month constraint...");
+    console.log("\n2. Testing invalid birth month constraint (>12)...");
     try {
       const invalidMonth = { ...validInput, birthMonth: 13 };
-      await testInput(invalidMonth);
-      console.log("❌ Should have rejected invalid month");
+      await calculateWitnessIsolated(invalidMonth);
+      console.log("❌ Should have rejected invalid birth month");
     } catch (error) {
       console.log("✅ Correctly rejected invalid birth month");
       passedTests++;
     }
 
-    // Test 3: Invalid day constraint
+    // Test 3: Invalid birth day constraint
     totalTests++;
-    console.log("\n3. Testing invalid birth day constraint...");
+    console.log("\n3. Testing invalid birth day constraint (>31)...");
     try {
       const invalidDay = { ...validInput, birthDay: 32 };
-      await testInput(invalidDay);
-      console.log("❌ Should have rejected invalid day");
+      await calculateWitnessIsolated(invalidDay);
+      console.log("❌ Should have rejected invalid birth day");
     } catch (error) {
       console.log("✅ Correctly rejected invalid birth day");
       passedTests++;
@@ -81,58 +83,39 @@ async function basicValidation() {
 
     // Test 4: Invalid hash byte constraint
     totalTests++;
-    console.log("\n4. Testing invalid hash byte constraint...");
+    console.log("\n4. Testing invalid fullNameHash byte value (>255)...");
     try {
       const invalidHash = { ...validInput };
       invalidHash.fullNameHash[0] = 256;
-      await testInput(invalidHash);
+      await calculateWitnessIsolated(invalidHash);
       console.log("❌ Should have rejected invalid hash byte");
     } catch (error) {
-      console.log("✅ Correctly rejected invalid hash byte");
+      console.log("✅ Correctly rejected invalid hash byte value");
       passedTests++;
     }
 
-    console.log("\n=================================");
+    // Results summary
+    console.log("\n=====================================");
     console.log(`RESULTS: ${passedTests}/${totalTests} tests passed`);
 
     if (passedTests === totalTests) {
-      console.log("🎉 All basic validation tests PASSED!");
+      console.log("🎉 All circuit tests PASSED!");
       console.log("\nValidated Features:");
-      console.log("- ✅ Circuit executes and produces 7 public outputs");
-      console.log("- ✅ Month validation (≤12) works correctly");
-      console.log("- ✅ Day validation (≤31) works correctly");
-      console.log("- ✅ Hash byte validation (≤255) works correctly");
-      console.log("- ✅ PersonHasher template functions correctly for all 3 persons");
+      console.log("- ✅ Basic circuit execution with 7 public outputs");
+      console.log("- ✅ Input constraint validation (months ≤12, days ≤31, bytes ≤255)");
+      console.log("- ✅ PersonHasher template functions correctly for all persons");
       return true;
     } else {
-      console.log("❌ Some tests failed");
+      console.log("❌ Some circuit tests failed");
       return false;
     }
   } catch (error) {
-    console.error("❌ Validation failed:", error);
+    console.error("❌ Circuit test suite failed:", error);
     return false;
   }
 }
 
-async function testInput(input) {
-  // Create fresh instance each time to avoid state issues
-  const wasm = fs.readFileSync(
-    path.join(__dirname, "../../artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm"),
-  );
-  const wc = require("../../artifacts/circuits/person_hash_zk_js/witness_calculator.js");
-
-  const witnessCalculator = await wc(wasm);
-  const witness = await witnessCalculator.calculateWitness(input, 0);
-
-  const publicSignals = [];
-  for (let i = 1; i <= 7; i++) {
-    publicSignals.push(witness[i].toString());
-  }
-
-  return { witness, publicSignals };
-}
-
-// Run validation
-basicValidation().then((success) => {
+// Run the test suite
+runCircuitConstraintTests().then((success) => {
   process.exit(success ? 0 : 1);
 });

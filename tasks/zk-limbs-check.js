@@ -51,9 +51,7 @@ function be128HiLoFromBytes32(bytes) {
 }
 
 async function buildExpectedSignalsFromInput(input) {
-  const { buildPoseidon } = require("circomlibjs");
-  const poseidon = await buildPoseidon();
-  const F = poseidon.F;
+  const { poseidon } = require("circomlibjs");
 
   function personCommitmentFrom(inputPrefix) {
     const nameBytes = input[`${inputPrefix}fullNameHash`];
@@ -71,7 +69,7 @@ async function buildExpectedSignalsFromInput(input) {
       (gender << 1n) |
       (isBirthBC & 1n);
     const h = poseidon([nameHi, nameLo, packedData]);
-    const hv = BigInt(F.toObject(h));
+    const hv = BigInt(h);
     const [hi, lo] = split128FromBigInt(hv);
     return [hi, lo];
   }
@@ -125,7 +123,7 @@ async function main() {
       // Ensure submitter matches
       input.submitter = expected[6].toString();
 
-      const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, opts.wasm, opts.zkey);
+      const { publicSignals } = await snarkjs.groth16.fullProve(input, opts.wasm, opts.zkey);
       console.log("Circuit publicSignals (decimal):", publicSignals);
 
       const ok =
