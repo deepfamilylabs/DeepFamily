@@ -725,6 +725,8 @@
     "feeNote": "DEEP token fee is dynamic based on current mining rewards",
     "insufficientBalance": "Insufficient DEEP Token Balance",
     "needMoreTokens": "You need more DEEP tokens to endorse this version",
+    "endorsementComplete": "Endorsement Complete",
+    "needMoreForNext": "You need more DEEP tokens for additional endorsements",
     "benefits": "Benefits of Endorsing",
     "benefitQuality": "Help verify and improve data quality",
     "benefitPriority": "Endorsed versions get higher priority in searches",

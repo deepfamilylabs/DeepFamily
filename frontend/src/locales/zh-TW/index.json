@@ -774,6 +774,8 @@
     "feeNote": "DEEP 費用會隨目前挖礦獎勵動態變化",
     "insufficientBalance": "DEEP 餘額不足",
     "needMoreTokens": "餘額不足，無法背書此版本",
+    "endorsementComplete": "背書完成",
+    "needMoreForNext": "需要更多 DEEP 代幣以進行額外背書",
     "benefits": "背書的好處",
     "benefitQuality": "協助驗證並提升資料品質",
     "benefitPriority": "被背書版本在搜尋中優先級更高",

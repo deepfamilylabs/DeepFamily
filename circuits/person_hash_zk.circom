@@ -27,7 +27,7 @@ template HashToLimbs() {
     // High 128 bits (bytes 0-15) - match contract: simple big-endian
     for (var i = 0; i < 16; i++) {
         for (var j = 0; j < 8; j++) {
-            limb0Bits.in[i * 8 + (7 - j)] <== byteCheck[i].out[j];
+            limb0Bits.in[127 - (i * 8 + j)] <== byteCheck[i].out[7 - j];
         }
     }
     limb0 <== limb0Bits.out;
@@ -35,7 +35,7 @@ template HashToLimbs() {
     // Low 128 bits (bytes 16-31) - match contract: simple big-endian
     for (var i = 0; i < 16; i++) {
         for (var j = 0; j < 8; j++) {
-            limb1Bits.in[i * 8 + (7 - j)] <== byteCheck[16 + i].out[j];
+            limb1Bits.in[127 - (i * 8 + j)] <== byteCheck[16 + i].out[7 - j];
         }
     }
     limb1 <== limb1Bits.out;
