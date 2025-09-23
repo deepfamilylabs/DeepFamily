@@ -68,4 +68,10 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 };
 
 module.exports = func;
-module.exports.tags = ["DeepFamily", "DeepFamilyToken", "PersonHashVerifier", "PoseidonT4", "Integrated"];
+module.exports.tags = [
+  "DeepFamily",
+  "DeepFamilyToken",
+  "PersonHashVerifier",
+  "PoseidonT4",
+  "Integrated",
+];

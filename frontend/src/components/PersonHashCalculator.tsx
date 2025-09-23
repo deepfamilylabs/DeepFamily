@@ -7,6 +7,10 @@ import { ethers } from 'ethers'
 import { ChevronDown, Clipboard } from 'lucide-react'
 import { useToast } from './ToastProvider'
 import { formatHashMiddle } from '../types/graph'
+import { poseidon3 } from 'poseidon-lite'
+import { useConfig } from '../context/ConfigContext'
+import { makeProvider } from '../utils/provider'
+import DeepFamily from '../abi/DeepFamily.json'
 
 const MAX_FULL_NAME_BYTES = 256
 
@@ -91,46 +95,58 @@ const hashFormSchema = z.object({
 
 export type HashForm = z.infer<typeof hashFormSchema>
 
-// Hash calculation function
+// Hash calculation function using Poseidon (matches circuit and contract)
 export function computePersonHashLocal(input: HashForm): string {
   const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
-  
-  // First compute fullNameHash exactly like the contract
+
+  // First compute fullNameHash exactly like the contract (still using Keccak256)
   const nameBytes = new TextEncoder().encode(fullName)
   const fullNameHash = ethers.keccak256(nameBytes)
-  
-  // Now build PersonBasicInfo hash exactly matching the contract's abi.encodePacked:
-  // abi.encodePacked(fullNameHash, uint8(isBirthBC), birthYear, birthMonth, birthDay, gender)
-  // Total: 32 + 1 + 2 + 1 + 1 + 1 = 38 bytes
-  const buffer = new Uint8Array(38)
-  let offset = 0
-  
-  // fullNameHash (32 bytes)
-  const hashBytes = ethers.getBytes(fullNameHash)
-  buffer.set(hashBytes, offset)
-  offset += 32
-  
-  // isBirthBC as uint8 (1 byte)
-  buffer[offset] = isBirthBC ? 1 : 0
-  offset += 1
-  
-  // birthYear as uint16 big-endian (2 bytes)
-  buffer[offset] = (birthYear >> 8) & 0xff
-  buffer[offset + 1] = birthYear & 0xff
-  offset += 2
-  
-  // birthMonth as uint8 (1 byte)
-  buffer[offset] = birthMonth & 0xff
-  offset += 1
-  
-  // birthDay as uint8 (1 byte)
-  buffer[offset] = birthDay & 0xff
-  offset += 1
-  
-  // gender as uint8 (1 byte)
-  buffer[offset] = gender & 0xff
-  
-  return ethers.keccak256(buffer)
+
+  // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
+  const fullNameHashBN = BigInt(fullNameHash)
+  const limb0 = fullNameHashBN >> 128n // High 128 bits
+  const limb1 = fullNameHashBN & ((1n << 128n) - 1n) // Low 128 bits
+
+  // Pack small fields into a single field element to match circuit's packedData
+  // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
+  const packedData = (BigInt(birthYear) << 24n) |
+    (BigInt(birthMonth) << 16n) |
+    (BigInt(birthDay) << 8n) |
+    (BigInt(gender) << 1n) |
+    (isBirthBC ? 1n : 0n)
+
+  // Poseidon(3) commitment over SNARK-friendly field elements
+  // Matching contract's uint[3] memory inputs
+  const poseidonResult = poseidon3([limb0, limb1, packedData])
+
+  // Convert result to bytes32 format - this matches contract getPersonHash
+  return '0x' + poseidonResult.toString(16).padStart(64, '0')
+}
+
+// Circuit-exact hash calculation (matches actual ZK circuit behavior)
+export function computePersonHashCircuit(input: HashForm): string {
+  const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
+
+  // Generate fullNameHash as byte array like the ZK system does
+  const hash = ethers.keccak256(ethers.toUtf8Bytes(fullName))
+  const hashBN = BigInt(hash)
+  const limb0 = hashBN >> 128n
+  const limb1 = hashBN & ((1n << 128n) - 1n)
+
+  // Pack small fields into a single field element to match circuit's packedData
+  // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
+  const packedData = (BigInt(birthYear) << 24n) |
+    (BigInt(birthMonth) << 16n) |
+    (BigInt(birthDay) << 8n) |
+    (BigInt(gender) << 1n) |
+    (isBirthBC ? 1n : 0n)
+
+  // Poseidon(3) commitment over SNARK-friendly field elements
+  const poseidonResult = poseidon3([limb0, limb1, packedData])
+
+  // Convert result to bytes32 format - this should match actual Person Hash
+  return '0x' + poseidonResult.toString(16).padStart(64, '0')
 }
 
 // Raw form input type (before transformation)
@@ -173,6 +189,12 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const { t } = useTranslation()
   const [internalOpen, setInternalOpen] = useState(true)
   const toast = useToast()
+  const config = useConfig()
+
+  // Contract hash calculation state
+  const [contractHash, setContractHash] = useState<string>('')
+  const [contractLoading, setContractLoading] = useState(false)
+  const [contractError, setContractError] = useState<string | null>(null)
 
   // Use external state if provided, otherwise use internal state
   const currentOpen = collapsible ? (onToggle ? isOpen : internalOpen) : true
@@ -228,6 +250,58 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     if (!transformedData.fullName.trim()) return ''
     return computePersonHashLocal(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
+
+  const computedCircuitHash = useMemo(() => {
+    const transformedData: HashForm = {
+      fullName: fullName || '',
+      isBirthBC: isBirthBC || false,
+      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
+      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
+      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
+      gender: Number(gender || 0),
+    }
+    if (!transformedData.fullName.trim()) return ''
+    return computePersonHashCircuit(transformedData)
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
+
+  // Function to call contract getPersonHash
+  const callContractHash = async (formData: HashForm) => {
+    if (!formData.fullName.trim()) {
+      setContractHash('')
+      setContractError(null)
+      return
+    }
+
+    setContractLoading(true)
+    setContractError(null)
+
+    try {
+      const provider = makeProvider(config.rpcUrl)
+      const contract = new ethers.Contract(config.contractAddress, (DeepFamily as any).abi, provider)
+
+      // Create PersonBasicInfo struct
+      const nameBytes = new TextEncoder().encode(formData.fullName)
+      const fullNameHash = ethers.keccak256(nameBytes)
+
+      const basicInfo = {
+        fullNameHash: fullNameHash,
+        isBirthBC: formData.isBirthBC,
+        birthYear: formData.birthYear,
+        birthMonth: formData.birthMonth,
+        birthDay: formData.birthDay,
+        gender: formData.gender
+      }
+
+      const result = await contract.getPersonHash(basicInfo)
+      setContractHash(result)
+    } catch (error: any) {
+      console.error('Contract hash calculation failed:', error)
+      setContractError(error.message || 'Failed to calculate contract hash')
+      setContractHash('')
+    } finally {
+      setContractLoading(false)
+    }
+  }
   
   const onFormChangeRef = useRef(onFormChange)
   
@@ -238,7 +312,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   
   useEffect(() => {
     if (!onFormChangeRef.current) return
-    
+
     const transformedData: HashForm = {
       fullName: fullName || '',
       isBirthBC: isBirthBC || false,
@@ -249,6 +323,19 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     }
     onFormChangeRef.current(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
+
+  // Call contract hash when form data changes
+  useEffect(() => {
+    const transformedData: HashForm = {
+      fullName: fullName || '',
+      isBirthBC: isBirthBC || false,
+      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
+      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
+      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
+      gender: Number(gender || 0),
+    }
+    callContractHash(transformedData)
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, config.rpcUrl, config.contractAddress])
 
   const content = (
     <div className="space-y-2">
@@ -347,10 +434,11 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
         </div>
       </div>
       {computedHash && (
-        <div className="space-y-1">
+        <div className="space-y-2">
+          {/* Local calculation result */}
           <div className="flex items-center gap-1 overflow-hidden">
             <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
-              {t('search.hashCalculator.hashLabel')}
+              Contract Style:
             </span>
             <HashInline value={computedHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
             <button
@@ -384,6 +472,110 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
               <Clipboard size={14} />
             </button>
           </div>
+
+          {/* Circuit-exact calculation result */}
+          <div className="flex items-center gap-1 overflow-hidden">
+            <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
+              Circuit Exact:
+            </span>
+            <HashInline value={computedCircuitHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    await navigator.clipboard.writeText(computedCircuitHash)
+                    toast.show(t('search.copied'))
+                    return
+                  }
+                } catch {}
+                try {
+                  const ta = document.createElement('textarea')
+                  ta.value = computedCircuitHash
+                  ta.style.position = 'fixed'
+                  ta.style.left = '-9999px'
+                  document.body.appendChild(ta)
+                  ta.focus(); ta.select()
+                  const ok = document.execCommand('copy')
+                  document.body.removeChild(ta)
+                  toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                } catch {
+                  toast.show(t('search.copyFailed'))
+                }
+              }}
+              aria-label={t('search.copy')}
+              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              title={t('search.copy')}
+            >
+              <Clipboard size={14} />
+            </button>
+          </div>
+
+          {/* Contract calculation result */}
+          <div className="flex items-center gap-1 overflow-hidden">
+            <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
+              Contract getPersonHash:
+            </span>
+            {contractLoading ? (
+              <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
+            ) : contractError ? (
+              <span className="text-xs text-red-500">{contractError}</span>
+            ) : contractHash ? (
+              <>
+                <HashInline
+                  value={contractHash}
+                  className={`font-mono text-sm leading-none tracking-tight ${
+                    contractHash === computedHash
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        await navigator.clipboard.writeText(contractHash)
+                        toast.show(t('search.copied'))
+                        return
+                      }
+                    } catch {}
+                    try {
+                      const ta = document.createElement('textarea')
+                      ta.value = contractHash
+                      ta.style.position = 'fixed'
+                      ta.style.left = '-9999px'
+                      document.body.appendChild(ta)
+                      ta.focus(); ta.select()
+                      const ok = document.execCommand('copy')
+                      document.body.removeChild(ta)
+                      toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+                    } catch {
+                      toast.show(t('search.copyFailed'))
+                    }
+                  }}
+                  aria-label={t('search.copy')}
+                  className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  title={t('search.copy')}
+                >
+                  <Clipboard size={14} />
+                </button>
+              </>
+            ) : (
+              <span className="text-xs text-gray-500 dark:text-gray-400">-</span>
+            )}
+          </div>
+
+          {/* Comparison status */}
+          {contractHash && computedHash && (
+            <div className="text-xs">
+              {contractHash === computedHash ? (
+                <span className="text-green-600 dark:text-green-400">✓ Hashes match</span>
+              ) : (
+                <span className="text-red-600 dark:text-red-400">✗ Hashes don't match</span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
