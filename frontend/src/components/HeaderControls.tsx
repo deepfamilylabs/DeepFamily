@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Moon, Sun, Menu, Globe } from 'lucide-react'
 import LanguageSwitch from './LanguageSwitch'
 import WalletConnectButton from './WalletConnectButton'
+import { languages } from '../config/languages'
 
 interface HeaderControlsProps {
   variant?: 'home' | 'normal'
@@ -46,14 +47,6 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
       console.error('Error changing language:', error)
     })
   }
-
-  const languages = [
-    { code: 'en', name: 'English', nativeName: 'English' },
-    { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文' },
-    { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: '繁體中文' }
-  ]
-
-  const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0]
 
   const isHomePage = variant === 'home'
 

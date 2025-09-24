@@ -62,7 +62,7 @@ export default function SiteHeader() {
           </NavLink>
           <NavLink to="/familyTree" className={navClasses}>
             <Network className="w-4 h-4" /> 
-            <span className="hidden lg:inline">{t('navigation.genealogy', '族谱')}</span>
+            <span className="hidden lg:inline">{t('navigation.familyTree')}</span>
           </NavLink>
           <NavLink to="/people" className={navClasses}>
             <Book className="w-4 h-4" /> 

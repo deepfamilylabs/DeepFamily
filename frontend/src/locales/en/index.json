@@ -1,8 +1,7 @@
 {
   "navigation": {
     "home": "Home",
-    "familyTree": "FamilyTree",
-    "genealogy": "Tree",
+    "familyTree": "Tree",
     "search": "Search",
     "people": "People",
     "actions": "Actions"
