@@ -26,42 +26,37 @@ const normalizeCode = (value: string | null | undefined): string | undefined => 
   return normalized.length ? normalized : undefined
 }
 
-const mapToSupported = (value?: string | null): CanonicalLocale | undefined => {
+const resolveCanonicalLocale = (value?: string | null): CanonicalLocale | undefined => {
   const normalized = normalizeCode(value)
   if (!normalized) return undefined
-
-  if (SUPPORTED.includes(normalized as CanonicalLocale)) {
-    return normalized as CanonicalLocale
-  }
-
-  return 'en'
+  return SUPPORTED.find((locale) => locale.toLowerCase() === normalized)
 }
 
 const customLanguageDetector = {
   name: 'customDetector',
   lookup(): string {
-    const stored = mapToSupported(localStorage.getItem('i18nextLng'))
+    const stored = resolveCanonicalLocale(localStorage.getItem('i18nextLng'))
     if (stored) {
       return stored
     }
 
     const navigatorLanguages = navigator.languages || [navigator.language]
     for (const nav of navigatorLanguages) {
-      const resolved = mapToSupported(nav)
+      const resolved = resolveCanonicalLocale(nav)
       if (resolved) return resolved
     }
 
     return 'en'
   },
   cacheUserLanguage(lng: string) {
-    if (SUPPORTED.includes(lng as CanonicalLocale)) {
-      localStorage.setItem('i18nextLng', lng)
+    const canonical = resolveCanonicalLocale(lng)
+    if (canonical) {
+      localStorage.setItem('i18nextLng', canonical)
     }
   }
 }
 
 i18n
-  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
@@ -71,11 +66,6 @@ i18n
     nonExplicitSupportedLngs: false,
     ns: ['translation'],
     defaultNS: 'translation',
-    detection: {
-      order: ['localStorage', 'navigator'],
-      lookupLocalStorage: 'i18nextLng',
-      caches: ['localStorage'],
-    },
     interpolation: { escapeValue: false },
     debug: process.env.NODE_ENV === 'development',
     load: 'currentOnly',
