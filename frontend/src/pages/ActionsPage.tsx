@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Image, Star, Wallet, AlertCircle } from 'lucide-react'
@@ -72,7 +72,7 @@ export default function ActionsPage() {
     versionData?: any
   }>({ isOpen: false })
 
-  const tabs = [
+  const tabs = useMemo(() => [
     {
       id: 'add-version' as ActionTab,
       name: t('actions.add', 'Add'),
@@ -97,7 +97,7 @@ export default function ActionsPage() {
       description: t('actions.mintNFTDesc', 'Convert endorsed person data into valuable NFT collectibles'),
       color: 'purple'
     }
-  ]
+  ], [t])
 
   // Wallet not connected view
   if (!address) {

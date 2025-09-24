@@ -11,7 +11,7 @@
     "subtitle": "多版本可信谱系 · 经济激励背书 · NFT 价值归属 · 分片叙事封存 · 零知识证明隐私扩展",
     "exploreFamilyTree": "族谱图",
     "addPerson": "添加人物",
-    "participate": "搜索",
+    "search": "搜索",
     "searchGenealogy": "搜索族谱",
     "configSettings": "配置连接设置",
     "blockchainActions": "添加人物",
@@ -77,6 +77,26 @@
         "feature3": "挖矿奖励机制",
         "feature3Desc": "完善双亲引用的版本可获得 DEEP 代币奖励",
         "description": "特性：经济激励、价值发现、可验证叙事资产化"
+      },
+      "privacyLayer": {
+        "title": "隐私保护层",
+        "description": "基于零知识证明的隐私保护机制，确保敏感信息的安全性",
+        "feature1": "零知识证明验证",
+        "feature2": "敏感字段隐藏",
+        "feature3": "结构正确性验证"
+      },
+      "valueLayer": {
+        "title": "价值确认层",
+        "description": "通过经济激励和共识机制实现数据价值的确认与分配",
+        "feature1": "背书共识机制",
+        "feature2": "NFT 价值绑定",
+        "feature3": "收益权分配"
+      },
+      "flow": {
+        "dataInput": "数据输入",
+        "dataInputDesc": "结构化数据输入与验证",
+        "valueOutput": "价值输出",
+        "valueOutputDesc": "经过验证的价值确认输出"
       },
       "advantages": {
         "title": "运作流程",
@@ -201,12 +221,16 @@
     "cta": {
       "title": "开始构建您的数字族谱",
       "subtitle": "使用智能合约构建您的数字族谱，参与去中心化家族记录系统的建设",
+      "startButton": "开始构建",
+      "exploreButton": "探索族谱",
       "experience": "立即体验",
       "search": "搜索族谱",
       "configure": "配置连接",
       "opensource": "GitHub 开源项目",
       "free": "开源免费",
-      "license": "MIT 许可证"
+      "license": "MIT 许可证",
+      "privacy": "隐私保护",
+      "security": "安全保障"
     }
   },
   "search": {

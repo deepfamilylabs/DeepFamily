@@ -11,7 +11,7 @@
     "subtitle": "Multi-Version Trust Lineage · Economically Backed · NFT Value Ownership · Sharded Narrative Sealing · ZK Privacy Scaling",
     "exploreFamilyTree": "Family Tree",
     "addPerson": "Add Person", 
-    "participate": "Search",
+    "search": "Search",
     "searchGenealogy": "Search Family",
     "blockchainActions": "Add Person",
     "tagStrip": {
@@ -76,6 +76,26 @@
         "feature3": "Mining Reward Mechanism",
         "feature3Desc": "Versions with complete parent references receive DEEP token rewards",
         "description": "Features: Economic incentives, value discovery, verifiable narrative assetization"
+      },
+      "privacyLayer": {
+        "title": "Privacy Protection Layer",
+        "description": "Privacy protection mechanism based on zero-knowledge proofs, ensuring the security of sensitive information",
+        "feature1": "Zero-knowledge proof verification",
+        "feature2": "Sensitive field hiding",
+        "feature3": "Structural correctness verification"
+      },
+      "valueLayer": {
+        "title": "Value Confirmation Layer",
+        "description": "Achieving data value confirmation and distribution through economic incentives and consensus mechanisms",
+        "feature1": "Endorsement consensus mechanism",
+        "feature2": "NFT value binding",
+        "feature3": "Revenue rights distribution"
+      },
+      "flow": {
+        "dataInput": "Data Input",
+        "dataInputDesc": "Structured data input and verification",
+        "valueOutput": "Value Output",
+        "valueOutputDesc": "Verified value confirmation output"
       },
       "advantages": {
         "title": "Workflow",
@@ -199,13 +219,17 @@
     },
     "cta": {
       "title": "Start Building Your Digital Family Tree",
-      "subtitle": "Build your digital family tree using smart contracts and participate in constructing a decentralized family history recording system",
+      "subtitle": "Build your digital family tree using smart contracts and search in constructing a decentralized family history recording system",
+      "startButton": "Start Building",
+      "exploreButton": "Explore Family Tree",
       "experience": "Experience Now",
       "search": "Search Family",
       "configure": "Configure Connection",
       "opensource": "Open Source on GitHub",
       "free": "Free & Open Source",
-      "license": "MIT License"
+      "license": "MIT License",
+      "privacy": "Privacy Protection",
+      "security": "Security Guarantee"
     }
   },
   "search": {
