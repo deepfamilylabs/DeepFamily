@@ -124,7 +124,7 @@
       },
       "versionManagement": {
         "title": "인물 버전 관리",
-        "description": "다중 버전 병렬, 이름/부모/자식으로 색인 가능, 변조 불가하고 새로운 대체 서사만 추가 가능"
+        "description": "다중 버전 병렬, 부모/자식으로 색인 가능, 변조 불가하고 새로운 대체 서사만 추가 가능"
       },
       "endorsementEconomy": {
         "title": "승인 경제",

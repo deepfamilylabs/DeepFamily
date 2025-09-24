@@ -29,6 +29,12 @@ const WorkflowSection: React.FC = () => {
       title: t('home.architecture.advantages.step4', 'Write Story Shards'),
       description: t('home.architecture.advantages.step4Desc', 'NFT holders write/append person story fragments'),
       color: 'from-red-500 to-red-600'
+    },
+    {
+      number: 5,
+      title: t('home.architecture.advantages.step5', 'Story Sealing'),
+      description: t('home.architecture.advantages.step5Desc', 'Seal stories to form immutable on-chain historical records'),
+      color: 'from-orange-500 to-orange-600'
     }
   ]
 
@@ -47,7 +53,7 @@ const WorkflowSection: React.FC = () => {
 
         {/* Workflow Steps */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-gray-200/50 dark:border-gray-700/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             {steps.map((step, index) => (
               <div key={step.number} className="relative">
                 {/* Step Card */}

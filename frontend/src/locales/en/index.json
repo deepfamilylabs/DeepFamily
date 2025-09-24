@@ -123,7 +123,7 @@
       },
       "versionManagement": {
         "title": "Version Management", 
-        "description": "Multi-version coexistence, indexable by name/parents/children, immutable with only additive alternative narratives"
+        "description": "Multi-version coexistence, indexable by parents/children, immutable with only additive alternative narratives"
       },
       "endorsementEconomy": {
         "title": "Endorsement Economy",
