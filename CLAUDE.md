@@ -161,3 +161,7 @@ ETHERSCAN_API_KEY=              # Contract verification
 - English documentation
 - Synchronized test updates with new features
 - Pre-production auditing required
+- **STRICTLY FORBIDDEN**: Never include any AI identifiers, signatures, or acknowledgments in commit messages
+  - No "Generated with Claude", "Co-Authored-By: Claude", "By AI", "AI-generated", "Assisted by", etc.
+  - No references to artificial intelligence, automation tools, or AI assistance
+  - Commit messages must appear as if written by a human developer

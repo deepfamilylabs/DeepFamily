@@ -181,9 +181,9 @@ function getPersonHashJS(basic) {
 ### ZK Artifacts Structure
 ```
 frontend/public/zk/
-├── person_hash_zk.wasm          # Circuit execution (2.1MB)
-├── person_hash_zk_final.zkey    # Proving key (218MB)
-└── person_hash_zk.vkey.json     # Verification key (4KB)
+├── person_hash_zk.wasm          # Circuit execution
+├── person_hash_zk_final.zkey    # Proving key
+└── person_hash_zk.vkey.json     # Verification key
 ```
 
 ### File Descriptions
@@ -201,22 +201,8 @@ frontend/public/zk/
 3. **`.vkey.json` (Verification Key)**
    - Public verification parameters
    - Used for proof verification (on-chain and off-chain)
-   - Much smaller than proving key
+   - Compact file for verification purposes
 
-### Trusted Setup Process
-
-The current setup uses Powers of Tau ceremony:
-
-```bash
-# Phase 1: Universal setup (reusable)
-snarkjs powersoftau new bn128 19 pot19_0000.ptau
-snarkjs powersoftau contribute pot19_0000.ptau pot19_0001.ptau
-
-# Phase 2: Circuit-specific setup
-snarkjs powersoftau prepare phase2 pot19_final.ptau pot19_final.ptau
-snarkjs groth16 setup person_hash_zk.r1cs pot19_final.ptau person_hash_zk_0000.zkey
-snarkjs zkey contribute person_hash_zk_0000.zkey person_hash_zk_final.zkey
-```
 
 ## Smart Contract Integration
 
@@ -269,25 +255,6 @@ The limb-based representation reduces on-chain storage:
 - **Input Sanitization**: All user inputs are validated before circuit submission
 - **Proof Validation**: Optional client-side verification before submission
 
-## Performance Metrics
-
-### Circuit Complexity
-- **Constraints**: 455,324 constraints
-- **Witness Size**: 455,324 elements
-- **Proving Time**: ~2-3 seconds on modern hardware
-- **Verification Time**: <100ms
-
-### File Sizes
-- **Circuit WASM**: 2.1MB (affects initial load)
-- **Proving Key**: 218MB (significant bandwidth consideration)
-- **Verification Key**: 4KB (minimal impact)
-
-### Network Considerations
-For production deployment, consider:
-- **CDN Distribution**: Use CDN for large .zkey files
-- **Progressive Loading**: Load circuits on-demand
-- **Compression**: Enable gzip/brotli compression
-- **Caching Strategy**: Implement aggressive caching for static ZK files
 
 ## Testing and Validation
 
@@ -328,7 +295,7 @@ const tx = await submitAddPersonZK(signer, contractAddress, proof, ...)
 
 1. **Modify Circuit**: Update `person_hash_zk.circom`
 2. **Recompile**: Generate new `.wasm` and `.r1cs` files
-3. **Trusted Setup**: Create new `.zkey` with existing `.ptau`
+3. **Trusted Setup**: Generate new verification key
 4. **Update Frontend**: Modify input structure in `zk.ts`
 5. **Test Integration**: Validate end-to-end proof generation
 6. **Deploy Artifacts**: Update `frontend/public/zk/` files
