@@ -124,7 +124,7 @@
       },
       "versionManagement": {
         "title": "人物版本管理", 
-        "description": "多版本并列，按名字 / 父母 / 子代可索引，无法篡改只能新增替代叙述"
+        "description": "多版本并列，按父母 / 子代可索引，无法篡改只能新增替代叙述"
       },
       "endorsementEconomy": {
         "title": "背书经济",

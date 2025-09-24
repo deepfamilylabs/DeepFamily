@@ -124,7 +124,7 @@
       },
       "versionManagement": {
         "title": "人物版本管理",
-        "description": "多版本並列、名前/親/子代でインデックス可能、改竄不可で新増代替叙述のみ"
+        "description": "多版本並列、親/子代でインデックス可能、改竄不可で新増代替叙述のみ"
       },
       "endorsementEconomy": {
         "title": "承認経済",
