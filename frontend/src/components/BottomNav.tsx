@@ -41,7 +41,7 @@ export default function BottomNav() {
               }`}>
                 <Network className="w-4 h-4" />
               </div>
-              <span className="mt-1 text-[10px] leading-tight">{t('navigation.genealogy', '族谱')}</span>
+              <span className="mt-1 text-[10px] leading-tight">{t('navigation.familyTree')}</span>
             </>
           )}
         </NavLink>

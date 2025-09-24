@@ -2,48 +2,73 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 
-// Import language resources
 import zhCN from '../locales/zh-CN/index.json'
 import zhTW from '../locales/zh-TW/index.json'
 import en from '../locales/en/index.json'
+import ja from '../locales/ja/index.json'
+import ko from '../locales/ko/index.json'
 
 const resources = {
+  en: { translation: en },
+  ja: { translation: ja },
+  ko: { translation: ko },
   'zh-CN': { translation: zhCN },
   'zh-TW': { translation: zhTW },
-  'zh': { translation: zhCN }, // alias maps to Simplified Chinese
-  'en': { translation: en }
+} satisfies Record<string, { translation: Record<string, unknown> }>
+
+type CanonicalLocale = keyof typeof resources
+
+const SUPPORTED = Object.keys(resources) as CanonicalLocale[]
+
+const normalizeCode = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined
+  const normalized = value.trim().toLowerCase().replace(/_/g, '-')
+  return normalized.length ? normalized : undefined
 }
 
-const SUPPORTED = ['zh-CN', 'zh-TW', 'en', 'zh']
+const mapToSupported = (value?: string | null): CanonicalLocale | undefined => {
+  const normalized = normalizeCode(value)
+  if (!normalized) return undefined
 
-// Ensure default language setting
-const getInitialLanguage = () => {
-  const stored = localStorage.getItem('i18nextLng')
-  if (stored && SUPPORTED.includes(stored)) return stored === 'zh' ? 'zh-CN' : stored
-  // Try navigator languages
-  const nav = (navigator.languages || [navigator.language]).find(l => !!l)
-  if (nav) {
-    if (nav === 'zh') return 'zh-CN'
-    if (SUPPORTED.includes(nav)) return nav
-    // collapse generic zh-* to zh-CN
-    if (/^zh/i.test(nav)) return 'zh-CN'
+  if (SUPPORTED.includes(normalized as CanonicalLocale)) {
+    return normalized as CanonicalLocale
   }
-  return 'en' // Default to English
+
+  return 'en'
+}
+
+const customLanguageDetector = {
+  name: 'customDetector',
+  lookup(): string {
+    const stored = mapToSupported(localStorage.getItem('i18nextLng'))
+    if (stored) {
+      return stored
+    }
+
+    const navigatorLanguages = navigator.languages || [navigator.language]
+    for (const nav of navigatorLanguages) {
+      const resolved = mapToSupported(nav)
+      if (resolved) return resolved
+    }
+
+    return 'en'
+  },
+  cacheUserLanguage(lng: string) {
+    if (SUPPORTED.includes(lng as CanonicalLocale)) {
+      localStorage.setItem('i18nextLng', lng)
+    }
+  }
 }
 
 i18n
-  .use(LanguageDetector) // Detect user language
-  .use(initReactI18next) // Initialize react-i18next
+  .use(LanguageDetector)
+  .use(initReactI18next)
   .init({
     resources,
-    lng: getInitialLanguage(), // Use function to get initial language
-    fallbackLng: {
-      'zh': ['zh-CN'],
-      'zh-TW': ['zh-CN'],
-      'default': ['en']
-    },
+    lng: customLanguageDetector.lookup(),
+    fallbackLng: 'en',
     supportedLngs: SUPPORTED,
-    nonExplicitSupportedLngs: true,
+    nonExplicitSupportedLngs: false,
     ns: ['translation'],
     defaultNS: 'translation',
     detection: {
@@ -51,22 +76,14 @@ i18n
       lookupLocalStorage: 'i18nextLng',
       caches: ['localStorage'],
     },
-    interpolation: { escapeValue: false }, // React already protects against XSS
+    interpolation: { escapeValue: false },
     debug: process.env.NODE_ENV === 'development',
-    load: 'all',
+    load: 'currentOnly',
     cleanCode: true,
   })
 
-// Listen for language changes, ensure localStorage is always in sync
 i18n.on('languageChanged', (lng) => {
-  const normalized = lng === 'zh' ? 'zh-CN' : lng
-  localStorage.setItem('i18nextLng', normalized)
+  customLanguageDetector.cacheUserLanguage(lng)
 })
-
-// Ensure initial language setting is correct
-const currentLang = i18n.language === 'zh' ? 'zh-CN' : i18n.language
-if (currentLang && SUPPORTED.includes(currentLang)) {
-  localStorage.setItem('i18nextLng', currentLang)
-}
 
 export default i18n

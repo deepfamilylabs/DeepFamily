@@ -1,18 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Globe } from 'lucide-react'
-
-interface Language {
-  code: string
-  name: string
-  nativeName: string
-}
-
-const languages: Language[] = [
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文' },
-  { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: '繁體中文' }
-]
+import { languages, getLanguageByCode } from '../config/languages'
 
 interface LanguageSwitchProps {
   variant?: 'home' | 'normal'
@@ -46,7 +35,7 @@ export default function LanguageSwitch({ variant = 'home' }: LanguageSwitchProps
     })
   }
 
-  const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0]
+  const currentLanguage = getLanguageByCode(i18n.language)
 
   return (
     <div className="relative" ref={dropdownRef}>
