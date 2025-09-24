@@ -297,7 +297,7 @@
       "birthYearLabel": "出生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
-      "nameInputPlaceholder": "注意：英文名區分大小寫 (如：John Smith)",
+      "nameInputPlaceholder": "註：中文姓+名 (如：張三)",
       "toggleNo": "否",
       "toggleYes": "是",
       "birthPlace": "出生地(可選)",
@@ -324,7 +324,8 @@
       "required": "必填",
       "monthRange": "月份必須在0-12之間",
       "dayRange": "日期必須在0-31之間",
-      "yearRange": "年份必須在0-10000之間"
+      "yearRange": "年份必須在0-10000之間",
+      "yearExceedsCurrent": "公元年份不能超過當前年份"
     },
     "offset": "offset"
   },
@@ -762,6 +763,14 @@
     "errorMessage": "錯誤訊息",
     "errorDetails": "詳細資訊",
     "continueMinting": "繼續鑄造",
+    "validation": {
+      "birthPlaceTooLong": "出生地過長",
+      "deathPlaceTooLong": "死亡地過長",
+      "storyTooLong": "故事內容過長",
+      "tokenURITooLong": "Token URI 過長",
+      "invalidTokenURI": "無效的 URL 或 IPFS URI",
+      "yearExceedsCurrent": "公元年份不能超過當前年份"
+    },
     "errors": {
       "versionAlreadyMinted": "此版本已被鑄造為 NFT",
       "mustEndorseFirst": "您必須先背書此版本才能鑄造",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -79,26 +79,44 @@ const isValidTokenUri = (v: string) => {
   }
 }
 
-const mintNFTSchema = z.object({
+const createMintNFTSchema = (t: (key: string) => string) => z.object({
   // PersonSupplementInfo
-  birthPlace: z.string().max(256, 'Birth place too long'),
+  birthPlace: z.string().max(256, t('mintNFT.validation.birthPlaceTooLong')),
   isDeathBC: z.boolean(),
-  deathYear: z.number().min(0).max(9999),
-  deathMonth: z.number().min(0).max(12),
-  deathDay: z.number().min(0).max(31),
-  deathPlace: z.string().max(256, 'Death place too long'),
-  story: z.string().max(256, 'Story too long'),
-  
+  deathYear: z.union([z.number().int().min(0).max(9999), z.string()]).transform(val => {
+    if (val === '' || val === undefined) return 0;
+    return typeof val === 'string' ? (val === '' ? 0 : parseInt(val, 10)) : val;
+  }),
+  deathMonth: z.union([z.number().int().min(0).max(12), z.string()]).transform(val => {
+    if (val === '' || val === undefined) return 0;
+    return typeof val === 'string' ? (val === '' ? 0 : parseInt(val, 10)) : val;
+  }),
+  deathDay: z.union([z.number().int().min(0).max(31), z.string()]).transform(val => {
+    if (val === '' || val === undefined) return 0;
+    return typeof val === 'string' ? (val === '' ? 0 : parseInt(val, 10)) : val;
+  }),
+  deathPlace: z.string().max(256, t('mintNFT.validation.deathPlaceTooLong')),
+  story: z.string().max(256, t('mintNFT.validation.storyTooLong')),
+
   // NFT Metadata
   tokenURI: z
     .string()
-    .max(256, 'Token URI too long')
+    .max(256, t('mintNFT.validation.tokenURITooLong'))
     .optional()
     .or(z.literal(''))
-    .refine((v) => isValidTokenUri(v ?? ''), 'Invalid URL or IPFS URI')
+    .refine((v) => isValidTokenUri(v ?? ''), t('mintNFT.validation.invalidTokenURI'))
+}).refine((data) => {
+  // 如果是公元(AD)，年份不能超过当前年份
+  if (!data.isDeathBC && data.deathYear > new Date().getFullYear()) {
+    return false;
+  }
+  return true;
+}, {
+  message: t('mintNFT.validation.yearExceedsCurrent'),
+  path: ["deathYear"]
 })
 
-type MintNFTForm = z.infer<typeof mintNFTSchema>
+type MintNFTForm = z.infer<ReturnType<typeof createMintNFTSchema>>
 
 interface MintNFTModalProps {
   isOpen: boolean
@@ -131,6 +149,9 @@ export default function MintNFTModal({
   const { t } = useTranslation()
   const { address } = useWallet()
   const { mintPersonNFT, getVersionDetails, contract, getFullNameHash, getPersonHash } = useContract()
+
+  // Create schema with translations
+  const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t])
   const [searchParams] = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEndorsed, setIsEndorsed] = useState(false)
@@ -230,15 +251,15 @@ export default function MintNFTModal({
     reset,
     setValue,
     watch
-  } = useForm<MintNFTForm>({
+  } = useForm({
     resolver: zodResolver(mintNFTSchema),
     defaultValues: {
       // PersonSupplementInfo
       birthPlace: '',
       isDeathBC: false,
-      deathYear: 0,
-      deathMonth: 0,
-      deathDay: 0,
+      deathYear: '' as string | number,
+      deathMonth: '' as string | number,
+      deathDay: '' as string | number,
       deathPlace: '',
       story: '',
       tokenURI: ''
@@ -383,7 +404,7 @@ export default function MintNFTModal({
     // Keep modal open for continued use
   }
 
-  const onSubmit = async (data: MintNFTForm) => {
+  const onSubmit = async (data: any) => {
     if (!address) {
       alert(t('wallet.notConnected', 'Please connect your wallet'))
       return
@@ -413,6 +434,14 @@ export default function MintNFTModal({
     setContractError(null)
     setIsSubmitting(true)
 
+    // Convert form data to proper types
+    const processedData = {
+      ...data,
+      deathYear: data.deathYear === '' || data.deathYear === undefined ? 0 : Number(data.deathYear),
+      deathMonth: data.deathMonth === '' || data.deathMonth === undefined ? 0 : Number(data.deathMonth),
+      deathDay: data.deathDay === '' || data.deathDay === undefined ? 0 : Number(data.deathDay),
+    }
+
     console.log('🚀 Starting mint NFT process...')
 
     try {
@@ -433,13 +462,13 @@ export default function MintNFTModal({
         },
         supplementInfo: {
           fullName: personInfo.fullName,
-          birthPlace: data.birthPlace,
-          isDeathBC: data.isDeathBC,
-          deathYear: data.deathYear,
-          deathMonth: data.deathMonth,
-          deathDay: data.deathDay,
-          deathPlace: data.deathPlace,
-          story: data.story
+          birthPlace: processedData.birthPlace,
+          isDeathBC: processedData.isDeathBC,
+          deathYear: processedData.deathYear,
+          deathMonth: processedData.deathMonth,
+          deathDay: processedData.deathDay,
+          deathPlace: processedData.deathPlace,
+          story: processedData.story
         }
       }
 
@@ -470,14 +499,14 @@ export default function MintNFTModal({
       console.log('📞 Calling mintPersonNFT with:', {
         personHash: finalPersonHash,
         versionIndex: finalVersionIndex,
-        tokenURI: data.tokenURI || '',
+        tokenURI: processedData.tokenURI || '',
         coreInfo
       })
 
       const receipt = await mintPersonNFT(
         finalPersonHash,
         finalVersionIndex,
-        data.tokenURI || '',
+        processedData.tokenURI || '',
         coreInfo as any
       )
 
@@ -516,7 +545,7 @@ export default function MintNFTModal({
           tokenId,
           personHash: finalPersonHash,
           versionIndex: finalVersionIndex,
-          tokenURI: data.tokenURI || '',
+          tokenURI: processedData.tokenURI || '',
           transactionHash: receipt.hash || receipt.transactionHash || '',
           blockNumber: receipt.blockNumber || 0,
           events: {
@@ -525,7 +554,7 @@ export default function MintNFTModal({
               tokenId: mintedEvent.args?.tokenId || tokenId,
               owner: mintedEvent.args?.owner || address,
               versionIndex: mintedEvent.args?.versionIndex || finalVersionIndex,
-              tokenURI: mintedEvent.args?.tokenURI || data.tokenURI || '',
+              tokenURI: mintedEvent.args?.tokenURI || processedData.tokenURI || '',
               timestamp: mintedEvent.args?.timestamp || Math.floor(Date.now() / 1000)
             } : null
           }
@@ -860,7 +889,7 @@ export default function MintNFTModal({
 
                 <div className="flex flex-nowrap items-start gap-1">
                   <div className="flex items-start gap-1">
-                    <div className="w-35">
+                    <div className="w-24">
                       <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                         {t('search.hashCalculator.isBirthBC')}
                       </label>
@@ -873,45 +902,47 @@ export default function MintNFTModal({
                         ]}
                       />
                     </div>
-                    
-                    <div className="w-25">
+
+                    <div className="w-[120px]">
                       <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                         {t('search.hashCalculator.birthYearLabel')}
                       </label>
-                      <input 
-                        type="number" 
-                        placeholder="0" 
-                        className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
-                        {...register('deathYear', { setValueAs: (v) => v === '' ? 0 : parseInt(v, 10) })} 
+                      <input
+                        type="number"
+                        min="0"
+                        max={watch('isDeathBC') ? 9999 : new Date().getFullYear()}
+                        placeholder={t('search.hashCalculator.birthYear')}
+                        className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                        {...register('deathYear', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="w-24">
                     <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                       {t('search.hashCalculator.birthMonthLabel')}
                     </label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      max="12" 
-                      placeholder="0" 
-                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
-                      {...register('deathMonth', { setValueAs: (v) => v === '' ? 0 : parseInt(v, 10) })} 
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      placeholder={t('search.hashCalculator.birthMonth')}
+                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                      {...register('deathMonth', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })}
                     />
                   </div>
-                  
+
                   <div className="w-24">
                     <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                       {t('search.hashCalculator.birthDayLabel')}
                     </label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      max="31" 
-                      placeholder="0" 
-                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
-                      {...register('deathDay', { setValueAs: (v) => v === '' ? 0 : parseInt(v, 10) })} 
+                    <input
+                      type="number"
+                      min="0"
+                      max="31"
+                      placeholder={t('search.hashCalculator.birthDay')}
+                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                      {...register('deathDay', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })}
                     />
                   </div>
                 </div>
