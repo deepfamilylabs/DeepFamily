@@ -298,7 +298,7 @@
       "birthYearLabel": "出生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
-      "nameInputPlaceholder": "注意：英文名区分大小写 (如：John Smith)",
+      "nameInputPlaceholder": "注意：中文姓+名 (如：张三)",
       "toggleNo": "否",
       "toggleYes": "是",
       "birthPlace": "出生地(可选)",
@@ -325,7 +325,8 @@
       "required": "必填",
       "monthRange": "月份必须在0-12之间",
       "dayRange": "日期必须在0-31之间",
-      "yearRange": "年份必须在0-10000之间"
+      "yearRange": "年份必须在0-10000之间",
+      "yearExceedsCurrent": "公元年份不能超过当前年份"
     },
     "offset": "offset"
   },
@@ -761,6 +762,14 @@
     "nftMintedEventDesc": "NFT 已成功铸造并记录在链上",
     "owner": "所有者",
     "continueMinting": "继续铸造",
+    "validation": {
+      "birthPlaceTooLong": "出生地过长",
+      "deathPlaceTooLong": "死亡地过长",
+      "storyTooLong": "故事内容过长",
+      "tokenURITooLong": "Token URI 过长",
+      "invalidTokenURI": "无效的 URL 或 IPFS URI",
+      "yearExceedsCurrent": "公元年份不能超过当前年份"
+    },
     "errors": {
       "versionAlreadyMinted": "此版本已被铸造为 NFT",
       "mustEndorseFirst": "您必须先背书此版本才能铸造",

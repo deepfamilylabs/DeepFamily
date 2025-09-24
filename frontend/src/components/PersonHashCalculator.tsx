@@ -175,10 +175,19 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       .min(1, t('search.validation.required'))
       .refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
     isBirthBC: z.boolean(),
-    birthYear: z.union([z.number().int().min(0, t('search.validation.yearRange')).max(10000, t('search.validation.yearRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
+    birthYear: z.union([z.number().int().min(0, t('search.validation.yearRange')).max(9999, t('search.validation.yearRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     birthMonth: z.union([z.number().int().min(0, t('search.validation.monthRange')).max(12, t('search.validation.monthRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     birthDay: z.union([z.number().int().min(0, t('search.validation.dayRange')).max(31, t('search.validation.dayRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     gender: z.number().int().min(0).max(3),
+  }).refine((data) => {
+    // 如果是公元(AD)，年份不能超过当前年份
+    if (!data.isBirthBC && data.birthYear > new Date().getFullYear()) {
+      return false;
+    }
+    return true;
+  }, {
+    message: t('search.validation.yearExceedsCurrent'),
+    path: ["birthYear"]
   }), [t])
 
   const { register, formState: { errors }, setValue, watch } = useForm({
@@ -323,7 +332,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
         
         <div className="flex flex-nowrap items-start gap-1">
           <div className="flex items-start gap-1">
-            <div className="w-35">
+            <div className="w-24">
               <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                 {t('search.hashCalculator.isBirthBC')}
               </label>
@@ -338,15 +347,17 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
               <FieldError />
             </div>
             
-            <div className="w-25">
+            <div className="w-[120px]">
               <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                 {t('search.hashCalculator.birthYearLabel')}
               </label>
-              <input 
-                type="number" 
-                placeholder={t('search.hashCalculator.birthYear')} 
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
-                {...register('birthYear', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })} 
+              <input
+                type="number"
+                min="0"
+                max={isBirthBC ? 9999 : new Date().getFullYear()}
+                placeholder={t('search.hashCalculator.birthYear')}
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                {...register('birthYear', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })}
               />
               <FieldError message={errors.birthYear?.message} />
             </div>
