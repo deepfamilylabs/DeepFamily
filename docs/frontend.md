@@ -27,26 +27,26 @@
 ### **Project Structure**
 ```
 frontend/src/
-├── components/          # Reusable UI Components (33 files)
+├── components/          # Reusable UI Components
 │   ├── FamilyTree.tsx      # Main family tree container
 │   ├── FlexibleDAGView.tsx # Customizable tree layout
 │   ├── ForceDAGView.tsx    # Physics-based tree visualization
 │   ├── NodeDetailModal.tsx # Person information modal
 │   ├── WalletConnectButton.tsx # Web3 wallet integration
 │   └── ...                 # Additional UI components
-├── pages/               # Route Components (9 pages)
+├── pages/               # Route Components
 │   ├── Home.tsx            # Landing page
 │   ├── TreePage.tsx        # Family tree visualization
 │   ├── SearchPage.tsx      # Person search interface
 │   ├── PersonPage.tsx      # Individual person details
 │   ├── StoryEditorPage.tsx # Biography editing
 │   └── ...                 # Additional pages
-├── context/            # React Context Providers (7 contexts)
+├── context/            # React Context Providers
 │   ├── WalletContext.tsx   # Web3 wallet state management
 │   ├── TreeDataContext.tsx # Family tree data caching
 │   ├── ConfigContext.tsx   # Application configuration
 │   └── ...                 # Additional context providers
-├── hooks/              # Custom React Hooks (8 hooks)
+├── hooks/              # Custom React Hooks
 │   ├── useContract.ts      # Smart contract interaction
 │   ├── usePersonData.ts    # Person data fetching
 │   ├── useTreeData.ts      # Tree data management
@@ -106,14 +106,6 @@ VITE_ROOT_VERSION_INDEX=1
 # VITE_STRICT_CACHE_ONLY=true     # Enable strict cache-only mode
 ```
 
-### **ZK Artifacts Setup**
-- The frontend requires Groth16 artifacts for proof generation and verification. Two files are already included:
-  - `frontend/public/zk/person_hash_zk.wasm`
-  - `frontend/public/zk/person_hash_zk.vkey.json`
-- Due to its large size, the proving key is not checked in or hosted on the online demo. Download it and place it locally:
-  - Download: https://github.com/deepfamilylabs/DeepFamily/releases/download/v1.0.0/person_hash_zk_final.zkey
-  - Place at: `frontend/public/zk/person_hash_zk_final.zkey`
-- Once present, UI actions that require ZK proofs (e.g., “Add Version”) are enabled locally.
 
 ### **ABI Synchronization System**
 The frontend automatically syncs contract ABIs from Hardhat compilation:

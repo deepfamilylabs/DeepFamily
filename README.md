@@ -121,23 +121,23 @@ DeepFamily/
 │   └── PersonHashVerifier.sol # ZK proof verifier
 ├── frontend/               # React dApp
 │   ├── src/
-│   │   ├── components/        # UI components (33 files)
+│   │   ├── components/        # UI components
 │   │   │   ├── FlexibleDAGView.tsx    # Flexible family tree
 │   │   │   ├── ForceDAGView.tsx       # Force-directed tree
 │   │   │   ├── NodeDetailModal.tsx    # Person details
 │   │   │   └── ...
-│   │   ├── pages/            # Application routes (9 pages)
-│   │   ├── hooks/            # React hooks (8 hooks)
-│   │   ├── context/          # State management (7 contexts)
+│   │   ├── pages/            # Application routes
+│   │   ├── hooks/            # React hooks
+│   │   ├── context/          # State management
 │   │   ├── abi/              # Contract ABIs
 │   │   └── utils/            # Helper utilities
-├── test/                   # Hardhat Tests (8 test suites)
-├── tasks/                  # Hardhat Tasks (16 custom tasks)
+├── test/                   # Hardhat Tests
+├── tasks/                  # Hardhat Tasks
 ├── deploy/                 # Deployment Scripts
 ├── scripts/                # Utility Scripts
 │   ├── seed-demo.js          # Demo data seeding
 │   └── check-root.js         # Root node validation
-├── docs/                   # Documentation (7 guides)
+├── docs/                   # Documentation
 └── circuits/               # ZK Circuit Development
 ```
 
@@ -154,35 +154,25 @@ DeepFamily/
    git clone https://github.com/deepfamilylabs/DeepFamily.git
    cd DeepFamily
    ```
-2. ZK Proving Key (.zkey) for Local Use
-
-- Download `.zkey` (Groth16 proving key):
-  https://github.com/deepfamilylabs/DeepFamily/releases/download/v1.0.0/person_hash_zk_final.zkey
-- Place the file at: `frontend/public/zk/person_hash_zk_final.zkey`
-  - The frontend loads artifacts from `frontend/public/zk/` and expects the exact filenames:
-    - `person_hash_zk.wasm` (already included)
-    - `person_hash_zk.vkey.json` (already included)
-    - `person_hash_zk_final.zkey` (you need to download)
-
-3. Install dependencies
+2. Install dependencies
    ```bash
    npm run setup
    # Installs root + frontend dependencies
    ```
 
-4. Configure environment
+3. Configure environment
    ```bash
    cp .env.example .env
    # Required for deployment and verification
    PRIVATE_KEY=0x... # Your deployer wallet private key
    ```
 
-5. Compile smart contracts
+4. Compile smart contracts
    ```bash
    npm run build
    ```
 
-6. Run complete development environment
+5. Run complete development environment
    ```bash
    npm run dev:all
    # This starts: local node + contract deployment + demo data + frontend
@@ -238,7 +228,13 @@ npm run dev:deploy
 # 5. Seed demo data
 npm run dev:seed
 
-# 6. Start frontend development server
+# 6. Configure frontend environment
+npm run frontend:config
+
+# This automatically configures for local development
+# For manual configuration: copy frontend/.env.example to frontend/.env and update values
+
+# 7. Start frontend development server
 npm run frontend:dev
 ```
 
