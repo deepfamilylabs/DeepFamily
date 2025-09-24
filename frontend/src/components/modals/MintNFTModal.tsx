@@ -106,7 +106,7 @@ const createMintNFTSchema = (t: (key: string) => string) => z.object({
     .or(z.literal(''))
     .refine((v) => isValidTokenUri(v ?? ''), t('mintNFT.validation.invalidTokenURI'))
 }).refine((data) => {
-  // 如果是公元(AD)，年份不能超过当前年份
+  // If AD (Anno Domini), the year must not exceed the current year
   if (!data.isDeathBC && data.deathYear > new Date().getFullYear()) {
     return false;
   }

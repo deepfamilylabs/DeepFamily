@@ -180,7 +180,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     birthDay: z.union([z.number().int().min(0, t('search.validation.dayRange')).max(31, t('search.validation.dayRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     gender: z.number().int().min(0).max(3),
   }).refine((data) => {
-    // 如果是公元(AD)，年份不能超过当前年份
+    // If AD (Anno Domini), the year must not exceed the current year
     if (!data.isBirthBC && data.birthYear > new Date().getFullYear()) {
       return false;
     }
