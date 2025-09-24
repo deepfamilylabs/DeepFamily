@@ -11,7 +11,7 @@
     "subtitle": "多版本信頼系譜 · 経済的インセンティブ承認 · NFT価値帰属 · 分片叙事封存 · ゼロ知識証明プライバシー拡張",
     "exploreFamilyTree": "家系図",
     "addPerson": "人物追加",
-    "participate": "検索",
+    "search": "検索",
     "searchGenealogy": "家系図検索",
     "configSettings": "接続設定",
     "blockchainActions": "人物追加",
@@ -77,6 +77,26 @@
         "feature3": "マイニング報酬機制",
         "feature3Desc": "両親参照を完備した版本はDEEPトークン報酬を獲得",
         "description": "特性：経済インセンティブ、価値発見、検証可能叙事資産化"
+      },
+      "privacyLayer": {
+        "title": "プライバシー保護層",
+        "description": "ゼロ知識証明に基づくプライバシー保護機制、機密情報の安全性を確保",
+        "feature1": "ゼロ知識証明検証",
+        "feature2": "機密フィールド隠蔽",
+        "feature3": "構造正確性検証"
+      },
+      "valueLayer": {
+        "title": "価値確認層",
+        "description": "経済インセンティブと合意機制によりデータ価値の確認と配分を実現",
+        "feature1": "承認合意機制",
+        "feature2": "NFT価値結合",
+        "feature3": "収益権配分"
+      },
+      "flow": {
+        "dataInput": "データ入力",
+        "dataInputDesc": "構造化データ入力と検証",
+        "valueOutput": "価値出力",
+        "valueOutputDesc": "検証済み価値確認出力"
       },
       "advantages": {
         "title": "動作フロー",
@@ -201,12 +221,16 @@
     "cta": {
       "title": "あなたのデジタル家系図を構築開始",
       "subtitle": "スマートコントラクトを使用してデジタル家系図を構築し、分散型家族記録システム建設に参加",
+      "startButton": "構築開始",
+      "exploreButton": "家系図探索",
       "experience": "今すぐ体験",
       "search": "家系図検索",
       "configure": "接続設定",
       "opensource": "GitHubオープンソースプロジェクト",
       "free": "オープンソース無料",
-      "license": "MITライセンス"
+      "license": "MITライセンス",
+      "privacy": "プライバシー保護",
+      "security": "セキュリティ保証"
     }
   },
   "search": {

@@ -11,7 +11,7 @@
     "subtitle": "多版本可信譜系 · 經濟激勵背書 · NFT 價值歸屬 · 分片敘事封存 · 零知識證明隱私擴展",
     "exploreFamilyTree": "族譜圖",
     "addPerson": "添加人物",
-    "participate": "搜尋",
+    "search": "搜尋",
     "blockchainActions": "添加人物",
     "configSettings": "配置連接設定",
     "tagStrip": {
@@ -76,6 +76,26 @@
         "feature3": "挖礦獎勵機制",
         "feature3Desc": "完善雙親引用的版本可獲得 DEEP 代幣獎勵",
         "description": "特性：經濟激勵、價值發現、可驗證敘事資產化"
+      },
+      "privacyLayer": {
+        "title": "隱私保護層",
+        "description": "基於零知識證明的隱私保護機制，確保敏感資訊的安全性",
+        "feature1": "零知識證明驗證",
+        "feature2": "敏感欄位隱藏",
+        "feature3": "結構正確性驗證"
+      },
+      "valueLayer": {
+        "title": "價值確認層",
+        "description": "透過經濟激勵和共識機制實現資料價值的確認與分配",
+        "feature1": "背書共識機制",
+        "feature2": "NFT 價值綁定",
+        "feature3": "收益權分配"
+      },
+      "flow": {
+        "dataInput": "資料輸入",
+        "dataInputDesc": "結構化資料輸入與驗證",
+        "valueOutput": "價值輸出",
+        "valueOutputDesc": "經過驗證的價值確認輸出"
       },
       "advantages": {
         "title": "運作流程",
@@ -200,12 +220,16 @@
     "cta": {
       "title": "開始構建您的數位族譜",
       "subtitle": "使用智慧合約構建您的數位族譜，參與去中心化家族記錄系統的建設",
+      "startButton": "開始構建",
+      "exploreButton": "探索族譜",
       "experience": "立即體驗",
       "search": "搜尋族譜",
       "configure": "配置連接",
       "opensource": "GitHub 開源專案",
       "free": "開源免費",
-      "license": "MIT 許可證"
+      "license": "MIT 許可證",
+      "privacy": "隱私保護",
+      "security": "安全保障"
     }
   },
   "search": {

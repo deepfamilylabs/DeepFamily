@@ -11,7 +11,7 @@
     "subtitle": "다중 버전 신뢰 가계 • 경제적 인센티브 승인 • NFT 가치 귀속 • 샤드 서사 봉인 • 영지식 증명 개인정보 확장",
     "exploreFamilyTree": "가계도",
     "addPerson": "인물 추가",
-    "participate": "검색",
+    "search": "검색",
     "searchGenealogy": "가계도 검색",
     "configSettings": "연결 설정 구성",
     "blockchainActions": "인물 추가",
@@ -77,6 +77,26 @@
         "feature3": "채굴 보상 메커니즘",
         "feature3Desc": "완전한 부모 참조 버전은 DEEP 토큰 보상 획득",
         "description": "특성: 경제적 인센티브, 가치 발견, 검증 가능한 서사 자산화"
+      },
+      "privacyLayer": {
+        "title": "개인정보 보호 레이어",
+        "description": "영지식 증명 기반 개인정보 보호 메커니즘, 민감 정보의 안전성 보장",
+        "feature1": "영지식 증명 검증",
+        "feature2": "민감 필드 숨김",
+        "feature3": "구조 정확성 검증"
+      },
+      "valueLayer": {
+        "title": "가치 확인 레이어",
+        "description": "경제적 인센티브와 합의 메커니즘을 통한 데이터 가치 확인 및 배분 실현",
+        "feature1": "승인 합의 메커니즘",
+        "feature2": "NFT 가치 바인딩",
+        "feature3": "수익권 배분"
+      },
+      "flow": {
+        "dataInput": "데이터 입력",
+        "dataInputDesc": "구조적 데이터 입력 및 검증",
+        "valueOutput": "가치 출력",
+        "valueOutputDesc": "검증된 가치 확인 출력"
       },
       "advantages": {
         "title": "운영 프로세스",
@@ -201,12 +221,16 @@
     "cta": {
       "title": "디지털 가계도 구축 시작",
       "subtitle": "스마트 계약을 사용하여 디지털 가계도를 구축하고 탈중앙화 가족 기록 시스템 건설에 참여하세요",
+      "startButton": "구축 시작",
+      "exploreButton": "가계도 탐색",
       "experience": "지금 체험",
       "search": "가계도 검색",
       "configure": "연결 구성",
       "opensource": "GitHub 오픈 소스 프로젝트",
       "free": "오픈 소스 무료",
-      "license": "MIT 라이센스"
+      "license": "MIT 라이센스",
+      "privacy": "개인정보 보호",
+      "security": "보안 보장"
     }
   },
   "search": {
