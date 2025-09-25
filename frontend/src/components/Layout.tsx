@@ -18,9 +18,9 @@ export default function Layout() {
   const isHomePage = location.pathname === '/'
 
   return (
-    <div className="bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900" style={{ minHeight: '100vh' }}>
+    <div className="bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900 min-h-screen">
       <SiteHeader />
-      <main>
+      <main className="relative">
         {isHomePage ? (
           <Outlet />
         ) : (

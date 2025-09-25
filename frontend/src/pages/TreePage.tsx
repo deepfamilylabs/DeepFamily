@@ -28,7 +28,7 @@ export default function TreePage() {
   useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('df:viewMode', viewMode) }, [viewMode])
 
   return (
-    <div className="space-y-6 text-gray-900 dark:text-gray-100 overflow-visible pb-4 md:pb-0">
+    <div className="space-y-6 text-gray-900 dark:text-gray-100 overflow-visible pb-4 md:pb-0 w-full max-w-full">
       {SHOW_DEBUG && errors.length > 0 && (
         <div className="text-xs rounded border border-amber-300 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/30 p-2 space-y-1">
           <div className="font-medium text-amber-700 dark:text-amber-300">Debug Errors ({errors.length})</div>
