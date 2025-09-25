@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
 import { 
   User, 
@@ -25,6 +26,7 @@ interface PersonStoryCardProps {
 
 export default function PersonStoryCard({ person, viewMode, onClick }: PersonStoryCardProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { preloadStoryData } = useTreeData()
 
   const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
@@ -90,8 +92,21 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                       {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
                         <span className="flex items-center gap-1 whitespace-nowrap">
                           <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
-                          <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500" />
-                          <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Navigate to endorse page with person hash and version index
+                              const params = new URLSearchParams()
+                              if (person.personHash) params.set('hash', person.personHash)
+                              if (person.versionIndex) params.set('vi', person.versionIndex.toString())
+                              navigate(`/actions?tab=endorse&${params.toString()}`)
+                            }}
+                            className="flex items-center gap-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
+                            title={t('people.clickToEndorse', 'Click to endorse this version')}
+                          >
+                            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500" />
+                            <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
+                          </button>
                         </span>
                       )}
                     </span>
@@ -209,8 +224,21 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                   {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
                     <>
                       <span className="text-gray-300 dark:text-gray-600 mx-1">•</span>
-                      <Star className="w-3 h-3 text-yellow-500" />
-                      <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Navigate to endorse page with person hash and version index
+                          const params = new URLSearchParams()
+                          if (person.personHash) params.set('hash', person.personHash)
+                          if (person.versionIndex) params.set('vi', person.versionIndex.toString())
+                          navigate(`/actions?tab=endorse&${params.toString()}`)
+                        }}
+                        className="flex items-center gap-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
+                        title={t('people.clickToEndorse', 'Click to endorse this version')}
+                      >
+                        <Star className="w-3 h-3 text-yellow-500" />
+                        <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
+                      </button>
                     </>
                   )}
                 </div>
