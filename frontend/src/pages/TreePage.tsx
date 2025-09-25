@@ -81,11 +81,9 @@ export default function TreePage() {
               <div className="inline-flex rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-visible">
                 <div className="relative group">
                   <button type="button" aria-label={t('familyTree.config.strictCacheOff')} onClick={() => update({ strictCacheOnly: false })} className={`px-1.5 py-0.5 text-[10px] transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l ${!strictCacheOnly ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{t('familyTree.config.strictCacheOff')}</button>
-                  <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('familyTree.config.strictCacheOff')}</div>
                 </div>
                 <div className="relative group border-l border-slate-300 dark:border-slate-600">
                   <button type="button" aria-label={t('familyTree.config.strictCacheOn')} onClick={() => update({ strictCacheOnly: true })} className={`px-1.5 py-0.5 text-[10px] transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r ${strictCacheOnly ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{t('familyTree.config.strictCacheOn')}</button>
-                  <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{t('familyTree.config.strictCacheOn')}</div>
                 </div>
               </div>
             </div>

@@ -40,8 +40,8 @@ const TagStrip = memo(() => {
     <div className={TAG_STRIP_STYLES.container}>
       <div className={TAG_STRIP_STYLES.wrapper}>
         {TAG_DATA.map((tag, index) => (
-          <div key={tag.key} className={`${TAG_STRIP_STYLES.tagBase} border border-${tag.color}-200/50 dark:border-${tag.color}-600/30`}>
-            <div className={`${TAG_STRIP_STYLES.dotBase} bg-${tag.color}-500`} style={{ animationDelay: `${index * 200}ms` }} />
+          <div key={tag.key} className={`${TAG_STRIP_STYLES.tagBase} border ${tag.borderClass}`}>
+            <div className={`${TAG_STRIP_STYLES.dotBase} ${tag.dotClass}`} style={{ animationDelay: `${index * 200}ms` }} />
             <span className={TAG_STRIP_STYLES.text}>
               {t(`home.tagStrip.${tag.key}`)}
             </span>
@@ -69,13 +69,6 @@ const CTAButtons = memo(() => {
       icon: "Network",
       text: t('home.exploreFamilyTree'),
       className: `${CTA_BUTTON_STYLES.secondaryButton} ${CTA_BUTTON_STYLES.blueSecondary}`,
-      hasOverlay: false
-    },
-    {
-      to: "/search",
-      icon: "Search",
-      text: t('home.search'),
-      className: `${CTA_BUTTON_STYLES.secondaryButton} ${CTA_BUTTON_STYLES.greenSecondary}`,
       hasOverlay: false
     }
   ], [t])

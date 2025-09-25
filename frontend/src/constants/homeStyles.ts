@@ -47,10 +47,30 @@ export const HERO_CONTENT_STYLES = {
 
 // Tag data
 export const TAG_DATA = [
-  { key: 'protocol', color: 'blue' },
-  { key: 'incentive', color: 'purple' },
-  { key: 'nft', color: 'violet' },
-  { key: 'zk', color: 'emerald' }
+  { 
+    key: 'protocol', 
+    color: 'blue',
+    borderClass: 'border-blue-200/50 dark:border-blue-600/30',
+    dotClass: 'bg-blue-500'
+  },
+  { 
+    key: 'incentive', 
+    color: 'purple',
+    borderClass: 'border-purple-200/50 dark:border-purple-600/30',
+    dotClass: 'bg-purple-500'
+  },
+  { 
+    key: 'nft', 
+    color: 'violet',
+    borderClass: 'border-violet-200/50 dark:border-violet-600/30',
+    dotClass: 'bg-violet-500'
+  },
+  { 
+    key: 'zk', 
+    color: 'emerald',
+    borderClass: 'border-emerald-200/50 dark:border-emerald-600/30',
+    dotClass: 'bg-emerald-500'
+  }
 ] as const
 
 // Button configuration type

@@ -51,7 +51,7 @@ const ThemedSelect: React.FC<{
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -67,7 +67,7 @@ const ThemedSelect: React.FC<{
                 role="option"
                 aria-selected={o.value === value}
                 onClick={() => { onChange(o.value); setOpen(false) }}
-                className={`px-3 py-2 text-sm cursor-pointer select-none transition-colors ${
+                className={`px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
                   o.value === value
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                     : 'text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -299,20 +299,20 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const content = (
     <div className="space-y-2">
       <div className="w-full space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="basis-full sm:basis-[360px] md:basis-[420px] grow-0 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
             <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
               {t('search.hashCalculator.name')} <span className="text-red-500">*</span>
             </label>
             <input 
-              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
+              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
               placeholder={t('search.hashCalculator.nameInputPlaceholder')}
               {...register('fullName')} 
             />
             <FieldError message={errors.fullName?.message} />
           </div>
           
-          <div className="w-28">
+          <div className="w-28 sm:w-28 flex-shrink-0">
             <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
               {t('search.hashCalculator.gender')}
             </label>
@@ -332,7 +332,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
         
         <div className="flex flex-nowrap items-start gap-1">
           <div className="flex items-start gap-1">
-            <div className="w-24">
+            <div className="w-20">
               <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                 {t('search.hashCalculator.isBirthBC')}
               </label>
@@ -347,7 +347,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
               <FieldError />
             </div>
             
-            <div className="w-[120px]">
+            <div className="w-20 sm:w-[120px]">
               <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                 {t('search.hashCalculator.birthYearLabel')}
               </label>
@@ -355,8 +355,8 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
                 type="number"
                 min="0"
                 max={isBirthBC ? 9999 : new Date().getFullYear()}
-                placeholder={t('search.hashCalculator.birthYear')}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                placeholder={isBirthBC ? '<10000' : '<=' + new Date().getFullYear()}
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                 {...register('birthYear', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })}
               />
               <FieldError message={errors.birthYear?.message} />
@@ -372,7 +372,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
               min="0" 
               max="12" 
               placeholder={t('search.hashCalculator.birthMonth')} 
-              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
+              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
               {...register('birthMonth', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })} 
             />
             <FieldError message={errors.birthMonth?.message} />
@@ -387,7 +387,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
               min="0" 
               max="31" 
               placeholder={t('search.hashCalculator.birthDay')} 
-              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
+              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition" 
               {...register('birthDay', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })} 
             />
             <FieldError message={errors.birthDay?.message} />
