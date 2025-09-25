@@ -8,9 +8,6 @@ import { ChevronDown, Clipboard } from 'lucide-react'
 import { useToast } from './ToastProvider'
 import { formatHashMiddle } from '../types/graph'
 import { poseidon3 } from 'poseidon-lite'
-import { useConfig } from '../context/ConfigContext'
-import { makeProvider } from '../utils/provider'
-import DeepFamily from '../abi/DeepFamily.json'
 
 const MAX_FULL_NAME_BYTES = 256
 
@@ -152,12 +149,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const { t } = useTranslation()
   const [internalOpen, setInternalOpen] = useState(true)
   const toast = useToast()
-  const config = useConfig()
 
-  // Contract hash calculation state
-  const [contractHash, setContractHash] = useState<string>('')
-  const [contractLoading, setContractLoading] = useState(false)
-  const [contractError, setContractError] = useState<string | null>(null)
 
   // Use external state if provided, otherwise use internal state
   const currentOpen = collapsible ? (onToggle ? isOpen : internalOpen) : true
@@ -223,44 +215,6 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     return computePersonHash(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
 
-  // Function to call contract getPersonHash
-  const callContractHash = async (formData: HashForm) => {
-    if (!formData.fullName.trim()) {
-      setContractHash('')
-      setContractError(null)
-      return
-    }
-
-    setContractLoading(true)
-    setContractError(null)
-
-    try {
-      const provider = makeProvider(config.rpcUrl)
-      const contract = new ethers.Contract(config.contractAddress, (DeepFamily as any).abi, provider)
-
-      // Create PersonBasicInfo struct
-      const nameBytes = new TextEncoder().encode(formData.fullName)
-      const fullNameHash = ethers.keccak256(nameBytes)
-
-      const basicInfo = {
-        fullNameHash: fullNameHash,
-        isBirthBC: formData.isBirthBC,
-        birthYear: formData.birthYear,
-        birthMonth: formData.birthMonth,
-        birthDay: formData.birthDay,
-        gender: formData.gender
-      }
-
-      const result = await contract.getPersonHash(basicInfo)
-      setContractHash(result)
-    } catch (error: any) {
-      console.error('Contract hash calculation failed:', error)
-      setContractError(error.message || 'Failed to calculate contract hash')
-      setContractHash('')
-    } finally {
-      setContractLoading(false)
-    }
-  }
   
   const onFormChangeRef = useRef(onFormChange)
   
@@ -283,18 +237,6 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     onFormChangeRef.current(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
 
-  // Call contract hash when form data changes
-  useEffect(() => {
-    const transformedData: HashForm = {
-      fullName: fullName || '',
-      isBirthBC: isBirthBC || false,
-      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
-      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
-      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
-      gender: Number(gender || 0),
-    }
-    callContractHash(transformedData)
-  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, config.rpcUrl, config.contractAddress])
 
   const content = (
     <div className="space-y-2">
@@ -434,71 +376,6 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             </button>
           </div>
 
-          {/* Contract verification result */}
-          <div className="flex items-center gap-1 overflow-hidden">
-            <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
-              {t('search.hashCalculator.contractHash')}:
-            </span>
-            {contractLoading ? (
-              <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
-            ) : contractError ? (
-              <span className="text-xs text-red-500">{contractError}</span>
-            ) : contractHash ? (
-              <>
-                <HashInline
-                  value={contractHash}
-                  className={`font-mono text-sm leading-none tracking-tight ${
-                    contractHash === computedHash
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-red-600 dark:text-red-400'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                        await navigator.clipboard.writeText(contractHash)
-                        toast.show(t('search.copied'))
-                        return
-                      }
-                    } catch {}
-                    try {
-                      const ta = document.createElement('textarea')
-                      ta.value = contractHash
-                      ta.style.position = 'fixed'
-                      ta.style.left = '-9999px'
-                      document.body.appendChild(ta)
-                      ta.focus(); ta.select()
-                      const ok = document.execCommand('copy')
-                      document.body.removeChild(ta)
-                      toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                    } catch {
-                      toast.show(t('search.copyFailed'))
-                    }
-                  }}
-                  aria-label={t('search.copy')}
-                  className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                  title={t('search.copy')}
-                >
-                  <Clipboard size={14} />
-                </button>
-              </>
-            ) : (
-              <span className="text-xs text-gray-500 dark:text-gray-400">-</span>
-            )}
-          </div>
-
-          {/* Comparison status */}
-          {contractHash && computedHash && (
-            <div className="text-xs">
-              {contractHash === computedHash ? (
-                <span className="text-green-600 dark:text-green-400">✓ {t('search.hashCalculator.hashesMatch')}</span>
-              ) : (
-                <span className="text-red-600 dark:text-red-400">✗ {t('search.hashCalculator.hashesNoMatch')}</span>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
