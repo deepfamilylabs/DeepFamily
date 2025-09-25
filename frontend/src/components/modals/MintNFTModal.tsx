@@ -775,7 +775,7 @@ export default function MintNFTModal({
                       if (onVersionIndexChange) onVersionIndexChange(val)
                       else setLocalVersionIndex(val)
                     }}
-                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                    className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                     placeholder="1"
                   />
                 </div>
@@ -889,7 +889,7 @@ export default function MintNFTModal({
 
                 <div className="flex flex-nowrap items-start gap-1">
                   <div className="flex items-start gap-1">
-                    <div className="w-24">
+                    <div className="w-20">
                       <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                         {t('search.hashCalculator.isBirthBC')}
                       </label>
@@ -903,15 +903,15 @@ export default function MintNFTModal({
                       />
                     </div>
 
-                    <div className="w-[120px]">
+                    <div className="w-20 sm:w-[120px]">
                       <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
-                        {t('search.hashCalculator.birthYearLabel')}
+                        {t('mintNFT.deathYear', 'Death Year')}
                       </label>
                       <input
                         type="number"
                         min="0"
                         max={watch('isDeathBC') ? 9999 : new Date().getFullYear()}
-                        placeholder={t('search.hashCalculator.birthYear')}
+                        placeholder={watch('isDeathBC') ? '<10000' : '<=' + new Date().getFullYear()}
                         className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                         {...register('deathYear', { setValueAs: (v) => v === '' ? '' : parseInt(v, 10) })}
                       />
