@@ -1,25 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, User, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle } from 'lucide-react'
+import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle } from 'lucide-react'
 import { useWallet } from '../../context/WalletContext'
 import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
 import { useConfig } from '../../context/ConfigContext'
 import PersonHashCalculator from '../PersonHashCalculator'
 
 const addVersionSchema = z.object({
-  // Father and mother version indexes only
-  fatherVersionIndex: z.number().min(0),
-  motherVersionIndex: z.number().min(0),
-  
-  // Metadata
+  // Parent version indexes: allow empty string input, transform to 0 for processing
+  fatherVersionIndex: z.union([z.number().int().min(0), z.literal('')]).transform(val => val === '' ? 0 : val),
+  motherVersionIndex: z.union([z.number().int().min(0), z.literal('')]).transform(val => val === '' ? 0 : val),
   tag: z.string().max(50, 'Tag too long'),
   metadataCID: z.string().optional()
 })
 
-type AddVersionForm = z.infer<typeof addVersionSchema>
+// Input type (before transformation)
+type AddVersionFormInput = {
+  fatherVersionIndex: number | ''
+  motherVersionIndex: number | ''
+  tag: string
+  metadataCID?: string
+}
 
 interface AddVersionModalProps {
   isOpen: boolean
@@ -149,12 +153,12 @@ export default function AddVersionModal({
     formState: { errors },
     watch,
     reset
-  } = useForm<AddVersionForm>({
+  } = useForm<AddVersionFormInput>({
     resolver: zodResolver(addVersionSchema),
     defaultValues: {
-      // Parent version indexes only
-      fatherVersionIndex: 0,
-      motherVersionIndex: 0,
+      // Parent version indexes (empty string to show placeholder, will be converted to 0 if empty)
+      fatherVersionIndex: '',
+      motherVersionIndex: '',
       
       tag: '',
       metadataCID: ''
@@ -170,7 +174,7 @@ export default function AddVersionModal({
     const versionIndex = parentType === 'father' ? watchedValues.fatherVersionIndex : watchedValues.motherVersionIndex
     
     if (!info || !info.fullName.trim()) return 'empty'
-    if (info.fullName.trim() && versionIndex > 0) return 'complete'
+    if (info.fullName.trim() && typeof versionIndex === 'number' && versionIndex > 0) return 'complete'
     return 'partial'
   }
   
@@ -261,7 +265,7 @@ export default function AddVersionModal({
   }
 
 
-  const onSubmit = async (data: AddVersionForm) => {
+  const onSubmit = async (data: AddVersionFormInput) => {
     if (!signer) {
       alert(t('wallet.notConnected', 'Please connect your wallet'))
       return
@@ -271,6 +275,9 @@ export default function AddVersionModal({
       alert(t('addVersion.contractNotConfigured', 'Contract not configured'))
       return
     }
+
+    // Transform the input data to the final form
+    const processedData = addVersionSchema.parse(data)
 
     if (!personInfo || !personInfo.fullName.trim()) {
       alert(t('addVersion.personInfoRequired', 'Please fill in person information'))
@@ -326,10 +333,10 @@ export default function AddVersionModal({
         contractAddress,
         proof,
         publicSignals,
-        data.fatherVersionIndex,
-        data.motherVersionIndex,
-        data.tag,
-        data.metadataCID || ''
+        processedData.fatherVersionIndex,
+        processedData.motherVersionIndex,
+        processedData.tag,
+        processedData.metadataCID || ''
       )
 
       if (result) {
@@ -501,16 +508,18 @@ export default function AddVersionModal({
                   }}
                 />
                 
-                <div className="w-32">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {t('addVersion.versionIndex', 'Version Index')}
+                <div className="w-40">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
+                    {t('addVersion.versionIndex', 'Version Index')} ({t('addVersion.versionIndexHint')})
                   </label>
                   <input
                     type="number"
                     min="0"
-                    {...register('fatherVersionIndex', { valueAsNumber: true })}
+                    {...register('fatherVersionIndex', {
+                      setValueAs: (v) => v === '' ? '' : parseInt(v, 10)
+                    })}
                     className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                    placeholder="1"
+                    placeholder='0'
                   />
                 </div>
               </div>
@@ -562,16 +571,18 @@ export default function AddVersionModal({
                   }}
                 />
                 
-                <div className="w-32">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {t('addVersion.versionIndex', 'Version Index')}
+                <div className="w-40">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
+                    {t('addVersion.versionIndex', 'Version Index')} ({t('addVersion.versionIndexHint')})
                   </label>
                   <input
                     type="number"
                     min="0"
-                    {...register('motherVersionIndex', { valueAsNumber: true })}
+                    {...register('motherVersionIndex', {
+                      setValueAs: (v) => v === '' ? '' : parseInt(v, 10)
+                    })}
                     className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                    placeholder="1"
+                    placeholder='0'
                   />
                 </div>
               </div>

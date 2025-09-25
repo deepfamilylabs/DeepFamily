@@ -697,6 +697,7 @@
     "addNewVersion": "Add New Version",
     "addPerson": "Add Person",
     "description": "Add person with zero-knowledge proof",
+    "versionIndexHint": "0=Unknown version, 1+=Specific version number",
     "fatherInfo": "Father Information",
     "motherInfo": "Mother Information",
     "versionIndex": "Version Index",

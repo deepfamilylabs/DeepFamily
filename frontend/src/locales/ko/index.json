@@ -691,6 +691,8 @@
     "addNewVersion": "새 버전 추가",
     "addPerson": "인물 추가",
     "description": "영지식 증명으로 인물 추가",
+    "versionIndexHint": "0=알 수 없는 버전, 1+=구체적인 버전 번호",
+    "versionIndexPlaceholder": "0",
     "fatherInfo": "아버지 정보",
     "motherInfo": "어머니 정보",
     "versionIndex": "버전 번호",

@@ -985,35 +985,7 @@ export default function EndorseModal({
               </div>
             </div>
 
-          {/* Version Info - now always displayed for reference */}
-          {hasValidTarget && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Users className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  {t('endorse.versionInfo', 'Version Information')}
-                </h3>
-                <div className="mt-2 space-y-1 text-sm text-blue-700 dark:text-blue-200">
-                  {versionData?.fullName && (
-                    <div>
-                      <span className="font-medium">{t('endorse.fullName', 'Full Name')}:</span> {versionData.fullName}
-                    </div>
-                  )}
-                  <div>
-                      <span className="font-medium">{t('endorse.personHash', 'Person Hash')}:</span> {formatAddress(targetPersonHash || '')}
-                  </div>
-                  <div>
-                    <span className="font-medium">{t('endorse.versionIndex', 'Version')}:</span> {targetVersionIndex}
-                  </div>
-                  <div>
-                    <span className="font-medium">{t('endorse.currentEndorsements', 'Current Endorsements')}:</span> {currentEndorsementCount}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
+
 
           {/* DEEP Token Fee Info */}
           <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">

@@ -13,8 +13,8 @@ type ActionTab = 'add-version' | 'mint-nft' | 'endorse'
 
 export default function ActionsPage() {
   const { t } = useTranslation()
-  const { address, isConnecting } = useWallet()
-  const [searchParams] = useSearchParams()
+  const { address } = useWallet()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<ActionTab>('add-version')
 
   // Handle URL tab parameter
@@ -174,7 +174,10 @@ export default function ActionsPage() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    setSearchParams({ tab: tab.id })
+                  }}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
                       ? `text-${tab.color}-700 dark:text-${tab.color}-300 bg-white dark:bg-gray-700 shadow-sm`
