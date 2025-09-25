@@ -15,7 +15,7 @@ export default function BottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/80 dark:border-gray-700/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20 z-[9999]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/80 dark:border-gray-700/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20 z-[9999] transform-gpu" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex h-16 w-full px-2 gap-0 justify-between items-stretch">
         <NavLink to="/" className={navItemClasses} end>
           {({ isActive }) => (
