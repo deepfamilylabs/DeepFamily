@@ -691,7 +691,7 @@
     "addNewVersion": "添加新版本",
     "addPerson": "添加人物",
     "description": "使用零知识证明添加人物",
-    "versionIndexHint": "0=未知版本，1+=具体版本号",
+    "versionIndexHint": "0=未知",
     "fatherInfo": "父亲信息",
     "motherInfo": "母亲信息",
     "versionIndex": "版本序号",
