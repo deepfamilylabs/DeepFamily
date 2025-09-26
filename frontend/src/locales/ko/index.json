@@ -369,11 +369,13 @@
       "rpc": "RPC",
       "contract": "계약",
       "root": "루트 노드",
-      "clearAndRefresh": "캐시 지우고 새로 고침",
+      "clearAndRefresh": "지우기",
       "strictCacheOnly": "엄격 읽기 전용 캐시",
       "strictCacheOn": "오프라인 모드",
       "strictCacheOff": "온라인 모드",
-      "rootHistory": "루트 해시 기록"
+      "rootHistory": "루트 해시 기록",
+      "reset": "재설정",
+      "resetToDefaults": "환경 변수 기본값으로 재설정"
     },
     "ui": {
       "displaySettings": "데이터 옵션",
@@ -636,7 +638,8 @@
     "born": "출생",
     "died": "사망",
     "chunks": "{{count}}개 샤드",
-    "viewDetails": "보기"
+    "viewDetails": "보기",
+    "clickToEndorse": "이 버전을 승인하려면 클릭하세요"
   },
   "storyChunksModal": {
     "fetchError": "전기 데이터 로드 실패",

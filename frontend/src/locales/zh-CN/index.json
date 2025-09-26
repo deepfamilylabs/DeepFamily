@@ -369,11 +369,13 @@
       "rpc": "RPC",
       "contract": "合约",
       "root": "根节点",
-      "clearAndRefresh": "清空缓存并刷新",
+      "clearAndRefresh": "清空",
       "strictCacheOnly": "严格只读缓存",
       "strictCacheOn": "离线模式",
       "strictCacheOff": "在线模式",
-      "rootHistory": "根哈希历史"
+      "rootHistory": "根哈希历史",
+      "reset": "重置",
+      "resetToDefaults": "重置为环境变量默认值"
     },
     "ui": {
       "displaySettings": "数据选项",
@@ -636,7 +638,8 @@
     "born": "出生",
     "died": "逝世",
     "chunks": "{{count}} 个分片",
-    "viewDetails": "查看"
+    "viewDetails": "查看",
+    "clickToEndorse": "点击为此版本背书"
   },
   "storyChunksModal": {
     "fetchError": "加载传记数据失败",

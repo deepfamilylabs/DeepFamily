@@ -368,11 +368,13 @@
       "rpc": "RPC",
       "contract": "合約",
       "root": "根節點",
-      "clearAndRefresh": "清空並重新整理",
-      "strictCacheOnly": "嚴格只讀緩存",
+      "clearAndRefresh": "清空",
+      "strictCacheOnly": "嚴格唯讀快取",
       "strictCacheOn": "離線模式",
       "strictCacheOff": "線上模式",
-      "rootHistory": "根雜湊歷史"
+      "rootHistory": "根雜湊歷史",
+      "reset": "重置",
+      "resetToDefaults": "重置為環境變數預設值"
     },
     "ui": {
       "displaySettings": "數據選項",
@@ -631,7 +633,8 @@
     "born": "出生",
     "died": "逝世",
     "chunks": "{{count}} 個分片",
-    "viewDetails": "查看"
+    "viewDetails": "查看",
+    "clickToEndorse": "點擊為此版本背書"
   },
   "storyChunksModal": {
     "fetchError": "載入傳記資料失敗",

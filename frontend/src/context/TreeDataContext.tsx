@@ -899,6 +899,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const clearAllCaches = useCallback(() => {
     setNodesData({})
     setRoot(null)
+    setProgress(undefined)
     try {
       localStorage.removeItem(`${storageNS}::nodesData`)
       localStorage.removeItem(vizRootKey)

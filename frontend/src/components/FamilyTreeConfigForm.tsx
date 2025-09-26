@@ -19,7 +19,7 @@ interface Props {
 
 export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
   const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress)
@@ -66,6 +66,13 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
     localContractAddress !== contractAddress ||
     localRootHash !== rootHash
   )
+
+  const resetToDefaults = () => {
+    setLocalRpcUrl(defaults.rpcUrl)
+    setLocalContractAddress(defaults.contractAddress)
+    setLocalRootHash(defaults.rootHash)
+    setLocalVersion(defaults.rootVersionIndex)
+  }
 
   const applyConfigChanges = () => {
     if (!validateAll()) return
@@ -164,6 +171,11 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
             {editing ? (
               <div className="flex gap-2">
                 <button
+                  onClick={resetToDefaults}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-md hover:shadow-lg transition-all duration-200 font-semibold"
+                  title={t('familyTree.config.resetToDefaults')}
+                >{t('familyTree.config.reset')}</button>
+                <button
                   onClick={applyConfigChanges}
                   disabled={!hasDiff}
                   className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-semibold ${hasDiff ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md hover:shadow-lg' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'}`}
@@ -197,10 +209,17 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
           )}
           <button
             type="button"
-            onClick={() => { clearAllCaches(); onRefresh?.() }}
+            onClick={() => { clearAllCaches(); }}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-300 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
           >
-            <span className="truncate">{t('familyTree.config.clearAndRefresh', 'Clear Cache and Refresh')}</span>
+            <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+            <span className="truncate">{t('familyTree.config.clearAndRefresh', 'Clear')}</span>
           </button>
         </div>
       </div>
@@ -258,15 +277,16 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
         </div>
       ) : (
         <div className="space-y-2 text-slate-700 dark:text-slate-300">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.rpc')}:</span>
-            <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rpcUrl}>{rpcUrl}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.contract')}:</span>
-            <div className="flex-1 min-w-0">
-              <div className="inline-flex items-center gap-1 max-w-full">
-                <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={contractAddress}>
+          {/* RPC and Contract - responsive layout */}
+          <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
+            <div className="flex items-center gap-2 lg:flex-1 lg:min-w-0">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.rpc')}:</span>
+              <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rpcUrl}>{rpcUrl}</span>
+            </div>
+            <div className="flex items-center gap-2 lg:flex-shrink-0">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.contract')}:</span>
+              <div className="inline-flex items-center gap-1">
+                <span className="font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={contractAddress}>
                   <span className="inline sm:hidden">{shortAddress(contractAddress)}</span>
                   <span className="hidden sm:inline">{contractAddress}</span>
                 </span>
@@ -288,49 +308,52 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
 
       {/* Compact version controls */}
       <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.root')}:</span>
-          <div className="flex-1 min-w-0">
-            <div className="inline-flex items-center gap-1 max-w-full">
-              <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
-                <span className="inline sm:hidden">{formatHashMiddle(rootHash)}</span>
-                <span className="hidden sm:inline">{rootHash}</span>
-              </span>
-              {rootHash && (
-                <button
-                  onClick={() => copy(rootHash)}
-                  aria-label={t('search.copy', 'Copy')}
-                  className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                  title={t('search.copy', 'Copy') as string}
-                >
-                  <Clipboard size={14} />
-                </button>
-              )}
+        {/* Root and Version - responsive layout */}
+        <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
+          <div className="flex items-center gap-2 lg:flex-1 lg:min-w-0">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.root')}:</span>
+            <div className="flex-1 min-w-0">
+              <div className="inline-flex items-center gap-1 max-w-full">
+                <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
+                  <span className="inline sm:hidden">{formatHashMiddle(rootHash)}</span>
+                  <span className="hidden sm:inline">{rootHash}</span>
+                </span>
+                {rootHash && (
+                  <button
+                    onClick={() => copy(rootHash)}
+                    aria-label={t('search.copy', 'Copy')}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    title={t('search.copy', 'Copy') as string}
+                  >
+                    <Clipboard size={14} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.ui.versionNumber')}:</span>
-          <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
-            <button
-              className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
-              onClick={() => setLocalVersion(v => Math.max(1, (v || 1) - 1))}
-              aria-label="Decrease version"
-            >-</button>
-            <input
-              type="number"
-              min={1}
-              value={localVersion}
-              onChange={e => setLocalVersion(Math.max(1, Number(e.target.value)))}
-              onBlur={applyVersion}
-              onKeyDown={e => { if (e.key === 'Enter') applyVersion() }}
-              className="w-12 h-6 text-xs text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
-            />
-            <button
-              className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
-              onClick={() => setLocalVersion(v => (v || 1) + 1)}
-              aria-label="Increase version"
-            >+</button>
+          <div className="flex items-center gap-2 lg:flex-shrink-0">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.ui.versionNumber')}:</span>
+            <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
+              <button
+                className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
+                onClick={() => setLocalVersion(v => Math.max(1, (v || 1) - 1))}
+                aria-label="Decrease version"
+              >-</button>
+              <input
+                type="number"
+                min={1}
+                value={localVersion}
+                onChange={e => setLocalVersion(Math.max(1, Number(e.target.value)))}
+                onBlur={applyVersion}
+                onKeyDown={e => { if (e.key === 'Enter') applyVersion() }}
+                className="w-12 h-6 text-xs text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
+              />
+              <button
+                className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
+                onClick={() => setLocalVersion(v => (v || 1) + 1)}
+                aria-label="Increase version"
+              >+</button>
+            </div>
           </div>
         </div>
       </div>

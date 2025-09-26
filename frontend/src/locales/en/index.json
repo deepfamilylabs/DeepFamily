@@ -368,11 +368,13 @@
       "rpc": "RPC",
       "contract": "Contract",
       "root": "Root",
-      "clearAndRefresh": "Clear & Refresh",
+      "clearAndRefresh": "Clear",
       "strictCacheOnly": "Strict Cache Only",
       "strictCacheOn": "Offline Mode",
       "strictCacheOff": "Online Mode",
-      "rootHistory": "Root hash history"
+      "rootHistory": "Root hash history",
+      "reset": "Reset",
+      "resetToDefaults": "Reset to environment defaults"
     },
     "ui": {
       "displaySettings": "Data Options",
@@ -634,7 +636,8 @@
     "born": "Born",
     "died": "Died",
     "chunks": "{{count}} chunks",
-    "viewDetails": "View"
+    "viewDetails": "View",
+    "clickToEndorse": "Click to endorse this version"
   },
   "storyChunksModal": {
     "fetchError": "Failed to load story data",

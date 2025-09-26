@@ -369,11 +369,13 @@
       "rpc": "RPC",
       "contract": "コントラクト",
       "root": "ルートノード",
-      "clearAndRefresh": "キャッシュクリア・リフレッシュ",
+      "clearAndRefresh": "クリア",
       "strictCacheOnly": "厳密読み取り専用キャッシュ",
       "strictCacheOn": "オフラインモード",
       "strictCacheOff": "オンラインモード",
-      "rootHistory": "ルートハッシュ履歴"
+      "rootHistory": "ルートハッシュ履歴",
+      "reset": "リセット",
+      "resetToDefaults": "環境変数デフォルト値にリセット"
     },
     "ui": {
       "displaySettings": "データオプション",
@@ -636,7 +638,8 @@
     "born": "誕生",
     "died": "死去",
     "chunks": "{{count}} 個の分片",
-    "viewDetails": "表示"
+    "viewDetails": "表示",
+    "clickToEndorse": "クリックしてこの版本を承認"
   },
   "storyChunksModal": {
     "fetchError": "伝記データ読み込み失敗",
