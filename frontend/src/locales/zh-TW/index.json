@@ -686,7 +686,7 @@
     "addNewVersion": "新增版本",
     "addPerson": "新增人物",
     "description": "使用零知識證明新增人物",
-    "versionIndexHint": "0=未知版本，1+=具體版本號",
+    "versionIndexHint": "0=未知",
     "fatherInfo": "父親資訊",
     "motherInfo": "母親資訊",
     "versionIndex": "版本序號",
