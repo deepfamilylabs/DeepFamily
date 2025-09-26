@@ -368,7 +368,7 @@
     "config": {
       "rpc": "RPC",
       "contract": "コントラクト",
-      "root": "ルートノード",
+      "root": "ルートノード ハッシュ",
       "clearAndRefresh": "クリア",
       "strictCacheOnly": "厳密読み取り専用キャッシュ",
       "strictCacheOn": "オフラインモード",
@@ -380,7 +380,7 @@
     "ui": {
       "displaySettings": "データオプション",
       "versionNumber": "版本番号",
-      "contractModeConfig": "コントラクト設定",
+      "contractModeConfig": "設定",
       "traversalDFS": "DFS深度優先：高速深入、パス順に下降後バックトラック",
       "traversalBFS": "BFS幅優先：階層順に展開、層構造がより直感的",
       "traversal": "トラバーサル方式",
@@ -402,7 +402,7 @@
       "badge": {
         "checking": "チェック中",
         "ok": "正常",
-        "root_missing": "ルートノード不足",
+        "root_missing": "ルートノードハッシュ不足",
         "error": "エラー"
       },
       "networkError": "ネットワークリクエスト失敗",
@@ -416,12 +416,12 @@
     "nodeDetail": {
       "title": "ノード詳細",
       "hash": "ハッシュ",
-      "version": "版本",
+      "version": "版本番号",
       "endorsementCount": "承認数",
       "father": "父ハッシュ",
-      "fatherVersion": "父版本",
+      "fatherVersion": "父版本番号",
       "mother": "母ハッシュ",
-      "motherVersion": "母版本",
+      "motherVersion": "母版本番号",
       "addedBy": "追加者",
       "timestamp": "タイムスタンプ",
       "tag": "タグ",
@@ -464,7 +464,8 @@
     "validation": {
       "rpc": "有効なRPCアドレスを入力してください",
       "contract": "有効なコントラクトアドレスを入力してください (0x + 40桁16進数)",
-      "root": "有効なルートハッシュを入力してください (0x + 64桁16進数)"
+      "root": "有効なルートハッシュを入力してください (0x + 64桁16進数)",
+      "version": "有効な版本番号を入力してください"
     }
   },
   "common": {

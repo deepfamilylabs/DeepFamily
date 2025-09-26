@@ -367,7 +367,7 @@
     "config": {
       "rpc": "RPC",
       "contract": "合約",
-      "root": "根節點",
+      "root": "根節點哈希",
       "clearAndRefresh": "清空",
       "strictCacheOnly": "嚴格唯讀快取",
       "strictCacheOn": "離線模式",
@@ -378,8 +378,8 @@
     },
     "ui": {
       "displaySettings": "數據選項",
-      "versionNumber": "版本號",
-      "contractModeConfig": "合約配置",
+      "versionNumber": "版本序號",
+      "contractModeConfig": "配置",
       "traversalDFS": "DFS 深度優先：快速深入後回溯",
       "traversalBFS": "BFS 廣度優先：按層展開更均衡",
       "traversal": "遍歷方式",
@@ -395,13 +395,13 @@
     },
     "status": {
       "loading": "加載中...",
-      "contractModeRootNotFound": "未找到該根節點版本，請檢查哈希與版本號",
-      "rootNotFound": "未找到根節點，請檢查 Root 配置或等待索引",
+      "contractModeRootNotFound": "未找到該根節點版本，請檢查哈希與版本序號",
+      "rootNotFound": "未找到根節點，請檢查哈希與版本序號或等待索引",
       "contractOk": "合約資料載入完成",
       "badge": {
         "checking": "檢查中",
         "ok": "正常",
-        "root_missing": "缺少根節點",
+        "root_missing": "缺少根節點哈希",
         "error": "錯誤"
       },
       "networkError": "網路請求失敗",
@@ -415,12 +415,12 @@
     "nodeDetail": {
       "title": "節點詳情",
       "hash": "哈希",
-      "version": "版本",
+      "version": "版本序號",
       "endorsementCount": "背書數",
       "father": "父親哈希",
-      "fatherVersion": "父親版本",
+      "fatherVersion": "父親版本序號",
       "mother": "母親哈希",
-      "motherVersion": "母親版本",
+      "motherVersion": "母親版本序號",
       "addedBy": "添加者",
       "timestamp": "時間戳",
       "tag": "標籤",
@@ -463,7 +463,8 @@
     "validation": {
       "rpc": "請輸入有效的 RPC 位址",
       "contract": "請輸入有效的合約位址 (0x + 40位16進制)",
-      "root": "請輸入有效的根雜湊 (0x + 64位16進制)"
+      "root": "請輸入有效的根雜湊 (0x + 64位16進制)",
+      "version": "請輸入有效的版本序號"
     }
   },
   "common": {

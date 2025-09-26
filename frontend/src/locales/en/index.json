@@ -367,7 +367,7 @@
     "config": {
       "rpc": "RPC",
       "contract": "Contract",
-      "root": "Root",
+      "root": "Root Hash",
       "clearAndRefresh": "Clear",
       "strictCacheOnly": "Strict Cache Only",
       "strictCacheOn": "Offline Mode",
@@ -378,8 +378,8 @@
     },
     "ui": {
       "displaySettings": "Data Options",
-      "versionNumber": "Version",
-      "contractModeConfig": "Contract Configuration",
+      "versionNumber": "Version Index",
+      "contractModeConfig": "Config",
       "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
       "traversalBFS": "BFS - Breadth-First (level order)",
       "traversal": "Traversal Mode",

@@ -44,7 +44,7 @@ export default function ViewContainer({ viewMode, root, contractMessage, loading
     <div className="w-full transition-colors relative">
       {/* Floating View Mode Switch - positioned above zoom controls */}
       {onViewModeChange && viewModeLabels && (
-        <div className="absolute top-4 right-3 z-50">
+        <div className="absolute top-4 right-3 z-10">
           <ViewModeSwitch 
             value={viewMode} 
             onChange={onViewModeChange} 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useDebounce } from '../hooks/useDebounce'
 import { useTranslation } from 'react-i18next'
 import { useConfig } from '../context/ConfigContext'
-import { useDebounce } from '../hooks/useDebounce'
 import { formatHashMiddle, shortAddress } from '../types/graph'
 import { Clipboard } from 'lucide-react'
 import { useTreeData } from '../context/TreeDataContext'
@@ -15,9 +15,13 @@ interface Props {
   loading?: boolean
   onRefresh?: () => void
   t: any
+  // Traversal and stats props
+  traversal: 'dfs' | 'bfs'
+  setTraversal: (t: 'dfs' | 'bfs') => void
+  progress?: { created: number; visited: number; depth: number }
 }
 
-export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT }: Props) {
+export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, progress }: Props) {
   const { t } = useTranslation()
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
   const { clearAllCaches } = useTreeData()
@@ -64,7 +68,8 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
   const hasDiff = (
     localRpcUrl !== rpcUrl ||
     localContractAddress !== contractAddress ||
-    localRootHash !== rootHash
+    localRootHash !== rootHash ||
+    localVersion !== rootVersionIndex
   )
 
   const resetToDefaults = () => {
@@ -80,6 +85,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
       rpcUrl: localRpcUrl,
       contractAddress: localContractAddress,
       rootHash: localRootHash,
+      rootVersionIndex: localVersion,
     })
     setEditing(false)
     // Proactively refresh after saving config
@@ -90,11 +96,13 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
     setLocalRpcUrl(rpcUrl)
     setLocalContractAddress(contractAddress)
     setLocalRootHash(rootHash)
+    setLocalVersion(rootVersionIndex)
     setEditing(false)
   }
 
-  // debounce version apply on blur or enter
+  // version apply (only for non-edit mode)
   const applyVersion = () => {
+    if (editing) return // Don't auto-apply in edit mode
     update({ rootVersionIndex: localVersion })
     // Proactively refresh after changing version
     onRefresh?.()
@@ -115,20 +123,13 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
 
   useEffect(() => { if (editing) validateAll() }, [editing, localRpcUrl, localContractAddress, localRootHash])
 
-  // debounce version change (auto apply after 600ms idle)
-  useDebounce(localVersion, 600, v => { if (v !== rootVersionIndex) applyVersion() })
+  // debounce version change (auto apply after 600ms idle, only in non-edit mode)
+  useDebounce(localVersion, 600, v => { if (!editing && v !== rootVersionIndex) applyVersion() })
 
   // Status badge logic
-  const colorMap: Record<string, string> = {
-    checking: 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border-amber-300/60 dark:from-amber-900/40 dark:to-orange-900/30 dark:text-amber-300 dark:border-amber-600/40 shadow-sm backdrop-blur-sm',
-    ok: 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border-emerald-300/60 dark:from-emerald-900/40 dark:to-green-900/30 dark:text-emerald-300 dark:border-emerald-600/40 shadow-sm backdrop-blur-sm',
-    root_missing: 'bg-gradient-to-r from-rose-100 to-red-100 text-rose-700 border-rose-300/60 dark:from-rose-900/40 dark:to-red-900/30 dark:text-rose-300 dark:border-rose-600/40 shadow-sm backdrop-blur-sm',
-    error: 'bg-gradient-to-r from-red-100 to-rose-100 text-red-700 border-red-300/60 dark:from-red-900/40 dark:to-rose-900/30 dark:text-red-300 dark:border-red-600/40 shadow-sm backdrop-blur-sm'
-  }
-
   const getStatusBadge = () => {
     let bgClass, borderClass, textClass, text
-    
+
     if (loading) {
       bgClass = 'bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/30'
       borderClass = 'border-amber-300/60 dark:border-amber-600/40'
@@ -147,7 +148,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
     }
 
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full border text-xs font-semibold shadow-sm backdrop-blur-sm ${bgClass} ${borderClass} ${textClass}`}>
+      <span className={`inline-flex items-center px-1.5 py-0 rounded-full border text-[10px] font-semibold shadow-sm backdrop-blur-sm ${bgClass} ${borderClass} ${textClass}`}>
         {text}
       </span>
     )
@@ -165,7 +166,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
               {t('familyTree.ui.contractModeConfig')}
             </span>
           </div>
-          
+
           {/* Right side: Edit/Save/Cancel Buttons - always in top right */}
           <div className="flex-shrink-0">
             {editing ? (
@@ -187,93 +188,130 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
             )}
           </div>
         </div>
-        
-        {/* Status Badge and Refresh Button Row */}
-        <div className="flex flex-wrap items-center gap-3">
-          {getStatusBadge()}
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs whitespace-nowrap"
-              disabled={loading}
-              title={statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}
-              aria-label={statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}
-            >
-              <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300 flex-shrink-0`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10" />
-                <polyline points="1 20 1 14 7 14" />
-                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-              </svg>
-              <span className="truncate">{statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => { clearAllCaches(); }}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-300 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
-          >
-            <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
-            <span className="truncate">{t('familyTree.config.clearAndRefresh', 'Clear')}</span>
-          </button>
-        </div>
+
+        {/* Status Badge and Action Buttons Row - only show in non-editing mode */}
+        {!editing && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Left: Status Badge */}
+            <div className="flex items-center">
+              {getStatusBadge()}
+            </div>
+
+            {/* Right: Action Buttons */}
+            <div className="flex items-center gap-2">
+              {onRefresh && (
+                <button
+                  onClick={onRefresh}
+                  className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs whitespace-nowrap"
+                  disabled={loading}
+                  title={statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}
+                  aria-label={statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}
+                >
+                  <svg className={`w-3 h-3 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-transform duration-300 flex-shrink-0`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                  </svg>
+                  <span className="truncate">{statusT ? statusT('familyTree.actions.refresh') : 'Refresh'}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { clearAllCaches(); }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-300 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
+              >
+                <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                <span className="truncate">{t('familyTree.config.clearAndRefresh', 'Clear')}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {editing ? (
         <div className="space-y-4">
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.rpc')}:</label>
-            <input type="text" value={localRpcUrl} onChange={e => setLocalRpcUrl(e.target.value)} className={`w-full px-4 py-3 text-base sm:text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
-            {errors.rpc && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.rpc, 'RPC format error')}</div>}
+          {/* RPC and Contract in same row */}
+          <div className="flex flex-col lg:flex-row lg:gap-4 gap-4">
+            <div className="flex-1">
+              <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.rpc')}:</label>
+              <input type="text" value={localRpcUrl} onChange={e => setLocalRpcUrl(e.target.value)} className={`w-full px-3 py-2 text-sm font-mono rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
+              {errors.rpc && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.rpc, 'RPC format error')}</div>}
+            </div>
+            <div className="flex-1">
+              <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.contract')}:</label>
+              <input type="text" value={localContractAddress} onChange={e => setLocalContractAddress(e.target.value)} className={`w-full px-3 py-2 text-sm font-mono rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.contract ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
+              {errors.contract && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.contract, 'Contract address format error')}</div>}
+            </div>
           </div>
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.contract')}:</label>
-            <input type="text" value={localContractAddress} onChange={e => setLocalContractAddress(e.target.value)} className={`w-full px-4 py-3 text-base sm:text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.contract ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
-            {errors.contract && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.contract, 'Contract address format error')}</div>}
-          </div>
-          <div>
-            <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.root')}:</label>
-            <input type="text" value={localRootHash} onChange={e => setLocalRootHash(e.target.value)} className={`w-full px-4 py-3 text-base sm:text-sm font-mono rounded-lg border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
-            {errors.root && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.root, 'Root Hash format error')}</div>}
-            {rootHistory.length > 0 && (
-              <div className="mt-2">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  {t('familyTree.config.rootHistory', 'Root hash history')}
-                </div>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {rootHistory.map(h => (
-                    <div key={h} className="inline-flex items-center gap-1 max-w-full">
-                      <button
-                        type="button"
-                        onClick={() => setLocalRootHash(h)}
-                        className="px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-600 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 hover:border-emerald-500 dark:hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors duration-150 font-mono text-[11px] shadow-sm truncate max-w-[240px]"
-                        title={h}
-                      >{formatHashMiddle(h)}</button>
-                      <button
-                        type="button"
-                        aria-label={t('familyTree.actions.remove', 'Remove')}
-                        className="w-4 h-4 inline-flex items-center justify-center rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors duration-150"
-                        onClick={() => removeRootFromHistory(h)}
-                        title={t('familyTree.actions.remove', 'Remove') as string}
-                      >×</button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-1">
-                  <button
-                    type="button"
-                    onClick={clearRootHistory}
-                    className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 underline"
-                  >{t('familyTree.actions.clearAll', 'Clear all')}</button>
-                </div>
+          {/* Root Hash and Version in same row */}
+          <div className="flex flex-col lg:flex-row lg:gap-4 gap-4">
+            <div className="flex-1">
+              <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.root')}:</label>
+              <input type="text" value={localRootHash} onChange={e => setLocalRootHash(e.target.value)} className={`w-full px-3 py-2 text-sm font-mono rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
+              {errors.root && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.root, 'Root Hash format error')}</div>}
+            </div>
+            <div className="lg:min-w-32">
+              <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.ui.versionNumber')}:</label>
+              <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm h-[38px]">
+                <button
+                  className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
+                  onClick={() => setLocalVersion(v => Math.max(1, (v || 1) - 1))}
+                  aria-label="Decrease version"
+                >-</button>
+                <input
+                  type="number"
+                  min={1}
+                  value={localVersion}
+                  onChange={e => setLocalVersion(Math.max(1, Number(e.target.value)))}
+                  className="w-24 h-full text-sm text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
+                />
+                <button
+                  className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
+                  onClick={() => setLocalVersion(v => (v || 1) + 1)}
+                  aria-label="Increase version"
+                >+</button>
               </div>
-            )}
+            </div>
           </div>
+          {rootHistory.length > 0 && (
+            <div className="mt-2">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                {t('familyTree.config.rootHistory', 'Root hash history')}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {rootHistory.map(h => (
+                  <div key={h} className="inline-flex items-center gap-1 max-w-full">
+                    <button
+                      type="button"
+                      onClick={() => setLocalRootHash(h)}
+                      className="px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-600 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 hover:border-emerald-500 dark:hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors duration-150 font-mono text-[11px] shadow-sm truncate max-w-[240px]"
+                      title={h}
+                    >{formatHashMiddle(h)}</button>
+                    <button
+                      type="button"
+                      aria-label={t('familyTree.actions.remove', 'Remove')}
+                      className="w-4 h-4 inline-flex items-center justify-center rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors duration-150"
+                      onClick={() => removeRootFromHistory(h)}
+                      title={t('familyTree.actions.remove', 'Remove') as string}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={clearRootHistory}
+                  className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 underline"
+                >{t('familyTree.actions.clearAll', 'Clear all')}</button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-2 text-slate-700 dark:text-slate-300">
@@ -306,57 +344,105 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
         </div>
       )}
 
-      {/* Compact version controls */}
-      <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
-        {/* Root and Version - responsive layout */}
-        <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
-          <div className="flex items-center gap-2 lg:flex-1 lg:min-w-0">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.root')}:</span>
-            <div className="flex-1 min-w-0">
-              <div className="inline-flex items-center gap-1 max-w-full">
-                <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
-                  <span className="inline sm:hidden">{formatHashMiddle(rootHash)}</span>
-                  <span className="hidden sm:inline">{rootHash}</span>
-                </span>
-                {rootHash && (
-                  <button
-                    onClick={() => copy(rootHash)}
-                    aria-label={t('search.copy', 'Copy')}
-                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                    title={t('search.copy', 'Copy') as string}
-                  >
-                    <Clipboard size={14} />
-                  </button>
-                )}
+      {/* Compact version controls - only show in non-editing mode */}
+      {!editing && (
+        <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
+          {/* Root and Version - responsive layout */}
+          <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
+            <div className="flex items-center gap-2 lg:flex-1 lg:min-w-0">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.root')}:</span>
+              <div className="flex-1 min-w-0">
+                <div className="inline-flex items-center gap-1 max-w-full">
+                  <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
+                    <span className="inline sm:hidden">{formatHashMiddle(rootHash)}</span>
+                    <span className="hidden sm:inline">{rootHash}</span>
+                  </span>
+                  {rootHash && (
+                    <button
+                      onClick={() => copy(rootHash)}
+                      aria-label={t('search.copy', 'Copy')}
+                      className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      title={t('search.copy', 'Copy') as string}
+                    >
+                      <Clipboard size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 lg:flex-shrink-0">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.ui.versionNumber')}:</span>
+              <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
+                <button
+                  className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
+                  onClick={() => setLocalVersion(v => Math.max(1, (v || 1) - 1))}
+                  aria-label="Decrease version"
+                >-</button>
+                <input
+                  type="number"
+                  min={1}
+                  value={localVersion}
+                  onChange={e => setLocalVersion(Math.max(1, Number(e.target.value)))}
+                  onBlur={applyVersion}
+                  onKeyDown={e => { if (e.key === 'Enter') applyVersion() }}
+                  className="w-12 h-6 text-xs text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
+                />
+                <button
+                  className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
+                  onClick={() => setLocalVersion(v => (v || 1) + 1)}
+                  aria-label="Increase version"
+                >+</button>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 lg:flex-shrink-0">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.ui.versionNumber')}:</span>
-            <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
-              <button
-                className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
-                onClick={() => setLocalVersion(v => Math.max(1, (v || 1) - 1))}
-                aria-label="Decrease version"
-              >-</button>
-              <input
-                type="number"
-                min={1}
-                value={localVersion}
-                onChange={e => setLocalVersion(Math.max(1, Number(e.target.value)))}
-                onBlur={applyVersion}
-                onKeyDown={e => { if (e.key === 'Enter') applyVersion() }}
-                className="w-12 h-6 text-xs text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
-              />
-              <button
-                className="w-6 h-6 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
-                onClick={() => setLocalVersion(v => (v || 1) + 1)}
-                aria-label="Increase version"
-              >+</button>
+        </div>
+      )}
+
+      {/* Divider and bottom controls - only show in non-editing mode */}
+      {!editing && (
+        <>
+          <div className="border-t border-slate-200/60 dark:border-slate-700/60 mt-4"></div>
+
+          {/* Bottom section with traversal on left and stats on right */}
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mt-4 text-xs">
+        {/* Left: Traversal controls */}
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <span className="hidden sm:block text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{statusT ? statusT('familyTree.ui.traversal') : '遍历方式'}:</span>
+          <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+            <div className="relative group">
+              <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalDFS') : 'DFS'} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
+              <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{statusT ? statusT('familyTree.ui.traversalDFS') : 'Depth First Search'}</div>
+            </div>
+            <div className="relative group border-l border-slate-300 dark:border-slate-600">
+              <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalBFS') : 'BFS'} onClick={() => setTraversal('bfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-lg ${traversal==='bfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>BFS</button>
+              <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{statusT ? statusT('familyTree.ui.traversalBFS') : 'Breadth First Search'}</div>
             </div>
           </div>
         </div>
+
+        {/* Right: Stats */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {(() => {
+            const createdDisplay = progress ? progress.created : (loading ? '…' : 0)
+            const depthDisplay = progress ? progress.depth : (loading ? '…' : 0)
+            return (
+              <span className="text-xs px-3 sm:px-4 py-0.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 sm:gap-5 backdrop-blur-sm shadow-sm flex-shrink-0">
+                <span className="inline-flex flex-col items-start gap-0">
+                  <span className="text-[10px] leading-tight font-semibold text-blue-600 dark:text-blue-400">{statusT ? statusT('familyTree.ui.nodesLabelFull') : 'Nodes'}</span>
+                  <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
+                </span>
+                <span className="h-5 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
+                <span className="inline-flex flex-col items-start gap-0">
+                  <span className="text-[10px] leading-tight font-semibold text-blue-600 dark:text-blue-400">{statusT ? statusT('familyTree.ui.depthLabelFull') : 'Depth'}</span>
+                  <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
+                </span>
+              </span>
+            )
+          })()}
+        </div>
       </div>
+        </>
+      )}
     </div>
   )
 }

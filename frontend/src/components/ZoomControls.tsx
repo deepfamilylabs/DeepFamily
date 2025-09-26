@@ -111,7 +111,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({ width, height, miniSvgRef, vie
   return (
     <div className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-200/60 dark:border-slate-600/60 p-1.5 select-none transition-all duration-200 hover:shadow-xl ${className}`}>      
       <svg ref={miniSvgRef} width={width} height={height} onClick={onClick} className="cursor-pointer">
-        <rect x={0} y={0} width={width} height={height} rx={6} ry={6} fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" className="dark:fill-slate-800 dark:stroke-slate-600" />
+        <rect x={0} y={0} width={width} height={height} rx={6} ry={6} fill="#f8fafc" className="dark:fill-slate-800" />
         <g className="nodes" />
         <rect ref={viewportRef} x={0} y={0} width={20} height={20} fill="none" stroke="#3b82f6" strokeWidth={2} rx={2} ry={2} className="dark:stroke-blue-400" />
         {children}
