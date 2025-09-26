@@ -115,7 +115,7 @@ function FlexibleDAGViewInner({
   }, [ctxSelectedId, positions, measuredWidths, nodeWidth, transform, ctxSelected, hover])
 
   const miniNodes = useMemo(() => nodes.map(n => ({ id: n.id, x: positions[n.id].x, y: positions[n.id].y, w: measuredWidths[n.id] || nodeWidth, h: nodeHeight })), [nodes, positions, measuredWidths, nodeWidth, nodeHeight])
-  const { miniSvgRef, viewportRef, dims } = useMiniMap({}, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
+  const { miniSvgRef, viewportRef, dims } = useMiniMap({ width: 120, height: 90 }, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
     const box = containerRef.current?.getBoundingClientRect(); if (!box) return
     centerOn(gx, gy, box.width, box.height)
   } })
@@ -137,7 +137,7 @@ function FlexibleDAGViewInner({
       className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16 pb-4 px-4 md:px-6"
       style={{ height: responsiveHeight, overscrollBehavior: 'contain' }}
     >
-      <div className="absolute bottom-4 right-4 z-10">
+      <div className="absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left">
         <MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} />
       </div>
       <ZoomControls className="absolute top-24 right-4 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />

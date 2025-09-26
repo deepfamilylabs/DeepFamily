@@ -165,7 +165,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
     setMiniNodes(arr)
   }, [])
   useEffect(() => { const id = setInterval(refreshMiniNodes, 500); return () => clearInterval(id) }, [refreshMiniNodes])
-  const { miniSvgRef, viewportRef, dims, update } = useMiniMap({ shape: 'circle' }, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
+  const { miniSvgRef, viewportRef, dims, update } = useMiniMap({ shape: 'circle', width: 120, height: 90 }, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
     const box = containerRef.current?.getBoundingClientRect(); if (!box) return
     centerOn(gx, gy, box.width, box.height)
   } })
@@ -177,7 +177,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16"
       style={{ height: defaultHeight, touchAction: 'none', overscrollBehavior: 'contain' }}
     >
-      <div className="absolute bottom-3 right-3 z-10"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
+      <div className="absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
       <ZoomControls className="absolute top-20 right-3 z-10" k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
       <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 800 ${defaultHeight}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}>
         <g ref={innerRef as any} />

@@ -216,12 +216,13 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (strictCacheOnly) return
     
     // Check if we already have complete cached data (three-tier cache check)
-    const hasMemoryCache = root && 
+    const hasMemoryCache = root &&
       typeof rootHash === 'string' && root.personHash.toLowerCase() === rootHash.toLowerCase() &&
       Number(root.versionIndex) === Number(rootVersionIndex)
-    
+
     if (hasMemoryCache) {
-      // Memory cache hit - no need to load
+      // Memory cache hit - no need to load, but clear any previous error message
+      setContractMessage('')
       return
     }
     
@@ -240,6 +241,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           // Root structure is persisted progressively during streaming; accepting it avoids
           // unnecessary network calls on reload when cache is already present.
           setRoot(cachedRoot)
+          // Clear any previous error message when using cached data
+          setContractMessage('')
           return
         }
       }
@@ -348,12 +351,16 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
             lastUpdate = now
           }
         }
-        if (!cancelled && rootNode) setRoot(prev => {
-          const rn = rootNode as GraphNode
-          if (!prev) return { ...rn }
-          if (prev.personHash === rn.personHash && prev.versionIndex === rn.versionIndex && (prev.children?.length || 0) === (rn.children?.length || 0)) return prev
-          return { ...rn }
-        })
+        if (!cancelled && rootNode) {
+          setRoot(prev => {
+            const rn = rootNode as GraphNode
+            if (!prev) return { ...rn }
+            if (prev.personHash === rn.personHash && prev.versionIndex === rn.versionIndex && (prev.children?.length || 0) === (rn.children?.length || 0)) return prev
+            return { ...rn }
+          })
+          // Clear any previous error message when successfully loading root
+          setContractMessage('')
+        }
       } catch (e: any) {
         if (!cancelled && e?.name !== 'AbortError') {
           const raw = String(

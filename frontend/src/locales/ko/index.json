@@ -368,7 +368,7 @@
     "config": {
       "rpc": "RPC",
       "contract": "계약",
-      "root": "루트 노드",
+      "root": "루트 노드 해시",
       "clearAndRefresh": "지우기",
       "strictCacheOnly": "엄격 읽기 전용 캐시",
       "strictCacheOn": "오프라인 모드",
@@ -380,7 +380,7 @@
     "ui": {
       "displaySettings": "데이터 옵션",
       "versionNumber": "버전 번호",
-      "contractModeConfig": "계약 구성",
+      "contractModeConfig": "구성",
       "traversalDFS": "DFS 깊이 우선",
       "traversalBFS": "BFS 너비 우선",
       "traversal": "순회 방식",
