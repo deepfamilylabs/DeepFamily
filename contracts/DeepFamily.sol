@@ -243,13 +243,13 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /**
    * @dev Person version added event (extended: includes parent hashes and version indices for frontend/indexing tree construction)
    * @notice Version index starts from 1
-   * @param personHash Person hash
+   * @param personHash Person hash (keccak256 of Poseidon commitment)
    * @param versionIndex Version index
    * @param addedBy Address of the person who added this
    * @param timestamp Addition timestamp
-   * @param fatherHash Father's hash
+   * @param fatherHash Father's hash (keccak256 of Poseidon commitment)
    * @param fatherVersionIndex Father's version index (0 means unspecified)
-   * @param motherHash Mother's hash
+   * @param motherHash Mother's hash (keccak256 of Poseidon commitment)
    * @param motherVersionIndex Mother's version index (0 means unspecified)
    * @param tag Version tag
    */
@@ -268,7 +268,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /**
    * @dev Version endorsement event
    * @notice Version index starts from 1
-   * @param personHash Person hash
+   * @param personHash Person hash (keccak256 of Poseidon commitment)
    * @param endorser Endorser's address
    * @param versionIndex Endorsed version index
    * @param endorsementFee Endorsement fee
@@ -283,14 +283,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   );
 
   /**
-   * @dev Person hash ZK verification event
+   * @dev Person hash ZK verification event (emits final keccak256-wrapped hash)
    */
   event PersonHashZKVerified(bytes32 indexed personHash, address indexed prover);
 
   /**
    * @dev NFT minting event
    * @notice Version index starts from 1
-   * @param personHash Person hash
+   * @param personHash Person hash (keccak256 of Poseidon commitment)
    * @param tokenId NFT TokenID
    * @param owner NFT holder
    * @param versionIndex Corresponding version index
@@ -419,7 +419,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Core Functionality Functions ==========
 
   /**
-   * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into bytes32 (big-endian: hi128|lo128).
+   * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into raw Poseidon digest bytes32 (big-endian: hi128|lo128).
    */
   function _packHashFromTwo128(
     uint256[] calldata signals,
@@ -433,6 +433,13 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 v = (hi << 128) | lo; // Big-endian concatenation
       h = bytes32(v);
     }
+  }
+
+  /**
+   * @dev Wrap raw Poseidon digest with keccak256 for domain separation and collision resistance.
+   */
+  function _wrapPoseidonHash(bytes32 poseidonDigest) internal pure returns (bytes32) {
+    return keccak256(abi.encodePacked(poseidonDigest));
   }
 
   /**
@@ -456,7 +463,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /**
    * @notice Calculate unique person hash value
-   * @dev Uses Poseidon hash to match ZK circuit implementation exactly
+   * @dev Matches circuit Poseidon output and applies keccak256 for final domain-separated hash
    */
   function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
     if (basicInfo.fullNameHash == bytes32(0)) revert InvalidFullName();
@@ -476,14 +483,15 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       (basicInfo.isBirthBC ? 1 : 0);
 
     // Poseidon(3) commitment over SNARK-friendly field elements
-    uint[3] memory inputs;
+    uint256[3] memory inputs;
     inputs[0] = limb0; // name hi128
     inputs[1] = limb1; // name lo128
     inputs[2] = packedData;
 
     uint256 poseidonResult = PoseidonT4.hash(inputs);
+    bytes32 poseidonDigest = bytes32(poseidonResult);
 
-    return bytes32(poseidonResult);
+    return _wrapPoseidonHash(poseidonDigest);
   }
 
   /**
@@ -645,10 +653,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert InvalidZKProof();
     }
 
-    // Extract hashes from limbs once
-    bytes32 personHash_ = _packHashFromTwo128(publicSignals, 0);
-    bytes32 fatherHash_ = _packHashFromTwo128(publicSignals, 2);
-    bytes32 motherHash_ = _packHashFromTwo128(publicSignals, 4);
+    // Extract raw Poseidon digests from limbs and wrap with keccak256 for final hashes
+    bytes32 personHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals, 0));
+    bytes32 fatherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals, 2));
+    bytes32 motherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals, 4));
 
     emit PersonHashZKVerified(personHash_, msg.sender);
 
