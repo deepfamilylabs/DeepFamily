@@ -40,12 +40,13 @@ function packVitalStats({ birthYear, birthMonth, birthDay, gender, isBirthBC }) 
 /**
  * Combine Poseidon output into canonical bytes32 and expose high/low limbs for comparison
  */
-function normalisePoseidonOutput(raw) {
+function normalisePoseidonOutput(raw, ethers) {
   const output = BigInt(raw);
   const limb0 = output >> 128n;
   const limb1 = output & FIELD_MASK_128;
-  const hashHex = `0x${output.toString(16).padStart(64, '0')}`;
-  return { hashHex, limb0, limb1 };
+  const poseidonHex = `0x${output.toString(16).padStart(64, '0')}`;
+  const finalHash = ethers.keccak256(poseidonHex);
+  return { poseidonHex, finalHash, limb0, limb1 };
 }
 
 /**
@@ -56,13 +57,14 @@ function computePersonHashCircuitEquivalent(input) {
   const nameLimbs = hashToCircuitLimbs(fullNameHash);
   const packedData = packVitalStats(input);
   const poseidonResult = poseidon([nameLimbs.limb0, nameLimbs.limb1, packedData]);
-  const normalised = normalisePoseidonOutput(poseidonResult);
+  const normalised = normalisePoseidonOutput(poseidonResult, hre.ethers);
 
   return {
     fullNameHash,
     nameLimbs,
     packedData,
-    personHash: normalised.hashHex,
+    poseidonHex: normalised.poseidonHex,
+    personHash: normalised.finalHash,
     poseidonLimbs: { limb0: normalised.limb0, limb1: normalised.limb1 },
   };
 }
@@ -120,9 +122,9 @@ describe('Hash Consistency Tests', function () {
       const contractHash = await deepFamily.getPersonHash(basicInfo);
       expect(contractHash).to.equal(expected.personHash);
 
-      const contractLimbs = hashToCircuitLimbs(contractHash);
-      expect(contractLimbs.limb0).to.equal(expected.poseidonLimbs.limb0);
-      expect(contractLimbs.limb1).to.equal(expected.poseidonLimbs.limb1);
+      const poseidonLimbs = hashToCircuitLimbs(expected.poseidonHex);
+      expect(poseidonLimbs.limb0).to.equal(expected.poseidonLimbs.limb0);
+      expect(poseidonLimbs.limb1).to.equal(expected.poseidonLimbs.limb1);
     });
   });
 });

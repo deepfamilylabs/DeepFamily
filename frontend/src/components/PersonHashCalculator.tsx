@@ -115,8 +115,9 @@ export function computePersonHash(input: HashForm): string {
   // Poseidon(3) commitment over SNARK-friendly field elements
   const poseidonResult = poseidon3([limb0, limb1, packedData])
 
-  // Convert result to bytes32 format
-  return '0x' + poseidonResult.toString(16).padStart(64, '0')
+  // Domain-separate with keccak256 to mirror contract wrapping
+  const poseidonHex = '0x' + poseidonResult.toString(16).padStart(64, '0')
+  return ethers.keccak256(poseidonHex)
 }
 
 // Component props interface
