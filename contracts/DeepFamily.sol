@@ -421,16 +421,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /**
    * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into raw Poseidon digest bytes32 (big-endian: hi128|lo128).
    */
-  function _packHashFromTwo128(
-    uint256[] calldata signals,
-    uint256 start
-  ) internal pure returns (bytes32 h) {
+  function _packHashFromTwo128(uint256 hi, uint256 lo) internal pure returns (bytes32 h) {
     unchecked {
-      uint256 hi = signals[start];
-      uint256 lo = signals[start + 1];
-      // Ensure each limb < 2^128
       if ((hi >> 128) != 0 || (lo >> 128) != 0) revert InvalidZKProof();
-      uint256 v = (hi << 128) | lo; // Big-endian concatenation
+      uint256 v = (hi << 128) | lo;
       h = bytes32(v);
     }
   }
@@ -534,7 +528,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         motherHash,
         fatherVersionIndex,
         motherVersionIndex,
-        metadataCID
+        tag
       )
     );
     if (versionExists[personHash][versionHash]) revert DuplicateVersion();
@@ -623,40 +617,25 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[] calldata publicSignals,
+    uint256[7] calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
     string calldata tag,
     string calldata metadataCID
   ) external {
-    // 6 limbs (3 hashes × 2 limbs) + 1 submitter
-    if (publicSignals.length != _HASH_LIMBS_REQUIRED + 1) revert InvalidZKProof();
-
-    // cheap check: all limbs < 2^128 (avoid burning verify gas first)
-    unchecked {
-      for (uint256 i = 0; i < _HASH_LIMBS_REQUIRED; ++i) {
-        if (publicSignals[i] >> 128 != 0) revert InvalidZKProof();
-      }
-    }
-
     // submitter binding: prevent same-chain frontrunning
     uint256 submitter = publicSignals[_HASH_LIMBS_REQUIRED];
-    if (submitter >> 160 != 0) revert InvalidZKProof();
     if (submitter != uint256(uint160(msg.sender))) revert InvalidZKProof();
 
     // verify ZK proof (verifier expects fixed-size [7] array)
-    uint256[7] memory fixedSignals;
-    unchecked {
-      for (uint256 i = 0; i < 7; ++i) fixedSignals[i] = publicSignals[i];
-    }
-    if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, fixedSignals)) {
+    if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals)) {
       revert InvalidZKProof();
     }
 
     // Extract raw Poseidon digests from limbs and wrap with keccak256 for final hashes
-    bytes32 personHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals, 0));
-    bytes32 fatherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals, 2));
-    bytes32 motherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals, 4));
+    bytes32 personHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals[0], publicSignals[1]));
+    bytes32 fatherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals[2], publicSignals[3]));
+    bytes32 motherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals[4], publicSignals[5]));
 
     emit PersonHashZKVerified(personHash_, msg.sender);
 
