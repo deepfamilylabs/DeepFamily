@@ -8,7 +8,7 @@
   },
   "home": {
     "title": "分散型オンチェーン家系図プロトコル",
-    "subtitle": "多版本信頼系譜 · 経済的インセンティブ承認 · NFT価値帰属 · 分片叙事封存 · ゼロ知識証明プライバシー拡張",
+    "subtitle": "多バージョン系譜の共存 · パスフレーズのソルト化によるデリンク · ZKプライバシー保護 · NFT価値の沈殿 · 経済的インセンティブ駆動",
     "exploreFamilyTree": "家系図を探索",
     "addPerson": "人物追加",
     "search": "検索",
@@ -18,8 +18,8 @@
     "tagStrip": {
       "protocol": "分散型",
       "incentive": "インセンティブループ",
-      "nft": "NFT伝記",
-      "zk": "ZKプライバシー"
+      "nft": "NFT",
+      "zk": "ZK"
     },
     "coreValue": {
       "title": "コアミッション",

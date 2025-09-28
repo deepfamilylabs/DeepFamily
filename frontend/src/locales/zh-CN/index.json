@@ -8,7 +8,7 @@
   },
   "home": {
     "title": "去中心化链上族谱协议",
-    "subtitle": "多版本可信谱系 · 经济激励背书 · NFT 价值归属 · 分片叙事封存 · 零知识证明隐私扩展",
+    "subtitle": "多版本谱系共存 · 口令盐化去链接 · 零知识隐私守护 · NFT 价值沉淀 · 经济激励驱动",
     "exploreFamilyTree": "探索族谱",
     "addPerson": "添加人物",
     "search": "搜索",
@@ -18,8 +18,8 @@
     "tagStrip": {
       "protocol": "去中心化",
       "incentive": "激励循环", 
-      "nft": "NFT 传记",
-      "zk": "ZK 隐私"
+      "nft": "NFT",
+      "zk": "ZK"
     },
     "coreValue": {
       "title": "核心使命",

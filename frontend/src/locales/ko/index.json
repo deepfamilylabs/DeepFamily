@@ -8,7 +8,7 @@
   },
   "home": {
     "title": "탈중앙화 온체인 가계도 프로토콜",
-    "subtitle": "다중 버전 신뢰 가계 • 경제적 인센티브 승인 • NFT 가치 귀속 • 샤드 서사 봉인 • 영지식 증명 개인정보 확장",
+    "subtitle": "다중 버전 가계 공존 · 패스프레이즈 솔팅으로 디링킹 · ZK 개인정보 보호 · NFT 가치 침전 · 경제적 인센티브 주도",
     "exploreFamilyTree": "가계도 탐색",
     "addPerson": "인물 추가",
     "search": "검색",
@@ -18,8 +18,8 @@
     "tagStrip": {
       "protocol": "탈중앙화",
       "incentive": "인센티브 순환",
-      "nft": "NFT 전기",
-      "zk": "ZK 개인정보"
+      "nft": "NFT",
+      "zk": "ZK"
     },
     "coreValue": {
       "title": "핵심 사명",
