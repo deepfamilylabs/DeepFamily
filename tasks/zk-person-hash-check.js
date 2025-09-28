@@ -55,6 +55,7 @@ async function buildExpectedSignalsFromInput(input) {
 
   function personCommitmentFrom(inputPrefix) {
     const nameBytes = input[`${inputPrefix}fullNameHash`];
+    const saltBytes = input[`${inputPrefix}saltHash`] || new Array(32).fill(0);
     const isBirthBC = BigInt(input[`${inputPrefix}isBirthBC`]);
     const birthYear = BigInt(input[`${inputPrefix}birthYear`]);
     const birthMonth = BigInt(input[`${inputPrefix}birthMonth`]);
@@ -62,13 +63,19 @@ async function buildExpectedSignalsFromInput(input) {
     const gender = BigInt(input[`${inputPrefix}gender`]);
 
     const [nameHi, nameLo] = be128HiLoFromBytes32(nameBytes);
+    const [saltHi, saltLo] = be128HiLoFromBytes32(saltBytes);
+
+    const salted = poseidon([nameHi, nameLo, saltHi, saltLo, 0n]);
+    const saltedBig = BigInt(salted);
+    const [saltedHi, saltedLo] = split128FromBigInt(saltedBig);
+
     const packedData =
       (birthYear << 24n) |
       (birthMonth << 16n) |
       (birthDay << 8n) |
       (gender << 1n) |
       (isBirthBC & 1n);
-    const h = poseidon([nameHi, nameLo, packedData]);
+    const h = poseidon([saltedHi, saltedLo, packedData]);
     const hv = BigInt(h);
     const [hi, lo] = split128FromBigInt(hv);
     return [hi, lo];

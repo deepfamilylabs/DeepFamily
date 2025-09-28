@@ -27,6 +27,15 @@ interface IPersonHashVerifier {
   ) external view returns (bool);
 }
 
+interface INamePoseidonVerifier {
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[4] calldata publicSignals
+  ) external view returns (bool);
+}
+
 /**
  * @title DeepFamily - Decentralized Global On-Chain Family Tree Protocol
  * @dev Multi-version family tree with endorsements, ZK proofs, NFTs, and token incentives.
@@ -54,6 +63,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // Added ZK-related errors
   error InvalidZKProof();
   error VerifierNotSet();
+  error NameVerifierNotSet();
 
   // Business logic errors
   error DuplicateVersion();
@@ -82,7 +92,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Basic identity information structure
    */
   struct PersonBasicInfo {
-    bytes32 fullNameHash; // Hash of the full name (keccak256)
+    bytes32 fullNameHash; // Poseidon digest derived from keccak(fullName) and salt
     bool isBirthBC; // Whether birth is BC (Before Christ)
     uint16 birthYear; // Birth year(0=unknown)
     uint8 birthMonth; // Birth month (1-12, 0=unknown)
@@ -237,6 +247,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /// @dev ZK verification contract address (immutable)
   address public immutable PERSON_HASH_VERIFIER;
+  address public immutable NAME_POSEIDON_VERIFIER;
 
   // ========== Event Definitions ==========
 
@@ -408,12 +419,15 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   constructor(
     address _deepFamilyTokenContract,
-    address _personHashVerifier
+    address _personHashVerifier,
+    address _namePoseidonVerifier
   ) ERC721("DeepFamily", "Family") Ownable(msg.sender) {
     if (_deepFamilyTokenContract == address(0)) revert TokenContractNotSet();
     if (_personHashVerifier == address(0)) revert VerifierNotSet();
+    if (_namePoseidonVerifier == address(0)) revert NameVerifierNotSet();
     DEEP_FAMILY_TOKEN_CONTRACT = _deepFamilyTokenContract;
     PERSON_HASH_VERIFIER = _personHashVerifier;
+    NAME_POSEIDON_VERIFIER = _namePoseidonVerifier;
   }
 
   // ========== Core Functionality Functions ==========
@@ -443,16 +457,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   function _personExists(bytes32 personHash) internal view returns (bool) {
     return personHash != bytes32(0) && personVersions[personHash].length > 0;
-  }
-
-  /**
-   * @notice Calculate fullNameHash from full name string
-   * @dev Helper function to convert string to hash for PersonBasicInfo
-   */
-  function getFullNameHash(string memory fullName) public pure returns (bytes32) {
-    bytes memory nameBytes = bytes(fullName);
-    if (nameBytes.length == 0 || nameBytes.length > MAX_LONG_TEXT_LENGTH) revert InvalidFullName();
-    return keccak256(nameBytes);
   }
 
   /**
@@ -633,9 +637,15 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     }
 
     // Extract raw Poseidon digests from limbs and wrap with keccak256 for final hashes
-    bytes32 personHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals[0], publicSignals[1]));
-    bytes32 fatherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals[2], publicSignals[3]));
-    bytes32 motherHash_ = _wrapPoseidonHash(_packHashFromTwo128(publicSignals[4], publicSignals[5]));
+    bytes32 personHash_ = _wrapPoseidonHash(
+      _packHashFromTwo128(publicSignals[0], publicSignals[1])
+    );
+    bytes32 fatherHash_ = _wrapPoseidonHash(
+      _packHashFromTwo128(publicSignals[2], publicSignals[3])
+    );
+    bytes32 motherHash_ = _wrapPoseidonHash(
+      _packHashFromTwo128(publicSignals[4], publicSignals[5])
+    );
 
     emit PersonHashZKVerified(personHash_, msg.sender);
 
@@ -723,6 +733,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param coreInfo Person core information structure
    */
   function mintPersonNFT(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[4] calldata publicSignals,
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
@@ -741,19 +755,29 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
     // Input validation
     if (bytes(_tokenURI).length > MAX_LONG_TEXT_LENGTH) revert InvalidTokenURI();
+    if (bytes(coreInfo.supplementInfo.fullName).length == 0) revert InvalidFullName();
+    if (bytes(coreInfo.supplementInfo.fullName).length > MAX_LONG_TEXT_LENGTH)
+      revert InvalidFullName();
     if (bytes(coreInfo.supplementInfo.story).length > MAX_LONG_TEXT_LENGTH) revert InvalidStory();
     if (bytes(coreInfo.supplementInfo.birthPlace).length > MAX_LONG_TEXT_LENGTH)
       revert InvalidBirthPlace();
     if (bytes(coreInfo.supplementInfo.deathPlace).length > MAX_LONG_TEXT_LENGTH)
       revert InvalidDeathPlace();
 
-    // Validate if fullName matches fullNameHash (getFullNameHash will validate fullName length)
-    bytes32 computedFullNameHash = getFullNameHash(coreInfo.supplementInfo.fullName);
-    if (computedFullNameHash != coreInfo.basicInfo.fullNameHash) revert BasicInfoMismatch();
-
     // Validate if core information matches personHash
     bytes32 computedHash = getPersonHash(coreInfo.basicInfo);
     if (computedHash != personHash) revert BasicInfoMismatch();
+
+    // Validate fullName proof binding (Poseidon digest and keccak(fullName))
+    if (!INamePoseidonVerifier(NAME_POSEIDON_VERIFIER).verifyProof(a, b, c, publicSignals))
+      revert InvalidZKProof();
+
+    bytes32 poseidonDigest = _packHashFromTwo128(publicSignals[0], publicSignals[1]);
+    if (poseidonDigest != coreInfo.basicInfo.fullNameHash) revert BasicInfoMismatch();
+
+    bytes32 providedFullNameHash = _packHashFromTwo128(publicSignals[2], publicSignals[3]);
+    bytes32 computedFullNameHash = _hashString(coreInfo.supplementInfo.fullName);
+    if (computedFullNameHash != providedFullNameHash) revert BasicInfoMismatch();
 
     // Generate new tokenId
     uint256 newTokenId = ++tokenCounter;

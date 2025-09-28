@@ -33,7 +33,6 @@ task("endorse", "Endorse a person version (uses DeepFamilyToken recentReward as 
 
     // Existence / bounds check (prevents confusing InvalidVersionIndex revert on fresh network)
     const totalVersions = Number(await deepFamily.countPersonVersions(args.person));
-    console.log("Total versions for person:", totalVersions);
     if (versionIndex > totalVersions) {
       throw new Error(
         `Version index ${versionIndex} out of range (total=${totalVersions}). Did you add the person on this network / use --network localhost?`,
@@ -43,23 +42,15 @@ task("endorse", "Endorse a person version (uses DeepFamilyToken recentReward as 
     // Read current fee (recentReward)
     let fee = await token.recentReward();
     fee = BigInt(fee);
-    console.log("DeepFamily contract:", deepDeployment.address);
-    console.log("Token contract:", tokenDeployment.address);
-    console.log("Current recentReward fee:", fee.toString());
 
     // Handle allowance if fee > 0
     if (fee > 0n) {
       const allowance = await token.allowance(signer.address, deepDeployment.address);
-      console.log("Existing allowance:", allowance.toString());
       if (allowance < fee) {
         if (String(args.autoapprove).toLowerCase() === "true") {
           const multiplier = BigInt(Number(args.approvebuffer) || 1);
           const approveAmount = fee * multiplier;
-          console.log(
-            `Approving allowance ${approveAmount.toString()} (multiplier ${multiplier.toString()})`,
-          );
           const approveTx = await token.approve(deepDeployment.address, approveAmount);
-          console.log("Approve tx:", approveTx.hash);
           await approveTx.wait();
         } else {
           throw new Error(
@@ -71,9 +62,7 @@ task("endorse", "Endorse a person version (uses DeepFamilyToken recentReward as 
 
     // Call endorseVersion
     const tx = await deepFamily.endorseVersion(args.person, versionIndex);
-    console.log("Submitted endorse tx:", tx.hash);
     const receipt = await tx.wait();
-    console.log("Mined in block:", receipt.blockNumber);
 
     // Decode PersonVersionEndorsed event
     try {
@@ -86,16 +75,11 @@ task("endorse", "Endorse a person version (uses DeepFamilyToken recentReward as 
         try {
           const parsed = iface.parseLog(log);
           if (parsed && parsed.name === "PersonVersionEndorsed") {
-            console.log("Event personHash:", parsed.args.personHash);
-            console.log("Event versionIndex:", parsed.args.versionIndex.toString());
-            console.log("Event fee:", parsed.args.endorsementFee.toString());
             break;
           }
         } catch (_) {
           /* ignore individual log parse errors */
         }
       }
-    } catch (e) {
-      console.log("Event parse failed:", e.message || e);
-    }
+    } catch (e) {}
   });

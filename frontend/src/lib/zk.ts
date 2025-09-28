@@ -3,7 +3,7 @@ import DeepFamilyAbi from '../abi/DeepFamily.json'
 // @ts-ignore
 import * as snarkjs from 'snarkjs'
 
-type Groth16Proof = {
+export type Groth16Proof = {
   pi_a: [string | bigint, string | bigint, string | bigint]
   pi_b: [[string | bigint, string | bigint], [string | bigint, string | bigint], [string | bigint, string | bigint]]
   pi_c: [string | bigint, string | bigint, string | bigint]
@@ -454,6 +454,7 @@ export async function submitAddPersonZK(
 // Person data input interface
 export interface PersonData {
   fullName: string
+  passphrase: string
   birthYear: number
   birthMonth: number
   birthDay: number
@@ -461,14 +462,31 @@ export interface PersonData {
   gender: number // 1=male, 2=female
 }
 
-// Hash a full name to 32 bytes using keccak256
-export function hashFullName(fullName: string): number[] {
-  const hash = keccak256(toUtf8Bytes(fullName))
+// Hash helpers convert UTF-8 string to keccak bytes array (32 elements)
+function keccakStringToBytes(value: string): number[] {
+  const hash = keccak256(toUtf8Bytes(value || ''))
   const bytes = new Uint8Array(32)
   for (let i = 0; i < 32; i++) {
     bytes[i] = parseInt(hash.slice(2 + i * 2, 4 + i * 2), 16)
   }
   return Array.from(bytes)
+}
+
+export function hashFullName(fullName: string): number[] {
+  return keccakStringToBytes(fullName)
+}
+
+type PassphraseInput = string | number | bigint | Array<string | number | bigint> | undefined | null
+
+export function hashPassphrase(passphrase: PassphraseInput): number[] {
+  if (Array.isArray(passphrase)) {
+    return passphrase.slice(0, 32).map((v) => Number(v) & 0xff)
+  }
+  const normalized = passphrase == null ? '' : String(passphrase)
+  if (normalized.length === 0) {
+    return Array(32).fill(0)
+  }
+  return keccakStringToBytes(normalized)
 }
 
 // Generate ZK proof for adding a person
@@ -482,6 +500,7 @@ export async function generatePersonProof(
     // Create default parent data if they don't exist
     const defaultParent: PersonData = {
       fullName: '',
+      passphrase: '',
       birthYear: 0,
       birthMonth: 1,
       birthDay: 1,
@@ -495,6 +514,7 @@ export async function generatePersonProof(
     // Prepare circuit input
     const input = {
       fullNameHash: hashFullName(person.fullName),
+      saltHash: hashPassphrase(person.passphrase),
       isBirthBC: person.isBirthBC ? 1 : 0,
       birthYear: person.birthYear,
       birthMonth: person.birthMonth,
@@ -502,6 +522,7 @@ export async function generatePersonProof(
       gender: person.gender,
       
       father_fullNameHash: hashFullName(fatherData.fullName),
+      father_saltHash: hashPassphrase(fatherData.passphrase),
       father_isBirthBC: fatherData.isBirthBC ? 1 : 0,
       father_birthYear: fatherData.birthYear,
       father_birthMonth: fatherData.birthMonth,
@@ -509,6 +530,7 @@ export async function generatePersonProof(
       father_gender: fatherData.gender,
       
       mother_fullNameHash: hashFullName(motherData.fullName),
+      mother_saltHash: hashPassphrase(motherData.passphrase),
       mother_isBirthBC: motherData.isBirthBC ? 1 : 0,
       mother_birthYear: motherData.birthYear,
       mother_birthMonth: motherData.birthMonth,
@@ -522,6 +544,7 @@ export async function generatePersonProof(
 
     console.log('📊 Circuit input prepared:', {
       fullNameHashLength: input.fullNameHash.length,
+      saltHashLength: input.saltHash.length,
       hasFather: input.hasFather,
       hasMother: input.hasMother,
       submitterLength: input.submitter.length,
@@ -567,3 +590,71 @@ export async function verifyProof(
   }
 }
 
+export async function generateNamePoseidonProof(
+  fullName: string,
+  passphrase: string
+): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
+  try {
+    const input = {
+      fullNameHash: hashFullName(fullName),
+      saltHash: hashPassphrase(passphrase)
+    }
+
+    const timestamp = Date.now()
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input,
+      `/zk/name_poseidon_zk.wasm?t=${timestamp}`,
+      `/zk/name_poseidon_zk_final.zkey?t=${timestamp}`
+    )
+
+    return { proof, publicSignals }
+  } catch (error) {
+    console.error('Error generating name poseidon ZK proof:', error)
+    throw new Error(`Failed to generate name poseidon ZK proof: ${error}`)
+  }
+}
+
+export async function verifyNamePoseidonProof(
+  proof: Groth16Proof,
+  publicSignals: string[]
+): Promise<boolean> {
+  try {
+    const vKeyResponse = await fetch('/zk/name_poseidon_zk.vkey.json')
+    const vKey = await vKeyResponse.json()
+    return snarkjs.groth16.verify(vKey, publicSignals, proof)
+  } catch (error) {
+    console.error('Error verifying name poseidon proof:', error)
+    return false
+  }
+}
+
+export function formatGroth16ProofForContract(proof: Groth16Proof) {
+  if (!proof || !proof.pi_a || !proof.pi_b || !proof.pi_c) {
+    throw new Error('Invalid proof structure')
+  }
+
+  if (!Array.isArray(proof.pi_a) || proof.pi_a.length < 2) {
+    throw new Error('Invalid proof.pi_a length')
+  }
+
+  if (!Array.isArray(proof.pi_b) || proof.pi_b.length < 2) {
+    throw new Error('Invalid proof.pi_b length')
+  }
+
+  if (!Array.isArray(proof.pi_c) || proof.pi_c.length < 2) {
+    throw new Error('Invalid proof.pi_c length')
+  }
+
+  const a: [bigint, bigint] = [toBigInt(proof.pi_a[0]), toBigInt(proof.pi_a[1])]
+  const b: [[bigint, bigint], [bigint, bigint]] = [
+    [toBigInt(proof.pi_b[0][1]), toBigInt(proof.pi_b[0][0])],
+    [toBigInt(proof.pi_b[1][1]), toBigInt(proof.pi_b[1][0])]
+  ]
+  const c: [bigint, bigint] = [toBigInt(proof.pi_c[0]), toBigInt(proof.pi_c[1])]
+
+  return { a, b, c }
+}
+
+export function toBigIntArray(values: Array<string | number | bigint>): bigint[] {
+  return values.map(toBigInt)
+}

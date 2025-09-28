@@ -321,6 +321,25 @@
       "birthYearLabel": "出生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
+      "passphrase": "口令",
+      "passphrasePlaceholder": "可选：输入口令以增强隐私保护",
+      "passphraseHelp": {
+        "title": "口令作用说明",
+        "privacy": "🔒 隐私保护",
+        "privacyDesc": "为您的身份哈希添加额外保护层，防止他人通过姓名和生日推测您的身份。",
+        "optional": "✅ 完全可选",
+        "optionalDesc": "可以留空，但建议使用强口令提升安全性。",
+        "remember": "⚠️ 请牢记",
+        "rememberDesc": "口令无法找回，忘记后将生成不同的身份哈希。"
+      },
+      "passwordStrength": {
+        "weak": "弱",
+        "medium": "中",
+        "strong": "强"
+      },
+      "passwordTips": {
+        "weak": "💡 建议：使用8位以上密码，包含大小写字母、数字或特殊字符"
+      },
       "nameInputPlaceholder": "例如：张三",
       "toggleNo": "否",
       "toggleYes": "是",

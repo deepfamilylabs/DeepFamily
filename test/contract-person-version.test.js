@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const hre = require('hardhat');
+const { buildBasicInfo } = require('../lib/namePoseidon');
 
 // Tests focused on add-person (version creation) including validation and duplicate logic
 
@@ -24,8 +25,13 @@ describe('Person Version (add-person) Tests', function () {
         ipfs: 'QmCID1'
       })
     ).to.not.be.reverted;
-    const fullNameHash = await deepFamily.getFullNameHash('John Doe');
-    const basicInfo = { fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1990, birthMonth: 0, birthDay: 0, gender: 1 };
+    const basicInfo = buildBasicInfo({
+      fullName: 'John Doe',
+      birthYear: 1990,
+      birthMonth: 0,
+      birthDay: 0,
+      gender: 1,
+    });
     const personHash = await deepFamily.getPersonHash(basicInfo);
     const count = await deepFamily.countPersonVersions(personHash);
     expect(count).to.equal(1n);
@@ -41,12 +47,20 @@ describe('Person Version (add-person) Tests', function () {
   it('reverts on invalid birthMonth / birthDay via direct call (solidity validation)', async () => {
     const { deepFamily } = await baseSetup();
     // Construct invalid basic info to call pure getPersonHash (will revert)
-    const fullNameHash = await deepFamily.getFullNameHash('A');
+    const baseInfo = {
+      fullName: 'A',
+      birthYear: 1000,
+      gender: 1,
+    };
     await expect(
-      deepFamily.getPersonHash({ fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1000, birthMonth: 13, birthDay: 0, gender: 1 })
+      deepFamily.getPersonHash(
+        buildBasicInfo({ ...baseInfo, birthMonth: 13, birthDay: 0 })
+      )
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidBirthMonth');
     await expect(
-      deepFamily.getPersonHash({ fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1000, birthMonth: 12, birthDay: 32, gender: 1 })
+      deepFamily.getPersonHash(
+        buildBasicInfo({ ...baseInfo, birthMonth: 12, birthDay: 32 })
+      )
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidBirthDay');
   });
 

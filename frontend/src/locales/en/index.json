@@ -320,6 +320,25 @@
       "birthYearLabel": "Birth Year",
       "birthMonthLabel": "Month",
       "birthDayLabel": "Day",
+      "passphrase": "Passphrase",
+      "passphrasePlaceholder": "Optional: Enter passphrase for enhanced privacy",
+      "passphraseHelp": {
+        "title": "Passphrase Usage Guide",
+        "privacy": "🔒 Privacy Protection",
+        "privacyDesc": "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
+        "optional": "✅ Completely Optional",
+        "optionalDesc": "Can be left empty, but using a strong passphrase is recommended for better security.",
+        "remember": "⚠️ Please Remember",
+        "rememberDesc": "Passphrase cannot be recovered. If forgotten, a different identity hash will be generated."
+      },
+      "passwordStrength": {
+        "weak": "Weak",
+        "medium": "Medium",
+        "strong": "Strong"
+      },
+      "passwordTips": {
+        "weak": "💡 Tip: Use 8+ characters with uppercase, lowercase, numbers or special characters"
+      },
       "nameInputPlaceholder": "e.g., John Smith",
       "toggleNo": "No",
       "toggleYes": "Yes",

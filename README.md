@@ -190,9 +190,9 @@ npm run test:gas
 npm run test:coverage
 
 # Run specific test suites
-npx hardhat test test/personVersion.test.js
-npx hardhat test test/endorse.test.js
-npx hardhat test test/mintNft.test.js
+npx hardhat test test/contract-person-version.test.js
+npx hardhat test test/contract-endorse.test.js
+npx hardhat test test/contract-mint-nft.test.js
 ```
 
 ## Usage

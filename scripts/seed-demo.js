@@ -1,5 +1,9 @@
 const hre = require("hardhat");
 const { ethers } = hre;
+const path = require("path");
+const fs = require("fs");
+const snarkjs = require("snarkjs");
+const { computePoseidonDigest } = require("../lib/namePoseidon");
 
 // Added: debug helper
 const DEBUG_ENABLED = process.env.DEBUG_SEED === "1";
@@ -14,6 +18,109 @@ if (DEBUG_ENABLED) {
     () => console.log(`[DEBUG][heartbeat] ${new Date().toISOString()}`),
     15000,
   );
+}
+
+const NAME_POSEIDON_WASM_PATH = path.join(__dirname, "../frontend/public/zk/name_poseidon_zk.wasm");
+const NAME_POSEIDON_ZKEY_PATH = path.join(
+  __dirname,
+  "../frontend/public/zk/name_poseidon_zk_final.zkey",
+);
+
+function assertFileExists(label, filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(
+      `${label} not found at ${filePath}. Run frontend build/scripts to generate ZK artifacts.`,
+    );
+  }
+}
+
+assertFileExists("Name Poseidon wasm", NAME_POSEIDON_WASM_PATH);
+assertFileExists("Name Poseidon zkey", NAME_POSEIDON_ZKEY_PATH);
+
+function hexToBytes(hex) {
+  const cleaned = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const bytes = [];
+  for (let i = 0; i < cleaned.length; i += 2) {
+    bytes.push(parseInt(cleaned.slice(i, i + 2), 16));
+  }
+  return bytes;
+}
+
+function toBigIntValue(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(value);
+  if (typeof value === "string") return BigInt(value);
+  if (Array.isArray(value) && value.length > 0) {
+    return BigInt(value[0]);
+  }
+  throw new Error(`Unable to convert value to BigInt: ${value}`);
+}
+
+function formatGroth16ProofForContract(proof) {
+  if (!proof || !proof.pi_a || !proof.pi_b || !proof.pi_c) {
+    throw new Error("Invalid proof structure returned by snarkjs");
+  }
+
+  const a = [toBigIntValue(proof.pi_a[0]), toBigIntValue(proof.pi_a[1])];
+  const b = [
+    [toBigIntValue(proof.pi_b[0][1]), toBigIntValue(proof.pi_b[0][0])],
+    [toBigIntValue(proof.pi_b[1][1]), toBigIntValue(proof.pi_b[1][0])],
+  ];
+  const c = [toBigIntValue(proof.pi_c[0]), toBigIntValue(proof.pi_c[1])];
+
+  return { a, b, c };
+}
+
+const nameProofCache = new Map();
+
+function prepareBasicInfo(basicInfo) {
+  const passphrase = basicInfo.passphrase || "";
+  const digest = computePoseidonDigest(basicInfo.fullName, passphrase);
+
+  const prepared = {
+    fullNameHash: digest.digestHex,
+    isBirthBC: Boolean(basicInfo.isBirthBC),
+    birthYear: Number(basicInfo.birthYear ?? 0),
+    birthMonth: Number(basicInfo.birthMonth ?? 0),
+    birthDay: Number(basicInfo.birthDay ?? 0),
+    gender: Number(basicInfo.gender ?? 0),
+  };
+
+  return { prepared, digest };
+}
+
+async function generateNamePoseidonProofForSeed(fullName, passphrase = "") {
+  const cacheKey = `${fullName}::${passphrase}`;
+  if (nameProofCache.has(cacheKey)) {
+    return nameProofCache.get(cacheKey);
+  }
+
+  const digest = computePoseidonDigest(fullName, passphrase);
+  const input = {
+    fullNameHash: hexToBytes(digest.nameHex),
+    saltHash: hexToBytes(digest.saltHex),
+  };
+
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    input,
+    NAME_POSEIDON_WASM_PATH,
+    NAME_POSEIDON_ZKEY_PATH,
+  );
+
+  const formatted = formatGroth16ProofForContract(proof);
+  const signalValues = publicSignals.map((value) => BigInt(value.toString()));
+  if (signalValues.length < 4) {
+    throw new Error(
+      `Name poseidon public signals length mismatch (expected >=4, got ${signalValues.length})`,
+    );
+  }
+  const result = {
+    proof: formatted,
+    publicSignals: signalValues,
+  };
+
+  nameProofCache.set(cacheKey, result);
+  return result;
 }
 
 // Global flag: if token isn't initialized/bound correctly, avoid reward mint
@@ -48,17 +155,8 @@ function solidityStringHash(s) {
 
 // Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
-  // First compute fullNameHash from fullName
-  const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
-
-  return await deepFamily.getPersonHash({
-    fullNameHash: fullNameHash,
-    isBirthBC: basicInfo.isBirthBC,
-    birthYear: basicInfo.birthYear,
-    birthMonth: basicInfo.birthMonth,
-    birthDay: basicInfo.birthDay,
-    gender: basicInfo.gender,
-  });
+  const { prepared } = prepareBasicInfo(basicInfo);
+  return await deepFamily.getPersonHash(prepared);
 }
 // Generate example story text with strict 256 bytes (or <=256): includes multi-language previously, now English only; padded with ASCII to reach limit
 const LONG_STORY = (() => {
@@ -360,6 +458,7 @@ async function main() {
       birthMonth: month,
       birthDay: day,
       gender,
+      passphrase: "",
     };
   }
 
@@ -682,19 +781,11 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
       const j = Math.floor(rand() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    const coreFromInfo = async (b) => {
-      // Get fullNameHash for basicInfo
-      const fullNameHash = await deepFamily.getFullNameHash(b.fullName);
+    const coreFromInfo = (b) => {
+      const { prepared } = prepareBasicInfo(b);
 
       return {
-        basicInfo: {
-          fullNameHash: fullNameHash,
-          isBirthBC: b.isBirthBC,
-          birthYear: b.birthYear,
-          birthMonth: b.birthMonth || 1,
-          birthDay: b.birthDay || 1,
-          gender: b.gender,
-        },
+        basicInfo: prepared,
         supplementInfo: {
           fullName: b.fullName, // fullName now goes in supplementInfo
           birthPlace: PLACE,
@@ -735,8 +826,22 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
         }
         let t1 = await deepFamily.endorseVersion(n.hash, n.ver);
         await t1.wait();
-        const core = await coreFromInfo(n.info);
-        let t2 = await deepFamily.mintPersonNFT(n.hash, n.ver, `ipfs://seed/${i}`, core);
+        const core = coreFromInfo(n.info);
+        const { proof, publicSignals } = await generateNamePoseidonProofForSeed(
+          n.info.fullName,
+          n.info.passphrase || "",
+        );
+        const proofSignals = publicSignals.slice(0, 4);
+        let t2 = await deepFamily.mintPersonNFT(
+          proof.a,
+          proof.b,
+          proof.c,
+          proofSignals,
+          n.hash,
+          n.ver,
+          `ipfs://seed/${i}`,
+          core,
+        );
         await t2.wait();
         minted++;
         if (minted % 10 === 0 || minted === TARGET_NFTS)
@@ -850,8 +955,13 @@ if (typeof globalThis !== "undefined" && typeof globalThis.tagFor === "undefined
   globalThis.tagFor = tagFor;
 }
 
-main().catch((e) => {
-  console.error(e);
-  if (DEBUG_ENABLED && HEARTBEAT) clearInterval(HEARTBEAT);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    if (DEBUG_ENABLED && HEARTBEAT) clearInterval(HEARTBEAT);
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    if (DEBUG_ENABLED && HEARTBEAT) clearInterval(HEARTBEAT);
+    process.exit(1);
+  });
