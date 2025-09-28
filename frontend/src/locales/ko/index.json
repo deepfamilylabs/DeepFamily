@@ -321,6 +321,25 @@
       "birthYearLabel": "출생연도",
       "birthMonthLabel": "월",
       "birthDayLabel": "일",
+      "passphrase": "패스프레이즈",
+      "passphrasePlaceholder": "선택사항: 프라이버시 강화를 위한 패스프레이즈 입력",
+      "passphraseHelp": {
+        "title": "패스프레이즈 사용 가이드",
+        "privacy": "🔒 프라이버시 보호",
+        "privacyDesc": "신원 해시에 추가 보호 계층을 추가하여 다른 사람이 이름과 생년월일로 신원을 추측하는 것을 방지합니다.",
+        "optional": "✅ 완전히 선택사항",
+        "optionalDesc": "비워둘 수 있지만, 보안 향상을 위해 강한 패스프레이즈 사용을 권장합니다.",
+        "remember": "⚠️ 기억해 주세요",
+        "rememberDesc": "패스프레이즈는 복구할 수 없습니다. 잊어버리면 다른 신원 해시가 생성됩니다."
+      },
+      "passwordStrength": {
+        "weak": "약함",
+        "medium": "보통",
+        "strong": "강함"
+      },
+      "passwordTips": {
+        "weak": "💡 팁: 8자 이상, 대소문자, 숫자 또는 특수문자를 포함한 비밀번호를 사용하세요"
+      },
       "nameInputPlaceholder": "예: 김철수",
       "toggleNo": "아니오",
       "toggleYes": "예",

@@ -1,18 +1,23 @@
 const hre = require("hardhat");
+const path = require("path");
+const { computePoseidonDigest } = require(path.join(__dirname, "../lib/namePoseidon"));
 
-// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
+function prepareBasicInfo(basicInfo) {
+  const digest = computePoseidonDigest(basicInfo.fullName, basicInfo.passphrase || "");
+  return {
+    fullNameHash: digest.digestHex,
+    isBirthBC: Boolean(basicInfo.isBirthBC),
+    birthYear: Number(basicInfo.birthYear ?? 0),
+    birthMonth: Number(basicInfo.birthMonth ?? 0),
+    birthDay: Number(basicInfo.birthDay ?? 0),
+    gender: Number(basicInfo.gender ?? 0),
+  };
+}
+
+// Helper: call getPersonHash with precomputed Poseidon-based hash
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
-  // First compute fullNameHash from fullName
-  const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
-
-  return await deepFamily.getPersonHash({
-    fullNameHash: fullNameHash,
-    isBirthBC: basicInfo.isBirthBC,
-    birthYear: basicInfo.birthYear,
-    birthMonth: basicInfo.birthMonth,
-    birthDay: basicInfo.birthDay,
-    gender: basicInfo.gender,
-  });
+  const prepared = prepareBasicInfo(basicInfo);
+  return await deepFamily.getPersonHash(prepared);
 }
 
 async function main() {
@@ -28,11 +33,13 @@ async function main() {
   // Fetch other related deployments as well
   const depToken = await get("DeepFamilyToken");
   const depVerifier = await get("PersonHashVerifier");
+  const depNameVerifier = await get("NamePoseidonVerifier");
 
   // Log addresses for three contracts
   console.log("DeepFamily contract:", dep.address);
   console.log("DeepFamilyToken contract:", depToken.address);
   console.log("PersonHashVerifier contract:", depVerifier.address);
+  console.log("NamePoseidonVerifier contract:", depNameVerifier.address);
 
   const ft = await ethers.getContractAt("DeepFamily", dep.address);
 
@@ -44,6 +51,7 @@ async function main() {
     birthDay: 1,
     gender: 1,
     birthPlace: "US-CA-Los Angeles",
+    passphrase: "",
   };
   const demoHash = await getPersonHashFromBasicInfo(ft, demo);
   console.log("DemoRoot hash:", demoHash);

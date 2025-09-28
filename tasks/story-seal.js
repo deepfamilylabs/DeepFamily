@@ -36,11 +36,8 @@ task("seal-story", "Seal the story for an NFT (no further chunk modifications)")
       throw new Error("Cannot seal empty story (no chunks)");
     }
 
-    console.log("Sealing story for tokenId:", tokenId.toString());
     const tx = await deepFamily.sealStory(tokenId);
-    console.log("Submitted tx:", tx.hash);
     const receipt = await tx.wait();
-    console.log("Confirmed in block:", receipt.blockNumber);
 
     try {
       const iface = new ethers.Interface([
@@ -52,15 +49,11 @@ task("seal-story", "Seal the story for an NFT (no further chunk modifications)")
         try {
           const parsed = iface.parseLog(log);
           if (parsed && parsed.name === "StorySealed") {
-            console.log("Total chunks:", parsed.args.totalChunks.toString());
-            console.log("Full story hash:", parsed.args.fullStoryHash);
             break;
           }
         } catch (_) {
           /* ignore */
         }
       }
-    } catch (e) {
-      console.log("Event parse failed:", e.message || e);
-    }
+    } catch (e) {}
   });

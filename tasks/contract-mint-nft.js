@@ -1,4 +1,6 @@
 const { task } = require("hardhat/config");
+const { buildBasicInfo } = require("../lib/namePoseidon");
+const { generateNamePoseidonProof } = require("../lib/namePoseidonProof");
 
 // mintPersonNFT(personHash, versionIndex, tokenURI, PersonCoreInfo { basicInfo, supplementInfo })
 // No ETH fee; must have endorsed the version first.
@@ -8,6 +10,7 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
   .addParam("vindex", "Version index (starting from 1)")
   .addParam("tokenuri", "NFT metadata URI (e.g. ipfs://CID)")
   .addParam("fullname", "Full name (must match original person hash)")
+  .addOptionalParam("passphrase", "Passphrase used in original ZK proof", "")
   .addParam("birthyear", "Birth year (0=unknown)")
   .addOptionalParam("birthbc", "Is birth BC (true/false)", "false")
   .addOptionalParam("birthmonth", "Birth month (1-12, 0=unknown)", "0")
@@ -60,7 +63,6 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
 
     // Check version existence
     const totalVersions = Number(await deepFamily.countPersonVersions(args.person));
-    console.log("Total versions for person:", totalVersions);
     if (versionIndex > totalVersions) {
       throw new Error(`Version index ${versionIndex} out of range (total=${totalVersions}).`);
     }
@@ -73,18 +75,20 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
       );
     }
 
-    // Get fullNameHash first
-    const fullNameHash = await deepFamily.getFullNameHash(args.fullname);
-
-    // Construct nested core info
-    const basicInfo = {
-      fullNameHash: fullNameHash,
+    const basicInfo = buildBasicInfo({
+      fullName: args.fullname,
+      passphrase: args.passphrase,
       isBirthBC: String(args.birthbc).toLowerCase() === "true",
       birthYear,
       birthMonth,
       birthDay,
       gender,
-    };
+    });
+
+    const { proof, publicSignals } = await generateNamePoseidonProof(
+      args.fullname,
+      args.passphrase,
+    );
 
     // Recompute hash to sanity check user input matches person hash
     const computedHash = await deepFamily.getPersonHash(basicInfo);
@@ -107,13 +111,17 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
 
     const coreInfo = { basicInfo, supplementInfo };
 
-    console.log("DeepFamily contract:", deepDeployment.address);
-    console.log("Minting NFT with tokenURI:", args.tokenuri);
-
-    const tx = await deepFamily.mintPersonNFT(args.person, versionIndex, args.tokenuri, coreInfo);
-    console.log("Submitted mint tx:", tx.hash);
+    const tx = await deepFamily.mintPersonNFT(
+      proof.a,
+      proof.b,
+      proof.c,
+      publicSignals,
+      args.person,
+      versionIndex,
+      args.tokenuri,
+      coreInfo,
+    );
     const receipt = await tx.wait();
-    console.log("NFT minted in block:", receipt.blockNumber);
 
     // Optionally parse PersonNFTMinted event
     try {
@@ -126,16 +134,11 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
         try {
           const parsed = iface.parseLog(log);
           if (parsed && parsed.name === "PersonNFTMinted") {
-            console.log("Minted tokenId:", parsed.args.tokenId.toString());
-            console.log("Event versionIndex:", parsed.args.versionIndex.toString());
-            console.log("Stored tokenURI:", parsed.args.tokenURI);
             break;
           }
         } catch (_) {
           /* ignore */
         }
       }
-    } catch (e) {
-      console.log("Event parse failed:", e.message || e);
-    }
+    } catch (e) {}
   });

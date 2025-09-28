@@ -30,33 +30,10 @@ task("list-story-chunks", "List story chunks for an NFT with pagination")
     const limit = Number(args.limit);
 
     const metadata = await deepFamily.getStoryMetadata(tokenId);
-    console.log(
-      "Story metadata: totalChunks=",
-      metadata.totalChunks.toString(),
-      " sealed=",
-      metadata.isSealed,
-    );
-    console.log(
-      "Total length chars:",
-      metadata.totalLength.toString(),
-      " lastUpdate=",
-      metadata.lastUpdateTime.toString(),
-    );
-    console.log("Full story hash:", metadata.fullStoryHash);
 
     const result = await deepFamily.listStoryChunks(tokenId, offset, limit);
     const chunks = result[0];
     const totalChunks = Number(result[1]);
     const hasMore = result[2];
     const nextOffset = Number(result[3]);
-
-    console.log(
-      `Returned ${chunks.length} chunks (total=${totalChunks}) hasMore=${hasMore} nextOffset=${nextOffset}`,
-    );
-    chunks.forEach((c, i) => {
-      console.log(
-        `#${i} -> index=${c.chunkIndex.toString()} hash=${c.chunkHash} length=${c.content.length}`,
-      );
-      console.log(`   content: ${c.content}`);
-    });
   });

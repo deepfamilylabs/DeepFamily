@@ -1,7 +1,8 @@
 const { task } = require("hardhat/config");
+const { computePoseidonDigest, buildBasicInfo } = require("../lib/namePoseidon");
 
 // PersonBasicInfo {
-//   bytes32 fullNameHash;
+//   bytes32 fullNameHash; // Poseidon5 hash, NOT simple keccak256!
 //   bool isBirthBC;
 //   uint16 birthYear;
 //   uint8 birthMonth;
@@ -9,8 +10,9 @@ const { task } = require("hardhat/config");
 //   uint8 gender;
 // }
 
-task("add-person", "Add a person version (basic info only; birthPlace removed)")
+task("add-person", "Add a person version using correct fullNameHash calculation")
   .addParam("fullname", "Full name")
+  .addOptionalParam("passphrase", "Salt passphrase for privacy (default: empty)", "")
   .addOptionalParam("birthbc", "Is birth year BC (true/false)", "false")
   .addParam("birthyear", "Birth year (0=unknown)")
   .addOptionalParam("birthmonth", "Birth month (1-12, 0=unknown)", "0")
@@ -56,23 +58,24 @@ task("add-person", "Add a person version (basic info only; birthPlace removed)")
     if (birthDayNum < 0 || birthDayNum > 31) throw new Error("birthDay must be 0-31");
     if (genderNum < 0 || genderNum > 3) throw new Error("gender must be 0-3");
 
-    // Get fullNameHash first
-    const fullNameHash = await deepFamily.getFullNameHash(args.fullname);
+    if (!args.fullname || args.fullname.trim().length === 0) {
+      throw new Error("InvalidFullName");
+    }
 
-    const basicInfo = {
-      fullNameHash: fullNameHash,
+    computePoseidonDigest(args.fullname, args.passphrase);
+
+    const basicInfo = buildBasicInfo({
+      fullName: args.fullname,
+      passphrase: args.passphrase,
       isBirthBC: String(args.birthbc).toLowerCase() === "true",
       birthYear: birthYearNum,
       birthMonth: birthMonthNum,
       birthDay: birthDayNum,
       gender: genderNum,
-    };
+    });
 
     // Compute hashes
     const personHash = await deepFamily.getPersonHash(basicInfo);
-
-    console.log("DeepFamily address:", deep.address);
-    console.log("Computed personHash:", personHash);
 
     const tx = await deepFamily.addPerson(
       personHash,
@@ -83,9 +86,7 @@ task("add-person", "Add a person version (basic info only; birthPlace removed)")
       args.tag,
       args.ipfs,
     );
-    console.log("Submitted tx:", tx.hash);
     const receipt = await tx.wait();
-    console.log("Mined in block:", receipt.blockNumber);
 
     // Decode PersonVersionAdded event
     try {
@@ -98,16 +99,11 @@ task("add-person", "Add a person version (basic info only; birthPlace removed)")
         try {
           const parsed = iface.parseLog(log);
           if (parsed && parsed.name === "PersonVersionAdded") {
-            console.log("Event personHash:", parsed.args.personHash);
-            console.log("Event versionIndex:", parsed.args.versionIndex.toString());
-            console.log("Tag:", parsed.args.tag);
             break;
           }
         } catch (_) {
           /* ignore */
         }
       }
-    } catch (e) {
-      console.log("Event parse failed:", e.message || e);
-    }
+    } catch (e) {}
   });

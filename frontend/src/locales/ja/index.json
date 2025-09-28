@@ -321,6 +321,25 @@
       "birthYearLabel": "生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
+      "passphrase": "パスフレーズ",
+      "passphrasePlaceholder": "オプション：プライバシー強化のためのパスフレーズを入力",
+      "passphraseHelp": {
+        "title": "パスフレーズの役割説明",
+        "privacy": "🔒 プライバシー保護",
+        "privacyDesc": "あなたの身元ハッシュに追加の保護層を追加し、他の人が名前と生年月日からあなたの身元を推測することを防ぎます。",
+        "optional": "✅ 完全にオプション",
+        "optionalDesc": "空のままでも構いませんが、セキュリティ向上のため強いパスフレーズの使用をお勧めします。",
+        "remember": "⚠️ 覚えておいてください",
+        "rememberDesc": "パスフレーズは復元できません。忘れると異なる身元ハッシュが生成されます。"
+      },
+      "passwordStrength": {
+        "weak": "弱",
+        "medium": "中",
+        "strong": "強"
+      },
+      "passwordTips": {
+        "weak": "💡 ヒント：8文字以上で大文字・小文字・数字・特殊文字を含むパスワードを使用してください"
+      },
       "nameInputPlaceholder": "例：田中太郎",
       "toggleNo": "いいえ",
       "toggleYes": "はい",

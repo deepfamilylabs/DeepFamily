@@ -6,6 +6,7 @@ const ZKProofTest: React.FC = () => {
   const [result, setResult] = useState<string>('')
   const [person, setPerson] = useState<PersonData>({
     fullName: 'Test Person',
+    passphrase: 'secret-person',
     birthYear: 1990,
     birthMonth: 12,
     birthDay: 25,
@@ -23,6 +24,7 @@ const ZKProofTest: React.FC = () => {
       // Test with both parents
       const father: PersonData = {
         fullName: 'Test Father',
+        passphrase: 'secret-father',
         birthYear: 1960,
         birthMonth: 5,
         birthDay: 15,
@@ -32,6 +34,7 @@ const ZKProofTest: React.FC = () => {
 
       const mother: PersonData = {
         fullName: 'Test Mother',
+        passphrase: 'secret-mother',
         birthYear: 1965,
         birthMonth: 8,
         birthDay: 20,

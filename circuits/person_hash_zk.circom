@@ -43,7 +43,8 @@ template HashToLimbs() {
 
 // Fixed-length PersonHasher using fullNameHash (32 bytes)
 template PersonHasher() {
-    signal input fullNameHash[32];  // 32-byte hash of the full name
+    signal input fullNameHash[32];  // 32-byte keccak256 hash of the full name
+    signal input saltHash[32];      // 32-byte keccak256 hash of the passphrase-derived salt
     signal input isBirthBC;
     signal input birthYear;
     signal input birthMonth;
@@ -81,15 +82,40 @@ template PersonHasher() {
     for (var i = 0; i < 32; i++) {
         nameLimbs.hashBytes[i] <== fullNameHash[i];
     }
-    
+
+    component saltLimbs = HashToLimbs();
+    for (var i = 0; i < 32; i++) {
+        saltLimbs.hashBytes[i] <== saltHash[i];
+    }
+
+    component fullNamePoseidon = Poseidon(5);
+    fullNamePoseidon.inputs[0] <== nameLimbs.limb0;
+    fullNamePoseidon.inputs[1] <== nameLimbs.limb1;
+    fullNamePoseidon.inputs[2] <== saltLimbs.limb0;
+    fullNamePoseidon.inputs[3] <== saltLimbs.limb1;
+    fullNamePoseidon.inputs[4] <== 0; // Domain separator slot
+
+    component poseidonNameBits = Num2Bits(256);
+    poseidonNameBits.in <== fullNamePoseidon.out;
+
+    component poseidonNameLow = Bits2Num(128);
+    for (var i = 0; i < 128; i++) {
+        poseidonNameLow.in[i] <== poseidonNameBits.out[i];
+    }
+
+    component poseidonNameHigh = Bits2Num(128);
+    for (var i = 0; i < 128; i++) {
+        poseidonNameHigh.in[i] <== poseidonNameBits.out[128 + i];
+    }
+
     // Pack small fields into single field element (saves 4 Poseidon inputs)
     // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
     signal packedData <== birthYear * 16777216 + birthMonth * 65536 + birthDay * 256 + gender * 2 + isBirthBC;
 
     // Poseidon commitment over SNARK-friendly field elements (reduced from 7 to 3 inputs)
     component poseidon = Poseidon(3);
-    poseidon.inputs[0] <== nameLimbs.limb0; // high 128 bits of fullNameHash
-    poseidon.inputs[1] <== nameLimbs.limb1; // low 128 bits of fullNameHash
+    poseidon.inputs[0] <== poseidonNameHigh.out; // high 128 bits of salted name Poseidon digest
+    poseidon.inputs[1] <== poseidonNameLow.out; // low 128 bits of salted name Poseidon digest
     poseidon.inputs[2] <== packedData;
 
     // Split Poseidon output into two 128-bit limbs for public signals
@@ -114,6 +140,7 @@ template PersonHasher() {
 template PersonHashTest() {
     // Person to be added
     signal input fullNameHash[32];
+    signal input saltHash[32];
     signal input isBirthBC;
     signal input birthYear;
     signal input birthMonth;
@@ -122,6 +149,7 @@ template PersonHashTest() {
     
     // Father
     signal input father_fullNameHash[32];
+    signal input father_saltHash[32];
     signal input father_isBirthBC;
     signal input father_birthYear;
     signal input father_birthMonth;
@@ -130,6 +158,7 @@ template PersonHashTest() {
     
     // Mother
     signal input mother_fullNameHash[32];
+    signal input mother_saltHash[32];
     signal input mother_isBirthBC;
     signal input mother_birthYear;
     signal input mother_birthMonth;
@@ -156,6 +185,7 @@ template PersonHashTest() {
     component personHasher = PersonHasher();
     for (var i = 0; i < 32; i++) {
         personHasher.fullNameHash[i] <== fullNameHash[i];
+        personHasher.saltHash[i] <== saltHash[i];
     }
     personHasher.isBirthBC <== isBirthBC;
     personHasher.birthYear <== birthYear;
@@ -167,6 +197,7 @@ template PersonHashTest() {
     component fatherHasher = PersonHasher();
     for (var j = 0; j < 32; j++) {
         fatherHasher.fullNameHash[j] <== father_fullNameHash[j];
+        fatherHasher.saltHash[j] <== father_saltHash[j];
     }
     fatherHasher.isBirthBC <== father_isBirthBC;
     fatherHasher.birthYear <== father_birthYear;
@@ -178,6 +209,7 @@ template PersonHashTest() {
     component motherHasher = PersonHasher();
     for (var t = 0; t < 32; t++) {
         motherHasher.fullNameHash[t] <== mother_fullNameHash[t];
+        motherHasher.saltHash[t] <== mother_saltHash[t];
     }
     motherHasher.isBirthBC <== mother_isBirthBC;
     motherHasher.birthYear <== mother_birthYear;

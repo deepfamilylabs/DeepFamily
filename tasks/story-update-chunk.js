@@ -48,7 +48,6 @@ task("update-story-chunk", "Update an existing story chunk")
 
     const expectedHash = args.exphash;
     const localHash = ethers.keccak256(ethers.toUtf8Bytes(newContent));
-    console.log("Local new content hash:", localHash);
     if (
       expectedHash &&
       expectedHash !== "0x" + "0".repeat(64) &&
@@ -59,12 +58,8 @@ task("update-story-chunk", "Update an existing story chunk")
       );
     }
 
-    console.log("Updating chunk", chunkIndex, "for token", tokenId.toString());
-
     const tx = await deepFamily.updateStoryChunk(tokenId, chunkIndex, newContent, expectedHash);
-    console.log("Submitted tx:", tx.hash);
     const receipt = await tx.wait();
-    console.log("Confirmed in block:", receipt.blockNumber);
 
     // Parse StoryChunkUpdated
     try {
@@ -77,15 +72,11 @@ task("update-story-chunk", "Update an existing story chunk")
         try {
           const parsed = iface.parseLog(log);
           if (parsed && parsed.name === "StoryChunkUpdated") {
-            console.log("Old hash:", parsed.args.oldHash);
-            console.log("New hash:", parsed.args.newHash);
             break;
           }
         } catch (_) {
           /* ignore */
         }
       }
-    } catch (e) {
-      console.log("Event parse failed:", e.message || e);
-    }
+    } catch (e) {}
   });

@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const hre = require('hardhat');
+const { buildBasicInfo } = require('../lib/namePoseidon');
 
 // Additional negative & edge-case tests for story sharding (add/update/seal)
 // Covers: non-owner, index mismatch, oversize, hash mismatch, seal rules, max chunks, zero-chunk seal
@@ -24,15 +25,13 @@ describe('Story Sharding - Error & Edge Cases', function () {
       tag: 'edge',
       ipfs: 'QmEdgeMeta'
     });
-    const fullNameHash = await deepFamily.getFullNameHash(FULLNAME);
-    const basicInfo = {
-      fullNameHash: fullNameHash,
-      isBirthBC: false,
+    const basicInfo = buildBasicInfo({
+      fullName: FULLNAME,
       birthYear: parseInt(BIRTH_YEAR, 10),
       birthMonth: 0,
       birthDay: 0,
-      gender: parseInt(GENDER, 10)
-    };
+      gender: parseInt(GENDER, 10),
+    });
     const personHash = await deepFamily.getPersonHash(basicInfo);
     await hre.run('endorse', { person: personHash, vindex: '1' });
     await hre.run('mint-nft', {

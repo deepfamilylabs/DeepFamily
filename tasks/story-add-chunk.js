@@ -54,7 +54,6 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
     const expectedHash = args.exphash;
     // Compute local hash (contract uses keccak256(abi.encodePacked(content)))
     const localHash = ethers.keccak256(ethers.toUtf8Bytes(content));
-    console.log("Local content hash:", localHash);
     if (
       expectedHash &&
       expectedHash !== "0x" + "0".repeat(64) &&
@@ -65,15 +64,8 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
       );
     }
 
-    console.log("DeepFamily contract:", deepDeployment.address);
-    console.log(
-      `Adding chunk ${chunkIndex} (current total=${currentTotal}) length=${content.length}`,
-    );
-
     const tx = await deepFamily.addStoryChunk(tokenId, chunkIndex, content, expectedHash);
-    console.log("Submitted tx:", tx.hash);
     const receipt = await tx.wait();
-    console.log("Confirmed in block:", receipt.blockNumber);
 
     // Parse StoryChunkAdded event
     try {
@@ -86,17 +78,11 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
         try {
           const parsed = iface.parseLog(log);
           if (parsed && parsed.name === "StoryChunkAdded") {
-            console.log("Event tokenId:", parsed.args.tokenId.toString());
-            console.log("Event chunkIndex:", parsed.args.chunkIndex.toString());
-            console.log("Event chunkHash:", parsed.args.chunkHash);
-            console.log("Content length:", parsed.args.contentLength.toString());
             break;
           }
         } catch (_) {
           /* ignore */
         }
       }
-    } catch (e) {
-      console.log("Event parse failed:", e.message || e);
-    }
+    } catch (e) {}
   });

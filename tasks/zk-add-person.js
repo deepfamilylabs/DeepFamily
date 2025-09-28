@@ -17,6 +17,65 @@ function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(abs, "utf8"));
 }
 
+function addressToUint160(address) {
+  if (typeof address !== "string") {
+    throw new Error("address must be a string");
+  }
+
+  return BigInt(address);
+}
+
+function normalizePublicSignals(pubJson, sender) {
+  const rawSignals = pubJson.publicSignals || pubJson;
+  const publicSignals = toBigIntArray(rawSignals);
+
+  if (publicSignals.length !== 7) {
+    throw new Error(`publicSignals length must be 7, got ${publicSignals.length}`);
+  }
+
+  const TWO_POW_128 = 1n << 128n;
+  for (let i = 0; i < 6; i++) {
+    if (publicSignals[i] < 0n || publicSignals[i] >= TWO_POW_128) {
+      throw new Error(`publicSignals[${i}] not in [0, 2^128)`);
+    }
+  }
+
+  const senderUint160 = addressToUint160(sender);
+  const submitter = publicSignals[6];
+  if (submitter !== senderUint160) {
+    throw new Error(
+      `submitter mismatch: publicSignals[6]=${submitter} expected ${senderUint160} (from ${sender})`,
+    );
+  }
+
+  return publicSignals;
+}
+
+function normalizeProof(proofJson) {
+  const proof = proofJson.proof || proofJson;
+
+  if (proof.pi_a && proof.pi_b && proof.pi_c) {
+    return {
+      a: [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])],
+      b: [
+        [BigInt(proof.pi_b[0][0]), BigInt(proof.pi_b[0][1])],
+        [BigInt(proof.pi_b[1][0]), BigInt(proof.pi_b[1][1])],
+      ],
+      c: [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])],
+    };
+  }
+
+  if (proof.a && proof.b && proof.c) {
+    return {
+      a: toBigIntArray(proof.a),
+      b: [toBigIntArray(proof.b[0]), toBigIntArray(proof.b[1])],
+      c: toBigIntArray(proof.c),
+    };
+  }
+
+  throw new Error("Unknown proof format: expected pi_a/pi_b/pi_c or a/b/c");
+}
+
 task("add-person-zk", "Submit Groth16 proof to addPersonZK")
   .addParam("proof", "Path to proof.json from snarkjs")
   .addParam("public", "Path to public.json from snarkjs")
@@ -44,47 +103,26 @@ task("add-person-zk", "Submit Groth16 proof to addPersonZK")
     const pubJson = loadJson(args.public);
 
     // snarkjs groth16 output formats can vary: ensure a,b,c arrays are in uint form
-    const proof = proofJson.proof || proofJson;
-    const publicSignals = toBigIntArray(pubJson.publicSignals || pubJson);
+    const { a, b, c } = normalizeProof(proofJson);
+    const publicSignals = normalizePublicSignals(pubJson, sender);
 
-    if (publicSignals.length !== 7n) {
-      throw new Error(`publicSignals length must be 7, got ${publicSignals.length}`);
-    }
-
-    // Check limbs < 2^128 for first 6 signals (mirror contract's cheap check)
-    const TWO_POW_128 = 1n << 128n;
-    for (let i = 0; i < 6; i++) {
-      if (publicSignals[i] < 0 || publicSignals[i] >= TWO_POW_128) {
-        throw new Error(`publicSignals[${i}] not in [0, 2^128)`);
-      }
-    }
-
-    // Submitter binding check: last element must equal uint160(sender)
-    const submitter = publicSignals[6];
-    const senderUint160 = BigInt(sender);
-    if (submitter !== senderUint160) {
-      throw new Error(
-        `submitter mismatch: publicSignals[6]=${submitter} expected ${senderUint160} (from ${sender})`,
-      );
-    }
-
-    // Reformat proof for Solidity verifier signature (a,b,c)
-    // snarkjs proof.groth16 has form: { pi_a: [..], pi_b: [[..],[..]], pi_c: [..] } or a/b/c numeric keys
-    let a, b, c;
-    if (proof.pi_a && proof.pi_b && proof.pi_c) {
-      a = [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])];
-      b = [
-        [BigInt(proof.pi_b[0][0]), BigInt(proof.pi_b[0][1])],
-        [BigInt(proof.pi_b[1][0]), BigInt(proof.pi_b[1][1])],
-      ];
-      c = [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])];
-    } else if (proof.a && proof.b && proof.c) {
-      a = toBigIntArray(proof.a);
-      b = [toBigIntArray(proof.b[0]), toBigIntArray(proof.b[1])];
-      c = toBigIntArray(proof.c);
-    } else {
-      throw new Error("Unknown proof format: expected pi_a/pi_b/pi_c or a/b/c");
-    }
+    console.log("Public signals breakdown:");
+    console.log(
+      "  Person hash (high, low):",
+      publicSignals[0].toString(),
+      publicSignals[1].toString(),
+    );
+    console.log(
+      "  Father hash (high, low):",
+      publicSignals[2].toString(),
+      publicSignals[3].toString(),
+    );
+    console.log(
+      "  Mother hash (high, low):",
+      publicSignals[4].toString(),
+      publicSignals[5].toString(),
+    );
+    console.log("  Submitter address:", publicSignals[6].toString());
 
     console.log("DeepFamily:", deep.address);
     console.log("Sender:", sender);
@@ -122,3 +160,11 @@ task("add-person-zk", "Submit Groth16 proof to addPersonZK")
       }
     } catch (_) {}
   });
+
+module.exports = {
+  toBigIntArray,
+  loadJson,
+  addressToUint160,
+  normalizePublicSignals,
+  normalizeProof,
+};

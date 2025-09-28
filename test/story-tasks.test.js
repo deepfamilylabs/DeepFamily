@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const hre = require('hardhat');
+const { buildBasicInfo } = require('../lib/namePoseidon');
 
 // This test exercises the newly added Hardhat tasks for story sharding:
 // add-story-chunk, update-story-chunk, seal-story, list-story-chunks
@@ -33,15 +34,13 @@ describe('Story Tasks Integration', function () {
     });
 
     // Compute personHash to use in later tasks
-    const fullNameHash = await deepFamily.getFullNameHash(FULLNAME);
-    const basicInfo = {
-      fullNameHash: fullNameHash,
-      isBirthBC: false,
+    const basicInfo = buildBasicInfo({
+      fullName: FULLNAME,
       birthYear: parseInt(BIRTH_YEAR, 10),
       birthMonth: 0,
       birthDay: 0,
       gender: parseInt(GENDER, 10),
-    };
+    });
     const personHash = await deepFamily.getPersonHash(basicInfo);
 
     // Sanity: version count should be 1

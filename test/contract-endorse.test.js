@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const hre = require('hardhat');
+const { buildBasicInfo } = require('../lib/namePoseidon');
 
 // Tests for endorsement logic
 
@@ -12,8 +13,13 @@ describe('Endorse Tests', function () {
     const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
     const p = { fullname: 'Eva Sample', birthyear: '1985', gender: '2', tag: 'v1', ipfs: 'QmEva1' };
     await hre.run('add-person', p);
-    const fullNameHash = await deepFamily.getFullNameHash(p.fullname);
-    const basicInfo = { fullNameHash: fullNameHash, isBirthBC: false, birthYear: 1985, birthMonth: 0, birthDay: 0, gender: 2 };
+    const basicInfo = buildBasicInfo({
+      fullName: p.fullname,
+      birthYear: 1985,
+      birthMonth: 0,
+      birthDay: 0,
+      gender: 2,
+    });
     const personHash = await deepFamily.getPersonHash(basicInfo);
     return { deepFamily, personHash };
   }

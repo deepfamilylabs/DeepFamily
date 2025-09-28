@@ -37,6 +37,7 @@ interface AddVersionModalProps {
     birthMonth?: number
     birthDay?: number
     isBirthBC?: boolean
+    passphrase?: string
   }
 }
 
@@ -78,6 +79,7 @@ export default function AddVersionModal({
     birthMonth: number
     birthDay: number
     isBirthBC: boolean
+    passphrase: string
   } | null>(null)
 
   // Father and mother info from PersonHashCalculator components
@@ -88,6 +90,7 @@ export default function AddVersionModal({
     birthMonth: number
     birthDay: number
     isBirthBC: boolean
+    passphrase: string
   } | null>(null)
 
   const [motherInfo, setMotherInfo] = useState<{
@@ -97,6 +100,7 @@ export default function AddVersionModal({
     birthMonth: number
     birthDay: number
     isBirthBC: boolean
+    passphrase: string
   } | null>(null)
   
   const [entered, setEntered] = useState(false)
@@ -190,7 +194,8 @@ export default function AddVersionModal({
         birthYear: existingPersonData.birthYear || 0,
         birthMonth: existingPersonData.birthMonth || 0,
         birthDay: existingPersonData.birthDay || 0,
-        isBirthBC: existingPersonData.isBirthBC || false
+        isBirthBC: existingPersonData.isBirthBC || false,
+        passphrase: existingPersonData.passphrase || ''
       })
     }
   }, [personHash, existingPersonData])
@@ -283,7 +288,6 @@ export default function AddVersionModal({
       alert(t('addVersion.personInfoRequired', 'Please fill in person information'))
       return
     }
-
     // Clear old prompt information
     setSuccessResult(null)
     setErrorResult(null)
@@ -459,7 +463,8 @@ export default function AddVersionModal({
                 birthYear: formData.birthYear,
                 birthMonth: formData.birthMonth,
                 birthDay: formData.birthDay,
-                isBirthBC: formData.isBirthBC
+                isBirthBC: formData.isBirthBC,
+                passphrase: formData.passphrase
               })
             }}
           />
@@ -501,10 +506,19 @@ export default function AddVersionModal({
                     birthYear: 0,
                     birthMonth: 0,
                     birthDay: 0,
-                    isBirthBC: false
+                    isBirthBC: false,
+                    passphrase: ''
                   }}
                   onFormChange={(formData) => {
-                    setFatherInfo(formData)
+                    setFatherInfo({
+                      fullName: formData.fullName,
+                      gender: formData.gender,
+                      birthYear: formData.birthYear,
+                      birthMonth: formData.birthMonth,
+                      birthDay: formData.birthDay,
+                      isBirthBC: formData.isBirthBC,
+                      passphrase: formData.passphrase
+                    })
                   }}
                 />
                 
@@ -564,10 +578,19 @@ export default function AddVersionModal({
                     birthYear: 0,
                     birthMonth: 0,
                     birthDay: 0,
-                    isBirthBC: false
+                    isBirthBC: false,
+                    passphrase: ''
                   }}
                   onFormChange={(formData) => {
-                    setMotherInfo(formData)
+                    setMotherInfo({
+                      fullName: formData.fullName,
+                      gender: formData.gender,
+                      birthYear: formData.birthYear,
+                      birthMonth: formData.birthMonth,
+                      birthDay: formData.birthDay,
+                      isBirthBC: formData.isBirthBC,
+                      passphrase: formData.passphrase
+                    })
                   }}
                 />
                 

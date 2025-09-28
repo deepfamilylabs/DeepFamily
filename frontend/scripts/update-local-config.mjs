@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { ethers } from 'ethers';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,20 +17,27 @@ const FRONTEND_DIR = path.dirname(__dirname);
 const PROJECT_ROOT = path.dirname(FRONTEND_DIR);
 const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, 'deployments', 'localhost');
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, '.env.local');
+const require = createRequire(import.meta.url);
+const { computePoseidonDigest } = require(path.join(PROJECT_ROOT, 'lib', 'namePoseidon.js'));
+
+function prepareBasicInfo(basicInfo) {
+  const passphrase = basicInfo.passphrase || '';
+  const digest = computePoseidonDigest(basicInfo.fullName, passphrase);
+
+  return {
+    fullNameHash: digest.digestHex,
+    isBirthBC: Boolean(basicInfo.isBirthBC),
+    birthYear: Number(basicInfo.birthYear ?? 0),
+    birthMonth: Number(basicInfo.birthMonth ?? 0),
+    birthDay: Number(basicInfo.birthDay ?? 0),
+    gender: Number(basicInfo.gender ?? 0)
+  };
+}
 
 // Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
-  // First compute fullNameHash from fullName
-  const fullNameHash = await deepFamily.getFullNameHash(basicInfo.fullName);
-
-  return await deepFamily.getPersonHash({
-    fullNameHash: fullNameHash,
-    isBirthBC: basicInfo.isBirthBC,
-    birthYear: basicInfo.birthYear,
-    birthMonth: basicInfo.birthMonth,
-    birthDay: basicInfo.birthDay,
-    gender: basicInfo.gender,
-  });
+  const prepared = prepareBasicInfo(basicInfo);
+  return await deepFamily.getPersonHash(prepared);
 }
 
 async function updateLocalConfig() {

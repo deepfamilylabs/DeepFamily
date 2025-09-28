@@ -7,9 +7,16 @@ import { X, Coins, AlertCircle, Image, Check, AlertTriangle, ChevronDown } from 
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
+import { poseidon5 } from 'poseidon-lite'
 import { useSearchParams } from 'react-router-dom'
 import PersonHashCalculator from '../PersonHashCalculator'
 import EndorseModal from './EndorseModal'
+import {
+  generateNamePoseidonProof,
+  verifyNamePoseidonProof,
+  formatGroth16ProofForContract,
+  toBigIntArray
+} from '../../lib/zk'
 
 // Simple themed select component (from PersonHashCalculator)
 const ThemedSelect: React.FC<{
@@ -79,6 +86,49 @@ const isValidTokenUri = (v: string) => {
   }
 }
 
+const ZERO_BYTES32 = `0x${'00'.repeat(32)}`
+const MASK_128 = (1n << 128n) - 1n
+
+type MintProofArgs = {
+  a: [bigint, bigint]
+  b: [[bigint, bigint], [bigint, bigint]]
+  c: [bigint, bigint]
+  publicSignals: [bigint, bigint, bigint, bigint]
+}
+
+const splitToLimbs = (hex: string) => {
+  const value = BigInt(hex)
+  return {
+    hi: value >> 128n,
+    lo: value & MASK_128,
+  }
+}
+
+const computeNameBinding = (fullName: string, passphrase: string) => {
+  const trimmedName = fullName.trim()
+  const nameHex = ethers.keccak256(ethers.toUtf8Bytes(trimmedName))
+  const saltHex = passphrase && passphrase.length > 0 ? ethers.keccak256(ethers.toUtf8Bytes(passphrase)) : ZERO_BYTES32
+
+  const nameLimbs = splitToLimbs(nameHex)
+  const saltLimbs = splitToLimbs(saltHex)
+
+  const digestBig = poseidon5([nameLimbs.hi, nameLimbs.lo, saltLimbs.hi, saltLimbs.lo, 0n])
+  const digestHex = `0x${digestBig.toString(16).padStart(64, '0')}`
+  const digestLimbs = {
+    hi: digestBig >> 128n,
+    lo: digestBig & MASK_128,
+  }
+
+  return {
+    nameHex,
+    saltHex,
+    nameLimbs,
+    saltLimbs,
+    digestHex,
+    digestLimbs,
+  }
+}
+
 const createMintNFTSchema = (t: (key: string) => string) => z.object({
   // PersonSupplementInfo
   birthPlace: z.string().max(256, t('mintNFT.validation.birthPlaceTooLong')),
@@ -133,6 +183,7 @@ interface MintNFTModalProps {
     birthMonth?: number
     birthDay?: number
     isBirthBC?: boolean
+    passphrase?: string
   }
 }
 
@@ -148,7 +199,7 @@ export default function MintNFTModal({
 }: MintNFTModalProps) {
   const { t } = useTranslation()
   const { address } = useWallet()
-  const { mintPersonNFT, getVersionDetails, contract, getFullNameHash, getPersonHash } = useContract()
+  const { mintPersonNFT, getVersionDetails, contract, getPersonHash } = useContract()
 
   // Create schema with translations
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t])
@@ -180,6 +231,7 @@ export default function MintNFTModal({
     details: string
   } | null>(null)
   const [contractError, setContractError] = useState<any>(null)
+  const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
   // Local fallback state when parent does not control inputs
   const [localPersonHash, setLocalPersonHash] = useState<string>('')
   const [localVersionIndex, setLocalVersionIndex] = useState<number>(1)
@@ -198,6 +250,7 @@ export default function MintNFTModal({
     birthMonth: number
     birthDay: number
     isBirthBC: boolean
+    passphrase: string
   } | null>(null)
   
   // Unified target values: prefer props if provided, otherwise local state
@@ -275,7 +328,8 @@ export default function MintNFTModal({
         birthYear: versionData.birthYear || 0,
         birthMonth: versionData.birthMonth || 0,
         birthDay: versionData.birthDay || 0,
-        isBirthBC: versionData.isBirthBC || false
+        isBirthBC: versionData.isBirthBC || false,
+        passphrase: versionData.passphrase || ''
       })
     }
   }, [versionData, isOpen])
@@ -347,6 +401,7 @@ export default function MintNFTModal({
     setSuccessResult(null)
     setErrorResult(null)
     setContractError(null)
+    setProofGenerationStep('')
     setEntered(false)
     setDragging(false)
     setDragOffset(0)
@@ -398,6 +453,7 @@ export default function MintNFTModal({
     setSuccessResult(null)
     setErrorResult(null)
     setContractError(null)
+    setProofGenerationStep('')
     setIsEndorsed(false)
     setIsAlreadyMinted(false)
     setIsCheckingStatus(false)
@@ -445,15 +501,24 @@ export default function MintNFTModal({
     console.log('🚀 Starting mint NFT process...')
 
     try {
+      setProofGenerationStep(t('mintNFT.preparingProof', 'Preparing proof inputs...'))
+
+      const trimmedFullName = personInfo.fullName.trim()
+      const passphrase = personInfo.passphrase || ''
+
+      if (!trimmedFullName) {
+        alert(t('mintNFT.fullNameRequired', 'Full name is required to generate proof'))
+        setIsSubmitting(false)
+        setProofGenerationStep('')
+        return
+      }
+
       // Construct PersonCoreInfo object matching the contract structure
-      // PersonBasicInfo
-      const fullNameHash = getFullNameHash
-        ? await getFullNameHash(personInfo.fullName)
-        : ethers.keccak256(ethers.toUtf8Bytes(personInfo.fullName))
+      const nameBinding = computeNameBinding(trimmedFullName, passphrase)
 
       const coreInfo = {
         basicInfo: {
-          fullNameHash,
+          fullNameHash: nameBinding.digestHex,
           isBirthBC: personInfo.isBirthBC,
           birthYear: personInfo.birthYear,
           birthMonth: personInfo.birthMonth,
@@ -461,7 +526,7 @@ export default function MintNFTModal({
           gender: personInfo.gender
         },
         supplementInfo: {
-          fullName: personInfo.fullName,
+          fullName: trimmedFullName,
           birthPlace: processedData.birthPlace,
           isDeathBC: processedData.isDeathBC,
           deathYear: processedData.deathYear,
@@ -471,6 +536,36 @@ export default function MintNFTModal({
           story: processedData.story
         }
       }
+
+      console.log('Full name keccak256:', nameBinding.nameHex)
+      console.log('Passphrase keccak256:', nameBinding.saltHex)
+      console.log('Poseidon digest:', nameBinding.digestHex)
+
+      setProofGenerationStep(t('mintNFT.generatingProof', 'Generating zero-knowledge proof... (this may take 30-60 seconds)'))
+      const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(trimmedFullName, passphrase)
+      console.log('🔒 Generated name poseidon proof:', generatedProof)
+      console.log('🔒 Generated public signals:', publicSignals)
+
+      setProofGenerationStep(t('mintNFT.verifyingProof', 'Verifying zero-knowledge proof...'))
+      const isProofValid = await verifyNamePoseidonProof(generatedProof, publicSignals)
+      if (!isProofValid) {
+        throw new Error(t('mintNFT.proofVerificationFailed', 'Generated proof verification failed'))
+      }
+
+      const formattedProof = formatGroth16ProofForContract(generatedProof)
+      const signalValues = toBigIntArray(publicSignals)
+      if (signalValues.length < 4) {
+        throw new Error('Invalid name poseidon public signals length')
+      }
+
+      const proof: MintProofArgs = {
+        a: formattedProof.a,
+        b: formattedProof.b,
+        c: formattedProof.c,
+        publicSignals: signalValues.slice(0, 4) as [bigint, bigint, bigint, bigint]
+      }
+
+      setProofGenerationStep(t('mintNFT.proofVerified', 'Zero-knowledge proof verified. Submitting transaction...'))
 
       // Determine personHash/versionIndex
       let finalPersonHash = targetPersonHash as string | undefined
@@ -500,10 +595,12 @@ export default function MintNFTModal({
         personHash: finalPersonHash,
         versionIndex: finalVersionIndex,
         tokenURI: processedData.tokenURI || '',
-        coreInfo
+        coreInfo,
+        proof
       })
 
       const receipt = await mintPersonNFT(
+        proof,
         finalPersonHash,
         finalVersionIndex,
         processedData.tokenURI || '',
@@ -663,6 +760,7 @@ export default function MintNFTModal({
       })
     } finally {
       setIsSubmitting(false)
+      setProofGenerationStep('')
     }
   }
 
@@ -834,7 +932,8 @@ export default function MintNFTModal({
                     birthYear: personInfo.birthYear,
                     birthMonth: personInfo.birthMonth,
                     birthDay: personInfo.birthDay,
-                    isBirthBC: personInfo.isBirthBC
+                    isBirthBC: personInfo.isBirthBC,
+                    passphrase: personInfo.passphrase
                   } : versionData}
                   onFormChange={canEdit ? (formData) => {
                     setPersonInfo({
@@ -843,7 +942,8 @@ export default function MintNFTModal({
                       birthYear: formData.birthYear,
                       birthMonth: formData.birthMonth,
                       birthDay: formData.birthDay,
-                      isBirthBC: formData.isBirthBC
+                      isBirthBC: formData.isBirthBC,
+                      passphrase: formData.passphrase
                     })
                   } : undefined}
                 />
@@ -1013,13 +1113,20 @@ export default function MintNFTModal({
                 <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-1">
-                    {t('mintNFT.minting', 'Minting NFT...')}
+                    {proofGenerationStep
+                      ? t('mintNFT.processing', 'Processing...')
+                      : t('mintNFT.minting', 'Minting NFT...')}
                   </p>
                   <p className="text-xs text-purple-700 dark:text-purple-300">
-                    {t('mintNFT.mintingDesc', 'Creating your unique NFT on the blockchain...')}
+                    {proofGenerationStep || t('mintNFT.mintingDesc', 'Creating your unique NFT on the blockchain...')}
                   </p>
                 </div>
               </div>
+              {proofGenerationStep?.includes('30-60 seconds') && (
+                <div className="mt-3 text-xs text-purple-700 dark:text-purple-300">
+                  {t('mintNFT.proofGenerationNote', 'ZK proof generation requires heavy cryptography. Please keep this tab active until completion.')}
+                </div>
+              )}
             </div>
           )}
 

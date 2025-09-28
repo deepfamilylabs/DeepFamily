@@ -252,6 +252,12 @@ export function useContract() {
   }, [executeTransaction, t, contract])
 
   const mintPersonNFT = useCallback(async (
+    proof: {
+      a: [bigint, bigint]
+      b: [[bigint, bigint], [bigint, bigint]]
+      c: [bigint, bigint]
+      publicSignals: [bigint, bigint, bigint, bigint]
+    },
     personHash: string,
     versionIndex: number,
     tokenURI: string,
@@ -281,7 +287,7 @@ export function useContract() {
     }
   ) => {
     return executeTransaction(
-      () => contract!.mintPersonNFT(personHash, versionIndex, tokenURI, coreInfo),
+      () => contract!.mintPersonNFT(proof.a, proof.b, proof.c, proof.publicSignals, personHash, versionIndex, tokenURI, coreInfo),
       {
         successMessage: t('contract.mintSuccess', 'NFT minted successfully'),
         errorMessage: t('contract.mintFailed', 'Failed to mint NFT'),

@@ -4,10 +4,13 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { ChevronDown, Clipboard } from 'lucide-react'
+import { ChevronDown, Clipboard, Eye, EyeOff, Info } from 'lucide-react'
 import { useToast } from './ToastProvider'
 import { formatHashMiddle } from '../types/graph'
-import { poseidon3 } from 'poseidon-lite'
+import { poseidon3, poseidon5 } from 'poseidon-lite'
+
+// Align with contract convention: blank passphrase -> zero salt limbs
+const ZERO_BYTES32 = '0x' + '00'.repeat(32)
 
 const MAX_FULL_NAME_BYTES = 256
 
@@ -81,6 +84,8 @@ const ThemedSelect: React.FC<{
 }
 
 // Hash form schema and types
+const optionalPassphrase = z.union([z.string(), z.undefined(), z.null()]).transform((val) => (typeof val === 'string' ? val : ''))
+
 const hashFormSchema = z.object({
   fullName: z.string().min(1).refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
   isBirthBC: z.boolean(),
@@ -88,21 +93,41 @@ const hashFormSchema = z.object({
   birthMonth: z.union([z.number().int().min(0).max(12), z.literal('')]).transform(val => val === '' ? 0 : val),
   birthDay: z.union([z.number().int().min(0).max(31), z.literal('')]).transform(val => val === '' ? 0 : val),
   gender: z.number().int().min(0).max(3),
+  passphrase: optionalPassphrase,
 })
 
 export type HashForm = z.infer<typeof hashFormSchema>
 
+// Password strength calculation
+const calculatePasswordStrength = (password: string): { level: 'weak' | 'medium' | 'strong'; score: number } => {
+  if (!password) return { level: 'weak', score: 0 }
+
+  let score = 0
+
+  // Length scoring
+  if (password.length >= 8) score += 2
+  else if (password.length >= 6) score += 1
+
+  // Character variety scoring
+  if (/[a-z]/.test(password)) score += 1 // lowercase
+  if (/[A-Z]/.test(password)) score += 1 // uppercase
+  if (/[0-9]/.test(password)) score += 1 // numbers
+  if (/[^a-zA-Z0-9]/.test(password)) score += 1 // special characters
+
+  // Additional length bonus
+  if (password.length >= 12) score += 1
+
+  if (score <= 2) return { level: 'weak', score }
+  if (score <= 4) return { level: 'medium', score }
+  return { level: 'strong', score }
+}
+
 // Hash calculation function using Poseidon (matches circuit and contract)
 export function computePersonHash(input: HashForm): string {
-  const { fullName, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
+  const { fullName, passphrase, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
 
-  // Compute fullNameHash exactly like the contract
-  const fullNameHash = ethers.keccak256(ethers.toUtf8Bytes(fullName))
-
-  // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
-  const fullNameHashBN = BigInt(fullNameHash)
-  const limb0 = fullNameHashBN >> 128n // High 128 bits
-  const limb1 = fullNameHashBN & ((1n << 128n) - 1n) // Low 128 bits
+  const normalizedFullName = fullName.trim()
+  const normalizedPassphrase = typeof passphrase === 'string' ? passphrase : ''
 
   // Pack small fields into a single field element to match circuit's packedData
   // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
@@ -112,8 +137,28 @@ export function computePersonHash(input: HashForm): string {
     (BigInt(gender) << 1n) |
     (isBirthBC ? 1n : 0n)
 
+  // Compute fullNameHash exactly like the contract
+  const fullNameHash = ethers.keccak256(ethers.toUtf8Bytes(normalizedFullName))
+  const saltHash = normalizedPassphrase.length > 0
+    ? ethers.keccak256(ethers.toUtf8Bytes(normalizedPassphrase))
+    : ZERO_BYTES32
+
+  // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
+  const fullNameHashBN = BigInt(fullNameHash)
+  const limb0 = fullNameHashBN >> 128n // High 128 bits
+  const limb1 = fullNameHashBN & ((1n << 128n) - 1n) // Low 128 bits
+
+  const saltHashBN = BigInt(saltHash)
+  const saltLimb0 = saltHashBN >> 128n
+  const saltLimb1 = saltHashBN & ((1n << 128n) - 1n)
+
+  const saltedNamePoseidon = poseidon5([limb0, limb1, saltLimb0, saltLimb1, 0n])
+  const saltedNameBN = BigInt(saltedNamePoseidon)
+  const saltedLimb0 = saltedNameBN >> 128n
+  const saltedLimb1 = saltedNameBN & ((1n << 128n) - 1n)
+
   // Poseidon(3) commitment over SNARK-friendly field elements
-  const poseidonResult = poseidon3([limb0, limb1, packedData])
+  const poseidonResult = poseidon3([saltedLimb0, saltedLimb1, packedData])
 
   // Domain-separate with keccak256 to mirror contract wrapping
   const poseidonHex = '0x' + poseidonResult.toString(16).padStart(64, '0')
@@ -135,6 +180,7 @@ interface PersonHashCalculatorProps {
     birthMonth?: number
     birthDay?: number
     isBirthBC?: boolean
+    passphrase?: string
   }
 }
 
@@ -149,6 +195,8 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
 }) => {
   const { t } = useTranslation()
   const [internalOpen, setInternalOpen] = useState(true)
+  const [showPassphrase, setShowPassphrase] = useState(false)
+  const [showPassphraseHelp, setShowPassphraseHelp] = useState(false)
   const toast = useToast()
 
 
@@ -172,6 +220,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     birthMonth: z.union([z.number().int().min(0, t('search.validation.monthRange')).max(12, t('search.validation.monthRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     birthDay: z.union([z.number().int().min(0, t('search.validation.dayRange')).max(31, t('search.validation.dayRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     gender: z.number().int().min(0).max(3),
+    passphrase: optionalPassphrase,
   }).refine((data) => {
     // If AD (Anno Domini), the year must not exceed the current year
     if (!data.isBirthBC && data.birthYear > new Date().getFullYear()) {
@@ -191,7 +240,8 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       birthYear: initialValues?.birthYear || '', 
       birthMonth: initialValues?.birthMonth || '', 
       birthDay: initialValues?.birthDay || '', 
-      gender: initialValues?.gender || 0 
+      gender: initialValues?.gender || 0,
+      passphrase: initialValues?.passphrase || '' 
     },
   })
 
@@ -202,7 +252,13 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const birthMonth = watch('birthMonth')
   const birthDay = watch('birthDay')
   const gender = watch('gender')
-  
+  const passphrase = watch('passphrase')
+
+  // Calculate password strength
+  const passwordStrength = useMemo(() => {
+    return calculatePasswordStrength(passphrase || '')
+  }, [passphrase])
+
   const computedHash = useMemo(() => {
     const transformedData: HashForm = {
       fullName: fullName || '',
@@ -211,10 +267,11 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
       birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
       gender: Number(gender || 0),
+      passphrase: passphrase || '',
     }
     if (!transformedData.fullName.trim()) return ''
     return computePersonHash(transformedData)
-  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
 
   
   const onFormChangeRef = useRef(onFormChange)
@@ -234,9 +291,10 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
       birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
       gender: Number(gender || 0),
+      passphrase: passphrase || '',
     }
     onFormChangeRef.current(transformedData)
-  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender])
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
 
 
   const content = (
@@ -336,15 +394,143 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             <FieldError message={errors.birthDay?.message} />
           </div>
         </div>
+        <div className="w-full mt-2">
+          <div className="flex items-center gap-2 mb-1">
+            <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-gray-600 dark:text-gray-400 whitespace-normal sm:whitespace-nowrap leading-tight">
+              {t('search.hashCalculator.passphrase', 'Passphrase')}
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowPassphraseHelp(!showPassphraseHelp)}
+                className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                aria-label="Passphrase help"
+              >
+                <Info size={14} />
+              </button>
+              {showPassphraseHelp && (
+                <>
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40"
+                    onClick={() => setShowPassphraseHelp(false)}
+                  />
+                  {/* Modal */}
+                  <div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-gray-800 dark:text-gray-100">
+                          {t('search.hashCalculator.passphraseHelp.title', '口令作用说明')}
+                        </div>
+                        <button
+                          onClick={() => setShowPassphraseHelp(false)}
+                          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 text-sm">
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
+                            {t('search.hashCalculator.passphraseHelp.privacy', '🔒 隐私保护')}
+                          </div>
+                          <div className="text-xs leading-relaxed">
+                            {t('search.hashCalculator.passphraseHelp.privacyDesc', '为您的身份哈希添加额外保护层，防止他人通过姓名和生日推测您的身份。')}
+                          </div>
+                        </div>
+
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-green-600 dark:text-green-400">
+                            {t('search.hashCalculator.passphraseHelp.optional', '✅ 完全可选')}
+                          </div>
+                          <div className="text-xs leading-relaxed">
+                            {t('search.hashCalculator.passphraseHelp.optionalDesc', '可以留空，但建议使用强口令提升安全性。')}
+                          </div>
+                        </div>
+
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
+                            {t('search.hashCalculator.passphraseHelp.remember', '⚠️ 请牢记')}
+                          </div>
+                          <div className="text-xs leading-relaxed">
+                            {t('search.hashCalculator.passphraseHelp.rememberDesc', '口令无法找回，忘记后将生成不同的身份哈希。')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="relative">
+            <input
+              type={showPassphrase ? "text" : "password"}
+              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+              placeholder={t('search.hashCalculator.passphrasePlaceholder', '可选：输入口令以增强隐私保护')}
+              {...register('passphrase')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassphrase(!showPassphrase)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+              aria-label={showPassphrase ? "Hide passphrase" : "Show passphrase"}
+            >
+              {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {/* Password strength indicator and tips */}
+          {passphrase && passphrase.length > 0 && (
+            <div className="mt-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1 flex-1">
+                  <div className={`h-1 flex-1 rounded ${
+                    passwordStrength.level === 'weak' ? 'bg-red-400' :
+                    passwordStrength.level === 'medium' ? 'bg-red-400' : 'bg-green-400'
+                  }`} />
+                  <div className={`h-1 flex-1 rounded ${
+                    passwordStrength.level === 'medium' ? 'bg-yellow-400' :
+                    passwordStrength.level === 'strong' ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-600'
+                  }`} />
+                  <div className={`h-1 flex-1 rounded ${
+                    passwordStrength.level === 'strong' ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-600'
+                  }`} />
+                </div>
+                <span className={`text-xs font-medium ${
+                  passwordStrength.level === 'weak' ? 'text-red-600 dark:text-red-400' :
+                  passwordStrength.level === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                  'text-green-600 dark:text-green-400'
+                }`}>
+                  {passwordStrength.level === 'weak' ? t('search.hashCalculator.passwordStrength.weak', '弱') :
+                   passwordStrength.level === 'medium' ? t('search.hashCalculator.passwordStrength.medium', '中') :
+                   t('search.hashCalculator.passwordStrength.strong', '强')}
+                </span>
+              </div>
+              {passwordStrength.level === 'weak' && (
+                <div className="text-xs text-amber-600 dark:text-amber-400">
+                  {t('search.hashCalculator.passwordTips.weak', '💡 建议：使用8位以上密码，包含大小写字母、数字或特殊字符')}
+                </div>
+              )}
+            </div>
+          )}
+
+          <FieldError message={errors.passphrase?.message} />
+        </div>
       </div>
       {computedHash && (
         <div className="space-y-2">
           {/* Local calculation result */}
-          <div className="flex items-center gap-1 overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:overflow-hidden">
             <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
               {t('search.hashCalculator.calculatedHash')}:
             </span>
-            <HashInline value={computedHash} className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight" />
+            <HashInline
+              value={computedHash}
+              className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight"
+              wrapOnMobile
+            />
             <button
               type="button"
               onClick={async () => {
@@ -440,7 +626,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
 export default PersonHashCalculator
 
 // Inline hash renderer: shows full when fits; otherwise 10...8 middle ellipsis
-const HashInline: React.FC<{ value: string; className?: string; titleText?: string; prefix?: number; suffix?: number }> = ({ value, className = '', titleText, prefix = 10, suffix = 8 }) => {
+const HashInline: React.FC<{ value: string; className?: string; titleText?: string; prefix?: number; suffix?: number; wrapOnMobile?: boolean }> = ({ value, className = '', titleText, prefix = 10, suffix = 8, wrapOnMobile = false }) => {
   const containerRef = useRef<HTMLSpanElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
   const [display, setDisplay] = useState<string>(value)
@@ -451,7 +637,8 @@ const HashInline: React.FC<{ value: string; className?: string; titleText?: stri
     if (!container || !meas) return
     meas.textContent = value
     const fits = meas.scrollWidth <= container.clientWidth
-    setDisplay(fits ? value : formatHashMiddle(value, prefix, suffix))
+    const shouldWrap = wrapOnMobile && typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+    setDisplay(shouldWrap || fits ? value : formatHashMiddle(value, prefix, suffix))
   }
 
   useEffect(() => {
@@ -464,11 +651,15 @@ const HashInline: React.FC<{ value: string; className?: string; titleText?: stri
       ro.disconnect()
       window.removeEventListener('resize', onResize)
     }
-  }, [value, prefix, suffix])
+  }, [value, prefix, suffix, wrapOnMobile])
 
   return (
     <>
-      <span ref={containerRef} className={`min-w-0 overflow-hidden whitespace-nowrap ${className}`} title={titleText ?? value}>
+      <span
+        ref={containerRef}
+        className={`min-w-0 ${wrapOnMobile ? 'sm:overflow-hidden' : 'overflow-hidden'} ${wrapOnMobile ? 'w-full sm:w-auto break-all whitespace-normal sm:whitespace-nowrap' : 'whitespace-nowrap'} ${className}`}
+        title={titleText ?? value}
+      >
         {display}
       </span>
       {/* measurement node mirrors font styles to ensure accurate width */}

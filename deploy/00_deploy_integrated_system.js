@@ -36,10 +36,21 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 
   log(`PersonHashVerifier deployed at: ${verifierDeployment.address}`);
 
-  // 4) Deploy DeepFamily with PoseidonT4 library linked
+  // 4) Deploy NamePoseidonVerifier (placeholder; replace with generated verifier in production)
+  const nameVerifierDeployment = await deploy("NamePoseidonVerifier", {
+    contract: "NamePoseidonVerifier",
+    from: deployer,
+    args: [],
+    log: true,
+    waitConfirmations: network.live ? 2 : 1,
+  });
+
+  log(`NamePoseidonVerifier deployed at: ${nameVerifierDeployment.address}`);
+
+  // 5) Deploy DeepFamily with PoseidonT4 library linked
   const deepFamilyDeployment = await deploy("DeepFamily", {
     from: deployer,
-    args: [tokenDeployment.address, verifierDeployment.address],
+    args: [tokenDeployment.address, verifierDeployment.address, nameVerifierDeployment.address],
     libraries: {
       PoseidonT4: poseidonT4Deployment.address,
     },
@@ -47,7 +58,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     waitConfirmations: network.live ? 2 : 1,
   });
 
-  // 5) Initialize the DeepFamilyToken contract (set DeepFamily address)
+  // 6) Initialize the DeepFamilyToken contract (set DeepFamily address)
   const deepFamilyToken = await ethers.getContractAt("DeepFamilyToken", tokenDeployment.address);
   const initialized = (await deepFamilyToken.totalAdditions()) !== undefined; // Read-only to avoid call revert
   // initialize can be called only once; read deepFamilyContract and initialize if zero address

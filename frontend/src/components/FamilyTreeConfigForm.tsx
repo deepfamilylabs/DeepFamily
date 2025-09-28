@@ -407,7 +407,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
           <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mt-4 text-xs">
         {/* Left: Traversal controls */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          <span className="hidden sm:block text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{statusT ? statusT('familyTree.ui.traversal') : '遍历方式'}:</span>
+          <span className="hidden sm:block text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{statusT ? statusT('familyTree.ui.traversal') : 'Traversal'}:</span>
           <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
             <div className="relative group">
               <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalDFS') : 'DFS'} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
