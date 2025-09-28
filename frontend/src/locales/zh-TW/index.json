@@ -8,7 +8,7 @@
   },
   "home": {
     "title": "去中心化鏈上族譜協定",
-    "subtitle": "多版本可信譜系 · 經濟激勵背書 · NFT 價值歸屬 · 分片敘事封存 · 零知識證明隱私擴展",
+    "subtitle": "多版本譜系共存 · 口令鹽化去連結 · 零知識隱私守護 · NFT 價值沉澱 · 經濟激勵驅動",
     "exploreFamilyTree": "探索族譜",
     "addPerson": "添加人物",
     "search": "搜尋",
@@ -17,8 +17,8 @@
     "tagStrip": {
       "protocol": "去中心化",
       "incentive": "激勵循環",
-      "nft": "NFT 傳記", 
-      "zk": "ZK 隱私"
+      "nft": "NFT", 
+      "zk": "ZK"
     },
     "coreValue": {
       "title": "核心使命",
@@ -773,7 +773,7 @@
     "canMint": "可鑄造",
     "targetVersion": "目標版本",
     "specifyVersion": "指定要鑄造的版本",
-    "specifyVersionDesc": "請輸入要鑄造成 NFT 的人物雜湊和版本序號。",
+    "specifyVersionDesc": "請輸入要鑄造為 NFT 的人物雜湊和版本序號。",
     "basicInfo": "基本資訊",
     "supplementalInfo": "補充資訊",
     "birthPlace": "出生地",
@@ -788,7 +788,7 @@
     "tokenURI": "Token URI",
     "tokenURIHint": "選填：NFT 元資料的 URL 或 IPFS 雜湊",
     "nftAlreadyMinted": "NFT 已鑄造",
-    "nftAlreadyMintedDesc": "此版本已鑄造成 NFT。每個版本只能鑄造一次。",
+    "nftAlreadyMintedDesc": "此版本已鑄造為 NFT。每個版本只能鑄造一次。",
     "mint": "鑄造 NFT",
     "minting": "正在鑄造...",
     "goEndorse": "前往背書",
