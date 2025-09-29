@@ -25,7 +25,7 @@ function prepareBasicInfo(basicInfo) {
   const digest = computePoseidonDigest(basicInfo.fullName, passphrase);
 
   return {
-    fullNameHash: digest.digestHex,
+    fullNameCommitment: digest.digestHex,
     isBirthBC: Boolean(basicInfo.isBirthBC),
     birthYear: Number(basicInfo.birthYear ?? 0),
     birthMonth: Number(basicInfo.birthMonth ?? 0),
@@ -34,7 +34,7 @@ function prepareBasicInfo(basicInfo) {
   };
 }
 
-// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
+// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameCommitment)
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
   const prepared = prepareBasicInfo(basicInfo);
   return await deepFamily.getPersonHash(prepared);

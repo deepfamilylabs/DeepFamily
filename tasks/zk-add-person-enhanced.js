@@ -115,7 +115,7 @@ task("add-person-zk-enhanced", "Add person using ZK proof with internal proof ge
       const saltedNamePoseidon = poseidon([nameLimb0, nameLimb1, saltLimb0, saltLimb1, 0n]);
 
       const basicInfo = {
-        fullNameHash: "0x" + saltedNamePoseidon.toString(16).padStart(64, "0"),
+        fullNameCommitment: "0x" + saltedNamePoseidon.toString(16).padStart(64, "0"),
         isBirthBC: isBirthBC,
         birthYear: birthYear,
         birthMonth: birthMonth,

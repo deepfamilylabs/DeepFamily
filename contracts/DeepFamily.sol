@@ -92,7 +92,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Basic identity information structure
    */
   struct PersonBasicInfo {
-    bytes32 fullNameHash; // Poseidon digest derived from keccak(fullName) and salt
+    bytes32 fullNameCommitment; // Poseidon digest derived from keccak(fullName) and salt
     bool isBirthBC; // Whether birth is BC (Before Christ)
     uint16 birthYear; // Birth year(0=unknown)
     uint8 birthMonth; // Birth month (1-12, 0=unknown)
@@ -464,13 +464,13 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Matches circuit Poseidon output and applies keccak256 for final domain-separated hash
    */
   function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
-    if (basicInfo.fullNameHash == bytes32(0)) revert InvalidFullName();
+    if (basicInfo.fullNameCommitment == bytes32(0)) revert InvalidFullName();
     if (basicInfo.birthMonth > 12) revert InvalidBirthMonth();
     if (basicInfo.birthDay > 31) revert InvalidBirthDay();
 
-    // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
-    uint256 limb0 = uint256(basicInfo.fullNameHash) >> 128; // High 128 bits
-    uint256 limb1 = uint256(basicInfo.fullNameHash) & ((1 << 128) - 1); // Low 128 bits
+    // Convert fullNameCommitment to two 128-bit limbs (matching circuit's HashToLimbs)
+    uint256 limb0 = uint256(basicInfo.fullNameCommitment) >> 128; // High 128 bits
+    uint256 limb1 = uint256(basicInfo.fullNameCommitment) & ((1 << 128) - 1); // Low 128 bits
 
     // Pack small fields into a single field element to match circuit's packedData
     // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
@@ -773,7 +773,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert InvalidZKProof();
 
     bytes32 poseidonDigest = _packHashFromTwo128(publicSignals[0], publicSignals[1]);
-    if (poseidonDigest != coreInfo.basicInfo.fullNameHash) revert BasicInfoMismatch();
+    if (poseidonDigest != coreInfo.basicInfo.fullNameCommitment) revert BasicInfoMismatch();
 
     bytes32 providedFullNameHash = _packHashFromTwo128(publicSignals[2], publicSignals[3]);
     bytes32 computedFullNameHash = _hashString(coreInfo.supplementInfo.fullName);

@@ -101,7 +101,7 @@ describe('Hash Consistency Tests', function () {
         gender: input.gender,
       });
 
-      expect(basicInfo.fullNameHash).to.equal(expected.poseidonDigestHex);
+      expect(basicInfo.fullNameCommitment).to.equal(expected.poseidonDigestHex);
 
       // Note: This test may need adjustment based on how the contract handles the new Poseidon digest
       // The contract's getPersonHash function should now work with the Poseidon digest as input

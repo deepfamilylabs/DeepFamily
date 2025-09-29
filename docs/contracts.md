@@ -18,7 +18,7 @@
 #### **PersonBasicInfo**
 ```solidity
 struct PersonBasicInfo {
-    bytes32 fullNameHash;  // keccak256 hash of full name
+    bytes32 fullNameCommitment;  // Poseidon commitment derived from keccak256(name || salt)
     bool isBirthBC;        // BC/AD birth designation
     uint16 birthYear;      // Birth year (0 = unknown)
     uint8 birthMonth;      // Month (1-12, 0 = unknown)

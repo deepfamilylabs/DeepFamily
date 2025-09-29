@@ -5,7 +5,7 @@ const { computePoseidonDigest } = require(path.join(__dirname, "../lib/namePosei
 function prepareBasicInfo(basicInfo) {
   const digest = computePoseidonDigest(basicInfo.fullName, basicInfo.passphrase || "");
   return {
-    fullNameHash: digest.digestHex,
+    fullNameCommitment: digest.digestHex,
     isBirthBC: Boolean(basicInfo.isBirthBC),
     birthYear: Number(basicInfo.birthYear ?? 0),
     birthMonth: Number(basicInfo.birthMonth ?? 0),
