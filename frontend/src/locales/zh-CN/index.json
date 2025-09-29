@@ -7,8 +7,8 @@
     "actions": "操作"
   },
   "home": {
-    "title": "去中心化链上族谱协议",
-    "subtitle": "多版本谱系共存 · 口令盐化去链接 · 零知识隐私守护 · NFT 价值沉淀 · 经济激励驱动",
+    "title": "去中心化数字族谱",
+    "subtitle": "零知识隐私保护 · 口令加盐去链接性 · 双树模式 · 社区背书机制 · NFT价值创造",
     "exploreFamilyTree": "探索族谱",
     "addPerson": "添加人物",
     "search": "搜索",
@@ -28,78 +28,74 @@
     "valueProps": {
       "title": "核心价值主张",
       "subtitle": "构建多维度可信谱系生态，实现从信息探索到价值确认的自然演进",
-      "trustedGenealogy": {
-        "title": "可信谱系",
-        "description": "父母引用 + 版本共存，不覆写历史，只累积证据与共识"
+      "zkPrivacy": {
+        "title": "零知识隐私",
+        "description": "使用Groth16证明私密提交族谱成员，验证结构正确性的同时隐藏敏感信息"
       },
-      "consensusFocus": {
-        "title": "共识聚焦", 
-        "description": "背书消耗代币，成本锚定挖矿奖励，过滤噪声形成事实焦点"
+      "saltedUnlinkability": {
+        "title": "口令加盐去链接性",
+        "description": "独有口令防止身份推理和污染攻击，确保每个身份哈希的唯一性和安全性"
       },
-      "valuePrecipitation": {
-        "title": "价值沉淀",
-        "description": "版本 → NFT → 持有人获得后续背书费用流，激励高质量输入"
+      "dualTreeModels": {
+        "title": "双树模式",
+        "description": "支持公开协作树和私有保护树，满足不同场景下的族谱构建需求"
       },
-      "narrativeExtension": {
-        "title": "叙事扩展", 
-        "description": "故事分片增量写入 + 全量哈希校验 + 封存即不可篡改"
+      "communityEndorsement": {
+        "title": "社区背书",
+        "description": "DEEP代币背书机制过滤噪声，形成高质量数据的社区共识"
       },
-      "privacyGuardian": {
-        "title": "隐私守护",
-        "description": "ZK 证明验证结构正确性，可隐藏原始敏感字段"
+      "nftValueCreation": {
+        "title": "NFT价值创造",
+        "description": "版本 → NFT → 持有人获得后续背书费用流，激励高质量数据贡献"
       },
-      "openComposition": {
-        "title": "开放组合",
-        "description": "链上结构供社区构建应用、可视化、研究数据库"
+      "storyShardingSealing": {
+        "title": "故事分片与封存",
+        "description": "分片写入传记内容 + 哈希验证 + 封存后不可篡改，形成永久链上档案"
       }
     },
-    "architecture": {
-      "title": "双层网络模型",
-      "subtitle": "第一层 关系层与第二层 价值层的协同设计，实现结构化数据与经济价值的有机融合",
+    "valueSystem": {
+      "title": "两层价值体系",
+      "subtitle": "渐进式隐私模型：私有提交 → 社区背书 → 可选公开披露",
       "layer1": {
-        "title": "关系层",
-        "subtitle": "结构与时间序列",
-        "feature1": "人物哈希管理",
-        "feature1Desc": "基于哈希的人物标识，支持多版本并存与演化追踪",
-        "feature2": "版本控制系统",
-        "feature2Desc": "不可篡改的版本历史，每个版本记录创建时间与作者",
-        "feature3": "父母-子代拓扑",
-        "feature3Desc": "构建完整的族谱网络拓扑结构与血缘关系链",
-        "description": "特性：结构化数据、时间序列、拓扑网络"
+        "title": "隐私保护",
+        "description": "口令加盐系统防止身份推理和污染攻击。零知识证明确保提交过程完全隐私。",
+        "feature1": "口令加盐去链接性",
+        "feature2": "反污染保护机制",
+        "feature3": "双树模式：公开与私有"
       },
       "layer2": {
-        "title": "价值层",
-        "subtitle": "经济激励与资产化",
-        "feature1": "NFT 资产绑定",
-        "feature1Desc": "特定版本可铸造为 NFT，承载价值与收益权",
-        "feature2": "背书费用流",
-        "feature2Desc": "背书费用分配给 NFT 持有人，形成持续收益",
-        "feature3": "挖矿奖励机制",
-        "feature3Desc": "完善双亲引用的版本可获得 DEEP 代币奖励",
-        "description": "特性：经济激励、价值发现、可验证叙事资产化"
-      },
-      "privacyLayer": {
-        "title": "隐私保护层",
-        "description": "基于零知识证明的隐私保护机制，确保敏感信息的安全性",
-        "feature1": "零知识证明验证",
-        "feature2": "敏感字段隐藏",
-        "feature3": "结构正确性验证"
-      },
-      "valueLayer": {
-        "title": "价值确认层",
-        "description": "通过经济激励和共识机制实现数据价值的确认与分配",
-        "feature1": "背书共识机制",
-        "feature2": "NFT 价值绑定",
-        "feature3": "收益权分配"
+        "title": "公开NFT资产",
+        "description": "社区背书的版本可铸造为NFT，公开完整个人信息。故事分片支持详细的链上传记。",
+        "feature1": "NFT铸造公开完整信息",
+        "feature2": "需要社区背书",
+        "feature3": "故事分片与价值确认"
       },
       "flow": {
-        "dataInput": "数据输入",
-        "dataInputDesc": "结构化数据输入与验证",
-        "valueOutput": "价值输出",
-        "valueOutputDesc": "经过验证的价值确认输出"
+        "title": "隐私到价值流程",
+        "description": "从私有哈希存储到社区验证的NFT资产",
+        "step1": "私有提交",
+        "step1Desc": "使用零知识证明添加族谱成员",
+        "step2": "公开披露",
+        "step2Desc": "铸造NFT公开完整传记信息"
+      },
+      "dualModels": {
+        "title": "双树模式",
+        "description": "口令加盐系统支持协作公开树和抗污染私有树两种模式",
+        "public": {
+          "title": "公开协作树",
+          "description": "共享口令使多个用户能够协作构建完整的族谱。",
+          "benefit": "社区协作",
+          "mode": "共享口令模式"
+        },
+        "private": {
+          "title": "私有保护树",
+          "description": "独有口令创建完全受保护的族谱，免受污染攻击和关系破坏。",
+          "benefit": "反污染保护",
+          "mode": "独有口令模式"
+        }
       },
       "advantages": {
-        "title": "运作流程",
+        "title": "工作流程",
         "subtitle": "五步式价值发现与共识形成机制",
         "step1": "添加人物版本",
         "step1Desc": "若双亲均存在 → 获得挖矿奖励",

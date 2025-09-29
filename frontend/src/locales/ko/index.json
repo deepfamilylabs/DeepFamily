@@ -7,8 +7,8 @@
     "actions": "작업"
   },
   "home": {
-    "title": "탈중앙화 온체인 가계도 프로토콜",
-    "subtitle": "다중 버전 가계 공존 · 패스프레이즈 솔팅으로 디링킹 · ZK 개인정보 보호 · NFT 가치 침전 · 경제적 인센티브 주도",
+    "title": "탈중앙화디지털가계도",
+    "subtitle": "ZK 개인정보 보호 · 패스프레이즈 솔팅으로 디링킹 · 다중 버전 가계 공존 · NFT 가치 침전 · 경제적 인센티브 주도",
     "exploreFamilyTree": "가계도 탐색",
     "addPerson": "인물 추가",
     "search": "검색",
@@ -28,32 +28,32 @@
     "valueProps": {
       "title": "핵심 가치 제안",
       "subtitle": "다차원 신뢰 가계 생태계 구축, 정보 탐색에서 가치 확인까지의 자연스러운 진화 실현",
-      "trustedGenealogy": {
-        "title": "신뢰 가계",
-        "description": "부모 참조 + 버전 공존, 기록을 덮어쓰지 않고 증거와 합의만 축적"
+      "zkPrivacy": {
+        "title": "영지식 프라이버시",
+        "description": "Groth16 증명으로 가족 구성원을 비밀리에 제출, 구조 정확성을 검증하면서 민감 정보 숨김"
       },
-      "consensusFocus": {
-        "title": "합의 집중",
-        "description": "승인은 토큰을 소비하고 채굴 보상에 비용을 고정하여 노이즈를 필터링하고 사실 초점 형성"
+      "saltedUnlinkability": {
+        "title": "패스프레이즈 솔트 비연결성",
+        "description": "고유 패스프레이즈로 신원 추론과 오염 공격을 방지, 각 신원 해시의 유일성과 보안성 확보"
       },
-      "valuePrecipitation": {
-        "title": "가치 침전",
-        "description": "버전 → NFT → 보유자가 후속 승인 수수료 흐름을 받아 고품질 입력 장려"
+      "dualTreeModels": {
+        "title": "이중 트리 모델",
+        "description": "공개 협력 트리와 개인 보호 트리를 모두 지원, 다양한 가계도 구축 요구에 대응"
       },
-      "narrativeExtension": {
-        "title": "서사 확장",
-        "description": "스토리 샤드 증분 작성 + 전체 해시 검증 + 봉인 후 변조 불가"
+      "communityEndorsement": {
+        "title": "커뮤니티 승인",
+        "description": "DEEP 토큰 승인 메커니즘으로 노이즈 필터링, 고품질 데이터의 커뮤니티 합의 형성"
       },
-      "privacyGuardian": {
-        "title": "개인정보 보호",
-        "description": "ZK 증명으로 구조 정확성 검증, 원본 민감 필드 숨김 가능"
+      "nftValueCreation": {
+        "title": "NFT 가치 창조",
+        "description": "버전 → NFT → 보유자가 후속 승인 수수료 흐름 획득, 고품질 데이터 기여 장려"
       },
-      "openComposition": {
-        "title": "개방 구성",
-        "description": "온체인 구조로 커뮤니티가 애플리케이션, 시각화, 연구 데이터베이스 구축"
+      "storyShardingSealing": {
+        "title": "스토리 샤딩과 봉인",
+        "description": "전기 내용을 샤드로 작성 + 해시 검증 + 봉인 후 불가변, 영구적인 온체인 아카이브 형성"
       }
     },
-    "architecture": {
+    "valueSystem": {
       "title": "이중 레이어 네트워크 모델",
       "subtitle": "첫 번째 레이어 관계 레이어와 두 번째 레이어 가치 레이어의 협력 설계, 구조적 데이터와 경제적 가치의 유기적 융합 실현",
       "layer1": {
@@ -93,10 +93,12 @@
         "feature3": "수익권 배분"
       },
       "flow": {
-        "dataInput": "데이터 입력",
-        "dataInputDesc": "구조적 데이터 입력 및 검증",
-        "valueOutput": "가치 출력",
-        "valueOutputDesc": "검증된 가치 확인 출력"
+        "title": "프라이버시에서 가치로의 흐름",
+        "description": "개인 해시 저장소에서 커뮤니티 검증 NFT 자산까지",
+        "step1": "개인 제출",
+        "step1Desc": "영지식 증명으로 가족 구성원 추가",
+        "step2": "공개 공개",
+        "step2Desc": "완전한 전기 정보를 공개하는 NFT 주조"
       },
       "advantages": {
         "title": "운영 프로세스",
@@ -113,6 +115,22 @@
         "step5Desc": "스토리 봉인하여 변경 불가한 온체인 역사 이미지 형성",
         "conclusion": "가치 주도 협력 네트워크",
         "conclusionDesc": "경제적 인센티브 메커니즘을 통해 고품질 가계 데이터의 자연스러운 축적과 가치 발견 실현"
+      },
+      "dualModels": {
+        "title": "이중 가계도 모델",
+        "description": "암호화된 패스프레이즈 시스템은 협력적인 공개 트리와 오염 방지 개인 트리를 모두 가능하게 합니다",
+        "public": {
+          "title": "공개 협력 트리",
+          "description": "공유 패스프레이즈를 통해 여러 사용자가 협력하여 포괄적인 가계도를 구축할 수 있습니다.",
+          "benefit": "커뮤니티 협력",
+          "mode": "공유 패스프레이즈 모드"
+        },
+        "private": {
+          "title": "개인 보호 트리",
+          "description": "고유한 패스프레이즈는 오염 공격과 관계 파괴로부터 완전히 보호되는 트리를 생성합니다.",
+          "benefit": "오염 방지 보호",
+          "mode": "고유 패스프레이즈 모드"
+        }
       }
     },
     "features": {

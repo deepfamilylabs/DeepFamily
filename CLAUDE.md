@@ -2,162 +2,216 @@
 
 ## Project Overview
 
-DeepFamily is a blockchain-based decentralized global digital family tree protocol. Leveraging blockchain technology, NFTs, ERC20 token economics, and community governance, it creates a collaborative, verifiable, perpetual, and globally shared family history recording system.
+DeepFamily is a blockchain-based decentralized global digital family tree protocol leveraging zero-knowledge proofs, NFTs, ERC20 token economics, and community governance to create a collaborative, verifiable, and perpetual family history recording system.
 
+## Two-Layer Value System
 
-## Dual-Layer Architecture Design
+The system implements a two-layer value model that balances privacy protection with community validation:
 
-The system adopts a dual-layer architecture that balances privacy protection with value creation:
+### Layer 1: Privacy Protection (Hash Storage)
+- **Zero-Knowledge Proofs**: Uses Groth16 proofs to add family tree members privately
+- **Salted Passphrase Unlinkability**: Uses cryptographic hash combinations with unique passphrases to prevent identity inference
+- **Anti-Pollution Protection**: Unique passphrases prevent malicious users from creating fake versions pointing to real people
+- **Dual Tree Models**: Supports both public collaborative trees (shared passphrase) and private protected trees (unique passphrase)
+- **Family Tree Networks**: Build relationships through personHash/fatherHash/motherHash connections
+- **Token Incentives**: Receive DEEP tokens only when both parent relationships exist (complete family data)
 
-#### Layer 1: Privacy Protection Layer (Relational Data)
-- **Hash Storage Mechanism**: Only hash values of personal information are stored on-chain, with original sensitive data kept off-chain
-- **Relationship Establishment**: Build family tree relationship networks through `personHash`, `fatherHash`, and `motherHash`
-- **Low-Barrier Participation**: Anyone can safely contribute family tree data without privacy leakage risks
-- **Token Incentives**: Receive DEEP tokens for each `addPerson()` operation, encouraging data contribution
+### Layer 2: Value Confirmation (NFT Assets)
+- **Public Disclosure**: Community-endorsed versions can be minted as NFTs, revealing full personal information
+- **Story Sharding**: Detailed biographical data stored in up to 100×1KB on-chain chunks
+- **Community Validation**: Must endorse a version before minting its NFT
+- **Value Recognition**: NFTs represent community-validated family tree data
 
-#### Layer 2: Value Confirmation Layer (NFT Assets)
-- **Selective Disclosure**: High-quality information endorsed by the community can optionally be minted as NFTs
-- **Value Solidification**: NFTs represent value recognition for specific version data
+### Key Advantages
+- **Progressive Privacy Model**: Private submission → Community endorsement → Optional public disclosure
+- **Smart Incentives**: Tokens reward complete family data, NFTs reward quality information
+- **Risk Management**: Private layer allows exploration, public layer ensures quality
+- **Value Discovery**: Natural evolution from private data to community-validated assets
 
-#### Architectural Advantages
-- **Progressive Privacy Disclosure**: From private Hash → community validation → selective disclosure → NFT assetization
-- **Layered Risk Management**: Layer 1 allows trial and error, Layer 2 ensures quality control
-- **Tiered Incentive Mechanisms**: Tokens encourage data contribution, NFTs incentivize quality improvement
-- **Value Discovery Mechanism**: Natural evolution from "information exploration" to "value confirmation"
+## Smart Contract Architecture
 
-
-### Smart Contract Architecture
-
-**DeepFamily.sol** (Main Contract, 1447 lines)
-- Multi-version person data with ZK proof support for privacy
+### DeepFamily.sol - Main Protocol
+- Multi-version person data with ZK proof validation
 - Community endorsement system with automatic fee distribution
-- NFT minting with on-chain core information storage
-- Story sharding system (100 shards × 1KB each)
-- Mining rewards for complete family data
-- Paginated queries with gas optimization
+- NFT minting with on-chain biographical storage
+- Story sharding system for detailed life narratives
+- Mining rewards for complete family connections
+- Comprehensive security with 50+ custom errors
 
-**DeepFamilyToken.sol** (ERC20 Contract, 208 lines)
-- DEEP token with progressive halving mining (113,777 → 0.1)
+### DeepFamilyToken.sol - DEEP Token
+- ERC20 with progressive halving mining mechanism
 - 100 billion supply cap with 10 halving cycles
+- Expanding cycle lengths: 1→10→100→1K→10K→100K→1M→10M→100M→Fixed 100M
 - Authorized minting only by DeepFamily contract
 
-### Key Features
+### ZK Verifier Contracts
+- **PersonHashVerifier**: Validates family relationships for private submissions
+- **NamePoseidonVerifier**: Proves name ownership for NFT minting
+- Both use Groth16 proofs with circom circuits
 
-#### Data Management
-- **Multi-Version System**: Each person supports multiple data versions (indexed from 1) with duplicate prevention
-- **Family Relationships**: Complete family tree networks through personHash/fatherHash/motherHash with version references
-- **Name Indexing**: Hash-based reverse indexing for rapid person discovery
+## Key Features
 
-#### Privacy & Security
-- **Zero-Knowledge Proofs**: Groth16-based privacy-preserving data submission with limb-based hash processing
-- **Access Control**: Role-based permissions (holders, endorsers) with 50+ custom error types
-- **Reentrancy Protection**: Comprehensive security against attacks, rejects direct ETH transfers
+### Zero-Knowledge Privacy System
+- **Private Family Tree Construction**: Add members without revealing personal information
+- **Salted Passphrase Unlinkability**: Prevents identity inference and pollution attacks through unique passphrases
+- **Dual Tree Architecture**: Public collaborative trees vs. private protected trees for relationship correctness
+- **Selective Disclosure**: Users choose when to reveal information through NFT minting
+- **Dual-Hash Design**: Poseidon commitments + keccak256 wrapping for security
+- **Limb-Based Verification**: Efficient on-chain ZK proof validation
 
-#### Economic Incentives
-- **Endorsement System**: Users endorse trusted versions, fees distributed between contributors and NFT holders
-- **Mining Rewards**: DEEP tokens awarded for complete family data (113,777 → 0.1 progressive halving)
-- **NFT Monetization**: One NFT per version with on-chain core information and updatable metadata
+### Economic Incentives
+- **Smart Mining**: Rewards only for complete family data (both parents exist)
+- **Community Endorsement**: Pay current mining reward to endorse trusted versions
+- **Fee Distribution**: Endorsement fees flow to NFT holders or original contributors
+- **Progressive Halving**: Advanced tokenomics with 10 halving cycles
 
-#### Scalability Solutions
-- **Story Sharding**: Biographical data stored in up to 100×1KB shards with version control and sealing
-- **Paginated Queries**: Gas-optimized queries with 100-record page limits and multi-dimensional indexing
-- **Composite APIs**: Single-call functions return complete associated data
+### Data Management
+- **Multi-Version System**: Each person supports multiple data versions with duplicate prevention
+- **Family Relationships**: Complete parent-child relationship tracking with version references
+- **Story Sharding**: Biographical data in sequentially indexed, hash-verified chunks
+- **Immutable Sealing**: Stories can be permanently locked for historical preservation
 
-## Build System and Development Environment
+### Scalability & Security
+- **Paginated Queries**: Gas-optimized queries with 100-record limits
+- **Reentrancy Protection**: Comprehensive security against attacks
+- **Access Control**: Role-based permissions with explicit error handling
+- **ETH Rejection**: Contract rejects direct ETH transfers
 
-### Overall Project Structure
+## Technology Stack
+
+### Smart Contracts
+- **Solidity**: ^0.8.20 with OpenZeppelin v5 security primitives
+- **Zero-Knowledge**: Groth16 proofs, circom circuits, Poseidon hashing
+- **Testing**: Hardhat, comprehensive test coverage, gas optimization
+- **Deployment**: Multi-network support with hardhat-deploy
+
+### Frontend
+- **React**: 18 with TypeScript for type safety
+- **Build**: Vite for fast development and optimized builds
+- **Styling**: TailwindCSS for responsive design
+- **Visualization**: D3.js for interactive family tree displays
+- **Web3**: Ethers v6 for blockchain interaction
+
+### Development Tools
+- **Testing**: Comprehensive unit and integration tests
+- **Linting**: Solhint, Prettier, ESLint with pre-commit hooks
+- **Coverage**: Solidity coverage analysis
+- **Documentation**: Auto-generated docs from NatSpec comments
+
+## Project Structure
 
 ```
 DeepFamily/
-├── contracts/              # Smart Contract Module
-│   ├── DeepFamily.sol
-│   ├── DeepFamilyToken.sol
-├── frontend/               # React Frontend Application
+├── contracts/              # Smart Contracts
+│   ├── DeepFamily.sol         # Main family tree protocol
+│   ├── DeepFamilyToken.sol    # DEEP ERC20 token
+│   └── verifiers/             # ZK proof verifiers
+├── circuits/               # ZK Circuit Development
+│   ├── person_hash_zk.circom  # Family relationship proofs
+│   └── name_poseidon_zk.circom # Name binding proofs
+├── frontend/               # React dApp
 │   ├── src/
-│   │   ├── components/     # React Components
-│   │   │   ├── FlexibleDAGView.tsx   # Flexible DAG FamilyTree
-│   │   │   ├── ForceDAGView.tsx      # Force-Directed FamilyTree
-│   │   │   ├── MerkleTreeView.tsx    # Merkle Tree FamilyTree
-│   │   │   ├── NodeDetailModal.tsx   # Node Detail Modal
-│   │   │   └── ...                   # Other UI Components
-│   │   ├── pages/          # Route Pages
-│   │   ├── types/          # TypeScript Type Definitions
-│   │   ├── context/        # React Context
-│   │   ├── abi/           # Contract ABI Files
-│   │   └── lib/           # Utility Libraries
-│   ├── scripts/           # Build Scripts
-│   ├── package.json       # Frontend Dependencies
-│   └── vite.config.ts     # Vite Configuration
-├── test/                  # Smart Contract Tests
-├── deploy/                # Deployment Scripts
-├── tasks/                 # Hardhat Tasks
-├── scripts/               # Utility Scripts
-│   ├── check-root.js      # Check Root Node Script
-│   └── seed-demo.js       # Demo Data Seeder
-├── docs/                  # Project Documentation
-└── package.json          # Main Project Dependencies
+│   │   ├── components/        # React components
+│   │   │   ├── FlexibleDAGView.tsx   # Flexible family tree
+│   │   │   ├── ForceDAGView.tsx      # Force-directed tree
+│   │   │   └── NodeDetailModal.tsx   # Person details
+│   │   ├── pages/             # Application routes
+│   │   ├── context/           # State management
+│   │   ├── abi/              # Contract ABIs
+│   │   └── lib/              # Utility libraries
+├── test/                   # Smart contract tests
+├── deploy/                 # Deployment scripts
+├── tasks/                  # Hardhat tasks
+├── scripts/                # Utility scripts
+│   ├── seed-demo.js           # Demo data seeding
+│   └── check-root.js          # Root node validation
+└── docs/                   # Technical documentation
 ```
 
-### Technology Stack
+## Development Commands
 
-**Smart Contracts (Hardhat)**
-- OpenZeppelin v5.0, Hardhat, Ethers v6, Solidity coverage & linting
-
-**Frontend (React + Vite)**
-- React 18, TypeScript, Vite, TailwindCSS, D3 familyTree
-- Multi-DAG views, wallet integration, responsive design
-
-**Indexing (The Graph)**
-- GraphQL API, event indexing, real-time blockchain sync
-
-### Development Commands
-
-**Core Development**
+### Core Development
 ```bash
-npm run build                    # Compile contracts
-npm run test                     # Run all tests
-npm run dev:all                  # Start complete environment
-npm run frontend:dev             # Frontend development server
+npm run setup                # Install all dependencies
+npm run build                # Compile contracts and generate types
+npm run test                 # Run comprehensive test suite
+npm run dev:all              # Start complete development environment
+npm run frontend:dev         # Frontend development server only
 ```
 
-**Deployment (Multi-chain)**
+### Testing & Quality
 ```bash
-npm run deploy:conflux           # Conflux testnet
-npm run deploy:holesky           # Holesky testnet (latest)
-npm run deploy:mainnet           # Ethereum mainnet
-npm run deploy:polygon           # Polygon networks
-npm run deploy:arbitrum          # Arbitrum networks
+npm run test:coverage        # Generate coverage reports
+npm run test:gas            # Gas usage analysis
+npm run lint                # Code quality checks
+npm run size                # Contract size analysis
 ```
 
-**Code Quality & Testing**
+### Multi-Network Deployment
 ```bash
-npm run test:coverage            # Coverage analysis
-npm run lint                     # Code standards check
-npm run size                     # Contract size check
+npm run deploy:holesky      # Holesky testnet (recommended)
+npm run deploy:polygonAmoy  # Polygon testnet
+npm run deploy:confluxTestnet # Conflux testnet
+npm run deploy:mainnet      # Ethereum mainnet
+npm run deploy:polygon      # Polygon mainnet
+npm run deploy:arbitrum     # Arbitrum networks
 ```
 
-### Network Support & Configuration
-
-**Supported Networks**: Ethereum (Sepolia/Holesky/Mainnet), Polygon, BSC, Arbitrum, Optimism, Conflux eSpace
-
-**Environment Setup** (`.env` file):
+### Contract Verification
 ```bash
-PRIVATE_KEY=                     # Deployment key (secure!)
-INFURA_API_KEY=                 # Network access
-ETHERSCAN_API_KEY=              # Contract verification
-# Additional keys for Polygon, BSC, Arbitrum, etc.
+npm run verify:holesky      # Verify on Holesky
+npm run verify:polygon      # Verify on Polygon
+npm run verify:arbitrum     # Verify on Arbitrum
 ```
 
+## Network Support
+
+### Supported Networks
+- **Ethereum**: Mainnet, Sepolia, Holesky
+- **Layer 2**: Polygon, Arbitrum, Optimism
+- **Alternative**: BSC, Conflux eSpace
+
+### Environment Configuration
+Required `.env` variables:
+```bash
+PRIVATE_KEY=                # Deployer wallet private key (secure!)
+INFURA_API_KEY=            # Network RPC access
+ETHERSCAN_API_KEY=         # Ethereum contract verification
+POLYGONSCAN_API_KEY=       # Polygon contract verification
+ARBISCAN_API_KEY=          # Arbitrum contract verification
+BSCSCAN_API_KEY=           # BSC contract verification
+```
 
 ## Testing & Development Standards
 
-**Comprehensive Testing Coverage**
-- Integration testing (DeepFamily + Token system)
-- Token economics (mining, halving, ERC20 compliance)  
-- Security verification (reentrancy, access control)
-- Governance mechanisms and gas optimization
+### Comprehensive Testing
+- **Unit Tests**: Individual contract function testing
+- **Integration Tests**: Cross-contract interaction testing
+- **ZK Proof Tests**: Circuit validation and proof generation
+- **Economic Tests**: Token mining and halving mechanism validation
+- **Security Tests**: Reentrancy, access control, edge case testin
 
-**Development Guidelines**
+## Security Considerations
+
+### Smart Contract Security
+- **Reentrancy Protection**: All external calls protected
+- **Access Control**: Role-based permissions with explicit error types
+- **Input Validation**: Comprehensive parameter checking
+- **Overflow Protection**: SafeMath patterns and Solidity 0.8+ built-ins
+
+### ZK Proof Security
+- **Trusted Setup**: Uses community-audited Powers of Tau
+- **Circuit Validation**: All constraints properly implemented
+- **Proof Verification**: On-chain Groth16 verification
+- **Domain Separation**: keccak256 wrapper prevents hash collisions
+
+### Frontend Security
+- **Wallet Integration**: Secure Web3 provider handling
+- **Input Sanitization**: All user inputs validated
+- **State Management**: Immutable state patterns
+- **Error Handling**: Graceful error recovery and user feedback
+
+## **Development Guidelines**
 - English documentation
 - Synchronized test updates with new features
 - Pre-production auditing required

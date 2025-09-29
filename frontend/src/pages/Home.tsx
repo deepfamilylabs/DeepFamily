@@ -15,7 +15,7 @@ import { ANIMATION_CLASSES } from '../constants/animationStyles'
 
 // Lazy loaded components
 const ValuePropositions = lazy(() => import('../components/home/ValuePropositions'))
-const DualLayerArchitecture = lazy(() => import('../components/home/DualLayerArchitecture'))
+const TwoLayerValueSystem = lazy(() => import('../components/home/TwoLayerValueSystem'))
 const WorkflowSection = lazy(() => import('../components/WorkflowSection'))
 const CoreFeatures = lazy(() => import('../components/home/CoreFeatures'))
 const Tokenomics = lazy(() => import('../components/home/Tokenomics'))
@@ -111,7 +111,7 @@ export default function Home() {
           <div className={ANIMATION_CLASSES.FADE_IN_UP}>
             <div className={HERO_CONTENT_STYLES.badge}>
               <DynamicIcon name="Sparkles" className={HERO_CONTENT_STYLES.badgeIcon} />
-              <span className={HERO_CONTENT_STYLES.badgeText}>Decentralized Family Tree</span>
+              <span className={HERO_CONTENT_STYLES.badgeText}>Digital Legacy</span>
             </div>
             
             <h1 className={HERO_CONTENT_STYLES.title}>
@@ -144,9 +144,9 @@ export default function Home() {
         <ValuePropositions />
       </Suspense>
 
-      {/* Dual Layer Architecture */}
+      {/* Two-Layer Value System */}
       <Suspense fallback={<LoadingFallback />}>
-        <DualLayerArchitecture />
+        <TwoLayerValueSystem />
       </Suspense>
 
       {/* Workflow Section */}
