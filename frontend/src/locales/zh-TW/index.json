@@ -7,8 +7,8 @@
     "actions": "操作"
   },
   "home": {
-    "title": "去中心化鏈上族譜協定",
-    "subtitle": "多版本譜系共存 · 口令鹽化去連結 · 零知識隱私守護 · NFT 價值沉澱 · 經濟激勵驅動",
+    "title": "去中心化數位族譜",
+    "subtitle": "零知識隱私守護 · 口令鹽化去連結 · 多版本譜系共存 · NFT 價值沉澱 · 經濟激勵驅動",
     "exploreFamilyTree": "探索族譜",
     "addPerson": "添加人物",
     "search": "搜尋",
@@ -27,32 +27,32 @@
     "valueProps": {
       "title": "核心價值主張",
       "subtitle": "構建多維度可信譜系生態，實現從資訊探索到價值確認的自然演進",
-      "trustedGenealogy": {
-        "title": "可信譜系",
-        "description": "父母引用 + 版本共存，不覆寫歷史，只累積證據與共識"
+      "zkPrivacy": {
+        "title": "零知識隱私",
+        "description": "使用Groth16證明私密提交家族成員，驗證結構正確性的同時隱藏敏感資訊"
       },
-      "consensusFocus": {
-        "title": "共識聚焦", 
-        "description": "背書消耗代幣，成本錨定挖礦獎勵，過濾噪聲形成事實焦點"
+      "saltedUnlinkability": {
+        "title": "口令鹽化去連結性",
+        "description": "獨有口令防止身份推理和污染攻擊，確保每個身份雜湊的唯一性和安全性"
       },
-      "valuePrecipitation": {
-        "title": "價值沉澱",
-        "description": "版本 → NFT → 持有人獲得後續背書費用流，激勵高品質輸入"
+      "dualTreeModels": {
+        "title": "雙樹模式",
+        "description": "支援公開協作樹和私有保護樹，滿足不同場景下的族譜構建需求"
       },
-      "narrativeExtension": {
-        "title": "敘事擴展", 
-        "description": "故事分片增量寫入 + 全量雜湊校驗 + 封存即不可篡改"
+      "communityEndorsement": {
+        "title": "社群背書",
+        "description": "DEEP代幣背書機制過濾噪聲，形成高品質資料的社群共識"
       },
-      "privacyGuardian": {
-        "title": "隱私守護",
-        "description": "ZK 證明驗證結構正確性，可隱藏原始敏感欄位"
+      "nftValueCreation": {
+        "title": "NFT價值創造",
+        "description": "版本 → NFT → 持有人獲得後續背書費用流，激勵高品質資料貢獻"
       },
-      "openComposition": {
-        "title": "開放組合",
-        "description": "鏈上結構供社群構建應用、視覺化、研究資料庫"
+      "storyShardingSealing": {
+        "title": "故事分片與封存",
+        "description": "分片寫入傳記內容 + 雜湊驗證 + 封存後不可篡改，形成永久鏈上檔案"
       }
     },
-    "architecture": {
+    "valueSystem": {
       "title": "雙層網路模型",
       "subtitle": "第一層 關係層與第二層 價值層的協同設計，實現結構化資料與經濟價值的有機融合",
       "layer1": {
@@ -92,10 +92,12 @@
         "feature3": "收益權分配"
       },
       "flow": {
-        "dataInput": "資料輸入",
-        "dataInputDesc": "結構化資料輸入與驗證",
-        "valueOutput": "價值輸出",
-        "valueOutputDesc": "經過驗證的價值確認輸出"
+        "title": "隱私到價值流程",
+        "description": "從私有雜湊儲存到社群驗證的NFT資產",
+        "step1": "私有提交",
+        "step1Desc": "使用零知識證明添加家族成員",
+        "step2": "公開披露",
+        "step2Desc": "鑄造NFT公開完整傳記資訊"
       },
       "advantages": {
         "title": "運作流程",
@@ -112,6 +114,22 @@
         "step5Desc": "故事封存，形成不可更改的鏈上歷史影像",
         "conclusion": "價值驅動的協作網路",
         "conclusionDesc": "透過經濟激勵機制，實現高品質譜系資料的自然累積與價值發現"
+      },
+      "dualModels": {
+        "title": "雙重家族樹模式",
+        "description": "口令加鹽系統支援協作公開樹和抗污染私有樹兩種模式",
+        "public": {
+          "title": "公開協作樹",
+          "description": "共享口令使多個用戶能夠協作構建完整的族譜。",
+          "benefit": "社群協作",
+          "mode": "共享口令模式"
+        },
+        "private": {
+          "title": "私有保護樹",
+          "description": "獨有口令創建完全受保護的族譜，免受污染攻擊和關係破壞。",
+          "benefit": "反污染保護",
+          "mode": "獨有口令模式"
+        }
       }
     },
     "features": {

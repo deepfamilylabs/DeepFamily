@@ -1,4 +1,4 @@
-# DeepFamily - Decentralized Global On-Chain Family Tree Protocol
+# DeepFamily - Decentralized Global Digital Family Tree Protocol
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 [![Node](https://img.shields.io/badge/Node.js-18+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
 **A blockchain-based decentralized global digital family tree protocol**
-*Leveraging NFTs, ERC20 tokenomics, and community governance for collaborative family history*
+*Leveraging zero-knowledge proofs, NFTs, and community governance for collaborative family history*
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Core Features](#-core-features) • [🏗️ Architecture](#️-architecture) • [🚀 Deployment](#-deployment) • [🤝 Contributing](#-contributing)
 
@@ -19,127 +19,87 @@
 
 ## 🌟 Vision & Mission
 
-DeepFamily creates the world's first decentralized family tree infrastructure, combining blockchain immutability with privacy-preserving technology to build a collaborative, verifiable, and perpetual family history recording system.
+DeepFamily creates the decentralized family tree infrastructure, using zero-knowledge proofs and blockchain immutability to build a collaborative, verifiable, and perpetual family history recording system.
 
 ### 🎯 Core Principles
-- 🔐 **Privacy-Preserving**: Dual-layer architecture with hash-based storage and zero-knowledge proofs
-- 🌍 **Globally Accessible**: Borderless family connections powered by blockchain technology
-- 💎 **Immutable Heritage**: Permanent on-chain storage ensures data preservation across generations
-- 💰 **Incentivized Participation**: DEEP token rewards encourage quality contributions and family completeness
-- 🤝 **Community-Driven**: Endorsement-based governance validates information quality and builds trust
-- 🏗️ **Scalable Design**: Multi-version data model supports diverse cultural family tree traditions
+- 🔐 **Zero-Knowledge Privacy**: Private family tree construction with selective disclosure through NFT minting
+- 🌍 **Globally Accessible**: Borderless family connections accessible from anywhere in the world
+- 💎 **Immutable Heritage**: Permanent on-chain storage preserves data across generations
+- 💰 **Smart Incentives**: DEEP token rewards for complete family data contributions
+- 🤝 **Community Validation**: Endorsement-based governance ensures information quality
 
 ## 🎯 Core Features
 
-### 🔐 Privacy & Security
-- **Zero-Knowledge Proofs**: Groth16-based privacy-preserving data submission via `IPersonHashVerifier` interface
-- **Hash-Only Storage**: Personal data stored as keccak256 hashes on-chain, with raw PII kept off-chain
+### 🔐 Zero-Knowledge Privacy System
+- **Private Member Addition**: Uses Groth16 proofs to add family tree members without revealing personal information
+- **Salted Passphrase Unlinkability**: Poseidon(fullName, passphrase) prevents identity inference and family tree pollution
+- **Dual Family Tree Models**: Public trees (shared passphrase) for collaboration, private trees (unique passphrase) for complete protection
+- **Selective Disclosure**: Privacy protection during member addition, **full disclosure when minting NFTs**
 - **Multi-Version Support**: Each person can have multiple verified versions with parent relationship tracking
-- **Comprehensive Security**: 50+ custom errors, reentrancy protection, and access control mechanisms
 
-### 🎨 NFT Ecosystem
-- **Unique NFTs**: Each person version can mint exactly one ERC721 token with on-chain core metadata
-- **Story Sharding**: Biographical data stored in up to 100 shards × 1KB each with immutable sealing
-- **Value Recognition**: Endorsement-driven value accrual and fee distribution system
-- **Rich Metadata**: On-chain name, birth/death years, and story hash with off-chain detailed content
+### 🎨 NFT Value Creation
+- **Family Tree NFTs**: Each person version can mint exactly one ERC721 token
+- **Public Information**: **NFT minting reveals full name and biographical data to the community**
+- **Story Sharding**: Detailed life stories stored in up to 100×1KB on-chain chunks with immutable sealing
+- **Endorsement Requirement**: Must endorse a version before minting its NFT
 
 ### 💰 DEEP Token Economics
 - **Smart Mining**: Rewards only granted when both parent relationships exist (complete family data)
-- **Progressive Halving**: Advanced tokenomics with variable-length cycles and binary halving
-  - Initial: 113,777 DEEP → Final: 0.1 DEEP minimum
-  - Cycles: 1→10→100→1k→10k→100k→1M→10M→100M→fixed 100M
-- **Capped Supply**: Maximum 100 billion DEEP tokens
-- **Mining Incentives**: Encourages family tree completeness over isolated entries
+- **Progressive Halving**: 10 halving cycles with expanding periods (1→10→100→1K→10K→100K→1M→10M→100M→Fixed 100M)
+- **100 Billion Cap**: Fixed maximum supply with minimum reward threshold
+- **Complete Family Incentives**: Encourages connected family trees over isolated entries
 
 ### 🤝 Community Governance
-- **Staked Endorsements**: Pay current mining reward to endorse trusted versions
-- **Dynamic Fee Distribution**:
-  - Pre-NFT: 100% to version creator
-  - Post-NFT: 100% to current NFT holder
-- **Quality Signaling**: Community endorsement count indicates version trustworthiness
-- **Reputation System**: Build trust through verified contributions and endorsements
+- **Endorsement Fees**: Pay current mining reward to endorse trusted versions
+- **Fee Distribution**: Endorsement fees flow to NFT holders or original contributors
+- **Version Competition**: Multiple versions per person, community selects best through endorsements
+- **Quality Signaling**: Endorsement counts indicate version trustworthiness
 
 ### 📊 Advanced Data Management
-- **Name Indexing**: Hash-based reverse lookup for efficient person discovery
+- **Multi-Version System**: Each person supports multiple data versions with duplicate prevention
 - **Paginated Queries**: Gas-optimized queries with 100-record limits
-- **Composite APIs**: Single-call functions return complete relationship data
-- **Version Control**: Full history preservation with immutable parent references
+- **Family Tree Networks**: Complete relationship tracking through personHash/fatherHash/motherHash
+- **Story Sealing**: Biographical data can be permanently locked for historical preservation
 
-## 🏗️ Architecture
+## 🏗️ Two-Layer Value System
 
-### 🔄 Dual-Layer Design
+### Layer 1: Private Hash Storage
+- Add family tree members with zero-knowledge proofs without revealing personal information
+- **Salted Passphrase System**: `Poseidon(fullName, passphrase)` prevents identity inference and pollution attacks
+- Only cryptographic commitments stored on-chain (personHash, fatherHash, motherHash)
+- **Dual Tree Models**: Public collaborative trees vs. private protected trees with unique passphrases
+- Receive DEEP token rewards for complete family connections
 
-The system implements a sophisticated dual-layer architecture that balances privacy protection with value creation:
+### Layer 2: Public NFT Assets
+- Community-endorsed versions can be minted as NFTs
+- **NFT minting reveals full name and biographical information**
+- Story sharding enables detailed on-chain biographies
+- NFTs represent community-validated family tree data
 
-#### **Layer 1: Privacy Protection (Hash-Based Relationships)**
-- **Hash Storage**: Only keccak256 hashes of personal information stored on-chain
-- **Relationship Networks**: Build family tree connections through `personHash`, `fatherHash`, `motherHash`
-- **Low-Barrier Entry**: Safe participation without privacy risks
-- **Token Incentives**: DEEP rewards for complete family data contributions
+### 🛠️ Technology Stack
+- **Smart Contracts**: Solidity ^0.8.20, OpenZeppelin v5, Poseidon hashing
+- **Zero-Knowledge**: Groth16 proofs, circom circuits, snarkjs integration
+- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, D3.js family tree visualization
+- **Development**: Hardhat, Ethers v6, comprehensive testing suite
 
-#### **Layer 2: Value Confirmation (NFT Assets)**
-- **Selective Disclosure**: Community-endorsed information can be minted as NFTs
-- **Value Solidification**: NFTs represent recognition of high-quality, verified data
-- **Progressive Evolution**: Natural progression from private data → community validation → asset creation
+### Smart Contracts
 
-### 📱 Technology Stack
-- **Smart Contracts**: Solidity ^0.8.20, Hardhat, hardhat-deploy
-- **Blockchain Layer**: ERC20 (DEEP token) + ERC721Enumerable (Family NFTs)
-- **Frontend**: React 18 + TypeScript + Vite + TailwindCSS + D3.js
-- **Development**: Ethers v6, Hardhat testing, OpenZeppelin security primitives
-- **Privacy**: Zero-knowledge proofs (Groth16), hash-based identity protection
+**DeepFamily.sol** - Main Protocol
+- Multi-version person data with ZK proof validation
+- Community endorsement with automatic fee distribution
+- NFT minting with on-chain biographical storage
+- Story sharding system for detailed life narratives
+- Mining rewards for complete family data
 
-### ⛓️ Smart Contract System
+**DeepFamilyToken.sol** - DEEP Token
+- ERC20 with progressive halving mining mechanism
+- 100 billion supply cap, 10 halving cycles
+- Authorized minting only by DeepFamily contract
 
-```
-DeepFamily Contract Ecosystem
-├── 📄 DeepFamily.sol 
-│   ├── Multi-version person data management
-│   ├── Community endorsement & fee distribution
-│   ├── NFT minting with on-chain metadata
-│   ├── Story sharding system (100×1KB chunks)
-│   ├── Mining rewards for complete families
-│   └── Paginated queries & gas optimization
-│
-├── 🪙 DeepFamilyToken.sol
-│   ├── ERC20 with progressive halving
-│   ├── 100 billion supply cap, 10 halving cycles
-│   └── Authorized minting by DeepFamily contract only
-│
-└── 🔐 PersonHashVerifier.sol
-    ├── Groth16 zero-knowledge proof verification
-    ├── 7-limb hash validation for privacy
-    └── Integration ready for production ZK circuits
-```
+**ZK Verifiers** - Privacy Protection
+- PersonHashVerifier: Validates family relationships for private submissions
+- NamePoseidonVerifier: Proves name ownership for NFT minting
 
-### 🏗️ Project Structure
-```
-DeepFamily/
-├── contracts/              # Smart Contracts (Solidity)
-│   ├── DeepFamily.sol         # Main family tree contract
-│   ├── DeepFamilyToken.sol    # DEEP ERC20 token
-│   └── PersonHashVerifier.sol # ZK proof verifier
-├── frontend/               # React dApp
-│   ├── src/
-│   │   ├── components/        # UI components
-│   │   │   ├── FlexibleDAGView.tsx    # Flexible family tree
-│   │   │   ├── ForceDAGView.tsx       # Force-directed tree
-│   │   │   ├── NodeDetailModal.tsx    # Person details
-│   │   │   └── ...
-│   │   ├── pages/            # Application routes
-│   │   ├── hooks/            # React hooks
-│   │   ├── context/          # State management
-│   │   ├── abi/              # Contract ABIs
-│   │   └── utils/            # Helper utilities
-├── test/                   # Hardhat Tests
-├── tasks/                  # Hardhat Tasks
-├── deploy/                 # Deployment Scripts
-├── scripts/                # Utility Scripts
-│   ├── seed-demo.js          # Demo data seeding
-│   └── check-root.js         # Root node validation
-├── docs/                   # Documentation
-└── circuits/               # ZK Circuit Development
-```
 
 ## 🚀 Quick Start
 
@@ -274,27 +234,11 @@ npm run deploy:local
 npm run verify:net --net=holesky
 ```
 
-## 📚 Core Docs
-See detailed documents under `docs/`:
-- [Architecture](docs/architecture.md)
-- [Contracts Reference](docs/contracts.md)
-- [Data Model](docs/data-model.md)
-- [API & Tasks](docs/api.md)
-- [Tokenomics](docs/tokenomics.md)
-- [ZK Roadmap](docs/zk-roadmap.md)
-- [Frontend Integration](docs/frontend.md)
-3. Provide hosted service / decentralised index endpoints.
+## 📖 Documentation
 
-## 📘 Glossary
-| Term | Meaning |
-|------|---------|
-| Person Hash | keccak256 of structured basic info (name + birth data + gender) |
-| Version | A submitted record referencing optional parent version indices |
-| Endorsement | Staked trust action paying current reward to version author / NFT holder |
-| NFT | On-chain minted representation of a specific person version |
-| Story Chunk | Sharded biography text segment (hashed & aggregated) |
-| Full Story Hash | keccak256 of concatenated chunk hashes in order |
-| Mining Reward | DEEP tokens minted when adding qualifying person version |
+- [Smart Contracts Reference](docs/contracts.md) - Complete contract API and implementation details
+- [Zero-Knowledge Proofs](docs/zk-proofs.md) - ZK proof system and circuit documentation
+- [Frontend Integration](docs/frontend.md) - React component and UI development guide
 
 ## 🤝 Contributing
 

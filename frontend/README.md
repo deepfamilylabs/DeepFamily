@@ -1,6 +1,6 @@
 # DeepFamily Frontend
 
-React-based blockchain family tree visualization with D3.js and multi-language support.
+React-based blockchain family tree.
 
 > 📖 **Complete Documentation**: See [docs/frontend.md](../docs/frontend.md) for detailed architecture and integration guide.
 

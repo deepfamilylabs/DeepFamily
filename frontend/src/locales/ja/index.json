@@ -7,8 +7,8 @@
     "actions": "操作"
   },
   "home": {
-    "title": "分散型オンチェーン家系図プロトコル",
-    "subtitle": "多バージョン系譜の共存 · パスフレーズのソルト化によるデリンク · ZKプライバシー保護 · NFT価値の沈殿 · 経済的インセンティブ駆動",
+    "title": "分散型デジタル家系図",
+    "subtitle": "ZKプライバシー保護 · パスフレーズのソルト化によるデリンク · 多バージョン系譜の共存 · NFT価値の沈殿 · 経済的インセンティブ駆動",
     "exploreFamilyTree": "家系図を探索",
     "addPerson": "人物追加",
     "search": "検索",
@@ -28,32 +28,32 @@
     "valueProps": {
       "title": "コア価値提案",
       "subtitle": "多次元信頼系譜エコシステムの構築、情報探索から価値確認への自然進化を実現",
-      "trustedGenealogy": {
-        "title": "信頼系譜",
-        "description": "親参照 + 版本共存、履歴を上書きせず、証拠と合意のみを蓄積"
+      "zkPrivacy": {
+        "title": "ゼロ知識プライバシー",
+        "description": "Groth16証明で家族メンバーを秘密裏に提出、構造正確性を検証しつつ機密情報を隠蔽"
       },
-      "consensusFocus": {
-        "title": "合意集約",
-        "description": "承認はトークンを消費、コストはマイニング報酬に固定、ノイズをフィルタして事実焦点を形成"
+      "saltedUnlinkability": {
+        "title": "パスフレーズソルト非連結性",
+        "description": "独自パスフレーズで身元推理と汚染攻撃を防止、各身元ハッシュの一意性と安全性を確保"
       },
-      "valuePrecipitation": {
-        "title": "価値沈殿",
-        "description": "版本 → NFT → 保有者が後続承認手数料流を取得、高品質入力を奨励"
+      "dualTreeModels": {
+        "title": "デュアルツリーモデル",
+        "description": "公開協力ツリーと私有保護ツリーの両方をサポート、異なる系譜構築ニーズに対応"
       },
-      "narrativeExtension": {
-        "title": "叙事拡張",
-        "description": "ストーリー分片増分書き込み + 全量ハッシュ検証 + 封存即不可改竄"
+      "communityEndorsement": {
+        "title": "コミュニティ背書",
+        "description": "DEEPトークン背書機制でノイズをフィルタリング、高品質データのコミュニティ合意を形成"
       },
-      "privacyGuardian": {
-        "title": "プライバシー保護",
-        "description": "ZK証明で構造正確性を検証、原始機密フィールドを隠蔽可能"
+      "nftValueCreation": {
+        "title": "NFT価値創造",
+        "description": "バージョン → NFT → 持有者が後続背書費用流を獲得、高品質データ貢献を激励"
       },
-      "openComposition": {
-        "title": "オープン合成",
-        "description": "オンチェーン構造でコミュニティがアプリ、可視化、研究データベースを構築"
+      "storyShardingSealing": {
+        "title": "ストーリー分片と封存",
+        "description": "伝記内容を分片書き込み + ハッシュ検証 + 封存後不可改竄、永続的なオンチェーンアーカイブを形成"
       }
     },
-    "architecture": {
+    "valueSystem": {
       "title": "二層ネットワークモデル",
       "subtitle": "第一層関係層と第二層価値層の協調設計、構造化データと経済価値の有機融合を実現",
       "layer1": {
@@ -93,10 +93,12 @@
         "feature3": "収益権配分"
       },
       "flow": {
-        "dataInput": "データ入力",
-        "dataInputDesc": "構造化データ入力と検証",
-        "valueOutput": "価値出力",
-        "valueOutputDesc": "検証済み価値確認出力"
+        "title": "プライバシーから価値への流れ",
+        "description": "プライベートハッシュストレージからコミュニティ検証済みNFTアセットまで",
+        "step1": "プライベート提出",
+        "step1Desc": "ゼロ知識証明で家族メンバーを追加",
+        "step2": "公開開示",
+        "step2Desc": "完全な伝記情報を公開するNFTを鋳造"
       },
       "advantages": {
         "title": "動作フロー",
@@ -113,6 +115,22 @@
         "step5Desc": "ストーリー封存、不可変更のオンチェーン歴史映像を形成",
         "conclusion": "価値駆動の協作ネットワーク",
         "conclusionDesc": "経済インセンティブ機制により、高品質系譜データの自然蓄積と価値発見を実現"
+      },
+      "dualModels": {
+        "title": "デュアル家系図モデル",
+        "description": "パスフレーズソルト系統は、協力的な公開ツリーと汚染耐性のあるプライベートツリーの両方を可能にします",
+        "public": {
+          "title": "公開協力ツリー",
+          "description": "共有パスフレーズにより、複数のユーザーが協力して包括的な家系図を構築できます。",
+          "benefit": "コミュニティ協力",
+          "mode": "共有パスフレーズモード"
+        },
+        "private": {
+          "title": "プライベート保護ツリー",
+          "description": "独自のパスフレーズは、汚染攻撃や関係破壊から完全に保護されたツリーを作成します。",
+          "benefit": "汚染防止保護",
+          "mode": "独自パスフレーズモード"
+        }
       }
     },
     "features": {

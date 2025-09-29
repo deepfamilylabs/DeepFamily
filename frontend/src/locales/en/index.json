@@ -7,8 +7,8 @@
     "actions": "Actions"
   },
   "home": {
-    "title": "On-Chain Decentralized Family Tree Protocol",
-    "subtitle": "Multi-version lineage coexistence · Salted passphrases for de-linking · ZK privacy protection · NFT value precipitation · Economic incentive driven",
+    "title": "Decentralized Digital Family Tree",
+    "subtitle": "Zero-knowledge privacy protection · Salted passphrase unlinkability · Dual tree models · Community endorsement · NFT value creation",
     "exploreFamilyTree": "Explore Family Tree",
     "addPerson": "Add Person", 
     "search": "Search",
@@ -27,75 +27,71 @@
     "valueProps": {
       "title": "Core Value Propositions",
       "subtitle": "A trusted multi-dimensional genealogy layer turning open exploration into confirmed value.",
-      "trustedGenealogy": {
-        "title": "Trusted Genealogies",
-        "description": "Parent references + version coexistence, never overwriting history, only accumulating evidence and consensus"
+      "zkPrivacy": {
+        "title": "Zero-Knowledge Privacy",
+        "description": "Use Groth16 proofs to privately submit family members, verifying structural correctness while hiding sensitive information"
       },
-      "consensusFocus": {
-        "title": "Consensus Formation", 
-        "description": "Endorsements consume tokens, costs anchored to mining rewards, filtering noise to form factual focus"
+      "saltedUnlinkability": {
+        "title": "Salted Passphrase Unlinkability",
+        "description": "Unique passphrases prevent identity inference and pollution attacks, ensuring uniqueness and security of each identity hash"
       },
-      "valuePrecipitation": {
-        "title": "Value Precipitation",
-        "description": "Version → NFT → holders receive subsequent endorsement fee streams, incentivizing high-quality contributions"
+      "dualTreeModels": {
+        "title": "Dual Tree Models",
+        "description": "Support both public collaborative trees and private protected trees, meeting different genealogy construction needs"
       },
-      "narrativeExtension": {
-        "title": "Narrative Extension", 
-        "description": "Story shards incremental writing + full hash verification + sealing creates immutable records"
+      "communityEndorsement": {
+        "title": "Community Endorsement",
+        "description": "DEEP token endorsement mechanism filters noise, forming community consensus on high-quality data"
       },
-      "privacyGuardian": {
-        "title": "Privacy Protection",
-        "description": "ZK proofs verify structural correctness while hiding original sensitive fields"
+      "nftValueCreation": {
+        "title": "NFT Value Creation",
+        "description": "Version → NFT → holders receive subsequent endorsement fee streams, incentivizing high-quality data contributions"
       },
-      "openComposition": {
-        "title": "Open Composability",
-        "description": "On-chain structure, enabling community to build applications, familyTrees, research databases"
+      "storyShardingSealing": {
+        "title": "Story Sharding & Sealing",
+        "description": "Shard biographical content + hash verification + immutable after sealing, creating permanent on-chain archives"
       }
     },
-    "architecture": {
-      "title": "Dual-Layer Network",
-      "subtitle": "Synergistic design of Layer 1 Relational Layer and Layer 2 Value Layer, achieving organic integration of structured data and economic value",
+    "valueSystem": {
+      "title": "Two-Layer Value System",
+      "subtitle": "Progressive privacy model: private submission → community endorsement → optional public disclosure",
       "layer1": {
-        "title": "Relational Layer",
-        "subtitle": "Structure & Temporal Series",
-        "feature1": "Person Hash Management",
-        "feature1Desc": "Hash-based person identification, supporting multi-version coexistence and evolution tracking",
-        "feature2": "Version Control System",
-        "feature2Desc": "Immutable version history, each version records creation time and author",
-        "feature3": "Parent-Child Topology",
-        "feature3Desc": "Building complete genealogy network topology and bloodline relationship chains",
-        "description": "Features: Structured data, temporal series, topological networks"
+        "title": "Privacy Protection",
+        "description": "Salted passphrase system prevents identity inference and pollution attacks. Zero-knowledge proofs ensure complete privacy during submission.",
+        "feature1": "Salted Passphrase Unlinkability",
+        "feature2": "Anti-Pollution Protection",
+        "feature3": "Dual Tree Models: Public & Private"
       },
       "layer2": {
-        "title": "Value Layer",
-        "subtitle": "Economic Incentives & Assetization",
-        "feature1": "NFT Asset Binding",
-        "feature1Desc": "Specific versions can be minted as NFTs, carrying value and revenue rights",
-        "feature2": "Endorsement Fee Streams",
-        "feature2Desc": "Endorsement fees distributed to NFT holders, creating continuous revenue",
-        "feature3": "Mining Reward Mechanism",
-        "feature3Desc": "Versions with complete parent references receive DEEP token rewards",
-        "description": "Features: Economic incentives, value discovery, verifiable narrative assetization"
-      },
-      "privacyLayer": {
-        "title": "Privacy Protection Layer",
-        "description": "Privacy protection mechanism based on zero-knowledge proofs, ensuring the security of sensitive information",
-        "feature1": "Zero-knowledge proof verification",
-        "feature2": "Sensitive field hiding",
-        "feature3": "Structural correctness verification"
-      },
-      "valueLayer": {
-        "title": "Value Confirmation Layer",
-        "description": "Achieving data value confirmation and distribution through economic incentives and consensus mechanisms",
-        "feature1": "Endorsement consensus mechanism",
-        "feature2": "NFT value binding",
-        "feature3": "Revenue rights distribution"
+        "title": "Public NFT Assets",
+        "description": "Community-endorsed versions can be minted as NFTs, revealing full personal information. Story sharding enables detailed on-chain biographies.",
+        "feature1": "NFT Minting Reveals Full Information",
+        "feature2": "Community Endorsement Required",
+        "feature3": "Story Sharding & Value Recognition"
       },
       "flow": {
-        "dataInput": "Data Input",
-        "dataInputDesc": "Structured data input and verification",
-        "valueOutput": "Value Output",
-        "valueOutputDesc": "Verified value confirmation output"
+        "title": "Privacy to Value Flow",
+        "description": "From private hash storage to community-validated NFT assets",
+        "step1": "Private Submission",
+        "step1Desc": "Add family members with zero-knowledge proofs",
+        "step2": "Public Disclosure",
+        "step2Desc": "Mint NFTs revealing full biographical information"
+      },
+      "dualModels": {
+        "title": "Dual Family Tree Models",
+        "description": "Salted passphrase system enables both collaborative public trees and pollution-resistant private trees",
+        "public": {
+          "title": "Public Collaborative Trees",
+          "description": "Shared passphrases enable multiple users to collaboratively build comprehensive family trees together.",
+          "benefit": "Community Collaboration",
+          "mode": "Shared Passphrase Mode"
+        },
+        "private": {
+          "title": "Private Protected Trees",
+          "description": "Unique passphrases create completely protected trees immune to pollution attacks and relationship corruption.",
+          "benefit": "Anti-Pollution Protection",
+          "mode": "Unique Passphrase Mode"
+        }
       },
       "advantages": {
         "title": "Workflow",
