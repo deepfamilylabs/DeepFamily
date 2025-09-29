@@ -263,7 +263,7 @@ export function useContract() {
     tokenURI: string,
     coreInfo: {
       basicInfo: {
-        fullNameHash: string
+        fullNameCommitment: string
         isBirthBC: boolean
         birthYear: number
         birthMonth: number
@@ -409,7 +409,7 @@ export function useContract() {
 
   // Utility functions
   const getPersonHash = useCallback(async (basicInfo: {
-    fullNameHash: string
+    fullNameCommitment: string
     isBirthBC: boolean
     birthYear: number
     birthMonth: number

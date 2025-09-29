@@ -26,7 +26,7 @@ DeepFamily uses a hash-based identity system to ensure privacy while maintaining
 
 ```solidity
 struct PersonBasicInfo {
-    bytes32 fullNameHash;  // keccak256 of complete name
+    bytes32 fullNameCommitment;  // Poseidon commitment derived from keccak256(name || salt)
     bool isBirthBC;        // BC (Before Christ) or AD designation
     uint16 birthYear;      // Year of birth (0 = unknown/private)
     uint8 birthMonth;      // Month (1-12, 0 = unknown/private)

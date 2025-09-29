@@ -78,7 +78,7 @@ function prepareBasicInfo(basicInfo) {
   const digest = computePoseidonDigest(basicInfo.fullName, passphrase);
 
   const prepared = {
-    fullNameHash: digest.digestHex,
+    fullNameCommitment: digest.digestHex,
     isBirthBC: Boolean(basicInfo.isBirthBC),
     birthYear: Number(basicInfo.birthYear ?? 0),
     birthMonth: Number(basicInfo.birthMonth ?? 0),
@@ -153,7 +153,7 @@ function solidityStringHash(s) {
   return ethers.keccak256(ethers.toUtf8Bytes(s));
 }
 
-// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameHash)
+// Helper: call new getPersonHash (using PersonBasicInfo struct with fullNameCommitment)
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
   const { prepared } = prepareBasicInfo(basicInfo);
   return await deepFamily.getPersonHash(prepared);

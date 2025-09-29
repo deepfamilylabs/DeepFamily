@@ -137,7 +137,7 @@ export function computePersonHash(input: HashForm): string {
     (BigInt(gender) << 1n) |
     (isBirthBC ? 1n : 0n)
 
-  // Compute fullNameHash exactly like the contract
+  // Compute fullNameHash exactly like the circuit pre-image
   const fullNameHash = ethers.keccak256(ethers.toUtf8Bytes(normalizedFullName))
   const saltHash = normalizedPassphrase.length > 0
     ? ethers.keccak256(ethers.toUtf8Bytes(normalizedPassphrase))

@@ -518,7 +518,7 @@ export default function MintNFTModal({
 
       const coreInfo = {
         basicInfo: {
-          fullNameHash: nameBinding.digestHex,
+          fullNameCommitment: nameBinding.digestHex,
           isBirthBC: personInfo.isBirthBC,
           birthYear: personInfo.birthYear,
           birthMonth: personInfo.birthMonth,

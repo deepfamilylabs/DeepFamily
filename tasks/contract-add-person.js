@@ -2,7 +2,7 @@ const { task } = require("hardhat/config");
 const { computePoseidonDigest, buildBasicInfo } = require("../lib/namePoseidon");
 
 // PersonBasicInfo {
-//   bytes32 fullNameHash; // Poseidon5 hash, NOT simple keccak256!
+//   bytes32 fullNameCommitment; // Poseidon5 hash, NOT simple keccak256!
 //   bool isBirthBC;
 //   uint16 birthYear;
 //   uint8 birthMonth;
@@ -10,7 +10,7 @@ const { computePoseidonDigest, buildBasicInfo } = require("../lib/namePoseidon")
 //   uint8 gender;
 // }
 
-task("add-person", "Add a person version using correct fullNameHash calculation")
+task("add-person", "Add a person version using correct fullNameCommitment calculation")
   .addParam("fullname", "Full name")
   .addOptionalParam("passphrase", "Salt passphrase for privacy (default: empty)", "")
   .addOptionalParam("birthbc", "Is birth year BC (true/false)", "false")

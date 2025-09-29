@@ -23,14 +23,14 @@ describe('Mint NFT Tests', function () {
       birthDay: 0,
       gender: 1,
     });
-    const fullNameHash = basicInfo.fullNameHash;
+    const fullNameCommitment = basicInfo.fullNameCommitment;
     const personHash = await deepFamily.getPersonHash(basicInfo);
     const proofBundle = await generateNamePoseidonProof(FULLNAME);
     const { proof, publicSignals } = proofBundle;
     if (endorsed) {
       await hre.run('endorse', { person: personHash, vindex: '1' });
     }
-    return { deepFamily, personHash, FULLNAME, fullNameHash, basicInfo, proof, publicSignals };
+    return { deepFamily, personHash, FULLNAME, fullNameCommitment, basicInfo, proof, publicSignals };
   }
 
   it('fails mint through task before endorsement (task layer error)', async () => {
@@ -132,7 +132,7 @@ describe('Mint NFT Tests', function () {
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName');
   });
 
-  it('rejects mismatched fullName and fullNameHash via direct contract call', async () => {
+  it('rejects mismatched fullName and fullNameCommitment via direct contract call', async () => {
     const { deepFamily, personHash, basicInfo, proof, publicSignals } = await prepare(true);
 
     const coreInfo = {
@@ -154,7 +154,7 @@ describe('Mint NFT Tests', function () {
     ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
   });
 
-  it('accepts valid fullName that matches fullNameHash via direct contract call', async () => {
+  it('accepts valid fullName that matches fullNameCommitment via direct contract call', async () => {
     const { deepFamily, personHash, FULLNAME, basicInfo, proof, publicSignals } = await prepare(true);
 
     const coreInfo = {
