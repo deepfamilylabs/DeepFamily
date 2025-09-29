@@ -912,7 +912,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       return;
     }
 
-    // Collect all chunk hashes in index order
     bytes memory combinedHashes;
     for (uint256 i = 0; i < indices.length; i++) {
       uint256 chunkIndex = indices[i];
@@ -920,7 +919,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       combinedHashes = abi.encodePacked(combinedHashes, chunkHash);
     }
 
-    // Calculate combined hash
     metadata.fullStoryHash = keccak256(combinedHashes);
   }
 
