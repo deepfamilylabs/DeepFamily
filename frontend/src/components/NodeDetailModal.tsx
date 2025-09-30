@@ -300,7 +300,7 @@ export default function NodeDetailModal({
                       navigate(`/actions?tab=endorse&${params.toString()}`)
                     }}
                     className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 rounded-full whitespace-nowrap transition-colors cursor-pointer text-[12px]"
-                    title={t('nodeDetail.clickToEndorse', 'Click to endorse this version')}
+                    title={t('people.clickToEndorse', 'Click to endorse this version')}
                   >
                     <Star className="w-3 h-3 text-yellow-500" />
                     <span className="font-medium text-yellow-700 dark:text-yellow-300">

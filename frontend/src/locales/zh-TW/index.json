@@ -13,11 +13,10 @@
     "addPerson": "添加人物",
     "search": "搜尋",
     "blockchainActions": "添加人物",
-    "configSettings": "配置連接設定",
     "tagStrip": {
       "protocol": "去中心化",
       "incentive": "激勵循環",
-      "nft": "NFT", 
+      "nft": "NFT",
       "zk": "ZK"
     },
     "coreValue": {
@@ -53,29 +52,61 @@
       }
     },
     "valueSystem": {
-      "title": "雙層網路模型",
-      "subtitle": "第一層 關係層與第二層 價值層的協同設計，實現結構化資料與經濟價值的有機融合",
+      "title": "兩層價值體系",
+      "subtitle": "漸進式隱私模型：私有提交 → 社群背書 → 可選公開披露",
       "layer1": {
-        "title": "關係層",
-        "subtitle": "結構與時間序列",
-        "feature1": "人物雜湊管理",
-        "feature1Desc": "基於雜湊的人物標識，支援多版本並存與演化追蹤",
-        "feature2": "版本控制系統",
-        "feature2Desc": "不可篡改的版本歷史，每個版本記錄建立時間與作者",
-        "feature3": "父母-子代拓撲",
-        "feature3Desc": "構建完整的族譜網路拓撲結構與血緣關係鏈",
-        "description": "特性：結構化資料、時間序列、拓撲網路"
+        "title": "隱私保護",
+        "description": "口令加鹽系統防止身份推理和污染攻擊。零知識證明確保提交過程完全隱私。",
+        "feature1": "口令加鹽去連結性",
+        "feature2": "反污染保護機制",
+        "feature3": "雙樹模式：公開與私有"
       },
       "layer2": {
-        "title": "價值層",
-        "subtitle": "經濟激勵與資產化",
-        "feature1": "NFT 資產綁定",
-        "feature1Desc": "特定版本可鑄造為 NFT，承載價值與收益權",
-        "feature2": "背書費用流",
-        "feature2Desc": "背書費用分配給 NFT 持有人，形成持續收益",
-        "feature3": "挖礦獎勵機制",
-        "feature3Desc": "完善雙親引用的版本可獲得 DEEP 代幣獎勵",
-        "description": "特性：經濟激勵、價值發現、可驗證敘事資產化"
+        "title": "公開NFT資產",
+        "description": "社群背書的版本可鑄造為NFT，公開完整個人資訊。故事分片支援詳細的鏈上傳記。",
+        "feature1": "NFT鑄造公開完整資訊",
+        "feature2": "需要社群背書",
+        "feature3": "故事分片與價值確認"
+      },
+      "flow": {
+        "title": "隱私到價值流程",
+        "description": "從私有雜湊儲存到社群驗證的NFT資產",
+        "step1": "私有提交",
+        "step1Desc": "使用零知識證明添加族譜成員",
+        "step2": "公開披露",
+        "step2Desc": "鑄造NFT公開完整傳記資訊"
+      },
+      "dualModels": {
+        "title": "雙樹模式",
+        "description": "口令加鹽系統支援協作公開樹和抗污染私有樹兩種模式",
+        "public": {
+          "title": "公開協作樹",
+          "description": "共享口令使多個用戶能夠協作構建完整的族譜。",
+          "benefit": "社群協作",
+          "mode": "共享口令模式"
+        },
+        "private": {
+          "title": "私有保護樹",
+          "description": "獨有口令創建完全受保護的族譜，免受污染攻擊和關係破壞。",
+          "benefit": "反污染保護",
+          "mode": "獨有口令模式"
+        }
+      },
+      "advantages": {
+        "title": "工作流程",
+        "subtitle": "五步式價值發現與共識形成機制",
+        "step1": "添加人物版本",
+        "step1Desc": "若雙親均存在 → 獲得挖礦獎勵",
+        "step2": "其他用戶背書",
+        "step2Desc": "支付 DEEP 背書某一版本",
+        "step3": "鑄造版本 NFT",
+        "step3Desc": "背書者可鑄造對應版本的 NFT",
+        "step4": "撰寫故事分片",
+        "step4Desc": "NFT 持有人撰寫/追加人物故事分片",
+        "step5": "故事封存",
+        "step5Desc": "故事封存，形成不可更改的鏈上歷史影像",
+        "conclusion": "價值驅動的協作網路",
+        "conclusionDesc": "透過經濟激勵機制，實現高品質譜系資料的自然累積與價值發現"
       },
       "privacyLayer": {
         "title": "隱私保護層",
@@ -90,46 +121,6 @@
         "feature1": "背書共識機制",
         "feature2": "NFT 價值綁定",
         "feature3": "收益權分配"
-      },
-      "flow": {
-        "title": "隱私到價值流程",
-        "description": "從私有雜湊儲存到社群驗證的NFT資產",
-        "step1": "私有提交",
-        "step1Desc": "使用零知識證明添加家族成員",
-        "step2": "公開披露",
-        "step2Desc": "鑄造NFT公開完整傳記資訊"
-      },
-      "advantages": {
-        "title": "運作流程",
-        "subtitle": "五步式價值發現與共識形成機制",
-        "step1": "新增人物版本",
-        "step1Desc": "若雙親均存在 → 獲得挖礦獎勵",
-        "step2": "其他使用者背書",
-        "step2Desc": "支付 DEEP 背書某一版本",
-        "step3": "鑄造版本 NFT",
-        "step3Desc": "背書者可鑄造對應版本的 NFT",
-        "step4": "撰寫故事分片",
-        "step4Desc": "NFT 持有人撰寫/追加人物故事分片",
-        "step5": "故事封存",
-        "step5Desc": "故事封存，形成不可更改的鏈上歷史影像",
-        "conclusion": "價值驅動的協作網路",
-        "conclusionDesc": "透過經濟激勵機制，實現高品質譜系資料的自然累積與價值發現"
-      },
-      "dualModels": {
-        "title": "雙重家族樹模式",
-        "description": "口令加鹽系統支援協作公開樹和抗污染私有樹兩種模式",
-        "public": {
-          "title": "公開協作樹",
-          "description": "共享口令使多個用戶能夠協作構建完整的族譜。",
-          "benefit": "社群協作",
-          "mode": "共享口令模式"
-        },
-        "private": {
-          "title": "私有保護樹",
-          "description": "獨有口令創建完全受保護的族譜，免受污染攻擊和關係破壞。",
-          "benefit": "反污染保護",
-          "mode": "獨有口令模式"
-        }
       }
     },
     "features": {
@@ -198,7 +189,7 @@
         "benefit2": "享受長期背書費用分成"
       },
       "researchers": {
-        "title": "族譜研究者", 
+        "title": "族譜研究者",
         "description": "追蹤版本演化與分歧，探索家族歷史的多元敘述和真相",
         "benefit1": "存取完整的版本演化歷史",
         "benefit2": "發現家族關係網路的隱藏連接"
@@ -229,7 +220,7 @@
         "feature2": "10個減半階段",
         "feature3": "總供應量1000億"
       },
-  "votes": {
+      "votes": {
         "feature1": "NFT投票權重",
         "feature2": "背書挑戰提案",
         "feature3": "費用調整提案"
@@ -519,6 +510,10 @@
     "disconnect": "斷開連接",
     "wrongNetwork": "網路錯誤",
     "noMetaMask": "請安裝 MetaMask",
+    "noWallet": "請安裝錢包擴充程式",
+    "selectWallet": "選擇錢包",
+    "noWalletsFound": "找不到錢包",
+    "installWallet": "請安裝錢包擴充程式",
     "connected": "錢包連接成功",
     "rejected": "用戶拒絕連接",
     "pending": "連接請求待處理",
@@ -737,7 +732,7 @@
     "metadataCID": "元數據CID",
     "processing": "處理中...",
     "preparingData": "準備資料...",
-    "generatingProof": "生成零知識證明...（可能需要30-60秒）",
+    "generatingProof": "生成零知識證明...",
     "verifyingProof": "驗證證明...",
     "submittingToBlockchain": "提交到區塊鏈...",
     "addedSuccessfully": "人物新增成功！",
@@ -759,6 +754,7 @@
     "familyComplete": "完整家庭資料獎勵 - 父母均已存在",
     "miner": "礦工",
     "hashPrefix": "雜湊",
+    "prover": "證明者",
     "rewardAmount": "獎勵數量",
     "noTokenReward": "無代幣獎勵",
     "tokenRewardCondition": "只有父母均已存在時才發放代幣獎勵",
@@ -817,18 +813,23 @@
     "mintFailed": "鑄造 NFT 失敗",
     "mintedSuccessfully": "NFT 鑄造成功！",
     "tokenId": "Token ID",
+    "owner": "所有者",
+    "transactionHash": "交易雜湊",
+    "blockNumber": "區塊號",
+    "timestamp": "時間戳",
     "mintingDesc": "正在區塊鏈上創建您的獨特 NFT...",
-    "eventDetails": "事件詳情",
+    "processing": "處理中...",
+    "generatingProof": "生成零知識證明...",
+    "verifyingProof": "驗證零知識證明...",
+    "proofVerified": "零知識證明已驗證。正在提交交易...",
+    "proofGenerationNote": "ZK證明生成需要複雜的加密計算。請保持此標籤頁活躍直到完成。",
     "nftMintedEvent": "PersonNFTMinted 事件",
     "nftMintedEventDesc": "NFT 已成功鑄造並記錄在鏈上",
-    "owner": "所有者",
-    "timestamp": "時間戳",
-    "blockNumber": "區塊號",
-    "transactionHash": "交易雜湊",
+    "continueMinting": "繼續鑄造",
     "errorType": "錯誤類型",
     "errorMessage": "錯誤訊息",
     "errorDetails": "詳細資訊",
-    "continueMinting": "繼續鑄造",
+    "eventDetails": "事件詳情",
     "validation": {
       "birthPlaceTooLong": "出生地過長",
       "deathPlaceTooLong": "死亡地過長",
@@ -886,8 +887,8 @@
     "invalidTarget": "人物雜湊或版本序號無效",
     "invalidTargetDesc": "請確認雜湊與索引對應鏈上已存在的版本",
     "needApprove": "授權額度不足，請重新授權 DEEP",
-    "approvingDesc": "請在錢包中確認代幣授權",
-    "endorsingDesc": "正在區塊鏈上處理背書...",
+    "personHashRequired": "請提供有效的人物雜湊和版本索引",
+    "insufficientDeepTokens": "DEEP代幣餘額不足以進行背書",
     "endorsedSuccessfully": "版本背書成功！",
     "feePaid": "已支付費用",
     "transactionHash": "交易雜湊",
@@ -906,6 +907,8 @@
     "canContinueEndorsing": "您現在可以繼續背書其他版本或關閉此對話框。",
     "transactionFailed": "交易失敗。請檢查錯誤訊息後重試。",
     "transactionFailedDetails": "交易已提交但未能成功完成。",
+    "approvingDesc": "請在錢包中確認代幣授權",
+    "endorsingDesc": "正在區塊鏈上處理背書...",
     "errors": {
       "invalidTarget": "無效的人物雜湊或版本序號",
       "needApprove": "授權額度不足，請重新授權 DEEP 代幣",
@@ -920,12 +923,13 @@
     "approveUnlimitedHint": "推薦：每次背書都會消耗授權額度，無限制授權避免重複操作",
     "retryTransaction": "重試交易"
   },
+  "transaction": {
+    "pending": "交易等待確認中...",
+    "pendingDetails": "交易已提交或等待錢包確認。您可以繼續使用應用，我們會在確認後更新。",
+    "submitted": "交易已提交..."
+  },
   "contract": {
     "endorseSuccess": "背書提交成功",
     "endorseFailed": "背書版本失敗"
-  },
-  "transaction": {
-    "pending": "交易等待確認中...",
-    "pendingDetails": "交易已提交或等待錢包確認。您可以繼續使用應用，我們會在確認後更新。"
   }
 }
