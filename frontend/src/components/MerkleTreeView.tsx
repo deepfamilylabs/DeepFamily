@@ -6,7 +6,7 @@ import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import NodeCard from './NodeCard'
-import { useNodeData } from '../hooks/useNodeData'
+import { useTreeData } from '../context/TreeDataContext'
 import { shortHash } from '../types/graph'
 import { isMinted } from '../types/graph'
 import { birthDateString } from '../types/graph'
@@ -89,6 +89,7 @@ function computeLayout(root: GraphNode) {
 function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<MerkleTreeViewHandle>) {
   const { nodes: positioned, width: svgWidth, height: svgHeight } = useMemo(() => computeLayout(root), [root])
   const idToPos = useMemo(() => { const m = new Map<string, PositionedNode>(); for (const pn of positioned) m.set(pn.id, pn); return m }, [positioned])
+  const { nodesData } = useTreeData()
   const textRefs = useRef<Record<string, SVGTextElement | null>>({})
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
   useLayoutEffect(() => { const next: Record<string, number> = {}; for (const id of Object.keys(textRefs.current)) { const el = textRefs.current[id]; if (el?.getComputedTextLength) { const computed = Math.ceil(el.getComputedTextLength()) + 16; next[id] = Math.max(BASE_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, computed)) } } if (Object.keys(next).length) setMeasuredWidths(next) }, [positioned])
@@ -154,7 +155,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
           <g>
             {positioned.map(pn => {
               const w = measuredWidths[pn.id] || BASE_NODE_WIDTH
-              const nd = useNodeData(pn.id)
+              const nd = nodesData[pn.id]
               const mintedFlag = isMinted(nd)
               const shortHashText = shortHash(pn.data.personHash)
               const nameTextRaw = (mintedFlag && nd?.fullName) ? nd.fullName : shortHashText

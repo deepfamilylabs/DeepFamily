@@ -7,7 +7,7 @@ import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import NodeCard from './NodeCard'
-import { useNodeData } from '../hooks/useNodeData'
+import { useTreeData } from '../context/TreeDataContext'
 import { useFamilyTreeHeight } from '../constants/layout'
 
 export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
@@ -24,6 +24,7 @@ function FlexibleDAGViewInner({
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const ctxSelectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
+  const { nodesData } = useTreeData()
 
   type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
   type Edge = { from: string; to: string }
@@ -72,15 +73,6 @@ function FlexibleDAGViewInner({
     }
     if (Object.keys(next).length) setMeasuredWidths(next)
   }, [nodes, nodeWidth])
-
-  const truncateName = useCallback((name: string, width: number) => {
-    if (!name) return ''
-    const charW = 8
-    const maxChars = Math.max(0, Math.floor((width - 16) / charW))
-    if (name.length <= maxChars) return name
-    if (maxChars <= 1) return '…'
-    return name.slice(0, maxChars - 1) + '…'
-  }, [])
 
   const [hover, setHover] = useState<{ id: string; x: number; y: number; hash: string } | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -163,9 +155,8 @@ function FlexibleDAGViewInner({
           {nodes.map(n => {
             const p = positions[n.id]
             const w = measuredWidths[n.id] || nodeWidth
-            const nd = useNodeData(n.id)
+            const nd = nodesData[n.id]
             const mintedFlag = isMinted(nd)
-            const nameDisplay = nd?.fullName ? truncateName(nd.fullName, w) : undefined
             const endorse = nd?.endorsementCount
             const hashShort = shortHash(n.hash)
             const isSelected = ctxSelectedId === n.id
