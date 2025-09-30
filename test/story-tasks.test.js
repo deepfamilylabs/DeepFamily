@@ -44,8 +44,8 @@ describe('Story Tasks Integration', function () {
     const personHash = await deepFamily.getPersonHash(basicInfo);
 
     // Sanity: version count should be 1
-    const versionCount = await deepFamily.countPersonVersions(personHash);
-    expect(versionCount).to.equal(1n);
+    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 0);
+    expect(totalVersions).to.equal(1n);
 
     // 2. endorse version 1
     await hre.run('endorse', { person: personHash, vindex: '1' });

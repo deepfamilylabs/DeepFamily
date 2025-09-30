@@ -414,6 +414,64 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     _;
   }
 
+  /**
+   * @dev Validates tokenId exists
+   * @param tokenId NFT token ID
+   */
+  modifier validTokenId(uint256 tokenId) {
+    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
+    _;
+  }
+
+  // ========== Internal Utility Structures ==========
+
+  /**
+   * @dev Pagination calculation result structure
+   */
+  struct PaginationResult {
+    uint256 startIndex;
+    uint256 endIndex;
+    uint256 resultLength;
+    uint256 nextOffset;
+    bool hasMore;
+  }
+
+  /**
+   * @dev Calculate pagination parameters
+   * @param totalCount Total item count
+   * @param offset Starting position
+   * @param limit Page size limit
+   * @return result Pagination calculation result
+   */
+  function _getPaginationParams(
+    uint256 totalCount,
+    uint256 offset,
+    uint256 limit
+  ) internal pure returns (PaginationResult memory result) {
+    if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
+
+    if (limit == 0 || offset >= totalCount) {
+      return PaginationResult({
+        startIndex: offset,
+        endIndex: offset,
+        resultLength: 0,
+        nextOffset: offset >= totalCount ? totalCount : offset,
+        hasMore: false
+      });
+    }
+
+    uint256 endIndex = offset + limit;
+    if (endIndex > totalCount) endIndex = totalCount;
+
+    return PaginationResult({
+      startIndex: offset,
+      endIndex: endIndex,
+      resultLength: endIndex - offset,
+      nextOffset: endIndex,
+      hasMore: endIndex < totalCount
+    });
+  }
+
   // ========== Constructor ==========
 
   /**
@@ -925,16 +983,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Query Functions ==========
 
   /**
-   * @notice Get total version count of specified person (lightweight query)
-   * @dev Very low gas consumption, used to quickly understand how many versions a person has
-   * @param personHash Person hash
-   * @return versionCount Total version count
-   */
-  function countPersonVersions(bytes32 personHash) external view returns (uint256 versionCount) {
-    versionCount = personVersions[personHash].length;
-  }
-
-  /**
    * @notice Get complete information of specified version
    * @dev Directly query endorsement count and TokenID of single version, version index starts from 1
    * @param personHash Person hash
@@ -988,34 +1036,25 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
-    if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
-
     ChildRef[] storage allChildren = childrenOf[parentHash][parentVersionIndex];
     totalCount = allChildren.length;
 
-    if (limit == 0) {
-      return (new bytes32[](0), new uint256[](0), totalCount, false, offset);
+    PaginationResult memory page = _getPaginationParams(totalCount, offset, limit);
+
+    if (page.resultLength == 0) {
+      return (new bytes32[](0), new uint256[](0), totalCount, page.hasMore, page.nextOffset);
     }
 
-    if (offset >= totalCount) {
-      return (new bytes32[](0), new uint256[](0), totalCount, false, totalCount);
-    }
+    childHashes = new bytes32[](page.resultLength);
+    childVersionIndices = new uint256[](page.resultLength);
 
-    uint256 endIndex = offset + limit;
-    if (endIndex > totalCount) endIndex = totalCount;
-    uint256 resultLength = endIndex - offset;
-    childHashes = new bytes32[](resultLength);
-    childVersionIndices = new uint256[](resultLength);
-
-    for (uint256 i = 0; i < resultLength; i++) {
-      ChildRef storage c = allChildren[offset + i];
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      ChildRef storage c = allChildren[page.startIndex + i];
       childHashes[i] = c.childHash;
       childVersionIndices[i] = c.childVersionIndex;
     }
 
-    nextOffset = endIndex;
-    hasMore = endIndex < totalCount;
-    return (childHashes, childVersionIndices, totalCount, hasMore, nextOffset);
+    return (childHashes, childVersionIndices, totalCount, page.hasMore, page.nextOffset);
   }
 
   /**
@@ -1081,35 +1120,22 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
-    if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
-
     PersonVersion[] storage allVersions = personVersions[personHash];
     totalVersions = allVersions.length;
 
-    if (limit == 0) {
-      return (new PersonVersion[](0), totalVersions, false, offset);
+    PaginationResult memory page = _getPaginationParams(totalVersions, offset, limit);
+
+    if (page.resultLength == 0) {
+      return (new PersonVersion[](0), totalVersions, page.hasMore, page.nextOffset);
     }
 
-    if (offset >= totalVersions) {
-      return (new PersonVersion[](0), totalVersions, false, totalVersions);
+    versions = new PersonVersion[](page.resultLength);
+
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      versions[i] = allVersions[page.startIndex + i];
     }
 
-    uint256 endIndex = offset + limit;
-    if (endIndex > totalVersions) {
-      endIndex = totalVersions;
-    }
-
-    uint256 resultLength = endIndex - offset;
-    versions = new PersonVersion[](resultLength);
-
-    for (uint256 i = 0; i < resultLength; i++) {
-      versions[i] = allVersions[offset + i];
-    }
-
-    nextOffset = endIndex;
-    hasMore = endIndex < totalVersions;
-
-    return (versions, totalVersions, hasMore, nextOffset);
+    return (versions, totalVersions, page.hasMore, page.nextOffset);
   }
 
   /**
@@ -1141,48 +1167,26 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
-    if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
+    totalVersions = personVersions[personHash].length;
 
-    PersonVersion[] storage versions = personVersions[personHash];
-    totalVersions = versions.length;
+    PaginationResult memory page = _getPaginationParams(totalVersions, offset, limit);
 
-    if (limit == 0) {
-      return (new uint256[](0), new uint256[](0), new uint256[](0), totalVersions, false, offset);
+    if (page.resultLength == 0) {
+      return (new uint256[](0), new uint256[](0), new uint256[](0), totalVersions, page.hasMore, page.nextOffset);
     }
 
-    if (offset >= totalVersions) {
-      return (
-        new uint256[](0),
-        new uint256[](0),
-        new uint256[](0),
-        totalVersions,
-        false,
-        totalVersions
-      );
-    }
+    versionIndices = new uint256[](page.resultLength);
+    endorsementCounts = new uint256[](page.resultLength);
+    tokenIds = new uint256[](page.resultLength);
 
-    uint256 endIndex = offset + limit;
-    if (endIndex > totalVersions) {
-      endIndex = totalVersions;
-    }
-
-    uint256 resultLength = endIndex - offset;
-    versionIndices = new uint256[](resultLength);
-    endorsementCounts = new uint256[](resultLength);
-    tokenIds = new uint256[](resultLength);
-
-    for (uint256 i = 0; i < resultLength; i++) {
-      uint256 versionIndex = offset + i;
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      uint256 versionIndex = page.startIndex + i;
       versionIndices[i] = versionIndex + 1;
       endorsementCounts[i] = versionEndorsementCount[personHash][versionIndex];
       tokenIds[i] = versionToTokenId[personHash][versionIndex];
     }
 
-    // Calculate next query starting position and whether there is more data
-    nextOffset = endIndex;
-    hasMore = endIndex < totalVersions;
-
-    return (versionIndices, endorsementCounts, tokenIds, totalVersions, hasMore, nextOffset);
+    return (versionIndices, endorsementCounts, tokenIds, totalVersions, page.hasMore, page.nextOffset);
   }
 
   /**
@@ -1203,24 +1207,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string[] storage all = tokenURIHistory[tokenId];
     totalCount = all.length;
 
-    if (limit == 0) {
-      return (new string[](0), totalCount, false, offset);
+    PaginationResult memory page = _getPaginationParams(totalCount, offset, limit);
+
+    if (page.resultLength == 0) {
+      return (new string[](0), totalCount, page.hasMore, page.nextOffset);
     }
 
-    if (offset >= totalCount) {
-      return (new string[](0), totalCount, false, totalCount);
+    uris = new string[](page.resultLength);
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      uris[i] = all[page.startIndex + i];
     }
-
-    uint256 end = offset + limit;
-    if (end > totalCount) end = totalCount;
-    uint256 resultLength = end - offset;
-    uris = new string[](resultLength);
-    for (uint256 i = 0; i < resultLength; i++) {
-      uris[i] = all[offset + i];
-    }
-    nextOffset = end;
-    hasMore = end < totalCount;
-    return (uris, totalCount, hasMore, nextOffset);
+    return (uris, totalCount, page.hasMore, page.nextOffset);
   }
 
   /**
@@ -1266,8 +1263,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param tokenId NFT TokenID
    * @return metadata Story metadata
    */
-  function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata memory metadata) {
-    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
+  function getStoryMetadata(uint256 tokenId) external view validTokenId(tokenId) returns (StoryMetadata memory metadata) {
     metadata = storyMetadata[tokenId];
   }
 
@@ -1280,8 +1276,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   function getStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex
-  ) external view returns (StoryChunk memory chunk) {
-    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
+  ) external view validTokenId(tokenId) returns (StoryChunk memory chunk) {
     StoryMetadata storage metadata = storyMetadata[tokenId];
     if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
     chunk = storyChunks[tokenId][chunkIndex];
@@ -1304,36 +1299,25 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   )
     external
     view
+    validTokenId(tokenId)
     returns (StoryChunk[] memory chunks, uint256 totalChunks, bool hasMore, uint256 nextOffset)
   {
-    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
-    if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
-
     StoryMetadata storage metadata = storyMetadata[tokenId];
     totalChunks = metadata.totalChunks;
 
-    if (limit == 0) {
-      return (new StoryChunk[](0), totalChunks, false, offset);
+    PaginationResult memory page = _getPaginationParams(totalChunks, offset, limit);
+
+    if (page.resultLength == 0) {
+      return (new StoryChunk[](0), totalChunks, page.hasMore, page.nextOffset);
     }
 
-    if (offset >= totalChunks) {
-      return (new StoryChunk[](0), totalChunks, false, totalChunks);
+    chunks = new StoryChunk[](page.resultLength);
+
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      chunks[i] = storyChunks[tokenId][page.startIndex + i];
     }
 
-    uint256 endIndex = offset + limit;
-    if (endIndex > totalChunks) endIndex = totalChunks;
-
-    uint256 resultLength = endIndex - offset;
-    chunks = new StoryChunk[](resultLength);
-
-    for (uint256 i = 0; i < resultLength; i++) {
-      chunks[i] = storyChunks[tokenId][offset + i];
-    }
-
-    nextOffset = endIndex;
-    hasMore = endIndex < totalChunks;
-
-    return (chunks, totalChunks, hasMore, nextOffset);
+    return (chunks, totalChunks, page.hasMore, page.nextOffset);
   }
 
   // ===== ETH Reception Path Protection: Reject Direct Transfers =====

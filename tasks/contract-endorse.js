@@ -32,7 +32,7 @@ task("endorse", "Endorse a person version (uses DeepFamilyToken recentReward as 
     }
 
     // Existence / bounds check (prevents confusing InvalidVersionIndex revert on fresh network)
-    const totalVersions = Number(await deepFamily.countPersonVersions(args.person));
+    const [, totalVersions] = await deepFamily.listPersonVersions(args.person, 0, 0);
     if (versionIndex > totalVersions) {
       throw new Error(
         `Version index ${versionIndex} out of range (total=${totalVersions}). Did you add the person on this network / use --network localhost?`,

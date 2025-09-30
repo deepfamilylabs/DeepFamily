@@ -62,7 +62,7 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
     if (deathDay < 0 || deathDay > 31) throw new Error("deathDay must be 0-31");
 
     // Check version existence
-    const totalVersions = Number(await deepFamily.countPersonVersions(args.person));
+    const [, totalVersions] = await deepFamily.listPersonVersions(args.person, 0, 0);
     if (versionIndex > totalVersions) {
       throw new Error(`Version index ${versionIndex} out of range (total=${totalVersions}).`);
     }

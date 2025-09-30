@@ -186,7 +186,6 @@ function sealStory(uint256 tokenId) external
 
 #### Version Queries
 ```solidity
-function countPersonVersions(bytes32 personHash) external view returns (uint256)
 function getVersionDetails(bytes32 personHash, uint256 versionIndex) external view returns (PersonVersion memory, uint256, uint256)
 function listPersonVersions(bytes32 personHash, uint256 offset, uint256 limit) external view returns (PersonVersion[] memory, uint256, bool, uint256)
 ```
