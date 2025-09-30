@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Zap, Lock, Network, TrendingUp, Award, Book, Shield } from 'lucide-react'
+import { Zap, Shield, GitBranch, Coins, Trophy, FileText, TreePine } from 'lucide-react'
 import { ANIMATION_CLASSES } from '../../constants/animationStyles'
 import PageContainer from '../PageContainer'
 
@@ -35,7 +35,7 @@ const CoreFeatures = memo(() => {
               <div className="relative mb-8">
                 <div className="absolute -inset-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative w-20 h-20 bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 dark:from-blue-400 dark:via-blue-500 dark:to-cyan-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <Lock className="w-10 h-10 text-white" />
+                  <Shield className="w-10 h-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.zkVersion.title')}</h3>
@@ -53,7 +53,7 @@ const CoreFeatures = memo(() => {
               <div className="relative mb-8">
                 <div className="absolute -inset-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative w-20 h-20 bg-gradient-to-br from-purple-500 via-purple-600 to-pink-600 dark:from-purple-400 dark:via-purple-500 dark:to-pink-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <Network className="w-10 h-10 text-white" />
+                  <GitBranch className="w-10 h-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.versionManagement.title')}</h3>
@@ -71,7 +71,7 @@ const CoreFeatures = memo(() => {
               <div className="relative mb-8">
                 <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative w-20 h-20 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 dark:from-emerald-400 dark:via-emerald-500 dark:to-teal-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <TrendingUp className="w-10 h-10 text-white" />
+                  <Coins className="w-10 h-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.endorsementEconomy.title')}</h3>
@@ -89,7 +89,7 @@ const CoreFeatures = memo(() => {
               <div className="relative mb-8">
                 <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative w-20 h-20 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 dark:from-indigo-400 dark:via-indigo-500 dark:to-violet-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <Award className="w-10 h-10 text-white" />
+                  <Trophy className="w-10 h-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.personNFT.title')}</h3>
@@ -107,7 +107,7 @@ const CoreFeatures = memo(() => {
               <div className="relative mb-8">
                 <div className="absolute -inset-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative w-20 h-20 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 dark:from-orange-400 dark:via-orange-500 dark:to-amber-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <Book className="w-10 h-10 text-white" />
+                  <FileText className="w-10 h-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.storySharding.title')}</h3>
@@ -125,7 +125,7 @@ const CoreFeatures = memo(() => {
               <div className="relative mb-8">
                 <div className="absolute -inset-2 bg-gradient-to-r from-rose-500 to-red-500 rounded-2xl blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative w-20 h-20 bg-gradient-to-br from-rose-500 via-rose-600 to-red-600 dark:from-rose-400 dark:via-rose-500 dark:to-red-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  <Shield className="w-10 h-10 text-white" />
+                  <TreePine className="w-10 h-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.versionNotarization.title')}</h3>

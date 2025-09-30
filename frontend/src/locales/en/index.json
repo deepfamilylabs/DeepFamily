@@ -112,30 +112,30 @@
     },
     "features": {
       "title": "Core Features",
-      "subtitle": "Complete feature modules supporting dual-layer network operation",
+      "subtitle": "Advanced blockchain infrastructure enabling privacy-first family tree construction with community validation",
       "zkVersion": {
-        "title": "ZK Version Addition",
-        "description": "Submit hash-bound versions with zero-knowledge proofs, verifying structural correctness while hiding sensitive fields"
+        "title": "Zero-Knowledge Privacy Protection",
+        "description": "Build family trees privately using Groth16 proofs - verify relationships exist without revealing personal information. Salted passphrases prevent identity inference and pollution attacks."
       },
       "versionManagement": {
-        "title": "Version Management", 
-        "description": "Multi-version coexistence, indexable by parents/children, immutable with only additive alternative narratives"
+        "title": "Multi-Version Data Management",
+        "description": "Support multiple versions of each person with complete traceability. Immutable history with endorsement-based priority filtering ensures data integrity and community consensus."
       },
       "endorsementEconomy": {
-        "title": "Endorsement Economy",
-        "description": "Fees dynamically float with current issuance rewards, endorsements filter priorities, reducing noise to form consensus"
+        "title": "Smart Economic Incentives",
+        "description": "DEEP token endorsement system with progressive halving rewards. Pay mining rewards to endorse quality data, creating sustainable economic cycles that reward complete family connections."
       },
       "personNFT": {
-        "title": "Person NFTs",
-        "description": "Bound to specific versions, carrying value and future revenue rights, incentivizing high-quality data contributions"
+        "title": "Value-Creating NFT Assets",
+        "description": "Transform endorsed person versions into valuable NFTs with ongoing revenue streams. NFT holders receive future endorsement fees, creating long-term value for quality contributions."
       },
       "storySharding": {
-        "title": "Story Sharding",
-        "description": "Shard writing → hash synthesis → sealed as historical snapshots, forming verifiable on-chain archives"
+        "title": "Biographical Story Preservation",
+        "description": "Store detailed life stories in 100×1KB on-chain chunks with hash verification. Immutable sealing creates permanent historical archives with complete biographical content."
       },
       "versionNotarization": {
-        "title": "Version Notarization",
-        "description": "Immutable version history, only additive alternative narratives, with endorsement-filtered priorities"
+        "title": "Dual Tree Architecture",
+        "description": "Enable both public collaborative trees (shared passphrases) and private protected trees (unique passphrases) for flexible genealogy construction with anti-pollution guarantees."
       }
     },
     "tokenomics": {
