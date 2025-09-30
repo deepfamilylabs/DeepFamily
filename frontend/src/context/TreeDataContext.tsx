@@ -60,7 +60,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<TreeProgress | undefined>(undefined)
   const [contractMessage, setContractMessage] = useState('')
-  const [refreshTick, setRefreshTick] = useState(0)
+  const [refreshTick, setRefreshTick] = useState(1)
   const refresh = useCallback(() => setRefreshTick(t => t + 1), [])
   // Remove auto-refresh from context; pages should call refresh() explicitly when needed
   const { errors, push } = useErrorMonitor()
@@ -489,7 +489,9 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           const calls = targets.map(p => ({ target: contractAddress, callData: iface.encodeFunctionData('getVersionDetails', [p.h, p.v]) }))
           let returned: any[] = []
           if (multicall && useMulticall) {
-            try { returned = await multicall.tryAggregate(false, calls) } catch (e) {
+            try {
+              returned = await multicall.tryAggregate(false, calls)
+            } catch (e) {
               if (!stageLoggedRef.current.has('multicall_tryAggregate_counts')) { stageLoggedRef.current.add('multicall_tryAggregate_counts'); push(e as any, { stage: 'multicall_tryAggregate_counts' }) }
               returned = await Promise.all(calls.map(c => contract.getVersionDetails(...iface.decodeFunctionData('getVersionDetails', c.callData))))
               returned = returned.map(r => [true, iface.encodeFunctionResult('getVersionDetails', r)])
@@ -514,7 +516,6 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                 const tokenId = tokenIdVal !== undefined && tokenIdVal !== null ? tokenIdVal.toString() : '0'
                 const id = makeNodeId(original.h, original.v)
                 setNodesData(prev => {
-                  if (!prev[id]) return prev
                   const vs = versionStruct || {}
                   const fatherHash = vs.fatherHash || vs[1]
                   const motherHash = vs.motherHash || vs[2]
@@ -523,12 +524,12 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                   const addedBy = vs.addedBy || vs[6]
                   const timestampRaw = vs.timestamp !== undefined ? vs.timestamp : vs[7]
                   const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
-                  const tag = vs.tag || vs[8] || prev[id].tag
+                  const tag = vs.tag || vs[8] || prev[id]?.tag
                   const metadataCID = vs.metadataCID || vs[9]
                   return {
                     ...prev,
                     [id]: {
-                      ...prev[id],
+                      ...(prev[id] || { personHash: original.h, versionIndex: original.v, id }),
                       endorsementCount,
                       tokenId,
                       fatherHash,
@@ -643,7 +644,9 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
               if (!stageLoggedRef.current.has('nft_details_batch')) { stageLoggedRef.current.add('nft_details_batch'); push(e as any, { stage: 'nft_details_batch' }) }
             }
           }
-        } catch (e) { if (!stageLoggedRef.current.has('counts_batch')) { stageLoggedRef.current.add('counts_batch'); push(e as any, { stage: 'counts_batch' }) } }
+        } catch (e) {
+          if (!stageLoggedRef.current.has('counts_batch')) { stageLoggedRef.current.add('counts_batch'); push(e as any, { stage: 'counts_batch' }) }
+        }
       }
     })()
     return () => { cancelled = true }
