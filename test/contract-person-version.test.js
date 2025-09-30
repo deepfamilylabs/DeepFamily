@@ -33,8 +33,8 @@ describe('Person Version (add-person) Tests', function () {
       gender: 1,
     });
     const personHash = await deepFamily.getPersonHash(basicInfo);
-    const count = await deepFamily.countPersonVersions(personHash);
-    expect(count).to.equal(1n);
+    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 0);
+    expect(totalVersions).to.equal(1n);
   });
 
   it('reverts on empty full name', async () => {

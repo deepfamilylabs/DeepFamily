@@ -584,7 +584,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     // Check if this mother already exists in blockchain
     const motherHash = await getPersonHashFromBasicInfo(deepFamily, motherBasic);
     try {
-      const existingVersions = await deepFamily.countPersonVersions(motherHash);
+      const [, existingVersions] = await deepFamily.listPersonVersions(motherHash, 0, 0);
       if (existingVersions > 0) {
         dlog(`Mother already exists on-chain with ${existingVersions} versions, reusing`);
         const motherObj = { hash: motherHash, ver: 1, info: motherBasic };
@@ -624,7 +624,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
 
     // Proactively validate parent version indices on-chain to avoid opaque reverts
     try {
-      const fatherCount = await deepFamily.countPersonVersions(fatherNode.hash);
+      const [, fatherCount] = await deepFamily.listPersonVersions(fatherNode.hash, 0, 0);
       if (Number(fatherNode.ver) === 0 || Number(fatherNode.ver) > Number(fatherCount)) {
         console.warn(
           `Invalid father reference for ${name}: ver=${fatherNode.ver} > on-chain count=${fatherCount}`,
@@ -637,7 +637,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     }
 
     try {
-      const existingVersions = await deepFamily.countPersonVersions(childHash);
+      const [, existingVersions] = await deepFamily.listPersonVersions(childHash, 0, 0);
       if (existingVersions > 0) {
         dlog(`Child ${name} already exists with ${existingVersions} versions, reusing`);
         return { hash: childHash, ver: 1, info, generation, name: info.fullName };
@@ -667,7 +667,7 @@ async function seedLargeDemo({ deepFamily, rootHash, rootVer, basic, ethers }) {
     // If a mother is referenced, validate her version too
     if (mother) {
       try {
-        const motherCount = await deepFamily.countPersonVersions(motherHash);
+        const [, motherCount] = await deepFamily.listPersonVersions(motherHash, 0, 0);
         if (Number(motherVer) === 0 || Number(motherVer) > Number(motherCount)) {
           console.warn(
             `Invalid mother reference for ${name}: ver=${motherVer} > on-chain count=${motherCount}`,
@@ -883,7 +883,7 @@ async function addPersonVersion({
 
   // Check if this version already exists
   try {
-    const versionCount = await deepFamily.countPersonVersions(personHash);
+    const [, versionCount] = await deepFamily.listPersonVersions(personHash, 0, 0);
     dlog(`Person ${info.fullName} has ${versionCount} existing versions`);
 
     // Check if any existing version has the same tag or basic info
@@ -921,7 +921,7 @@ async function addPersonVersion({
     console.warn(`Failed to add person ${info.fullName}:`, error.message?.slice(0, 100));
     // If it looks like a sticky duplicate (possible from prior partial tx), try once with a unique CID
     try {
-      const existingCount = await deepFamily.countPersonVersions(personHash);
+      const [, existingCount] = await deepFamily.listPersonVersions(personHash, 0, 0);
       if (Number(existingCount) === 0) {
         const uniqueCid = `${cid}_${Date.now()}`;
         console.warn(
