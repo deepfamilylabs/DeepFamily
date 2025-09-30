@@ -10,13 +10,12 @@
     "title": "Decentralized Digital Family Tree",
     "subtitle": "Zero-knowledge privacy protection · Salted passphrase unlinkability · Dual tree models · Community endorsement · NFT value creation",
     "exploreFamilyTree": "Explore Family Tree",
-    "addPerson": "Add Person", 
+    "addPerson": "Add Person",
     "search": "Search",
-    "searchGenealogy": "Search Family",
     "blockchainActions": "Add Person",
     "tagStrip": {
       "protocol": "Decentralized",
-      "incentive": "Incentives", 
+      "incentive": "Incentives",
       "nft": "NFT",
       "zk": "ZK"
     },
@@ -108,6 +107,20 @@
         "step5Desc": "Seal stories to form immutable on-chain historical records",
         "conclusion": "Value-Driven Collaborative Network",
         "conclusionDesc": "Through economic incentive mechanisms, achieving natural accumulation and value discovery of high-quality genealogy data"
+      },
+      "privacyLayer": {
+        "title": "Privacy Protection Layer",
+        "description": "Privacy protection mechanism based on zero-knowledge proofs, ensuring security of sensitive information",
+        "feature1": "Zero-knowledge proof verification",
+        "feature2": "Sensitive field hiding",
+        "feature3": "Structural correctness verification"
+      },
+      "valueLayer": {
+        "title": "Value Confirmation Layer",
+        "description": "Achieving data value confirmation and distribution through economic incentives and consensus mechanisms",
+        "feature1": "Endorsement consensus mechanism",
+        "feature2": "NFT value binding",
+        "feature3": "Revenue rights distribution"
       }
     },
     "features": {
@@ -176,7 +189,7 @@
         "benefit2": "Receive long-term endorsement fee distributions"
       },
       "researchers": {
-        "title": "Family Researchers", 
+        "title": "Family Researchers",
         "description": "Track version evolution and divergences, explore multi-dimensional narratives and truths of family history",
         "benefit1": "Access complete version evolution history",
         "benefit2": "Discover hidden connections in family relationship networks"
@@ -281,7 +294,7 @@
       "tokenId": "Token ID",
       "placeholder": "Enter NFT Token ID",
       "chunkIndex": "Chunk Index",
-      "chunkHash": "Chunk Hash", 
+      "chunkHash": "Chunk Hash",
       "content": "Content",
       "timestamp": "Timestamp",
       "lastEditor": "Last Editor",
@@ -478,7 +491,8 @@
     "validation": {
       "rpc": "Please enter a valid RPC URL",
       "contract": "Please enter a valid contract address (0x + 40 hex chars)",
-      "root": "Please enter a valid root hash (0x + 64 hex chars)"
+      "root": "Please enter a valid root hash (0x + 64 hex chars)",
+      "version": "Please enter a valid version index"
     }
   },
   "common": {
@@ -616,7 +630,8 @@
     "viewFamilyTree": "FamilyTree View",
     "invalidTokenId": "Invalid Token ID",
     "nonexistentToken": "Token does not exist",
-    "fetchFailed": "Failed to load token"
+    "fetchFailed": "Failed to load token",
+    "tokenId": "Token ID"
   },
   "people": {
     "syncing": "Syncing...",
@@ -701,15 +716,7 @@
     "mintNFTHint": "First search for a person and version to mint as NFT",
     "openMintNFT": "Open NFT Minting",
     "endorseHint": "Search for person versions to endorse",
-    "openEndorse": "Open Endorsement",
-    "zkTest": "ZK Proof Test",
-    "zkTestDesc": "Test zero-knowledge proof generation with parent existence flags",
-    "zkTestHint": "Test the improved ZK proof generation with parent existence flags",
-    "testFeatures": "Test Features",
-    "testParentExists": "Generate proof with existing parents",
-    "testNoParents": "Generate proof with no parents (outputs bytes32(0))",
-    "testVerification": "Verify proof validity in browser",
-    "testCompatibility": "Test smart contract compatibility"
+    "openEndorse": "Open Endorsement"
   },
   "addVersion": {
     "addNewVersion": "Add New Version",
@@ -747,6 +754,7 @@
     "familyComplete": "Complete family data bonus - both parents exist in the system",
     "miner": "Miner",
     "hashPrefix": "Hash",
+    "prover": "Prover",
     "rewardAmount": "Reward Amount",
     "noTokenReward": "No Token Reward",
     "tokenRewardCondition": "Token rewards are only distributed when both parents already exist in the system",
@@ -765,8 +773,83 @@
     "partial": "Partial",
     "complete": "Complete",
     "proofGenerationNote": "ZK proof generation requires complex cryptographic calculations. Please wait..."
-  }
-  ,
+  },
+  "mintNFT": {
+    "title": "Mint NFT",
+    "description": "Create a unique NFT for this person",
+    "personInfo": "Person Information",
+    "personHash": "Person Hash",
+    "versionIndex": "Version Index",
+    "checkingStatus": "Checking status...",
+    "endorsed": "Endorsed",
+    "notEndorsed": "Not Endorsed",
+    "alreadyMinted": "Already Minted",
+    "canMint": "Can Mint",
+    "targetVersion": "Target Version",
+    "specifyVersion": "Specify Version to Mint",
+    "specifyVersionDesc": "Enter the person hash and version index of the version you want to mint as NFT.",
+    "basicInfo": "Basic Information",
+    "supplementalInfo": "Supplemental Information",
+    "birthPlace": "Birth Place",
+    "birthPlacePlaceholder": "Enter birth place",
+    "deathPlace": "Death Place",
+    "deathPlacePlaceholder": "Enter death place (if applicable)",
+    "deathDate": "Death Date (if applicable)",
+    "deathYear": "Death Year",
+    "story": "Life Story Summary",
+    "storyPlaceholder": "Enter a brief life story summary...",
+    "metadata": "NFT Metadata",
+    "tokenURI": "Token URI",
+    "tokenURIHint": "Optional: URL or IPFS hash for NFT metadata",
+    "nftAlreadyMinted": "NFT Already Minted",
+    "nftAlreadyMintedDesc": "This version has already been minted as an NFT. Each version can only be minted once.",
+    "mint": "Mint NFT",
+    "minting": "Minting...",
+    "goEndorse": "Go Endorse",
+    "endorsementRequiredTitle": "Endorsement Required",
+    "endorsementRequiredDesc": "You must endorse this version before minting. Would you like to go endorse now?",
+    "personInfoRequired": "Please fill in person information",
+    "personHashRequired": "Unable to compute person hash",
+    "mintFailed": "Failed to mint NFT",
+    "mintedSuccessfully": "NFT minted successfully!",
+    "tokenId": "Token ID",
+    "owner": "Owner",
+    "transactionHash": "Transaction Hash",
+    "blockNumber": "Block Number",
+    "timestamp": "Timestamp",
+    "mintingDesc": "Creating your unique NFT on the blockchain...",
+    "processing": "Processing...",
+    "generatingProof": "Generating zero-knowledge proof...",
+    "verifyingProof": "Verifying zero-knowledge proof...",
+    "proofVerified": "Zero-knowledge proof verified. Submitting transaction...",
+    "proofGenerationNote": "ZK proof generation requires heavy cryptography. Please keep this tab active until completion.",
+    "nftMintedEvent": "PersonNFTMinted Event",
+    "nftMintedEventDesc": "NFT was successfully minted and recorded on-chain",
+    "continueMinting": "Continue Minting",
+    "errorType": "Error Type",
+    "errorMessage": "Message",
+    "errorDetails": "Details",
+    "eventDetails": "Event Details",
+    "validation": {
+      "birthPlaceTooLong": "Birth place is too long",
+      "deathPlaceTooLong": "Death place is too long",
+      "storyTooLong": "Story content is too long",
+      "tokenURITooLong": "Token URI is too long",
+      "invalidTokenURI": "Invalid URL or IPFS URI",
+      "yearExceedsCurrent": "AD year cannot exceed current year"
+    },
+    "errors": {
+      "versionAlreadyMinted": "This version has already been minted as NFT",
+      "mustEndorseFirst": "You must endorse this version before minting",
+      "basicInfoMismatch": "Person information does not match the version data",
+      "invalidTokenURI": "Invalid token URI format",
+      "invalidStory": "Story content is too long",
+      "invalidBirthPlace": "Birth place is too long",
+      "invalidDeathPlace": "Death place is too long",
+      "insufficientFunds": "Insufficient funds for transaction",
+      "userRejected": "Transaction was rejected by user"
+    }
+  },
   "endorse": {
     "title": "Endorse Version",
     "description": "Support quality data by endorsing versions",
@@ -842,74 +925,8 @@
   },
   "transaction": {
     "pending": "Transaction pending confirmation...",
-    "pendingDetails": "The transaction is submitted or awaiting wallet confirmation. You can keep using the app; we will update once it confirms."
-  },
-  "mintNFT": {
-    "title": "Mint NFT",
-    "description": "Create a unique NFT for this person",
-    "personInfo": "Person Information",
-    "personHash": "Person Hash",
-    "versionIndex": "Version Index",
-    "checkingStatus": "Checking status...",
-    "endorsed": "Endorsed",
-    "notEndorsed": "Not Endorsed",
-    "alreadyMinted": "Already Minted",
-    "canMint": "Can Mint",
-    "targetVersion": "Target Version",
-    "specifyVersion": "Specify Version to Mint",
-    "specifyVersionDesc": "Enter the person hash and version index of the version you want to mint as NFT.",
-    "basicInfo": "Basic Information",
-    "supplementalInfo": "Supplemental Information",
-    "birthPlace": "Birth Place",
-    "birthPlacePlaceholder": "Enter birth place",
-    "deathPlace": "Death Place",
-    "deathPlacePlaceholder": "Enter death place (if applicable)",
-    "deathDate": "Death Date (if applicable)",
-    "deathYear": "Death Year",
-    "story": "Life Story Summary",
-    "storyPlaceholder": "Enter a brief life story summary...",
-    "metadata": "NFT Metadata",
-    "tokenURI": "Token URI",
-    "tokenURIHint": "Optional: URL or IPFS hash for NFT metadata",
-    "nftAlreadyMinted": "NFT Already Minted",
-    "nftAlreadyMintedDesc": "This version has already been minted as an NFT. Each version can only be minted once.",
-    "mint": "Mint NFT",
-    "minting": "Minting...",
-    "goEndorse": "Go Endorse",
-    "endorsementRequiredTitle": "Endorsement Required",
-    "endorsementRequiredDesc": "You must endorse this version before minting. Would you like to go endorse now?",
-    "personInfoRequired": "Please fill in person information",
-    "personHashRequired": "Unable to compute person hash",
-    "mintFailed": "Failed to mint NFT",
-    "mintedSuccessfully": "NFT minted successfully!",
-    "tokenId": "Token ID",
-    "owner": "Owner",
-    "mintingDesc": "Creating your unique NFT on the blockchain...",
-    "nftMintedEvent": "PersonNFTMinted Event",
-    "nftMintedEventDesc": "NFT was successfully minted and recorded on-chain",
-    "continueMinting": "Continue Minting",
-    "errorType": "Error Type",
-    "errorMessage": "Message",
-    "errorDetails": "Details",
-    "validation": {
-      "birthPlaceTooLong": "Birth place is too long",
-      "deathPlaceTooLong": "Death place is too long",
-      "storyTooLong": "Story content is too long",
-      "tokenURITooLong": "Token URI is too long",
-      "invalidTokenURI": "Invalid URL or IPFS URI",
-      "yearExceedsCurrent": "AD year cannot exceed current year"
-    },
-    "errors": {
-      "versionAlreadyMinted": "This version has already been minted as NFT",
-      "mustEndorseFirst": "You must endorse this version before minting",
-      "basicInfoMismatch": "Person information does not match the version data",
-      "invalidTokenURI": "Invalid token URI format",
-      "invalidStory": "Story content is too long",
-      "invalidBirthPlace": "Birth place is too long",
-      "invalidDeathPlace": "Death place is too long",
-      "insufficientFunds": "Insufficient funds for transaction",
-      "userRejected": "Transaction was rejected by user"
-    }
+    "pendingDetails": "Transaction has been submitted or waiting for wallet confirmation. You can continue using the app, we'll update after confirmation.",
+    "submitted": "Transaction submitted..."
   },
   "contract": {
     "endorseSuccess": "endorse success",

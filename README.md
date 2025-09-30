@@ -1,4 +1,4 @@
-# DeepFamily - Decentralized Global Digital Family Tree Protocol
+# DeepFamily - Decentralized Digital Family Tree Protocol
 
 <div align="center">
 
@@ -8,7 +8,7 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
 [![Node](https://img.shields.io/badge/Node.js-18+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
-**A blockchain-based decentralized global digital family tree protocol**
+**A blockchain-based decentralized digital family tree protocol**
 *Leveraging zero-knowledge proofs, NFTs, and community governance for collaborative family history*
 
 [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Core Features](#-core-features) • [🏗️ Architecture](#️-architecture) • [🚀 Deployment](#-deployment) • [🤝 Contributing](#-contributing)
