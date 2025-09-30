@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Clipboard } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import DeepFamily from '../abi/DeepFamily.json'
@@ -142,6 +142,33 @@ export default function SearchPage() {
   const schemas = createSchemas()
   const { rpcUrl, contractAddress } = useConfig()
   const toast = useToast()
+
+  const copyText = React.useCallback(async (text: string) => {
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text)
+        return true
+      }
+    } catch {}
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.focus(); ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }, [])
+
+  const onCopy = async (text: string) => {
+    const ok = await copyText(text)
+    toast.show(ok ? t('search.copied') : t('search.copyFailed'))
+  }
   
   
   const [endorsementOffset, setEndorsementOffset] = useState<number>(0)
@@ -478,31 +505,12 @@ export default function SearchPage() {
                   <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.creator')}:</span>
                   <HashInline value={String(version.addedBy || '')} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
                   <button
-                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    onClick={async () => {
-                      const value = String(version.addedBy || '')
-                      try {
-                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                          await navigator.clipboard.writeText(value)
-                          toast.show(t('search.copied'))
-                          return
-                        }
-                      } catch {}
-                      try {
-                        const ta = document.createElement('textarea')
-                        ta.value = value
-                        ta.style.position = 'fixed'
-                        ta.style.left = '-9999px'
-                        document.body.appendChild(ta)
-                        ta.focus(); ta.select()
-                        const ok = document.execCommand('copy')
-                        document.body.removeChild(ta)
-                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                      } catch {
-                        toast.show(t('search.copyFailed'))
-                      }
-                    }}
-                  >{t('search.copy')}</button>
+                    aria-label={t('search.copy')}
+                    onClick={() => onCopy(String(version.addedBy || ''))}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                  >
+                    <Clipboard size={14} />
+                  </button>
                 </div>
               <div className="min-w-0"><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? formatUnixSeconds(version.timestamp) : t('search.versionsQuery.unknown')}</span></div>
               </div>
@@ -512,62 +520,24 @@ export default function SearchPage() {
                   <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.fatherHash')}:</span>
                   <HashInline value={version.fatherHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
                   <button
-                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    onClick={async () => {
-                      const value = String(version.fatherHash || '')
-                      try {
-                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                          await navigator.clipboard.writeText(value)
-                          toast.show(t('search.copied'))
-                          return
-                        }
-                      } catch {}
-                      try {
-                        const ta = document.createElement('textarea')
-                        ta.value = value
-                        ta.style.position = 'fixed'
-                        ta.style.left = '-9999px'
-                        document.body.appendChild(ta)
-                        ta.focus(); ta.select()
-                        const ok = document.execCommand('copy')
-                        document.body.removeChild(ta)
-                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                      } catch {
-                        toast.show(t('search.copyFailed'))
-                      }
-                    }}
-                  >{t('search.copy')}</button>
+                    aria-label={t('search.copy')}
+                    onClick={() => onCopy(String(version.fatherHash || ''))}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                  >
+                    <Clipboard size={14} />
+                  </button>
                 </div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.fatherVersion')}:</span> {Number(version.fatherVersionIndex)}</div>
                 <div className="flex items-center gap-1 overflow-hidden">
                   <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.motherHash')}:</span>
                   <HashInline value={version.motherHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
                   <button
-                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    onClick={async () => {
-                      const value = String(version.motherHash || '')
-                      try {
-                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                          await navigator.clipboard.writeText(value)
-                          toast.show(t('search.copied'))
-                          return
-                        }
-                      } catch {}
-                      try {
-                        const ta = document.createElement('textarea')
-                        ta.value = value
-                        ta.style.position = 'fixed'
-                        ta.style.left = '-9999px'
-                        document.body.appendChild(ta)
-                        ta.focus(); ta.select()
-                        const ok = document.execCommand('copy')
-                        document.body.removeChild(ta)
-                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                      } catch {
-                        toast.show(t('search.copyFailed'))
-                      }
-                    }}
-                  >{t('search.copy')}</button>
+                    aria-label={t('search.copy')}
+                    onClick={() => onCopy(String(version.motherHash || ''))}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                  >
+                    <Clipboard size={14} />
+                  </button>
                 </div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.motherVersion')}:</span> {Number(version.motherVersionIndex)}</div>
               </div>
@@ -675,30 +645,12 @@ export default function SearchPage() {
               <div className="text-sm space-y-1">
                 <div className="flex items-center gap-1 overflow-hidden"><span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.childrenQuery.childHash')}:</span> <HashInline value={childHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
                 <button
-                  className="whitespace-nowrap text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  onClick={async () => {
-                  try {
-                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                      await navigator.clipboard.writeText(childHash)
-                      toast.show(t('search.copied'))
-                      return
-                    }
-                  } catch {}
-                  try {
-                    const ta = document.createElement('textarea')
-                    ta.value = childHash
-                    ta.style.position = 'fixed'
-                    ta.style.left = '-9999px'
-                    document.body.appendChild(ta)
-                    ta.focus(); ta.select()
-                    const ok = document.execCommand('copy')
-                    document.body.removeChild(ta)
-                    toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                  } catch {
-                    toast.show(t('search.copyFailed'))
-                  }
-                }}
-                >{t('search.copy')}</button></div>
+                  aria-label={t('search.copy')}
+                  onClick={() => onCopy(childHash)}
+                  className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                >
+                  <Clipboard size={14} />
+                </button></div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.childrenQuery.childVersion')}:</span> {childrenData.childVersions[i]}</div>
               </div>
             </div>
@@ -756,62 +708,24 @@ export default function SearchPage() {
                   <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.chunkHash')}:</span>
                   <HashInline value={chunk.chunkHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
                   <button
-                    className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    onClick={async () => {
-                      const value = String(chunk.chunkHash || '')
-                      try {
-                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                          await navigator.clipboard.writeText(value)
-                          toast.show(t('search.copied'))
-                          return
-                        }
-                      } catch {}
-                      try {
-                        const ta = document.createElement('textarea')
-                        ta.value = value
-                        ta.style.position = 'fixed'
-                        ta.style.left = '-9999px'
-                        document.body.appendChild(ta)
-                        ta.focus(); ta.select()
-                        const ok = document.execCommand('copy')
-                        document.body.removeChild(ta)
-                        toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                      } catch {
-                        toast.show(t('search.copyFailed'))
-                      }
-                    }}
-                  >{t('search.copy')}</button>
+                    aria-label={t('search.copy')}
+                    onClick={() => onCopy(String(chunk.chunkHash || ''))}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                  >
+                    <Clipboard size={14} />
+                  </button>
                 </div>
                 <div className="flex items-center gap-1 overflow-hidden">
                   <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.lastEditor')}:</span>
                   <HashInline value={String(chunk.lastEditor || '')} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
                   {chunk.lastEditor && (
                     <button
-                      className="whitespace-nowrap text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      onClick={async () => {
-                        const value = String(chunk.lastEditor || '')
-                        try {
-                          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                            await navigator.clipboard.writeText(value)
-                            toast.show(t('search.copied'))
-                            return
-                          }
-                        } catch {}
-                        try {
-                          const ta = document.createElement('textarea')
-                          ta.value = value
-                          ta.style.position = 'fixed'
-                          ta.style.left = '-9999px'
-                          document.body.appendChild(ta)
-                          ta.focus(); ta.select()
-                          const ok = document.execCommand('copy')
-                          document.body.removeChild(ta)
-                          toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                        } catch {
-                          toast.show(t('search.copyFailed'))
-                        }
-                      }}
-                    >{t('search.copy')}</button>
+                      aria-label={t('search.copy')}
+                      onClick={() => onCopy(String(chunk.lastEditor || ''))}
+                      className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                    >
+                      <Clipboard size={14} />
+                    </button>
                   )}
                 </div>
                 <div><span className="text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.contentPreview')}:</span></div>
@@ -864,30 +778,12 @@ export default function SearchPage() {
             <div key={i} className="p-2 flex items-center gap-2 overflow-hidden">
               <span className="min-w-0 flex-1 font-mono text-sm truncate text-gray-800 dark:text-gray-200" title={uri}>{uri}</span>
               <button
-                className="whitespace-nowrap text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                onClick={async () => {
-                  try {
-                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                      await navigator.clipboard.writeText(uri)
-                      toast.show(t('search.copied'))
-                      return
-                    }
-                  } catch {}
-                  try {
-                    const ta = document.createElement('textarea')
-                    ta.value = uri
-                    ta.style.position = 'fixed'
-                    ta.style.left = '-9999px'
-                    document.body.appendChild(ta)
-                    ta.focus(); ta.select()
-                    const ok = document.execCommand('copy')
-                    document.body.removeChild(ta)
-                    toast.show(ok ? t('search.copied') : t('search.copyFailed'))
-                  } catch {
-                    toast.show(t('search.copyFailed'))
-                  }
-                }}
-              >{t('search.copy')}</button>
+                aria-label={t('search.copy')}
+                onClick={() => onCopy(uri)}
+                className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+              >
+                <Clipboard size={14} />
+              </button>
             </div>
           ))}
         </div>
@@ -932,7 +828,7 @@ const HashInline: React.FC<{ value: string; className?: string; titleText?: stri
 
   return (
     <>
-      <span ref={containerRef} className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${className}`} title={titleText ?? value}>
+      <span ref={containerRef} className={`min-w-0 overflow-hidden whitespace-nowrap ${className}`} title={titleText ?? value}>
         {display}
       </span>
       {/* measurement node mirrors font styles to ensure accurate width */}
