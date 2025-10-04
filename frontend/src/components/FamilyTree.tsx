@@ -94,6 +94,8 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
   const { contract, pageSize, signal, onStats, metricsRef, statsIntervalMs } = params
   const versionCache = new Map<string, { tag?: string }>()
   const childrenCache = new Map<string, { childHashes: string[]; childVersionIndices: (number|bigint)[]; hasMore: boolean; nextOffset: number; pageOffset: number }>()
+  const unversionedChildrenCache = new Map<string, { childHashes: string[]; childVersionIndices: number[] }>()
+  const bestVersionCache = new Map<string, number>()
   const key = (h: string, v: number) => `${h.toLowerCase()}-v-${v}`
   const checkAbort = () => { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError') }
   let lastStatsEmit = 0
@@ -112,6 +114,67 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     return versionCache.get(k)!
   }
 
+  async function getBestVersion(personHash: string): Promise<number> {
+    checkAbort()
+    const cacheKey = personHash.toLowerCase()
+    if (bestVersionCache.has(cacheKey)) {
+      return bestVersionCache.get(cacheKey)!
+    }
+    try {
+      const stats = await contract.listVersionsEndorsementStats(personHash, 0, 100)
+      let bestVersion = 1
+      let maxEndorsements = -1
+      for (let i = 0; i < stats.versionIndices.length; i++) {
+        const versionIndex = Number(stats.versionIndices[i])
+        const endorsementCount = Number(stats.endorsementCounts[i])
+        if (endorsementCount > maxEndorsements) {
+          maxEndorsements = endorsementCount
+          bestVersion = versionIndex
+        }
+      }
+      bestVersionCache.set(cacheKey, bestVersion)
+      return bestVersion
+    } catch (e) {
+      bestVersionCache.set(cacheKey, 1)
+      return 1
+    }
+  }
+
+  async function loadUnversionedChildren(h: string) {
+    checkAbort()
+    const cacheKey = h.toLowerCase()
+    if (unversionedChildrenCache.has(cacheKey)) {
+      return unversionedChildrenCache.get(cacheKey)!
+    }
+
+    const collectedHashes: string[] = []
+    const collectedVersions: number[] = []
+    let offset = 0
+
+    try {
+      while (true) {
+        checkAbort()
+        const response = await contract.listChildren(h, 0, offset, pageSize)
+        const hashes = response[0] as string[]
+        const versions = response[1] as (number | bigint)[]
+        for (let i = 0; i < hashes.length; i++) {
+          collectedHashes.push(hashes[i])
+          collectedVersions.push(Number(versions[i]))
+        }
+        const hasMore = Boolean(response[3])
+        const nextOffset = Number(response[4])
+        if (!hasMore || nextOffset === offset) break
+        offset = nextOffset
+      }
+    } catch {
+      // Swallow errors and treat as no unversioned children
+    }
+
+    const entry = { childHashes: collectedHashes, childVersionIndices: collectedVersions }
+    unversionedChildrenCache.set(cacheKey, entry)
+    return entry
+  }
+
   async function loadChildrenPage(h: string, v: number, offset: number) {
     checkAbort()
     const cacheKey = `${key(h,v)}:o:${offset}`
@@ -120,7 +183,47 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     metricsRef.current.childrenCacheMisses++
     try {
       const r = await contract.listChildren(h, v, offset, pageSize)
-      const entry = { childHashes: r[0] as string[], childVersionIndices: r[1] as (number|bigint)[], hasMore: Boolean(r[3]), nextOffset: Number(r[4]), pageOffset: offset }
+      let childHashes = r[0] as string[]
+      let childVersionIndices = r[1] as (number|bigint)[]
+
+      if (v !== 0) {
+        const zeroChildren = await loadUnversionedChildren(h)
+        if (zeroChildren.childHashes.length) {
+          childHashes = childHashes.concat(zeroChildren.childHashes)
+          childVersionIndices = childVersionIndices.concat(zeroChildren.childVersionIndices)
+        }
+      }
+
+      // Deduplication & version resolution using getBestVersion cache
+      const childMap = new Map<string, { hash: string; version: number; resolved: boolean }>()
+
+      for (let i = 0; i < childHashes.length; i++) {
+        const childHash = childHashes[i].toLowerCase()
+        let childVersion = Number(childVersionIndices[i])
+
+        // Deduplication: use getBestVersion to determine which version to keep
+        if (childMap.has(childHash)) {
+          const existing = childMap.get(childHash)!
+
+          // Only resolve best version once per unique personHash
+          if (!existing.resolved) {
+            // First duplicate: resolve to best version
+            const bestVer = await getBestVersion(childHashes[i])
+            childMap.set(childHash, { hash: childHashes[i], version: bestVer, resolved: true })
+          }
+          // Subsequent duplicates are silently ignored (best version already determined)
+        } else {
+          // First occurrence: store as-is (childVersionIndex from contract is always >= 1)
+          childMap.set(childHash, { hash: childHashes[i], version: childVersion, resolved: false })
+        }
+      }
+
+      // Rebuild deduplicated arrays
+      const dedupedChildren = Array.from(childMap.values())
+      childHashes = dedupedChildren.map(c => c.hash)
+      childVersionIndices = dedupedChildren.map(c => c.version)
+
+      const entry = { childHashes, childVersionIndices, hasMore: Boolean(r[3]), nextOffset: Number(r[4]), pageOffset: offset }
       childrenCache.set(cacheKey, entry)
       return entry
     } catch {
