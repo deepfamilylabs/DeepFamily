@@ -1010,7 +1010,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @notice Get children of specified parent version (paginated)
    * @dev When limit=0, only returns total count; supports offset/limit, max page length limited by MAX_QUERY_PAGE_SIZE
    * @param parentHash Parent person hash
-   * @param parentVersionIndex Parent version index (starts from 1)
+   * @param parentVersionIndex Parent version index (0 = unversioned children, >=1 = specific version)
    * @param offset Starting position (starts from 0)
    * @param limit Return quantity limit (1-50)
    * @return childHashes Children person hash array
@@ -1027,7 +1027,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   )
     external
     view
-    validPersonAndVersion(parentHash, parentVersionIndex)
     returns (
       bytes32[] memory childHashes,
       uint256[] memory childVersionIndices,
@@ -1036,6 +1035,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
+    // Custom validation: allow versionIndex=0 for unversioned children
+    if (parentHash == bytes32(0)) revert InvalidPersonHash();
+    if (parentVersionIndex > personVersions[parentHash].length) {
+      revert InvalidVersionIndex();
+    }
+
     ChildRef[] storage allChildren = childrenOf[parentHash][parentVersionIndex];
     totalCount = allChildren.length;
 
