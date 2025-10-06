@@ -372,6 +372,7 @@
       "hashRequired": "Please enter person hash",
       "hashInvalid": "Please enter a valid 64-character hexadecimal hash",
       "tokenIdRequired": "Please enter a valid Token ID",
+      "versionIndexRequired": "Please enter a valid version index (≥0)",
       "required": "Required",
       "monthRange": "Month must be between 0-12",
       "dayRange": "Day must be between 0-31",
@@ -419,7 +420,8 @@
       "depthLabelFull": "Depth",
       "edit": "Edit",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "deduplicateChildren": "Deduplicate Children"
     },
     "status": {
       "loading": "Loading...",

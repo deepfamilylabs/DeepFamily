@@ -167,6 +167,8 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
               const versionText = `v${pn.data.versionIndex}`
               const tagTextRaw = nd?.tag || ''
               const tagText = truncateNoEllipsisByWidth(tagTextRaw, Math.max(0, w - PADDING_X * 2))
+              // Count total versions for this person hash
+              const totalVersions = Object.keys(nodesData).filter(id => id.startsWith(`${pn.data.personHash}-v-`)).length
               return (
                 <g key={pn.id}
                    transform={`translate(${pn.x}, ${pn.y})`}
@@ -181,7 +183,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                     <tspan x={8} y={14}>{(mintedFlag && nd?.fullName) ? nd.fullName : shortHashText}</tspan>
                   </text>
 
-                  <NodeCard w={w} h={NODE_HEIGHT} minted={mintedFlag} selected={isSel} hover={isHover} versionText={versionText} titleText={nameDisplaySingle} tagText={tagText} gender={nd?.gender} birthPlace={nd?.birthPlace} birthDateText={mintedFlag ? birthDateString(nd) : undefined} shortHashText={shortHashText} endorsementCount={endorse} />
+                  <NodeCard w={w} h={NODE_HEIGHT} minted={mintedFlag} selected={isSel} hover={isHover} versionText={versionText} titleText={nameDisplaySingle} tagText={tagText} gender={nd?.gender} birthPlace={nd?.birthPlace} birthDateText={mintedFlag ? birthDateString(nd) : undefined} shortHashText={shortHashText} endorsementCount={endorse} totalVersions={totalVersions} />
                 </g>
               )
             })}

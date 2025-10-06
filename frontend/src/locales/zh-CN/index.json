@@ -372,6 +372,7 @@
       "hashRequired": "请输入人物哈希",
       "hashInvalid": "请输入有效的64位十六进制哈希值",
       "tokenIdRequired": "请输入有效的Token ID",
+      "versionIndexRequired": "请输入有效的版本序号（≥0）",
       "required": "必填",
       "monthRange": "月份必须在0-12之间",
       "dayRange": "日期必须在0-31之间",
@@ -419,7 +420,8 @@
       "depthLabelFull": "深度",
       "edit": "编辑",
       "save": "保存",
-      "cancel": "取消"
+      "cancel": "取消",
+      "deduplicateChildren": "去重子节点"
     },
     "status": {
       "loading": "加载中...",

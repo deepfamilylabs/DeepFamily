@@ -14,6 +14,7 @@ export interface NodeCardProps {
   birthDateText?: string
   shortHashText: string
   endorsementCount?: number
+  totalVersions?: number  // Total number of versions for this person
 }
 
 const PADDING_X = 12
@@ -45,7 +46,9 @@ function buildStarPath(cx: number, cy: number, spikes = 5, outerR = 6.5, innerR 
 }
 
 export default function NodeCard(props: NodeCardProps) {
-  const { w, h, minted, selected, hover, versionText, titleText, tagText, gender, birthPlace, birthDateText, shortHashText, endorsementCount } = props
+  const { w, h, minted, selected, hover, versionText, titleText, tagText, gender, birthPlace, birthDateText, shortHashText, endorsementCount, totalVersions } = props
+
+  const hasMultipleVersions = totalVersions && totalVersions > 1
 
   const baseRect = minted
     ? 'fill-emerald-50 dark:fill-emerald-900/20 stroke-emerald-300 dark:stroke-emerald-400'
@@ -93,6 +96,31 @@ export default function NodeCard(props: NodeCardProps) {
         strokeWidth={minted || selected ? 2 : 1}
       />
       <rect width={w} height={h} rx={12} ry={12} fill="url(#cardGlossGrad)" className="dark:opacity-0" />
+
+      {/* Multi-version badge (top-left corner) */}
+      {hasMultipleVersions && (
+        <>
+          <rect
+            x={8}
+            y={6}
+            width={20}
+            height={14}
+            rx={7}
+            ry={7}
+            className={`${minted ? 'fill-purple-500 dark:fill-purple-400' : selected ? 'fill-indigo-500 dark:fill-indigo-400' : 'fill-violet-500 dark:fill-violet-400'}`}
+          />
+          <text className="font-mono">
+            <tspan
+              x={18}
+              y={16}
+              textAnchor="middle"
+              className="text-[10px] font-bold fill-white"
+            >
+              {totalVersions}
+            </tspan>
+          </text>
+        </>
+      )}
 
       {/* Version number at top */}
       <text className="font-mono">

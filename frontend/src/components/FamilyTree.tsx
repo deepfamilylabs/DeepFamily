@@ -75,6 +75,7 @@ export type FetchSubtreeOptions = {
   adaptiveConcurrency?: boolean
   minParallel?: number
   maxParallel?: number
+  deduplicateChildren?: boolean // true: show highest-endorsed version only, false: keep every version
 }
 
 export interface WalkerMetrics {
@@ -90,8 +91,8 @@ export interface WalkerMetrics {
   parallel: number
 }
 
-function createTreeLoader(params: { contract: ethers.Contract; pageSize: number; signal?: AbortSignal; onStats?: (m: WalkerMetrics)=>void; metricsRef: React.MutableRefObject<WalkerMetrics>; statsIntervalMs?: number }) {
-  const { contract, pageSize, signal, onStats, metricsRef, statsIntervalMs } = params
+function createTreeLoader(params: { contract: ethers.Contract; pageSize: number; signal?: AbortSignal; onStats?: (m: WalkerMetrics)=>void; metricsRef: React.MutableRefObject<WalkerMetrics>; statsIntervalMs?: number; deduplicateChildren?: boolean }) {
+  const { contract, pageSize, signal, onStats, metricsRef, statsIntervalMs, deduplicateChildren = true } = params
   const versionCache = new Map<string, { tag?: string }>()
   const childrenCache = new Map<string, { childHashes: string[]; childVersionIndices: (number|bigint)[]; hasMore: boolean; nextOffset: number; pageOffset: number }>()
   const unversionedChildrenCache = new Map<string, { childHashes: string[]; childVersionIndices: number[] }>()
@@ -175,9 +176,51 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     return entry
   }
 
+  async function loadAllChildrenAcrossVersions(h: string): Promise<{ childHashes: string[]; childVersionIndices: number[] }> {
+    checkAbort()
+    const cacheKey = `${h.toLowerCase()}:all-versions`
+    if (unversionedChildrenCache.has(cacheKey)) {
+      return unversionedChildrenCache.get(cacheKey)!
+    }
+
+    const collectedHashes: string[] = []
+    const collectedVersions: number[] = []
+
+    try {
+      // First get the total number of versions for this parent using listVersionsEndorsementStats
+      const stats = await contract.listVersionsEndorsementStats(h, 0, 1)
+      const totalVersions = Number(stats.totalVersions || stats[3])
+
+      // Query children for v=0 and all parent versions (v=1, v=2, ...)
+      for (let parentVer = 0; parentVer <= totalVersions; parentVer++) {
+        let offset = 0
+        while (true) {
+          checkAbort()
+          const response = await contract.listChildren(h, parentVer, offset, pageSize)
+          const hashes = response[0] as string[]
+          const versions = response[1] as (number | bigint)[]
+          for (let i = 0; i < hashes.length; i++) {
+            collectedHashes.push(hashes[i])
+            collectedVersions.push(Number(versions[i]))
+          }
+          const hasMore = Boolean(response[3])
+          const nextOffset = Number(response[4])
+          if (!hasMore || nextOffset === offset) break
+          offset = nextOffset
+        }
+      }
+    } catch (e) {
+      // Swallow errors and return what we have
+    }
+
+    const entry = { childHashes: collectedHashes, childVersionIndices: collectedVersions }
+    unversionedChildrenCache.set(cacheKey, entry)
+    return entry
+  }
+
   async function loadChildrenPage(h: string, v: number, offset: number) {
     checkAbort()
-    const cacheKey = `${key(h,v)}:o:${offset}`
+    const cacheKey = `${key(h,v)}:o:${offset}:dedup:${deduplicateChildren ? 1 : 0}`
     const start = performance.now()
     if (childrenCache.has(cacheKey)) { metricsRef.current.childrenCacheHits++; emit(start); return childrenCache.get(cacheKey)! }
     metricsRef.current.childrenCacheMisses++
@@ -186,7 +229,15 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
       let childHashes = r[0] as string[]
       let childVersionIndices = r[1] as (number|bigint)[]
 
-      if (v !== 0) {
+      // When deduplication is disabled, load children from ALL parent versions
+      // This ensures all versions are visible (e.g., a child version might be under a specific fatherVersionIndex)
+      if (!deduplicateChildren && offset === 0) {
+        const allChildren = await loadAllChildrenAcrossVersions(h)
+        childHashes = allChildren.childHashes
+        childVersionIndices = allChildren.childVersionIndices
+      } else if (deduplicateChildren && v !== 0) {
+        // When deduplication is enabled, merge unversioned children (v=0) with versioned children
+        // This ensures children added with fatherVersionIndex=0 are visible
         const zeroChildren = await loadUnversionedChildren(h)
         if (zeroChildren.childHashes.length) {
           childHashes = childHashes.concat(zeroChildren.childHashes)
@@ -194,34 +245,59 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
         }
       }
 
-      // Deduplication & version resolution using getBestVersion cache
-      const childMap = new Map<string, { hash: string; version: number; resolved: boolean }>()
+      // Deduplication & version resolution (controlled by deduplicateChildren option)
+      if (deduplicateChildren) {
+        const childMap = new Map<string, { hash: string; versions: number[] }>()
 
-      for (let i = 0; i < childHashes.length; i++) {
-        const childHash = childHashes[i].toLowerCase()
-        let childVersion = Number(childVersionIndices[i])
+        // First pass: collect all versions of each personHash that exist under this parent
+        for (let i = 0; i < childHashes.length; i++) {
+          const childHash = childHashes[i].toLowerCase()
+          let childVersion = Number(childVersionIndices[i])
 
-        // Deduplication: use getBestVersion to determine which version to keep
-        if (childMap.has(childHash)) {
-          const existing = childMap.get(childHash)!
-
-          // Only resolve best version once per unique personHash
-          if (!existing.resolved) {
-            // First duplicate: resolve to best version
-            const bestVer = await getBestVersion(childHashes[i])
-            childMap.set(childHash, { hash: childHashes[i], version: bestVer, resolved: true })
+          if (childMap.has(childHash)) {
+            const existing = childMap.get(childHash)!
+            existing.versions.push(childVersion)
+          } else {
+            childMap.set(childHash, { hash: childHashes[i], versions: [childVersion] })
           }
-          // Subsequent duplicates are silently ignored (best version already determined)
-        } else {
-          // First occurrence: store as-is (childVersionIndex from contract is always >= 1)
-          childMap.set(childHash, { hash: childHashes[i], version: childVersion, resolved: false })
         }
-      }
 
-      // Rebuild deduplicated arrays
-      const dedupedChildren = Array.from(childMap.values())
-      childHashes = dedupedChildren.map(c => c.hash)
-      childVersionIndices = dedupedChildren.map(c => c.version)
+        // Second pass: for duplicates, find best version among the children under this parent ONLY
+        const finalChildren: Array<{ hash: string; version: number }> = []
+        for (const [childHash, entry] of childMap.entries()) {
+          if (entry.versions.length > 1) {
+            // Get endorsement stats for all versions
+            const stats = await contract.listVersionsEndorsementStats(entry.hash, 0, 100)
+
+            const endorsementMap = new Map<number, number>()
+            const versionIndices = stats.versionIndices || stats[0]
+            const endorsementCounts = stats.endorsementCounts || stats[1]
+            for (let i = 0; i < versionIndices.length; i++) {
+              endorsementMap.set(Number(versionIndices[i]), Number(endorsementCounts[i]))
+            }
+
+            // Find best version among versions under this parent
+            let bestVersion = entry.versions[0]
+            let maxEndorsements = endorsementMap.get(bestVersion) ?? 0
+            for (const ver of entry.versions) {
+              const endorsements = endorsementMap.get(ver) ?? 0
+              if (endorsements > maxEndorsements || (endorsements === maxEndorsements && ver < bestVersion)) {
+                maxEndorsements = endorsements
+                bestVersion = ver
+              }
+            }
+
+            finalChildren.push({ hash: entry.hash, version: bestVersion })
+          } else {
+            // Only one version, keep it
+            finalChildren.push({ hash: entry.hash, version: entry.versions[0] })
+          }
+        }
+
+        // Rebuild deduplicated arrays
+        childHashes = finalChildren.map(c => c.hash)
+        childVersionIndices = finalChildren.map(c => c.version)
+      }
 
       const entry = { childHashes, childVersionIndices, hasMore: Boolean(r[3]), nextOffset: Number(r[4]), pageOffset: offset }
       childrenCache.set(cacheKey, entry)
@@ -261,7 +337,7 @@ async function* walkSubtree(
   const minParallel = Math.max(1, options?.minParallel ?? 1)
   const maxParallel = Math.max(minParallel, options?.maxParallel ?? parallel * 2)
   const metricsRef = { current: { created:0, visited:0, depth:0, versionCacheHits:0, versionCacheMisses:0, childrenCacheHits:0, childrenCacheMisses:0, avgVersionMs:0, avgChildrenMs:0, parallel } as WalkerMetrics }
-  const { loadVersion, loadChildrenPage, key, checkAbort } = createTreeLoader({ contract, pageSize, signal, onStats, metricsRef, statsIntervalMs: options?.statsIntervalMs })
+  const { loadVersion, loadChildrenPage, key, checkAbort } = createTreeLoader({ contract, pageSize, signal, onStats, metricsRef, statsIntervalMs: options?.statsIntervalMs, deduplicateChildren: options?.deduplicateChildren })
   if (signal?.aborted) throw new DOMException('Aborted','AbortError')
   const visited = new Set<string>()
   const root: GraphNode = { personHash, versionIndex, children: [] }
@@ -287,7 +363,10 @@ async function* walkSubtree(
       if (parent) {
         node = { personHash: h, versionIndex: v, tag, children: [] }
         parent.children = parent.children ? [...parent.children, node] : [node]
-      } else { node = root; node.tag = tag }
+      } else {
+        node = root
+        node.tag = tag
+      }
       onNode?.(node)
       onProgress?.({ created: metricsRef.current.created, visited: visited.size, depth })
       yield node

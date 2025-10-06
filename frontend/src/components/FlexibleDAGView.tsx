@@ -160,6 +160,8 @@ function FlexibleDAGViewInner({
             const endorse = nd?.endorsementCount
             const hashShort = shortHash(n.hash)
             const isSelected = ctxSelectedId === n.id
+            // Count total versions for this person hash
+            const totalVersions = Object.keys(nodesData).filter(id => id.startsWith(`${n.hash}-v-`)).length
             return (
               <g key={n.id}
                  transform={`translate(${p.x}, ${p.y})`}
@@ -186,6 +188,7 @@ function FlexibleDAGViewInner({
                   birthDateText={mintedFlag ? birthDateString(nd) : undefined}
                   shortHashText={hashShort}
                   endorsementCount={endorse}
+                  totalVersions={totalVersions}
                 />
               </g>
             )

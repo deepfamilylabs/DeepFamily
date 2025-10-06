@@ -419,7 +419,8 @@
       "depthLabelFull": "깊이",
       "edit": "편집",
       "save": "저장",
-      "cancel": "취소"
+      "cancel": "취소",
+      "deduplicateChildren": "자식 노드 중복 제거"
     },
     "status": {
       "loading": "로딩 중...",

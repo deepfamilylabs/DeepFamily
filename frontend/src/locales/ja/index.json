@@ -419,7 +419,8 @@
       "depthLabelFull": "深度",
       "edit": "編集",
       "save": "保存",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "deduplicateChildren": "子ノード重複除去"
     },
     "status": {
       "loading": "読み込み中...",
