@@ -113,6 +113,30 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       .attr('stroke', strokeColor)
       .attr('stroke-width', 1)
 
+    // Multi-version badge
+    node.each((d: any) => {
+      const sim = d as SimNode
+      const totalVersions = Object.keys(nodesData || {}).filter(id => id.startsWith(`${sim.hash}-v-`)).length
+      if (totalVersions > 1) {
+        const g = d3.select((node as any)._groups[0][data.nodes.indexOf(d)])
+        g.append('circle')
+          .attr('r', 8)
+          .attr('cx', -(NODE_R - 4))
+          .attr('cy', -(NODE_R - 4))
+          .attr('fill', '#8b5cf6')
+          .attr('stroke', strokeColor)
+          .attr('stroke-width', 1)
+        g.append('text')
+          .attr('x', -(NODE_R - 4))
+          .attr('y', -(NODE_R - 8))
+          .attr('text-anchor', 'middle')
+          .attr('font-size', 9)
+          .attr('font-weight', 'bold')
+          .attr('fill', '#ffffff')
+          .text(totalVersions)
+      }
+    })
+
     node.append('title').text((d: any) => (d as SimNode).hash)
     const lbl = node.append('text').attr('class', 'font-mono').attr('fill', '#0f172a')
     lbl.each((d: any, i: number, nodesSel: any) => {

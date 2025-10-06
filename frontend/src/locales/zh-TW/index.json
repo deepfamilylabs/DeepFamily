@@ -419,7 +419,8 @@
       "depthLabelFull": "深度",
       "edit": "編輯",
       "save": "保存",
-      "cancel": "取消"
+      "cancel": "取消",
+      "deduplicateChildren": "去重子節點"
     },
     "status": {
       "loading": "加載中...",

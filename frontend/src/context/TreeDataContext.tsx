@@ -42,7 +42,7 @@ const MULTICALL_ABI = [
 export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly } = useConfig()
-  const { traversal, includeVersionDetails } = useVizOptions()
+  const { traversal, includeVersionDetails, deduplicateChildren } = useVizOptions()
   const [root, setRoot] = useState<GraphNode | null>(null)
   // Synchronous bootstrap for nodesData from localStorage (ensures details available even in strict mode on first paint)
   const initialNodesDataRef = useRef<Record<string, NodeData> | null>(null)
@@ -71,8 +71,14 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       setLoadOptionsSnapshot(s => s.includeVersionDetails ? s : { ...s, includeVersionDetails: true })
     }
   }, [includeVersionDetails, loadOptionsSnapshot.includeVersionDetails])
-  const optionsRef = useRef({ traversal })
-  useEffect(() => { const o = optionsRef.current; if (o.traversal !== traversal) { o.traversal = traversal; refresh() } }, [traversal, refresh])
+  const optionsRef = useRef({ traversal, deduplicateChildren })
+  useEffect(() => {
+    const o = optionsRef.current
+    if (o.traversal !== traversal || o.deduplicateChildren !== deduplicateChildren) {
+      optionsRef.current = { traversal, deduplicateChildren }
+      refresh()
+    }
+  }, [traversal, deduplicateChildren, refresh])
 
   // Provider + contract (memoized & cached)
   const provider = useMemo(() => {
@@ -330,6 +336,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           traversal: trv,
           maxDepth: getRuntimeFamilyTreeConfig().DEFAULT_MAX_DEPTH,
           hardNodeLimit: getRuntimeFamilyTreeConfig().DEFAULT_HARD_NODE_LIMIT,
+          deduplicateChildren,
           onProgress: stats => { if (!cancelled) setProgress(stats) },
           onNode: n => {
             if (!rootNode) rootNode = n
@@ -391,7 +398,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       controller.abort() 
       setLoading(l => l ? false : l)
     }
-  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails, strictCacheOnly])
+  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, deduplicateChildren, t, push, includeVersionDetails, strictCacheOnly])
 
   const nodePairs = useMemo(() => {
     if (!root) return [] as Array<{ h: string; v: number }>

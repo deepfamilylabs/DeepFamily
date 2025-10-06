@@ -134,7 +134,7 @@ export default function SearchPage() {
     }),
     children: z.object({
       parentHash: z.string().min(1, t('search.validation.hashRequired')).regex(/^0x[a-fA-F0-9]{64}$/, t('search.validation.hashInvalid')),
-      parentVersionIndex: z.number().int().min(1, t('search.validation.tokenIdRequired')),
+      parentVersionIndex: z.number().int().min(0, t('search.validation.versionIndexRequired')),
       pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
     }),
   })

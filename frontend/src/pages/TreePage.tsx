@@ -5,7 +5,7 @@ import ViewContainer from '../components/ViewContainer'
 import { useTreeData } from '../context/TreeDataContext'
 import { useVizOptions } from '../context/VizOptionsContext'
 export default function TreePage() {
-  const { traversal, setTraversal } = useVizOptions()
+  const { traversal, setTraversal, deduplicateChildren, setDeduplicateChildren } = useVizOptions()
   const [viewMode, setViewMode] = useState<'dag' | 'tree' | 'force' | 'virtual'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('df:viewMode')
@@ -16,8 +16,7 @@ export default function TreePage() {
   const [editingConfig, setEditingConfig] = useState(false)
 
   const { t } = useTranslation()
-  const { root, loading: loadingContract, progress, contractMessage, refresh, errors } = useTreeData()
-  const SHOW_DEBUG = (import.meta as any).env.VITE_SHOW_DEBUG === '1'
+  const { root, loading: loadingContract, progress, contractMessage, refresh } = useTreeData()
 
   const triggerRefresh = useCallback(() => refresh(), [refresh])
   useEffect(() => { triggerRefresh() }, [triggerRefresh])
@@ -26,16 +25,6 @@ export default function TreePage() {
 
   return (
     <div className="space-y-6 text-gray-900 dark:text-gray-100 overflow-visible pb-4 md:pb-0 w-full max-w-full">
-      {SHOW_DEBUG && errors.length > 0 && (
-        <div className="text-xs rounded border border-amber-300 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/30 p-2 space-y-1">
-          <div className="font-medium text-amber-700 dark:text-amber-300">Debug Errors ({errors.length})</div>
-          {errors.slice(-5).map(e => (
-            <div key={e.id} className="text-amber-800 dark:text-amber-200 break-all">
-              <span className="font-semibold">[{e.context?.stage||'unknown'}]</span> {e.message}
-            </div>
-          ))}
-        </div>
-      )}
       <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-200/50 dark:border-slate-700/30 shadow-lg overflow-hidden">
         <FamilyTreeConfigForm
           editing={editingConfig}
@@ -46,6 +35,8 @@ export default function TreePage() {
           t={t as any}
           traversal={traversal}
           setTraversal={setTraversal}
+          deduplicateChildren={deduplicateChildren}
+          setDeduplicateChildren={setDeduplicateChildren}
           progress={progress}
         />
       </div>
