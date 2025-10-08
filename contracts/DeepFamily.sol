@@ -507,8 +507,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /**
    * @dev Wrap raw Poseidon digest with keccak256 for domain separation and collision resistance.
+   * Returns zero if input is zero (preserves semantics for non-existent parent hashes).
    */
   function _wrapPoseidonHash(bytes32 poseidonDigest) internal pure returns (bytes32) {
+    if (poseidonDigest == bytes32(0)) return bytes32(0);
     return keccak256(abi.encodePacked(poseidonDigest));
   }
 
@@ -640,29 +642,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         emit TokenRewardDistributed(msg.sender, personHash, versionIndex, reward);
       }
     }
-  }
-
-  /**
-   * @dev Original addPerson changed to call internal function (preserves non-ZK entry point, can be disabled later)
-   */
-  function addPerson(
-    bytes32 personHash,
-    bytes32 fatherHash,
-    bytes32 motherHash,
-    uint256 fatherVersionIndex,
-    uint256 motherVersionIndex,
-    string calldata tag,
-    string calldata metadataCID
-  ) public {
-    _addPersonInternal(
-      personHash,
-      fatherHash,
-      motherHash,
-      fatherVersionIndex,
-      motherVersionIndex,
-      tag,
-      metadataCID
-    );
   }
 
   /**

@@ -5,7 +5,6 @@ require("dotenv").config();
 require("./tasks/contract-add-person");
 require("./tasks/contract-endorse");
 require("./tasks/contract-mint-nft");
-require("./tasks/zk-add-person-enhanced");
 require("./tasks/zk-generate-name-poseidon-proof");
 require("./tasks/networks-check");
 require("./tasks/networks-list");
