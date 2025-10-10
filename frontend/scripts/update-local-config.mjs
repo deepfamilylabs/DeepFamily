@@ -19,6 +19,7 @@ const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, 'deployments', 'localhost');
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, '.env.local');
 const require = createRequire(import.meta.url);
 const { computePoseidonDigest } = require(path.join(PROJECT_ROOT, 'lib', 'namePoseidon.js'));
+const { DEMO_ROOT_PERSON } = require(path.join(PROJECT_ROOT, 'lib', 'constants.js'));
 
 function prepareBasicInfo(basicInfo) {
   const passphrase = basicInfo.passphrase || '';
@@ -64,18 +65,8 @@ async function updateLocalConfig() {
     const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
     const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
 
-    // Demo root person info (same as in check-root.js)
-    const demo = {
-      fullName: "DemoRoot",
-      isBirthBC: false,
-      birthYear: 1970,
-      birthMonth: 1,
-      birthDay: 1,
-      gender: 1,
-      birthPlace: "US-CA-Los Angeles",
-    };
-
-    const rootPersonHash = await getPersonHashFromBasicInfo(deepFamily, demo);
+    // Use standard demo root person from seedHelpers
+    const rootPersonHash = await getPersonHashFromBasicInfo(deepFamily, DEMO_ROOT_PERSON);
     console.log(`🔑 DemoRoot hash: ${rootPersonHash}`);
 
     // Read current .env.local or create from template
