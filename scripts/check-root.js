@@ -1,5 +1,5 @@
 const hre = require("hardhat");
-const { computePersonHash, checkPersonExists } = require("../lib/seedHelpers");
+const { DEMO_ROOT_PERSON, computePersonHash, checkPersonExists } = require("../lib/seedHelpers");
 
 /**
  * Check detailed information for a specific person
@@ -129,34 +129,8 @@ async function main() {
   console.log("Check Default Test Person");
   console.log("=".repeat(70));
 
-  const demoPersonData = {
-    fullName: "DemoRoot",
-    passphrase: "",
-    isBirthBC: false,
-    birthYear: 1970,
-    birthMonth: 1,
-    birthDay: 1,
-    gender: 1,
-  };
-
-  await checkPerson(deepFamily, demoPersonData, 1);
-
-  // Check LargeRoot (for seed-large-v2.js)
-  console.log("\n" + "=".repeat(70));
-  console.log("Check Large Scale Test Root Node");
-  console.log("=".repeat(70));
-
-  const largeRootData = {
-    fullName: "LargeRoot",
-    passphrase: "",
-    isBirthBC: false,
-    birthYear: Number(process.env.BASE_YEAR || 1950),
-    birthMonth: 1,
-    birthDay: 1,
-    gender: 1,
-  };
-
-  await checkPerson(deepFamily, largeRootData, 1);
+  // Use standard demo root person from seedHelpers
+  await checkPerson(deepFamily, DEMO_ROOT_PERSON, 1);
 
   // If environment variables provided, check custom person
   const customName = process.env.PERSON_NAME;
