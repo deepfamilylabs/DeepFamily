@@ -60,6 +60,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error InvalidCIDLength();
   error InvalidBirthPlace();
   error InvalidDeathPlace();
+  error InvalidDeathMonth();
+  error InvalidDeathDay();
   error InvalidBirthMonth();
   error InvalidBirthDay();
   error InvalidStory();
@@ -75,6 +77,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error VersionAlreadyMinted();
   error BasicInfoMismatch();
   error CallerMismatch();
+  error UnauthorizedParentUpdate();
+  error FatherAlreadySet();
+  error MotherAlreadySet();
+  error NoParentUpdate();
+  error InvalidParentHash();
 
   // Token-related errors
   error TokenContractNotSet();
@@ -349,6 +356,26 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 reward
   );
 
+  /**
+   * @dev Person parent linkage update event
+   * @param personHash Person hash
+   * @param versionIndex Version index being updated
+   * @param fatherHash Updated father hash (zero when unchanged)
+   * @param fatherVersionIndex Updated father version index (zero when unchanged)
+   * @param motherHash Updated mother hash (zero when unchanged)
+   * @param motherVersionIndex Updated mother version index (zero when unchanged)
+   * @param updater Address who performed the update
+   */
+  event PersonParentsUpdated(
+    bytes32 indexed personHash,
+    uint256 indexed versionIndex,
+    bytes32 fatherHash,
+    uint256 fatherVersionIndex,
+    bytes32 motherHash,
+    uint256 motherVersionIndex,
+    address indexed updater
+  );
+
   // ========== Story Sharding Related Events ==========
 
   /**
@@ -584,13 +611,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (fatherVersionIndex > personVersions[fatherHash].length) revert InvalidFatherVersionIndex();
     if (motherVersionIndex > personVersions[motherHash].length) revert InvalidMotherVersionIndex();
     bytes32 versionHash = keccak256(
-      abi.encodePacked(
+      abi.encode(
         personHash,
         fatherHash,
         motherHash,
         fatherVersionIndex,
         motherVersionIndex,
-        tag
+        tag,
+        metadataCID
       )
     );
     if (versionExists[personHash][versionHash]) revert DuplicateVersion();
@@ -645,6 +673,99 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
+   * @notice Update parent linkage for a version that was initially created without parent data.
+   * @dev Only original submitter or contract owner can perform the update. Parent info can only
+   *      transition from unset (hash == 0) to a validated non-zero parent reference.
+   */
+  function updatePersonParents(
+    bytes32 personHash,
+    uint256 versionIndex,
+    bytes32 newFatherHash,
+    uint256 newFatherVersionIndex,
+    bytes32 newMotherHash,
+    uint256 newMotherVersionIndex
+  ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
+    PersonVersion storage version = personVersions[personHash][versionIndex - 1];
+    if (msg.sender != version.addedBy) revert UnauthorizedParentUpdate();
+
+    bytes32 oldVersionHash = keccak256(
+      abi.encode(
+        personHash,
+        version.fatherHash,
+        version.motherHash,
+        version.fatherVersionIndex,
+        version.motherVersionIndex,
+        version.tag,
+        version.metadataCID
+      )
+    );
+
+    bool updated;
+
+    if (newFatherHash != bytes32(0)) {
+      if (version.fatherHash != bytes32(0)) revert FatherAlreadySet();
+      if (newFatherHash == personHash) revert InvalidParentHash();
+      if (newFatherVersionIndex > personVersions[newFatherHash].length)
+        revert InvalidFatherVersionIndex();
+
+      version.fatherHash = newFatherHash;
+      version.fatherVersionIndex = newFatherVersionIndex;
+      childrenOf[newFatherHash][newFatherVersionIndex].push(
+        ChildRef({childHash: personHash, childVersionIndex: versionIndex})
+      );
+      updated = true;
+    } else if (newFatherVersionIndex != 0) {
+      revert InvalidParentHash();
+    }
+
+    if (newMotherHash != bytes32(0)) {
+      if (version.motherHash != bytes32(0)) revert MotherAlreadySet();
+      if (newMotherHash == personHash) revert InvalidParentHash();
+      if (newMotherVersionIndex > personVersions[newMotherHash].length)
+        revert InvalidMotherVersionIndex();
+
+      version.motherHash = newMotherHash;
+      version.motherVersionIndex = newMotherVersionIndex;
+      childrenOf[newMotherHash][newMotherVersionIndex].push(
+        ChildRef({childHash: personHash, childVersionIndex: versionIndex})
+      );
+      updated = true;
+    } else if (newMotherVersionIndex != 0) {
+      revert InvalidParentHash();
+    }
+
+    if (!updated) revert NoParentUpdate();
+
+    bytes32 newVersionHash = keccak256(
+      abi.encode(
+        personHash,
+        version.fatherHash,
+        version.motherHash,
+        version.fatherVersionIndex,
+        version.motherVersionIndex,
+        version.tag,
+        version.metadataCID
+      )
+    );
+
+    if (oldVersionHash != newVersionHash) {
+      if (versionExists[personHash][newVersionHash]) revert DuplicateVersion();
+      versionExists[personHash][oldVersionHash] = false;
+      versionExists[personHash][newVersionHash] = true;
+    }
+
+    emit PersonParentsUpdated(
+      personHash,
+      versionIndex,
+      version.fatherHash,
+      version.fatherVersionIndex,
+      version.motherHash,
+      version.motherVersionIndex,
+      msg.sender
+    );
+  }
+
+  /**
    * @dev Zero-knowledge proof based addition entry point (limb version):
    * publicSignals mapping (fixed order, all are 128-bit limbs, big-endian concatenation hi|lo):
    * 0..1 => personHash limbs (hi -> lo)
@@ -661,7 +782,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 motherVersionIndex,
     string calldata tag,
     string calldata metadataCID
-  ) external {
+  ) external nonReentrant {
     if (publicSignals[6] != uint256(uint160(msg.sender))) revert CallerMismatch();
 
     if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals)) {
@@ -785,6 +906,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert InvalidBirthPlace();
     if (bytes(coreInfo.supplementInfo.deathPlace).length > MAX_LONG_TEXT_LENGTH)
       revert InvalidDeathPlace();
+    if (coreInfo.supplementInfo.deathMonth > 12) revert InvalidDeathMonth();
+    if (coreInfo.supplementInfo.deathDay > 31) revert InvalidDeathDay();
 
     bytes32 computedHash = getPersonHash(coreInfo.basicInfo);
     if (computedHash != personHash) revert BasicInfoMismatch();
