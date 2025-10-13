@@ -849,7 +849,12 @@
       "invalidDeathPlace": "死亡地過長",
       "insufficientFunds": "交易手續費不足",
       "userRejected": "用戶拒絕交易"
-    }
+    },
+    "missingParentsTitle": "父母資訊不完善",
+    "missingBothParents": "此版本的父母雜湊均為空。版本添加者可能會在未來補錄父母資訊。",
+    "missingFather": "此版本的父親雜湊為空。版本添加者可能會在未來補錄父親資訊。",
+    "missingMother": "此版本的母親雜湊為空。版本添加者可能會在未來補錄母親資訊。",
+    "parentUpdateNote": "注意：只有版本的原始添加者可以透過 updatePersonParents 函式補錄父母資訊。"
   },
   "endorse": {
     "title": "背書版本",

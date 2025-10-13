@@ -850,7 +850,12 @@
       "invalidDeathPlace": "Death place is too long",
       "insufficientFunds": "Insufficient funds for transaction",
       "userRejected": "Transaction was rejected by user"
-    }
+    },
+    "missingParentsTitle": "Incomplete Parent Information",
+    "missingBothParents": "Both parent hashes are empty for this version. The version creator may supplement parent information in the future.",
+    "missingFather": "The father hash is empty for this version. The version creator may supplement father information in the future.",
+    "missingMother": "The mother hash is empty for this version. The version creator may supplement mother information in the future.",
+    "parentUpdateNote": "Note: Only the original version creator can supplement parent information via the updatePersonParents function."
   },
   "endorse": {
     "title": "Endorse Version",

@@ -607,12 +607,15 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string calldata tag,
     string calldata metadataCID
   ) internal {
-    if (bytes(tag).length > MAX_LONG_TEXT_LENGTH) revert InvalidTagLength();
-    if (bytes(metadataCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
+    if (personHash == bytes32(0)) revert InvalidPersonHash();
     if (fatherHash == personHash || motherHash == personHash) revert InvalidParentHash();
     if (fatherHash != bytes32(0) && fatherHash == motherHash) revert InvalidParentHash();
+    if (fatherHash == bytes32(0) && fatherVersionIndex != 0) revert InvalidFatherVersionIndex();
+    if (motherHash == bytes32(0) && motherVersionIndex != 0) revert InvalidMotherVersionIndex();
     if (fatherVersionIndex > personVersions[fatherHash].length) revert InvalidFatherVersionIndex();
     if (motherVersionIndex > personVersions[motherHash].length) revert InvalidMotherVersionIndex();
+    if (bytes(tag).length > MAX_LONG_TEXT_LENGTH) revert InvalidTagLength();
+    if (bytes(metadataCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
     bytes32 versionHash = keccak256(
       abi.encode(
         personHash,

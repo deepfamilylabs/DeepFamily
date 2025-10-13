@@ -850,7 +850,12 @@
       "invalidDeathPlace": "死亡地过长",
       "insufficientFunds": "交易手续费不足",
       "userRejected": "用户拒绝交易"
-    }
+    },
+    "missingParentsTitle": "父母信息不完善",
+    "missingBothParents": "此版本的父母哈希均为空。版本添加者可能会在未来补录父母信息。",
+    "missingFather": "此版本的父亲哈希为空。版本添加者可能会在未来补录父亲信息。",
+    "missingMother": "此版本的母亲哈希为空。版本添加者可能会在未来补录母亲信息。",
+    "parentUpdateNote": "注意：只有版本的原始添加者可以通过 updatePersonParents 函数补录父母信息。"
   },
   "endorse": {
     "title": "背书版本",
