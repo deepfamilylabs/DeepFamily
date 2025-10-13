@@ -68,7 +68,7 @@ describe('Mint NFT Tests', function () {
     expect(mappedPerson).to.equal(personHash);
     const versionIdx = await deepFamily.tokenIdToVersionIndex(1n);
     expect(versionIdx).to.equal(1n);
-    const versionToken = await deepFamily.versionToTokenId(personHash, 0); // array index 0
+    const versionToken = await deepFamily.versionToTokenId(personHash, 1n);
     expect(versionToken).to.equal(1n);
   });
 

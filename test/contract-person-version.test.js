@@ -483,6 +483,96 @@ describe('Person Version (add-person) Tests', function () {
       expect(zeroVersionChildren[0][0]).to.equal(childHash);
       expect(zeroVersionChildren[1][0]).to.equal(1n);
     });
+
+    it('rejects setting a parent hash equal to the child hash', async () => {
+      const { deepFamily } = await baseSetup();
+      const [deployer] = await hre.ethers.getSigners();
+
+      await hre.run('add-person', {
+        fullname: 'Self Parent',
+        birthyear: '1990',
+        gender: '1',
+        tag: 'v1',
+        ipfs: 'QmSelf'
+      });
+
+      const childHash = await deepFamily.getPersonHash(
+        buildBasicInfo({
+          fullName: 'Self Parent',
+          birthYear: 1990,
+          birthMonth: 0,
+          birthDay: 0,
+          gender: 1,
+        })
+      );
+
+      await expect(
+        deepFamily
+          .connect(deployer)
+          .updatePersonParents(
+            childHash,
+            1,
+            childHash,
+            1,
+            hre.ethers.ZeroHash,
+            0
+          )
+      ).to.be.revertedWithCustomError(deepFamily, 'InvalidParentHash');
+    });
+
+    it('rejects assigning the same hash to both parents in a single update', async () => {
+      const { deepFamily } = await baseSetup();
+      const [deployer] = await hre.ethers.getSigners();
+
+      await hre.run('add-person', {
+        fullname: 'Dual Parent',
+        birthyear: '1970',
+        gender: '1',
+        tag: 'v1',
+        ipfs: 'QmDualParent'
+      });
+
+      await hre.run('add-person', {
+        fullname: 'Dual Parent Child',
+        birthyear: '2000',
+        gender: '1',
+        tag: 'v1',
+        ipfs: 'QmDualChild'
+      });
+
+      const parentHash = await deepFamily.getPersonHash(
+        buildBasicInfo({
+          fullName: 'Dual Parent',
+          birthYear: 1970,
+          birthMonth: 0,
+          birthDay: 0,
+          gender: 1,
+        })
+      );
+
+      const childHash = await deepFamily.getPersonHash(
+        buildBasicInfo({
+          fullName: 'Dual Parent Child',
+          birthYear: 2000,
+          birthMonth: 0,
+          birthDay: 0,
+          gender: 1,
+        })
+      );
+
+      await expect(
+        deepFamily
+          .connect(deployer)
+          .updatePersonParents(
+            childHash,
+            1,
+            parentHash,
+            1,
+            parentHash,
+            1
+          )
+      ).to.be.revertedWithCustomError(deepFamily, 'InvalidParentHash');
+    });
   });
 
   it('reverts when proof submitter does not match caller', async () => {

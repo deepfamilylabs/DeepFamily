@@ -608,6 +608,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   ) internal {
     if (bytes(tag).length > MAX_LONG_TEXT_LENGTH) revert InvalidTagLength();
     if (bytes(metadataCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
+    if (fatherHash == personHash || motherHash == personHash) revert InvalidParentHash();
+    if (fatherHash != bytes32(0) && fatherHash == motherHash) revert InvalidParentHash();
     if (fatherVersionIndex > personVersions[fatherHash].length) revert InvalidFatherVersionIndex();
     if (motherVersionIndex > personVersions[motherHash].length) revert InvalidMotherVersionIndex();
     bytes32 versionHash = keccak256(
@@ -685,6 +687,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     bytes32 newMotherHash,
     uint256 newMotherVersionIndex
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
+    if (newFatherHash != bytes32(0) && newFatherHash == newMotherHash)
+      revert InvalidParentHash();
     PersonVersion storage version = personVersions[personHash][versionIndex - 1];
     if (msg.sender != version.addedBy) revert UnauthorizedParentUpdate();
 
@@ -705,6 +709,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (newFatherHash != bytes32(0)) {
       if (version.fatherHash != bytes32(0)) revert FatherAlreadySet();
       if (newFatherHash == personHash) revert InvalidParentHash();
+      if (version.motherHash != bytes32(0) && newFatherHash == version.motherHash)
+        revert InvalidParentHash();
       if (newFatherVersionIndex > personVersions[newFatherHash].length)
         revert InvalidFatherVersionIndex();
 
@@ -721,6 +727,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (newMotherHash != bytes32(0)) {
       if (version.motherHash != bytes32(0)) revert MotherAlreadySet();
       if (newMotherHash == personHash) revert InvalidParentHash();
+      if (version.fatherHash != bytes32(0) && newMotherHash == version.fatherHash)
+        revert InvalidParentHash();
       if (newMotherVersionIndex > personVersions[newMotherHash].length)
         revert InvalidMotherVersionIndex();
 
@@ -832,7 +840,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
     if (fee > 0) {
       PersonVersion storage v = personVersions[personHash][arrayIndex];
-      uint256 tokenId = versionToTokenId[personHash][arrayIndex];
+      uint256 tokenId = versionToTokenId[personHash][versionIndex];
       address recipient;
       if (tokenId != 0) {
         address holder = _ownerOf(tokenId);
@@ -890,8 +898,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
     if (publicSignals[4] != uint256(uint160(msg.sender))) revert CallerMismatch();
 
-    uint256 arrayIndex = versionIndex - 1;
-    if (versionToTokenId[personHash][arrayIndex] != 0) revert VersionAlreadyMinted();
+    if (versionToTokenId[personHash][versionIndex] != 0) revert VersionAlreadyMinted();
 
     if (endorsedVersionIndex[personHash][msg.sender] != versionIndex) {
       revert MustEndorseVersionFirst();
@@ -930,7 +937,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     tokenIdToPerson[newTokenId] = personHash;
     tokenIdToVersionIndex[newTokenId] = versionIndex;
 
-    versionToTokenId[personHash][arrayIndex] = newTokenId;
+    versionToTokenId[personHash][versionIndex] = newTokenId;
 
     nftCoreInfo[newTokenId] = coreInfo;
 
@@ -1107,7 +1114,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 arrayIndex = versionIndex - 1; // Convert to array index (starts from 0)
     version = personVersions[personHash][arrayIndex];
     endorsementCount = versionEndorsementCount[personHash][arrayIndex];
-    tokenId = versionToTokenId[personHash][arrayIndex];
+    tokenId = versionToTokenId[personHash][versionIndex];
   }
 
   /**
@@ -1299,7 +1306,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 versionIndex = page.startIndex + i;
       versionIndices[i] = versionIndex + 1;
       endorsementCounts[i] = versionEndorsementCount[personHash][versionIndex];
-      tokenIds[i] = versionToTokenId[personHash][versionIndex];
+      tokenIds[i] = versionToTokenId[personHash][versionIndex + 1];
     }
 
     return (
