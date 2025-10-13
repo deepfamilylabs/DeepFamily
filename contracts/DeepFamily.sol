@@ -35,7 +35,7 @@ interface INamePoseidonVerifier {
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[4] calldata publicSignals
+    uint256[5] calldata publicSignals
   ) external view returns (bool);
 }
 
@@ -74,6 +74,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error MustEndorseVersionFirst();
   error VersionAlreadyMinted();
   error BasicInfoMismatch();
+  error CallerMismatch();
 
   // Token-related errors
   error TokenContractNotSet();
@@ -242,9 +243,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /// @dev Maximum number of story chunks per NFT
   uint256 public constant MAX_STORY_CHUNKS = 100;
-
-  // Public signals include 3 hashes × 2 limbs (each limb 128-bit): person/father/mother
-  uint256 private constant _HASH_LIMBS_REQUIRED = 6; // 3 hashes * 2 limbs
 
   /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
@@ -451,25 +449,27 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (limit > MAX_QUERY_PAGE_SIZE) revert PageSizeExceedsLimit();
 
     if (limit == 0 || offset >= totalCount) {
-      return PaginationResult({
-        startIndex: offset,
-        endIndex: offset,
-        resultLength: 0,
-        nextOffset: offset >= totalCount ? totalCount : offset,
-        hasMore: false
-      });
+      return
+        PaginationResult({
+          startIndex: offset,
+          endIndex: offset,
+          resultLength: 0,
+          nextOffset: offset >= totalCount ? totalCount : offset,
+          hasMore: false
+        });
     }
 
     uint256 endIndex = offset + limit;
     if (endIndex > totalCount) endIndex = totalCount;
 
-    return PaginationResult({
-      startIndex: offset,
-      endIndex: endIndex,
-      resultLength: endIndex - offset,
-      nextOffset: endIndex,
-      hasMore: endIndex < totalCount
-    });
+    return
+      PaginationResult({
+        startIndex: offset,
+        endIndex: endIndex,
+        resultLength: endIndex - offset,
+        nextOffset: endIndex,
+        hasMore: endIndex < totalCount
+      });
   }
 
   // ========== Constructor ==========
@@ -662,8 +662,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string calldata tag,
     string calldata metadataCID
   ) external {
-    uint256 submitter = publicSignals[_HASH_LIMBS_REQUIRED];
-    if (submitter != uint256(uint160(msg.sender))) revert InvalidZKProof();
+    if (publicSignals[6] != uint256(uint160(msg.sender))) revert CallerMismatch();
 
     if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals)) {
       revert InvalidZKProof();
@@ -749,6 +748,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /**
    * @notice Mint family tree NFT and put core information on-chain.
    * @dev Can only mint when caller has completed endorsement for this version.
+   *      Expected publicSignals order:
+   *        0..1 => fullNameCommitment Poseidon digest limbs (hi -> lo)
+   *        2..3 => keccak256(fullName) limbs (hi -> lo)
+   *        4    => minter address (lower 160 bits)
    * @param personHash Person hash
    * @param versionIndex Version index (starts from 1)
    * @param _tokenURI NFT metadata URI (can be empty string)
@@ -758,14 +761,15 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[4] calldata publicSignals,
+    uint256[5] calldata publicSignals,
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
     PersonCoreInfo calldata coreInfo
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
-    uint256 arrayIndex = versionIndex - 1;
+    if (publicSignals[4] != uint256(uint160(msg.sender))) revert CallerMismatch();
 
+    uint256 arrayIndex = versionIndex - 1;
     if (versionToTokenId[personHash][arrayIndex] != 0) revert VersionAlreadyMinted();
 
     if (endorsedVersionIndex[personHash][msg.sender] != versionIndex) {
@@ -1154,7 +1158,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     PaginationResult memory page = _getPaginationParams(totalVersions, offset, limit);
 
     if (page.resultLength == 0) {
-      return (new uint256[](0), new uint256[](0), new uint256[](0), totalVersions, page.hasMore, page.nextOffset);
+      return (
+        new uint256[](0),
+        new uint256[](0),
+        new uint256[](0),
+        totalVersions,
+        page.hasMore,
+        page.nextOffset
+      );
     }
 
     versionIndices = new uint256[](page.resultLength);
@@ -1168,7 +1179,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       tokenIds[i] = versionToTokenId[personHash][versionIndex];
     }
 
-    return (versionIndices, endorsementCounts, tokenIds, totalVersions, page.hasMore, page.nextOffset);
+    return (
+      versionIndices,
+      endorsementCounts,
+      tokenIds,
+      totalVersions,
+      page.hasMore,
+      page.nextOffset
+    );
   }
 
   /**
@@ -1245,7 +1263,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param tokenId NFT TokenID
    * @return metadata Story metadata
    */
-  function getStoryMetadata(uint256 tokenId) external view validTokenId(tokenId) returns (StoryMetadata memory metadata) {
+  function getStoryMetadata(
+    uint256 tokenId
+  ) external view validTokenId(tokenId) returns (StoryMetadata memory metadata) {
     metadata = storyMetadata[tokenId];
   }
 

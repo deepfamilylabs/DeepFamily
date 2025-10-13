@@ -88,6 +88,7 @@ task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")
     const { proof, publicSignals } = await generateNamePoseidonProof(
       args.fullname,
       args.passphrase,
+      { minter: signer.address },
     );
 
     // Recompute hash to sanity check user input matches person hash

@@ -122,5 +122,4 @@ async function main() {
 
 main().catch((error) => {
   console.error("Unexpected error while syncing artifacts:", error);
-  process.exitCode = 1;
 });

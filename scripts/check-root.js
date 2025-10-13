@@ -32,10 +32,14 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
     console.log(`  Added at: ${new Date(Number(versionDetails.timestamp) * 1000).toISOString()}`);
     console.log(`  Added by: ${versionDetails.addedBy}`);
     if (versionDetails.fatherHash !== ethers.ZeroHash) {
-      console.log(`  Father hash: ${versionDetails.fatherHash} (v${versionDetails.fatherVersionIndex})`);
+      console.log(
+        `  Father hash: ${versionDetails.fatherHash} (v${versionDetails.fatherVersionIndex})`,
+      );
     }
     if (versionDetails.motherHash !== ethers.ZeroHash) {
-      console.log(`  Mother hash: ${versionDetails.motherHash} (v${versionDetails.motherVersionIndex})`);
+      console.log(
+        `  Mother hash: ${versionDetails.motherHash} (v${versionDetails.motherVersionIndex})`,
+      );
     }
   } catch (e) {
     console.warn(`  Failed to get version details: ${e.message}`);
@@ -89,7 +93,7 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
 async function main() {
   const { deployments, ethers } = hre;
   const { get } = deployments;
-  
+
   console.log("=".repeat(70));
   console.log("DeepFamily Person Check Tool");
   console.log("=".repeat(70));
@@ -158,7 +162,9 @@ async function main() {
         console.log(`\nVersion ${version} details:`);
         console.log(`  Tag: ${versionDetails.tag}`);
         console.log(`  IPFS CID: ${versionDetails.ipfsCID}`);
-        console.log(`  Added at: ${new Date(Number(versionDetails.timestamp) * 1000).toISOString()}`);
+        console.log(
+          `  Added at: ${new Date(Number(versionDetails.timestamp) * 1000).toISOString()}`,
+        );
       } catch (e) {
         console.warn(`  Failed to get details: ${e.message}`);
       }
@@ -189,7 +195,9 @@ async function main() {
   console.log("✨ Check Complete");
   console.log("=".repeat(70));
   console.log("\nUsage:");
-  console.log("  By name: PERSON_NAME='John Doe' PERSON_BIRTH_YEAR=1990 PERSON_GENDER=1 npm run check:root");
+  console.log(
+    "  By name: PERSON_NAME='John Doe' PERSON_BIRTH_YEAR=1990 PERSON_GENDER=1 npm run check:root",
+  );
   console.log("  By hash: PERSON_HASH=0x123... npm run check:root");
   console.log("");
 }

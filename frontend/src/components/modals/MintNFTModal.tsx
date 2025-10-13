@@ -93,7 +93,7 @@ type MintProofArgs = {
   a: [bigint, bigint]
   b: [[bigint, bigint], [bigint, bigint]]
   c: [bigint, bigint]
-  publicSignals: [bigint, bigint, bigint, bigint]
+  publicSignals: [bigint, bigint, bigint, bigint, bigint]
 }
 
 const splitToLimbs = (hex: string) => {
@@ -542,7 +542,10 @@ export default function MintNFTModal({
       console.log('Poseidon digest:', nameBinding.digestHex)
 
       setProofGenerationStep(t('mintNFT.generatingProof', 'Generating zero-knowledge proof... (this may take 30-60 seconds)'))
-      const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(trimmedFullName, passphrase)
+      if (!address) {
+        throw new Error(t('mintNFT.walletRequired', 'Wallet connection required to mint'))
+      }
+      const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(trimmedFullName, passphrase, address)
       console.log('🔒 Generated name poseidon proof:', generatedProof)
       console.log('🔒 Generated public signals:', publicSignals)
 
@@ -554,7 +557,7 @@ export default function MintNFTModal({
 
       const formattedProof = formatGroth16ProofForContract(generatedProof)
       const signalValues = toBigIntArray(publicSignals)
-      if (signalValues.length < 4) {
+      if (signalValues.length < 5) {
         throw new Error('Invalid name poseidon public signals length')
       }
 
@@ -562,7 +565,7 @@ export default function MintNFTModal({
         a: formattedProof.a,
         b: formattedProof.b,
         c: formattedProof.c,
-        publicSignals: signalValues.slice(0, 4) as [bigint, bigint, bigint, bigint]
+        publicSignals: signalValues.slice(0, 5) as [bigint, bigint, bigint, bigint, bigint]
       }
 
       setProofGenerationStep(t('mintNFT.proofVerified', 'Zero-knowledge proof verified. Submitting transaction...'))

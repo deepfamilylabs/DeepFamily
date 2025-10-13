@@ -71,7 +71,6 @@ task("add-person", "Add a person version using ZK proof")
       gender: genderNum,
     };
 
-
     // Prepare father data
     const fatherData = args.fathername
       ? {
@@ -103,7 +102,7 @@ task("add-person", "Add a person version using ZK proof")
       personData,
       fatherData,
       motherData,
-      sender
+      sender,
     );
 
     // Submit to contract
@@ -117,7 +116,7 @@ task("add-person", "Add a person version using ZK proof")
         Number(args.fatherversion),
         Number(args.motherversion),
         args.tag,
-        args.ipfs
+        args.ipfs,
       );
 
     const receipt = await tx.wait();
@@ -129,8 +128,14 @@ task("add-person", "Add a person version using ZK proof")
       ]);
 
       // Reconstruct expected personHash from proof
-      const poseidonDigest = "0x" + ((BigInt(publicSignals[0]) << 128n) | BigInt(publicSignals[1])).toString(16).padStart(64, "0");
-      const expectedPersonHash = ethers.keccak256(ethers.solidityPacked(["bytes32"], [poseidonDigest]));
+      const poseidonDigest =
+        "0x" +
+        ((BigInt(publicSignals[0]) << 128n) | BigInt(publicSignals[1]))
+          .toString(16)
+          .padStart(64, "0");
+      const expectedPersonHash = ethers.keccak256(
+        ethers.solidityPacked(["bytes32"], [poseidonDigest]),
+      );
 
       for (const log of receipt.logs || []) {
         if ((log.address || "").toLowerCase() !== deep.address.toLowerCase()) continue;

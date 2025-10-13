@@ -256,7 +256,7 @@ export function useContract() {
       a: [bigint, bigint]
       b: [[bigint, bigint], [bigint, bigint]]
       c: [bigint, bigint]
-      publicSignals: [bigint, bigint, bigint, bigint]
+      publicSignals: [bigint, bigint, bigint, bigint, bigint]
     },
     personHash: string,
     versionIndex: number,

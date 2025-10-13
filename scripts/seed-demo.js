@@ -59,7 +59,13 @@ function generateChunkContent(personName, chunkIndex, isMaxLength = false) {
   return truncateUtf8Bytes(content, MAX_CHUNK_CONTENT_LENGTH);
 }
 
-async function addStoryChunks(deepFamily, tokenId, personName, numChunks = 5, useMaxLength = false) {
+async function addStoryChunks(
+  deepFamily,
+  tokenId,
+  personName,
+  numChunks = 5,
+  useMaxLength = false,
+) {
   console.log(`Adding ${numChunks} story chunks for TokenID ${tokenId} (${personName})...`);
 
   // Check if contract supports story chunks
@@ -113,7 +119,7 @@ let HEARTBEAT;
 if (DEBUG_ENABLED) {
   HEARTBEAT = setInterval(
     () => console.log(`[DEBUG][heartbeat] ${new Date().toISOString()}`),
-    15000
+    15000,
   );
 }
 
@@ -200,7 +206,7 @@ async function ensureTokenReady({ deepFamily, token, signer }) {
       console.warn(
         `⚠️  DeepFamilyToken not initialized or bound to different DeepFamily contract`,
         `\n   Bound address: ${bound}`,
-        `\n   Expected address: ${deepFamilyAddr}`
+        `\n   Expected address: ${deepFamilyAddr}`,
       );
       return false;
     }
@@ -354,7 +360,7 @@ async function main() {
     const chainChildData = createPersonData(
       chainChildName,
       BASE_YEAR + gen * 20,
-      rng.nextInt(1, 2)
+      rng.nextInt(1, 2),
     );
     const chainChildHash = await computePersonHash({ deepFamily, personData: chainChildData });
 
@@ -410,7 +416,7 @@ async function main() {
       const siblingData = createPersonData(
         siblingName,
         BASE_YEAR + gen * 20 + rng.nextInt(0, 5),
-        rng.nextInt(1, 2)
+        rng.nextInt(1, 2),
       );
       const siblingHash = await computePersonHash({ deepFamily, personData: siblingData });
 
@@ -455,7 +461,7 @@ async function main() {
     mainChain.push(currentGen[0]); // Main chain node is always first
 
     console.log(
-      `  Generation ${gen} complete: planned ${totalThisGen} people, actual ${currentGen.length} people (main chain 1 + siblings ${actualSiblingsAdded})`
+      `  Generation ${gen} complete: planned ${totalThisGen} people, actual ${currentGen.length} people (main chain 1 + siblings ${actualSiblingsAdded})`,
     );
   }
 
@@ -466,7 +472,7 @@ async function main() {
   }
   const theoreticalMax = 2 ** TARGET_DEPTH - 1;
   console.log(
-    `\nFamily tree complete: ${TARGET_DEPTH} generations, ${totalPeople} people (theoretical max ${theoreticalMax})`
+    `\nFamily tree complete: ${TARGET_DEPTH} generations, ${totalPeople} people (theoretical max ${theoreticalMax})`,
   );
 
   // 6. Random endorsement and NFT minting
@@ -513,17 +519,13 @@ async function main() {
 
         // Mint NFT
         dlog(`Minting NFT: ${person.name}`);
-        const supplementInfo = createSupplementInfo(
-          person.personData.fullName,
-          DEFAULT_PLACE,
-          {
-            deathYear: person.personData.birthYear + 70 + rng.nextInt(0, 20),
-            deathMonth: 12,
-            deathDay: 31,
-            deathPlace: DEFAULT_PLACE,
-            // story will be auto-generated with padding in createSupplementInfo
-          }
-        );
+        const supplementInfo = createSupplementInfo(person.personData.fullName, DEFAULT_PLACE, {
+          deathYear: person.personData.birthYear + 70 + rng.nextInt(0, 20),
+          deathMonth: 12,
+          deathDay: 31,
+          deathPlace: DEFAULT_PLACE,
+          // story will be auto-generated with padding in createSupplementInfo
+        });
 
         const mintResult = await mintPersonNFT({
           deepFamily,
@@ -543,17 +545,19 @@ async function main() {
         mintedCount++;
         if (mintedCount % 5 === 0 || mintedCount === targetNFTCount) {
           console.log(
-            `  Progress: ${mintedCount}/${targetNFTCount} (${Math.round((mintedCount / targetNFTCount) * 100)}%)`
+            `  Progress: ${mintedCount}/${targetNFTCount} (${Math.round((mintedCount / targetNFTCount) * 100)}%)`,
           );
         }
         dlog(`NFT minted successfully, TokenID: ${tokenId || "unknown"}`);
       } catch (error) {
-        console.warn(`  Mint failed [${idx + 1}/${selected.length}]: ${error.message?.slice(0, 120)}`);
+        console.warn(
+          `  Mint failed [${idx + 1}/${selected.length}]: ${error.message?.slice(0, 120)}`,
+        );
       }
     }
 
     console.log(
-      `\nNFT minting complete: ${mintedCount}/${targetNFTCount} (${Math.round((mintedCount / allPeople.length) * 100)}%)`
+      `\nNFT minting complete: ${mintedCount}/${targetNFTCount} (${Math.round((mintedCount / allPeople.length) * 100)}%)`,
     );
 
     // Add story chunks for minted NFTs
@@ -569,7 +573,7 @@ async function main() {
           ...mintedNFTs[0],
           chunks: 10,
           useMaxLength: false,
-          sealed: false
+          sealed: false,
         }); // normal chunks
       }
       if (mintedNFTs.length >= 2) {
@@ -577,7 +581,7 @@ async function main() {
           ...mintedNFTs[1],
           chunks: 25,
           useMaxLength: true,
-          sealed: false
+          sealed: false,
         }); // large chunks
       }
       if (mintedNFTs.length >= 3) {
@@ -585,7 +589,7 @@ async function main() {
           ...mintedNFTs[2],
           chunks: MAX_STORY_CHUNKS,
           useMaxLength: true,
-          sealed: true
+          sealed: true,
         }); // max chunks + seal
       }
       if (mintedNFTs.length >= 5) {
@@ -593,13 +597,13 @@ async function main() {
           ...mintedNFTs[3],
           chunks: 50,
           useMaxLength: false,
-          sealed: false
+          sealed: false,
         }); // medium
         storyChunkTargets.push({
           ...mintedNFTs[4],
           chunks: 75,
           useMaxLength: true,
-          sealed: false
+          sealed: false,
         }); // many chunks
       }
 
@@ -627,7 +631,7 @@ async function main() {
             target.tokenId,
             target.name,
             target.chunks,
-            target.useMaxLength
+            target.useMaxLength,
           );
           totalChunksAdded += chunksAdded;
 
@@ -639,13 +643,19 @@ async function main() {
               await sealTx.wait();
               console.log(`  TokenID ${target.tokenId} story sealed`);
             } catch (error) {
-              console.warn(`  TokenID ${target.tokenId} seal failed:`, error.message?.slice(0, 100));
+              console.warn(
+                `  TokenID ${target.tokenId} seal failed:`,
+                error.message?.slice(0, 100),
+              );
             }
           }
 
           processedCount++;
         } catch (error) {
-          console.warn(`Processing TokenID ${target.tokenId} failed:`, error.message?.slice(0, 100));
+          console.warn(
+            `Processing TokenID ${target.tokenId} failed:`,
+            error.message?.slice(0, 100),
+          );
         }
       }
 
@@ -653,7 +663,7 @@ async function main() {
       console.log(`  NFTs processed: ${processedCount}/${storyChunkTargets.length}`);
       console.log(`  Total chunks added: ${totalChunksAdded}`);
       console.log(
-        `  Average chunks per NFT: ${processedCount > 0 ? Math.round(totalChunksAdded / processedCount) : 0}`
+        `  Average chunks per NFT: ${processedCount > 0 ? Math.round(totalChunksAdded / processedCount) : 0}`,
       );
     }
   } else {
@@ -697,4 +707,3 @@ main()
     if (DEBUG_ENABLED && HEARTBEAT) clearInterval(HEARTBEAT);
     process.exit(1);
   });
-
