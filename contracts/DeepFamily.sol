@@ -701,7 +701,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   function endorseVersion(
     bytes32 personHash,
     uint256 versionIndex
-  ) external validPersonAndVersion(personHash, versionIndex) {
+  ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
     uint256 prev = endorsedVersionIndex[personHash][msg.sender];
     if (prev == versionIndex) {
       return;
@@ -833,10 +833,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string calldata content,
     bytes32 expectedHash
   ) external nonReentrant {
-    // Verify NFT ownership
     if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
 
-    // Validate input
     if (bytes(content).length == 0 || bytes(content).length > MAX_CHUNK_CONTENT_LENGTH) {
       revert InvalidChunkContent();
     }
