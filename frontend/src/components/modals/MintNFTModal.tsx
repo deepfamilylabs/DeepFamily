@@ -208,6 +208,7 @@ export default function MintNFTModal({
   const [isEndorsed, setIsEndorsed] = useState(false)
   const [isAlreadyMinted, setIsAlreadyMinted] = useState(false)
   const [isCheckingStatus, setIsCheckingStatus] = useState(false)
+  const [hasMissingParents, setHasMissingParents] = useState<{ father: boolean; mother: boolean } | null>(null)
   const [entered, setEntered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
@@ -375,11 +376,23 @@ export default function MintNFTModal({
         // Minted: tokenId > 0 in getVersionDetails
         const tokenId = Number(details?.tokenId ?? 0)
         setIsAlreadyMinted(tokenId > 0)
+
+        // Check for missing parent hashes
+        const ZERO_BYTES32 = `0x${'00'.repeat(32)}`
+        const fatherMissing = !details?.version?.fatherHash || details.version.fatherHash === ZERO_BYTES32
+        const motherMissing = !details?.version?.motherHash || details.version.motherHash === ZERO_BYTES32
+        
+        if (fatherMissing || motherMissing) {
+          setHasMissingParents({ father: fatherMissing, mother: motherMissing })
+        } else {
+          setHasMissingParents(null)
+        }
         
       } catch (error) {
         console.error('Failed to check status:', error)
         setIsEndorsed(false)
         setIsAlreadyMinted(false)
+        setHasMissingParents(null)
       } finally {
         setIsCheckingStatus(false)
       }
@@ -398,6 +411,7 @@ export default function MintNFTModal({
     setIsEndorsed(false)
     setIsAlreadyMinted(false)
     setIsCheckingStatus(false)
+    setHasMissingParents(null)
     setSuccessResult(null)
     setErrorResult(null)
     setContractError(null)
@@ -457,6 +471,7 @@ export default function MintNFTModal({
     setIsEndorsed(false)
     setIsAlreadyMinted(false)
     setIsCheckingStatus(false)
+    setHasMissingParents(null)
     // Keep modal open for continued use
   }
 
@@ -886,32 +901,58 @@ export default function MintNFTModal({
 
           {/* Status indicators for valid targets */}
           {hasValidTarget && (
-            <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-200/50 dark:border-blue-700/50">
-              <div className="flex items-center gap-4">
-                {isCheckingStatus ? (
-                  <div className="text-sm text-blue-600 dark:text-blue-400">
-                    {t('mintNFT.checkingStatus', 'Checking status...')}
-                  </div>
-                ) : (
-                  <>
-                    <div className={`flex items-center gap-2 text-sm ${isEndorsed ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                      <div className={`w-2 h-2 rounded-full ${isEndorsed ? 'bg-green-500' : 'bg-orange-500'}`} />
-                      {isEndorsed ?
-                        t('mintNFT.endorsed', 'Endorsed') :
-                        t('mintNFT.notEndorsed', 'Not Endorsed')
-                      }
+            <div className="space-y-3">
+              <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-200/50 dark:border-blue-700/50">
+                <div className="flex items-center gap-4">
+                  {isCheckingStatus ? (
+                    <div className="text-sm text-blue-600 dark:text-blue-400">
+                      {t('mintNFT.checkingStatus', 'Checking status...')}
                     </div>
+                  ) : (
+                    <>
+                      <div className={`flex items-center gap-2 text-sm ${isEndorsed ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                        <div className={`w-2 h-2 rounded-full ${isEndorsed ? 'bg-green-500' : 'bg-orange-500'}`} />
+                        {isEndorsed ?
+                          t('mintNFT.endorsed', 'Endorsed') :
+                          t('mintNFT.notEndorsed', 'Not Endorsed')
+                        }
+                      </div>
 
-                    <div className={`flex items-center gap-2 text-sm ${isAlreadyMinted ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                      <div className={`w-2 h-2 rounded-full ${isAlreadyMinted ? 'bg-red-500' : 'bg-green-500'}`} />
-                      {isAlreadyMinted ?
-                        t('mintNFT.alreadyMinted', 'Already Minted') :
-                        t('mintNFT.canMint', 'Can Mint')
-                      }
-                    </div>
-                  </>
-                )}
+                      <div className={`flex items-center gap-2 text-sm ${isAlreadyMinted ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                        <div className={`w-2 h-2 rounded-full ${isAlreadyMinted ? 'bg-red-500' : 'bg-green-500'}`} />
+                        {isAlreadyMinted ?
+                          t('mintNFT.alreadyMinted', 'Already Minted') :
+                          t('mintNFT.canMint', 'Can Mint')
+                        }
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {/* Missing parents warning */}
+              {!isCheckingStatus && hasMissingParents && (hasMissingParents.father || hasMissingParents.mother) && (
+                <div className="p-4 bg-amber-50/50 dark:bg-amber-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-1">
+                        {t('mintNFT.missingParentsTitle', '父母信息未完整')}
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-200">
+                        {hasMissingParents.father && hasMissingParents.mother
+                          ? t('mintNFT.missingBothParents', '此版本的父母哈希均为空。版本添加者可能会在未来补录父母信息。')
+                          : hasMissingParents.father
+                          ? t('mintNFT.missingFather', '此版本的父亲哈希为空。版本添加者可能会在未来补录父亲信息。')
+                          : t('mintNFT.missingMother', '此版本的母亲哈希为空。版本添加者可能会在未来补录母亲信息。')}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-300 mt-2">
+                        {t('mintNFT.parentUpdateNote', '注意：只有版本的原始添加者可以通过 updatePersonParents 函数补录父母信息。')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

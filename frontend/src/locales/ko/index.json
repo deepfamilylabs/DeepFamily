@@ -849,7 +849,12 @@
       "invalidDeathPlace": "사망지가 너무 깁니다",
       "insufficientFunds": "트랜잭션 수수료 부족",
       "userRejected": "사용자가 트랜잭션을 거부했습니다"
-    }
+    },
+    "missingParentsTitle": "부모 정보 불완전",
+    "missingBothParents": "이 버전의 부모 해시가 비어 있습니다. 버전 추가자가 향후 부모 정보를 보완할 수 있습니다.",
+    "missingFather": "이 버전의 아버지 해시가 비어 있습니다. 버전 추가자가 향후 아버지 정보를 보완할 수 있습니다.",
+    "missingMother": "이 버전의 어머니 해시가 비어 있습니다. 버전 추가자가 향후 어머니 정보를 보완할 수 있습니다.",
+    "parentUpdateNote": "참고: 원래 버전 추가자만 updatePersonParents 함수를 통해 부모 정보를 보완할 수 있습니다."
   },
   "endorse": {
     "title": "버전 승인",
