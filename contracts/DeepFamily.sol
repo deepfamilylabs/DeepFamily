@@ -40,12 +40,13 @@ interface INamePoseidonVerifier {
 }
 
 /**
- * @title DeepFamily — Zero-Knowledge Secured Family Tree
- * @notice Maintains verifiable family lineages with multi-version personas, endorsement flows, and NFT incentives.
- * @dev Poseidon commitments paired with Groth16 verifiers deliver:
- *      - private-yet-verifiable identity commitments plus addPersonZK onboarding
- *      - mintPersonNFT name-binding proofs, endorsement-driven FT reward routing, and parent-linked version histories
- *      - story chunk append/update/seal lifecycle, pagination-friendly read APIs, and strict validation guardrails
+ * @title DeepFamily — Zero-Knowledge Decentralized Family Tree Protocol
+ * @notice Verifiable global family lineages through ZK proofs, multi-version management, community endorsement, and NFT assets
+ * @dev Architecture:
+ *      - Privacy Layer: Groth16 proofs + Poseidon/keccak256 dual-hash for private submissions (addPersonZK)
+ *      - Incentive Layer: DEEP token mining for complete families, endorsement fees route to NFT holders/contributors
+ *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + 100-chunk story sharding
+ *      - Security: Reentrancy guards, paginated queries (max 100), 50+ custom errors, access controls
  */
 contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Custom Errors (Unified Error Handling) ==========
@@ -931,15 +932,13 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
     uint256 newTokenId = ++tokenCounter;
 
-    _safeMint(msg.sender, newTokenId);
-    _setTokenURI(newTokenId, _tokenURI);
-
     tokenIdToPerson[newTokenId] = personHash;
     tokenIdToVersionIndex[newTokenId] = versionIndex;
-
     versionToTokenId[personHash][versionIndex] = newTokenId;
-
     nftCoreInfo[newTokenId] = coreInfo;
+    _setTokenURI(newTokenId, _tokenURI);
+
+    _safeMint(msg.sender, newTokenId);
 
     emit PersonNFTMinted(
       personHash,
