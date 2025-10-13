@@ -88,6 +88,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error TokenContractNotSet();
   error InvalidTokenId();
   error EndorsementFeeTransferFailed();
+  error OwnerFeeTooHigh();
 
   // Query-related errors
   error PageSizeExceedsLimit();
@@ -233,6 +234,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Person hash => version index => endorsement count, reflects version credibility
   mapping(bytes32 => mapping(uint256 => uint256)) public versionEndorsementCount;
 
+  /// @dev Owner-share fee (in basis points) taken from each endorsement fee（default 5%, max 20%）
+  uint256 public ownerEndorsementFeeBps = 500;
+
   // Name indexing removed for privacy
 
   /// @dev (parent person hash, parent version index) => children version reference array
@@ -251,6 +255,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /// @dev Maximum number of story chunks per NFT
   uint256 public constant MAX_STORY_CHUNKS = 100;
+
+  /// @dev Maximum basis points the owner can take from endorsement fees (20%)
+  uint256 public constant OWNER_FEE_BPS_MAX = 2000;
+
+  /// @dev Basis points denominator (10_000 = 100%)
+  uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
 
   /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
@@ -425,6 +435,13 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     address indexed sealer
   );
 
+  /**
+   * @dev Owner fee update event
+   * @param previousBps Previous owner fee in basis points
+   * @param newBps New owner fee in basis points
+   */
+  event OwnerEndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
+
   // ========== Function Modifiers ==========
 
   /**
@@ -518,6 +535,22 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     DEEP_FAMILY_TOKEN_CONTRACT = _deepFamilyTokenContract;
     PERSON_HASH_VERIFIER = _personHashVerifier;
     NAME_POSEIDON_VERIFIER = _namePoseidonVerifier;
+  }
+
+  // ========== Admin Functions ==========
+
+  /**
+   * @notice Update owner fee share for endorsement payments.
+   * @param newBps New owner fee in basis points (max 20%)
+   */
+  function updateOwnerEndorsementFee(uint256 newBps) external onlyOwner {
+    if (newBps > OWNER_FEE_BPS_MAX) revert OwnerFeeTooHigh();
+    uint256 previous = ownerEndorsementFeeBps;
+    if (previous == newBps) {
+      return;
+    }
+    ownerEndorsementFeeBps = newBps;
+    emit OwnerEndorsementFeeUpdated(previous, newBps);
   }
 
   // ========== Core Functionality Functions ==========
@@ -840,7 +873,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     }
 
     uint256 arrayIndex = versionIndex - 1;
-    uint256 fee = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).recentReward();
+    IDeepFamilyToken tokenContract = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT);
+    uint256 fee = tokenContract.recentReward();
 
     if (fee > 0) {
       PersonVersion storage v = personVersions[personHash][arrayIndex];
@@ -856,12 +890,16 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       } else {
         recipient = v.addedBy;
       }
-      bool ok = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).transferFrom(
-        msg.sender,
-        recipient,
-        fee
-      );
-      if (!ok) revert EndorsementFeeTransferFailed();
+      uint256 ownerShare = (fee * ownerEndorsementFeeBps) / FEE_BPS_DENOMINATOR;
+      uint256 recipientShare = fee - ownerShare;
+      if (recipientShare > 0) {
+        bool okRecipient = tokenContract.transferFrom(msg.sender, recipient, recipientShare);
+        if (!okRecipient) revert EndorsementFeeTransferFailed();
+      }
+      if (ownerShare > 0) {
+        bool okOwner = tokenContract.transferFrom(msg.sender, owner(), ownerShare);
+        if (!okOwner) revert EndorsementFeeTransferFailed();
+      }
     }
 
     if (prev > 0) {
