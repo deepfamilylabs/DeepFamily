@@ -154,7 +154,7 @@ function mintPersonNFT(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[4] calldata publicSignals,
+    uint256[5] calldata publicSignals,
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
@@ -167,7 +167,8 @@ function mintPersonNFT(
 2. `NamePoseidonVerifier.verifyProof()` must succeed
 3. `publicSignals[0:1]` must match `coreInfo.basicInfo.fullNameCommitment`
 4. `publicSignals[2:3]` must match `keccak256(coreInfo.supplementInfo.fullName)`
-5. `getPersonHash(coreInfo.basicInfo)` must equal `personHash`
+5. `publicSignals[4]` must equal `uint256(uint160(msg.sender))`
+6. `getPersonHash(coreInfo.basicInfo)` must equal `personHash`
 
 #### Story Sharding System
 ```solidity

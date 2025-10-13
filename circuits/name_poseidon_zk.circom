@@ -40,11 +40,13 @@ template HashToLimbs() {
 template NamePoseidonBinding() {
     signal input fullNameHash[32]; // keccak256(fullName) bytes
     signal input saltHash[32];     // keccak256(passphrase) bytes (can be zero when passphrase omitted)
+    signal input minter;           // Address of the intended NFT minter (lower 160 bits)
 
     signal output poseidonHi; // high 128 bits of Poseidon digest
     signal output poseidonLo; // low 128 bits of Poseidon digest
     signal output nameHashHi; // high 128 bits of keccak(fullName)
     signal output nameHashLo; // low 128 bits of keccak(fullName)
+    signal output minterOut;  // The minter address, exposed as public signal for on-chain binding
 
     component nameLimbs = HashToLimbs();
     for (var i = 0; i < 32; i++) {
@@ -81,6 +83,10 @@ template NamePoseidonBinding() {
 
     nameHashHi <== nameLimbs.limb0;
     nameHashLo <== nameLimbs.limb1;
+
+    component minterBits = Num2Bits(160);
+    minterBits.in <== minter;
+    minterOut <== minter;
 }
 
 component main = NamePoseidonBinding();

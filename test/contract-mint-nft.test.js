@@ -12,6 +12,7 @@ describe('Mint NFT Tests', function () {
     await hre.deployments.fixture(['Integrated']);
     const deepDeployment = await hre.deployments.get('DeepFamily');
     const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
+    const [signer] = await hre.ethers.getSigners();
     const FULLNAME = 'Mint Subject';
     const params = { fullname: FULLNAME, birthyear: '1999', gender: '1', tag: 'v1', ipfs: 'QmMint1' };
     await hre.run('add-person', params);
@@ -25,7 +26,7 @@ describe('Mint NFT Tests', function () {
     });
     const fullNameCommitment = basicInfo.fullNameCommitment;
     const personHash = await deepFamily.getPersonHash(basicInfo);
-    const proofBundle = await generateNamePoseidonProof(FULLNAME);
+    const proofBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: signer.address });
     const { proof, publicSignals } = proofBundle;
     if (endorsed) {
       await hre.run('endorse', { person: personHash, vindex: '1' });
@@ -178,5 +179,38 @@ describe('Mint NFT Tests', function () {
     // Verify the NFT was minted
     const tokenCounter = await deepFamily.tokenCounter();
     expect(tokenCounter).to.equal(1n);
+  });
+
+  it('reverts when proof minter does not match caller', async () => {
+    const { deepFamily, personHash, FULLNAME, basicInfo } = await prepare(true);
+    const [, otherSigner] = await hre.ethers.getSigners();
+    const mismatchBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: otherSigner.address });
+
+    const coreInfo = {
+      basicInfo,
+      supplementInfo: {
+        fullName: FULLNAME,
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story'
+      }
+    };
+
+    await expect(
+      deepFamily.mintPersonNFT(
+        mismatchBundle.proof.a,
+        mismatchBundle.proof.b,
+        mismatchBundle.proof.c,
+        mismatchBundle.publicSignals,
+        personHash,
+        1,
+        'ipfs://meta',
+        coreInfo
+      )
+    ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch');
   });
 });

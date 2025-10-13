@@ -37,10 +37,12 @@ describe("zk-name-poseidon-check helpers", function () {
       const raw = {
         fullNameHash: Array(32).fill("2"),
         saltHash: Array(32).fill(3),
+        minter: "0x1234",
       };
       const validated = validatePoseidonInput(raw);
       expect(validated.fullNameHash[0]).to.equal(2);
       expect(validated.saltHash[0]).to.equal(3);
+      expect(validated.minter).to.equal("4660");
     });
 
     it("rejects malformed objects", function () {
@@ -51,10 +53,10 @@ describe("zk-name-poseidon-check helpers", function () {
 
   describe("computeExpectedSignals", function () {
     it("matches fixture public signals", async function () {
-      const inputPath = path.join(__dirname, "../test_proof/name_poseidon_input.json");
+      const inputPath = path.join(__dirname, "../circuits/test/proof/name_poseidon_input.json");
       const publicPath = path.join(
         __dirname,
-        "../test_proof/name_poseidon_public.json",
+        "../circuits/test/proof/name_poseidon_public.json",
       );
 
       const input = validatePoseidonInput(loadJson(inputPath));

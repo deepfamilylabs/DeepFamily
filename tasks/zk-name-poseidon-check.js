@@ -10,9 +10,9 @@ Features:
   discovered or user-supplied wasm/zkey artifacts
 
 Usage examples:
-  node tasks/zk-name-poseidon-check.js --input test_proof/name_poseidon_input.json
-  node tasks/zk-name-poseidon-check.js --input test_proof/name_poseidon_input.json \
-    --public test_proof/name_poseidon_public.json
+  node tasks/zk-name-poseidon-check.js --input circuits/test/proof/name_poseidon_input.json
+  node tasks/zk-name-poseidon-check.js --input circuits/test/proof/name_poseidon_input.json \
+    --public circuits/test/proof/name_poseidon_public.json
   node tasks/zk-name-poseidon-check.js --input ./input.json --prove \
     --wasm ./circuits/name_poseidon_zk_js/name_poseidon_zk.wasm \
     --zkey ./circuits/name_poseidon_0001.zkey
@@ -61,18 +61,57 @@ function bytes32ToLimbs(bytes) {
   return split128FromBigInt(bigIntValue);
 }
 
+function normalizeMinter(value) {
+  if (value === undefined || value === null || value === "") {
+    return "0";
+  }
+
+  let bigintValue;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return "0";
+    }
+    if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
+      bigintValue = BigInt(trimmed);
+    } else {
+      bigintValue = BigInt(trimmed);
+    }
+  } else if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(
+        "minter must be a non-negative safe integer, decimal string, hex string, or bigint",
+      );
+    }
+    bigintValue = BigInt(value);
+  } else if (typeof value === "bigint") {
+    bigintValue = value;
+  } else {
+    throw new Error("minter must be provided as decimal string, hex string, number, or bigint");
+  }
+
+  if (bigintValue < 0n || bigintValue >= 1n << 160n) {
+    throw new Error(
+      "minter must fit within 160 bits (typical Ethereum address). Provide 0x-prefixed hex or decimal string.",
+    );
+  }
+
+  return bigintValue.toString();
+}
+
 function validatePoseidonInput(raw) {
   if (!raw || typeof raw !== "object") {
-    throw new Error("Input JSON must be an object with fullNameHash and saltHash fields");
+    throw new Error("Input JSON must be an object with fullNameHash, saltHash, and minter fields");
   }
 
   const fullNameHash = normaliseBytes32Array(raw.fullNameHash, "fullNameHash");
   const saltHash = normaliseBytes32Array(raw.saltHash, "saltHash");
+  const minter = normalizeMinter(raw.minter);
 
-  return { fullNameHash, saltHash };
+  return { fullNameHash, saltHash, minter };
 }
 
-async function computeExpectedSignalsFromHashes(fullNameHash, saltHash) {
+async function computeExpectedSignalsFromHashes(fullNameHash, saltHash, minter) {
   const { poseidon } = require("circomlibjs");
 
   const nameLimbs = bytes32ToLimbs(fullNameHash);
@@ -87,11 +126,12 @@ async function computeExpectedSignalsFromHashes(fullNameHash, saltHash) {
     poseidonLimbs.lo.toString(),
     nameLimbs.hi.toString(),
     nameLimbs.lo.toString(),
+    minter.toString(),
   ];
 }
 
 async function computeExpectedSignals(input) {
-  return computeExpectedSignalsFromHashes(input.fullNameHash, input.saltHash);
+  return computeExpectedSignalsFromHashes(input.fullNameHash, input.saltHash, BigInt(input.minter));
 }
 
 function loadJson(filePath) {
@@ -123,6 +163,12 @@ function parseArgs(rawArgs) {
       case "--prove":
         args.prove = true;
         break;
+      case "--minter":
+        args.minter = rawArgs[++i];
+        break;
+      case "--submitter":
+        args.minter = rawArgs[++i];
+        break;
       case "--help":
       case "-h":
         args.help = true;
@@ -136,11 +182,14 @@ function parseArgs(rawArgs) {
 }
 
 function formatSignalsForLog(label, signals) {
-  console.log(label);
+  if (label && label.length > 0) {
+    console.log(label);
+  }
   console.log(`  poseidonHi: ${signals[0]}`);
   console.log(`  poseidonLo: ${signals[1]}`);
   console.log(`  nameHashHi: ${signals[2]}`);
   console.log(`  nameHashLo: ${signals[3]}`);
+  console.log(`  minter: ${signals[4]}`);
 }
 
 function comparePublicSignals(expected, actual) {
@@ -212,11 +261,15 @@ async function runCli(rawArgs = process.argv.slice(2)) {
     }
 
     const inputJson = loadJson(args.input);
+    if (args.minter !== undefined) {
+      inputJson.minter = args.minter;
+    }
     const validInput = validatePoseidonInput(inputJson);
 
     console.log("🔍 Name Poseidon input summary:");
     console.log("  fullNameHash bytes:", formatBytePreview(validInput.fullNameHash));
     console.log("  saltHash bytes:", formatBytePreview(validInput.saltHash));
+    console.log("  minter address (decimal):", validInput.minter);
 
     const expected = await computeExpectedSignals(validInput);
 

@@ -1,6 +1,7 @@
 const { expect } = require('chai');
 const hre = require('hardhat');
 const { buildBasicInfo } = require('../lib/namePoseidon');
+const { generatePersonHashProof } = require('../lib/personHashProof');
 
 // Tests focused on add-person (version creation) including validation and duplicate logic
 
@@ -191,6 +192,44 @@ describe('Person Version (add-person) Tests', function () {
     expect(totalVersions).to.equal(2n);
     expect(versions[0].tag).to.equal('v1');
     expect(versions[1].tag).to.equal('v2');
+  });
+
+  it('reverts when proof submitter does not match caller', async () => {
+    const { deepFamily } = await baseSetup();
+    const [submitter, mismatchedCaller] = await hre.ethers.getSigners();
+    const submitterAddr = await submitter.getAddress();
+
+    const personData = {
+      fullName: 'Caller Bound',
+      passphrase: '',
+      isBirthBC: false,
+      birthYear: 1985,
+      birthMonth: 5,
+      birthDay: 20,
+      gender: 1,
+    };
+
+    const { proof, publicSignals } = await generatePersonHashProof(
+      personData,
+      null,
+      null,
+      submitterAddr,
+    );
+
+    await expect(
+      deepFamily
+        .connect(mismatchedCaller)
+        .addPersonZK(
+          proof.a,
+          proof.b,
+          proof.c,
+          publicSignals,
+          0,
+          0,
+          'vCaller',
+          'ipfs://caller-mismatch',
+        ),
+    ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch');
   });
 
   it('handles person with passphrase', async () => {

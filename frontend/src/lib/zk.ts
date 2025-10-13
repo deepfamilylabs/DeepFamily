@@ -592,12 +592,20 @@ export async function verifyProof(
 
 export async function generateNamePoseidonProof(
   fullName: string,
-  passphrase: string
+  passphrase: string,
+  minterAddress: string
 ): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
   try {
+    if (!minterAddress || minterAddress.length === 0) {
+      throw new Error('Minter address is required to generate the name poseidon proof')
+    }
+
+    const minterDecimal = BigInt(minterAddress).toString()
+
     const input = {
       fullNameHash: hashFullName(fullName),
-      saltHash: hashPassphrase(passphrase)
+      saltHash: hashPassphrase(passphrase),
+      minter: minterDecimal
     }
 
     const timestamp = Date.now()

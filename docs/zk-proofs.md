@@ -160,11 +160,13 @@ Proves knowledge of full name and salt that produce a specific Poseidon commitme
 template NamePoseidonBinding() {
     signal input fullNameHash[32]; // keccak256(fullName) bytes
     signal input saltHash[32];     // keccak256(passphrase) bytes
+    signal input minter;           // Intended minter address (lower 160 bits)
 
     signal output poseidonHi;      // High 128 bits of Poseidon digest
     signal output poseidonLo;      // Low 128 bits of Poseidon digest
     signal output nameHashHi;      // High 128 bits of keccak(fullName)
     signal output nameHashLo;      // Low 128 bits of keccak(fullName)
+    signal output minterOut;       // Public minter binding
 }
 ```
 
@@ -173,13 +175,14 @@ template NamePoseidonBinding() {
 2. Compute `Poseidon(nameHash_limbs, saltHash_limbs, 0)`
 3. Output both Poseidon commitment and original name hash as limbs
 
-#### Public Signals (4 outputs)
+#### Public Signals (5 outputs)
 ```javascript
 [
   poseidonHi,      // Poseidon commitment high 128 bits
   poseidonLo,      // Poseidon commitment low 128 bits
   nameHashHi,      // keccak(fullName) high 128 bits
-  nameHashLo       // keccak(fullName) low 128 bits
+  nameHashLo,      // keccak(fullName) low 128 bits
+  minterOut        // Authorised minter address
 ]
 ```
 
@@ -213,7 +216,7 @@ function mintPersonNFT(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[4] calldata publicSignals,
+    uint256[5] calldata publicSignals,
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
@@ -226,7 +229,8 @@ function mintPersonNFT(
 2. **Name Proof Verification**: `NamePoseidonVerifier.verifyProof(a, b, c, publicSignals)`
 3. **Commitment Validation**: `publicSignals[0:1]` must match `coreInfo.basicInfo.fullNameCommitment`
 4. **Name Hash Validation**: `publicSignals[2:3]` must match `keccak256(coreInfo.supplementInfo.fullName)`
-5. **Person Hash Validation**: `getPersonHash(coreInfo.basicInfo)` must match `personHash`
+5. **Minter Binding**: `publicSignals[4]` must equal `uint256(uint160(msg.sender))`
+6. **Person Hash Validation**: `getPersonHash(coreInfo.basicInfo)` must match `personHash`
 
 ## Security Features
 
