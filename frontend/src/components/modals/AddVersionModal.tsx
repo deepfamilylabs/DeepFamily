@@ -401,7 +401,7 @@ export default function AddVersionModal({
         >
         {/* Header */}
         <div 
-          className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-4 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
+          className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-3 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
           onPointerDown={(e) => { (e.currentTarget as any).setPointerCapture?.(e.pointerId); startYRef.current = e.clientY; setDragging(true) }}
           onPointerMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.clientY - startYRef.current); setDragOffset(dy) }}
           onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
@@ -414,8 +414,8 @@ export default function AddVersionModal({
           <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
           
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
+            <div className="flex-1 flex items-center gap-4 min-w-0">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
                 <UserPlus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
               </div>
               <div className="min-w-0 flex-1">
@@ -426,7 +426,7 @@ export default function AddVersionModal({
                   }
                 </h2>
                 <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  <span className="whitespace-nowrap">{t('addVersion.description', 'Add person with zero-knowledge proof')}</span>
+                  <span className="whitespace-normal">{t('addVersion.personInfoHint', 'Plain text won\'t go on-chain, used only for ZK proof')}</span>
                 </div>
               </div>
             </div>
@@ -452,22 +452,27 @@ export default function AddVersionModal({
             <div className="flex-1 p-4 sm:p-6 space-y-6">
           
           {/* Person Being Added - Using PersonHashCalculator */}
-          <PersonHashCalculator
-            showTitle={false}
-            collapsible={false}
-            initialValues={existingPersonData}
-            onFormChange={(formData) => {
-              setPersonInfo({
-                fullName: formData.fullName,
-                gender: formData.gender,
-                birthYear: formData.birthYear,
-                birthMonth: formData.birthMonth,
-                birthDay: formData.birthDay,
-                isBirthBC: formData.isBirthBC,
-                passphrase: formData.passphrase
-              })
-            }}
-          />
+          <div className="space-y-2">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              {t('addVersion.personInfo', 'Person Information')}
+            </h3>
+            <PersonHashCalculator
+              showTitle={false}
+              collapsible={false}
+              initialValues={existingPersonData}
+              onFormChange={(formData) => {
+                setPersonInfo({
+                  fullName: formData.fullName,
+                  gender: formData.gender,
+                  birthYear: formData.birthYear,
+                  birthMonth: formData.birthMonth,
+                  birthDay: formData.birthDay,
+                  isBirthBC: formData.isBirthBC,
+                  passphrase: formData.passphrase
+                })
+              }}
+            />
+          </div>
           {/* Father Information - Using PersonHashCalculator */}
           <div className="space-y-2">
             <button
@@ -614,10 +619,6 @@ export default function AddVersionModal({
 
           {/* Metadata */}
           <div className="space-y-3">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              {t('addVersion.metadata', 'Metadata')}
-            </h3>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -637,7 +638,7 @@ export default function AddVersionModal({
                 <input
                   {...register('metadataCID')}
                   className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                  placeholder="QmXXX..."
+                  placeholder={t('addVersion.metadataCIDPlaceholder', 'Optional: IPFS CID (Qm... or bafy...)')}
                 />
               </div>
             </div>
@@ -668,55 +669,8 @@ export default function AddVersionModal({
           {/* Success Message */}
           {successResult && (
             <div className="mx-4 sm:mx-6 mb-4 space-y-3">
-              {/* Main Success Message */}
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                <div className="flex items-center gap-3 mb-3">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                    {t('addVersion.addedSuccessfully', 'Person added successfully!')}
-                  </p>
-                </div>
-                
-                <div className="space-y-2 text-xs text-green-700 dark:text-green-300">
-                  {/* Person Hash */}
-                  <div>
-                    <span className="font-medium">{t('addVersion.personHash', 'Person Hash')}:</span>
-                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
-                      {successResult.hash}
-                    </code>
-                  </div>
-                  
-                  {/* Version Index */}
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t('addVersion.versionIndex', 'Version Index')}:</span>
-                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
-                      {successResult.index}
-                    </code>
-                  </div>
-                  
-                  {/* Transaction Hash */}
-                  <div>
-                    <span className="font-medium">{t('addVersion.transactionHash', 'Transaction Hash')}:</span>
-                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
-                      {successResult.transactionHash}
-                    </code>
-                  </div>
-                  
-                  {/* Block Number */}
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t('addVersion.blockNumber', 'Block Number')}:</span>
-                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
-                      {successResult.blockNumber}
-                    </code>
-                  </div>
-                </div>
-              </div>
-
               {/* Events Information */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {t('addVersion.eventsTriggered', 'Events Triggered')}:
-                </h4>
+              <div className="space-y-3">
                 
                 {/* ZK Proof Verified */}
                 {successResult.events.PersonHashZKVerified && (
@@ -786,7 +740,7 @@ export default function AddVersionModal({
                         <span className="font-medium text-green-800 dark:text-green-200">
                           {t('addVersion.versionIndex', 'Version Index')}:
                         </span>
-                        <code className="bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
                           {successResult.events.PersonVersionAdded.versionIndex}
                         </code>
                       </div>
@@ -826,7 +780,7 @@ export default function AddVersionModal({
                             <span className="font-medium text-green-800 dark:text-green-200">
                               {t('addVersion.fatherVersionIndex', 'Father Version')}:
                             </span>
-                            <code className="bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
                               {successResult.events.PersonVersionAdded.fatherVersionIndex}
                             </code>
                           </div>
@@ -848,7 +802,7 @@ export default function AddVersionModal({
                             <span className="font-medium text-green-800 dark:text-green-200">
                               {t('addVersion.motherVersionIndex', 'Mother Version')}:
                             </span>
-                            <code className="bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
                               {successResult.events.PersonVersionAdded.motherVersionIndex}
                             </code>
                           </div>
@@ -910,7 +864,7 @@ export default function AddVersionModal({
                         <span className="font-medium text-yellow-800 dark:text-yellow-200">
                           {t('addVersion.versionIndex', 'Version Index')}:
                         </span>
-                        <code className="bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                        <code className="col-span-2 bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs">
                           {successResult.events.TokenRewardDistributed.versionIndex}
                         </code>
                       </div>

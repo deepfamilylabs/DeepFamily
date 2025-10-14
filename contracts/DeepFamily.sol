@@ -13,6 +13,7 @@ interface IDeepFamilyToken {
   function mint(address to) external returns (uint256 reward);
   function recentReward() external view returns (uint256);
   function transferFrom(address from, address to, uint256 amount) external returns (bool);
+  function burnFrom(address account, uint256 amount) external;
 }
 
 /**
@@ -88,7 +89,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error TokenContractNotSet();
   error InvalidTokenId();
   error EndorsementFeeTransferFailed();
-  error OwnerFeeTooHigh();
+  error ProtocolFeeTooHigh();
+  error AlreadyEndorsed();
 
   // Query-related errors
   error PageSizeExceedsLimit();
@@ -234,8 +236,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Person hash => version index => endorsement count, reflects version credibility
   mapping(bytes32 => mapping(uint256 => uint256)) public versionEndorsementCount;
 
-  /// @dev Owner-share fee (in basis points) taken from each endorsement fee（default 5%, max 20%）
-  uint256 public ownerEndorsementFeeBps = 500;
+  /// @dev Protocol-share fee (in basis points) taken from each endorsement fee（default 5%, max 20%）
+  uint256 public protocolEndorsementFeeBps = 500;
 
   // Name indexing removed for privacy
 
@@ -256,8 +258,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Maximum number of story chunks per NFT
   uint256 public constant MAX_STORY_CHUNKS = 100;
 
-  /// @dev Maximum basis points the owner can take from endorsement fees (20%)
-  uint256 public constant OWNER_FEE_BPS_MAX = 2000;
+  /// @dev Maximum basis points the protocol can take from endorsement fees (20%)
+  uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
 
   /// @dev Basis points denominator (10_000 = 100%)
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
@@ -302,13 +304,21 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param personHash Person hash (keccak256 of Poseidon commitment)
    * @param endorser Endorser's address
    * @param versionIndex Endorsed version index
-   * @param endorsementFee Endorsement fee
+   * @param recipient Recipient receiving the non-protocol share (addedBy or NFT holder)
+   * @param recipientShare Recipient share amount
+   * @param protocolRecipient Protocol fee recipient (owner or zero address when burned)
+   * @param protocolShare Protocol fee amount
+   * @param endorsementFee Total endorsement fee (recipientShare + protocolShare)
    * @param timestamp Endorsement timestamp
    */
   event PersonVersionEndorsed(
     bytes32 indexed personHash,
     address indexed endorser,
     uint256 versionIndex,
+    address recipient,
+    uint256 recipientShare,
+    address protocolRecipient,
+    uint256 protocolShare,
     uint256 endorsementFee,
     uint256 timestamp
   );
@@ -436,11 +446,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   );
 
   /**
-   * @dev Owner fee update event
-   * @param previousBps Previous owner fee in basis points
-   * @param newBps New owner fee in basis points
+   * @dev Protocol fee update event
+   * @param previousBps Previous protocol fee in basis points
+   * @param newBps New protocol fee in basis points
    */
-  event OwnerEndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
+  event ProtocolEndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
   // ========== Function Modifiers ==========
 
@@ -540,17 +550,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Admin Functions ==========
 
   /**
-   * @notice Update owner fee share for endorsement payments.
-   * @param newBps New owner fee in basis points (max 20%)
+   * @notice Update protocol fee share for endorsement payments.
+   * @param newBps New protocol fee in basis points (max 20%)
    */
-  function updateOwnerEndorsementFee(uint256 newBps) external onlyOwner {
-    if (newBps > OWNER_FEE_BPS_MAX) revert OwnerFeeTooHigh();
-    uint256 previous = ownerEndorsementFeeBps;
+  function updateProtocolEndorsementFee(uint256 newBps) external onlyOwner {
+    if (newBps > PROTOCOL_FEE_BPS_MAX) revert ProtocolFeeTooHigh();
+    uint256 previous = protocolEndorsementFeeBps;
     if (previous == newBps) {
       return;
     }
-    ownerEndorsementFeeBps = newBps;
-    emit OwnerEndorsementFeeUpdated(previous, newBps);
+    protocolEndorsementFeeBps = newBps;
+    emit ProtocolEndorsementFeeUpdated(previous, newBps);
   }
 
   // ========== Core Functionality Functions ==========
@@ -724,8 +734,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     bytes32 newMotherHash,
     uint256 newMotherVersionIndex
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
-    if (newFatherHash != bytes32(0) && newFatherHash == newMotherHash)
-      revert InvalidParentHash();
+    if (newFatherHash != bytes32(0) && newFatherHash == newMotherHash) revert InvalidParentHash();
     PersonVersion storage version = personVersions[personHash][versionIndex - 1];
     if (msg.sender != version.addedBy) revert UnauthorizedParentUpdate();
 
@@ -868,39 +877,13 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 versionIndex
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
     uint256 prev = endorsedVersionIndex[personHash][msg.sender];
-    if (prev == versionIndex) {
-      return;
-    }
+    if (prev == versionIndex) revert AlreadyEndorsed();
 
     uint256 arrayIndex = versionIndex - 1;
-    IDeepFamilyToken tokenContract = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT);
-    uint256 fee = tokenContract.recentReward();
-
-    if (fee > 0) {
-      PersonVersion storage v = personVersions[personHash][arrayIndex];
-      uint256 tokenId = versionToTokenId[personHash][versionIndex];
-      address recipient;
-      if (tokenId != 0) {
-        address holder = _ownerOf(tokenId);
-        if (holder != address(0)) {
-          recipient = holder;
-        } else {
-          recipient = v.addedBy;
-        }
-      } else {
-        recipient = v.addedBy;
-      }
-      uint256 ownerShare = (fee * ownerEndorsementFeeBps) / FEE_BPS_DENOMINATOR;
-      uint256 recipientShare = fee - ownerShare;
-      if (recipientShare > 0) {
-        bool okRecipient = tokenContract.transferFrom(msg.sender, recipient, recipientShare);
-        if (!okRecipient) revert EndorsementFeeTransferFailed();
-      }
-      if (ownerShare > 0) {
-        bool okOwner = tokenContract.transferFrom(msg.sender, owner(), ownerShare);
-        if (!okOwner) revert EndorsementFeeTransferFailed();
-      }
-    }
+    uint256 fee = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).recentReward();
+    address recipientAddress = address(0);
+    address protocolRecipientAddress = address(0);
+    uint256 recipientShareAmount = 0;
 
     if (prev > 0) {
       uint256 prevIdx = prev - 1;
@@ -913,7 +896,56 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     versionEndorsementCount[personHash][arrayIndex] += 1;
     endorsedVersionIndex[personHash][msg.sender] = versionIndex;
 
-    emit PersonVersionEndorsed(personHash, msg.sender, versionIndex, fee, block.timestamp);
+    if (fee > 0) {
+      IDeepFamilyToken tokenContract = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT);
+      PersonVersion storage v = personVersions[personHash][arrayIndex];
+      uint256 tokenId = versionToTokenId[personHash][versionIndex];
+      if (tokenId != 0) {
+        address holder = _ownerOf(tokenId);
+        if (holder != address(0)) {
+          recipientAddress = holder;
+        } else {
+          recipientAddress = v.addedBy;
+        }
+      } else {
+        recipientAddress = v.addedBy;
+      }
+      uint256 protocolShare = (fee * protocolEndorsementFeeBps) / FEE_BPS_DENOMINATOR;
+      recipientShareAmount = fee - protocolShare;
+      if (recipientShareAmount > 0) {
+        bool okRecipient = tokenContract.transferFrom(
+          msg.sender,
+          recipientAddress,
+          recipientShareAmount
+        );
+        if (!okRecipient) revert EndorsementFeeTransferFailed();
+      }
+      if (protocolShare > 0) {
+        protocolRecipientAddress = owner();
+        if (protocolRecipientAddress == address(0)) {
+          tokenContract.burnFrom(msg.sender, protocolShare);
+        } else {
+          bool okOwner = tokenContract.transferFrom(
+            msg.sender,
+            protocolRecipientAddress,
+            protocolShare
+          );
+          if (!okOwner) revert EndorsementFeeTransferFailed();
+        }
+      }
+    }
+
+    emit PersonVersionEndorsed(
+      personHash,
+      msg.sender,
+      versionIndex,
+      recipientAddress,
+      recipientShareAmount,
+      protocolRecipientAddress,
+      fee - recipientShareAmount,
+      fee,
+      block.timestamp
+    );
   }
 
   /**

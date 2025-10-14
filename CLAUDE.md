@@ -62,7 +62,7 @@ The system implements a two-layer value model that balances privacy protection w
 ### Economic Incentives
 - **Smart Mining**: Rewards only for complete family data (both parents exist)
 - **Community Endorsement**: Pay current mining reward to endorse trusted versions
-- **Fee Distribution**: Endorsement fees flow to NFT holders or original contributors
+- **Fee Distribution**: Majority flows to NFT holders or contributors, with a small protocol share (default 5%, max 20%) for sustainability
 - **Progressive Halving**: Advanced tokenomics with 10 halving cycles
 
 ### Data Management
