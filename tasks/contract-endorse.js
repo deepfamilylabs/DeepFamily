@@ -67,7 +67,7 @@ task("endorse", "Endorse a person version (uses DeepFamilyToken recentReward as 
     // Decode PersonVersionEndorsed event
     try {
       const iface = new ethers.Interface([
-        "event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, uint256 endorsementFee, uint256 timestamp)",
+        "event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, address recipient, uint256 recipientShare, address protocolRecipient, uint256 protocolShare, uint256 endorsementFee, uint256 timestamp)",
       ]);
       const deepAddr = deepDeployment.address.toLowerCase();
       for (const log of receipt.logs || []) {

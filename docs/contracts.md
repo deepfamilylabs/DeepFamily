@@ -144,7 +144,8 @@ function endorseVersion(bytes32 personHash, uint256 versionIndex) external
 
 **Endorsement Mechanics**:
 - Endorsers pay `recentReward` amount in DEEP tokens
-- Funds flow to NFT holder if minted, otherwise to original contributor
+- **Fee Distribution**: Majority flows to NFT holder (if minted) or original contributor, with a small protocol share (default 5%, max 20%) for sustainability
+- Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
 - Switching endorsements rebalances vote counts
 

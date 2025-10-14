@@ -54,6 +54,7 @@ export default function EndorseModal({
   const [deepTokenAddress, setDeepTokenAddress] = useState<string>('')
   const [deepTokenDecimals, setDeepTokenDecimals] = useState<number>(18)
   const [deepTokenSymbol, setDeepTokenSymbol] = useState<string>('DEEP')
+  const [protocolFeeBps, setProtocolFeeBps] = useState<number>(500) // Default 5% (500 basis points)
   const [isApproving, setIsApproving] = useState(false)
   // Removed unlimited approval for user safety - always use exact amount approval
   const [entered, setEntered] = useState(false)
@@ -157,6 +158,14 @@ export default function EndorseModal({
         setDeepTokenFee(ethers.formatUnits(fee, decimals))
         setDeepTokenFeeRaw(fee)
         setUserDeepBalance(ethers.formatUnits(balance, decimals))
+
+        // Get protocol endorsement fee in basis points
+        try {
+          const feeBps = await contract.protocolEndorsementFeeBps()
+          setProtocolFeeBps(Number(feeBps))
+        } catch (error) {
+          console.warn('Failed to load protocol fee BPS, using default:', error)
+        }
 
         // Target-specific loads
         if (hasValidTarget && getVersionDetails && targetPersonHash && targetVersionIndex !== undefined) {
@@ -670,6 +679,10 @@ export default function EndorseModal({
                 personHash: endorsedEvent.args?.personHash || targetPersonHash!,
                 endorser: endorsedEvent.args?.endorser || address,
                 versionIndex: endorsedEvent.args?.versionIndex || targetVersionIndex!,
+                recipient: endorsedEvent.args?.recipient,
+                recipientShare: endorsedEvent.args?.recipientShare,
+                protocolRecipient: endorsedEvent.args?.protocolRecipient,
+                protocolShare: endorsedEvent.args?.protocolShare,
                 endorsementFee: endorsedEvent.args?.endorsementFee || deepTokenFeeRaw.toString(),
                 timestamp: endorsedEvent.args?.timestamp || Math.floor(Date.now() / 1000)
               } : null
@@ -935,18 +948,6 @@ export default function EndorseModal({
               </h3>
               
               <div className="p-4 bg-amber-50/50 dark:bg-amber-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
-                <div className="flex items-start gap-3 mb-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                      {t('endorse.specifyVersion', 'Specify Version to Endorse')}
-                    </h4>
-                    <p className="text-sm text-amber-700 dark:text-amber-200 mt-1">
-                      {t('endorse.specifyVersionDesc', 'Enter the person hash and version index of the version you want to endorse.')}
-                    </p>
-                  </div>
-                </div>
-                
                 <div className="space-y-4 sm:space-y-0 sm:flex sm:items-start sm:gap-4">
                   <div className="sm:flex-1">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -987,45 +988,51 @@ export default function EndorseModal({
 
 
 
-          {/* DEEP Token Fee Info */}
-          <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
+          {/* DEEP Token Fee & Distribution Info */}
+          <div className="bg-gradient-to-br from-purple-50 to-amber-50 dark:from-purple-900/20 dark:to-amber-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <Coins className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <span className="text-sm font-medium text-purple-800 dark:text-purple-200">
                 {t('endorse.deepTokenFee', 'DEEP Token Fee')}: {deepTokenFee} DEEP
               </span>
             </div>
+            
             <div className="text-xs text-purple-700 dark:text-purple-300 space-y-2">
+              {/* User Balance */}
               <div className="flex justify-between">
                 <span>{t('endorse.yourBalance', 'Your DEEP Balance')}:</span>
                 <span className={`font-mono ${canAffordEndorsement ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {userDeepBalance} DEEP
                 </span>
               </div>
+              
+              {/* Fee Recipient */}
               <div className="flex justify-between">
                 <span>{t('endorse.feeRecipient', 'Fee Recipient')}:</span>
                 <span className="font-mono">{formatAddress(feeRecipient)}</span>
               </div>
-            </div>
-          </div>
-
-          {/* Fee Distribution Explanation */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
-              {t('endorse.feeDistribution', 'Fee Distribution')}
-            </h3>
-            <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
-              {versionData?.isNFTMinted ? (
-                <div>
-                  <strong>{t('endorse.nftMinted', 'NFT Minted')}:</strong> {t('endorse.feeToNFTHolder', '100% of fee goes to current NFT holder')}
+              
+              {/* Distribution Rule */}
+              <div className="pt-2 mt-2 border-t border-purple-200/50 dark:border-purple-700/50">
+                <div className="flex items-start gap-2">
+                  <span className="font-medium shrink-0">{t('endorse.feeDistribution', 'Fee Distribution')}:</span>
+                  <span>
+                    {versionData?.isNFTMinted ? (
+                      <>
+                        <strong>{t('endorse.nftMinted', 'NFT Minted')}:</strong> {t('endorse.feeToNFTHolder', '{{recipientPercent}}% to NFT holder, {{protocolPercent}}% protocol fee', { recipientPercent: (10000 - protocolFeeBps) / 100, protocolPercent: protocolFeeBps / 100 })}
+                      </>
+                    ) : (
+                      <>
+                        <strong>{t('endorse.noNFT', 'No NFT Yet')}:</strong> {t('endorse.feeToCreator', '{{recipientPercent}}% to version creator, {{protocolPercent}}% protocol fee', { recipientPercent: (10000 - protocolFeeBps) / 100, protocolPercent: protocolFeeBps / 100 })}
+                      </>
+                    )}
+                  </span>
                 </div>
-              ) : (
-                <div>
-                  <strong>{t('endorse.noNFT', 'No NFT Yet')}:</strong> {t('endorse.feeToCreator', '100% of fee goes to version creator')}
-                </div>
-              )}
-              <p className="text-xs opacity-75">
-                {t('endorse.feeNote', 'DEEP token fee is dynamic based on current mining rewards')}
+              </div>
+              
+              {/* Dynamic Fee Note */}
+              <p className="text-xs opacity-75 italic">
+                💡 {t('endorse.feeNote', 'DEEP token fee is dynamic based on current mining rewards')}
               </p>
             </div>
           </div>
@@ -1130,120 +1137,143 @@ export default function EndorseModal({
           {/* Success Message */}
           {successResult && (
             <div className="mx-4 sm:mx-6 mb-4 space-y-3">
-              {/* Main Success Message */}
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                <div className="flex items-center gap-3 mb-3">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                      {t('endorse.endorsedSuccessfully', 'Version endorsed successfully!')}
-                    </p>
-                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                      {t('endorse.canContinueEndorsing', 'You can now continue to endorse other versions or close this dialog.')}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 text-xs text-green-700 dark:text-green-300">
-                  {/* Person Hash */}
-                  <div>
-                    <span className="font-medium">{t('endorse.personHash', 'Person Hash')}:</span>
-                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
-                      {successResult.personHash}
-                    </code>
-                  </div>
-                  
-                  {/* Version Index */}
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t('endorse.versionIndex', 'Version Index')}:</span>
-                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
-                      {successResult.versionIndex}
-                    </code>
-                  </div>
-                  
-                  {/* Endorsement Fee */}
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t('endorse.feePaid', 'Fee Paid')}:</span>
-                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
-                      {successResult.endorsementFee} DEEP
-                    </code>
-                  </div>
-                  
-                  {/* Fee Recipient */}
-                  <div>
-                    <span className="font-medium">{t('endorse.feeRecipient', 'Fee Recipient')}:</span>
-                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
-                      {successResult.feeRecipient}
-                    </code>
-                  </div>
-                  
-                  {/* Transaction Hash */}
-                  <div>
-                    <span className="font-medium">{t('endorse.transactionHash', 'Transaction Hash')}:</span>
-                    <code className="block bg-green-100 dark:bg-green-800 px-2 py-1 rounded mt-1 text-xs font-mono break-all">
-                      {successResult.transactionHash}
-                    </code>
-                  </div>
-                  
-                  {/* Block Number */}
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{t('endorse.blockNumber', 'Block Number')}:</span>
-                    <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs font-mono">
-                      {successResult.blockNumber}
-                    </code>
-                  </div>
-                </div>
-              </div>
-
-              {/* Event Information */}
+              {/* Complete Event Information */}
               {successResult.events.PersonVersionEndorsed && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {t('endorse.eventDetails', 'Event Details')}:
-                  </h4>
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                    <span className="text-sm font-semibold text-green-900 dark:text-green-100">
+                      {t('endorse.versionEndorsedEvent', 'PersonVersionEndorsed Event')}
+                    </span>
+                  </div>
                   
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                      <span className="text-xs font-medium text-green-900 dark:text-green-100">
-                        {t('endorse.versionEndorsedEvent', 'PersonVersionEndorsed Event')}
+                  {/* Complete Event Details */}
+                  <div className="space-y-2.5 text-xs">
+                    {/* Person Hash & Version */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.personHash', 'Person Hash')}:
+                      </span>
+                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                        {successResult.personHash}
+                      </code>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.versionIndex', 'Version Index')}:
+                      </span>
+                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                        {successResult.versionIndex}
+                      </code>
+                    </div>
+                    
+                    {/* Endorser */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.endorser', 'Endorser')}:
+                      </span>
+                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                        {successResult.events.PersonVersionEndorsed.endorser}
+                      </code>
+                    </div>
+                    
+                    {/* Fee Distribution - Divider */}
+                    <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
+                      <p className="text-xs font-bold text-green-800 dark:text-green-200 mb-2">
+                        {t('endorse.feeDistribution', 'Fee Distribution')}
+                      </p>
+                    </div>
+                    
+                    {/* Total Fee Amount */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.totalFee', 'Total Fee')}:
+                      </span>
+                      <span className="col-span-2 text-green-700 dark:text-green-300 font-mono font-semibold">
+                        {(Number(successResult.events.PersonVersionEndorsed.endorsementFee) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
                       </span>
                     </div>
-                    <p className="text-xs text-green-700 dark:text-green-300 mb-3">
-                      {t('endorse.versionEndorsedEventDesc', 'Endorsement was successfully recorded on-chain')}
-                    </p>
                     
-                    {/* Complete Event Details */}
-                    <div className="space-y-2 text-xs">
-                      {/* Endorser */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('endorse.endorser', 'Endorser')}:
-                        </span>
-                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.PersonVersionEndorsed.endorser}
-                        </code>
-                      </div>
-                      
-                      {/* Fee Amount */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('endorse.feeAmount', 'Fee Amount')}:
-                        </span>
-                        <span className="col-span-2 text-green-700 dark:text-green-300 font-mono">
-                          {(Number(successResult.events.PersonVersionEndorsed.endorsementFee) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
-                        </span>
-                      </div>
-                      
-                      {/* Timestamp */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('endorse.timestamp', 'Timestamp')}:
-                        </span>
-                        <span className="col-span-2 text-green-700 dark:text-green-300">
-                          {new Date(Number(successResult.events.PersonVersionEndorsed.timestamp) * 1000).toLocaleString()}
-                        </span>
-                      </div>
+                    {/* Recipient & Share */}
+                    {successResult.events.PersonVersionEndorsed.recipient && (
+                      <>
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {t('endorse.recipient', 'Recipient')}:
+                          </span>
+                          <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                            {successResult.events.PersonVersionEndorsed.recipient}
+                          </code>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {t('endorse.recipientShare', 'Recipient Share')}:
+                          </span>
+                          <span className="col-span-2 text-green-700 dark:text-green-300 font-mono">
+                            {(Number(successResult.events.PersonVersionEndorsed.recipientShare) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Protocol Recipient & Share */}
+                    {successResult.events.PersonVersionEndorsed.protocolRecipient && (
+                      <>
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {t('endorse.protocolRecipient', 'Protocol Recipient')}:
+                          </span>
+                          <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                            {successResult.events.PersonVersionEndorsed.protocolRecipient}
+                          </code>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {t('endorse.protocolShare', 'Protocol Share')}:
+                          </span>
+                          <span className="col-span-2 text-green-700 dark:text-green-300 font-mono">
+                            {(Number(successResult.events.PersonVersionEndorsed.protocolShare) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Transaction Info - Divider */}
+                    <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
+                      <p className="text-xs font-bold text-green-800 dark:text-green-200 mb-2">
+                        {t('endorse.transactionInfo', 'Transaction Info')}
+                      </p>
+                    </div>
+                    
+                    {/* Transaction Hash */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.transactionHash', 'Transaction Hash')}:
+                      </span>
+                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
+                        {successResult.transactionHash}
+                      </code>
+                    </div>
+                    
+                    {/* Block Number */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.blockNumber', 'Block Number')}:
+                      </span>
+                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
+                        {successResult.blockNumber}
+                      </code>
+                    </div>
+                    
+                    {/* Timestamp */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="font-medium text-green-800 dark:text-green-200">
+                        {t('endorse.timestamp', 'Timestamp')}:
+                      </span>
+                      <span className="col-span-2 text-green-700 dark:text-green-300">
+                        {new Date(Number(successResult.events.PersonVersionEndorsed.timestamp) * 1000).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>

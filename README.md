@@ -51,7 +51,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### 🤝 Community Governance
 - **Endorsement Fees**: Pay current mining reward to endorse trusted versions
-- **Fee Distribution**: Endorsement fees flow to NFT holders or original contributors
+- **Fee Distribution**: Majority flows to NFT holders or contributors, with a small protocol share (default 5%, max 20%) for sustainability
 - **Version Competition**: Multiple versions per person, community selects best through endorsements
 - **Quality Signaling**: Endorsement counts indicate version trustworthiness
 
