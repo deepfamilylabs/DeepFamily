@@ -113,7 +113,7 @@ export default function ActionsPage() {
           </h1>
           
           <p className="text-lg text-gray-600 dark:text-gray-300 mb-8">
-            {t('actions.walletRequiredDesc', 'Connect your wallet to access blockchain features like adding versions, minting NFTs, and endorsing data.')}
+            {t('actions.walletRequiredDesc', 'Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.')}
           </p>
           
           <div className="space-y-6">
@@ -132,12 +132,12 @@ export default function ActionsPage() {
                       {t('actions.feature1', 'Add new person versions with privacy protection')}
                     </li>
                     <li className="flex items-center gap-2">
-                      <Image className="w-4 h-4" />
-                      {t('actions.feature2', 'Mint NFTs from endorsed data')}
+                      <Star className="w-4 h-4" />
+                      {t('actions.feature2', 'Endorse quality data and earn rewards')}
                     </li>
                     <li className="flex items-center gap-2">
-                      <Star className="w-4 h-4" />
-                      {t('actions.feature3', 'Endorse quality data and earn rewards')}
+                      <Image className="w-4 h-4" />
+                      {t('actions.feature3', 'Mint NFTs from endorsed data')}
                     </li>
                   </ul>
                 </div>
