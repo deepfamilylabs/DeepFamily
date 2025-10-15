@@ -319,11 +319,11 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
         <div className="space-y-2 text-slate-700 dark:text-slate-300">
           {/* RPC and Contract - responsive layout */}
           <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
-            <div className="flex items-center gap-2 lg:flex-1 lg:min-w-0">
+            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-1 lg:min-w-0">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.rpc')}:</span>
-              <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all" title={rpcUrl}>{rpcUrl}</span>
+              <span className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all text-right lg:text-left" title={rpcUrl}>{rpcUrl}</span>
             </div>
-            <div className="flex items-center gap-2 lg:flex-shrink-0">
+            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-shrink-0">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.contract')}:</span>
               <div className="inline-flex items-center gap-1">
                 <span className="font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={contractAddress}>
@@ -351,9 +351,9 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
         <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
           {/* Root and Version - responsive layout */}
           <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
-            <div className="flex items-center gap-2 lg:flex-1 lg:min-w-0">
+            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-1 lg:min-w-0">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.config.root')}:</span>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 lg:flex-initial min-w-0 flex justify-end lg:justify-start">
                 <div className="inline-flex items-center gap-1 max-w-full">
                   <span className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all" title={rootHash}>
                     <span className="inline sm:hidden">{formatHashMiddle(rootHash)}</span>
@@ -372,7 +372,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 lg:flex-shrink-0">
+            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-shrink-0">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{t('familyTree.ui.versionNumber')}:</span>
               <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
                 <button
@@ -405,72 +405,76 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
         <>
           <div className="border-t border-slate-200/60 dark:border-slate-700/60 mt-4"></div>
 
-          {/* Bottom section with traversal on left and stats on right */}
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mt-4 text-xs">
-        {/* Left: Traversal and deduplicate controls */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-            <span className="hidden sm:block text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{statusT ? statusT('familyTree.ui.traversal') : 'Traversal'}:</span>
-            <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-              <div className="relative group">
-                <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalDFS') : 'DFS'} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
-                <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{statusT ? statusT('familyTree.ui.traversalDFS') : 'Depth First Search'}</div>
+          {/* Bottom section - two rows */}
+          <div className="mt-4 space-y-3">
+            {/* First row: Traversal mode and Stats */}
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 text-xs">
+              {/* Left: Traversal */}
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                <span className="hidden sm:block text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">{statusT ? statusT('familyTree.ui.traversal') : 'Traversal'}:</span>
+                <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                  <div className="relative group">
+                    <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalDFS') : 'DFS'} onClick={() => setTraversal('dfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${traversal==='dfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>DFS</button>
+                    <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{statusT ? statusT('familyTree.ui.traversalDFS') : 'Depth First Search'}</div>
+                  </div>
+                  <div className="relative group border-l border-slate-300 dark:border-slate-600">
+                    <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalBFS') : 'BFS'} onClick={() => setTraversal('bfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-lg ${traversal==='bfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>BFS</button>
+                    <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{statusT ? statusT('familyTree.ui.traversalBFS') : 'Breadth First Search'}</div>
+                  </div>
+                </div>
               </div>
-              <div className="relative group border-l border-slate-300 dark:border-slate-600">
-                <button type="button" aria-label={statusT ? statusT('familyTree.ui.traversalBFS') : 'BFS'} onClick={() => setTraversal('bfs')} className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-lg ${traversal==='bfs' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>BFS</button>
-                <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">{statusT ? statusT('familyTree.ui.traversalBFS') : 'Breadth First Search'}</div>
+
+              {/* Right: Stats */}
+              <div className="flex items-center gap-1 sm:gap-2">
+                {(() => {
+                  const createdDisplay = progress ? progress.created : (loading ? '…' : 0)
+                  const depthDisplay = progress ? progress.depth : (loading ? '…' : 0)
+                  return (
+                    <span className="text-xs px-3 sm:px-4 py-0.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 sm:gap-5 backdrop-blur-sm shadow-sm flex-shrink-0">
+                      <span className="inline-flex flex-col items-start gap-0">
+                        <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.nodesLabelFull') : 'Nodes'}</span>
+                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
+                      </span>
+                      <span className="h-5 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
+                      <span className="inline-flex flex-col items-start gap-0">
+                        <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.depthLabelFull') : 'Depth'}</span>
+                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
+                      </span>
+                    </span>
+                  )
+                })()}
               </div>
             </div>
-          </div>
 
-          {/* Deduplicate toggle - Modern switch style */}
-          <div className="flex items-center gap-2 flex-shrink-0 group relative">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-              {statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Deduplicate'}
-            </span>
-            <button
-              type="button"
-              onClick={() => setDeduplicateChildren(!deduplicateChildren)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
-                deduplicateChildren
-                  ? 'bg-blue-600 dark:bg-blue-500'
-                  : 'bg-slate-300 dark:bg-slate-600'
-              }`}
-              aria-label={statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Toggle deduplicate children'}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                  deduplicateChildren ? 'translate-x-[18px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-            <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-              {deduplicateChildren ? 'Active: highest endorsed version only' : 'Active: show every version (may include duplicates)'}
-            </div>
-          </div>
-        </div>
+            {/* Divider */}
+            <div className="border-t border-slate-200/60 dark:border-slate-700/60"></div>
 
-        {/* Right: Stats */}
-        <div className="flex items-center gap-1 sm:gap-2">
-          {(() => {
-            const createdDisplay = progress ? progress.created : (loading ? '…' : 0)
-            const depthDisplay = progress ? progress.depth : (loading ? '…' : 0)
-            return (
-              <span className="text-xs px-3 sm:px-4 py-0.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 sm:gap-5 backdrop-blur-sm shadow-sm flex-shrink-0">
-                <span className="inline-flex flex-col items-start gap-0">
-                  <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.nodesLabelFull') : 'Nodes'}</span>
-                  <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
-                </span>
-                <span className="h-5 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
-                <span className="inline-flex flex-col items-start gap-0">
-                  <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.depthLabelFull') : 'Depth'}</span>
-                  <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
-                </span>
+            {/* Second row: Deduplicate toggle */}
+            <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                {statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Deduplicate Children'}:
               </span>
-            )
-          })()}
-        </div>
-      </div>
+              <button
+                type="button"
+                onClick={() => setDeduplicateChildren(!deduplicateChildren)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
+                  deduplicateChildren
+                    ? 'bg-blue-600 dark:bg-blue-500'
+                    : 'bg-slate-300 dark:bg-slate-600'
+                }`}
+                aria-label={statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Toggle deduplicate children'}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    deduplicateChildren ? 'translate-x-[18px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+              <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
+                {deduplicateChildren ? 'Highest endorsed version only' : 'Show all versions'}
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>
