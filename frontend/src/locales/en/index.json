@@ -97,7 +97,7 @@
         "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
         "step1Desc": "If both parents exist → receive mining rewards",
-        "step2": "Community Endorsement",
+        "step2": "User Endorsement",
         "step2Desc": "Pay DEEP tokens to endorse a version",
         "step3": "Mint Version NFT",
         "step3Desc": "Endorsers can mint NFTs for corresponding versions",

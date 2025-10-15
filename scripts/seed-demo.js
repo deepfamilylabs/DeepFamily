@@ -330,6 +330,13 @@ async function main() {
   console.log("\nStep 3: Build family tree (2^n expansion)");
   console.log("-".repeat(70));
 
+  // Timing statistics
+  const timingStats = {
+    proofGenerations: [],
+    transactions: [],
+    totals: []
+  };
+
   const generations = new Map();
   generations.set(1, [
     {
@@ -376,7 +383,15 @@ async function main() {
           tag: "v1",
           ipfs: `QmMain_G${gen}`,
         });
-        console.log(`  ✓ Main chain: ${chainChildName}`);
+
+        // Collect timing data
+        if (result.timing) {
+          timingStats.proofGenerations.push(result.timing.proofGeneration);
+          timingStats.transactions.push(result.timing.transaction);
+          timingStats.totals.push(result.timing.total);
+        }
+
+        console.log(`  ✓ Main chain: ${chainChildName} (proof: ${result.timing?.proofGeneration}ms, tx: ${result.timing?.transaction}ms, total: ${result.timing?.total}ms)`);
         currentGen.push({
           hash: chainChildHash,
           personData: chainChildData,
@@ -423,7 +438,7 @@ async function main() {
       const siblingExists = await checkPersonExists({ deepFamily, personHash: siblingHash });
       if (!siblingExists.exists) {
         try {
-          await addPersonVersion({
+          const result = await addPersonVersion({
             deepFamily,
             signer,
             personData: siblingData,
@@ -432,6 +447,14 @@ async function main() {
             tag: "v1",
             ipfs: `QmSibling_G${gen}_N${i + 1}`,
           });
+
+          // Collect timing data
+          if (result.timing) {
+            timingStats.proofGenerations.push(result.timing.proofGeneration);
+            timingStats.transactions.push(result.timing.transaction);
+            timingStats.totals.push(result.timing.total);
+          }
+
           currentGen.push({
             hash: siblingHash,
             personData: siblingData,
@@ -685,6 +708,40 @@ async function main() {
     console.log(`  Total NFT supply: ${totalSupply.toString()}`);
   } catch (e) {
     dlog("Unable to query NFT total supply:", e.message);
+  }
+
+  // Output timing statistics
+  if (timingStats.totals.length > 0) {
+    console.log(`\nTiming Statistics (ZK Proof + addPersonZK):`);
+    console.log(`  Total operations: ${timingStats.totals.length}`);
+
+    // Calculate averages
+    const avgProof = timingStats.proofGenerations.reduce((a, b) => a + b, 0) / timingStats.proofGenerations.length;
+    const avgTx = timingStats.transactions.reduce((a, b) => a + b, 0) / timingStats.transactions.length;
+    const avgTotal = timingStats.totals.reduce((a, b) => a + b, 0) / timingStats.totals.length;
+
+    // Calculate min/max
+    const minProof = Math.min(...timingStats.proofGenerations);
+    const maxProof = Math.max(...timingStats.proofGenerations);
+    const minTx = Math.min(...timingStats.transactions);
+    const maxTx = Math.max(...timingStats.transactions);
+    const minTotal = Math.min(...timingStats.totals);
+    const maxTotal = Math.max(...timingStats.totals);
+
+    console.log(`\n  ZK Proof Generation:`);
+    console.log(`    Average: ${avgProof.toFixed(2)}ms`);
+    console.log(`    Min: ${minProof}ms`);
+    console.log(`    Max: ${maxProof}ms`);
+
+    console.log(`\n  Transaction (send + wait):`);
+    console.log(`    Average: ${avgTx.toFixed(2)}ms`);
+    console.log(`    Min: ${minTx}ms`);
+    console.log(`    Max: ${maxTx}ms`);
+
+    console.log(`\n  Total (Proof + Transaction):`);
+    console.log(`    Average: ${avgTotal.toFixed(2)}ms`);
+    console.log(`    Min: ${minTotal}ms`);
+    console.log(`    Max: ${maxTotal}ms`);
   }
 
   console.log("\n");
