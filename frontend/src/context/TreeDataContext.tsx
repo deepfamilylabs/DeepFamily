@@ -331,6 +331,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         let lastUpdate = performance.now()
         let emitted = 0
         const { traversal: trv } = optionsRef.current
+        // Cache totalVersions data before nodes are created
+        const totalVersionsCache = new Map<string, number>()
         for await (const _ of fetchSubtreeStream(contract, rootHash, rootVersionIndex, {
           signal: controller.signal,
           traversal: trv,
@@ -341,7 +343,38 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           onNode: n => {
             if (!rootNode) rootNode = n
             const id = makeNodeId(n.personHash, Number(n.versionIndex))
-            setNodesData(prev => prev[id] ? prev : ({ ...prev, [id]: { personHash: n.personHash, versionIndex: Number(n.versionIndex), id, tag: n.tag } }))
+            const cachedTotalVersions = totalVersionsCache.get(n.personHash.toLowerCase())
+            setNodesData(prev => {
+              if (prev[id]) return prev
+              const newNode = {
+                personHash: n.personHash,
+                versionIndex: Number(n.versionIndex),
+                id,
+                tag: n.tag,
+                ...(cachedTotalVersions !== undefined && { totalVersions: cachedTotalVersions })
+              }
+              return { ...prev, [id]: newNode }
+            })
+          },
+          onVersionStats: (personHash, totalVersions) => {
+            // Cache totalVersions for future node creation
+            if (!cancelled) {
+              const key = personHash.toLowerCase()
+              totalVersionsCache.set(key, totalVersions)
+
+              // Also update existing nodes with this personHash
+              setNodesData(prev => {
+                const next = { ...prev }
+                let changed = false
+                for (const [id, nd] of Object.entries(prev)) {
+                  if (nd.personHash.toLowerCase() === key && nd.totalVersions !== totalVersions) {
+                    next[id] = { ...nd, totalVersions }
+                    changed = true
+                  }
+                }
+                return changed ? next : prev
+              })
+            }
           }
         })) {
           if (cancelled) break

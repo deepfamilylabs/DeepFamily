@@ -11,6 +11,7 @@ import { shortHash } from '../types/graph'
 import { isMinted } from '../types/graph'
 import { birthDateString } from '../types/graph'
 import { useFamilyTreeHeight } from '../constants/layout'
+import { useVizOptions } from '../context/VizOptionsContext'
 
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
 
@@ -90,6 +91,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   const { nodes: positioned, width: svgWidth, height: svgHeight } = useMemo(() => computeLayout(root), [root])
   const idToPos = useMemo(() => { const m = new Map<string, PositionedNode>(); for (const pn of positioned) m.set(pn.id, pn); return m }, [positioned])
   const { nodesData } = useTreeData()
+  const { deduplicateChildren } = useVizOptions()
   const textRefs = useRef<Record<string, SVGTextElement | null>>({})
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
   useLayoutEffect(() => { const next: Record<string, number> = {}; for (const id of Object.keys(textRefs.current)) { const el = textRefs.current[id]; if (el?.getComputedTextLength) { const computed = Math.ceil(el.getComputedTextLength()) + 16; next[id] = Math.max(BASE_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, computed)) } } if (Object.keys(next).length) setMeasuredWidths(next) }, [positioned])
@@ -167,8 +169,9 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
               const versionText = `v${pn.data.versionIndex}`
               const tagTextRaw = nd?.tag || ''
               const tagText = truncateNoEllipsisByWidth(tagTextRaw, Math.max(0, w - PADDING_X * 2))
-              // Count total versions for this person hash
-              const totalVersions = Object.keys(nodesData).filter(id => id.startsWith(`${pn.data.personHash}-v-`)).length
+              // In deduplicate mode, show totalVersions badge from contract data
+              // In non-deduplicate mode, don't show badge (user can see all versions directly)
+              const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
               return (
                 <g key={pn.id}
                    transform={`translate(${pn.x}, ${pn.y})`}

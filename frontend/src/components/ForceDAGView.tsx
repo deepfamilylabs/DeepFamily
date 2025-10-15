@@ -8,6 +8,7 @@ import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import { useFamilyTreeHeight } from '../constants/layout'
+import { useVizOptions } from '../context/VizOptionsContext'
 
 // Re-add types lost during refactor
 export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
@@ -31,6 +32,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
   const responsiveHeight = useFamilyTreeHeight()
   const defaultHeight = height || responsiveHeight
   const { nodesData } = useTreeData() as any
+  const { deduplicateChildren } = useVizOptions()
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const data = useMemo(() => buildGraph(root), [root])
@@ -113,24 +115,24 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       .attr('stroke', strokeColor)
       .attr('stroke-width', 1)
 
-    // Multi-version badge
+    // Multi-version badge - only show in deduplicate mode when totalVersions > 1
     node.each((d: any) => {
       const sim = d as SimNode
-      const totalVersions = Object.keys(nodesData || {}).filter(id => id.startsWith(`${sim.hash}-v-`)).length
-      if (totalVersions > 1) {
+      const nd = nodesData?.[sim.id]
+      // Pass totalVersions only in deduplicate mode; badge logic handles display (show only if > 1)
+      const totalVersions = (deduplicateChildren && nd?.totalVersions && nd.totalVersions > 1) ? nd.totalVersions : undefined
+      if (totalVersions) {
         const g = d3.select((node as any)._groups[0][data.nodes.indexOf(d)])
         g.append('circle')
-          .attr('r', 8)
+          .attr('r', 6)
           .attr('cx', -(NODE_R - 4))
           .attr('cy', -(NODE_R - 4))
           .attr('fill', '#8b5cf6')
-          .attr('stroke', strokeColor)
-          .attr('stroke-width', 1)
         g.append('text')
           .attr('x', -(NODE_R - 4))
-          .attr('y', -(NODE_R - 8))
+          .attr('y', -(NODE_R - 7))
           .attr('text-anchor', 'middle')
-          .attr('font-size', 9)
+          .attr('font-size', 8)
           .attr('font-weight', 'bold')
           .attr('fill', '#ffffff')
           .text(totalVersions)
@@ -179,7 +181,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       })
 
     return () => { simulation.stop() }
-  }, [data, height, openNode, selectedId, innerRef, svgRef, nodesData])
+  }, [data, height, openNode, selectedId, innerRef, svgRef, nodesData, deduplicateChildren])
 
   const [miniNodes, setMiniNodes] = useState<any[]>([])
   const miniUpdateRef = useRef<()=>void>()
