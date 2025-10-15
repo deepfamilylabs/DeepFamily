@@ -8,16 +8,16 @@
   },
   "home": {
     "title": "去中心化数字族谱",
-    "subtitle": "零知识隐私保护 · 口令加盐去链接性 · 双树模式 · 社区背书机制 · NFT价值创造",
+    "subtitle": "零知识隐私保护 · 去链接性 · 多版本共识 · 社区背书 · NFT人物百科",
     "exploreFamilyTree": "探索族谱",
     "addPerson": "添加人物",
     "search": "搜索",
     "blockchainActions": "添加人物",
     "tagStrip": {
-      "protocol": "去中心化",
-      "incentive": "激励循环",
-      "nft": "NFT",
-      "zk": "ZK"
+      "protocol": "私密录入",
+      "incentive": "背书共识",
+      "nft": "人物百科",
+      "zk": "故事封存"
     },
     "coreValue": {
       "title": "核心使命",
@@ -28,45 +28,45 @@
       "subtitle": "构建多维度可信谱系生态，实现从信息探索到价值确认的自然演进",
       "zkPrivacy": {
         "title": "零知识隐私",
-        "description": "使用Groth16证明私密提交族谱成员，验证结构正确性的同时隐藏敏感信息"
+        "description": "零知识证明私密提交族谱关系，在不暴露明文的情况下证明提交者掌握与承诺匹配的私密信息"
       },
       "saltedUnlinkability": {
-        "title": "口令加盐去链接性",
-        "description": "独有口令防止身份推理和污染攻击，确保每个身份哈希的唯一性和安全性"
+        "title": "去链接性",
+        "description": "可选口令加盐哈希阻断身份推理与污染攻击，共享口令协作构建，独享口令形成隔离空间"
       },
       "dualTreeModels": {
-        "title": "双树模式",
-        "description": "支持公开协作树和私有保护树，满足不同场景下的族谱构建需求"
+        "title": "多版本共识治理",
+        "description": "人物可以并行提交多个版本，链上去重与父母版本指针保持可追溯历史，配合背书挑选最可信的那一个"
       },
       "communityEndorsement": {
         "title": "社区背书",
-        "description": "DEEP代币背书机制过滤噪声，形成高质量数据的社区共识"
+        "description": "DEEP代币背书需要真实成本，背书者用费用投票沉淀可信版本，让噪声自然被稀释"
       },
       "nftValueCreation": {
         "title": "NFT价值创造",
-        "description": "版本 → NFT → 持有人获得后续背书费用流，激励高质量数据贡献"
+        "description": "版本经背书可铸成NFT人物百科，持有人享受后续背书费与故事流量，驱动高质量贡献"
       },
       "storyShardingSealing": {
         "title": "故事分片与封存",
-        "description": "分片写入传记内容 + 哈希验证 + 封存后不可篡改，形成永久链上档案"
+        "description": "故事分片增量写入并哈希校验，封存后即可形成永久不可篡改的链上档案，既保留细节也保证可信度"
       }
     },
     "valueSystem": {
       "title": "两层价值体系",
-      "subtitle": "渐进式隐私模型：私有提交 → 社区背书 → 可选公开披露",
+      "subtitle": "渐进式隐私路径：哈希提交 → 社区背书 → NFT 公开",
       "layer1": {
-        "title": "隐私保护",
-        "description": "口令加盐系统防止身份推理和污染攻击。零知识证明确保提交过程完全隐私。",
-        "feature1": "口令加盐去链接性",
-        "feature2": "反污染保护机制",
-        "feature3": "双树模式：公开与私有"
+        "title": "哈希隐私层",
+        "description": "人物在此层仅提交加盐后的哈希承诺，明文不会上链。零知识证明确保提交过程完全私密。",
+        "feature1": "仅存储加盐哈希承诺，明文不上链",
+        "feature2": "口令加盐阻断身份推理与污染攻击",
+        "feature3": "共享口令私密协作，独享强口令完全隔离"
       },
       "layer2": {
-        "title": "公开NFT资产",
-        "description": "社区背书的版本可铸造为NFT，公开完整个人信息。故事分片支持详细的链上传记。",
-        "feature1": "NFT铸造公开完整信息",
-        "feature2": "需要社区背书",
-        "feature3": "故事分片与价值确认"
+        "title": "NFT人物百科层",
+        "description": "背书版本后可铸造成 NFT 人物百科，铸造即公开，明文上链。故事分片支持详细的链上传记。",
+        "feature1": "铸造即公开完整人物百科信息",
+        "feature2": "背书驱动社区共识与经济激励",
+        "feature3": "故事分片持续追加并链上确认"
       },
       "flow": {
         "title": "隐私到价值流程",
@@ -125,86 +125,86 @@
     },
     "features": {
       "title": "核心功能",
-      "subtitle": "先进的区块链基础设施，支持隐私优先的族谱构建与社区验证机制",
+      "subtitle": "从私密入链到价值沉淀的完整族谱工作流",
       "zkVersion": {
-        "title": "零知识隐私保护",
-        "description": "使用Groth16证明私密构建族谱，验证关系存在而不泄露个人信息。口令加盐防止身份推理和污染攻击，确保隐私安全。"
+        "title": "私密提交流程",
+        "description": "零知识证明结合口令加盐承诺实现隐私提交，链上仅存储哈希，整个录入过程完全私密。"
       },
       "versionManagement": {
-        "title": "多版本数据管理",
-        "description": "支持每个人物的多个版本，具备完整可追溯性。不可篡改的历史记录，通过背书优先级过滤确保数据完整性和社区共识。"
+        "title": "多版本治理体系",
+        "description": "人物版本记录父母指针与时间戳，链上去重并按背书排序，确保历史完整可追溯。"
       },
       "endorsementEconomy": {
-        "title": "智能经济激励",
-        "description": "DEEP代币背书系统，采用渐进式减半奖励机制。支付挖矿奖励来背书优质数据，创建可持续的经济循环，奖励完整家庭关系。"
+        "title": "背书经济循环",
+        "description": "每次背书都需支付 DEEP，费用在持有人、提交者与协议之间结算，把可信共识与真实成本绑定。"
       },
       "personNFT": {
-        "title": "价值创造NFT资产",
-        "description": "将背书的人物版本转化为有价值的NFT，具备持续收益流。NFT持有人获得未来背书费用，为优质贡献创造长期价值。"
+        "title": "NFT 人物百科",
+        "description": "经背书版本可铸成 NFT，公开人物核心信息，持有人可继续撰写故事并获取持续费用流。"
       },
       "storySharding": {
-        "title": "传记故事保存",
-        "description": "在100×1KB的链上分片中存储详细生平故事，配备哈希验证。不可篡改的封存机制创建永久历史档案，保存完整传记内容。"
+        "title": "故事分片与封存",
+        "description": "分片增量记录生平并哈希校验，封存后永不可改，形成永久可信的链上档案。"
       },
       "versionNotarization": {
-        "title": "双树架构",
-        "description": "支持公开协作树（共享口令）和私有保护树（独有口令），灵活的族谱构建方式，具备反污染保证机制。"
+        "title": "协作与私有模式",
+        "description": "默认无口令进入公开空间，共享口令共建协作树，独享强口令构建隔离私有树。"
       }
     },
     "tokenomics": {
       "title": "激励与代币经济",
-      "subtitle": "DEEP 代币驱动的可持续生态激励机制",
+      "subtitle": "DEEP 代币驱动的可持续激励闭环",
       "deepToken": {
         "title": "DEEP 代币",
-        "description": "多阶段递减挖矿 → 进入稳定发行区间，抗通胀设计"
+        "description": "渐进式减半发行模型，奖励随有效贡献平滑递减，长期维持发行纪律"
       },
       "supply": {
         "title": "总量上限",
-        "description": "1000 亿枚代币上限，无预挖，公平启动"
+        "description": "上限 1000 亿代币，无预挖，只能通过协议交互增发"
       },
       "mining": {
         "title": "挖矿触发",
-        "description": "新增含双亲引用的有效人物版本时触发挖矿奖励"
+        "description": "仅当新增人物同时引用父母版本时产出奖励，把结构化补全作为唯一挖矿条件"
       },
       "endorsement": {
         "title": "背书费用",
-        "description": "等于当前挖矿奖励，与发行强度自适应耦合"
+        "description": "背书费用随当期奖励动态调整，协议可保留小额份额，提升自我背书的真实成本"
       },
       "distribution": {
         "title": "费用分配",
-        "description": "NFT 铸造前归创建者，NFT 铸造后归 NFT 持有人"
+        "description": "收益在提交者与 NFT 持有人之间滚动转移，铸造前归创建者，铸造后归持有人"
       },
       "goal": {
         "title": "经济目标",
-        "description": "鼓励高质量结构化补全，抑制刷垃圾与重复噪声"
+        "description": "用真实成本驱动可信背书，奖励准确关系，抑制垃圾和重复噪声"
       }
     },
     "audience": {
       "title": "面向角色",
-      "subtitle": "多元化用户群体的协作生态",
+      "subtitle": "多元角色协作，人人都能贡献与受益",
       "contributors": {
         "title": "数据贡献者",
-        "description": "录入、补全与考证谱系信息，构建可信的族谱数据网络",
-        "benefit1": "获得 DEEP 代币挖矿奖励",
-        "benefit2": "享受长期背书费用分成"
+        "description": "录入、补全并考证族谱信息，构建可信数据网络",
+        "benefit1": "获得 DEEP 挖矿奖励",
+        "benefit2": "分享背书费用分成"
       },
       "researchers": {
         "title": "族谱研究者",
-        "description": "追踪版本演化与分歧，探索家族历史的多元叙述和真相",
-        "benefit1": "访问完整的版本演化历史",
-        "benefit2": "发现家族关系网络的隐藏连接"
+        "description": "追踪版本演化与分岔，挖掘家族历史的多元叙事",
+        "benefit1": "访问完整版本演化记录",
+        "benefit2": "探索关系图谱的隐藏连接"
       },
       "developers": {
         "title": "开发者",
-        "description": "集成智能合约、前端组件，开发二次应用和知识图谱系统",
-        "benefit1": "使用完整的智能合约接口",
-        "benefit2": "构建去中心化族谱生态应用"
+        "description": "集成合约与组件，打造二次应用、知识图谱等工具",
+        "benefit1": "获取完善协议 API",
+        "benefit2": "搭建去中心化族谱应用"
       },
       "creators": {
         "title": "叙事创作者",
-        "description": "编写与封存历史故事，将家族记忆转化为可验证的链上档案",
-        "benefit1": "创作内容获得永久存储",
-        "benefit2": "通过故事分片获得版权保护"
+        "description": "撰写并封存家族故事，把记忆转化为可验证档案",
+        "benefit1": "作品永久上链保存",
+        "benefit2": "故事分片保障创作权益"
       }
     },
     "contracts": {
@@ -700,12 +700,12 @@
     "title": "链上操作",
     "subtitle": "使用已连接的钱包操作 DeepFamily 协议",
     "walletRequired": "需要连接钱包",
-    "walletRequiredDesc": "连接您的钱包以访问区块链功能，如添加版本、铸造 NFT 和参与背书。",
+    "walletRequiredDesc": "连接您的钱包以访问区块链功能，如添加版本、参与背书和铸造 NFT。",
     "walletConnected": "钱包已连接",
     "whatYouCanDo": "连接后您可以：",
     "feature1": "添加新的人物版本（可获得 DEEP 代币奖励）",
-    "feature2": "将人物版本铸造为 NFT 收藏品",
-    "feature3": "背书优质版本（需要消耗 DEEP 代币）",
+    "feature2": "背书优质版本（需要消耗 DEEP 代币）",
+    "feature3": "将人物版本铸造为 NFT 收藏品",
     "addVersion": "添加版本",
     "add": "添加",
     "addVersionDesc": "使用零知识证明添加新的人物数据版本",
@@ -777,7 +777,7 @@
     "partial": "部分",
     "complete": "完整",
     "proofGenerationNote": "ZK证明生成需要复杂的加密计算，请耐心等待...",
-    "personInfo": "个人信息",
+    "personInfo": "人物信息",
     "personInfoHint": "明文不入链，仅用于本地零知识证明"
   },
   "mintNFT": {

@@ -8,16 +8,16 @@
   },
   "home": {
     "title": "Decentralized Digital Family Tree",
-    "subtitle": "Zero-knowledge privacy protection · Salted passphrase unlinkability · Dual tree models · Community endorsement · NFT value creation",
+    "subtitle": "Zero-knowledge privacy · Unlinkability · Multi-version governance · Community endorsement · NFT biographies",
     "exploreFamilyTree": "Explore Family Tree",
     "addPerson": "Add Person",
     "search": "Search",
     "blockchainActions": "Add Person",
     "tagStrip": {
-      "protocol": "Decentralized",
-      "incentive": "Incentives",
-      "nft": "NFT",
-      "zk": "ZK"
+      "protocol": "Private",
+      "incentive": "Endorse",
+      "nft": "NFT Bio",
+      "zk": "Sealed"
     },
     "coreValue": {
       "title": "Core Mission",
@@ -28,45 +28,45 @@
       "subtitle": "A trusted multi-dimensional genealogy layer turning open exploration into confirmed value.",
       "zkPrivacy": {
         "title": "Zero-Knowledge Privacy",
-        "description": "Use Groth16 proofs to privately submit family members, verifying structural correctness while hiding sensitive information"
+        "description": "Zero-knowledge proofs privately submit family relationships, proving the committer holds the private data behind the commitment without revealing plaintext"
       },
       "saltedUnlinkability": {
-        "title": "Salted Passphrase Unlinkability",
-        "description": "Unique passphrases prevent identity inference and pollution attacks, ensuring uniqueness and security of each identity hash"
+        "title": "Unlinkability",
+        "description": "Optional passphrases are Poseidon-salted to block identity inference and pollution; share a passphrase for collaboration or keep one private to isolate"
       },
       "dualTreeModels": {
-        "title": "Dual Tree Models",
-        "description": "Support both public collaborative trees and private protected trees, meeting different genealogy construction needs"
+        "title": "Multi-Version Governance",
+        "description": "People can submit multiple versions in parallel; on-chain deduplication plus parent pointers preserve traceable history while endorsements surface the most trusted one"
       },
       "communityEndorsement": {
         "title": "Community Endorsement",
-        "description": "DEEP token endorsement mechanism filters noise, forming community consensus on high-quality data"
+        "description": "Endorsing with DEEP tokens carries real cost, so endorsers vote with fees to surface trustworthy versions and dilute noise"
       },
       "nftValueCreation": {
         "title": "NFT Value Creation",
-        "description": "Version → NFT → holders receive subsequent endorsement fee streams, incentivizing high-quality data contributions"
+        "description": "Backed versions mint into NFT biographies where holders capture future endorsement fees and story traffic, rewarding quality contributions"
       },
       "storyShardingSealing": {
         "title": "Story Sharding & Sealing",
-        "description": "Shard biographical content + hash verification + immutable after sealing, creating permanent on-chain archives"
+        "description": "Story shards append details with hash checks; sealing makes them permanently immutable so archives stay rich and trustworthy"
       }
     },
     "valueSystem": {
       "title": "Two-Layer Value System",
-      "subtitle": "Progressive privacy model: private submission → community endorsement → optional public disclosure",
+      "subtitle": "Progressive privacy path: hash submission → community endorsement → NFT disclosure",
       "layer1": {
-        "title": "Privacy Protection",
-        "description": "Salted passphrase system prevents identity inference and pollution attacks. Zero-knowledge proofs ensure complete privacy during submission.",
-        "feature1": "Salted Passphrase Unlinkability",
-        "feature2": "Anti-Pollution Protection",
-        "feature3": "Dual Tree Models: Public & Private"
+        "title": "Hash Privacy Layer",
+        "description": "Only salted hash commitments are submitted at this layer—no plaintext ever touches the chain. Zero-knowledge proofs keep the entire submission process private.",
+        "feature1": "Store salted hash commitments only, no plaintext on-chain",
+        "feature2": "Salted passphrases block identity inference and pollution",
+        "feature3": "Shared passphrases enable private collaboration; strong solo passphrases fully isolate trees"
       },
       "layer2": {
-        "title": "Public NFT Assets",
-        "description": "Community-endorsed versions can be minted as NFTs, revealing full personal information. Story sharding enables detailed on-chain biographies.",
-        "feature1": "NFT Minting Reveals Full Information",
-        "feature2": "Community Endorsement Required",
-        "feature3": "Story Sharding & Value Recognition"
+        "title": "NFT Biography Layer",
+        "description": "Endorsed versions can be minted into NFT biographies, and minting immediately discloses the full narrative on-chain. Story sharding keeps detailed histories verifiable over time.",
+        "feature1": "Minting publishes the complete NFT biography",
+        "feature2": "Endorsements drive community consensus and incentives",
+        "feature3": "Story shards extend biographies with on-chain verification"
       },
       "flow": {
         "title": "Privacy to Value Flow",
@@ -125,86 +125,86 @@
     },
     "features": {
       "title": "Core Features",
-      "subtitle": "Advanced blockchain infrastructure enabling privacy-first family tree construction with community validation",
+      "subtitle": "An end-to-end workflow turning private submissions into lasting genealogy value",
       "zkVersion": {
-        "title": "Zero-Knowledge Privacy Protection",
-        "description": "Build family trees privately using Groth16 proofs - verify relationships exist without revealing personal information. Salted passphrases prevent identity inference and pollution attacks."
+        "title": "Private Submission Flow",
+        "description": "Zero-knowledge proofs with salted passphrase commitments keep onboarding private while only hash commitments touch the chain."
       },
       "versionManagement": {
-        "title": "Multi-Version Data Management",
-        "description": "Support multiple versions of each person with complete traceability. Immutable history with endorsement-based priority filtering ensures data integrity and community consensus."
+        "title": "Multi-Version Governance",
+        "description": "Person versions store parent pointers and timestamps; on-chain deduplication plus endorsement ordering keeps history traceable."
       },
       "endorsementEconomy": {
-        "title": "Smart Economic Incentives",
-        "description": "DEEP token endorsement system with progressive halving rewards. Pay mining rewards to endorse quality data, creating sustainable economic cycles that reward complete family connections."
+        "title": "Endorsement Economy Loop",
+        "description": "Every endorsement costs DEEP and splits between holder, contributor, and protocol, binding trusted consensus to real economic stakes."
       },
       "personNFT": {
-        "title": "Value-Creating NFT Assets",
-        "description": "Transform endorsed person versions into valuable NFTs with ongoing revenue streams. NFT holders receive future endorsement fees, creating long-term value for quality contributions."
+        "title": "NFT Biographies",
+        "description": "Endorsed versions mint into NFT biographies that disclose core info; holders can extend stories and capture ongoing fee streams."
       },
       "storySharding": {
-        "title": "Biographical Story Preservation",
-        "description": "Store detailed life stories in 100×1KB on-chain chunks with hash verification. Immutable sealing creates permanent historical archives with complete biographical content."
+        "title": "Story Sharding & Sealing",
+        "description": "Append life stories in 100×1KB shards with hash checks, then seal them for immutable, trustworthy on-chain archives."
       },
       "versionNotarization": {
-        "title": "Dual Tree Architecture",
-        "description": "Enable both public collaborative trees (shared passphrases) and private protected trees (unique passphrases) for flexible genealogy construction with anti-pollution guarantees."
+        "title": "Collaboration & Private Modes",
+        "description": "Default no-passphrase joins the public space; shared passphrases enable joint trees, while strong solo passphrases create isolated private zones."
       }
     },
     "tokenomics": {
       "title": "Incentives & Token Economics",
-      "subtitle": "DEEP token-driven sustainable ecosystem incentive mechanism",
+      "subtitle": "A DEEP token-powered loop that keeps incentives and data quality aligned",
       "deepToken": {
         "title": "DEEP Token",
-        "description": "Multi-stage declining mining → entering stable issuance intervals, anti-inflation design"
+        "description": "Progressive halving issuance keeps rewards tapering with contributions while maintaining long-term supply discipline."
       },
       "supply": {
         "title": "Supply Cap",
-        "description": "100 billion token cap, no pre-mining, fair launch"
+        "description": "Supply capped at 100B tokens with no pre-mine; issuance only happens through protocol interactions."
       },
       "mining": {
         "title": "Mining Trigger",
-        "description": "Triggered when adding valid person versions with parent references"
+        "description": "Rewards only mint when a new person version references both parents, making structured completion the sole mining condition."
       },
       "endorsement": {
         "title": "Endorsement Fees",
-        "description": "Equal to current mining rewards, adaptively coupled with issuance intensity"
+        "description": "Fees track the current reward level; the protocol can retain a small share to raise the real cost of self-endorsement."
       },
       "distribution": {
         "title": "Fee Distribution",
-        "description": "Before NFT minting → creators; after NFT minting → NFT holders"
+        "description": "Fees flow between submitters and NFT holders—before minting they reward the creator, after minting they follow the NFT ownership."
       },
       "goal": {
         "title": "Economic Goals",
-        "description": "Encourage high-quality structured completion, suppress spam and repetitive noise"
+        "description": "Use real-cost consensus to reward accurate relationships while suppressing spam and repetitive noise."
       }
     },
     "audience": {
       "title": "Target Audiences",
-      "subtitle": "A collaborative ecosystem of diverse user groups",
+      "subtitle": "A collaborative ecosystem where every role contributes and benefits",
       "contributors": {
         "title": "Data Contributors",
-        "description": "Input, complete and verify genealogy information, building trusted family tree data networks",
-        "benefit1": "Earn DEEP token mining rewards",
-        "benefit2": "Receive long-term endorsement fee distributions"
+        "description": "Input, enrich, and verify genealogy data to build a trusted network",
+        "benefit1": "Earn DEEP mining rewards",
+        "benefit2": "Share in ongoing endorsement fees"
       },
       "researchers": {
         "title": "Family Researchers",
-        "description": "Track version evolution and divergences, explore multi-dimensional narratives and truths of family history",
-        "benefit1": "Access complete version evolution history",
-        "benefit2": "Discover hidden connections in family relationship networks"
+        "description": "Track version evolution and divergences to surface multi-voiced family narratives",
+        "benefit1": "Access the complete version history",
+        "benefit2": "Explore hidden links across relationship graphs"
       },
       "developers": {
         "title": "Developers",
-        "description": "Integrate smart contracts, frontend components, develop secondary applications and knowledge graph systems",
-        "benefit1": "Use complete smart contract interfaces",
-        "benefit2": "Build decentralized genealogy ecosystem applications"
+        "description": "Integrate contracts and components to build secondary apps and knowledge tooling",
+        "benefit1": "Leverage the full protocol API",
+        "benefit2": "Ship decentralized genealogy experiences"
       },
       "creators": {
         "title": "Narrative Creators",
-        "description": "Write and preserve historical stories, transforming family memories into verifiable on-chain archives",
-        "benefit1": "Created content receives permanent storage",
-        "benefit2": "Obtain copyright protection through story sharding"
+        "description": "Write and seal family stories, turning memories into verifiable archives",
+        "benefit1": "Preserve work permanently on-chain",
+        "benefit2": "Protect authorship via story sharding"
       }
     },
     "contracts": {
@@ -700,12 +700,12 @@
     "title": "Blockchain Actions",
     "subtitle": "Interact with the DeepFamily protocol using your connected wallet",
     "walletRequired": "Wallet Connection Required",
-    "walletRequiredDesc": "Connect your wallet to access blockchain features like adding versions, minting NFTs, and endorsing.",
+    "walletRequiredDesc": "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
     "walletConnected": "Wallet Connected",
     "whatYouCanDo": "What you can do after connecting:",
     "feature1": "Add new person versions (earn DEEP tokens)",
-    "feature2": "Mint person versions as NFT collectibles",
-    "feature3": "Endorse quality versions (requires DEEP tokens)",
+    "feature2": "Endorse quality data and earn rewards",
+    "feature3": "Mint person versions as NFT collectibles",
     "addVersion": "Add Version",
     "add": "Add",
     "addVersionDesc": "Add a new version of person data with zero-knowledge proofs",
@@ -777,7 +777,7 @@
     "partial": "Partial",
     "complete": "Complete",
     "proofGenerationNote": "ZK proof generation requires complex cryptographic calculations. Please wait...",
-    "personInfo": "Personal Information",
+    "personInfo": "Person Information",
     "personInfoHint": "Plain text stays off-chain; used only for local ZK proof"
   },
   "mintNFT": {
