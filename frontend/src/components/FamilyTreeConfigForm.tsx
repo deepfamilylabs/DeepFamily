@@ -458,12 +458,12 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
             return (
               <span className="text-xs px-3 sm:px-4 py-0.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 sm:gap-5 backdrop-blur-sm shadow-sm flex-shrink-0">
                 <span className="inline-flex flex-col items-start gap-0">
-                  <span className="text-[10px] leading-tight font-semibold text-blue-600 dark:text-blue-400">{statusT ? statusT('familyTree.ui.nodesLabelFull') : 'Nodes'}</span>
+                  <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.nodesLabelFull') : 'Nodes'}</span>
                   <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
                 </span>
                 <span className="h-5 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
                 <span className="inline-flex flex-col items-start gap-0">
-                  <span className="text-[10px] leading-tight font-semibold text-blue-600 dark:text-blue-400">{statusT ? statusT('familyTree.ui.depthLabelFull') : 'Depth'}</span>
+                  <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.depthLabelFull') : 'Depth'}</span>
                   <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
                 </span>
               </span>

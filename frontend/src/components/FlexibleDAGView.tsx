@@ -9,6 +9,7 @@ import { ZoomControls, MiniMap } from './ZoomControls'
 import NodeCard from './NodeCard'
 import { useTreeData } from '../context/TreeDataContext'
 import { useFamilyTreeHeight } from '../constants/layout'
+import { useVizOptions } from '../context/VizOptionsContext'
 
 export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
 
@@ -25,6 +26,7 @@ function FlexibleDAGViewInner({
   const ctxSelectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
   const { nodesData } = useTreeData()
+  const { deduplicateChildren } = useVizOptions()
 
   type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
   type Edge = { from: string; to: string }
@@ -160,8 +162,9 @@ function FlexibleDAGViewInner({
             const endorse = nd?.endorsementCount
             const hashShort = shortHash(n.hash)
             const isSelected = ctxSelectedId === n.id
-            // Count total versions for this person hash
-            const totalVersions = Object.keys(nodesData).filter(id => id.startsWith(`${n.hash}-v-`)).length
+            // Pass totalVersions only in deduplicate mode; NodeCard will handle display logic (show badge only if > 1)
+            const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
+            console.log(`[FlexibleDAG] ${hashShort}: dedup=${deduplicateChildren}, nd exists=${!!nd}, nd.totalVersions=${nd?.totalVersions}, passing=${totalVersions}`)
             return (
               <g key={n.id}
                  transform={`translate(${p.x}, ${p.y})`}

@@ -68,6 +68,7 @@ export interface NodeData {
   storyMetadata?: StoryMetadata
   storyChunks?: StoryChunk[]
   storyFetchedAt?: number
+  totalVersions?: number // Total number of versions for this personHash (from contract)
 }
 
 export type NodeDataPatch = Partial<Omit<NodeData,'personHash'|'versionIndex'|'id'>>

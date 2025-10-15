@@ -48,7 +48,8 @@ function buildStarPath(cx: number, cy: number, spikes = 5, outerR = 6.5, innerR 
 export default function NodeCard(props: NodeCardProps) {
   const { w, h, minted, selected, hover, versionText, titleText, tagText, gender, birthPlace, birthDateText, shortHashText, endorsementCount, totalVersions } = props
 
-  const hasMultipleVersions = totalVersions && totalVersions > 1
+  // Only show badge when totalVersions is explicitly passed (deduplicate mode) and > 1
+  const hasMultipleVersions = typeof totalVersions === 'number' && totalVersions > 1
 
   const baseRect = minted
     ? 'fill-emerald-50 dark:fill-emerald-900/20 stroke-emerald-300 dark:stroke-emerald-400'
@@ -97,24 +98,22 @@ export default function NodeCard(props: NodeCardProps) {
       />
       <rect width={w} height={h} rx={12} ry={12} fill="url(#cardGlossGrad)" className="dark:opacity-0" />
 
-      {/* Multi-version badge (top-left corner) */}
+      {/* Multi-version badge: purple header bar with version count */}
       {hasMultipleVersions && (
         <>
-          <rect
-            x={8}
-            y={6}
-            width={20}
-            height={14}
-            rx={7}
-            ry={7}
-            className={`${minted ? 'fill-purple-500 dark:fill-purple-400' : selected ? 'fill-indigo-500 dark:fill-indigo-400' : 'fill-violet-500 dark:fill-violet-400'}`}
+          {/* Light blue background bar at top with rounded corners - fits inside card */}
+          <path
+            d={`M 1 12 Q 1 1 12 1 L ${w - 12} 1 Q ${w - 1} 1 ${w - 1} 12 L ${w - 1} 12 L 1 12 Z`}
+            className={`${minted ? 'fill-sky-500/20 dark:fill-sky-500/20' : selected ? 'fill-blue-500/20 dark:fill-blue-500/20' : 'fill-cyan-500/20 dark:fill-cyan-500/20'}`}
           />
+          {/* Version count number on the left */}
           <text className="font-mono">
             <tspan
-              x={18}
-              y={16}
-              textAnchor="middle"
-              className="text-[10px] font-bold fill-white"
+              x={7}
+              y={8}
+              textAnchor="start"
+              dominantBaseline="middle"
+              className="text-[11px] font-bold fill-slate-600 dark:fill-slate-200"
             >
               {totalVersions}
             </tspan>
@@ -128,7 +127,7 @@ export default function NodeCard(props: NodeCardProps) {
       </text>
 
       {/* Gender dot (top-right corner) */}
-      <circle cx={w - 10} cy={10} r={GENDER_DOT_R} className={`${genderClass} stroke-white dark:stroke-slate-900`} strokeWidth={1} />
+      <circle cx={w - 9} cy={7} r={GENDER_DOT_R} className={genderClass} />
 
       {/* Title */}
       {title && (
