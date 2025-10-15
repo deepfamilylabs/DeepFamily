@@ -11,7 +11,7 @@
 **A blockchain-based decentralized digital family tree protocol**
 *Leveraging zero-knowledge proofs, NFTs, and community governance for collaborative family history*
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Core Features](#-core-features) • [🏗️ Architecture](#️-architecture) • [🚀 Deployment](#-deployment) • [🤝 Contributing](#-contributing)
+[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🎯 Core Features](#-core-features) • [🚀 Deployment](#-deployment) • [🤝 Contributing](#-contributing)
 
 </div>
 
