@@ -475,7 +475,9 @@
       "hideFullStory": "전체 프로필 숨기기",
       "showChunks": "샤드 표시",
       "hideChunks": "샤드 숨기기",
+      "encyclopedia": "인물 백과",
       "editStory": "프로필 편집",
+      "edit": "편집",
       "viewFullStory": "전체 프로필 보기",
       "uri": "URI",
       "loading": "NFT 정보 로딩 중…",
@@ -604,6 +606,8 @@
       "customError": "계약 오류: {{error}}",
       "transactionReverted": "트랜잭션 실패: 실행이 되돌려졌습니다",
       "userRejected": "사용자가 트랜잭션을 거부했습니다",
+      "walletTimeout": "지갑 확인이 제한 시간을 초과했습니다. 지갑을 다시 열어 거래를 확인하세요.",
+      "walletPending": "지갑에 대기 중인 요청이 있습니다. 지갑에서 승인 또는 거절 후 다시 시도하세요.",
       "insufficientFunds": "Gas 수수료 부족",
       "unknown": "알 수 없는 오류가 발생했습니다"
     }
@@ -692,6 +696,8 @@
   },
   "storyChunksModal": {
     "fetchError": "전기 데이터 로드 실패",
+    "lifeEvents": "인생 주요 사건",
+    "blockchainIdentity": "온체인 신원",
     "viewDetail": "세부정보 보기",
     "born": "출생",
     "died": "사망",
@@ -758,6 +764,8 @@
     "verifyingProof": "증명 검증 중...",
     "submittingToBlockchain": "블록체인에 제출 중...",
     "addedSuccessfully": "인물 추가 성공!",
+    "successTitle": "버전 추가 성공",
+    "successDesc": "인물 버전이 블록체인에 성공적으로 추가되었습니다",
     "personHash": "인물 해시",
     "transactionHash": "트랜잭션 해시",
     "blockNumber": "블록 번호",
@@ -791,7 +799,6 @@
     "close": "닫기",
     "personInfoRequired": "인물 정보를 입력하세요",
     "contractNotConfigured": "계약이 구성되지 않음",
-    "wallet.notConnected": "지갑을 연결하세요",
     "partial": "부분",
     "complete": "완전",
     "proofGenerationNote": "ZK 증명 생성에는 복잡한 암호화 계산이 필요하니 잠시 기다려 주세요...",
@@ -838,6 +845,9 @@
     "personHashRequired": "인물 해시를 계산할 수 없습니다",
     "mintFailed": "NFT 주조 실패",
     "mintedSuccessfully": "NFT 주조 성공!",
+    "successTitle": "NFT 발행 성공",
+    "successDesc": "NFT가 블록체인에 생성되었습니다",
+    "nftDetails": "NFT 세부정보",
     "tokenId": "토큰 ID",
     "owner": "소유자",
     "transactionHash": "트랜잭션 해시",
@@ -921,6 +931,9 @@
     "personHashRequired": "유효한 인물 해시와 버전 인덱스를 제공하세요",
     "insufficientDeepTokens": "승인에 필요한 DEEP 토큰이 부족합니다",
     "endorsedSuccessfully": "버전 승인 성공!",
+    "successTitle": "지지 성공",
+    "successDesc": "버전이 성공적으로 지지되었습니다",
+    "endorsementDetails": "지지 세부정보",
     "feePaid": "수수료 지불됨",
     "transactionHash": "트랜잭션 해시",
     "blockNumber": "블록 번호",
@@ -953,6 +966,8 @@
       "feeTransferFailed": "승인 수수료 송금 실패",
       "insufficientFunds": "트랜잭션 수수료 부족",
       "userRejected": "사용자가 트랜잭션을 거부했습니다",
+      "walletPending": "지갑에 대기 중인 요청이 있습니다. 지갑을 열어 기존 요청을 처리한 뒤 다시 시도하세요.",
+      "walletPendingDetails": "지갑 확장 프로그램에서 승인 대기 또는 트랜잭션 대기 항목을 확인하고 승인 또는 거절 후 다시 시도하세요.",
       "walletTimeout": "지갑 확인 타임아웃. 지갑 팝업이 닫히거나 숨겨질 수 있습니다.",
       "walletTimeoutDetails": "다시 시도하고 지갑 팝업에서 트랜잭션을 확인하세요."
     },
@@ -963,10 +978,19 @@
   "transaction": {
     "pending": "트랜잭션 확인 대기 중...",
     "pendingDetails": "트랜잭션이 제출되었거나 지갑 확인을 기다리고 있습니다. 앱을 계속 사용하실 수 있으며 확인 후 업데이트해드릴게요.",
-    "submitted": "트랜잭션 제출됨..."
+    "submitted": "트랜잭션 제출됨...",
+    "success": "트랜잭션 성공",
+    "failed": "트랜잭션 실패",
+    "rejected": "사용자가 트랜잭션을 거부했습니다",
+    "insufficientFunds": "가스 비용 부족",
+    "walletTimeout": "지갑 확인 타임아웃. 지갑 팝업에서 확인해주세요."
   },
   "contract": {
     "endorseSuccess": "승인 제출 성공",
-    "endorseFailed": "버전 승인 실패"
+    "endorseFailed": "버전 승인 실패",
+    "addVersionSuccess": "인물 버전 추가 성공",
+    "addVersionFailed": "인물 버전 추가 실패",
+    "mintSuccess": "NFT 발행 성공",
+    "mintFailed": "NFT 발행 실패"
   }
 }

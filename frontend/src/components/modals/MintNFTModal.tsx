@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, AlertCircle, Image, AlertTriangle, ChevronDown } from 'lucide-react'
+import { X, AlertCircle, Image, AlertTriangle, ChevronDown, Check, ChevronRight } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
@@ -790,6 +790,46 @@ export default function MintNFTModal({
     }
   }
 
+  // Helper component for data rows in success result
+  const DataRow = ({
+    label,
+    value,
+    colorClass,
+    isPlainText = false
+  }: {
+    label: string
+    value: string
+    colorClass: 'purple'
+    isPlainText?: boolean
+  }) => {
+    const colorConfig = {
+      purple: {
+        labelColor: 'text-purple-800 dark:text-purple-200',
+        valueBg: 'bg-purple-100 dark:bg-purple-800',
+        valueColor: 'text-purple-900 dark:text-purple-100'
+      }
+    }
+
+    const config = colorConfig[colorClass]
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className={`text-xs font-medium ${config.labelColor}`}>
+          {label}
+        </span>
+        {isPlainText ? (
+          <span className={`text-xs ${config.valueColor}`}>
+            {value}
+          </span>
+        ) : (
+          <code className={`${config.valueBg} ${config.valueColor} px-2 py-1 rounded font-mono text-xs break-all`}>
+            {value}
+          </code>
+        )}
+      </div>
+    )
+  }
+
   if (!isOpen) return null
 
   return (
@@ -1144,7 +1184,7 @@ export default function MintNFTModal({
 
           {/* Progress Indicator */}
           {isSubmitting && !successResult && !errorResult && (
-            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
                 <div className="min-w-0 flex-1">
@@ -1168,132 +1208,133 @@ export default function MintNFTModal({
 
           {/* Success Message */}
           {successResult && (
-            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
-              {/* Event Information - single consolidated card */}
-              {successResult.events.PersonNFTMinted && (
-                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-700">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                    <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">
-                      {t('mintNFT.mintedSuccessfully', 'NFT minted successfully!')}
-                    </span>
-                  </div>
-                  
-                  {/* Complete Event Details */}
-                  <div className="space-y-2 text-xs">
-                    {/* Person Hash */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.personHash', 'Person Hash')}:
-                      </span>
-                      <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        {successResult.personHash}
-                      </code>
-                    </div>
-                    
-                    {/* Token ID */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.tokenId', 'Token ID')}:
-                      </span>
-                      <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        #{successResult.tokenId}
-                      </code>
-                    </div>
-                    
-                    {/* Version Index */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.versionIndex', 'Version Index')}:
-                      </span>
-                      <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                        {successResult.versionIndex}
-                      </code>
-                    </div>
-                    
-                    {/* Token URI */}
-                    {successResult.tokenURI && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-purple-800 dark:text-purple-200">
-                          {t('mintNFT.tokenURI', 'Token URI')}:
-                        </span>
-                        <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.tokenURI}
-                        </code>
-                      </div>
-                    )}
-                    
-                    {/* Owner */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.owner', 'Owner')}:
-                      </span>
-                      <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        {successResult.events.PersonNFTMinted.owner}
-                      </code>
-                    </div>
-                    
-                    {/* Transaction Hash */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.transactionHash', 'Transaction Hash')}:
-                      </span>
-                      <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        {successResult.transactionHash}
-                      </code>
-                    </div>
-                    
-                    {/* Block Number */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.blockNumber', 'Block Number')}:
-                      </span>
-                      <code className="col-span-2 bg-purple-100 dark:bg-purple-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                        {successResult.blockNumber}
-                      </code>
-                    </div>
-                    
-                    {/* Timestamp */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-purple-800 dark:text-purple-200">
-                        {t('mintNFT.timestamp', 'Timestamp')}:
-                      </span>
-                      <span className="col-span-2 text-purple-700 dark:text-purple-300">
-                        {new Date(Number(successResult.events.PersonNFTMinted.timestamp) * 1000).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
+            <div className="space-y-4">
+              {/* Success Header */}
+              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-50 to-fuchsia-50 dark:from-purple-900/20 dark:to-fuchsia-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-6 h-6 text-white" />
                 </div>
+                <div>
+                  <h3 className="text-base font-semibold text-purple-900 dark:text-purple-100">
+                    {t('mintNFT.successTitle', 'NFT Minted Successfully')}
+                  </h3>
+                  <p className="text-sm text-purple-700 dark:text-purple-300">
+                    {t('mintNFT.successDesc', 'Your NFT has been created on the blockchain')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Event Information - collapsible */}
+              {successResult.events.PersonNFTMinted && (
+                <details className="group bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700 overflow-hidden" open>
+                  <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                      <span className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                        {t('mintNFT.nftDetails', 'NFT Details')}
+                      </span>
+                      <span className="ml-2 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-800 px-2 py-0.5 rounded-full">
+                        #{successResult.tokenId}
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-purple-600 group-open:rotate-90 transition-transform" />
+                  </summary>
+                  <div className="px-3 pb-3 space-y-3">
+                    {/* Basic Info */}
+                    <div className="space-y-2">
+                      <DataRow
+                        label={t('mintNFT.personHash', 'Person Hash')}
+                        value={successResult.personHash}
+                        colorClass="purple"
+                      />
+                      <DataRow
+                        label={t('mintNFT.tokenId', 'Token ID')}
+                        value={`#${successResult.tokenId}`}
+                        colorClass="purple"
+                      />
+                      <DataRow
+                        label={t('mintNFT.versionIndex', 'Version Index')}
+                        value={successResult.versionIndex.toString()}
+                        colorClass="purple"
+                      />
+                      {successResult.tokenURI && (
+                        <DataRow
+                          label={t('mintNFT.tokenURI', 'Token URI')}
+                          value={successResult.tokenURI}
+                          colorClass="purple"
+                        />
+                      )}
+                      <DataRow
+                        label={t('mintNFT.owner', 'Owner')}
+                        value={successResult.events.PersonNFTMinted.owner}
+                        colorClass="purple"
+                      />
+                    </div>
+
+                    {/* Transaction Info Section */}
+                    <div className="pt-2 border-t border-purple-200/50 dark:border-purple-700/50">
+                      <p className="text-xs font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                        {t('mintNFT.transactionInfo', 'Transaction Info')}
+                      </p>
+                      <div className="space-y-2">
+                        <DataRow
+                          label={t('mintNFT.transactionHash', 'Transaction Hash')}
+                          value={successResult.transactionHash}
+                          colorClass="purple"
+                        />
+                        <DataRow
+                          label={t('mintNFT.blockNumber', 'Block Number')}
+                          value={successResult.blockNumber.toString()}
+                          colorClass="purple"
+                        />
+                        <DataRow
+                          label={t('mintNFT.timestamp', 'Timestamp')}
+                          value={new Date(Number(successResult.events.PersonNFTMinted.timestamp) * 1000).toLocaleString()}
+                          colorClass="purple"
+                          isPlainText
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </details>
               )}
             </div>
           )}
 
           {/* Error Message */}
           {errorResult && (
-            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                  <p className="text-base font-semibold text-red-900 dark:text-red-100 mb-2">
                     {t('mintNFT.mintFailed', 'NFT Minting Failed')}
                   </p>
-                  <div className="space-y-2 text-xs text-red-700 dark:text-red-300">
-                    <div>
-                      <span className="font-medium">{t('mintNFT.errorType', 'Error Type')}:</span>
-                      <code className="ml-2 bg-red-100 dark:bg-red-800 px-1.5 py-0.5 rounded">
+                  <div className="space-y-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        {t('mintNFT.errorType', 'Error Type')}
+                      </span>
+                      <code className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded font-mono text-xs">
                         {errorResult.type}
                       </code>
                     </div>
-                    <div>
-                      <span className="font-medium">{t('mintNFT.errorMessage', 'Message')}:</span>
-                      <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        {t('mintNFT.errorMessage', 'Message')}
+                      </span>
+                      <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
                         {errorResult.message}
                       </p>
                     </div>
                     {errorResult.details !== errorResult.message && (
-                      <div>
-                        <span className="font-medium">{t('mintNFT.errorDetails', 'Details')}:</span>
-                        <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded text-xs">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                          {t('mintNFT.errorDetails', 'Details')}
+                        </span>
+                        <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
                           {errorResult.details}
                         </p>
                       </div>

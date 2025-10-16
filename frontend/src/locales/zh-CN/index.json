@@ -476,7 +476,9 @@
       "hideFullStory": "隐藏完整档案",
       "showChunks": "显示分片",
       "hideChunks": "隐藏分片",
+      "encyclopedia": "人物百科",
       "editStory": "编辑档案",
+      "edit": "编辑",
       "viewFullStory": "查看完整档案",
       "uri": "URI",
       "loading": "NFT 信息加载中…",
@@ -605,6 +607,8 @@
       "customError": "合约错误：{{error}}",
       "transactionReverted": "交易失败：执行被回退",
       "userRejected": "用户拒绝了交易",
+      "walletTimeout": "钱包确认超时，请重新打开钱包并完成确认。",
+      "walletPending": "钱包中存在待处理请求，请打开钱包确认或取消后再试。",
       "insufficientFunds": "Gas费不足",
       "unknown": "发生未知错误"
     }
@@ -693,6 +697,8 @@
   },
   "storyChunksModal": {
     "fetchError": "加载传记数据失败",
+    "lifeEvents": "重要事件",
+    "blockchainIdentity": "链上身份",
     "viewDetail": "查看详情",
     "born": "出生",
     "died": "逝世",
@@ -759,6 +765,8 @@
     "verifyingProof": "验证证明...",
     "submittingToBlockchain": "提交到区块链...",
     "addedSuccessfully": "人物添加成功！",
+    "successTitle": "版本添加成功",
+    "successDesc": "人员版本已成功添加到区块链",
     "personHash": "人物哈希",
     "transactionHash": "交易哈希",
     "blockNumber": "区块号",
@@ -792,7 +800,6 @@
     "close": "关闭",
     "personInfoRequired": "请填写人物信息",
     "contractNotConfigured": "合约未配置",
-    "wallet.notConnected": "请连接钱包",
     "partial": "部分",
     "complete": "完整",
     "proofGenerationNote": "ZK证明生成需要复杂的加密计算，请耐心等待...",
@@ -839,6 +846,9 @@
     "personHashRequired": "无法计算人物哈希",
     "mintFailed": "铸造 NFT 失败",
     "mintedSuccessfully": "NFT 铸造成功！",
+    "successTitle": "NFT铸造成功",
+    "successDesc": "您的NFT已在区块链上创建",
+    "nftDetails": "NFT详情",
     "tokenId": "Token ID",
     "owner": "所有者",
     "transactionHash": "交易哈希",
@@ -922,6 +932,9 @@
     "personHashRequired": "请提供有效的人物哈希和版本索引",
     "insufficientDeepTokens": "DEEP代币余额不足以进行背书",
     "endorsedSuccessfully": "版本背书成功！",
+    "successTitle": "背书成功",
+    "successDesc": "版本已成功背书",
+    "endorsementDetails": "背书详情",
     "feePaid": "已支付费用",
     "transactionHash": "交易哈希",
     "blockNumber": "区块号",
@@ -964,10 +977,19 @@
   "transaction": {
     "pending": "交易等待确认中...",
     "pendingDetails": "交易已提交或等待钱包确认。您可以继续使用应用，我们会在确认后更新。",
-    "submitted": "交易已提交..."
+    "submitted": "交易已提交...",
+    "success": "交易成功",
+    "failed": "交易失败",
+    "rejected": "用户拒绝交易",
+    "insufficientFunds": "交易手续费不足",
+    "walletTimeout": "钱包确认超时。请重试并确保在钱包弹窗中确认。"
   },
   "contract": {
     "endorseSuccess": "背书提交成功",
-    "endorseFailed": "背书版本失败"
+    "endorseFailed": "背书版本失败",
+    "addVersionSuccess": "人物版本添加成功",
+    "addVersionFailed": "添加人物版本失败",
+    "mintSuccess": "NFT 铸造成功",
+    "mintFailed": "NFT 铸造失败"
   }
 }

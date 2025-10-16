@@ -111,63 +111,69 @@ export default function StoryEditorPage() {
     if (!signer) throw new Error('No wallet connected')
     if (!address) throw new Error('No wallet address')
 
-    // 执行区块链操作
-    const result = await addStoryChunk(
-      signer,
-      contractAddress,
-      data.tokenId,
-      data.chunkIndex,
-      data.content,
-      data.expectedHash || ''
-    )
-
-    // After successful operation, immediately update local state
-    const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk]
-    setChunks(newChunks)
-
-    // Update total chunks count in metadata
-    const newMeta: StoryMetadata | undefined = meta ? {
-      ...meta,
-      totalChunks: (meta.totalChunks || 0) + 1,
-      lastUpdateTime: result.newChunk.timestamp,
-      totalLength: (meta.totalLength || 0) + result.contentLength
-    } : undefined
-    setMeta(newMeta)
-
-    // Synchronize updates to TreeDataContext node data cache
-    if (setNodesData && validTokenId) {
-      setNodesData(prev => {
-        let foundId: string | undefined
-        for (const [id, nd] of Object.entries(prev)) {
-          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
-            foundId = id
-            break
-          }
-        }
-        if (!foundId) return prev
-
-        const cur = prev[foundId]
-        return {
-          ...prev,
-          [foundId]: {
-            ...cur,
-            storyMetadata: newMeta,
-            storyChunks: newChunks
-          }
-        }
-      })
-    }
-
-    // Show success message with event data if available
-    if (result.events.StoryChunkAdded) {
-      toast.success(
-        t('storyChunkEditor.success.chunkAdded', 'Chunk #{{index}} added successfully ({{bytes}} bytes)', {
-          index: result.events.StoryChunkAdded.chunkIndex,
-          bytes: result.events.StoryChunkAdded.contentLength
-        })
+    try {
+      // 执行区块链操作
+      const result = await addStoryChunk(
+        signer,
+        contractAddress,
+        data.tokenId,
+        data.chunkIndex,
+        data.content,
+        data.expectedHash || ''
       )
-    } else {
-      toast.success(t('storyChunkEditor.success.chunkAddedGeneric', 'Story chunk added successfully'))
+
+      // After successful operation, immediately update local state
+      const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk]
+      setChunks(newChunks)
+
+      // Update total chunks count in metadata
+      const newMeta: StoryMetadata | undefined = meta ? {
+        ...meta,
+        totalChunks: (meta.totalChunks || 0) + 1,
+        lastUpdateTime: result.newChunk.timestamp,
+        totalLength: (meta.totalLength || 0) + result.contentLength
+      } : undefined
+      setMeta(newMeta)
+
+      // Synchronize updates to TreeDataContext node data cache
+      if (setNodesData && validTokenId) {
+        setNodesData(prev => {
+          let foundId: string | undefined
+          for (const [id, nd] of Object.entries(prev)) {
+            if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
+              foundId = id
+              break
+            }
+          }
+          if (!foundId) return prev
+
+          const cur = prev[foundId]
+          return {
+            ...prev,
+            [foundId]: {
+              ...cur,
+              storyMetadata: newMeta,
+              storyChunks: newChunks
+            }
+          }
+        })
+      }
+
+      // Show success message with event data if available
+      if (result.events.StoryChunkAdded) {
+        toast.success(
+          t('storyChunkEditor.success.chunkAdded', 'Chunk #{{index}} added successfully ({{bytes}} bytes)', {
+            index: result.events.StoryChunkAdded.chunkIndex,
+            bytes: result.events.StoryChunkAdded.contentLength
+          })
+        )
+      } else {
+        toast.success(t('storyChunkEditor.success.chunkAddedGeneric', 'Story chunk added successfully'))
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('storyChunkEditor.operationFailed', 'Operation failed')
+      toast.error(message)
+      throw err
     }
   }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
 
@@ -176,64 +182,70 @@ export default function StoryEditorPage() {
     if (!signer) throw new Error('No wallet connected')
     if (!address) throw new Error('No wallet address')
 
-    // 执行区块链操作
-    const result = await updateStoryChunk(
-      signer,
-      contractAddress,
-      data.tokenId,
-      data.chunkIndex,
-      data.newContent,
-      data.expectedHash || ''
-    )
-
-    // After successful operation, immediately update local state and replace chunk at corresponding index
-    const newChunks = chunks ? [...chunks] : []
-    const index = newChunks.findIndex(c => c.chunkIndex === data.chunkIndex)
-    if (index !== -1) {
-      newChunks[index] = result.updatedChunk
-    }
-    setChunks(newChunks)
-
-    // Update last update time in metadata
-    const newMeta: StoryMetadata | undefined = meta ? {
-      ...meta,
-      lastUpdateTime: result.updatedChunk.timestamp
-    } : undefined
-    setMeta(newMeta)
-
-    // Synchronize updates to TreeDataContext node data cache
-    if (setNodesData && validTokenId) {
-      setNodesData(prev => {
-        let foundId: string | undefined
-        for (const [id, nd] of Object.entries(prev)) {
-          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
-            foundId = id
-            break
-          }
-        }
-        if (!foundId) return prev
-
-        const cur = prev[foundId]
-        return {
-          ...prev,
-          [foundId]: {
-            ...cur,
-            storyMetadata: newMeta,
-            storyChunks: newChunks
-          }
-        }
-      })
-    }
-
-    // Show success message with event data if available
-    if (result.events.StoryChunkUpdated) {
-      toast.success(
-        t('storyChunkEditor.success.chunkUpdated', 'Chunk #{{index}} updated successfully', {
-          index: result.events.StoryChunkUpdated.chunkIndex
-        })
+    try {
+      // 执行区块链操作
+      const result = await updateStoryChunk(
+        signer,
+        contractAddress,
+        data.tokenId,
+        data.chunkIndex,
+        data.newContent,
+        data.expectedHash || ''
       )
-    } else {
-      toast.success(t('storyChunkEditor.success.chunkUpdatedGeneric', 'Story chunk updated successfully'))
+
+      // After successful operation, immediately update local state and replace chunk at corresponding index
+      const newChunks = chunks ? [...chunks] : []
+      const index = newChunks.findIndex(c => c.chunkIndex === data.chunkIndex)
+      if (index !== -1) {
+        newChunks[index] = result.updatedChunk
+      }
+      setChunks(newChunks)
+
+      // Update last update time in metadata
+      const newMeta: StoryMetadata | undefined = meta ? {
+        ...meta,
+        lastUpdateTime: result.updatedChunk.timestamp
+      } : undefined
+      setMeta(newMeta)
+
+      // Synchronize updates to TreeDataContext node data cache
+      if (setNodesData && validTokenId) {
+        setNodesData(prev => {
+          let foundId: string | undefined
+          for (const [id, nd] of Object.entries(prev)) {
+            if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
+              foundId = id
+              break
+            }
+          }
+          if (!foundId) return prev
+
+          const cur = prev[foundId]
+          return {
+            ...prev,
+            [foundId]: {
+              ...cur,
+              storyMetadata: newMeta,
+              storyChunks: newChunks
+            }
+          }
+        })
+      }
+
+      // Show success message with event data if available
+      if (result.events.StoryChunkUpdated) {
+        toast.success(
+          t('storyChunkEditor.success.chunkUpdated', 'Chunk #{{index}} updated successfully', {
+            index: result.events.StoryChunkUpdated.chunkIndex
+          })
+        )
+      } else {
+        toast.success(t('storyChunkEditor.success.chunkUpdatedGeneric', 'Story chunk updated successfully'))
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('storyChunkEditor.operationFailed', 'Operation failed')
+      toast.error(message)
+      throw err
     }
   }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
 
@@ -242,49 +254,55 @@ export default function StoryEditorPage() {
     if (!signer) throw new Error('No wallet connected')
     if (!address) throw new Error('No wallet address')
 
-    // Execute blockchain operation
-    const result = await sealStory(signer, contractAddress, tid)
+    try {
+      // Execute blockchain operation
+      const result = await sealStory(signer, contractAddress, tid)
 
-    // After successful operation, immediately update sealed status in metadata
-    const newMeta: StoryMetadata | undefined = meta ? {
-      ...meta,
-      isSealed: true,
-      totalChunks: result.totalChunks
-    } : undefined
-    setMeta(newMeta)
+      // After successful operation, immediately update sealed status in metadata
+      const newMeta: StoryMetadata | undefined = meta ? {
+        ...meta,
+        isSealed: true,
+        totalChunks: result.totalChunks
+      } : undefined
+      setMeta(newMeta)
 
-    // Synchronize updates to TreeDataContext node data cache
-    if (setNodesData && validTokenId) {
-      setNodesData(prev => {
-        let foundId: string | undefined
-        for (const [id, nd] of Object.entries(prev)) {
-          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
-            foundId = id
-            break
+      // Synchronize updates to TreeDataContext node data cache
+      if (setNodesData && validTokenId) {
+        setNodesData(prev => {
+          let foundId: string | undefined
+          for (const [id, nd] of Object.entries(prev)) {
+            if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
+              foundId = id
+              break
+            }
           }
-        }
-        if (!foundId) return prev
+          if (!foundId) return prev
 
-        const cur = prev[foundId]
-        return {
-          ...prev,
-          [foundId]: {
-            ...cur,
-            storyMetadata: newMeta
+          const cur = prev[foundId]
+          return {
+            ...prev,
+            [foundId]: {
+              ...cur,
+              storyMetadata: newMeta
+            }
           }
-        }
-      })
-    }
-
-    // Show success message with event data if available
-    if (result.events.StorySealed) {
-      toast.success(
-        t('storyChunkEditor.success.storySealed', 'Story sealed successfully ({{total}} chunks)', {
-          total: result.events.StorySealed.totalChunks
         })
-      )
-    } else {
-      toast.success(t('storyChunkEditor.success.storySealedGeneric', 'Story sealed successfully'))
+      }
+
+      // Show success message with event data if available
+      if (result.events.StorySealed) {
+        toast.success(
+          t('storyChunkEditor.success.storySealed', 'Story sealed successfully ({{total}} chunks)', {
+            total: result.events.StorySealed.totalChunks
+          })
+        )
+      } else {
+        toast.success(t('storyChunkEditor.success.storySealedGeneric', 'Story sealed successfully'))
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('storyChunkEditor.operationFailed', 'Operation failed')
+      toast.error(message)
+      throw err
     }
   }, [contractAddress, signer, address, toast, t, meta, validTokenId, setNodesData])
 

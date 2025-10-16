@@ -378,12 +378,62 @@ export default function AddVersionModal({
       partial: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30' },
       complete: { icon: Check, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' }
     }
-    
+
     const { icon: Icon, color, bg } = config[status]
-    
+
     return (
       <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${bg}`}>
         <Icon className={`w-4 h-4 ${color}`} />
+      </div>
+    )
+  }
+
+  // Helper component for data rows in success result
+  const DataRow = ({
+    label,
+    value,
+    colorClass,
+    isPlainText = false
+  }: {
+    label: string
+    value: string
+    colorClass: 'blue' | 'green' | 'yellow'
+    isPlainText?: boolean
+  }) => {
+    const colorConfig = {
+      blue: {
+        labelColor: 'text-blue-800 dark:text-blue-200',
+        valueBg: 'bg-blue-100 dark:bg-blue-800',
+        valueColor: 'text-blue-900 dark:text-blue-100'
+      },
+      green: {
+        labelColor: 'text-green-800 dark:text-green-200',
+        valueBg: 'bg-green-100 dark:bg-green-800',
+        valueColor: 'text-green-900 dark:text-green-100'
+      },
+      yellow: {
+        labelColor: 'text-yellow-800 dark:text-yellow-200',
+        valueBg: 'bg-yellow-100 dark:bg-yellow-800',
+        valueColor: 'text-yellow-900 dark:text-yellow-100'
+      }
+    }
+
+    const config = colorConfig[colorClass]
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className={`text-xs font-medium ${config.labelColor}`}>
+          {label}
+        </span>
+        {isPlainText ? (
+          <span className={`text-xs ${config.valueColor}`}>
+            {value}
+          </span>
+        ) : (
+          <code className={`${config.valueBg} ${config.valueColor} px-2 py-1 rounded font-mono text-xs break-all`}>
+            {value}
+          </code>
+        )}
       </div>
     )
   }
@@ -646,7 +696,7 @@ export default function AddVersionModal({
           
           {/* Progress Indicator */}
           {isSubmitting && proofGenerationStep && !successResult && !errorResult && (
-            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
                 <div className="min-w-0 flex-1">
@@ -668,233 +718,195 @@ export default function AddVersionModal({
 
           {/* Success Message */}
           {successResult && (
-            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
-              {/* Events Information */}
+            <div className="space-y-4">
+              {/* Success Header */}
+              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-green-900 dark:text-green-100">
+                    {t('addVersion.successTitle', 'Version Added Successfully')}
+                  </h3>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    {t('addVersion.successDesc', 'The person version has been added to the blockchain')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Compact Event Cards */}
               <div className="space-y-3">
                 
                 {/* ZK Proof Verified */}
                 {successResult.events.PersonHashZKVerified && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                      <span className="text-xs font-medium text-blue-900 dark:text-blue-100">
-                        {t('addVersion.zkProofVerified', 'ZK Proof Verified')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                      {t('addVersion.zkProofVerifiedDesc', 'Zero-knowledge proof was successfully verified on-chain')}
-                    </p>
-                    
-                    {/* Complete Event Details */}
-                    <div className="space-y-2 text-xs">
-                      {/* Person Hash */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-blue-800 dark:text-blue-200">
-                          {t('addVersion.hashPrefix', 'Hash')}:
+                  <details className="group bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700 overflow-hidden">
+                    <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                        <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          {t('addVersion.zkProofVerified', 'ZK Proof Verified')}
                         </span>
-                        <code className="col-span-2 bg-blue-100 dark:bg-blue-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.PersonHashZKVerified.personHash}
-                        </code>
                       </div>
-                      
-                      {/* Prover */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-blue-800 dark:text-blue-200">
-                          {t('addVersion.prover', 'Prover')}:
-                        </span>
-                        <code className="col-span-2 bg-blue-100 dark:bg-blue-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.PersonHashZKVerified.prover}
-                        </code>
-                      </div>
+                      <ChevronRight className="w-4 h-4 text-blue-600 group-open:rotate-90 transition-transform" />
+                    </summary>
+                    <div className="px-3 pb-3 space-y-2">
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                        {t('addVersion.zkProofVerifiedDesc', 'Zero-knowledge proof was successfully verified on-chain')}
+                      </p>
+                      <DataRow
+                        label={t('addVersion.hashPrefix', 'Hash')}
+                        value={successResult.events.PersonHashZKVerified.personHash}
+                        colorClass="blue"
+                      />
+                      <DataRow
+                        label={t('addVersion.prover', 'Prover')}
+                        value={successResult.events.PersonHashZKVerified.prover}
+                        colorClass="blue"
+                      />
                     </div>
-                  </div>
+                  </details>
                 )}
                 
                 {/* Version Added */}
                 {successResult.events.PersonVersionAdded && (
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                      <span className="text-xs font-medium text-green-900 dark:text-green-100">
-                        {t('addVersion.versionAdded', 'Person Version Added')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-green-700 dark:text-green-300 mb-3">
-                      {t('addVersion.versionAddedDesc', 'Person version was successfully added to the family tree')}
-                    </p>
-                    
-                    {/* Complete Event Details */}
-                    <div className="space-y-2 text-xs">
-                      {/* Person Hash */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('addVersion.hashPrefix', 'Hash')}:
-                        </span>
-                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.PersonVersionAdded.personHash}
-                        </code>
-                      </div>
-                      
-                      {/* Version Index */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('addVersion.versionIndex', 'Version Index')}:
-                        </span>
-                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                          {successResult.events.PersonVersionAdded.versionIndex}
-                        </code>
-                      </div>
-                      
-                      {/* Added By */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('addVersion.addedBy', 'Added By')}:
-                        </span>
-                        <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.PersonVersionAdded.addedBy}
-                        </code>
-                      </div>
-                      
-                      {/* Timestamp */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-green-800 dark:text-green-200">
-                          {t('addVersion.timestamp', 'Timestamp')}:
-                        </span>
-                        <span className="col-span-2 text-green-700 dark:text-green-300">
-                          {new Date(successResult.events.PersonVersionAdded.timestamp * 1000).toLocaleString()}
+                  <details className="group bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 overflow-hidden" open>
+                    <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                          {t('addVersion.versionAdded', 'Person Version Added')}
                         </span>
                       </div>
-                      
+                      <ChevronRight className="w-4 h-4 text-green-600 group-open:rotate-90 transition-transform" />
+                    </summary>
+                    <div className="px-3 pb-3 space-y-2">
+                      <p className="text-xs text-green-700 dark:text-green-300 mb-2">
+                        {t('addVersion.versionAddedDesc', 'Person version was successfully added to the family tree')}
+                      </p>
+                      <DataRow
+                        label={t('addVersion.hashPrefix', 'Hash')}
+                        value={successResult.events.PersonVersionAdded.personHash}
+                        colorClass="green"
+                      />
+                      <DataRow
+                        label={t('addVersion.versionIndex', 'Version Index')}
+                        value={successResult.events.PersonVersionAdded.versionIndex.toString()}
+                        colorClass="green"
+                      />
+                      <DataRow
+                        label={t('addVersion.addedBy', 'Added By')}
+                        value={successResult.events.PersonVersionAdded.addedBy}
+                        colorClass="green"
+                      />
+                      <DataRow
+                        label={t('addVersion.timestamp', 'Timestamp')}
+                        value={new Date(successResult.events.PersonVersionAdded.timestamp * 1000).toLocaleString()}
+                        colorClass="green"
+                        isPlainText
+                      />
+
                       {/* Father Info */}
-                      {successResult.events.PersonVersionAdded.fatherHash && successResult.events.PersonVersionAdded.fatherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                      {successResult.events.PersonVersionAdded.fatherHash &&
+                       successResult.events.PersonVersionAdded.fatherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
                         <>
-                          <div className="grid grid-cols-3 gap-2">
-                            <span className="font-medium text-green-800 dark:text-green-200">
-                              {t('addVersion.fatherHash', 'Father Hash')}:
-                            </span>
-                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                              {successResult.events.PersonVersionAdded.fatherHash}
-                            </code>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            <span className="font-medium text-green-800 dark:text-green-200">
-                              {t('addVersion.fatherVersionIndex', 'Father Version')}:
-                            </span>
-                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                              {successResult.events.PersonVersionAdded.fatherVersionIndex}
-                            </code>
-                          </div>
+                          <DataRow
+                            label={t('addVersion.fatherHash', 'Father Hash')}
+                            value={successResult.events.PersonVersionAdded.fatherHash}
+                            colorClass="green"
+                          />
+                          <DataRow
+                            label={t('addVersion.fatherVersionIndex', 'Father Version')}
+                            value={successResult.events.PersonVersionAdded.fatherVersionIndex.toString()}
+                            colorClass="green"
+                          />
                         </>
                       )}
-                      
+
                       {/* Mother Info */}
-                      {successResult.events.PersonVersionAdded.motherHash && successResult.events.PersonVersionAdded.motherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                      {successResult.events.PersonVersionAdded.motherHash &&
+                       successResult.events.PersonVersionAdded.motherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
                         <>
-                          <div className="grid grid-cols-3 gap-2">
-                            <span className="font-medium text-green-800 dark:text-green-200">
-                              {t('addVersion.motherHash', 'Mother Hash')}:
-                            </span>
-                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                              {successResult.events.PersonVersionAdded.motherHash}
-                            </code>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            <span className="font-medium text-green-800 dark:text-green-200">
-                              {t('addVersion.motherVersionIndex', 'Mother Version')}:
-                            </span>
-                            <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                              {successResult.events.PersonVersionAdded.motherVersionIndex}
-                            </code>
-                          </div>
+                          <DataRow
+                            label={t('addVersion.motherHash', 'Mother Hash')}
+                            value={successResult.events.PersonVersionAdded.motherHash}
+                            colorClass="green"
+                          />
+                          <DataRow
+                            label={t('addVersion.motherVersionIndex', 'Mother Version')}
+                            value={successResult.events.PersonVersionAdded.motherVersionIndex.toString()}
+                            colorClass="green"
+                          />
                         </>
                       )}
-                      
+
                       {/* Tag */}
                       {successResult.events.PersonVersionAdded.tag && (
-                        <div className="grid grid-cols-3 gap-2">
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {t('addVersion.tag', 'Tag')}:
-                          </span>
-                          <span className="col-span-2 text-green-700 dark:text-green-300">
-                            "{successResult.events.PersonVersionAdded.tag}"
-                          </span>
-                        </div>
+                        <DataRow
+                          label={t('addVersion.tag', 'Tag')}
+                          value={`"${successResult.events.PersonVersionAdded.tag}"`}
+                          colorClass="green"
+                          isPlainText
+                        />
                       )}
                     </div>
-                  </div>
+                  </details>
                 )}
                 
                 {/* Token Reward */}
                 {successResult.events.TokenRewardDistributed ? (
-                  <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
-                      <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">
-                        {t('addVersion.tokenReward', 'Token Reward Distributed')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
-                      {t('addVersion.familyComplete', 'Complete family data bonus - both parents exist in the system')}
-                    </p>
-                    
-                    {/* Complete Event Details */}
-                    <div className="space-y-2 text-xs">
-                      {/* Miner (Recipient) */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
-                          {t('addVersion.miner', 'Miner')}:
+                  <details className="group bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700 overflow-hidden">
+                    <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
+                        <span className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                          {t('addVersion.tokenReward', 'Token Reward Distributed')}
                         </span>
-                        <code className="col-span-2 bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.TokenRewardDistributed.miner}
-                        </code>
-                      </div>
-                      
-                      {/* Person Hash */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
-                          {t('addVersion.hashPrefix', 'Hash')}:
-                        </span>
-                        <code className="col-span-2 bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                          {successResult.events.TokenRewardDistributed.personHash}
-                        </code>
-                      </div>
-                      
-                      {/* Version Index */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
-                          {t('addVersion.versionIndex', 'Version Index')}:
-                        </span>
-                        <code className="col-span-2 bg-yellow-100 dark:bg-yellow-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                          {successResult.events.TokenRewardDistributed.versionIndex}
-                        </code>
-                      </div>
-                      
-                      {/* Reward Amount */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="font-medium text-yellow-800 dark:text-yellow-200">
-                          {t('addVersion.rewardAmount', 'Reward Amount')}:
-                        </span>
-                        <span className="col-span-2 text-yellow-700 dark:text-yellow-300 font-mono">
+                        <span className="ml-2 text-xs font-semibold text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-800 px-2 py-0.5 rounded-full">
                           {(Number(successResult.events.TokenRewardDistributed.reward) / Math.pow(10, 18)).toLocaleString()} DEEP
                         </span>
                       </div>
+                      <ChevronRight className="w-4 h-4 text-yellow-600 group-open:rotate-90 transition-transform" />
+                    </summary>
+                    <div className="px-3 pb-3 space-y-2">
+                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
+                        {t('addVersion.familyComplete', 'Complete family data bonus - both parents exist in the system')}
+                      </p>
+                      <DataRow
+                        label={t('addVersion.miner', 'Miner')}
+                        value={successResult.events.TokenRewardDistributed.miner}
+                        colorClass="yellow"
+                      />
+                      <DataRow
+                        label={t('addVersion.hashPrefix', 'Hash')}
+                        value={successResult.events.TokenRewardDistributed.personHash}
+                        colorClass="yellow"
+                      />
+                      <DataRow
+                        label={t('addVersion.versionIndex', 'Version Index')}
+                        value={successResult.events.TokenRewardDistributed.versionIndex.toString()}
+                        colorClass="yellow"
+                      />
+                      <DataRow
+                        label={t('addVersion.rewardAmount', 'Reward Amount')}
+                        value={`${(Number(successResult.events.TokenRewardDistributed.reward) / Math.pow(10, 18)).toLocaleString()} DEEP`}
+                        colorClass="yellow"
+                        isPlainText
+                      />
                     </div>
-                  </div>
+                  </details>
                 ) : (
-                  // Show explanation when no token reward was distributed
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                        {t('addVersion.noTokenReward', 'No Token Reward')}
-                      </span>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {t('addVersion.noTokenReward', 'No Token Reward')}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {t('addVersion.tokenRewardCondition', 'Token rewards are only distributed when both parents already exist in the system')}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {t('addVersion.tokenRewardCondition', 'Token rewards are only distributed when both parents already exist in the system')}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      {t('addVersion.tokenRewardTip', 'Add the parents first to earn DEEP token rewards for complete family data')}
-                    </p>
                   </div>
                 )}
               </div>
@@ -903,30 +915,38 @@ export default function AddVersionModal({
 
           {/* Error Message */}
           {errorResult && (
-            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                  <p className="text-base font-semibold text-red-900 dark:text-red-100 mb-2">
                     {t('addVersion.failed', 'Transaction Failed')}
                   </p>
-                  <div className="space-y-2 text-xs text-red-700 dark:text-red-300">
-                    <div>
-                      <span className="font-medium">{t('addVersion.errorType', 'Error Type')}:</span>
-                      <code className="ml-2 bg-red-100 dark:bg-red-800 px-1.5 py-0.5 rounded">
+                  <div className="space-y-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        {t('addVersion.errorType', 'Error Type')}
+                      </span>
+                      <code className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded font-mono text-xs">
                         {errorResult.type}
                       </code>
                     </div>
-                    <div>
-                      <span className="font-medium">{t('addVersion.errorMessage', 'Message')}:</span>
-                      <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        {t('addVersion.errorMessage', 'Message')}
+                      </span>
+                      <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
                         {errorResult.message}
                       </p>
                     </div>
                     {errorResult.details !== errorResult.message && (
-                      <div>
-                        <span className="font-medium">{t('addVersion.errorDetails', 'Details')}:</span>
-                        <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded text-xs">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                          {t('addVersion.errorDetails', 'Details')}
+                        </span>
+                        <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
                           {errorResult.details}
                         </p>
                       </div>

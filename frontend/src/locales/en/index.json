@@ -476,7 +476,9 @@
       "hideFullStory": "Hide Full Story",
       "showChunks": "Show Chunks",
       "hideChunks": "Hide Chunks",
+      "encyclopedia": "Encyclopedia",
       "editStory": "Edit Story",
+      "edit": "Edit",
       "viewFullStory": "View Full Story",
       "uri": "URI",
       "loading": "Loading NFT info…",
@@ -605,6 +607,8 @@
       "customError": "Contract error: {{error}}",
       "transactionReverted": "Transaction failed: execution reverted",
       "userRejected": "Transaction was rejected by user",
+      "walletTimeout": "Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.",
+      "walletPending": "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
       "insufficientFunds": "Insufficient funds for gas",
       "unknown": "An unknown error occurred"
     }
@@ -693,6 +697,8 @@
   },
   "storyChunksModal": {
     "fetchError": "Failed to load story data",
+    "lifeEvents": "Life Events",
+    "blockchainIdentity": "Blockchain Identity",
     "viewDetail": "View Details",
     "born": "Born",
     "died": "Died",
@@ -755,10 +761,12 @@
     "metadataCIDPlaceholder": "Optional: IPFS CID (Qm... or bafy...)",
     "processing": "Processing...",
     "preparingData": "Preparing data...",
-    "generatingProof": "Generating zero-knowledge proof... (this may take 30-60 seconds)",
+    "generatingProof": "Generating zero-knowledge proof...",
     "verifyingProof": "Verifying proof...",
     "submittingToBlockchain": "Submitting to blockchain...",
     "addedSuccessfully": "Person added successfully!",
+    "successTitle": "Version Added Successfully",
+    "successDesc": "The person version has been added to the blockchain",
     "personHash": "Person Hash",
     "transactionHash": "Transaction Hash",
     "blockNumber": "Block Number",
@@ -792,7 +800,6 @@
     "close": "Close",
     "personInfoRequired": "Please fill in person information",
     "contractNotConfigured": "Contract not configured",
-    "wallet.notConnected": "Please connect your wallet",
     "partial": "Partial",
     "complete": "Complete",
     "proofGenerationNote": "ZK proof generation requires complex cryptographic calculations. Please wait...",
@@ -839,6 +846,9 @@
     "personHashRequired": "Unable to compute person hash",
     "mintFailed": "Failed to mint NFT",
     "mintedSuccessfully": "NFT minted successfully!",
+    "successTitle": "NFT Minted Successfully",
+    "successDesc": "Your NFT has been created on the blockchain",
+    "nftDetails": "NFT Details",
     "tokenId": "Token ID",
     "owner": "Owner",
     "transactionHash": "Transaction Hash",
@@ -922,6 +932,9 @@
     "personHashRequired": "Please provide valid person hash and version index",
     "insufficientDeepTokens": "Insufficient DEEP tokens for endorsement",
     "endorsedSuccessfully": "Version endorsed successfully!",
+    "successTitle": "Endorsement Successful",
+    "successDesc": "Version has been successfully endorsed",
+    "endorsementDetails": "Endorsement Details",
     "feePaid": "Fee Paid",
     "transactionHash": "Transaction Hash",
     "blockNumber": "Block Number",
@@ -964,10 +977,19 @@
   "transaction": {
     "pending": "Transaction pending confirmation...",
     "pendingDetails": "Transaction has been submitted or waiting for wallet confirmation. You can continue using the app, we'll update after confirmation.",
-    "submitted": "Transaction submitted..."
+    "submitted": "Transaction submitted...",
+    "success": "Transaction successful",
+    "failed": "Transaction failed",
+    "rejected": "Transaction rejected by user",
+    "insufficientFunds": "Insufficient funds",
+    "walletTimeout": "Wallet confirmation timed out. Please try again and make sure to confirm in the wallet popup."
   },
   "contract": {
     "endorseSuccess": "endorse success",
-    "endorseFailed": "endorse failed"
+    "endorseFailed": "endorse failed",
+    "addVersionSuccess": "Person version added successfully",
+    "addVersionFailed": "Failed to add person version",
+    "mintSuccess": "NFT minted successfully",
+    "mintFailed": "Failed to mint NFT"
   }
 }

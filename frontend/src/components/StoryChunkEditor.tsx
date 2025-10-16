@@ -183,8 +183,19 @@ export default function StoryChunkEditor({
       }
       
       handleCancelEdit()
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : t('storyChunkEditor.operationFailed', 'Operation failed'))
+    } catch (err: any) {
+      const errorType = err?.type || err?.code
+      let message = err instanceof Error ? err.message : t('storyChunkEditor.operationFailed', 'Operation failed')
+
+      if (errorType === 'USER_REJECTED') {
+        message = t('storyChunkEditor.errors.userRejected', 'Transaction was rejected by user')
+      } else if (errorType === 'WALLET_POPUP_TIMEOUT') {
+        message = t('storyChunkEditor.errors.walletTimeout', 'Wallet confirmation timed out. Please reopen your wallet and confirm in Fluent.')
+      } else if (errorType === 'WALLET_REQUEST_PENDING') {
+        message = t('storyChunkEditor.errors.walletPending', 'Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.')
+      }
+
+      setLocalError(message)
     } finally {
       setSubmitting(false)
     }

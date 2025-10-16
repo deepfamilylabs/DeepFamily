@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Star, Coins, AlertCircle, Users, Check, AlertTriangle } from 'lucide-react'
+import { X, Star, Coins, AlertCircle, Users, Check, AlertTriangle, ChevronRight } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
@@ -544,7 +544,7 @@ export default function EndorseModal({
         console.log('⏳ Waiting for blockchain state to update after approval...')
         let postAllowance: bigint = currentAllowance
         let retryCount = 0
-        const maxRetries = 16
+        const maxRetries = 32
 
         while (retryCount < maxRetries && postAllowance < required) {
           const waitTime = Math.min(500 + (retryCount * 300), 2000) // 500ms, 800ms, 1100ms, 1400ms, 1700ms, 2000ms...
@@ -880,6 +880,46 @@ export default function EndorseModal({
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
 
+  // Helper component for data rows in success result
+  const DataRow = ({
+    label,
+    value,
+    colorClass,
+    isPlainText = false
+  }: {
+    label: string
+    value: string
+    colorClass: 'green'
+    isPlainText?: boolean
+  }) => {
+    const colorConfig = {
+      green: {
+        labelColor: 'text-green-800 dark:text-green-200',
+        valueBg: 'bg-green-100 dark:bg-green-800',
+        valueColor: 'text-green-900 dark:text-green-100'
+      }
+    }
+
+    const config = colorConfig[colorClass]
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className={`text-xs font-medium ${config.labelColor}`}>
+          {label}
+        </span>
+        {isPlainText ? (
+          <span className={`text-xs ${config.valueColor}`}>
+            {value}
+          </span>
+        ) : (
+          <code className={`${config.valueBg} ${config.valueColor} px-2 py-1 rounded font-mono text-xs break-all`}>
+            {value}
+          </code>
+        )}
+      </div>
+    )
+  }
+
   const canAffordEndorsement = parseFloat(userDeepBalance) >= parseFloat(deepTokenFee)
 
     if (!isOpen) return null
@@ -1109,204 +1149,190 @@ export default function EndorseModal({
 
           {/* Progress Indicator with Wallet Guidance */}
           {(isSubmitting || isApproving) && !successResult && !errorResult && (
-            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
-              {/* Main Progress */}
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
-                      {isApproving ?
-                        t('endorse.approving', 'Approving DEEP tokens...') :
-                        t('endorse.endorsing', 'Endorsing version...')
-                      }
-                    </p>
-                    <p className="text-xs text-green-700 dark:text-green-300">
-                      {isApproving ?
-                        t('endorse.approvingDesc', 'Please confirm the token approval in your wallet') :
-                        t('endorse.endorsingDesc', 'Processing endorsement on the blockchain...')
-                      }
-                    </p>
-                  </div>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
+                    {isApproving ?
+                      t('endorse.approving', 'Approving DEEP tokens...') :
+                      t('endorse.endorsing', 'Endorsing version...')
+                    }
+                  </p>
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    {isApproving ?
+                      t('endorse.approvingDesc', 'Please confirm the token approval in your wallet') :
+                      t('endorse.endorsingDesc', 'Processing endorsement on the blockchain...')
+                    }
+                  </p>
                 </div>
               </div>
-
             </div>
           )}
 
           {/* Success Message */}
           {successResult && (
-            <div className="mx-4 sm:mx-6 mb-4 space-y-3">
+            <div className="space-y-4">
+              {/* Success Header */}
+              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-green-900 dark:text-green-100">
+                    {t('endorse.successTitle', 'Endorsement Successful')}
+                  </h3>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    {t('endorse.successDesc', 'Version has been successfully endorsed')}
+                  </p>
+                </div>
+              </div>
+
               {/* Complete Event Information */}
               {successResult.events.PersonVersionEndorsed && (
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                    <span className="text-sm font-semibold text-green-900 dark:text-green-100">
-                      {t('endorse.versionEndorsedEvent', 'PersonVersionEndorsed Event')}
-                    </span>
-                  </div>
-                  
-                  {/* Complete Event Details */}
-                  <div className="space-y-2.5 text-xs">
-                    {/* Person Hash & Version */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.personHash', 'Person Hash')}:
+                <details className="group bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 overflow-hidden" open>
+                  <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                      <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                        {t('endorse.endorsementDetails', 'Endorsement Details')}
                       </span>
-                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        {successResult.personHash}
-                      </code>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.versionIndex', 'Version Index')}:
-                      </span>
-                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                        {successResult.versionIndex}
-                      </code>
-                    </div>
-                    
-                    {/* Endorser */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.endorser', 'Endorser')}:
-                      </span>
-                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        {successResult.events.PersonVersionEndorsed.endorser}
-                      </code>
-                    </div>
-                    
-                    {/* Fee Distribution - Divider */}
-                    <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
-                      <p className="text-xs font-bold text-green-800 dark:text-green-200 mb-2">
-                        {t('endorse.feeDistribution', 'Fee Distribution')}
-                      </p>
-                    </div>
-                    
-                    {/* Total Fee Amount */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.totalFee', 'Total Fee')}:
-                      </span>
-                      <span className="col-span-2 text-green-700 dark:text-green-300 font-mono font-semibold">
+                      <span className="ml-2 text-xs font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-800 px-2 py-0.5 rounded-full">
                         {(Number(successResult.events.PersonVersionEndorsed.endorsementFee) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
                       </span>
                     </div>
-                    
-                    {/* Recipient & Share */}
-                    {successResult.events.PersonVersionEndorsed.recipient && (
-                      <>
-                        <div className="grid grid-cols-3 gap-2">
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {t('endorse.recipient', 'Recipient')}:
-                          </span>
-                          <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                            {successResult.events.PersonVersionEndorsed.recipient}
-                          </code>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {t('endorse.recipientShare', 'Recipient Share')}:
-                          </span>
-                          <span className="col-span-2 text-green-700 dark:text-green-300 font-mono">
-                            {(Number(successResult.events.PersonVersionEndorsed.recipientShare) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    
-                    {/* Protocol Recipient & Share */}
-                    {successResult.events.PersonVersionEndorsed.protocolRecipient && (
-                      <>
-                        <div className="grid grid-cols-3 gap-2">
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {t('endorse.protocolRecipient', 'Protocol Recipient')}:
-                          </span>
-                          <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                            {successResult.events.PersonVersionEndorsed.protocolRecipient}
-                          </code>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {t('endorse.protocolShare', 'Protocol Share')}:
-                          </span>
-                          <span className="col-span-2 text-green-700 dark:text-green-300 font-mono">
-                            {(Number(successResult.events.PersonVersionEndorsed.protocolShare) / Math.pow(10, deepTokenDecimals)).toLocaleString()} {deepTokenSymbol}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    
-                    {/* Transaction Info - Divider */}
+                    <ChevronRight className="w-4 h-4 text-green-600 group-open:rotate-90 transition-transform" />
+                  </summary>
+                  <div className="px-3 pb-3 space-y-3">
+                  
+                    {/* Basic Info */}
+                    <div className="space-y-2">
+                      <DataRow
+                        label={t('endorse.personHash', 'Person Hash')}
+                        value={successResult.personHash}
+                        colorClass="green"
+                      />
+                      <DataRow
+                        label={t('endorse.versionIndex', 'Version Index')}
+                        value={successResult.versionIndex.toString()}
+                        colorClass="green"
+                      />
+                      <DataRow
+                        label={t('endorse.endorser', 'Endorser')}
+                        value={successResult.events.PersonVersionEndorsed.endorser}
+                        colorClass="green"
+                      />
+                    </div>
+
+                    {/* Fee Distribution Section */}
                     <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
-                      <p className="text-xs font-bold text-green-800 dark:text-green-200 mb-2">
+                      <p className="text-xs font-semibold text-green-800 dark:text-green-200 mb-2">
+                        {t('endorse.feeDistribution', 'Fee Distribution')}
+                      </p>
+                      <div className="space-y-2">
+                        <DataRow
+                          label={t('endorse.totalFee', 'Total Fee')}
+                          value={`${(Number(successResult.events.PersonVersionEndorsed.endorsementFee) / Math.pow(10, deepTokenDecimals)).toLocaleString()} ${deepTokenSymbol}`}
+                          colorClass="green"
+                          isPlainText
+                        />
+                        {successResult.events.PersonVersionEndorsed.recipient && (
+                          <>
+                            <DataRow
+                              label={t('endorse.recipient', 'Recipient')}
+                              value={successResult.events.PersonVersionEndorsed.recipient}
+                              colorClass="green"
+                            />
+                            <DataRow
+                              label={t('endorse.recipientShare', 'Recipient Share')}
+                              value={`${(Number(successResult.events.PersonVersionEndorsed.recipientShare) / Math.pow(10, deepTokenDecimals)).toLocaleString()} ${deepTokenSymbol}`}
+                              colorClass="green"
+                              isPlainText
+                            />
+                          </>
+                        )}
+                        {successResult.events.PersonVersionEndorsed.protocolRecipient && (
+                          <>
+                            <DataRow
+                              label={t('endorse.protocolRecipient', 'Protocol Recipient')}
+                              value={successResult.events.PersonVersionEndorsed.protocolRecipient}
+                              colorClass="green"
+                            />
+                            <DataRow
+                              label={t('endorse.protocolShare', 'Protocol Share')}
+                              value={`${(Number(successResult.events.PersonVersionEndorsed.protocolShare) / Math.pow(10, deepTokenDecimals)).toLocaleString()} ${deepTokenSymbol}`}
+                              colorClass="green"
+                              isPlainText
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Transaction Info Section */}
+                    <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
+                      <p className="text-xs font-semibold text-green-800 dark:text-green-200 mb-2">
                         {t('endorse.transactionInfo', 'Transaction Info')}
                       </p>
-                    </div>
-                    
-                    {/* Transaction Hash */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.transactionHash', 'Transaction Hash')}:
-                      </span>
-                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs break-all">
-                        {successResult.transactionHash}
-                      </code>
-                    </div>
-                    
-                    {/* Block Number */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.blockNumber', 'Block Number')}:
-                      </span>
-                      <code className="col-span-2 bg-green-100 dark:bg-green-800 px-1.5 py-0.5 rounded font-mono text-xs">
-                        {successResult.blockNumber}
-                      </code>
-                    </div>
-                    
-                    {/* Timestamp */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        {t('endorse.timestamp', 'Timestamp')}:
-                      </span>
-                      <span className="col-span-2 text-green-700 dark:text-green-300">
-                        {new Date(Number(successResult.events.PersonVersionEndorsed.timestamp) * 1000).toLocaleString()}
-                      </span>
+                      <div className="space-y-2">
+                        <DataRow
+                          label={t('endorse.transactionHash', 'Transaction Hash')}
+                          value={successResult.transactionHash}
+                          colorClass="green"
+                        />
+                        <DataRow
+                          label={t('endorse.blockNumber', 'Block Number')}
+                          value={successResult.blockNumber.toString()}
+                          colorClass="green"
+                        />
+                        <DataRow
+                          label={t('endorse.timestamp', 'Timestamp')}
+                          value={new Date(Number(successResult.events.PersonVersionEndorsed.timestamp) * 1000).toLocaleString()}
+                          colorClass="green"
+                          isPlainText
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                </details>
               )}
             </div>
           )}
 
           {/* Error Message */}
           {errorResult && (
-            <div className="mx-4 sm:mx-6 mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
+                  <p className="text-base font-semibold text-red-900 dark:text-red-100 mb-2">
                     {t('endorse.endorseFailed', 'Endorsement Failed')}
                   </p>
-                  <div className="space-y-2 text-xs text-red-700 dark:text-red-300">
-                    <div>
-                      <span className="font-medium">{t('endorse.errorType', 'Error Type')}:</span>
-                      <code className="ml-2 bg-red-100 dark:bg-red-800 px-1.5 py-0.5 rounded">
+                  <div className="space-y-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        {t('endorse.errorType', 'Error Type')}
+                      </span>
+                      <code className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded font-mono text-xs">
                         {errorResult.type}
                       </code>
                     </div>
-                    <div>
-                      <span className="font-medium">{t('endorse.errorMessage', 'Message')}:</span>
-                      <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        {t('endorse.errorMessage', 'Message')}
+                      </span>
+                      <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
                         {errorResult.message}
                       </p>
                     </div>
                     {errorResult.details !== errorResult.message && (
-                      <div>
-                        <span className="font-medium">{t('endorse.errorDetails', 'Details')}:</span>
-                        <p className="mt-1 bg-red-100 dark:bg-red-800 px-2 py-1 rounded text-xs">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                          {t('endorse.errorDetails', 'Details')}
+                        </span>
+                        <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
                           {errorResult.details}
                         </p>
                       </div>
