@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ethers } from 'ethers'
 import StoryChunkEditor from '../components/StoryChunkEditor'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useWallet } from '../context/WalletContext'
-import DeepFamily from '../abi/DeepFamily.json'
+import { useToast } from '../components/ToastProvider'
+import { addStoryChunk, updateStoryChunk, sealStory } from '../lib/story'
 import type { StoryChunk, StoryChunkCreateData, StoryChunkUpdateData, StoryMetadata } from '../types/graph'
 
 interface PrefetchedState {
@@ -25,6 +26,7 @@ export default function StoryEditorPage() {
   const { contractAddress, strictCacheOnly } = useConfig()
   const { getStoryData, setNodesData } = useTreeData()
   const { signer, address } = useWallet()
+  const toast = useToast()
 
   const prefetched = (location.state as PrefetchedState | undefined)?.prefetchedStory
 
@@ -36,98 +38,10 @@ export default function StoryEditorPage() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [dirty, setDirty] = useState<boolean>(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState<boolean>(false)
 
   const validTokenId = useMemo(() => tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined, [tokenId])
 
-  const parseContractError = useCallback((error: any): string => {
-    console.error('[StoryEditor] Contract error:', error)
-
-    // Check for custom errors in the error data
-    if (error?.data && typeof error.data === 'string') {
-      // Common custom error selectors
-      const customErrors: Record<string, string> = {
-        '0xdaffd8a5': 'MustBeNFTHolder', // You must own this NFT to edit its story
-        '0x82b42900': 'Unauthorized', // Not authorized to perform this action
-        '0x3ee5aeb5': 'OnlyOwner', // Only owner can perform this action
-        '0x579b9c8a': 'StorySealed', // Story is already sealed and cannot be modified
-        '0x6512e97e': 'ChunkIndexExists', // Chunk at this index already exists
-        '0x766e8709': 'InvalidChunkIndex', // Invalid chunk index
-        '0x7b51ba7e': 'ContentTooLong', // Content exceeds maximum length
-        '0x9b9623c8': 'ExpectedHashMismatch', // Expected hash does not match actual hash
-        '0x5b00bc40': 'ChunkHashMismatch', // Chunk hash validation failed
-        '0x7df0b861': 'ChunkIndexOutOfRange', // Chunk index is out of valid range
-      }
-
-      const errorSelector = error.data.slice(0, 10)
-      const customError = customErrors[errorSelector]
-
-      if (customError) {
-        switch (customError) {
-          case 'MustBeNFTHolder':
-            return t('storyChunkEditor.errors.mustBeNFTHolder', 'You must own this NFT to edit its story')
-          case 'Unauthorized':
-            return t('storyChunkEditor.errors.unauthorized', 'Not authorized to perform this action')
-          case 'OnlyOwner':
-            return t('storyChunkEditor.errors.onlyOwner', 'Only the owner can perform this action')
-          case 'StorySealed':
-            return t('storyChunkEditor.errors.storySealed', 'Story is sealed and cannot be modified')
-          case 'ChunkIndexExists':
-            return t('storyChunkEditor.errors.chunkIndexExists', 'Chunk at this index already exists')
-          case 'InvalidChunkIndex':
-            return t('storyChunkEditor.errors.invalidChunkIndex', 'Invalid chunk index')
-          case 'ContentTooLong':
-            return t('storyChunkEditor.errors.contentTooLong', 'Content exceeds maximum length')
-          case 'ExpectedHashMismatch':
-            return t('storyChunkEditor.errors.expectedHashMismatch', 'Expected hash does not match')
-          case 'ChunkHashMismatch':
-            return t('storyChunkEditor.errors.chunkHashMismatch', 'Chunk content does not match expected hash')
-          case 'ChunkIndexOutOfRange':
-            return t('storyChunkEditor.errors.chunkIndexOutOfRange', 'Chunk index is out of valid range')
-          default:
-            return t('storyChunkEditor.errors.customError', 'Contract error: {{error}}', { error: customError })
-        }
-      }
-    }
-
-    // Check for standard error messages
-    if (error?.message) {
-      if (error.message.includes('execution reverted')) {
-        // Try to extract custom error from message
-        const customErrorMatch = error.message.match(/custom error '(\w+)'/);
-        if (customErrorMatch) {
-          const customError = customErrorMatch[1]
-          switch (customError) {
-            case 'MustBeNFTHolder':
-              return t('storyChunkEditor.errors.mustBeNFTHolder', 'You must own this NFT to edit its story')
-            case 'Unauthorized':
-              return t('storyChunkEditor.errors.unauthorized', 'Not authorized to perform this action')
-            case 'OnlyOwner':
-              return t('storyChunkEditor.errors.onlyOwner', 'Only the owner can perform this action')
-            case 'StorySealed':
-              return t('storyChunkEditor.errors.storySealed', 'Story is sealed and cannot be modified')
-            case 'ChunkHashMismatch':
-              return t('storyChunkEditor.errors.chunkHashMismatch', 'Chunk content does not match expected hash')
-            case 'ChunkIndexOutOfRange':
-              return t('storyChunkEditor.errors.chunkIndexOutOfRange', 'Chunk index is out of valid range')
-            default:
-              return t('storyChunkEditor.errors.customError', 'Contract error: {{error}}', { error: customError })
-          }
-        }
-        return t('storyChunkEditor.errors.transactionReverted', 'Transaction failed: execution reverted')
-      }
-
-      if (error.message.includes('user rejected')) {
-        return t('storyChunkEditor.errors.userRejected', 'Transaction was rejected by user')
-      }
-
-      if (error.message.includes('insufficient funds')) {
-        return t('storyChunkEditor.errors.insufficientFunds', 'Insufficient funds for gas')
-      }
-    }
-
-    // Fallback to original error message or generic error
-    return error?.message || t('storyChunkEditor.errors.unknown', 'An unknown error occurred')
-  }, [t])
 
   const loadIfNeeded = useCallback(async () => {
     if (!validTokenId) { setError(t('person.invalidTokenId', 'Invalid token ID')); return }
@@ -193,51 +107,191 @@ export default function StoryEditorPage() {
   }, [validTokenId, getStoryData, setNodesData, strictCacheOnly, t])
 
   const onAddChunk = useCallback(async (data: StoryChunkCreateData) => {
-    try {
-      if (!contractAddress) throw new Error('Missing contract')
-      if (!signer) throw new Error('No wallet connected')
-      if (!address) throw new Error('No wallet address')
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, signer)
-      const tx = await contract.addStoryChunk(data.tokenId, data.chunkIndex, data.content, data.expectedHash || ethers.ZeroHash)
-      await tx.wait()
-      await refetch()
-    } catch (err) {
-      throw new Error(parseContractError(err))
+    if (!contractAddress) throw new Error('Missing contract')
+    if (!signer) throw new Error('No wallet connected')
+    if (!address) throw new Error('No wallet address')
+
+    // 执行区块链操作
+    const result = await addStoryChunk(
+      signer,
+      contractAddress,
+      data.tokenId,
+      data.chunkIndex,
+      data.content,
+      data.expectedHash || ''
+    )
+
+    // After successful operation, immediately update local state
+    const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk]
+    setChunks(newChunks)
+
+    // Update total chunks count in metadata
+    const newMeta: StoryMetadata | undefined = meta ? {
+      ...meta,
+      totalChunks: (meta.totalChunks || 0) + 1,
+      lastUpdateTime: result.newChunk.timestamp,
+      totalLength: (meta.totalLength || 0) + result.contentLength
+    } : undefined
+    setMeta(newMeta)
+
+    // Synchronize updates to TreeDataContext node data cache
+    if (setNodesData && validTokenId) {
+      setNodesData(prev => {
+        let foundId: string | undefined
+        for (const [id, nd] of Object.entries(prev)) {
+          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
+            foundId = id
+            break
+          }
+        }
+        if (!foundId) return prev
+
+        const cur = prev[foundId]
+        return {
+          ...prev,
+          [foundId]: {
+            ...cur,
+            storyMetadata: newMeta,
+            storyChunks: newChunks
+          }
+        }
+      })
     }
-  }, [contractAddress, signer, address, refetch, parseContractError])
+
+    // Show success message with event data if available
+    if (result.events.StoryChunkAdded) {
+      toast.success(
+        t('storyChunkEditor.success.chunkAdded', 'Chunk #{{index}} added successfully ({{bytes}} bytes)', {
+          index: result.events.StoryChunkAdded.chunkIndex,
+          bytes: result.events.StoryChunkAdded.contentLength
+        })
+      )
+    } else {
+      toast.success(t('storyChunkEditor.success.chunkAddedGeneric', 'Story chunk added successfully'))
+    }
+  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
 
   const onUpdateChunk = useCallback(async (data: StoryChunkUpdateData) => {
-    try {
-      if (!contractAddress) throw new Error('Missing contract')
-      if (!signer) throw new Error('No wallet connected')
-      if (!address) throw new Error('No wallet address')
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, signer)
-      const tx = await contract.updateStoryChunk(data.tokenId, data.chunkIndex, data.newContent, data.expectedHash || ethers.ZeroHash)
-      await tx.wait()
-      await refetch()
-    } catch (err) {
-      throw new Error(parseContractError(err))
+    if (!contractAddress) throw new Error('Missing contract')
+    if (!signer) throw new Error('No wallet connected')
+    if (!address) throw new Error('No wallet address')
+
+    // 执行区块链操作
+    const result = await updateStoryChunk(
+      signer,
+      contractAddress,
+      data.tokenId,
+      data.chunkIndex,
+      data.newContent,
+      data.expectedHash || ''
+    )
+
+    // After successful operation, immediately update local state and replace chunk at corresponding index
+    const newChunks = chunks ? [...chunks] : []
+    const index = newChunks.findIndex(c => c.chunkIndex === data.chunkIndex)
+    if (index !== -1) {
+      newChunks[index] = result.updatedChunk
     }
-  }, [contractAddress, signer, address, refetch, parseContractError])
+    setChunks(newChunks)
+
+    // Update last update time in metadata
+    const newMeta: StoryMetadata | undefined = meta ? {
+      ...meta,
+      lastUpdateTime: result.updatedChunk.timestamp
+    } : undefined
+    setMeta(newMeta)
+
+    // Synchronize updates to TreeDataContext node data cache
+    if (setNodesData && validTokenId) {
+      setNodesData(prev => {
+        let foundId: string | undefined
+        for (const [id, nd] of Object.entries(prev)) {
+          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
+            foundId = id
+            break
+          }
+        }
+        if (!foundId) return prev
+
+        const cur = prev[foundId]
+        return {
+          ...prev,
+          [foundId]: {
+            ...cur,
+            storyMetadata: newMeta,
+            storyChunks: newChunks
+          }
+        }
+      })
+    }
+
+    // Show success message with event data if available
+    if (result.events.StoryChunkUpdated) {
+      toast.success(
+        t('storyChunkEditor.success.chunkUpdated', 'Chunk #{{index}} updated successfully', {
+          index: result.events.StoryChunkUpdated.chunkIndex
+        })
+      )
+    } else {
+      toast.success(t('storyChunkEditor.success.chunkUpdatedGeneric', 'Story chunk updated successfully'))
+    }
+  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
 
   const onSealStory = useCallback(async (tid: string) => {
-    try {
-      if (!contractAddress) throw new Error('Missing contract')
-      if (!signer) throw new Error('No wallet connected')
-      if (!address) throw new Error('No wallet address')
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, signer)
-      const tx = await contract.sealStory(tid)
-      await tx.wait()
-      await refetch()
-    } catch (err) {
-      throw new Error(parseContractError(err))
+    if (!contractAddress) throw new Error('Missing contract')
+    if (!signer) throw new Error('No wallet connected')
+    if (!address) throw new Error('No wallet address')
+
+    // Execute blockchain operation
+    const result = await sealStory(signer, contractAddress, tid)
+
+    // After successful operation, immediately update sealed status in metadata
+    const newMeta: StoryMetadata | undefined = meta ? {
+      ...meta,
+      isSealed: true,
+      totalChunks: result.totalChunks
+    } : undefined
+    setMeta(newMeta)
+
+    // Synchronize updates to TreeDataContext node data cache
+    if (setNodesData && validTokenId) {
+      setNodesData(prev => {
+        let foundId: string | undefined
+        for (const [id, nd] of Object.entries(prev)) {
+          if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
+            foundId = id
+            break
+          }
+        }
+        if (!foundId) return prev
+
+        const cur = prev[foundId]
+        return {
+          ...prev,
+          [foundId]: {
+            ...cur,
+            storyMetadata: newMeta
+          }
+        }
+      })
     }
-  }, [contractAddress, signer, address, refetch, parseContractError])
+
+    // Show success message with event data if available
+    if (result.events.StorySealed) {
+      toast.success(
+        t('storyChunkEditor.success.storySealed', 'Story sealed successfully ({{total}} chunks)', {
+          total: result.events.StorySealed.totalChunks
+        })
+      )
+    } else {
+      toast.success(t('storyChunkEditor.success.storySealedGeneric', 'Story sealed successfully'))
+    }
+  }, [contractAddress, signer, address, toast, t, meta, validTokenId, setNodesData])
 
   const handleClose = useCallback(() => {
     if (dirty) {
-      const ok = window.confirm(t('storyChunkEditor.leaveConfirm', 'Unsaved changes will be lost. Leave editor?'))
-      if (!ok) return
+      setShowLeaveConfirm(true)
+      return
     }
     // If the tab has history, go back; otherwise try to close the tab.
     if (window.history.length > 1) {
@@ -253,22 +307,56 @@ export default function StoryEditorPage() {
     } else {
       navigate('/', { replace: true })
     }
-  }, [dirty, navigate, t, validTokenId])
+  }, [dirty, navigate, validTokenId])
+
+  const handleConfirmLeave = useCallback(() => {
+    setShowLeaveConfirm(false)
+    // If the tab has history, go back; otherwise try to close the tab.
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+    try {
+      window.close()
+    } catch {}
+    // Fallback: navigate to person page or home if the tab couldn't be closed
+    if (validTokenId) {
+      navigate(`/person/${validTokenId}`, { replace: true })
+    } else {
+      navigate('/', { replace: true })
+    }
+  }, [navigate, validTokenId])
+
+  const handleCancelLeave = useCallback(() => {
+    setShowLeaveConfirm(false)
+  }, [])
 
   return (
-    <StoryChunkEditor
-      layout="page"
-      open={true}
-      onClose={handleClose}
-      tokenId={validTokenId}
-      storyMetadata={meta}
-      storyChunks={chunks}
-      loading={loading}
-      error={error || undefined}
-      onDirtyChange={setDirty}
-      onAddChunk={onAddChunk}
-      onUpdateChunk={onUpdateChunk}
-      onSealStory={onSealStory}
-    />
+    <>
+      <StoryChunkEditor
+        layout="page"
+        open={true}
+        onClose={handleClose}
+        tokenId={validTokenId}
+        storyMetadata={meta}
+        storyChunks={chunks}
+        loading={loading}
+        error={error || undefined}
+        onDirtyChange={setDirty}
+        onAddChunk={onAddChunk}
+        onUpdateChunk={onUpdateChunk}
+        onSealStory={onSealStory}
+      />
+      <ConfirmDialog
+        open={showLeaveConfirm}
+        title={t('storyChunkEditor.leaveConfirmTitle', 'Leave Editor')}
+        message={t('storyChunkEditor.leaveConfirm', 'Unsaved changes will be lost. Leave editor?')}
+        confirmText={t('storyChunkEditor.leaveConfirmButton', 'Leave')}
+        cancelText={t('common.cancel', 'Cancel')}
+        onConfirm={handleConfirmLeave}
+        onCancel={handleCancelLeave}
+        type="danger"
+      />
+    </>
   )
 }

@@ -235,6 +235,169 @@ async function ensureTokenReady({ deepFamily, token, signer }) {
   }
 }
 
+async function seedMultiVersionTestPerson({
+  deepFamily,
+  token,
+  primarySigner,
+  extraSigners,
+  rootPersonData,
+  rootVersionIndex,
+  defaultPlace,
+  skipNFT,
+  tokenReady,
+}) {
+  const targetVersionCount = 3;
+  if (!primarySigner) {
+    console.warn("  Skipping multi-version fixture: primary signer unavailable");
+    return;
+  }
+  const availableExtras = (extraSigners || []).filter(Boolean);
+  if (availableExtras.length < 2) {
+    console.warn("  Skipping multi-version fixture: need at least two extra signers for endorsements");
+    return;
+  }
+
+  console.log("Seeding multi-version test person with mixed NFT and endorsements...");
+
+  const personData = createPersonData(
+    "Demo MultiVersion",
+    (rootPersonData.birthYear || 1970) + 25,
+    1,
+    {
+      birthMonth: 7,
+      birthDay: 20,
+      passphrase: "demo-multiversion",
+    },
+  );
+
+  const personHash = await computePersonHash({ deepFamily, personData });
+  const existing = await checkPersonExists({ deepFamily, personHash });
+
+  if (existing.totalVersions < targetVersionCount) {
+    for (let i = existing.totalVersions; i < targetVersionCount; i++) {
+      const tag = `multi-v${i + 1}`;
+      const ipfs = `QmMultiVersion${i + 1}`;
+      try {
+        const result = await addPersonVersion({
+          deepFamily,
+          signer: primarySigner,
+          personData,
+          fatherData: rootPersonData,
+          fatherVersion: rootVersionIndex,
+          tag,
+          ipfs,
+        });
+        console.log(`  ✓ Added version ${i + 1} (tx: ${result.tx.hash})`);
+      } catch (error) {
+        console.warn(
+          `  ✗ Failed to add version ${i + 1}:`,
+          error.message?.slice(0, 160) || error,
+        );
+      }
+    }
+  } else {
+    console.log(`  • Versions already exist (${existing.totalVersions}), reuse for testing`);
+  }
+
+  const endorsers = [
+    { signer: primarySigner, label: "primary", versionIndex: 1 },
+    { signer: availableExtras[0], label: "extra#1", versionIndex: 1 },
+    { signer: availableExtras[1], label: "extra#2", versionIndex: 2 },
+  ];
+
+  for (const { signer, label, versionIndex } of endorsers) {
+    if (!signer) continue;
+    try {
+      await ensureTokenReady({ deepFamily, token, signer });
+    } catch (error) {
+      dlog(`  (${label}) token prep skipped: ${error.message?.slice(0, 120)}`);
+    }
+
+    try {
+      await endorseVersion({
+        deepFamily,
+        token,
+        signer,
+        personHash,
+        versionIndex,
+        autoApprove: true,
+      });
+      const signerAddr = await signer.getAddress();
+      console.log(
+        `  ✓ Endorser ${label} (${signerAddr.slice(0, 8)}...) set endorsement on version ${versionIndex}`,
+      );
+    } catch (error) {
+      const message = error.message || "";
+      if (message.includes("AlreadyEndorsed")) {
+        console.log(`  • Endorser ${label} already endorses version ${versionIndex}, skip`);
+      } else {
+        console.warn(
+          `  ✗ Endorser ${label} failed on version ${versionIndex}:`,
+          message.slice(0, 160),
+        );
+      }
+    }
+  }
+
+  if (!skipNFT && tokenReady) {
+    try {
+      const versionInfo = await deepFamily.getPersonVersion(personHash, 1);
+      const existingTokenId = versionInfo[2];
+      const mintedAlready =
+        typeof existingTokenId === "bigint"
+          ? existingTokenId !== 0n
+          : !!existingTokenId && existingTokenId.toString() !== "0";
+
+      if (!mintedAlready) {
+        const supplementInfo = createSupplementInfo(personData.fullName, defaultPlace, {
+          deathYear: personData.birthYear + 60,
+          deathMonth: 11,
+          deathDay: 5,
+          deathPlace: defaultPlace,
+        });
+
+        const mintResult = await mintPersonNFT({
+          deepFamily,
+          signer: primarySigner,
+          personHash,
+          versionIndex: 1,
+          tokenURI: "ipfs://demo-multiversion/v1",
+          basicInfo: personData,
+          supplementInfo,
+        });
+        const tokenId = mintResult.tokenId?.toString() ?? "unknown";
+        console.log(`  ✓ Minted NFT for version 1 (tokenId ${tokenId})`);
+      } else {
+        console.log("  • Version 1 already minted as NFT, skip minting");
+      }
+    } catch (error) {
+      console.warn(`  ✗ Minting NFT for version 1 failed:`, error.message?.slice(0, 160));
+    }
+  } else if (skipNFT) {
+    console.log("  • NFT minting disabled via SKIP_NFT, leaving all versions as non-NFT");
+  } else {
+    console.log("  • Token not ready, skip NFT minting for multi-version person");
+  }
+
+  for (let versionIndex = 1; versionIndex <= targetVersionCount; versionIndex++) {
+    try {
+      const versionInfo = await deepFamily.getPersonVersion(personHash, versionIndex);
+      const endorsementCount = Number(versionInfo[1]);
+      const tokenId = versionInfo[2];
+      const tokenIdStr =
+        typeof tokenId === "bigint" ? tokenId.toString() : tokenId?.toString?.() ?? "0";
+      console.log(
+        `  → Version ${versionIndex}: endorsements=${endorsementCount}, tokenId=${tokenIdStr}`,
+      );
+    } catch (error) {
+      console.warn(
+        `  ✗ Failed to read version ${versionIndex} summary:`,
+        error.message?.slice(0, 160),
+      );
+    }
+  }
+}
+
 /**
  * Main function: Large-scale family tree generation
  */
@@ -259,7 +422,9 @@ async function main() {
     tokenDeployment = await get("DeepFamilyToken");
   }
 
-  const [signer] = await ethers.getSigners();
+  const allSigners = await ethers.getSigners();
+  const signer = allSigners[0];
+  const extraSigners = allSigners.slice(1, 4);
   const signerAddr = await signer.getAddress();
   const deepFamily = await ethers.getContractAt("DeepFamily", deepDeployment.address, signer);
   const token = await ethers.getContractAt("DeepFamilyToken", tokenDeployment.address, signer);
@@ -268,6 +433,12 @@ async function main() {
   console.log(`  DeepFamily: ${deepDeployment.address}`);
   console.log(`  DeepFamilyToken: ${tokenDeployment.address}`);
   console.log(`  Signer: ${signerAddr}\n`);
+  if (extraSigners.length > 0) {
+    const extraAddrs = await Promise.all(extraSigners.map((s) => s.getAddress()));
+    console.log(`  Additional endorsers: ${extraAddrs.map((addr) => addr.slice(0, 10) + "...").join(", ")}`);
+  } else {
+    console.log(`  Additional endorsers: none available`);
+  }
 
   // 2. Read configuration
   const TARGET_DEPTH_RAW = Number(process.env.TARGET_DEPTH || 5);
@@ -691,6 +862,24 @@ async function main() {
     }
   } else {
     console.log("\nStep 4: Skip NFT minting phase");
+  }
+
+  console.log("\nStep 6: Seed multi-version fixtures");
+  console.log("-".repeat(70));
+  try {
+    await seedMultiVersionTestPerson({
+      deepFamily,
+      token,
+      primarySigner: signer,
+      extraSigners,
+      rootPersonData,
+      rootVersionIndex: rootVer,
+      defaultPlace: DEFAULT_PLACE,
+      skipNFT: SKIP_NFT,
+      tokenReady,
+    });
+  } catch (error) {
+    console.warn("  ✗ Multi-version fixture generation failed:", error.message?.slice(0, 160));
   }
 
   // 7. Summary
