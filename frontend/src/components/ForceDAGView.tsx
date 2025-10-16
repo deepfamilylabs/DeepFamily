@@ -9,6 +9,7 @@ import useMiniMap from '../hooks/useMiniMap'
 import { ZoomControls, MiniMap } from './ZoomControls'
 import { useFamilyTreeHeight } from '../constants/layout'
 import { useVizOptions } from '../context/VizOptionsContext'
+import { getGenderColorHex } from '../constants/genderColors'
 
 // Re-add types lost during refactor
 export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
@@ -110,7 +111,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
         const id = (d as SimNode).id
         const nd = nodesData?.[id]
         const g = nd?.gender as number | undefined
-        return g === 1 ? '#0ea5e9' : (g === 2 ? '#f43f5e' : (g === 3 ? '#8b5cf6' : '#94a3b8'))
+        return getGenderColorHex(g)
       })
       .attr('stroke', strokeColor)
       .attr('stroke-width', 1)

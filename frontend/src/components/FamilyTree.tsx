@@ -11,6 +11,7 @@ import { getRuntimeFamilyTreeConfig } from '../config/familyTreeConfig'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { LAYOUT, useFamilyTreeHeight } from '../constants/layout'
+import { getGenderColor } from '../constants/genderColors'
 
 const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = React.memo(function Node({ node, depth = 0, isLast = true }) {
   const indentPx = depth * 16
@@ -543,16 +544,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
             {mintedFlag && (
               <>
                 <span className="text-[10px] px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/40">NFT</span>
-                {(() => {
-                  const genderDotClass = gender === 1
-                    ? 'bg-sky-500'
-                    : gender === 2
-                      ? 'bg-rose-500'
-                      : gender === 3
-                        ? 'bg-violet-500'
-                        : 'bg-slate-400'
-                  return <span className={`ml-1 inline-block w-2 h-2 rounded-full ${genderDotClass} ring-1 ring-white dark:ring-slate-900`} />
-                })()}
+                <span className={`ml-1 inline-block w-2 h-2 rounded-full ${getGenderColor(gender, 'BG')} ring-1 ring-white dark:ring-slate-900`} />
               </>
             )}
             {name && <span className="text-slate-700 dark:text-slate-200 text-[12px] truncate max-w-[180px]" title={name}>{name}</span>}

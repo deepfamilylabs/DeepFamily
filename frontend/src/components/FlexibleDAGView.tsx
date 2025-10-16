@@ -50,7 +50,7 @@ function FlexibleDAGViewInner({
     nodes.forEach(n => { const arr = levels.get(n.depth) || []; arr.push(n); levels.set(n.depth, arr); if (n.depth > maxDepth) maxDepth = n.depth })
     const margin = { left: 24, top: 24, right: 24, bottom: 24 }
     const gapX = nodeWidth + 220
-    const gapY = nodeHeight + 12
+    const gapY = nodeHeight + 22  // Increased vertical spacing from 12 to 40
     const width = margin.left + margin.right + (maxDepth + 1) * gapX
     const maxPerLevel = Math.max(...Array.from(levels.values()).map(a => a.length)) || 1
     const height = margin.top + margin.bottom + maxPerLevel * gapY
@@ -164,7 +164,6 @@ function FlexibleDAGViewInner({
             const isSelected = ctxSelectedId === n.id
             // Pass totalVersions only in deduplicate mode; NodeCard will handle display logic (show badge only if > 1)
             const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
-            console.log(`[FlexibleDAG] ${hashShort}: dedup=${deduplicateChildren}, nd exists=${!!nd}, nd.totalVersions=${nd?.totalVersions}, passing=${totalVersions}`)
             return (
               <g key={n.id}
                  transform={`translate(${p.x}, ${p.y})`}
