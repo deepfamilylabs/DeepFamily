@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { ethers } from 'ethers'
 import { useToast } from '../components/ToastProvider'
 import { useTranslation } from 'react-i18next'
+import metamaskIcon from '../assets/metamask-icon.svg'
+import fluentIcon from '../assets/fluent-icon.svg'
 
 interface WalletState {
   address: string | null
@@ -109,7 +111,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           wallets.push({
             id: 'metamask',
             name: 'MetaMask',
-            icon: 'https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg',
+            icon: metamaskIcon,
             provider: provider
           })
         } else if (provider && (provider.isFluent || provider.isFluentWallet)) {
@@ -117,7 +119,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           wallets.push({
             id: 'fluent',
             name: 'Fluent Wallet',
-            icon: 'https://fluentwallet.com/assets/logo.b3425fdb.svg',
+            icon: fluentIcon,
             provider: provider
           })
         }
@@ -131,7 +133,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         wallets.push({
           id: 'metamask',
           name: 'MetaMask',
-          icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjRjY4NTFCIi8+CjxwYXRoIGQ9Ik0yNS4xIDkuN0wyMC4yIDYuMkMxOS44IDUuOSAxOS4zIDUuOSAxOC45IDYuMkwxNi4xIDguNUMxNS45IDguNyAxNS42IDguNyAxNS40IDguNUwxMi42IDYuMkMxMi4yIDUuOSAxMS43IDUuOSAxMS4zIDYuMkw2LjQgOS43QzYgMTAgNi4xIDEwLjcgNi42IDEwLjlMMTAuNSAxMi44QzEwLjcgMTIuOSAxMC44IDEzLjEgMTAuOCAxMy4zVjE2LjZDMTAuOCAxNi44IDEwLjkgMTcgMTEuMSAxNy4xTDEzLjkgMTguOEMxNC4xIDE4LjkgMTQuMyAxOC44IDE0LjMgMTguNlYxNS43QzE0LjMgMTUuNSAxNC41IDE1LjMgMTQuNyAxNS4zSDE3QzE3LjIgMTUuMyAxNy40IDE1LjUgMTcuNCAxNS43VjE4LjZDMTcuNCAxOC4gMTcuNiAxOC45IDE3LjggMTguOEwyMC42IDE3LjFDMjAuOCAxNyAyMC45IDE2LjggMjAuOSAxNi42VjEzLjNDMjAuOSAxMy4xIDIxIDEyLjkgMjEuMiAxMi44TDI1LjEgMTAuOUMyNS42IDEwLjcgMjUuNyAxMCAyNS4xIDkuN1oiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=',
+          icon: metamaskIcon,
           provider: eth
         })
       } else if (eth.isFluent || eth.isFluentWallet) {
@@ -139,7 +141,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         wallets.push({
           id: 'fluent',
           name: 'Fluent Wallet',
-          icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMzYzOEJBIi8+CjxwYXRoIGQ9Ik0yMCA4TDEyIDhDMTAuOSA4IDEwIDguOSAxMCAxMEwxMCAyMkMxMCAyMy4xIDEwLjkgMjQgMTIgMjRMMjAgMjRDMjEuMSAyNCAyMiAyMy4xIDIyIDIyTDIyIDEwQzIyIDguOSAyMS4xIDggMjAgOFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=',
+          icon: fluentIcon,
           provider: eth
         })
       }
@@ -151,7 +153,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       wallets.push({
         id: 'fluent',
         name: 'Fluent Wallet',
-        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMzYzOEJBIi8+CjxwYXRoIGQ9Ik0yMCA4TDEyIDhDMTAuOSA4IDEwIDguOSAxMCAxMEwxMCAyMkMxMCAyMy4xIDEwLjkgMjQgMTIgMjRMMjAgMjRDMjEuMSAyNCAyMiAyMy4xIDIyIDIyTDIyIDEwQzIyIDguOSAyMS4xIDggMjAgOFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=',
+        icon: fluentIcon,
         provider: conflux
       })
     }

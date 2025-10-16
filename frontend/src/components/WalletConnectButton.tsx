@@ -1,6 +1,7 @@
 import { useWallet } from '../context/WalletContext'
 import { useTranslation } from 'react-i18next'
 import { Wallet, LogOut, AlertCircle, ExternalLink } from 'lucide-react'
+import { shortAddress } from '../types/graph'
 
 interface WalletConnectButtonProps {
   className?: string
@@ -28,7 +29,7 @@ export default function WalletConnectButton({
   const isHomePage = variant === 'home'
 
   const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...`
+    return shortAddress(addr, 6, 4)
   }
 
   const formatBalance = (bal: string) => {
@@ -128,7 +129,7 @@ export default function WalletConnectButton({
         }`}></div>
         
         <div className="flex flex-col items-start gap-0.5 min-w-0">
-          <span className="text-xs lg:text-sm font-mono truncate max-w-20 lg:max-w-24">
+          <span className="text-xs lg:text-sm font-mono max-w-28 lg:max-w-32">
             {formatAddress(address)}
           </span>
           
