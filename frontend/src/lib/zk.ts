@@ -11,6 +11,58 @@ export type Groth16Proof = {
   curve: string
 }
 
+type ZkArtifacts = {
+  wasm: Uint8Array
+  zkey: Uint8Array
+}
+
+let personHashArtifactsPromise: Promise<ZkArtifacts> | null = null
+let namePoseidonArtifactsPromise: Promise<ZkArtifacts> | null = null
+
+async function loadArtifacts(wasmUrl: string, zkeyUrl: string): Promise<ZkArtifacts> {
+  const [wasmRes, zkeyRes] = await Promise.all([fetch(wasmUrl), fetch(zkeyUrl)])
+  if (!wasmRes.ok) {
+    throw new Error(`Failed to load wasm from ${wasmUrl}: ${wasmRes.status}`)
+  }
+  if (!zkeyRes.ok) {
+    throw new Error(`Failed to load zkey from ${zkeyUrl}: ${zkeyRes.status}`)
+  }
+
+  const [wasmBuffer, zkeyBuffer] = await Promise.all([wasmRes.arrayBuffer(), zkeyRes.arrayBuffer()])
+  return {
+    wasm: new Uint8Array(wasmBuffer),
+    zkey: new Uint8Array(zkeyBuffer)
+  }
+}
+
+async function loadPersonHashArtifacts(): Promise<ZkArtifacts> {
+  if (!personHashArtifactsPromise) {
+    personHashArtifactsPromise = (async () => {
+      try {
+        return await loadArtifacts('/zk/person_hash_zk.wasm', '/zk/person_hash_zk_final.zkey')
+      } catch (error) {
+        personHashArtifactsPromise = null
+        throw error
+      }
+    })()
+  }
+  return personHashArtifactsPromise
+}
+
+async function loadNamePoseidonArtifacts(): Promise<ZkArtifacts> {
+  if (!namePoseidonArtifactsPromise) {
+    namePoseidonArtifactsPromise = (async () => {
+      try {
+        return await loadArtifacts('/zk/name_poseidon_zk.wasm', '/zk/name_poseidon_zk_final.zkey')
+      } catch (error) {
+        namePoseidonArtifactsPromise = null
+        throw error
+      }
+    })()
+  }
+  return namePoseidonArtifactsPromise
+}
+
 function toBigInt(v: string | number | bigint): bigint {
   if (typeof v === 'bigint') return v
   if (typeof v === 'number') return BigInt(v)
@@ -551,15 +603,10 @@ export async function generatePersonProof(
       submitter: input.submitter
     })
 
-    // Add cache-busting timestamp to force reload of wasm file
-    const timestamp = Date.now()
-    
+    const { wasm, zkey } = await loadPersonHashArtifacts()
+
     // Generate proof using snarkjs
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input,
-      `/zk/person_hash_zk.wasm?t=${timestamp}`,
-      `/zk/person_hash_zk_final.zkey?t=${timestamp}`
-    )
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey)
 
     console.log('🔍 Generated proof object:', proof)
     console.log('🔍 Generated publicSignals:', publicSignals)
@@ -608,12 +655,8 @@ export async function generateNamePoseidonProof(
       minter: minterDecimal
     }
 
-    const timestamp = Date.now()
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      input,
-      `/zk/name_poseidon_zk.wasm?t=${timestamp}`,
-      `/zk/name_poseidon_zk_final.zkey?t=${timestamp}`
-    )
+    const { wasm, zkey } = await loadNamePoseidonArtifacts()
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey)
 
     return { proof, publicSignals }
   } catch (error) {
