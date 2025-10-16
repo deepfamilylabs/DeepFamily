@@ -1,4 +1,5 @@
 import React from 'react'
+import { getGenderColor } from '../constants/genderColors'
 
 export interface NodeCardProps {
   w: number
@@ -62,7 +63,7 @@ export default function NodeCard(props: NodeCardProps) {
   const title = (titleText || '').slice(0, Math.max(0, Math.floor((w - PADDING_X * 2) / 8)))
   const tag = (tagText || '').slice(0, Math.max(0, Math.floor((w - PADDING_X * 2) / SMALL_CHAR_W)))
 
-  const genderClass = gender === 1 ? 'fill-sky-500' : gender === 2 ? 'fill-rose-500' : gender === 3 ? 'fill-violet-500' : 'fill-slate-400'
+  const genderClass = getGenderColor(gender, 'SVG_FILL')
 
   const showTag = Boolean(tag)
 
@@ -98,7 +99,7 @@ export default function NodeCard(props: NodeCardProps) {
       />
       <rect width={w} height={h} rx={12} ry={12} fill="url(#cardGlossGrad)" className="dark:opacity-0" />
 
-      {/* Multi-version badge: purple header bar with version count */}
+      {/* Multi-version badge: background bar at top with rounded corners */}
       {hasMultipleVersions && (
         <>
           {/* Light blue background bar at top with rounded corners - fits inside card */}
@@ -106,28 +107,24 @@ export default function NodeCard(props: NodeCardProps) {
             d={`M 1 12 Q 1 1 12 1 L ${w - 12} 1 Q ${w - 1} 1 ${w - 1} 12 L ${w - 1} 12 L 1 12 Z`}
             className={`${minted ? 'fill-sky-500/20 dark:fill-sky-500/20' : selected ? 'fill-blue-500/20 dark:fill-blue-500/20' : 'fill-cyan-500/20 dark:fill-cyan-500/20'}`}
           />
-          {/* Version count number on the left */}
-          <text className="font-mono">
-            <tspan
-              x={7}
-              y={8}
-              textAnchor="start"
-              dominantBaseline="middle"
-              className="text-[11px] font-bold fill-slate-600 dark:fill-slate-200"
-            >
-              {totalVersions}
-            </tspan>
-          </text>
         </>
       )}
 
-      {/* Version number at top */}
+      {/* Version display at top-right corner */}
       <text className="font-mono">
-        <tspan x={w - PADDING_X} y={TITLE_START_Y} textAnchor="end" className={`text-[12px] ${minted ? 'fill-emerald-600 dark:fill-emerald-400' : selected ? 'fill-amber-600 dark:fill-amber-300' : 'fill-slate-600 dark:fill-slate-400'}`}>{versionText}</tspan>
+        <tspan
+          x={w - 7}
+          y={8}
+          textAnchor="end"
+          dominantBaseline="middle"
+          className={`text-[10px] ${minted ? 'fill-emerald-600 dark:fill-emerald-400' : selected ? 'fill-amber-600 dark:fill-amber-300' : 'fill-slate-600 dark:fill-slate-400'}`}
+        >
+          {hasMultipleVersions ? `T${totalVersions}:${versionText}` : versionText}
+        </tspan>
       </text>
 
-      {/* Gender dot (top-right corner) */}
-      <circle cx={w - 9} cy={7} r={GENDER_DOT_R} className={genderClass} />
+      {/* Gender dot (top-left corner) */}
+      <circle cx={9} cy={7} r={GENDER_DOT_R} className={genderClass} />
 
       {/* Title */}
       {title && (
