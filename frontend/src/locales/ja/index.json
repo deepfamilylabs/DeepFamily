@@ -421,7 +421,11 @@
       "edit": "編集",
       "save": "保存",
       "cancel": "キャンセル",
-      "deduplicateChildren": "子ノード重複除去"
+      "deduplicateChildren": "子ノード重複除去",
+      "deduplicateChildrenTooltip": {
+        "enabled": "最高エンドースメントバージョンのみ",
+        "disabled": "すべてのバージョンを表示"
+      }
     },
     "status": {
       "loading": "読み込み中...",
@@ -498,6 +502,7 @@
     }
   },
   "common": {
+    "back": "戻る",
     "confirm": "可視化に移動",
     "cancel": "キャンセル",
     "goBack": "戻る",
@@ -541,6 +546,9 @@
     "theme": "テーマ",
     "language": "言語"
   },
+  "storyEditor": {
+    "title": "伝記エディタ"
+  },
   "storyChunkEditor": {
     "title": "伝記コンテンツエディタ",
     "stats": "シャード数: {{count}}, 総長: {{length}}",
@@ -561,6 +569,9 @@
     "operationFailed": "操作失敗",
     "sealConfirm": "伝記をシーリングしますか？シーリング後は修正できません。",
     "sealFailed": "シーリング失敗",
+    "leaveConfirmTitle": "エディタを離れる",
+    "leaveConfirm": "未保存の変更は失われます。エディタから離れますか？",
+    "leaveConfirmButton": "離れる",
     "sealDialog": {
       "title": "伝記シーリング",
       "description": "伝記をシーリングしますか？シーリング後は修正できません。",
@@ -571,6 +582,14 @@
     "contentTooLongBytes": "内容は1000バイトを超えることはできません",
     "contentPlaceholderBytes": "シャード内容を入力してください（最大1000バイト、約1000英字または約333漢字）",
     "offlineNoData": "オフラインモード：この伝記のローカルキャッシュが存在しません",
+    "success": {
+      "chunkAdded": "チャンク #{{index}} を正常に追加しました（{{bytes}} バイト）",
+      "chunkAddedGeneric": "ストーリーチャンクを正常に追加しました",
+      "chunkUpdated": "チャンク #{{index}} を正常に更新しました",
+      "chunkUpdatedGeneric": "ストーリーチャンクを正常に更新しました",
+      "storySealed": "伝記を正常に封印しました（合計 {{total}} チャンク）",
+      "storySealedGeneric": "伝記を正常に封印しました"
+    },
     "errors": {
       "mustBeNFTHolder": "このNFTを所有している必要があります。所有者のみ伝記を編集できます",
       "unauthorized": "この操作の権限がありません",
