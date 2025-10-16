@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Clipboard, ChevronRight, Edit2, User, Image, Star } from 'lucide-react'
+import { X, Clipboard, Edit2, User, Image, Star, Book } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
@@ -148,13 +148,13 @@ export default function NodeDetailModal({
   const hasNFT = isMinted(nodeData)
 
   const Row: React.FC<{ label: React.ReactNode; value: React.ReactNode; copy?: string }> = ({ label, value, copy }) => (
-    <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-      <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate whitespace-nowrap overflow-hidden text-ellipsis font-medium" title={typeof label === 'string' ? label : undefined}>{label}</div>
-      <div className="flex items-start gap-1 min-w-0">
-        <div className="font-mono break-all min-w-0 text-[13px] text-gray-800 dark:text-gray-200 leading-snug">{value}</div>
+    <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-center text-[13px] leading-[1.4rem] py-2">
+      <div className="text-gray-600 dark:text-gray-400 select-none truncate whitespace-nowrap overflow-hidden text-ellipsis font-medium" title={typeof label === 'string' ? label : undefined}>{label}</div>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="font-mono break-all min-w-0 text-[14px] text-gray-900 dark:text-gray-100 leading-snug font-medium">{value}</div>
         {copy ? (
-          <button aria-label={t('search.copy')} onClick={() => onCopy(copy)} className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]">
-            <Clipboard size={14} />
+          <button aria-label={t('search.copy')} onClick={() => onCopy(copy)} className="shrink-0 p-1.5 rounded-lg hover:bg-gray-200/90 dark:hover:bg-gray-700/90 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-200 active:scale-95">
+            <Clipboard size={16} strokeWidth={2.5} />
           </button>
         ) : null}
       </div>
@@ -165,27 +165,37 @@ export default function NodeDetailModal({
     const measureRef = React.useRef<HTMLSpanElement | null>(null)
     const [useAbbrev, setUseAbbrev] = React.useState<boolean>(() => !isDesktop)
     const fullText = text ?? ''
+
     React.useEffect(() => {
       if (!text) { setUseAbbrev(false); return }
       if (!isDesktop) { setUseAbbrev(true); return }
-      const container = containerRef.current
-      const measure = measureRef.current
-      if (!container || !measure) return
-      const available = container.clientWidth
-      const needed = measure.scrollWidth
-      setUseAbbrev(needed > available + 1)
-    }, [fullText, isDesktop])
+
+      // Use requestAnimationFrame to ensure DOM is ready
+      const checkWidth = () => {
+        const container = containerRef.current
+        const measure = measureRef.current
+        if (!container || !measure) return
+
+        const available = container.clientWidth
+        const needed = measure.scrollWidth
+        setUseAbbrev(needed > available + 2)
+      }
+
+      requestAnimationFrame(checkWidth)
+    }, [fullText, isDesktop, text])
+
     React.useEffect(() => {
       if (!isDesktop) return
       const onResize = () => {
         const container = containerRef.current
         const measure = measureRef.current
         if (!container || !measure) return
-        setUseAbbrev(measure.scrollWidth > container.clientWidth + 1)
+        setUseAbbrev(measure.scrollWidth > container.clientWidth + 2)
       }
       window.addEventListener('resize', onResize)
       return () => window.removeEventListener('resize', onResize)
     }, [isDesktop])
+
     if (!text) return <span>-</span>
     return (
       <div ref={containerRef} className="relative min-w-0">
@@ -200,27 +210,37 @@ export default function NodeDetailModal({
     const measureRef = React.useRef<HTMLSpanElement | null>(null)
     const [useAbbrev, setUseAbbrev] = React.useState<boolean>(() => !isDesktop)
     const fullText = text ?? ''
+
     React.useEffect(() => {
       if (!text) { setUseAbbrev(false); return }
       if (!isDesktop) { setUseAbbrev(true); return }
-      const container = containerRef.current
-      const measure = measureRef.current
-      if (!container || !measure) return
-      const available = container.clientWidth
-      const needed = measure.scrollWidth
-      setUseAbbrev(needed > available + 1)
-    }, [fullText, isDesktop])
+
+      // Use requestAnimationFrame to ensure DOM is ready
+      const checkWidth = () => {
+        const container = containerRef.current
+        const measure = measureRef.current
+        if (!container || !measure) return
+
+        const available = container.clientWidth
+        const needed = measure.scrollWidth
+        setUseAbbrev(needed > available + 2)
+      }
+
+      requestAnimationFrame(checkWidth)
+    }, [fullText, isDesktop, text])
+
     React.useEffect(() => {
       if (!isDesktop) return
       const onResize = () => {
         const container = containerRef.current
         const measure = measureRef.current
         if (!container || !measure) return
-        setUseAbbrev(measure.scrollWidth > container.clientWidth + 1)
+        setUseAbbrev(measure.scrollWidth > container.clientWidth + 2)
       }
       window.addEventListener('resize', onResize)
       return () => window.removeEventListener('resize', onResize)
     }, [isDesktop])
+
     if (!text) return <span>-</span>
     return (
       <div ref={containerRef} className="relative min-w-0">
@@ -244,7 +264,7 @@ export default function NodeDetailModal({
           onClick={(e) => e.stopPropagation()}
         >
           <div
-            className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 px-4 py-4 pt-7 sm:pt-6 sm:px-6 border-b border-gray-200/50 dark:border-gray-700/50 z-10 relative touch-none cursor-grab active:cursor-grabbing backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60"
+            className="sticky top-0 bg-gradient-to-br from-blue-100/80 via-purple-100/60 to-blue-50/40 dark:from-gray-800 dark:via-gray-800/95 dark:to-gray-900 px-5 py-4 pt-7 sm:pt-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 z-10 relative touch-none cursor-grab active:cursor-grabbing backdrop-blur-sm supports-[backdrop-filter]:bg-white/90 dark:supports-[backdrop-filter]:bg-gray-900/80"
             onPointerDown={(e) => { (e.currentTarget as any).setPointerCapture?.(e.pointerId); startYRef.current = e.clientY; setDragging(true) }}
             onPointerMove={(e) => { if (!dragging || startYRef.current == null) return; const dy = Math.max(0, e.clientY - startYRef.current); setDragOffset(dy) }}
             onPointerUp={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
@@ -254,26 +274,81 @@ export default function NodeDetailModal({
             onTouchEnd={() => { if (!dragging) return; const shouldClose = dragOffset > 120; setDragging(false); setDragOffset(0); if (shouldClose) handleClose() }}
           >
             {/* Drag handle */}
-            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                  <User className="w-6 h-6 text-white" />
+            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" />
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
+                  <User className="w-7 h-7 sm:w-8 sm:h-8 text-white" strokeWidth={2.5} />
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[17px] sm:text-[18px] font-semibold text-gray-900 dark:text-gray-100 truncate pr-2 tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[16px] sm:text-[17px] font-bold text-gray-900 dark:text-gray-50 truncate pr-2 tracking-tight leading-tight">
                     {t('familyTree.personVersionDetail.title')}
+                  </div>
+                  {/* Endorsement and People Encyclopedia badges under title */}
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    {nodeData?.personHash && nodeData?.versionIndex !== undefined && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Navigate to endorse page with person hash and version index
+                          const params = new URLSearchParams()
+                          if (nodeData?.personHash) params.set('hash', nodeData.personHash)
+                          if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
+                          window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50 rounded-full transition-all duration-200 cursor-pointer"
+                        title={t('people.clickToEndorse', 'Click to endorse this version')}
+                      >
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" strokeWidth={0} />
+                        <span className="text-[13px] font-semibold text-amber-700 dark:text-amber-400">
+                          {nodeData.endorsementCount ?? 0}
+                        </span>
+                      </button>
+                    )}
+                    {isMinted(nodeData) && nodeData?.tokenId && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.open(`/person/${nodeData.tokenId}`, '_blank', 'noopener,noreferrer')
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer"
+                          title={t('familyTree.nodeDetail.viewFullStory', 'View Full Story')}
+                        >
+                          <Book className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <span className="hidden sm:inline text-[13px] font-semibold text-blue-700 dark:text-blue-400">{t('familyTree.nodeDetail.encyclopedia', 'Encyclopedia')}</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!nodeData?.tokenId) return
+                            navigate(`/editor/${nodeData.tokenId}`)
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60 border border-green-200/60 dark:border-green-800/50 rounded-full transition-all duration-200 cursor-pointer"
+                          title={t('familyTree.nodeDetail.editStory', 'Edit Story')}
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                          <span className="hidden sm:inline text-[13px] font-semibold text-green-700 dark:text-green-400">{t('familyTree.nodeDetail.edit', 'Edit')}</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-              <button 
-                aria-label="close" 
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors" 
+              <button
+                aria-label="close"
+                className="p-1.5 -mt-0.5 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-200 flex-shrink-0"
                 onClick={(e) => { e.stopPropagation(); handleClose() }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
               >
-                <X size={20} />
+                <X size={22} strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -282,53 +357,26 @@ export default function NodeDetailModal({
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>
           </div>
         )}
-        <div className="flex-1 min-h-0 px-4 pb-24 pt-2 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth space-y-3 text-[12px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)', touchAction: 'pan-y' }}>
-          <div className="space-y-1.5">
+        <div className="flex-1 min-h-0 px-5 pb-24 pt-3 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth space-y-0 text-[13px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)', touchAction: 'pan-y' }}>
+          <div className="space-y-0">
             <Row label={t('familyTree.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} />
             <Row label={t('familyTree.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
-            <Row
-              label={t('familyTree.nodeDetail.endorsementCount')}
-              value={
-                nodeData?.personHash && nodeData?.versionIndex ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Navigate to endorse page with person hash and version index
-                      const params = new URLSearchParams()
-                      if (nodeData?.personHash) params.set('hash', nodeData.personHash)
-                      if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
-                      navigate(`/actions?tab=endorse&${params.toString()}`)
-                    }}
-                    className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 rounded-full whitespace-nowrap transition-colors cursor-pointer text-[12px]"
-                    title={t('people.clickToEndorse', 'Click to endorse this version')}
-                  >
-                    <Star className="w-3 h-3 text-yellow-500" />
-                    <span className="font-medium text-yellow-700 dark:text-yellow-300">
-                      {nodeData.endorsementCount ?? 0}
-                    </span>
-                  </button>
-                ) : (
-                  nodeData?.endorsementCount ?? '-'
-                )
-              }
-            />
             <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} />
             <Row label={t('familyTree.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
             <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} />
             <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
             <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} />
             <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
-            <Row label={t('familyTree.nodeDetail.tag')} value={nodeData?.tag ?? '-'} />
             <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
             {/* NFT Section - show for all nodes */}
-            <div className="pt-1">
-              <div className="my-2 h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
-              <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-center text-[12px] leading-[1.15rem] mb-1">
-                <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-300 tracking-wide flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-sm bg-gray-400 dark:bg-gray-500" />{t('familyTree.nodeDetail.nft')}
+            <div className="pt-3 pb-1">
+              <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent dark:from-transparent dark:via-gray-500 dark:to-transparent" />
+              <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-center text-[13px] leading-[1.4rem] mb-2 py-1">
+                <div className="text-[14px] font-extrabold text-gray-800 dark:text-gray-200 tracking-wide flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500" />{t('familyTree.nodeDetail.nft')}
                 </div>
                 {!isMinted(nodeData) && (
-                  <div className="flex gap-3 text-[11px] flex-wrap">
+                  <div className="flex gap-3 text-[12px] flex-wrap">
                     <button
                       onClick={() => {
                         // Navigate to actions page with mint-nft tab and parameters
@@ -337,9 +385,9 @@ export default function NodeDetailModal({
                         if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
                         navigate(`/actions?tab=mint-nft&${params.toString()}`)
                       }}
-                      className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 underline flex items-center gap-1"
+                      className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium underline flex items-center gap-1.5 transition-colors duration-200"
                     >
-                      <Image size={11} />
+                      <Image size={12} strokeWidth={2} />
                       {t('actions.mintNFT')}
                     </button>
                   </div>
@@ -365,45 +413,18 @@ export default function NodeDetailModal({
                   return parts.length ? parts.join(' · ') : '-'
                 })()} />
                 {nodeData?.story && nodeData.story.trim() !== '' && (
-                  <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-                    <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('familyTree.nodeDetail.story')}</div>
-                    <div className="font-mono text-[11px] text-gray-800 dark:text-gray-200 leading-snug whitespace-pre-wrap break-words min-w-0">{nodeData.story}</div>
+                  <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-start text-[13px] leading-[1.4rem] py-2">
+                    <div className="text-gray-600 dark:text-gray-400 pt-0.5 select-none truncate font-medium">{t('familyTree.nodeDetail.story')}</div>
+                    <div className="font-mono text-[13px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words min-w-0 bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg max-h-[200px] overflow-y-auto">{nodeData.story}</div>
                   </div>
                 )}
-                <div className="grid grid-cols-[110px_1fr] gap-x-2 gap-y-0.5 items-start text-[12px] leading-[1.15rem]">
-                  <div className="text-gray-500 dark:text-gray-400 pt-0.5 select-none truncate">{t('familyTree.nodeDetail.profile')}</div>
-                  <div className="space-y-1">
-                    <div className="flex gap-3 text-[11px] flex-wrap pt-0.5">
-                      <button
-                        onClick={() => {
-                          const url = `/person/${nodeData?.tokenId}`
-                          window.open(url, '_blank')
-                        }}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline flex items-center gap-1"
-                      >
-                        <ChevronRight size={11} />
-                        {t('familyTree.nodeDetail.viewFullStory')}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!nodeData?.tokenId) return
-                          navigate(`/editor/${nodeData.tokenId}`)
-                        }}
-                        className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 underline flex items-center gap-1"
-                      >
-                        <Edit2 size={11} />
-                        {t('familyTree.nodeDetail.editStory')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
                 <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} />
                 {nodeData?.nftTokenURI && <Row label={t('familyTree.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
               </>
             ) : null}
           </div>
           {/* Bottom spacer to ensure last row (e.g., URI) is visible above rounded edge / safe area */}
-          <div className="h-3 sm:h-1" />
+          <div className="h-4 sm:h-2" />
           {loading && (
             <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">{t('familyTree.nodeDetail.loading')}</div>
           )}

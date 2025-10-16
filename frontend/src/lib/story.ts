@@ -2,6 +2,8 @@ import { ethers, Contract, type JsonRpcSigner } from 'ethers'
 import DeepFamilyAbi from '../abi/DeepFamily.json'
 import type { StoryChunk } from '../types/graph'
 
+const WALLET_CONFIRMATION_TIMEOUT_MS = 30000
+
 /**
  * Result from adding a story chunk
  */
@@ -75,8 +77,11 @@ export async function addStoryChunk(
     console.log('  Content Length:', content.length)
     console.log('  Expected Hash:', expectedHash)
 
-    // Send transaction
-    const tx = await contract.addStoryChunk(tokenId, chunkIndex, content, expectedHash || ethers.ZeroHash)
+    // Send transaction (with wallet confirmation timeout)
+    const tx = await withWalletConfirmationTimeout(
+      () => contract.addStoryChunk(tokenId, chunkIndex, content, expectedHash || ethers.ZeroHash),
+      'addStoryChunk'
+    )
     console.log('✅ Transaction sent:', tx.hash)
 
     // Wait for confirmation
@@ -162,8 +167,11 @@ export async function updateStoryChunk(
     console.log('  New Content Length:', newContent.length)
     console.log('  Expected Hash:', expectedHash)
 
-    // Send transaction
-    const tx = await contract.updateStoryChunk(tokenId, chunkIndex, newContent, expectedHash || ethers.ZeroHash)
+    // Send transaction (with wallet confirmation timeout)
+    const tx = await withWalletConfirmationTimeout(
+      () => contract.updateStoryChunk(tokenId, chunkIndex, newContent, expectedHash || ethers.ZeroHash),
+      'updateStoryChunk'
+    )
     console.log('✅ Transaction sent:', tx.hash)
 
     // Wait for confirmation
@@ -239,8 +247,11 @@ export async function sealStory(
     console.log('🚀 Sealing story...')
     console.log('  Token ID:', tokenId)
 
-    // Send transaction
-    const tx = await contract.sealStory(tokenId)
+    // Send transaction (with wallet confirmation timeout)
+    const tx = await withWalletConfirmationTimeout(
+      () => contract.sealStory(tokenId),
+      'sealStory'
+    )
     console.log('✅ Transaction sent:', tx.hash)
 
     // Wait for confirmation
@@ -295,6 +306,27 @@ export async function sealStory(
  */
 function parseStoryContractError(error: any, contract: Contract): Error {
   console.error('[Story] Contract error:', error)
+
+  if (error?.code === 'WALLET_POPUP_TIMEOUT' || error?.type === 'WALLET_POPUP_TIMEOUT' || typeof error?.message === 'string' && /wallet confirmation timed out/i.test(error.message)) {
+    const err = new Error('Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.')
+    ;(err as any).type = 'WALLET_POPUP_TIMEOUT'
+    ;(err as any).code = 'WALLET_POPUP_TIMEOUT'
+    return err
+  }
+
+  if (error?.code === 4001 || error?.code === 'ACTION_REJECTED') {
+    const err = new Error('Transaction was rejected by user')
+    ;(err as any).type = 'USER_REJECTED'
+    ;(err as any).code = 'USER_REJECTED'
+    return err
+  }
+
+  if (error?.code === -32002 || (typeof error?.message === 'string' && /request (?:is )?already pending/i.test(error.message))) {
+    const err = new Error('Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.')
+    ;(err as any).type = 'WALLET_REQUEST_PENDING'
+    ;(err as any).code = 'WALLET_REQUEST_PENDING'
+    return err
+  }
 
   // Check for custom errors in the error data
   if (error?.data && typeof error.data === 'string') {
@@ -375,4 +407,40 @@ function getErrorMessage(errorName: string): string {
   }
 
   return messages[errorName] || `Contract error: ${errorName}`
+}
+
+/**
+ * Apply a timeout while waiting for the wallet confirmation step.
+ * Prevents the UI from hanging indefinitely when Fluent hides the popup.
+ */
+async function withWalletConfirmationTimeout<T>(
+  sendTx: () => Promise<T>,
+  action: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutError = new Error('Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.')
+  ;(timeoutError as any).type = 'WALLET_POPUP_TIMEOUT'
+  ;(timeoutError as any).code = 'WALLET_POPUP_TIMEOUT'
+  ;(timeoutError as any).action = action
+
+  console.log(`[Wallet] Awaiting confirmation for ${action}...`)
+
+  const txPromise = sendTx()
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(timeoutError), WALLET_CONFIRMATION_TIMEOUT_MS)
+  })
+
+  try {
+    const result = await Promise.race([txPromise, timeoutPromise])
+    if (timeoutId) clearTimeout(timeoutId)
+    return result
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId)
+    // Avoid unhandled rejections if the original txPromise resolves later
+    if (err === timeoutError) {
+      console.warn(`[Wallet] Confirmation timeout exceeded (${WALLET_CONFIRMATION_TIMEOUT_MS}ms) for ${action}`)
+      txPromise.catch(() => {})
+    }
+    throw err
+  }
 }

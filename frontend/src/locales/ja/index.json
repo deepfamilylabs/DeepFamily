@@ -475,7 +475,9 @@
       "hideFullStory": "完全プロフィール非表示",
       "showChunks": "シャード表示",
       "hideChunks": "シャード非表示",
+      "encyclopedia": "人物百科",
       "editStory": "プロフィール編集",
+      "edit": "編集",
       "viewFullStory": "完全プロフィール閲覧",
       "uri": "URI",
       "loading": "NFT情報読み込み中…",
@@ -604,6 +606,8 @@
       "customError": "コントラクトエラー：{{error}}",
       "transactionReverted": "取引失敗：実行が戻されました",
       "userRejected": "ユーザーが取引を拒否",
+      "walletTimeout": "ウォレットの確認がタイムアウトしました。ウォレットを再度開き、取引を確認してください。",
+      "walletPending": "ウォレットに保留中のリクエストがあります。ウォレットを開いて承認または拒否してから再試行してください。",
       "insufficientFunds": "Gas費不足",
       "unknown": "不明なエラーが発生しました"
     }
@@ -692,6 +696,8 @@
   },
   "storyChunksModal": {
     "fetchError": "伝記データ読み込み失敗",
+    "lifeEvents": "人生の出来事",
+    "blockchainIdentity": "ブロックチェーン識別情報",
     "viewDetail": "詳細表示",
     "born": "誕生",
     "died": "死去",
@@ -758,6 +764,8 @@
     "verifyingProof": "証明検証中...",
     "submittingToBlockchain": "ブロックチェーンに提出中...",
     "addedSuccessfully": "人物追加成功！",
+    "successTitle": "バージョン追加成功",
+    "successDesc": "人物バージョンがブロックチェーンに正常に追加されました",
     "personHash": "人物ハッシュ",
     "transactionHash": "取引ハッシュ",
     "blockNumber": "ブロック番号",
@@ -791,7 +799,6 @@
     "close": "閉じる",
     "personInfoRequired": "人物情報を入力してください",
     "contractNotConfigured": "コントラクト未設定",
-    "wallet.notConnected": "ウォレットを接続してください",
     "partial": "部分",
     "complete": "完全",
     "proofGenerationNote": "ZK証明生成には複雑な暗号計算が必要です。しばらくお待ちください...",
@@ -838,6 +845,9 @@
     "personHashRequired": "人物ハッシュを計算できません",
     "mintFailed": "NFT鋳造失敗",
     "mintedSuccessfully": "NFT鋳造成功！",
+    "successTitle": "NFT鋳造成功",
+    "successDesc": "NFTがブロックチェーン上に作成されました",
+    "nftDetails": "NFT詳細",
     "tokenId": "トークンID",
     "owner": "所有者",
     "transactionHash": "取引ハッシュ",
@@ -921,6 +931,9 @@
     "personHashRequired": "有効な人物ハッシュとバージョンインデックスを提供してください",
     "insufficientDeepTokens": "エンドースメントに必要なDEEPトークン残高が不足しています",
     "endorsedSuccessfully": "バージョンエンドースメント成功！",
+    "successTitle": "承認成功",
+    "successDesc": "バージョンが正常に承認されました",
+    "endorsementDetails": "承認詳細",
     "feePaid": "手数料支払い済み",
     "transactionHash": "取引ハッシュ",
     "blockNumber": "ブロック番号",
@@ -953,6 +966,8 @@
       "feeTransferFailed": "エンドースメント手数料送金失敗",
       "insufficientFunds": "取引手数料不足",
       "userRejected": "ユーザーが取引を拒否",
+      "walletPending": "ウォレットに保留中のリクエストがあります。ウォレットを開き、既存の要求を処理してから再試行してください。",
+      "walletPendingDetails": "ウォレット拡張機能で承認待ちまたは取引待ちの項目を確認し、承認または拒否してからもう一度お試しください。",
       "walletTimeout": "ウォレット確認タイムアウト。ウォレットポップアップが閉じられたか隠れた可能性があります。",
       "walletTimeoutDetails": "再試行し、ウォレットポップアップで取引を確認してください。"
     },
@@ -963,10 +978,19 @@
   "transaction": {
     "pending": "取引確認待ち中...",
     "pendingDetails": "取引が提出されたかウォレット確認待ちです。アプリを継続使用でき、確認後に更新します。",
-    "submitted": "取引提出済み..."
+    "submitted": "取引提出済み...",
+    "success": "取引成功",
+    "failed": "取引失敗",
+    "rejected": "ユーザーが取引を拒否",
+    "insufficientFunds": "取引手数料不足",
+    "walletTimeout": "ウォレット確認タイムアウト。ウォレットポップアップで確認してください。"
   },
   "contract": {
     "endorseSuccess": "エンドースメント提出成功",
-    "endorseFailed": "バージョンエンドースメント失敗"
+    "endorseFailed": "バージョンエンドースメント失敗",
+    "addVersionSuccess": "人物バージョン追加成功",
+    "addVersionFailed": "人物バージョン追加失敗",
+    "mintSuccess": "NFT鋳造成功",
+    "mintFailed": "NFT鋳造失敗"
   }
 }

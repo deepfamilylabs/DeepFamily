@@ -84,7 +84,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {/* portal-like container */}
-      <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center pointer-events-none">
+      <div className="fixed inset-x-0 bottom-4 z-[2000] flex justify-center pointer-events-none">
         <div className="space-y-2">
           {toasts.map(toast => {
             const style = TOAST_STYLES[toast.type]
