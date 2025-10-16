@@ -421,7 +421,11 @@
       "edit": "編輯",
       "save": "保存",
       "cancel": "取消",
-      "deduplicateChildren": "去重子節點"
+      "deduplicateChildren": "去重子節點",
+      "deduplicateChildrenTooltip": {
+        "enabled": "僅顯示最高背書版本",
+        "disabled": "顯示所有版本"
+      }
     },
     "status": {
       "loading": "加載中...",
@@ -498,6 +502,7 @@
     }
   },
   "common": {
+    "back": "返回",
     "confirm": "前往視覺化",
     "cancel": "取消",
     "goBack": "返回",
@@ -541,6 +546,9 @@
     "theme": "主題",
     "language": "語言"
   },
+  "storyEditor": {
+    "title": "傳記編輯器"
+  },
   "storyChunkEditor": {
     "title": "傳記分片編輯器",
     "stats": "分片數量: {{count}}, 總長度: {{length}}",
@@ -561,6 +569,9 @@
     "operationFailed": "操作失敗",
     "sealConfirm": "確定要封存傳記嗎？封存後將無法再修改。",
     "sealFailed": "封存失敗",
+    "leaveConfirmTitle": "離開編輯器",
+    "leaveConfirm": "未儲存的變更將會丟失。確定離開編輯器？",
+    "leaveConfirmButton": "離開",
     "sealDialog": {
       "title": "封存傳記",
       "description": "確定要封存傳記嗎？封存後將無法再修改。",
@@ -571,6 +582,14 @@
     "contentTooLongBytes": "內容不能超過1000位元組",
     "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）",
     "offlineNoData": "離線模式：本地沒有快取該傳記",
+    "success": {
+      "chunkAdded": "分片 #{{index}} 新增成功（{{bytes}} 位元組）",
+      "chunkAddedGeneric": "分片新增成功",
+      "chunkUpdated": "分片 #{{index}} 更新成功",
+      "chunkUpdatedGeneric": "分片更新成功",
+      "storySealed": "傳記封存成功（共 {{total}} 個分片）",
+      "storySealedGeneric": "傳記封存成功"
+    },
     "errors": {
       "mustBeNFTHolder": "您必須擁有此NFT才能編輯其傳記",
       "unauthorized": "無權限執行此操作",

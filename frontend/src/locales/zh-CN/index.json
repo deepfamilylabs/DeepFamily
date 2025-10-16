@@ -422,7 +422,11 @@
       "edit": "编辑",
       "save": "保存",
       "cancel": "取消",
-      "deduplicateChildren": "去重子节点"
+      "deduplicateChildren": "去重子节点",
+      "deduplicateChildrenTooltip": {
+        "enabled": "仅显示最高背书版本",
+        "disabled": "显示所有版本"
+      }
     },
     "status": {
       "loading": "加载中...",
@@ -499,6 +503,7 @@
     }
   },
   "common": {
+    "back": "返回",
     "confirm": "前往可视化",
     "cancel": "取消",
     "goBack": "返回",
@@ -542,6 +547,9 @@
     "theme": "主题",
     "language": "语言"
   },
+  "storyEditor": {
+    "title": "传记编辑器"
+  },
   "storyChunkEditor": {
     "title": "传记内容编辑器",
     "stats": "分片数量: {{count}}, 总长度: {{length}}",
@@ -562,6 +570,9 @@
     "operationFailed": "操作失败",
     "sealConfirm": "确定要封存传记吗？封存后将无法再修改。",
     "sealFailed": "封存失败",
+    "leaveConfirmTitle": "离开编辑器",
+    "leaveConfirm": "未保存的更改将丢失。确定离开编辑器？",
+    "leaveConfirmButton": "离开",
     "sealDialog": {
       "title": "封存传记",
       "description": "确定要封存传记吗？封存后将无法再修改。",
@@ -572,6 +583,14 @@
     "contentTooLongBytes": "内容不能超过1000字节",
     "contentPlaceholderBytes": "请输入分片内容（最多1000字节，约=1000英文或≈333汉字）",
     "offlineNoData": "离线模式：本地没有缓存该传记",
+    "success": {
+      "chunkAdded": "分片 #{{index}} 添加成功（{{bytes}} 字节）",
+      "chunkAddedGeneric": "分片添加成功",
+      "chunkUpdated": "分片 #{{index}} 更新成功",
+      "chunkUpdatedGeneric": "分片更新成功",
+      "storySealed": "传记封存成功（共 {{total}} 个分片）",
+      "storySealedGeneric": "传记封存成功"
+    },
     "errors": {
       "mustBeNFTHolder": "您必须拥有此NFT才能编辑其传记",
       "unauthorized": "无权限执行此操作",

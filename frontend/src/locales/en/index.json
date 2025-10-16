@@ -422,7 +422,11 @@
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel",
-      "deduplicateChildren": "Deduplicate Children"
+      "deduplicateChildren": "Deduplicate Children",
+      "deduplicateChildrenTooltip": {
+        "enabled": "Highest endorsed version only",
+        "disabled": "Show all versions"
+      }
     },
     "status": {
       "loading": "Loading...",
@@ -499,6 +503,7 @@
     }
   },
   "common": {
+    "back": "Back",
     "confirm": "Go to FamilyTree",
     "cancel": "Cancel",
     "goBack": "Go Back",
@@ -542,6 +547,9 @@
     "theme": "Theme",
     "language": "Language"
   },
+  "storyEditor": {
+    "title": "Story Editor"
+  },
   "storyChunkEditor": {
     "title": "Biography Chunk Editor",
     "stats": "Chunks: {{count}}, Total Length: {{length}}",
@@ -562,6 +570,9 @@
     "operationFailed": "Operation failed",
     "sealConfirm": "Are you sure you want to seal the biography? Once sealed, it cannot be modified.",
     "sealFailed": "Seal failed",
+    "leaveConfirmTitle": "Leave Editor",
+    "leaveConfirm": "Unsaved changes will be lost. Do you want to leave the editor?",
+    "leaveConfirmButton": "Leave",
     "sealDialog": {
       "title": "Seal Biography",
       "description": "Are you sure you want to seal the biography? Once sealed, it can no longer be modified.",
@@ -572,6 +583,14 @@
     "contentTooLongBytes": "Content must not exceed 1000 bytes",
     "contentPlaceholderBytes": "Enter chunk content (max 1000 bytes ≈ 1000 ASCII or ~333 CJK chars)",
     "offlineNoData": "Offline mode: story not cached locally",
+    "success": {
+      "chunkAdded": "Chunk #{{index}} added successfully ({{bytes}} bytes)",
+      "chunkAddedGeneric": "Story chunk added successfully",
+      "chunkUpdated": "Chunk #{{index}} updated successfully",
+      "chunkUpdatedGeneric": "Story chunk updated successfully",
+      "storySealed": "Story sealed successfully ({{total}} chunks)",
+      "storySealedGeneric": "Story sealed successfully"
+    },
     "errors": {
       "mustBeNFTHolder": "You must own this NFT to edit its story",
       "unauthorized": "Not authorized to perform this action",
