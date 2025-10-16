@@ -168,9 +168,8 @@ export default function NodeDetailModal({
 
     React.useEffect(() => {
       if (!text) { setUseAbbrev(false); return }
-      if (!isDesktop) { setUseAbbrev(true); return }
+      if (isDesktop) { setUseAbbrev(false); return }
 
-      // Use requestAnimationFrame to ensure DOM is ready
       const checkWidth = () => {
         const container = containerRef.current
         const measure = measureRef.current
@@ -181,11 +180,12 @@ export default function NodeDetailModal({
         setUseAbbrev(needed > available + 2)
       }
 
-      requestAnimationFrame(checkWidth)
+      const raf = requestAnimationFrame(checkWidth)
+      return () => cancelAnimationFrame(raf)
     }, [fullText, isDesktop, text])
 
     React.useEffect(() => {
-      if (!isDesktop) return
+      if (isDesktop) return
       const onResize = () => {
         const container = containerRef.current
         const measure = measureRef.current
@@ -199,7 +199,9 @@ export default function NodeDetailModal({
     if (!text) return <span>-</span>
     return (
       <div ref={containerRef} className="relative min-w-0">
-        <span className="block whitespace-nowrap break-normal overflow-hidden text-ellipsis">{useAbbrev ? formatHashMiddle(text) : text}</span>
+        <span className={useAbbrev ? 'block whitespace-nowrap break-normal overflow-hidden text-ellipsis' : 'block whitespace-normal break-all'}>
+          {useAbbrev ? formatHashMiddle(text) : text}
+        </span>
         <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap break-normal">{text}</span>
       </div>
     )
@@ -213,9 +215,8 @@ export default function NodeDetailModal({
 
     React.useEffect(() => {
       if (!text) { setUseAbbrev(false); return }
-      if (!isDesktop) { setUseAbbrev(true); return }
+      if (isDesktop) { setUseAbbrev(false); return }
 
-      // Use requestAnimationFrame to ensure DOM is ready
       const checkWidth = () => {
         const container = containerRef.current
         const measure = measureRef.current
@@ -226,11 +227,12 @@ export default function NodeDetailModal({
         setUseAbbrev(needed > available + 2)
       }
 
-      requestAnimationFrame(checkWidth)
+      const raf = requestAnimationFrame(checkWidth)
+      return () => cancelAnimationFrame(raf)
     }, [fullText, isDesktop, text])
 
     React.useEffect(() => {
-      if (!isDesktop) return
+      if (isDesktop) return
       const onResize = () => {
         const container = containerRef.current
         const measure = measureRef.current
@@ -244,7 +246,9 @@ export default function NodeDetailModal({
     if (!text) return <span>-</span>
     return (
       <div ref={containerRef} className="relative min-w-0">
-        <span className="block whitespace-nowrap overflow-hidden text-ellipsis">{useAbbrev ? shortAddress(text) : text}</span>
+        <span className={useAbbrev ? 'block whitespace-nowrap overflow-hidden text-ellipsis' : 'block whitespace-normal break-all'}>
+          {useAbbrev ? shortAddress(text) : text}
+        </span>
         <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap">{text}</span>
       </div>
     )
@@ -298,12 +302,32 @@ export default function NodeDetailModal({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50 rounded-full transition-all duration-200 cursor-pointer"
+                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
                         title={t('people.clickToEndorse', 'Click to endorse this version')}
                       >
                         <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" strokeWidth={0} />
                         <span className="text-[13px] font-semibold text-amber-700 dark:text-amber-400">
                           {nodeData.endorsementCount ?? 0}
+                        </span>
+                      </button>
+                    )}
+                    {!hasNFT && nodeData?.personHash && nodeData?.versionIndex !== undefined && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const params = new URLSearchParams()
+                          if (nodeData?.personHash) params.set('hash', nodeData.personHash)
+                          if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
+                          window.open(`/actions?tab=mint-nft&${params.toString()}`, '_blank', 'noopener,noreferrer')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-950/60 border border-purple-200/60 dark:border-purple-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                        title={t('familyTree.nodeDetail.mintNFTTooltip', 'Mint this person as an NFT')}
+                      >
+                        <Image className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
+                        <span className="hidden sm:inline text-[13px] font-semibold text-purple-700 dark:text-purple-300">
+                          {t('actions.mintNFT', '铸造NFT')}
                         </span>
                       </button>
                     )}
@@ -316,7 +340,7 @@ export default function NodeDetailModal({
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer"
+                          className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
                           title={t('familyTree.nodeDetail.viewFullStory', 'View Full Story')}
                         >
                           <Book className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -326,11 +350,11 @@ export default function NodeDetailModal({
                           onClick={(e) => {
                             e.stopPropagation()
                             if (!nodeData?.tokenId) return
-                            navigate(`/editor/${nodeData.tokenId}`)
+                            window.open(`/editor/${nodeData.tokenId}`, '_blank', 'noopener,noreferrer')
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60 border border-green-200/60 dark:border-green-800/50 rounded-full transition-all duration-200 cursor-pointer"
+                          className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60 border border-green-200/60 dark:border-green-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
                           title={t('familyTree.nodeDetail.editStory', 'Edit Story')}
                         >
                           <Edit2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
@@ -368,33 +392,18 @@ export default function NodeDetailModal({
             <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} />
             <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
             <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
-            {/* NFT Section - show for all nodes */}
-            <div className="pt-3 pb-1">
-              <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent dark:from-transparent dark:via-gray-500 dark:to-transparent" />
-              <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-center text-[13px] leading-[1.4rem] mb-2 py-1">
-                <div className="text-[14px] font-extrabold text-gray-800 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500" />{t('familyTree.nodeDetail.nft')}
-                </div>
-                {!isMinted(nodeData) && (
-                  <div className="flex gap-3 text-[12px] flex-wrap">
-                    <button
-                      onClick={() => {
-                        // Navigate to actions page with mint-nft tab and parameters
-                        const params = new URLSearchParams()
-                        if (nodeData?.personHash) params.set('hash', nodeData.personHash)
-                        if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
-                        navigate(`/actions?tab=mint-nft&${params.toString()}`)
-                      }}
-                      className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-medium underline flex items-center gap-1.5 transition-colors duration-200"
-                    >
-                      <Image size={12} strokeWidth={2} />
-                      {t('actions.mintNFT')}
-                    </button>
+            {/* NFT Section - only when NFT exists */}
+            {hasNFT && (
+              <div className="pt-3 pb-1">
+                <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent dark:from-transparent dark:via-gray-500 dark:to-transparent" />
+                <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-center text-[13px] leading-[1.4rem] mb-2 py-1">
+                  <div className="text-[14px] font-extrabold text-gray-800 dark:text-gray-200 tracking-wide flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500" />{t('familyTree.nodeDetail.nft')}
                   </div>
-                )}
+                </div>
               </div>
-            </div>
-            {isMinted(nodeData) ? (
+            )}
+            {hasNFT ? (
               /* Already minted NFT - show NFT info */
               <>
                 <Row label={t('familyTree.nodeDetail.tokenId')} value={nodeData!.tokenId} copy={nodeData!.tokenId} />
