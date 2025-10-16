@@ -36,7 +36,7 @@ function TitleUpdater() {
           return `${baseName} - ${t('navigation.actions', 'Actions')}`
         default:
           if (location.pathname.startsWith('/person/')) {
-            return `${baseName} - ${t('person.pageTitle', 'Person Biography')}`
+            return `${t('person.pageTitle', 'Biography Wiki')}`
           }
           if (location.pathname.startsWith('/editor/')) {
             return `${baseName} - ${t('storyEditor.title', 'Story Editor')}`

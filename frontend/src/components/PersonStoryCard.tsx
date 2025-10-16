@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
 import { 
   User, 
-  MapPin, 
   Calendar, 
   Book, 
   Star, 
@@ -99,7 +98,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                               const params = new URLSearchParams()
                               if (person.personHash) params.set('hash', person.personHash)
                               if (person.versionIndex) params.set('vi', person.versionIndex.toString())
-                              navigate(`/actions?tab=endorse&${params.toString()}`)
+                              window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
                             }}
                             className="flex items-center gap-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
                             title={t('people.clickToEndorse', 'Click to endorse this version')}
@@ -231,7 +230,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                           const params = new URLSearchParams()
                           if (person.personHash) params.set('hash', person.personHash)
                           if (person.versionIndex) params.set('vi', person.versionIndex.toString())
-                          navigate(`/actions?tab=endorse&${params.toString()}`)
+                          window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
                         }}
                         className="flex items-center gap-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
                         title={t('people.clickToEndorse', 'Click to endorse this version')}
@@ -281,7 +280,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
 
           {(formatDate.death || person.deathPlace) && (
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <MapPin className="w-4 h-4 text-gray-500" />
+              <Calendar className="w-4 h-4 text-gray-500" />
               <span className="text-xs font-mono truncate">
                 {[formatDate.death, person.deathPlace].filter(Boolean).join(' · ')}
               </span>
