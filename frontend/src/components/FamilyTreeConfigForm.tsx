@@ -471,7 +471,10 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
                 />
               </button>
               <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                {deduplicateChildren ? 'Highest endorsed version only' : 'Show all versions'}
+                {deduplicateChildren 
+                  ? (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.enabled') : 'Highest endorsed version only')
+                  : (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.disabled') : 'Show all versions')
+                }
               </div>
             </div>
           </div>
