@@ -91,22 +91,14 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
         const id = (d as SimNode).id
         return id === selectedId ? '#fde68a' : (color((d as SimNode).depth.toString()) as string)
       })
-      .attr('stroke', (d: any) => {
-        const id = (d as SimNode).id
-        const nd = nodesData?.[id]
-        return isMinted(nd) ? '#059669' : (id === selectedId ? '#f59e0b' : '#6366f1')
-      })
-      .attr('stroke-width', (d: any) => {
-        const id = (d as SimNode).id
-        return isMinted(nodesData?.[id]) ? 2 : (id === selectedId ? 2 : 1)
-      }).attr('opacity', 0.95)
+      .attr('opacity', 0.95)
 
     const isDark = document.documentElement.classList.contains('dark')
     const strokeColor = isDark ? '#0f172a' : '#ffffff'
     node.append('circle')
-      .attr('r', 4)
-      .attr('cx', NODE_R - 6)
-      .attr('cy', -(NODE_R - 6))
+      .attr('r', 3)
+      .attr('cx', NODE_R - 5)
+      .attr('cy', -(NODE_R - 5))
       .attr('fill', (d: any) => {
         const id = (d as SimNode).id
         const nd = nodesData?.[id]
@@ -114,31 +106,9 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
         return getGenderColorHex(g)
       })
       .attr('stroke', strokeColor)
-      .attr('stroke-width', 1)
+      .attr('stroke-width', 0.5)
 
-    // Multi-version badge - only show in deduplicate mode when totalVersions > 1
-    node.each((d: any) => {
-      const sim = d as SimNode
-      const nd = nodesData?.[sim.id]
-      // Pass totalVersions only in deduplicate mode; badge logic handles display (show only if > 1)
-      const totalVersions = (deduplicateChildren && nd?.totalVersions && nd.totalVersions > 1) ? nd.totalVersions : undefined
-      if (totalVersions) {
-        const g = d3.select((node as any)._groups[0][data.nodes.indexOf(d)])
-        g.append('circle')
-          .attr('r', 6)
-          .attr('cx', -(NODE_R - 4))
-          .attr('cy', -(NODE_R - 4))
-          .attr('fill', '#8b5cf6')
-        g.append('text')
-          .attr('x', -(NODE_R - 4))
-          .attr('y', -(NODE_R - 7))
-          .attr('text-anchor', 'middle')
-          .attr('font-size', 8)
-          .attr('font-weight', 'bold')
-          .attr('fill', '#ffffff')
-          .text(totalVersions)
-      }
-    })
+
 
     node.append('title').text((d: any) => (d as SimNode).hash)
     const lbl = node.append('text').attr('class', 'font-mono').attr('fill', '#0f172a')
@@ -150,15 +120,79 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       const mintedFlag = isMinted(nd)
       const shortHashText = shortHash(sim.hash)
       const width = 60
-      gtxt.append('tspan').attr('x', 18).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(shortHashText)
-      gtxt.append('tspan').attr('x', 20 + width).attr('y', -3).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', mintedFlag ? '#059669' : '#6366f1').text(`v${sim.versionIndex}`)
+      gtxt.append('tspan').attr('x', 12).attr('y', -3).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#64748b').text(shortHashText)
+      gtxt.append('tspan').attr('x', 25 + width).attr('y', -3).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', mintedFlag ? '#059669' : '#64748b').text(
+        nd?.totalVersions && nd.totalVersions > 1 
+          ? `T${nd.totalVersions}:v${sim.versionIndex}` 
+          : `v${sim.versionIndex}`
+      )
       const nm = nd?.fullName
-      if (nm) gtxt.append('tspan').attr('x', 18).attr('y', 12).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#6366f1').text(nm)
+      if (nm) gtxt.append('tspan').attr('x', 12).attr('y', 12).attr('font-size', 11).attr('fill', mintedFlag ? '#047857' : '#64748b').text(nm)
     })
 
-    node.append('text').attr('class', 'endorse-count').attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', 10)
-      .attr('fill', '#ffffff')
-      .text((d: any) => { const ndLocal = nodesData?.[(d as SimNode).id]; const val = ndLocal?.endorsementCount; return val === undefined ? '' : String(val) })
+    // Endorsement count with star icon aligned with version text (right) and fullName bottom
+    node.each((d: any) => {
+      const sim = d as SimNode
+      const nd = nodesData?.[sim.id]
+      const endorsementCount = nd?.endorsementCount
+      const fullName = nd?.fullName
+      if (typeof endorsementCount === 'number' && fullName) {
+        const g = d3.select((node as any)._groups[0][data.nodes.indexOf(d)])
+        const mintedFlag = isMinted(nd)
+        
+        // Create star path (same as NodeCard)
+        function buildStarPath(cx: number, cy: number, spikes = 5, outerR = 4, innerR = 2): string {
+          const step = Math.PI / spikes
+          let rot = -Math.PI / 2
+          let path = ''
+          for (let i = 0; i < spikes * 2; i++) {
+            const r = (i % 2 === 0) ? outerR : innerR
+            const x = cx + Math.cos(rot) * r
+            const y = cy + Math.sin(rot) * r
+            path += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`)
+            rot += step
+          }
+          path += ' Z'
+          return path
+        }
+        
+        const txt = String(endorsementCount)
+        const badgeW = Math.max(20, 8 + txt.length * 5)
+        const width = 60
+        // Right-align with version text (T2:v1) and bottom-align with fullName (a1)
+        const x = 25 + width - badgeW  // Right-align with version text position
+        const y = 12 - 12 + 1  // fullName is at y=12, badge height is 12, so align bottom: y = 12 - 12 + 1 = 1
+        const cx = x + 6
+        const cy = y + 6
+        const starPath = buildStarPath(cx, cy)
+        
+        // Background badge
+        g.append('rect')
+          .attr('x', x)
+          .attr('y', y)
+          .attr('width', badgeW)
+          .attr('height', 12)
+          .attr('rx', 6)
+          .attr('ry', 6)
+          .attr('fill', mintedFlag ? '#d1fae5' : '#f1f5f9')
+          .attr('stroke', 'transparent')
+        
+        // Star icon
+        g.append('path')
+          .attr('d', starPath)
+          .attr('fill', mintedFlag ? '#059669' : '#64748b')
+        
+        // Count text
+        g.append('text')
+          .attr('x', x + 6 + 6)
+          .attr('y', y + 8)
+          .attr('text-anchor', 'start')
+          .attr('font-size', 8)
+          .attr('font-family', 'monospace')
+          .attr('fill', mintedFlag ? '#047857' : '#475569')
+          .text(txt)
+      }
+    })
 
     node.on('click', (_e: any, d: any) => { const sim = d as SimNode; openNode({ personHash: sim.hash, versionIndex: sim.versionIndex}) })
     node.on('dblclick', (_e: any, d: any) => { navigator.clipboard?.writeText((d as SimNode).hash).catch(() => {}) })

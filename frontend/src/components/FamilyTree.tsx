@@ -479,14 +479,25 @@ function flattenTree(root: GraphNode, expanded: Set<string>): FlatRow[] {
 }
 
 export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: number; rowHeight?: number }> = ({ root, height, rowHeight = LAYOUT.ROW_HEIGHT }) => {
-  const responsiveHeight = useFamilyTreeHeight()
-  const familyTreeHeight = height || responsiveHeight
+  const familyTreeHeight = useFamilyTreeHeight()
   const { nodesData } = useTreeData() as any
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([root.personHash + ':' + root.versionIndex]))
+  
   const rows = useMemo(() => flattenTree(root, expanded), [root, expanded])
+  
   const toggle = useCallback((node: GraphNode) => {
-    setExpanded(prev => { const k = node.personHash + ':' + node.versionIndex; const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n })
+    const key = node.personHash + ':' + node.versionIndex
+    setExpanded(prev => {
+      const n = new Set(prev)
+      if (n.has(key)) {
+        n.delete(key)
+      } else {
+        n.add(key)
+      }
+      return n
+    })
   }, [])
+  
   const getKey = (n: GraphNode) => n.personHash + ':' + n.versionIndex
   const { openNode, selected } = useNodeDetail()
   const selectedKey = selected ? `${selected.personHash}:${selected.versionIndex}` : null
@@ -519,7 +530,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
             </div>
           ) : (<div key={i} style={{ width:16 }} />))}
         </div>
-        <div style={{ paddingLeft: depth * 16 }} className="flex items-center gap-1 pl-1 pr-2 min-w-[140px] relative w-full" title={node.personHash}>
+        <div style={{ paddingLeft: depth * 16 }} className="flex items-center gap-1 pl-1 pr-2 min-w-[140px] relative" title={node.personHash}>
           <div className="flex items-center">
             {depth>0 && (
               <div className="relative" style={{ width:16, height: rowHeight }}>
@@ -530,9 +541,13 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
             )}
             <button onClick={(e)=>{ e.stopPropagation(); hasChildren && toggle(node) }} className={`mr-1 w-5 h-5 grid place-items-center rounded border text-[10px] ${hasChildren ? 'bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-slate-300' : 'border-transparent text-slate-400 dark:text-slate-500 cursor-default'}`}>{hasChildren ? (isOpen ? '−' : '+') : '·'}</button>
           </div>
-          <div className="flex items-center gap-2 flex-wrap w-full">
+          <div className="flex items-center gap-2 flex-wrap" style={{ minWidth: 'max-content' }}>
             <span className="text-slate-600 dark:text-slate-300">{shortHash(node.personHash)}</span>
-            <span className="text-sky-600 dark:text-sky-400">v{node.versionIndex}</span>
+            <span className="text-sky-600 dark:text-sky-400">
+              {nodesData?.[cacheKey]?.totalVersions && nodesData[cacheKey].totalVersions > 1 
+                ? `T${nodesData[cacheKey].totalVersions}:v${node.versionIndex}` 
+                : `v${node.versionIndex}`}
+            </span>
             {endorse !== undefined && (
               <span className="inline-flex items-center gap-1" title="Endorsements">
                 <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" className="flex-shrink-0">
@@ -556,8 +571,8 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
   }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
   return (
     <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm overflow-hidden" style={{ height: familyTreeHeight }}>
-      <div className="p-4 pt-16 h-full">
-        <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'100%'}>{Row}</VirtualList>
+      <div className="p-4 pt-16 h-full overflow-x-auto">
+        <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'auto'}>{Row}</VirtualList>
       </div>
     </div>
   )
