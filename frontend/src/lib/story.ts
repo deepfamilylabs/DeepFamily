@@ -18,8 +18,8 @@ export interface AddStoryChunkResult {
       tokenId: string
       chunkIndex: number
       contentLength: number
-      contentHash: string
-      expectedHash: string
+      chunkHash: string
+      editor: string
     } | null
   }
 }
@@ -36,8 +36,9 @@ export interface UpdateStoryChunkResult {
     StoryChunkUpdated: {
       tokenId: string
       chunkIndex: number
-      newContentHash: string
-      expectedHash: string
+      oldHash: string
+      newHash: string
+      editor: string
     } | null
   }
 }
@@ -47,12 +48,15 @@ export interface UpdateStoryChunkResult {
  */
 export interface SealStoryResult {
   totalChunks: number
+  fullStoryHash: string
   transactionHash: string
   blockNumber: number
   events: {
     StorySealed: {
       tokenId: string
       totalChunks: number
+      fullStoryHash: string
+      sealer: string
     } | null
   }
 }
@@ -110,8 +114,8 @@ export async function addStoryChunk(
               tokenId: parsedEvent.args.tokenId.toString(),
               chunkIndex: Number(parsedEvent.args.chunkIndex),
               contentLength: Number(parsedEvent.args.contentLength),
-              contentHash: parsedEvent.args.contentHash,
-              expectedHash: parsedEvent.args.expectedHash
+              chunkHash: parsedEvent.args.chunkHash,
+              editor: parsedEvent.args.editor
             }
             parsedChunkIndex = events.StoryChunkAdded.chunkIndex
             parsedContentLength = events.StoryChunkAdded.contentLength
@@ -127,10 +131,10 @@ export async function addStoryChunk(
     // Build new chunk data for immediate UI update
     const newChunk: StoryChunk = {
       chunkIndex: parsedChunkIndex,
-      chunkHash: events.StoryChunkAdded?.contentHash || ethers.keccak256(ethers.toUtf8Bytes(content)),
+      chunkHash: events.StoryChunkAdded?.chunkHash || ethers.keccak256(ethers.toUtf8Bytes(content)),
       content: content,
       timestamp: Math.floor(Date.now() / 1000), // Use current time as approximation
-      lastEditor: await signer.getAddress()
+      lastEditor: events.StoryChunkAdded?.editor || await signer.getAddress()
     }
 
     return {
@@ -198,8 +202,9 @@ export async function updateStoryChunk(
             events.StoryChunkUpdated = {
               tokenId: parsedEvent.args.tokenId.toString(),
               chunkIndex: Number(parsedEvent.args.chunkIndex),
-              newContentHash: parsedEvent.args.newContentHash,
-              expectedHash: parsedEvent.args.expectedHash
+              oldHash: parsedEvent.args.oldHash,
+              newHash: parsedEvent.args.newHash,
+              editor: parsedEvent.args.editor
             }
             parsedChunkIndex = events.StoryChunkUpdated.chunkIndex
             console.log('✅ StoryChunkUpdated event parsed:', events.StoryChunkUpdated)
@@ -214,10 +219,10 @@ export async function updateStoryChunk(
     // Build updated chunk data for immediate UI update
     const updatedChunk: StoryChunk = {
       chunkIndex: parsedChunkIndex,
-      chunkHash: events.StoryChunkUpdated?.newContentHash || ethers.keccak256(ethers.toUtf8Bytes(newContent)),
+      chunkHash: events.StoryChunkUpdated?.newHash || ethers.keccak256(ethers.toUtf8Bytes(newContent)),
       content: newContent,
       timestamp: Math.floor(Date.now() / 1000), // Use current time as approximation
-      lastEditor: await signer.getAddress()
+      lastEditor: events.StoryChunkUpdated?.editor || await signer.getAddress()
     }
 
     return {
@@ -265,6 +270,7 @@ export async function sealStory(
     }
 
     let parsedTotalChunks = 0
+    let parsedFullStoryHash = ethers.ZeroHash
 
     console.log(`🔍 Parsing ${receipt.logs.length} logs...`)
 
@@ -277,9 +283,12 @@ export async function sealStory(
           if (parsedEvent.name === 'StorySealed') {
             events.StorySealed = {
               tokenId: parsedEvent.args.tokenId.toString(),
-              totalChunks: Number(parsedEvent.args.totalChunks)
+              totalChunks: Number(parsedEvent.args.totalChunks),
+              fullStoryHash: parsedEvent.args.fullStoryHash,
+              sealer: parsedEvent.args.sealer
             }
             parsedTotalChunks = events.StorySealed.totalChunks
+            parsedFullStoryHash = events.StorySealed.fullStoryHash
             console.log('✅ StorySealed event parsed:', events.StorySealed)
           }
         }
@@ -291,6 +300,7 @@ export async function sealStory(
 
     return {
       totalChunks: parsedTotalChunks,
+      fullStoryHash: parsedFullStoryHash,
       transactionHash: tx.hash,
       blockNumber: receipt.blockNumber,
       events

@@ -654,7 +654,7 @@
     "verified": "Verified",
     "personHashLabel": "Person Hash",
     "versionLabel": "Version Index",
-    "viewFamilyTree": "FamilyTree View",
+    "viewFamilyTree": "View Family Tree",
     "invalidTokenId": "Invalid Token ID",
     "nonexistentToken": "Token does not exist",
     "fetchFailed": "Failed to load token",

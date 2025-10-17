@@ -131,7 +131,7 @@ export default function NodeDetailModal({
       blue: 'bg-blue-50/30 dark:bg-blue-900/5 border-blue-100/40 dark:border-blue-800/15 hover:border-blue-200/60 dark:hover:border-blue-700/25',
       amber: 'bg-amber-50/30 dark:bg-amber-900/5 border-amber-100/40 dark:border-amber-800/15 hover:border-amber-200/60 dark:hover:border-amber-700/25',
       pink: 'bg-pink-50/30 dark:bg-pink-900/5 border-pink-100/40 dark:border-pink-800/15 hover:border-pink-200/60 dark:hover:border-pink-700/25',
-      slate: 'bg-slate-50/30 dark:bg-slate-800/8 border-slate-100/40 dark:border-slate-700/15 hover:border-slate-200/60 dark:hover:border-slate-600/25'
+      slate: 'bg-indigo-50/30 dark:bg-indigo-900/5 border-indigo-100/40 dark:border-indigo-800/15 hover:border-indigo-200/60 dark:hover:border-indigo-700/25'
     }
     const labelColorClasses = {
       purple: 'text-gray-700 dark:text-gray-300',
