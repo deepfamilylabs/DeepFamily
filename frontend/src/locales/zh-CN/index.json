@@ -654,7 +654,7 @@
     "verified": "已校验",
     "personHashLabel": "人物哈希",
     "versionLabel": "版本序号",
-    "viewFamilyTree": "族谱视图",
+    "viewFamilyTree": "查看族谱",
     "invalidTokenId": "无效的 Token ID",
     "nonexistentToken": "该 Token 不存在",
     "fetchFailed": "加载 Token 失败",

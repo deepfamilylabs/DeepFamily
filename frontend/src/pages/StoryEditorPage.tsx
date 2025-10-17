@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ethers } from 'ethers'
 import StoryChunkEditor from '../components/StoryChunkEditor'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfig } from '../context/ConfigContext'
@@ -41,6 +42,17 @@ export default function StoryEditorPage() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState<boolean>(false)
 
   const validTokenId = useMemo(() => tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined, [tokenId])
+
+  // Helper function to compute fullStoryHash from chunks (matches contract's _updateFullStoryHash logic)
+  const computeFullStoryHash = useCallback((chunkList: StoryChunk[]): string => {
+    if (!chunkList || chunkList.length === 0) {
+      return ethers.ZeroHash
+    }
+    // Sort by chunkIndex and concatenate all chunkHash values
+    const sorted = [...chunkList].sort((a, b) => a.chunkIndex - b.chunkIndex)
+    const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
+    return ethers.keccak256(concatenated)
+  }, [])
 
 
   const loadIfNeeded = useCallback(async () => {
@@ -126,12 +138,14 @@ export default function StoryEditorPage() {
       const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk]
       setChunks(newChunks)
 
-      // Update total chunks count in metadata
+      // Update total chunks count and fullStoryHash in metadata
+      const newFullStoryHash = computeFullStoryHash(newChunks)
       const newMeta: StoryMetadata | undefined = meta ? {
         ...meta,
         totalChunks: (meta.totalChunks || 0) + 1,
         lastUpdateTime: result.newChunk.timestamp,
-        totalLength: (meta.totalLength || 0) + result.contentLength
+        totalLength: (meta.totalLength || 0) + result.contentLength,
+        fullStoryHash: newFullStoryHash
       } : undefined
       setMeta(newMeta)
 
@@ -175,7 +189,7 @@ export default function StoryEditorPage() {
       toast.error(message)
       throw err
     }
-  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
+  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData, computeFullStoryHash])
 
   const onUpdateChunk = useCallback(async (data: StoryChunkUpdateData) => {
     if (!contractAddress) throw new Error('Missing contract')
@@ -201,10 +215,12 @@ export default function StoryEditorPage() {
       }
       setChunks(newChunks)
 
-      // Update last update time in metadata
+      // Update last update time and fullStoryHash in metadata
+      const newFullStoryHash = computeFullStoryHash(newChunks)
       const newMeta: StoryMetadata | undefined = meta ? {
         ...meta,
-        lastUpdateTime: result.updatedChunk.timestamp
+        lastUpdateTime: result.updatedChunk.timestamp,
+        fullStoryHash: newFullStoryHash
       } : undefined
       setMeta(newMeta)
 
@@ -247,7 +263,7 @@ export default function StoryEditorPage() {
       toast.error(message)
       throw err
     }
-  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
+  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData, computeFullStoryHash])
 
   const onSealStory = useCallback(async (tid: string) => {
     if (!contractAddress) throw new Error('Missing contract')
@@ -258,11 +274,12 @@ export default function StoryEditorPage() {
       // Execute blockchain operation
       const result = await sealStory(signer, contractAddress, tid)
 
-      // After successful operation, immediately update sealed status in metadata
+      // After successful operation, immediately update sealed status and fullStoryHash in metadata
       const newMeta: StoryMetadata | undefined = meta ? {
         ...meta,
         isSealed: true,
-        totalChunks: result.totalChunks
+        totalChunks: result.totalChunks,
+        fullStoryHash: result.fullStoryHash
       } : undefined
       setMeta(newMeta)
 

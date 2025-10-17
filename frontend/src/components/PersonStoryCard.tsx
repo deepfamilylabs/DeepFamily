@@ -1,16 +1,15 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
 import { 
   User, 
   Calendar, 
-  Book, 
+  BookOpen, 
   Star, 
   Clock, 
   FileText, 
   Hash, 
-  Award,
   ChevronRight,
   Eye
 } from 'lucide-react'
@@ -29,6 +28,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
   const { preloadStoryData } = useTreeData()
 
   const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
+  const storyLabel = t('people.hasStory', 'Story')
 
   // Preload story data on hover
   const handleMouseEnter = useCallback(() => {
@@ -51,6 +51,67 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
     if (!person.story) return ''
     return person.story.length > 150 ? person.story.substring(0, 150) + '...' : person.story
   }, [person.story])
+
+  const handleStoryBadgeClick = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    if (!person.tokenId) return
+    preloadStoryData(person.tokenId)
+    if (!person.tokenId) return
+
+    const fullStory =
+      person.storyChunks && person.storyChunks.length > 0
+        ? person.storyChunks.map(chunk => chunk.content).join('')
+        : person.story
+
+    const hasCoreInfo =
+      person.gender !== undefined ||
+      person.birthYear !== undefined ||
+      person.birthPlace !== undefined ||
+      person.deathYear !== undefined ||
+      person.deathPlace !== undefined ||
+      (person.story && person.story.trim() !== '')
+
+    const prefetchedStory = {
+      tokenId: String(person.tokenId),
+      personHash: person.personHash,
+      versionIndex: person.versionIndex,
+      fullName: person.fullName,
+      owner: person.owner,
+      storyMetadata: person.storyMetadata,
+      storyChunks: person.storyChunks,
+      fullStory,
+      nftCoreInfo: hasCoreInfo
+        ? {
+            gender: person.gender,
+            birthYear: person.birthYear,
+            birthMonth: person.birthMonth,
+            birthDay: person.birthDay,
+            birthPlace: person.birthPlace,
+            isBirthBC: person.isBirthBC,
+            deathYear: person.deathYear,
+            deathMonth: person.deathMonth,
+            deathDay: person.deathDay,
+            deathPlace: person.deathPlace,
+            isDeathBC: person.isDeathBC,
+            story: person.story || ''
+          }
+        : undefined
+    }
+
+    navigate(`/person/${person.tokenId}`, { state: { prefetchedStory } })
+  }, [person, preloadStoryData, navigate])
+
+  const renderStoryBadge = () => (
+    <button
+      type="button"
+      onClick={handleStoryBadgeClick}
+      className="inline-flex items-center justify-center px-2 py-1 min-w-[2.5rem] rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400/70 dark:focus:ring-blue-500/60"
+      title={storyLabel}
+      aria-label={storyLabel}
+    >
+      <BookOpen className="w-3.5 h-3.5" strokeWidth={2.2} />
+    </button>
+  )
 
   if (viewMode === 'list') {
     return (
@@ -116,14 +177,10 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
               {/* Badges */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 {hasDetailedStory && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
-                    <Book className="w-3 h-3" />
-                    {t('people.hasStory', 'Story')}
-                  </span>
+                  renderStoryBadge()
                 )}
                 {isMinted(person) && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
-                    <Award className="w-3 h-3" />
                     {t('people.hasNFT', 'NFT')}
                   </span>
                 )}
@@ -248,13 +305,11 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
           {/* Status Badges */}
           <div className="flex flex-col gap-1">
             {hasDetailedStory && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-medium">
-                <Book className="w-3 h-3" />
-              </span>
+              renderStoryBadge()
             )}
             {isMinted(person) && (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs font-medium">
-                <Award className="w-3 h-3" />
+                {t('people.hasNFT', 'NFT')}
               </span>
             )}
           </div>

@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Edit2, Clock, User, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard } from 'lucide-react'
-import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
+import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, formatHashMiddle } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
@@ -67,7 +67,8 @@ export default function PersonPage() {
   const { t } = useTranslation()
   // Config used in child components (HashAndIndexLine) via useConfig
   const { getStoryData, getNodeByTokenId, getOwnerOf, nodesData } = useTreeData()
-  const { strictCacheOnly } = useConfig()
+  const config = useConfig()
+  const { strictCacheOnly } = config
   const toast = useToast()
   
   const [data, setData] = useState<StoryDetailData | null>(null)
@@ -76,11 +77,20 @@ export default function PersonPage() {
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<'paragraph' | 'raw'>('paragraph')
   const prefetched = (location.state as any)?.prefetchedStory as Partial<StoryDetailData> | undefined
+  const dataRef = useRef<StoryDetailData | null>(null)
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'instant' as any })
+    } catch {
+      window.scrollTo(0, 0)
+    }
+  }, [tokenId])
 
   // Dynamic title: person name + archive
   useEffect(()=>{
     if (data?.fullName) {
-      document.title = `DeepFamily - ${t('person.pageTitle', { name: data.fullName })}`
+      document.title = t('person.pageTitle', { name: data.fullName })
     }
   }, [data?.fullName, t])
 
@@ -164,17 +174,29 @@ export default function PersonPage() {
     if (!tokenId) return
     if (!prefetched) return
     if (prefetched.tokenId && String(prefetched.tokenId) !== String(tokenId)) return
-    // Only hydrate once if no existing data
+    const initialFullStory =
+      prefetched.fullStory ||
+      (prefetched.storyChunks && prefetched.storyChunks.length > 0
+        ? prefetched.storyChunks.map(c => c.content).join('')
+        : undefined)
     setData(prev => prev || ({
       tokenId,
+      personHash: prefetched.personHash,
+      versionIndex: prefetched.versionIndex,
       fullName: prefetched.fullName,
+      owner: prefetched.owner,
+      nftCoreInfo: prefetched.nftCoreInfo,
       storyMetadata: prefetched.storyMetadata,
       storyChunks: prefetched.storyChunks,
-      fullStory: prefetched.storyChunks ? prefetched.storyChunks.map(c => c.content).join('') : undefined,
+      fullStory: initialFullStory
     } as StoryDetailData))
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefetched?.tokenId])
+
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
 
   // Inline editor removed; navigation handles edit flow
 
@@ -191,7 +213,10 @@ export default function PersonPage() {
       return
     }
     try {
-      setLoading(true)
+      const hasExistingData = !!dataRef.current
+      if (!hasExistingData) {
+        setLoading(true)
+      }
       setError(null)
       // 1) First try to hit in memory nodesData (no network required)
       let node: any | null = null
@@ -272,10 +297,8 @@ export default function PersonPage() {
   }, [tokenId, t, nodesData, strictCacheOnly])
 
   useEffect(() => {
-    // Skip initial fetch if we already hydrated from prefetched state
-    if (prefetched && prefetched.tokenId && String(prefetched.tokenId) === String(tokenId)) return
     fetchStoryData()
-  }, [fetchStoryData, prefetched, tokenId])
+  }, [fetchStoryData])
 
   const copyText = useCallback(async (text: string) => {
     try {
@@ -367,52 +390,32 @@ export default function PersonPage() {
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
                   {data && (data.fullName || data.nftCoreInfo) && (
                     <div className="p-5 border-b border-gray-200 dark:border-gray-800">
-                      {/* Title row with edit button */}
+                      {/* Title row */}
                       <div className="flex items-start justify-between gap-4 mb-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100" title={data.fullName || `Token #${data.tokenId}`}>
+                          <div className="flex flex-col sm:flex-row sm:items-baseline gap-x-2">
+                            <h1 className="text-2xl sm:text-3xl font-normal text-gray-900 dark:text-gray-100" title={data.fullName || `Token #${data.tokenId}`}>
                               {data.fullName || `Token #${data.tokenId}`}
                             </h1>
-                            <span className="text-lg text-blue-600 dark:text-blue-400">
+                            <span className="text-sm sm:text-3xl text-gray-500 dark:text-gray-400 font-normal">
                               {t('person.encyclopedia', 'Encyclopedia')}
                             </span>
-                            {/* Integrity badge after title */}
-                            {data.storyMetadata && data.storyMetadata.totalChunks > 0 && data.integrity && (() => {
-                              const integ = data.integrity
-                              const localOk = integ.missing.length === 0 && integ.lengthMatch && (integ.hashMatch === true)
-                              return (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${localOk ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-                                  {localOk ? '✓ ' + t('person.integrityFrontendOk','Integrity Verified') : '⚠ ' + t('person.integrityWarn','Integrity Warning')}
-                                </span>
-                              )
-                            })()}
                           </div>
                         </div>
-                        <div className="flex-shrink-0">
-                          {data?.storyMetadata?.isSealed ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
-                              {t('person.sealed', 'Sealed')}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                if (!tokenId) return
-                                window.open(`/editor/${tokenId}`, '_blank', 'noopener,noreferrer')
-                              }}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onTouchStart={(e) => e.stopPropagation()}
-                              className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60 border border-green-200/60 dark:border-green-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
-                              aria-label={t('familyTree.nodeDetail.editStory', 'Edit Story') as string}
-                              title={t('familyTree.nodeDetail.editStory', 'Edit Story') as string}
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                              <span className="hidden sm:inline text-[13px] font-semibold text-green-700 dark:text-green-400">
-                                {t('familyTree.nodeDetail.edit', 'Edit')}
-                              </span>
-                            </button>
-                          )}
-                        </div>
+                        {/* Family Tree View Button */}
+                        {data.personHash && data.versionIndex !== undefined && (
+                          <button
+                            onClick={() => {
+                              config.update({ rootHash: data.personHash, rootVersionIndex: data.versionIndex })
+                              navigate(`/familyTree?root=${data.personHash}&v=${data.versionIndex}`)
+                            }}
+                            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors"
+                            title={t('person.viewFamilyTree', 'View Family Tree') as string}
+                          >
+                            <GitBranch size={16} />
+                            <span className="hidden sm:inline">{t('person.viewFamilyTree', 'View Family Tree')}</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Integrity warnings - only if has issues */}
@@ -429,10 +432,10 @@ export default function PersonPage() {
                       <div className="-mx-5 border-t border-gray-200 dark:border-gray-800 mb-4"></div>
 
                       {/* Basic Info section */}
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                         {t('person.basicInfo','Basic Info')}
                       </h3>
-                      <div className="space-y-3 text-sm">
+                      <div className="space-y-3 text-sm sm:text-base">
                         {data.fullName && (
                           <div className="flex items-center gap-3">
                             <span className="text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{t('familyTree.nodeDetail.fullName', 'Full Name')}</span>
@@ -487,9 +490,33 @@ export default function PersonPage() {
 
                   <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {t('person.fullStory', 'Biography')}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                          {t('person.fullStory', 'Biography')}
+                        </h3>
+                        {data?.storyMetadata?.isSealed ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                            {t('person.sealed', 'Sealed')}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (!tokenId) return
+                              window.open(`/editor/${tokenId}`, '_blank', 'noopener,noreferrer')
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60 border border-green-200/60 dark:border-green-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                            aria-label={t('familyTree.nodeDetail.editStory', 'Edit Story') as string}
+                            title={t('familyTree.nodeDetail.editStory', 'Edit Story') as string}
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                            <span className="hidden sm:inline text-[13px] font-semibold text-green-700 dark:text-green-400">
+                              {t('familyTree.nodeDetail.edit', 'Edit')}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                       {data && data.fullStory && data.fullStory.length > 0 && (
                         <div className="inline-flex items-center rounded border border-gray-300 dark:border-gray-600">
                           <button
@@ -500,7 +527,7 @@ export default function PersonPage() {
                             <List size={14} />
                             <span className="hidden sm:inline">{t('person.paragraph', 'Paragraph')}</span>
                           </button>
-                          <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                          <div className="w-px h-4 bg-gray-300 dark:border-gray-600"></div>
                           <button
                             onClick={() => setViewMode('raw')}
                             className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${viewMode === 'raw' ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
@@ -512,8 +539,23 @@ export default function PersonPage() {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Integrity warning - only show if there are issues */}
+                    {data && data.storyMetadata && data.storyMetadata.totalChunks > 0 && data.integrity && (() => {
+                      const integ = data.integrity
+                      const hasIssues = integ.missing.length > 0 || !integ.lengthMatch || integ.hashMatch === false
+                      if (!hasIssues) return null
+                      return (
+                        <div className="mb-4">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            ⚠ {t('person.integrityWarn','Integrity Warning')}
+                          </span>
+                        </div>
+                      )
+                    })()}
+                    
                     {viewMode === 'paragraph' && fullStoryParagraphs.length > 0 ? (
-                      <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                      <div className="space-y-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
                         {chunkParagraphs.length > 0 ? (
                           chunkParagraphs.map((content, i) => (
                             <p key={i} className="whitespace-pre-wrap">{content}</p>
@@ -525,12 +567,12 @@ export default function PersonPage() {
                         )}
                       </div>
                     ) : viewMode === 'paragraph' && fullStoryParagraphs.length === 0 && data && data.fullStory ? (
-                      <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                      <div className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
                         <p className="whitespace-pre-wrap">{data.fullStory}</p>
                       </div>
                     ) : viewMode === 'raw' && data && data.fullStory ? (
                       <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700">
-                        <pre className="font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-x-auto">{data.fullStory}</pre>
+                        <pre className="font-mono text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-x-auto">{data.fullStory}</pre>
                       </div>
                     ) : (
                       <div className="text-center py-8">
@@ -543,105 +585,105 @@ export default function PersonPage() {
                 </div>
                 {data && data.storyMetadata && (
                   <div className="xl:hidden bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
                       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                         {t('person.metadata', 'Metadata')}
                       </h3>
                     </div>
                     <div className="p-4">
-                      <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 mb-1">{t('person.tokenId', 'Token ID')}</div>
+                          <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.tokenId', 'Token ID')}</div>
                           <div className="font-mono font-medium text-gray-900 dark:text-gray-100">#{data.tokenId}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 mb-1">{t('person.totalChunks', 'Total Chunks')}</div>
+                          <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.totalChunks', 'Total Chunks')}</div>
                           <div className="font-mono font-medium text-gray-900 dark:text-gray-100">{data.storyMetadata.totalChunks}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 mb-1">{t('person.totalLength', 'Total Length')}</div>
+                          <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.totalLength', 'Total Length')}</div>
                           <div className="font-mono font-medium text-gray-900 dark:text-gray-100">{data.storyMetadata.totalLength}</div>
                         </div>
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 mb-1">{t('person.status', 'Status')}</div>
+                          <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.status', 'Status')}</div>
                           <div>
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-medium inline-block ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium inline-block ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>
                               {data.storyMetadata.isSealed ? t('person.sealed', 'Sealed') : t('person.editable', 'Editable')}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="text-xs mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
-                        <div className="text-gray-500 dark:text-gray-400 mb-1">{t('person.lastUpdate', 'Last Update')}</div>
-                        <div className="font-mono text-[10px] text-gray-700 dark:text-gray-300">{formatDate(data.storyMetadata.lastUpdateTime)}</div>
+                      <div className="text-sm mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
+                        <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.lastUpdate', 'Last Update')}</div>
+                        <div className="font-mono text-xs text-gray-700 dark:text-gray-300">{formatDate(data.storyMetadata.lastUpdateTime)}</div>
                       </div>
                       <div className="space-y-3">
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.storyHash', 'Story Hash')}</div>
-                          <div className="flex items-center gap-1">
-                            <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800 p-2 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
+                          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.storyHash', 'Story Hash')}</div>
+                          <div className="flex items-center">
+                            <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-md select-all text-gray-600 dark:text-gray-400 flex-1 min-w-0 border border-gray-200 dark:border-gray-700">
                               {data.storyMetadata.fullStoryHash}
                             </div>
                             <button
                               onClick={() => copyText(data.storyMetadata!.fullStoryHash)}
                               aria-label={t('search.copy')}
-                              className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              className="shrink-0 ml-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                               title={t('search.copy')}
                             >
-                              <Clipboard size={12} />
+                              <Clipboard size={14} />
                             </button>
                           </div>
                         </div>
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.owner', 'Owner Address')}</div>
-                          <div className="flex items-center gap-1">
-                            <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800 p-2 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700" title={data.owner}>
-                              {shortAddress(data.owner) || '-'}
+                          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.owner', 'Owner Address')}</div>
+                          <div className="flex items-center">
+                            <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-md select-all text-gray-600 dark:text-gray-400 flex-1 min-w-0 border border-gray-200 dark:border-gray-700" title={data.owner}>
+                              {data.owner || '-'}
                             </div>
                             {data.owner && (
                               <button
                                 onClick={() => copyText(data.owner!)}
                                 aria-label={t('search.copy')}
-                                className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                className="shrink-0 ml-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                 title={t('search.copy')}
                               >
-                                <Clipboard size={12} />
+                                <Clipboard size={14} />
                               </button>
                             )}
                           </div>
                         </div>
                         {data.personHash && (
                           <div>
-                            <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.personHashLabel', 'Person Hash')}</div>
-                            <div className="flex items-center gap-1">
-                              <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800 p-2 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
-                                {formatHashMiddle(data.personHash)}
+                            <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.personHashLabel', 'Person Hash')}</div>
+                            <div className="flex items-center">
+                              <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-md select-all text-gray-600 dark:text-gray-400 flex-1 min-w-0 border border-gray-200 dark:border-gray-700">
+                                {data.personHash}
                               </div>
                               <button
                                 onClick={() => copyText(data.personHash!)}
                                 aria-label={t('search.copy')}
-                                className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                className="shrink-0 ml-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                 title={t('search.copy')}
                               >
-                                <Clipboard size={12} />
+                                <Clipboard size={14} />
                               </button>
                             </div>
                           </div>
                         )}
                         {data.versionIndex !== undefined && data.versionIndex > 0 && (
                           <div>
-                            <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.versionLabel', 'Version:')}</div>
-                            <div className="flex items-center gap-1">
-                              <div className="font-mono text-[9px] bg-gray-50 dark:bg-gray-800 p-2 rounded text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
+                            <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.versionLabel', 'Version:')}</div>
+                            <div className="flex items-center">
+                              <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-md select-all text-gray-600 dark:text-gray-400 flex-1 min-w-0 border border-gray-200 dark:border-gray-700">
                                 {data.versionIndex}
                               </div>
                               <button
                                 onClick={() => copyText(`${data.versionIndex}`)}
                                 aria-label={t('search.copy')}
-                                className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                className="shrink-0 ml-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                 title={t('search.copy')}
                               >
-                                <Clipboard size={12} />
+                                <Clipboard size={14} />
                               </button>
                             </div>
                           </div>
@@ -654,7 +696,7 @@ export default function PersonPage() {
 
               <div className="space-y-4 xl:sticky xl:top-20 xl:self-start">
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                  <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
                       <span>{t('person.chunkList', 'Chunk List')}</span>
                       {data && data.storyChunks && data.storyChunks.length > 0 && (
@@ -693,13 +735,13 @@ export default function PersonPage() {
                                     {open ? chunk.content : preview}
                                   </div>
                                   {open && (
-                                    <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-gray-500 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                       <span className="flex items-center gap-1">
-                                        <Clock size={10} />
+                                        <Clock size={12} />
                                         {formatUnixSeconds(chunk.timestamp)}
                                       </span>
                                       <span className="flex items-center gap-1">
-                                        <User size={10} />
+                                        <User size={12} />
                                         {chunk.lastEditor.slice(0, 6)}...
                                       </span>
                                     </div>
@@ -721,46 +763,46 @@ export default function PersonPage() {
 
                 {data && data.storyMetadata && (
                   <div className="hidden xl:block bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
                       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                         {t('person.metadata', 'Metadata')}
                       </h3>
                     </div>
-                    <div className="p-4 space-y-2.5 text-xs">
+                    <div className="p-4 space-y-2.5 text-sm">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500 dark:text-gray-400">{t('person.tokenId', 'Token ID')}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.tokenId', 'Token ID')}</span>
                         <span className="font-mono font-medium text-gray-900 dark:text-gray-100">#{data.tokenId}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500 dark:text-gray-400">{t('person.totalChunks', 'Total Chunks')}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.totalChunks', 'Total Chunks')}</span>
                         <span className="font-mono font-medium text-gray-900 dark:text-gray-100">{data.storyMetadata.totalChunks}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500 dark:text-gray-400">{t('person.totalLength', 'Total Length')}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.totalLength', 'Total Length')}</span>
                         <span className="font-mono font-medium text-gray-900 dark:text-gray-100">{data.storyMetadata.totalLength}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500 dark:text-gray-400">{t('person.lastUpdate', 'Last Update')}</span>
-                        <span className="font-mono text-[10px] text-gray-700 dark:text-gray-300">{formatDate(data.storyMetadata.lastUpdateTime)}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.lastUpdate', 'Last Update')}</span>
+                        <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{formatDate(data.storyMetadata.lastUpdateTime)}</span>
                       </div>
                       <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-800">
-                        <span className="text-gray-500 dark:text-gray-400">{t('person.status', 'Status')}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.status', 'Status')}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>
                           {data.storyMetadata.isSealed ? t('person.sealed', 'Sealed') : t('person.editable', 'Editable')}
                         </span>
                       </div>
                     </div>
                     <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                       <div>
-                        <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.storyHash', 'Story Hash')}</div>
-                        <div className="flex items-center gap-1">
-                          <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800 p-2 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
+                        <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.storyHash', 'Story Hash')}</div>
+                        <div className="flex items-center">
+                          <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-md select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
                             {data.storyMetadata.fullStoryHash}
                           </div>
                           <button
                             onClick={() => copyText(data.storyMetadata!.fullStoryHash)}
                             aria-label={t('search.copy')}
-                            className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                             title={t('search.copy')}
                           >
                             <Clipboard size={12} />
@@ -768,16 +810,16 @@ export default function PersonPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.owner', 'Owner Address')}</div>
-                        <div className="flex items-center gap-1">
-                          <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800 p-2 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700" title={data.owner}>
-                            {shortAddress(data.owner) || '-'}
+                        <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.owner', 'Owner Address')}</div>
+                        <div className="flex items-center">
+                          <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700" title={data.owner}>
+                            {data.owner || '-'}
                           </div>
                           {data.owner && (
                             <button
                               onClick={() => copyText(data.owner!)}
                               aria-label={t('search.copy')}
-                              className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                               title={t('search.copy')}
                             >
                               <Clipboard size={12} />
@@ -787,15 +829,15 @@ export default function PersonPage() {
                       </div>
                       {data.personHash && (
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.personHashLabel', 'Person Hash')}</div>
-                          <div className="flex items-center gap-1">
-                            <div className="font-mono text-[9px] break-all bg-gray-50 dark:bg-gray-800 p-2 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
-                              {formatHashMiddle(data.personHash)}
+                          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.personHashLabel', 'Person Hash')}</div>
+                          <div className="flex items-center">
+                            <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
+                              {data.personHash}
                             </div>
                             <button
                               onClick={() => copyText(data.personHash!)}
                               aria-label={t('search.copy')}
-                              className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                               title={t('search.copy')}
                             >
                               <Clipboard size={12} />
@@ -805,15 +847,15 @@ export default function PersonPage() {
                       )}
                       {data.versionIndex !== undefined && data.versionIndex > 0 && (
                         <div>
-                          <div className="text-gray-500 dark:text-gray-400 text-[10px] mb-1.5">{t('person.versionLabel', 'Version:')}</div>
-                          <div className="flex items-center gap-1">
-                            <div className="font-mono text-[9px] bg-gray-50 dark:bg-gray-800 p-2 rounded text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
+                          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{t('person.versionLabel', 'Version:')}</div>
+                          <div className="flex items-center">
+                            <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
                               {data.versionIndex}
                             </div>
                             <button
                               onClick={() => copyText(`${data.versionIndex}`)}
                               aria-label={t('search.copy')}
-                              className="shrink-0 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                               title={t('search.copy')}
                             >
                               <Clipboard size={12} />
