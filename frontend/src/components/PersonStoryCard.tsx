@@ -28,7 +28,7 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
   const { preloadStoryData } = useTreeData()
 
   const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
-  const storyLabel = t('people.hasStory', 'Story')
+  const storyLabel = t('people.viewEncyclopedia', 'View Encyclopedia')
 
   // Preload story data on hover
   const handleMouseEnter = useCallback(() => {
@@ -179,11 +179,6 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                 {hasDetailedStory && (
                   renderStoryBadge()
                 )}
-                {isMinted(person) && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-[10px] sm:text-xs font-medium whitespace-nowrap">
-                    {t('people.hasNFT', 'NFT')}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -306,11 +301,6 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
           <div className="flex flex-col gap-1">
             {hasDetailedStory && (
               renderStoryBadge()
-            )}
-            {isMinted(person) && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs font-medium">
-                {t('people.hasNFT', 'NFT')}
-              </span>
             )}
           </div>
         </div>

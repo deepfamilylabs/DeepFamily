@@ -98,9 +98,10 @@ export function nodeLabel(node: Pick<GraphNode, 'personHash' | 'versionIndex' | 
 }
 
 // Derived helpers
+// Check if person has detailed story chunks (not just basic story field)
 export function hasDetailedStory(nd: Partial<NodeData> | undefined | null): boolean {
   if (!nd) return false
-  if (nd.story && nd.story.trim() !== '') return true
+  // Only return true if there are actual story chunks, not just basic story field
   if (Array.isArray(nd.storyChunks) && nd.storyChunks.length > 0) return true
   if (nd.storyMetadata && typeof nd.storyMetadata.totalChunks === 'number' && nd.storyMetadata.totalChunks > 0) return true
   return false
