@@ -272,7 +272,6 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 ```solidity
 uint256 public constant MAX_SUPPLY = 100_000_000_000e18;  // 100 billion cap
 uint256 public constant INITIAL_REWARD = 113_777e18;      // Initial reward
-uint256 public constant MIN_REWARD = 1e15;               // Minimum reward (0.001 tokens)
 uint256 public constant FIXED_LENGTH = 100_000_000;      // Fixed cycle length after 9th cycle
 
 uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000];
@@ -283,8 +282,8 @@ uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 
 **Cycle Progression**:
 - Cycles: 1 → 10 → 100 → 1K → 10K → 100K → 1M → 10M → 100M → Fixed 100M
 - Each cycle completion halves reward via bit shifting: `INITIAL_REWARD >> cycleIndex`
-- Mining stops when halved reward < `MIN_REWARD` (0.001 DEEP)
-- Final supply: ~100 billion DEEP (slightly less due to MIN_REWARD cutoff)
+- Mining continues indefinitely with progressively smaller rewards until MAX_SUPPLY is reached
+- Final supply: approaches 100 billion DEEP (rewards continue halving asymptotically)
 
 **Reward Calculation**:
 ```solidity
@@ -309,8 +308,7 @@ function getReward(uint256 recordCount) public view returns (uint256) {
         }
     }
 
-    uint256 reward = INITIAL_REWARD >> cycleIndex;
-    return reward < MIN_REWARD ? 0 : reward;
+    return INITIAL_REWARD >> cycleIndex;
 }
 ```
 
@@ -332,7 +330,7 @@ function mint(address miner) external onlyDeepFamilyContract returns (uint256 re
 - Checks reward calculation for next addition index
 - Enforces MAX_SUPPLY cap with partial reward if needed
 - Updates `totalAdditions` counter and `recentReward` for endorsement pricing
-- Returns 0 if reward would be below MIN_REWARD threshold
+- Returns 0 only when MAX_SUPPLY is reached
 
 #### View Functions
 ```solidity
@@ -363,7 +361,7 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 
 **Security Features**:
 - Supply cap enforcement (halts at 100B tokens)
-- Minimum reward threshold prevents dust issuance
+- Progressive halving ensures controlled supply distribution
 - Custom error types for precise debugging
 - OpenZeppelin's secure ERC20 base implementation
 

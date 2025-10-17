@@ -96,7 +96,7 @@
         "title": "워크플로우",
         "subtitle": "5단계 가치 발견 및 합의 형성 메커니즘",
         "step1": "인물 버전 추가",
-        "step1Desc": "부모가 모두 존재하면 → 채굴 보상 획득",
+        "step1Desc": "부모 정보 제공 → 채굴 보상 획득",
         "step2": "사용자 승인",
         "step2Desc": "DEEP를 지불하여 특정 버전 승인",
         "step3": "버전 NFT 주조",
@@ -164,7 +164,7 @@
       },
       "mining": {
         "title": "채굴 트리거",
-        "description": "부모 버전을 모두 참조하는 신규 인물 버전을 추가할 때만 보상이 발생해 구조화된 보완이 유일한 채굴 조건이 됩니다."
+        "description": "부모 정보를 제공하면 보상이 발생하여 완전한 가족 관계 데이터를 장려합니다."
       },
       "endorsement": {
         "title": "승인 수수료",
@@ -465,7 +465,7 @@
       "gender": "성별",
       "birth": "출생",
       "death": "사망",
-      "story": "사적",
+      "story": "약력",
       "profile": "프로필",
       "storyChunks": "샤드 수",
       "storyLength": "총 길이",
@@ -717,7 +717,7 @@
     "chunkTitle": "샤드 #{{index}}",
     "characters": "글자",
     "noStoryData": "전기 데이터 없음",
-    "basicStory": "사적",
+    "basicStory": "약력",
     "noStory": "전기 내용 없음",
     "peopleEncyclopedia": "인물 백과사전"
   },
@@ -782,14 +782,14 @@
     "motherHash": "어머니 해시",
     "motherVersionIndex": "어머니 버전 번호",
     "tokenReward": "토큰 보상 분배됨",
-    "familyComplete": "완전한 가족 데이터 보상 - 부모 모두 존재",
+    "familyComplete": "부모 정보 제공 - 토큰 보상 획득",
     "miner": "마이너",
     "hashPrefix": "해시",
     "prover": "증명자",
     "rewardAmount": "보상 금액",
     "noTokenReward": "토큰 보상 없음",
-    "tokenRewardCondition": "부모가 모두 존재할 때만 토큰 보상 분배",
-    "tokenRewardTip": "먼저 부모를 추가하고 가족 데이터를 완성하면 DEEP 토큰 보상을 받을 수 있습니다",
+    "tokenRewardCondition": "부모 정보를 제공하면 토큰 보상 분배",
+    "tokenRewardTip": "부모 정보를 추가하면 DEEP 토큰 보상을 받을 수 있습니다",
     "failed": "트랜잭션 실패",
     "errorType": "오류 유형",
     "errorMessage": "오류 메시지",

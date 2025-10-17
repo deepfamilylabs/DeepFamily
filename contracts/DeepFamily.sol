@@ -586,15 +586,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
-   * @dev Check if person hash exists in the system (non-zero and has version records)
-   * @param personHash Person hash to check
-   * @return Whether it exists
-   */
-  function _personExists(bytes32 personHash) internal view returns (bool) {
-    return personHash != bytes32(0) && personVersions[personHash].length > 0;
-  }
-
-  /**
    * @notice Calculate unique person hash value
    * @dev Matches circuit Poseidon output and applies keccak256 for final domain-separated hash
    */
@@ -712,8 +703,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       motherVersionIndex,
       tag
     );
-    // Name indexing removed
-    if (_personExists(fatherHash) && _personExists(motherHash)) {
+    if (fatherHash != bytes32(0) || motherHash != bytes32(0)) {
       uint256 reward = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).mint(msg.sender);
       if (reward > 0) {
         emit TokenRewardDistributed(msg.sender, personHash, versionIndex, reward);

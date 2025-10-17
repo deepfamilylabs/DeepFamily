@@ -16,14 +16,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  *
  * Halving cycles: 1 → 10 → 100 → 1k → 10k → 100k → 1M → 10M → 100M → Fixed 100M
  * Initial reward: 113,777 DEEP
- * Final supply: ~100 billion DEEP (slightly less than theoretical convergence due to MIN_REWARD early termination)
+ * Final supply: ~100 billion DEEP
  */
 contract DeepFamilyToken is ERC20Burnable, Ownable {
   // ========== Mining Parameter Constants ==========
 
   uint256 public constant MAX_SUPPLY = 100_000_000_000e18; // 100 billion cap
   uint256 public constant INITIAL_REWARD = 113_777e18; // Initial reward (integer, no over-issuance)
-  uint256 public constant MIN_REWARD = 1e15; // Minimum reward (0.001 tokens)
 
   // Preset halving cycle lengths (fixed at 100_000_000 after 9th cycle)
   uint256[] public cycleLengths = [
@@ -99,7 +98,7 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
     if (miner == address(0)) revert ZeroAddress();
 
     uint256 nextIndex = totalAdditions + 1;
-    reward = getReward(nextIndex); // Returns 0 if < MIN_REWARD
+    reward = getReward(nextIndex);
 
     if (reward == 0) {
       recentReward = 0;
@@ -150,11 +149,7 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
       }
     }
 
-    uint256 reward = INITIAL_REWARD >> cycleIndex;
-    if (reward < MIN_REWARD) {
-      return 0;
-    }
-    return reward;
+    return INITIAL_REWARD >> cycleIndex;
   }
 
   // ========== ERC20 Allowance Extension Functions ==========
