@@ -521,7 +521,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
       }
     }
     return (
-      <div style={{ ...style }} className={`group font-mono text-[12px] flex items-stretch relative ${isSel ? 'bg-amber-100 dark:bg-amber-900/40' : (index % 2 ? 'bg-white dark:bg-gray-800' : 'bg-slate-50 dark:bg-gray-800/60')} hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors`}
+      <div style={{ ...style }} className={`group font-mono text-[12px] flex items-stretch relative ${isSel ? 'bg-amber-100 dark:bg-amber-900/40' : ''} hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer`}
            onClick={() => openNode({ personHash: node.personHash, versionIndex: node.versionIndex})}>
         <div className="absolute inset-y-0 left-0 flex pointer-events-none">
           {ancestorGuides.map((show, i) => show ? (
@@ -539,7 +539,12 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
                 <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 h-px w-1/2 bg-slate-300 dark:bg-slate-600" />
               </div>
             )}
-            <button onClick={(e)=>{ e.stopPropagation(); hasChildren && toggle(node) }} className={`mr-1 w-5 h-5 grid place-items-center rounded border text-[10px] ${hasChildren ? 'bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-slate-300' : 'border-transparent text-slate-400 dark:text-slate-500 cursor-default'}`}>{hasChildren ? (isOpen ? '−' : '+') : '·'}</button>
+            <button
+              onClick={(e)=>{ e.stopPropagation(); hasChildren && toggle(node) }}
+              className={`mr-1 ${hasChildren ? 'w-5 h-5 text-[10px]' : 'w-5 h-5 text-lg leading-none'} grid place-items-center rounded border ${hasChildren ? 'bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-slate-300' : 'border-transparent text-slate-400 dark:text-slate-500 cursor-default'}`}
+            >
+              {hasChildren ? (isOpen ? '−' : '+') : '•'}
+            </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap" style={{ minWidth: 'max-content' }}>
             <span className="text-slate-600 dark:text-slate-300">{shortHash(node.personHash)}</span>
@@ -570,7 +575,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
     )
   }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
   return (
-    <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm overflow-hidden" style={{ height: familyTreeHeight }}>
+    <div className="w-full rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl overflow-hidden" style={{ height: familyTreeHeight }}>
       <div className="p-4 pt-16 h-full overflow-x-auto">
         <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'auto'}>{Row}</VirtualList>
       </div>

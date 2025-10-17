@@ -363,7 +363,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
           {/* Center Hint */}
           {centerHint && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
-              <div className="rounded-lg bg-black/80 dark:bg-black/70 text-white px-4 py-2 text-xs font-medium animate-fade-in shadow-lg">
+              <div className="rounded-lg bg-black/80 dark:bg-black/70 text-white px-4 py-2 text-sm font-medium animate-fade-in shadow-lg">
                 {centerHint}
               </div>
             </div>
@@ -401,49 +401,45 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                       <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white dark:from-gray-900 to-transparent" />
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                     {genderText && <span className="whitespace-nowrap font-medium">{genderText}</span>}
+                    {isMinted(person) && <span className="font-mono whitespace-nowrap font-semibold">#{person.tokenId}</span>}
+                    {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const params = new URLSearchParams()
+                          if (person.personHash) params.set('hash', person.personHash)
+                          if (person.versionIndex) params.set('vi', person.versionIndex.toString())
+                          window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 py-1 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                        title={t('people.clickToEndorse', 'Click to endorse this version')}
+                      >
+                        <Star className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500 dark:text-emerald-400 dark:fill-emerald-400" strokeWidth={0} />
+                        <span className="text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          {person.endorsementCount}
+                        </span>
+                      </button>
+                    )}
                     {isMinted(person) && (
-                      <>
-                        <span className="font-mono whitespace-nowrap font-semibold">#{person.tokenId}</span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const params = new URLSearchParams()
-                                if (person.personHash) params.set('hash', person.personHash)
-                                if (person.versionIndex) params.set('vi', person.versionIndex.toString())
-                                window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
-                              }}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onTouchStart={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50 rounded-full transition-all duration-200 cursor-pointer"
-                              title={t('people.clickToEndorse', 'Click to endorse this version')}
-                            >
-                              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" strokeWidth={0} />
-                              <span className="text-[13px] font-semibold text-amber-700 dark:text-amber-400">
-                                {person.endorsementCount}
-                              </span>
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              window.open(`/person/${person.tokenId || person.id}`, '_blank', 'noopener,noreferrer')
-                            }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer"
-                            title={t('storyChunksModal.peopleEncyclopedia', 'People Encyclopedia')}
-                          >
-                            <Book className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                            <span className="hidden sm:inline text-[13px] font-semibold text-blue-700 dark:text-blue-400">
-                              {t('familyTree.nodeDetail.encyclopedia', 'Encyclopedia')}
-                            </span>
-                          </button>
-                        </div>
-                      </>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(`/person/${person.tokenId || person.id}`, '_blank', 'noopener,noreferrer')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                        title={t('storyChunksModal.peopleEncyclopedia', 'People Encyclopedia')}
+                      >
+                        <Book className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span className="hidden sm:inline text-[13px] font-semibold text-blue-700 dark:text-blue-400">
+                          {t('familyTree.nodeDetail.encyclopedia', 'Encyclopedia')}
+                        </span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -465,8 +461,8 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
               {/* Life Events Section */}
               {((formatDate.birth || person.birthPlace) || (formatDate.death || person.deathPlace)) && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
-                    <Calendar className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
+                    <Calendar className="w-4.5 h-4.5 text-blue-600" />
                     {t('storyChunksModal.lifeEvents', 'Life Events')}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -476,10 +472,10 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                           <Calendar className="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-green-900 dark:text-green-100 mb-1.5">
+                          <div className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1.5">
                             {t('storyChunksModal.born', 'Born')}
                           </div>
-                          <div className="text-xs text-green-700 dark:text-green-300 font-medium leading-relaxed">
+                          <div className="text-[15px] text-green-700 dark:text-green-300 font-medium leading-relaxed">
                             {[formatDate.birth, person.birthPlace].filter(Boolean).join(' · ')}
                           </div>
                         </div>
@@ -492,10 +488,10 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                           <Calendar className="w-4.5 h-4.5 text-gray-600 dark:text-gray-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
                             {t('storyChunksModal.died', 'Died')}
                           </div>
-                          <div className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
+                          <div className="text-[15px] text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
                             {[formatDate.death, person.deathPlace].filter(Boolean).join(' · ')}
                           </div>
                         </div>
@@ -508,8 +504,8 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
               {/* Blockchain Identity Section */}
               {(person.personHash || isMinted(person) || person.tag || person.nftTokenURI) && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
-                    <Hash className="w-4 h-4 text-purple-600" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
+                    <Hash className="w-4.5 h-4.5 text-purple-600" />
                     {t('storyChunksModal.blockchainIdentity', 'Blockchain Identity')}
                   </h3>
                   <div className="space-y-2.5">
@@ -519,7 +515,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                           <Hash className="w-4.5 h-4.5 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-purple-900 dark:text-purple-100 mb-1.5 flex items-center gap-2">
+                          <div className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-1.5 flex items-center gap-2">
                             {t('storyChunksModal.personHash', 'Person Hash')}
                             {person.versionIndex && (
                               <span className="px-1.5 py-0.5 text-[9px] font-mono bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-300 rounded">
@@ -528,7 +524,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-xs text-purple-700 dark:text-purple-300 font-mono min-w-0 flex-1">
+                            <div className="text-sm text-purple-700 dark:text-purple-300 font-mono min-w-0 flex-1">
                               <SmartHash text={person.personHash} />
                             </div>
                             <button
@@ -536,7 +532,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                               className="p-1.5 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-lg transition-colors flex-shrink-0"
                               title={t('common.copy', 'Copy')}
                             >
-                              <Copy className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                              <Copy className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                             </button>
                           </div>
                         </div>
@@ -549,11 +545,11 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                           <Wallet className="w-4.5 h-4.5 text-indigo-600 dark:text-indigo-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-indigo-900 dark:text-indigo-100 mb-1.5">
+                          <div className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 mb-1.5">
                             {t('person.owner', 'Owner Address')}
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-xs text-indigo-700 dark:text-indigo-300 font-mono min-w-0 flex-1">
+                            <div className="text-sm text-indigo-700 dark:text-indigo-300 font-mono min-w-0 flex-1">
                               <SmartAddress text={owner} />
                             </div>
                             {owner && (
@@ -562,7 +558,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                 className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition-colors flex-shrink-0"
                                 title={t('common.copy', 'Copy')}
                               >
-                                <Copy className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                <Copy className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                               </button>
                             )}
                           </div>
@@ -576,7 +572,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                           <Hash className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 mb-1.5">
+                          <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-1.5">
                             {t('storyChunksModal.tag', 'Tag')}
                           </div>
                           <div className="flex items-center gap-2">
@@ -588,7 +584,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                               className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors flex-shrink-0"
                               title={t('common.copy', 'Copy')}
                             >
-                              <Copy className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <Copy className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                             </button>
                           </div>
                         </div>
@@ -601,11 +597,11 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                           <Link className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1.5">
+                          <div className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1.5">
                             {t('familyTree.nodeDetail.uri', 'Token URI')}
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-xs text-blue-700 dark:text-blue-300 font-mono break-all line-clamp-2 flex-1">
+                            <div className="text-sm text-blue-700 dark:text-blue-300 font-mono break-all line-clamp-2 flex-1">
                               {person.nftTokenURI}
                             </div>
                             <button
@@ -613,7 +609,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                               className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors flex-shrink-0"
                               title={t('common.copy', 'Copy')}
                             >
-                              <Copy className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                              <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             </button>
                           </div>
                         </div>
@@ -628,12 +624,12 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                 {/* Basic Story must reflect person.story exactly */}
                 {person.story && (
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 px-1">
-                      <FileText className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 px-1">
+                      <FileText className="w-4.5 h-4.5 text-blue-600" />
                       {t('storyChunksModal.basicStory', 'Basic Story')}
                     </h3>
                     <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 dark:from-gray-800/50 dark:via-gray-800/30 dark:to-gray-800/50 rounded-xl p-4 sm:p-5 border border-blue-200/50 dark:border-gray-700/50 shadow-sm">
-                      <p className="text-xs leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                      <p className="text-[15px] leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
                         {person.story}
                       </p>
                     </div>
@@ -644,12 +640,12 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                     {/* Header with View Mode Toggle */}
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
-                          <Book className="w-4 h-4 text-blue-600" />
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
+                          <Book className="w-4.5 h-4.5 text-blue-600" />
                           {t('storyChunksModal.detailedStory', 'Detailed Story')}
                         </h3>
                         {chunksCount > 0 && (
-                          <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
                             {t('storyChunksModal.chunksCount', '{{count}} chunks, {{length}} bytes', {
                               count: chunksCount,
                               length: lengthBytes
@@ -709,18 +705,18 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                       </div>
                       {chunksCount > 0 && !storyData.loading && (
                         storyData.integrityChecking ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-[10px] sm:text-xs font-medium bg-blue-50/50 dark:bg-blue-900/20">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-500/70 dark:border-blue-400/60 text-blue-600 dark:text-blue-300 text-xs font-medium bg-blue-50/50 dark:bg-blue-900/20">
                             <div className="animate-spin w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                             {t('storyChunksModal.integrityChecking', 'Checking...')}
                           </span>
                         ) : storyData.integrity && (
                           integrityOk ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-500/70 dark:border-green-400/60 text-green-600 dark:text-green-300 text-[10px] sm:text-xs font-medium bg-green-50/50 dark:bg-green-900/20">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-500/70 dark:border-green-400/60 text-green-600 dark:text-green-300 text-xs font-medium bg-green-50/50 dark:bg-green-900/20">
                               <Check className="w-3.5 h-3.5" />
                               {t('storyChunksModal.integrityVerified', 'Integrity verified')}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/70 dark:border-amber-400/60 text-amber-600 dark:text-amber-300 text-[10px] sm:text-xs font-medium bg-amber-50/50 dark:bg-amber-900/20">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/70 dark:border-amber-400/60 text-amber-600 dark:text-amber-300 text-xs font-medium bg-amber-50/50 dark:bg-amber-900/20">
                               <AlertCircle className="w-3.5 h-3.5" />
                               {t('storyChunksModal.integrityWarning', 'Integrity failed')}
                             </span>
@@ -769,25 +765,25 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
 
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between mb-2">
-                                    <span className={`text-sm font-semibold ${isExpanded ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>
+                                    <span className={`text-[15px] font-semibold ${isExpanded ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>
                                       {t('storyChunksModal.chunkTitle', 'Chunk #{{index}}', { index: chunk.chunkIndex })}
                                     </span>
-                                    <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-full">
                                       {chunk.content.length} {t('storyChunksModal.characters', 'chars')}
                                     </span>
                                   </div>
 
-                                  <div className={`text-xs leading-relaxed ${isExpanded ? 'text-gray-800 dark:text-gray-200 whitespace-pre-wrap' : 'text-gray-700 dark:text-gray-300 line-clamp-2'}`}>
+                                  <div className={`text-[13px] leading-relaxed ${isExpanded ? 'text-gray-800 dark:text-gray-200 whitespace-pre-wrap' : 'text-gray-700 dark:text-gray-300 line-clamp-2'}`}>
                                     {isExpanded ? chunk.content : preview}
                                   </div>
 
                                   {isExpanded && (
                                     <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                      <span className="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-400">
+                                      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                                         <Clock className="w-3.5 h-3.5" />
                                         {formatUnixSeconds(chunk.timestamp)}
                                       </span>
-                                      <span className="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-400">
+                                      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                                         <User className="w-3.5 h-3.5" />
                                         {shortAddress(chunk.lastEditor)}
                                       </span>
@@ -802,7 +798,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                     ) : viewMode === 'full' && storyData.fullStory ? (
                       <div className="bg-gradient-to-br from-gray-50/50 via-white to-gray-50/30 dark:from-gray-800/50 dark:via-gray-800/30 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <div className="whitespace-pre-wrap text-xs leading-relaxed text-gray-800 dark:text-gray-200">
+                          <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800 dark:text-gray-200">
                             {storyData.fullStory}
                           </div>
                         </div>

@@ -79,7 +79,9 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
 
     const link = g.append('g').attr('stroke', '#93c5fd').attr('stroke-width', 2).attr('stroke-opacity', 0.7).selectAll('line').data(data.links).enter().append('line').attr('marker-end', 'url(#fd-arrow)')
 
-    const node = g.append('g').selectAll('g').data(data.nodes).enter().append('g').call(d3.drag<SVGGElement, SimNode>()
+    const node = g.append('g').selectAll('g').data(data.nodes).enter().append('g')
+      .attr('class', 'cursor-pointer')
+      .call(d3.drag<SVGGElement, SimNode>()
       .on('start', (event: any, d: SimNode) => { if (!event.active) simulation.alphaTarget(0.3).restart(); (d as any).fx = d.x; (d as any).fy = d.y })
       .on('drag', (event: any, d: SimNode) => { (d as any).fx = event.x; (d as any).fy = event.y })
       .on('end', (_event: any, d: SimNode) => { (d as any).fx = null; (d as any).fy = null; simulation.alphaTarget(0) })
@@ -94,7 +96,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
       .attr('opacity', 0.95)
 
     const isDark = document.documentElement.classList.contains('dark')
-    const strokeColor = isDark ? '#0f172a' : '#ffffff'
+    const strokeColor = isDark ? '#f8fafc' : '#ffffff'
     node.append('circle')
       .attr('r', 3)
       .attr('cx', NODE_R - 5)
@@ -166,7 +168,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
         const cy = y + 6
         const starPath = buildStarPath(cx, cy)
         
-        // Background badge
+        // Subtle rounded badge background (consistent across themes)
         g.append('rect')
           .attr('x', x)
           .attr('y', y)
@@ -174,13 +176,13 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
           .attr('height', 12)
           .attr('rx', 6)
           .attr('ry', 6)
-          .attr('fill', mintedFlag ? '#d1fae5' : '#f1f5f9')
+          .attr('fill', '#38bdf830')
           .attr('stroke', 'transparent')
         
         // Star icon
         g.append('path')
           .attr('d', starPath)
-          .attr('fill', mintedFlag ? '#059669' : '#64748b')
+          .attr('fill', '#059669')
         
         // Count text
         g.append('text')
@@ -189,7 +191,7 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
           .attr('text-anchor', 'start')
           .attr('font-size', 8)
           .attr('font-family', 'monospace')
-          .attr('fill', mintedFlag ? '#047857' : '#475569')
+          .attr('fill', '#047857')
           .text(txt)
       }
     })

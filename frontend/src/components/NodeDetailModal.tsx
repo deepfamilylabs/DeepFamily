@@ -2,7 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, Clipboard, Edit2, User, Image, Star, Book } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
+import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
 
@@ -56,29 +56,6 @@ export default function NodeDetailModal({
   const navigate = useNavigate()
   const { getOwnerOf } = useTreeData()
   const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner)
-  const [isDesktop, setIsDesktop] = React.useState<boolean>(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
-    return window.matchMedia('(min-width: 640px)').matches
-  })
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
-    const mql = window.matchMedia('(min-width: 640px)')
-    const onChange = (e: MediaQueryListEvent | MediaQueryList) => setIsDesktop((e as MediaQueryListEvent).matches ?? (e as MediaQueryList).matches)
-    try {
-      mql.addEventListener('change', onChange as any)
-    } catch {
-      // Safari
-      ;(mql as any).addListener(onChange)
-    }
-    onChange(mql as any)
-    return () => {
-      try {
-        mql.removeEventListener('change', onChange as any)
-      } catch {
-        ;(mql as any).removeListener(onChange)
-      }
-    }
-  }, [])
   const handleClose = React.useCallback(() => {
     closedBySelfRef.current = true
     onClose()
@@ -147,111 +124,63 @@ export default function NodeDetailModal({
 
   const hasNFT = isMinted(nodeData)
 
-  const Row: React.FC<{ label: React.ReactNode; value: React.ReactNode; copy?: string }> = ({ label, value, copy }) => (
-    <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-center text-[13px] leading-[1.4rem] py-2">
-      <div className="text-gray-600 dark:text-gray-400 select-none truncate whitespace-nowrap overflow-hidden text-ellipsis font-medium" title={typeof label === 'string' ? label : undefined}>{label}</div>
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="font-mono break-all min-w-0 text-[14px] text-gray-900 dark:text-gray-100 leading-snug font-medium">{value}</div>
-        {copy ? (
-          <button aria-label={t('search.copy')} onClick={() => onCopy(copy)} className="shrink-0 p-1.5 rounded-lg hover:bg-gray-200/90 dark:hover:bg-gray-700/90 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-200 active:scale-95">
-            <Clipboard size={16} strokeWidth={2.5} />
-          </button>
-        ) : null}
-      </div>
-    </div>
-  )
-  const SmartHash: React.FC<{ text?: string | null }> = ({ text }) => {
-    const containerRef = React.useRef<HTMLDivElement | null>(null)
-    const measureRef = React.useRef<HTMLSpanElement | null>(null)
-    const [useAbbrev, setUseAbbrev] = React.useState<boolean>(() => !isDesktop)
-    const fullText = text ?? ''
-
-    React.useEffect(() => {
-      if (!text) { setUseAbbrev(false); return }
-      if (isDesktop) { setUseAbbrev(false); return }
-
-      const checkWidth = () => {
-        const container = containerRef.current
-        const measure = measureRef.current
-        if (!container || !measure) return
-
-        const available = container.clientWidth
-        const needed = measure.scrollWidth
-        setUseAbbrev(needed > available + 2)
-      }
-
-      const raf = requestAnimationFrame(checkWidth)
-      return () => cancelAnimationFrame(raf)
-    }, [fullText, isDesktop, text])
-
-    React.useEffect(() => {
-      if (isDesktop) return
-      const onResize = () => {
-        const container = containerRef.current
-        const measure = measureRef.current
-        if (!container || !measure) return
-        setUseAbbrev(measure.scrollWidth > container.clientWidth + 2)
-      }
-      window.addEventListener('resize', onResize)
-      return () => window.removeEventListener('resize', onResize)
-    }, [isDesktop])
-
-    if (!text) return <span>-</span>
+  const Row: React.FC<{ label: React.ReactNode; value: React.ReactNode; copy?: string; color?: 'purple' | 'emerald' | 'blue' | 'amber' | 'pink' | 'slate' }> = ({ label, value, copy, color = 'slate' }) => {
+    const colorClasses = {
+      purple: 'bg-purple-50/30 dark:bg-purple-900/5 border-purple-100/40 dark:border-purple-800/15 hover:border-purple-200/60 dark:hover:border-purple-700/25',
+      emerald: 'bg-emerald-50/30 dark:bg-emerald-900/5 border-emerald-100/40 dark:border-emerald-800/15 hover:border-emerald-200/60 dark:hover:border-emerald-700/25',
+      blue: 'bg-blue-50/30 dark:bg-blue-900/5 border-blue-100/40 dark:border-blue-800/15 hover:border-blue-200/60 dark:hover:border-blue-700/25',
+      amber: 'bg-amber-50/30 dark:bg-amber-900/5 border-amber-100/40 dark:border-amber-800/15 hover:border-amber-200/60 dark:hover:border-amber-700/25',
+      pink: 'bg-pink-50/30 dark:bg-pink-900/5 border-pink-100/40 dark:border-pink-800/15 hover:border-pink-200/60 dark:hover:border-pink-700/25',
+      slate: 'bg-slate-50/30 dark:bg-slate-800/8 border-slate-100/40 dark:border-slate-700/15 hover:border-slate-200/60 dark:hover:border-slate-600/25'
+    }
+    const labelColorClasses = {
+      purple: 'text-gray-700 dark:text-gray-300',
+      emerald: 'text-gray-700 dark:text-gray-300',
+      blue: 'text-gray-700 dark:text-gray-300',
+      amber: 'text-gray-700 dark:text-gray-300',
+      pink: 'text-gray-700 dark:text-gray-300',
+      slate: 'text-gray-700 dark:text-gray-300'
+    }
+    const valueColorClasses = {
+      purple: 'text-gray-900 dark:text-gray-100',
+      emerald: 'text-gray-900 dark:text-gray-100',
+      blue: 'text-gray-900 dark:text-gray-100',
+      amber: 'text-gray-900 dark:text-gray-100',
+      pink: 'text-gray-900 dark:text-gray-100',
+      slate: 'text-gray-900 dark:text-gray-100'
+    }
+    const buttonColorClasses = {
+      purple: 'hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400',
+      emerald: 'hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400',
+      blue: 'hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400',
+      amber: 'hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400',
+      pink: 'hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400',
+      slate: 'hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400'
+    }
     return (
-      <div ref={containerRef} className="relative min-w-0">
-        <span className={useAbbrev ? 'block whitespace-nowrap break-normal overflow-hidden text-ellipsis' : 'block whitespace-normal break-all'}>
-          {useAbbrev ? formatHashMiddle(text) : text}
-        </span>
-        <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap break-normal">{text}</span>
+      <div className={`flex items-center gap-3 p-3.5 rounded-xl border transition-colors ${colorClasses[color]}`}>
+        <div className="min-w-0 flex-1">
+          <div className={`text-sm font-semibold mb-1.5 ${labelColorClasses[color]}`}>{label}</div>
+          <div className="flex items-center gap-2">
+            <div className={`text-sm font-mono min-w-0 flex-1 break-all ${valueColorClasses[color]}`}>{value}</div>
+            {copy ? (
+              <button aria-label={t('search.copy')} onClick={() => onCopy(copy)} className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${buttonColorClasses[color]}`}>
+                <Clipboard size={15} strokeWidth={2.5} />
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
     )
   }
+  const SmartHash: React.FC<{ text?: string | null }> = ({ text }) => {
+    if (!text) return <span>-</span>
+    return <span className="block break-all">{text}</span>
+  }
 
   const SmartAddress: React.FC<{ text?: string | null }> = ({ text }) => {
-    const containerRef = React.useRef<HTMLDivElement | null>(null)
-    const measureRef = React.useRef<HTMLSpanElement | null>(null)
-    const [useAbbrev, setUseAbbrev] = React.useState<boolean>(() => !isDesktop)
-    const fullText = text ?? ''
-
-    React.useEffect(() => {
-      if (!text) { setUseAbbrev(false); return }
-      if (isDesktop) { setUseAbbrev(false); return }
-
-      const checkWidth = () => {
-        const container = containerRef.current
-        const measure = measureRef.current
-        if (!container || !measure) return
-
-        const available = container.clientWidth
-        const needed = measure.scrollWidth
-        setUseAbbrev(needed > available + 2)
-      }
-
-      const raf = requestAnimationFrame(checkWidth)
-      return () => cancelAnimationFrame(raf)
-    }, [fullText, isDesktop, text])
-
-    React.useEffect(() => {
-      if (isDesktop) return
-      const onResize = () => {
-        const container = containerRef.current
-        const measure = measureRef.current
-        if (!container || !measure) return
-        setUseAbbrev(measure.scrollWidth > container.clientWidth + 2)
-      }
-      window.addEventListener('resize', onResize)
-      return () => window.removeEventListener('resize', onResize)
-    }, [isDesktop])
-
     if (!text) return <span>-</span>
-    return (
-      <div ref={containerRef} className="relative min-w-0">
-        <span className={useAbbrev ? 'block whitespace-nowrap overflow-hidden text-ellipsis' : 'block whitespace-normal break-all'}>
-          {useAbbrev ? shortAddress(text) : text}
-        </span>
-        <span ref={measureRef} className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap">{text}</span>
-      </div>
-    )
+    return <span className="block break-all">{text}</span>
   }
   const onCopy = async (text: string) => {
     const ok = await copyText(text)
@@ -302,11 +231,11 @@ export default function NodeDetailModal({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
-                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 py-1 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
                         title={t('people.clickToEndorse', 'Click to endorse this version')}
                       >
-                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" strokeWidth={0} />
-                        <span className="text-[13px] font-semibold text-amber-700 dark:text-amber-400">
+                        <Star className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500 dark:text-emerald-400 dark:fill-emerald-400" strokeWidth={0} />
+                        <span className="text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
                           {nodeData.endorsementCount ?? 0}
                         </span>
                       </button>
@@ -381,54 +310,54 @@ export default function NodeDetailModal({
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>
           </div>
         )}
-        <div className="flex-1 min-h-0 px-5 pb-24 pt-3 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth space-y-0 text-[13px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)', touchAction: 'pan-y' }}>
-          <div className="space-y-0">
-            <Row label={t('familyTree.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} />
-            <Row label={t('familyTree.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} />
-            <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} />
-            <Row label={t('familyTree.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} />
-            <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} />
-            <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} />
-            <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} />
-            <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} />
-            <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} />
+        <div className="flex-1 min-h-0 px-5 pb-24 pt-3 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth text-[13px] text-gray-900 dark:text-gray-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4rem)', touchAction: 'pan-y' }}>
+          <div className="space-y-2.5">
+            <Row label={t('familyTree.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} color="purple" />
+            <Row label={t('familyTree.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} color="purple" />
+            <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} color="blue" />
+            <Row label={t('familyTree.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} color="blue" />
+            <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} color="pink" />
+            <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} color="pink" />
+            <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} color="emerald" />
+            <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} color="amber" />
+            <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} color="slate" />
             {/* NFT Section - only when NFT exists */}
             {hasNFT && (
-              <div className="pt-3 pb-1">
-                <div className="my-3 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent dark:from-transparent dark:via-gray-500 dark:to-transparent" />
-                <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-center text-[13px] leading-[1.4rem] mb-2 py-1">
-                  <div className="text-[14px] font-extrabold text-gray-800 dark:text-gray-200 tracking-wide flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-sm bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-400 dark:to-purple-500" />{t('familyTree.nodeDetail.nft')}
-                  </div>
-                </div>
+              <div className="pt-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 px-1">
+                  <Image className="w-4 h-4 text-purple-600" />
+                  {t('familyTree.nodeDetail.nft')}
+                </h3>
               </div>
             )}
             {hasNFT ? (
               /* Already minted NFT - show NFT info */
               <>
-                <Row label={t('familyTree.nodeDetail.tokenId')} value={nodeData!.tokenId} copy={nodeData!.tokenId} />
-                {nodeData?.fullName && <Row label={t('familyTree.nodeDetail.fullName')} value={nodeData.fullName} />}
+                <Row label={t('familyTree.nodeDetail.tokenId')} value={nodeData!.tokenId} copy={nodeData!.tokenId} color="purple" />
+                {nodeData?.fullName && <Row label={t('familyTree.nodeDetail.fullName')} value={nodeData.fullName} color="blue" />}
                 {nodeData?.gender !== undefined && (
-                  <Row label={t('familyTree.nodeDetail.gender')} value={genderTextFn(nodeData.gender, t as any) || '-'} />
+                  <Row label={t('familyTree.nodeDetail.gender')} value={genderTextFn(nodeData.gender, t as any) || '-'} color="emerald" />
                 )}
                 <Row label={t('familyTree.nodeDetail.birth')} value={(() => {
                   const d = birthDateString(nodeData)
                   const parts = [d, nodeData?.birthPlace].filter(Boolean)
                   return parts.length ? parts.join(' · ') : '-'
-                })()} />
+                })()} color="emerald" />
                 <Row label={t('familyTree.nodeDetail.death')} value={(() => {
                   const d = deathDateString(nodeData)
                   const parts = [d, nodeData?.deathPlace].filter(Boolean)
                   return parts.length ? parts.join(' · ') : '-'
-                })()} />
+                })()} color="slate" />
                 {nodeData?.story && nodeData.story.trim() !== '' && (
-                  <div className="grid grid-cols-[90px_1fr] sm:grid-cols-[110px_1fr] gap-x-3 gap-y-0 items-start text-[13px] leading-[1.4rem] py-2">
-                    <div className="text-gray-600 dark:text-gray-400 pt-0.5 select-none truncate font-medium">{t('familyTree.nodeDetail.story')}</div>
-                    <div className="font-mono text-[13px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words min-w-0 bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg max-h-[200px] overflow-y-auto">{nodeData.story}</div>
+                  <div className="flex items-start gap-3 p-3.5 bg-blue-50/30 dark:bg-blue-900/5 rounded-xl border border-blue-100/40 dark:border-blue-800/15 hover:border-blue-200/60 dark:hover:border-blue-700/25 transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{t('familyTree.nodeDetail.story')}</div>
+                      <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto">{nodeData.story}</div>
+                    </div>
                   </div>
                 )}
-                <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} />
-                {nodeData?.nftTokenURI && <Row label={t('familyTree.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} />}
+                <Row label={t('person.owner', 'Owner Address')} value={<SmartAddress text={owner} />} copy={owner} color="amber" />
+                {nodeData?.nftTokenURI && <Row label={t('familyTree.nodeDetail.uri')} value={nodeData.nftTokenURI} copy={nodeData.nftTokenURI} color="slate" />}
               </>
             ) : null}
           </div>
