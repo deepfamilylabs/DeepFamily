@@ -96,7 +96,7 @@
         "title": "ワークフロー",
         "subtitle": "五段階の価値発見と合意形成メカニズム",
         "step1": "人物バージョン追加",
-        "step1Desc": "両親が存在する場合 → マイニング報酬を獲得",
+        "step1Desc": "親情報を提供 → マイニング報酬を獲得",
         "step2": "ユーザーエンドース",
         "step2Desc": "DEEPを支払って特定バージョンをエンドース",
         "step3": "バージョンNFT鋳造",
@@ -164,7 +164,7 @@
       },
       "mining": {
         "title": "マイニングトリガー",
-        "description": "両親を参照する新しい人物バージョンを追加したときのみ報酬が発生し、構造的な補完が唯一の採掘条件になります。"
+        "description": "親情報を提供すると報酬が発生し、完全な家族関係データを奨励します。"
       },
       "endorsement": {
         "title": "エンドースメント手数料",
@@ -465,7 +465,7 @@
       "gender": "性別",
       "birth": "誕生",
       "death": "死去",
-      "story": "事跡",
+      "story": "略歴",
       "profile": "プロフィール",
       "storyChunks": "シャード数",
       "storyLength": "総長",
@@ -717,7 +717,7 @@
     "chunkTitle": "シャード #{{index}}",
     "characters": "文字",
     "noStoryData": "伝記データなし",
-    "basicStory": "事跡",
+    "basicStory": "略歴",
     "noStory": "伝記内容なし",
     "peopleEncyclopedia": "人物百科"
   },
@@ -782,14 +782,14 @@
     "motherHash": "母ハッシュ",
     "motherVersionIndex": "母バージョン",
     "tokenReward": "トークン報酬配布済み",
-    "familyComplete": "完全家族データ報酬 - 両親とも存在",
+    "familyComplete": "親情報提供 - トークン報酬獲得",
     "miner": "マイナー",
     "hashPrefix": "ハッシュ",
     "prover": "証明者",
     "rewardAmount": "報酬金額",
     "noTokenReward": "トークン報酬なし",
-    "tokenRewardCondition": "両親が存在する場合のみトークン報酬を配布",
-    "tokenRewardTip": "まず両親を追加し、家族データを完成させるとDEEPトークン報酬を獲得できます",
+    "tokenRewardCondition": "親情報を提供すればトークン報酬を獲得",
+    "tokenRewardTip": "親情報を追加すれば、DEEPトークン報酬を獲得できます",
     "failed": "取引失敗",
     "errorType": "エラータイプ",
     "errorMessage": "エラーメッセージ",

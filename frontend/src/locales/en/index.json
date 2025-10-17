@@ -96,7 +96,7 @@
         "title": "Workflow",
         "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
-        "step1Desc": "If both parents exist → receive mining rewards",
+        "step1Desc": "Provide parent information → receive mining rewards",
         "step2": "User Endorsement",
         "step2Desc": "Pay DEEP tokens to endorse a version",
         "step3": "Mint Version NFT",
@@ -164,7 +164,7 @@
       },
       "mining": {
         "title": "Mining Trigger",
-        "description": "Rewards only mint when a new person version references both parents, making structured completion the sole mining condition."
+        "description": "Rewards are minted when parent information is provided, encouraging complete family relationship data."
       },
       "endorsement": {
         "title": "Endorsement Fees",
@@ -466,7 +466,7 @@
       "gender": "Gender",
       "birth": "Birth",
       "death": "Death",
-      "story": "Deeds",
+      "story": "Brief Biography",
       "profile": "Profile",
       "storyChunks": "Chunks Count",
       "storyLength": "Total Length",
@@ -718,7 +718,7 @@
     "chunkTitle": "Chunk #{{index}}",
     "characters": "characters",
     "noStoryData": "No story data",
-    "basicStory": "Deeds",
+    "basicStory": "Brief Biography",
     "noStory": "No story content",
     "peopleEncyclopedia": "Encyclopedia"
   },
@@ -783,14 +783,14 @@
     "motherHash": "Mother Hash",
     "motherVersionIndex": "Mother Version",
     "tokenReward": "Token Reward Distributed",
-    "familyComplete": "Complete family data bonus - both parents exist in the system",
+    "familyComplete": "Parent information provided - token reward earned",
     "miner": "Miner",
     "hashPrefix": "Hash",
     "prover": "Prover",
     "rewardAmount": "Reward Amount",
     "noTokenReward": "No Token Reward",
-    "tokenRewardCondition": "Token rewards are only distributed when both parents already exist in the system",
-    "tokenRewardTip": "Add the parents first to earn DEEP token rewards for complete family data",
+    "tokenRewardCondition": "Token rewards are distributed when parent information is provided",
+    "tokenRewardTip": "Add parent information to earn DEEP token rewards",
     "failed": "Transaction Failed",
     "errorType": "Error Type",
     "errorMessage": "Message",
