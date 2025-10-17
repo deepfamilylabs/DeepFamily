@@ -179,6 +179,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                    onMouseLeave={() => setHoverId(h => (h === pn.id ? null : h))}
                    onClick={() => openNode({ personHash: pn.data.personHash, versionIndex: pn.data.versionIndex})}
                    onDoubleClick={() => navigator.clipboard?.writeText(pn.data.personHash).catch(() => {})}
+                   className="cursor-pointer"
                 >
                   <title>{pn.data.personHash}</title>
                   {/* Hidden text for width measurement with maximum width constraint */}

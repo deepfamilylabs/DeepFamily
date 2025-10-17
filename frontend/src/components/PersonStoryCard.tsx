@@ -100,11 +100,11 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                               if (person.versionIndex) params.set('vi', person.versionIndex.toString())
                               window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
                             }}
-                            className="flex items-center gap-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
+                            className="flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
                             title={t('people.clickToEndorse', 'Click to endorse this version')}
                           >
-                            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500" />
-                            <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
+                            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                            <span className="text-emerald-600 dark:text-emerald-400">{person.endorsementCount}</span>
                           </button>
                         </span>
                       )}
@@ -232,11 +232,11 @@ export default function PersonStoryCard({ person, viewMode, onClick }: PersonSto
                           if (person.versionIndex) params.set('vi', person.versionIndex.toString())
                           window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
                         }}
-                        className="flex items-center gap-1 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-full px-1 py-0.5 transition-colors cursor-pointer"
                         title={t('people.clickToEndorse', 'Click to endorse this version')}
                       >
-                        <Star className="w-3 h-3 text-yellow-500" />
-                        <span className="text-yellow-600 dark:text-yellow-400">{person.endorsementCount}</span>
+                        <Star className="w-3 h-3 text-emerald-500" />
+                        <span className="text-emerald-600 dark:text-emerald-400">{person.endorsementCount}</span>
                       </button>
                     </>
                   )}
