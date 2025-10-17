@@ -801,15 +801,8 @@ async function main() {
         }); // many chunks
       }
 
-      // For remaining NFTs, use environment variable settings
-      for (let i = storyChunkTargets.length; i < mintedNFTs.length; i++) {
-        storyChunkTargets.push({
-          ...mintedNFTs[i],
-          chunks: STORY_CHUNKS_PER_NFT,
-          useMaxLength: USE_MAX_LENGTH_CHUNKS,
-          sealed: false,
-        });
-      }
+      // Only process the first 5 NFTs for story chunks, skip remaining NFTs
+      console.log(`Note: Only first ${Math.min(5, mintedNFTs.length)} NFTs will have story chunks`);
 
       console.log(`Processing ${storyChunkTargets.length} NFTs with story chunks\n`);
 
