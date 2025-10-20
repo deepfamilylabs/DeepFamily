@@ -575,7 +575,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
     )
   }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
   return (
-    <div className="w-full rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl overflow-hidden" style={{ height: familyTreeHeight }}>
+    <div className="w-full transition-all duration-300 overflow-hidden" style={{ height: familyTreeHeight }}>
       <div className="p-4 pt-16 h-full overflow-x-auto">
         <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'auto'}>{Row}</VirtualList>
       </div>

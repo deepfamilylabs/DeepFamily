@@ -44,7 +44,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - **Endorsement Requirement**: Must endorse a version before minting its NFT
 
 ### 💰 DEEP Token Economics
-- **Smart Mining**: Rewards granted when parent information is provided (encourages family relationship data)
+- **Smart Mining**: Rewards mint only when parent hash commitments are submitted (encourages structured family data without exposing plaintext)
 - **Progressive Halving**: 10 halving cycles with expanding periods (1→10→100→1K→10K→100K→1M→10M→100M→Fixed 100M)
 - **100 Billion Cap**: Fixed maximum supply, rewards continue halving asymptotically until cap is reached
 - **Complete Family Incentives**: Encourages connected family trees over isolated entries

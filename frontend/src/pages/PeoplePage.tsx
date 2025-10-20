@@ -423,7 +423,6 @@ export default function PeoplePage() {
                     onClick={addAddress}
                     disabled={!addressInput.trim()}
                     className="w-10 h-10 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center justify-center flex-shrink-0 hover:scale-105 disabled:hover:scale-100 active:scale-95"
-                    title={t('people.addFilter', 'Add')}
                   >
                     <Plus className="w-5 h-5" strokeWidth={2.5} />
                   </button>
@@ -467,7 +466,6 @@ export default function PeoplePage() {
                     onClick={addTag}
                     disabled={!tagInput.trim()}
                     className="w-10 h-10 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center justify-center flex-shrink-0 hover:scale-105 disabled:hover:scale-100 active:scale-95"
-                    title={t('people.addFilter', 'Add')}
                   >
                     <Plus className="w-5 h-5" strokeWidth={2.5} />
                   </button>

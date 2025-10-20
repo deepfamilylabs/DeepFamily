@@ -24,8 +24,9 @@ export default function TreePage() {
   useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('df:viewMode', viewMode) }, [viewMode])
 
   return (
-    <div className="space-y-6 text-gray-900 dark:text-gray-100 overflow-visible pb-4 md:pb-0 w-full max-w-full">
-      <div className="bg-white/40 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-200/50 dark:border-slate-700/30 shadow-lg overflow-hidden">
+    <div className="space-y-4 text-gray-900 dark:text-gray-100 overflow-visible pb-4 md:pb-0 w-full max-w-full">
+      {/* Configuration Card - Minimal Design */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden transition-shadow duration-200 hover:shadow-md dark:hover:shadow-slate-900/50">
         <FamilyTreeConfigForm
           editing={editingConfig}
           setEditing={setEditingConfig}
@@ -40,14 +41,18 @@ export default function TreePage() {
           progress={progress}
         />
       </div>
-      <ViewContainer
-        viewMode={viewMode as any}
-        root={root}
-        contractMessage={contractMessage}
-        loading={loadingContract}
-        onViewModeChange={setViewMode}
-        viewModeLabels={{ tree: t('familyTree.viewModes.tree'), dag: t('familyTree.viewModes.dag'), force: t('familyTree.viewModes.force'), virtual: t('familyTree.viewModes.virtual') }}
-      />
+
+      {/* Tree Visualization Card - Minimal Design */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden transition-shadow duration-200 hover:shadow-lg dark:hover:shadow-slate-900/60">
+        <ViewContainer
+          viewMode={viewMode as any}
+          root={root}
+          contractMessage={contractMessage}
+          loading={loadingContract}
+          onViewModeChange={setViewMode}
+          viewModeLabels={{ tree: t('familyTree.viewModes.tree'), dag: t('familyTree.viewModes.dag'), force: t('familyTree.viewModes.force'), virtual: t('familyTree.viewModes.virtual') }}
+        />
+      </div>
     </div>
   )
 }

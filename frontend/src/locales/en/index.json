@@ -96,7 +96,7 @@
         "title": "Workflow",
         "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
-        "step1Desc": "Provide parent information → receive mining rewards",
+        "step1Desc": "Submit parent hash commitments → earn mining rewards",
         "step2": "User Endorsement",
         "step2Desc": "Pay DEEP tokens to endorse a version",
         "step3": "Mint Version NFT",
@@ -164,7 +164,7 @@
       },
       "mining": {
         "title": "Mining Trigger",
-        "description": "Rewards are minted when parent information is provided, encouraging complete family relationship data."
+        "description": "Rewards mint only when a new person submits parent hash commitments, incentivizing structured completion without exposing parent plaintext."
       },
       "endorsement": {
         "title": "Endorsement Fees",
@@ -785,14 +785,14 @@
     "motherHash": "Mother Hash",
     "motherVersionIndex": "Mother Version",
     "tokenReward": "Token Reward Distributed",
-    "familyComplete": "Parent information provided - token reward earned",
+    "familyComplete": "Parent hash commitments submitted - token reward earned",
     "miner": "Miner",
     "hashPrefix": "Hash",
     "prover": "Prover",
     "rewardAmount": "Reward Amount",
     "noTokenReward": "No Token Reward",
-    "tokenRewardCondition": "Token rewards are distributed when parent information is provided",
-    "tokenRewardTip": "Add parent information to earn DEEP token rewards",
+    "tokenRewardCondition": "Token rewards distribute when parent hash commitments are submitted",
+    "tokenRewardTip": "Submit parent hash commitments to earn DEEP token rewards",
     "failed": "Transaction Failed",
     "errorType": "Error Type",
     "errorMessage": "Message",
@@ -890,10 +890,10 @@
       "userRejected": "Transaction was rejected by user"
     },
     "missingParentsTitle": "Incomplete Parent Information",
-    "missingBothParents": "Both parent hashes are empty for this version. The version creator may supplement parent information in the future.",
-    "missingFather": "The father hash is empty for this version. The version creator may supplement father information in the future.",
-    "missingMother": "The mother hash is empty for this version. The version creator may supplement mother information in the future.",
-    "parentUpdateNote": "Note: Only the original version creator can supplement parent information via the updatePersonParents function."
+    "missingBothParents": "Both parent hashes are empty for this version. The creator may submit parent hash commitments later.",
+    "missingFather": "The father hash is empty for this version. The creator may submit a father hash commitment later.",
+    "missingMother": "The mother hash is empty for this version. The creator may submit a mother hash commitment later.",
+    "parentUpdateNote": "Note: Only the original version creator can submit parent hash commitments via the updatePersonParents function."
   },
   "endorse": {
     "title": "Endorse Version",
