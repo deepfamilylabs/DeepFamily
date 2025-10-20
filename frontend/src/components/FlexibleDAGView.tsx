@@ -128,7 +128,7 @@ function FlexibleDAGViewInner({
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 rounded-2xl transition-all duration-300 border border-slate-200/50 dark:border-slate-700/50 shadow-xl backdrop-blur-sm pt-16 pb-4 px-4 md:px-6"
+      className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 pt-16 pb-4 px-4 md:px-6"
       style={{ height: responsiveHeight, overscrollBehavior: 'contain' }}
     >
       <div className="absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left">

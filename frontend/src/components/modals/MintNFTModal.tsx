@@ -967,13 +967,13 @@ export default function MintNFTModal({
                       </h4>
                       <p className="text-sm text-amber-700 dark:text-amber-200">
                         {hasMissingParents.father && hasMissingParents.mother
-                          ? t('mintNFT.missingBothParents', 'Both parent hashes are empty for this version. The version contributor may add parent information in the future.')
+                          ? t('mintNFT.missingBothParents', 'Both parent hashes are empty for this version. The contributor may submit parent hash commitments later.')
                           : hasMissingParents.father
-                          ? t('mintNFT.missingFather', 'The father hash is empty for this version. The version contributor may add father information in the future.')
-                          : t('mintNFT.missingMother', 'The mother hash is empty for this version. The version contributor may add mother information in the future.')}
+                          ? t('mintNFT.missingFather', 'The father hash is empty for this version. The contributor may submit a father hash commitment later.')
+                          : t('mintNFT.missingMother', 'The mother hash is empty for this version. The contributor may submit a mother hash commitment later.')}
                       </p>
                       <p className="text-xs text-amber-600 dark:text-amber-300 mt-2">
-                        {t('mintNFT.parentUpdateNote', 'Note: Only the original contributor of the version can add parent information through the updatePersonParents function.')}
+                        {t('mintNFT.parentUpdateNote', 'Note: Only the original contributor of the version can submit parent hash commitments through the updatePersonParents function.')}
                       </p>
                     </div>
                   </div>

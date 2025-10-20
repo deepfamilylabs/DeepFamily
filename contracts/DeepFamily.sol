@@ -703,7 +703,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       motherVersionIndex,
       tag
     );
-    if (fatherHash != bytes32(0) || motherHash != bytes32(0)) {
+    if (fatherHash != bytes32(0) && motherHash != bytes32(0)) {
       uint256 reward = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).mint(msg.sender);
       if (reward > 0) {
         emit TokenRewardDistributed(msg.sender, personHash, versionIndex, reward);

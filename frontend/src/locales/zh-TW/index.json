@@ -96,7 +96,7 @@
         "title": "工作流程",
         "subtitle": "五步式價值發現與共識形成機制",
         "step1": "添加人物版本",
-        "step1Desc": "提供父母資訊 → 獲得挖礦獎勵",
+        "step1Desc": "提交父母雜湊承諾 → 獲得挖礦獎勵",
         "step2": "用戶背書",
         "step2Desc": "支付 DEEP 背書某一版本",
         "step3": "鑄造版本 NFT",
@@ -164,7 +164,7 @@
       },
       "mining": {
         "title": "挖礦觸發",
-        "description": "僅當新增人物同時引用父母版本時產生獎勵，把結構化補全作為唯一挖礦條件"
+        "description": "僅當新增人物同時提交父母雜湊承諾時才會產生獎勵，鼓勵結構化補全且不揭露父母明文"
       },
       "endorsement": {
         "title": "背書費用",
@@ -784,14 +784,14 @@
     "motherHash": "母親雜湊",
     "motherVersionIndex": "母親版本",
     "tokenReward": "代幣獎勵已發放",
-    "familyComplete": "提供父母資訊 - 獲得代幣獎勵",
+    "familyComplete": "提交父母雜湊承諾 - 獲得代幣獎勵",
     "miner": "礦工",
     "hashPrefix": "雜湊",
     "prover": "證明者",
     "rewardAmount": "獎勵數量",
     "noTokenReward": "無代幣獎勵",
-    "tokenRewardCondition": "提供父母資訊即可獲得代幣獎勵",
-    "tokenRewardTip": "新增父母資訊，即可獲得 DEEP 代幣獎勵",
+    "tokenRewardCondition": "提交父母雜湊承諾即可獲得代幣獎勵",
+    "tokenRewardTip": "提交父母雜湊承諾，即可獲得 DEEP 代幣獎勵",
     "failed": "交易失敗",
     "errorType": "錯誤類型",
     "errorMessage": "錯誤訊息",
@@ -806,7 +806,7 @@
     "complete": "完整",
     "proofGenerationNote": "ZK證明生成需要複雜的加密計算，請耐心等待...",
     "personInfo": "人物資訊",
-    "personInfoHint": "明文不入鏈，僅用於本地零知識證明"
+    "personInfoHint": "明文不上鏈，僅用於本地零知識證明"
   },
   "mintNFT": {
     "title": "鑄造 NFT",
@@ -889,10 +889,10 @@
       "userRejected": "用戶拒絕交易"
     },
     "missingParentsTitle": "父母資訊不完善",
-    "missingBothParents": "此版本的父母雜湊均為空。版本添加者可能會在未來補錄父母資訊。",
-    "missingFather": "此版本的父親雜湊為空。版本添加者可能會在未來補錄父親資訊。",
-    "missingMother": "此版本的母親雜湊為空。版本添加者可能會在未來補錄母親資訊。",
-    "parentUpdateNote": "注意：只有版本的原始添加者可以透過 updatePersonParents 函式補錄父母資訊。"
+    "missingBothParents": "此版本的父母雜湊均為空。版本添加者可能會在未來補錄父母雜湊承諾。",
+    "missingFather": "此版本的父親雜湊為空。版本添加者可能會在未來補錄父親雜湊承諾。",
+    "missingMother": "此版本的母親雜湊為空。版本添加者可能會在未來補錄母親雜湊承諾。",
+    "parentUpdateNote": "注意：只有版本的原始添加者可以透過 updatePersonParents 函式補錄父母雜湊承諾。"
   },
   "endorse": {
     "title": "背書版本",
