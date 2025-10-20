@@ -53,6 +53,9 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
 
   /// @dev Mining reward distribution event
   event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions);
+  
+  /// @dev DeepFamily contract address initialization event
+  event DeepFamilyContractInitialized(address indexed deepFamilyContract);
 
   // ========== Custom Errors ==========
 
@@ -87,6 +90,8 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
 
     deepFamilyContract = _deepFamilyContract;
     initialized = true;
+
+    emit DeepFamilyContractInitialized(_deepFamilyContract);
   }
 
   /**
@@ -106,8 +111,13 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
     uint256 nextIndex = totalAdditions + 1;
     reward = getReward(nextIndex);
 
+    if (reward == 0) {
+      recentReward = 0;
+      return 0;
+    }
+
     uint256 remaining = MAX_SUPPLY - supply;
-    if (reward == 0 || reward > remaining) {
+    if (reward > remaining) {
       reward = remaining;
     }
 
