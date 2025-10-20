@@ -29,7 +29,7 @@ const CoreFeatures = memo(() => {
         
         <div className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-300`}>
           {/* Enhanced Feature Cards */}
-          {/* 1. 私密提交流程 */}
+          {/* 1. Private Submission Process */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} h-full`}>
             <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-blue-100/50 dark:border-blue-400/20 hover:shadow-blue-500/10 dark:hover:shadow-blue-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
@@ -47,8 +47,8 @@ const CoreFeatures = memo(() => {
               </div>
             </div>
           </div>
-          
-          {/* 2. 协作与私有模式 */}
+
+          {/* 2. Collaborative and Private Modes */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-100 h-full`}>
             <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-red-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-rose-100/50 dark:border-rose-400/20 hover:shadow-rose-500/10 dark:hover:shadow-rose-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
@@ -66,8 +66,8 @@ const CoreFeatures = memo(() => {
               </div>
             </div>
           </div>
-          
-          {/* 3. 多版本治理体系 */}
+
+          {/* 3. Multi-Version Governance System */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-200 h-full`}>
             <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-purple-100/50 dark:border-purple-400/20 hover:shadow-purple-500/10 dark:hover:shadow-purple-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
@@ -85,8 +85,8 @@ const CoreFeatures = memo(() => {
               </div>
             </div>
           </div>
-          
-          {/* 4. 背书经济循环 */}
+
+          {/* 4. Endorsement Economy Cycle */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-300 h-full`}>
             <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-emerald-100/50 dark:border-emerald-400/20 hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
@@ -104,8 +104,8 @@ const CoreFeatures = memo(() => {
               </div>
             </div>
           </div>
-          
-          {/* 5. NFT人物百科 */}
+
+          {/* 5. NFT People Encyclopedia */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-400 h-full`}>
             <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-indigo-100/50 dark:border-indigo-400/20 hover:shadow-indigo-500/10 dark:hover:shadow-indigo-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
@@ -123,8 +123,8 @@ const CoreFeatures = memo(() => {
               </div>
             </div>
           </div>
-          
-          {/* 6. 故事分片与封存 */}
+
+          {/* 6. Story Sharding and Sealing */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-500 h-full`}>
             <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-orange-100/50 dark:border-orange-400/20 hover:shadow-orange-500/10 dark:hover:shadow-orange-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">

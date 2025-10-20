@@ -256,7 +256,7 @@ export default function NodeDetailModal({
                       >
                         <Image className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
                         <span className="hidden sm:inline text-[13px] font-semibold text-purple-700 dark:text-purple-300">
-                          {t('actions.mintNFT', '铸造NFT')}
+                          {t('actions.mintNFT', 'Mint NFT')}
                         </span>
                       </button>
                     )}

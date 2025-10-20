@@ -18,6 +18,29 @@ const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
 
+const normalizeForHash = (value: string): string => {
+  if (!value) return ''
+  const trimmed = value.trim()
+  return typeof trimmed.normalize === 'function' ? trimmed.normalize('NFC') : trimmed
+}
+
+const getGraphemeLength = (() => {
+  if (typeof Intl !== 'undefined' && typeof (Intl as any).Segmenter === 'function') {
+    const segmenter = new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' })
+    return (value: string): number => {
+      if (!value) return 0
+      let count = 0
+      for (const _ of segmenter.segment(value)) count += 1
+      return count
+    }
+  }
+
+  return (value: string): number => {
+    if (!value) return 0
+    return Array.from(value).length
+  }
+})()
+
 // Field error component
 const FieldError: React.FC<{ message?: string }> = ({ message }) => (
   <div className={`text-xs h-4 leading-4 ${message ? 'text-red-600' : 'text-transparent'}`}>
@@ -87,7 +110,10 @@ const ThemedSelect: React.FC<{
 const optionalPassphrase = z.union([z.string(), z.undefined(), z.null()]).transform((val) => (typeof val === 'string' ? val : ''))
 
 const hashFormSchema = z.object({
-  fullName: z.string().min(1).refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
+  fullName: z.string()
+    .min(1)
+    .refine((val) => normalizeForHash(val).length > 0, 'Name required')
+    .refine((val) => getByteLength(normalizeForHash(val)) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
   isBirthBC: z.boolean(),
   birthYear: z.union([z.number().int().min(0).max(10000), z.literal('')]).transform(val => val === '' ? 0 : val),
   birthMonth: z.union([z.number().int().min(0).max(12), z.literal('')]).transform(val => val === '' ? 0 : val),
@@ -100,25 +126,35 @@ export type HashForm = z.infer<typeof hashFormSchema>
 
 // Password strength calculation
 const calculatePasswordStrength = (password: string): { level: 'weak' | 'medium' | 'strong'; score: number } => {
-  if (!password) return { level: 'weak', score: 0 }
+  const normalized = normalizeForHash(password)
+  const graphemeLength = getGraphemeLength(normalized)
+
+  if (!normalized) return { level: 'weak', score: 0 }
 
   let score = 0
 
-  // Length scoring
-  if (password.length >= 8) score += 2
-  else if (password.length >= 6) score += 1
+  if (graphemeLength >= 16) score += 4
+  else if (graphemeLength >= 12) score += 3
+  else if (graphemeLength >= 8) score += 2
+  else if (graphemeLength >= 4) score += 1
 
-  // Character variety scoring
-  if (/[a-z]/.test(password)) score += 1 // lowercase
-  if (/[A-Z]/.test(password)) score += 1 // uppercase
-  if (/[0-9]/.test(password)) score += 1 // numbers
-  if (/[^a-zA-Z0-9]/.test(password)) score += 1 // special characters
+  const categories = new Set<string>()
+  if (/\p{L}/u.test(normalized)) categories.add('letter')
+  if (/\p{N}/u.test(normalized)) categories.add('number')
+  if (/\p{S}/u.test(normalized)) categories.add('symbol')
+  if (/\p{P}/u.test(normalized)) categories.add('punctuation')
+  if (/\p{M}/u.test(normalized)) categories.add('mark')
+  if (/\p{Zs}/u.test(normalized)) categories.add('space')
 
-  // Additional length bonus
-  if (password.length >= 12) score += 1
+  const diversityCategories = ['letter', 'number', 'symbol', 'punctuation', 'mark']
+  const diversityScore = diversityCategories.reduce((acc, cat) => acc + (categories.has(cat) ? 1 : 0), 0)
+  score += diversityScore
+
+  if (categories.has('space')) score += 1
+  if (graphemeLength >= 20) score += 1
 
   if (score <= 2) return { level: 'weak', score }
-  if (score <= 4) return { level: 'medium', score }
+  if (score <= 5) return { level: 'medium', score }
   return { level: 'strong', score }
 }
 
@@ -126,8 +162,8 @@ const calculatePasswordStrength = (password: string): { level: 'weak' | 'medium'
 export function computePersonHash(input: HashForm): string {
   const { fullName, passphrase, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
 
-  const normalizedFullName = fullName.trim()
-  const normalizedPassphrase = typeof passphrase === 'string' ? passphrase : ''
+  const normalizedFullName = normalizeForHash(fullName)
+  const normalizedPassphrase = typeof passphrase === 'string' ? normalizeForHash(passphrase) : ''
 
   // Pack small fields into a single field element to match circuit's packedData
   // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
@@ -193,9 +229,10 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   onToggle,
   initialValues
 }) => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [internalOpen, setInternalOpen] = useState(true)
   const [showPassphrase, setShowPassphrase] = useState(false)
+  const [supportsCssMasking, setSupportsCssMasking] = useState(false)
   const [showPassphraseHelp, setShowPassphraseHelp] = useState(false)
   const toast = useToast()
 
@@ -214,7 +251,8 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const hashFormSchema = useMemo(() => z.object({
     fullName: z.string()
       .min(1, t('search.validation.required'))
-      .refine((val) => getByteLength(val) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
+      .refine((val) => normalizeForHash(val).length > 0, { message: t('search.validation.required') })
+      .refine((val) => getByteLength(normalizeForHash(val)) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
     isBirthBC: z.boolean(),
     birthYear: z.union([z.number().int().min(0, t('search.validation.yearRange')).max(9999, t('search.validation.yearRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     birthMonth: z.union([z.number().int().min(0, t('search.validation.monthRange')).max(12, t('search.validation.monthRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
@@ -254,10 +292,17 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const gender = watch('gender')
   const passphrase = watch('passphrase')
 
+  const normalizedPassphrase = useMemo(() => normalizeForHash(passphrase || ''), [passphrase])
+  const passphraseGraphemeLength = useMemo(() => getGraphemeLength(normalizedPassphrase), [normalizedPassphrase])
+  const maskedInputStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (showPassphrase || !supportsCssMasking) return undefined
+    return { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties
+  }, [showPassphrase, supportsCssMasking])
+
   // Calculate password strength
   const passwordStrength = useMemo(() => {
-    return calculatePasswordStrength(passphrase || '')
-  }, [passphrase])
+    return calculatePasswordStrength(normalizedPassphrase)
+  }, [normalizedPassphrase])
 
   const computedHash = useMemo(() => {
     const transformedData: HashForm = {
@@ -280,7 +325,16 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   useEffect(() => {
     onFormChangeRef.current = onFormChange
   }, [onFormChange])
-  
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.CSS === 'undefined' || typeof window.CSS.supports !== 'function') {
+      setSupportsCssMasking(false)
+      return
+    }
+    const canMask = window.CSS.supports('-webkit-text-security', 'disc') || window.CSS.supports('text-security', 'disc')
+    setSupportsCssMasking(canMask)
+  }, [])
+
   useEffect(() => {
     if (!onFormChangeRef.current) return
 
@@ -420,7 +474,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="font-semibold text-gray-800 dark:text-gray-100">
-                          {t('search.hashCalculator.passphraseHelp.title', '口令作用说明')}
+                          {t('search.hashCalculator.passphraseHelp.title', 'Passphrase Information')}
                         </div>
                         <button
                           onClick={() => setShowPassphraseHelp(false)}
@@ -433,28 +487,37 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
                       <div className="space-y-3 text-sm">
                         <div className="text-gray-600 dark:text-gray-300">
                           <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
-                            {t('search.hashCalculator.passphraseHelp.privacy', '🔒 隐私保护')}
+                            {t('search.hashCalculator.passphraseHelp.privacy', '🔒 Privacy Protection')}
                           </div>
                           <div className="text-xs leading-relaxed">
-                            {t('search.hashCalculator.passphraseHelp.privacyDesc', '为您的身份哈希添加额外保护层，防止他人通过姓名和生日推测您的身份。')}
+                            {t('search.hashCalculator.passphraseHelp.privacyDesc', 'Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.')}
                           </div>
                         </div>
 
                         <div className="text-gray-600 dark:text-gray-300">
                           <div className="mb-1 font-medium text-green-600 dark:text-green-400">
-                            {t('search.hashCalculator.passphraseHelp.optional', '✅ 完全可选')}
+                            {t('search.hashCalculator.passphraseHelp.optional', '✅ Completely Optional')}
                           </div>
                           <div className="text-xs leading-relaxed">
-                            {t('search.hashCalculator.passphraseHelp.optionalDesc', '可以留空，但建议使用强口令提升安全性。')}
+                            {t('search.hashCalculator.passphraseHelp.optionalDesc', 'Can be left blank, but using longer family mottos, poems, or emoji combinations is recommended for enhanced privacy.')}
                           </div>
                         </div>
 
                         <div className="text-gray-600 dark:text-gray-300">
                           <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
-                            {t('search.hashCalculator.passphraseHelp.remember', '⚠️ 请牢记')}
+                            {t('search.hashCalculator.passphraseHelp.remember', '⚠️ Please Remember')}
                           </div>
                           <div className="text-xs leading-relaxed">
-                            {t('search.hashCalculator.passphraseHelp.rememberDesc', '口令无法找回，忘记后将生成不同的身份哈希。')}
+                            {t('search.hashCalculator.passphraseHelp.rememberDesc', 'Passphrases cannot be recovered. Forgetting it will generate a different identity hash.')}
+                          </div>
+                        </div>
+
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
+                            {t('search.hashCalculator.passphraseHelp.privacyNoteTitle', '🔐 Local Only')}
+                          </div>
+                          <div className="text-xs leading-relaxed text-gray-500 dark:text-gray-300">
+                            {t('search.hashCalculator.passphraseHelp.privacyNote', 'The passphrase is hashed locally only; nothing is uploaded or stored.')}
                           </div>
                         </div>
                       </div>
@@ -466,9 +529,16 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
           </div>
           <div className="relative">
             <input
-              type={showPassphrase ? "text" : "password"}
+              type={showPassphrase || !supportsCssMasking ? (showPassphrase ? 'text' : 'password') : 'text'}
               className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-              placeholder={t('search.hashCalculator.passphrasePlaceholder', '可选：输入口令以增强隐私保护')}
+              placeholder={t('search.hashCalculator.passphrasePlaceholder', 'Enter any characters—family mottos or secret phrases. 12+ characters with mixed symbols recommended')}
+              inputMode="text"
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              lang={i18n.language}
+              style={maskedInputStyle}
               {...register('passphrase')}
             />
             <button
@@ -480,6 +550,12 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
               {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+
+          {passphrase && passphrase.length > 0 && (
+            <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+              {t('search.hashCalculator.passphraseCharCount', { count: passphraseGraphemeLength })}
+            </div>
+          )}
 
           {/* Password strength indicator and tips */}
           {passphrase && passphrase.length > 0 && (
@@ -503,14 +579,14 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
                   passwordStrength.level === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
                   'text-green-600 dark:text-green-400'
                 }`}>
-                  {passwordStrength.level === 'weak' ? t('search.hashCalculator.passwordStrength.weak', '弱') :
-                   passwordStrength.level === 'medium' ? t('search.hashCalculator.passwordStrength.medium', '中') :
-                   t('search.hashCalculator.passwordStrength.strong', '强')}
+                  {passwordStrength.level === 'weak' ? t('search.hashCalculator.passwordStrength.weak', 'Weak') :
+                   passwordStrength.level === 'medium' ? t('search.hashCalculator.passwordStrength.medium', 'Medium') :
+                   t('search.hashCalculator.passwordStrength.strong', 'Strong')}
                 </span>
               </div>
               {passwordStrength.level === 'weak' && (
                 <div className="text-xs text-amber-600 dark:text-amber-400">
-                  {t('search.hashCalculator.passwordTips.weak', '💡 建议：使用8位以上密码，包含大小写字母、数字或特殊字符')}
+                  {t('search.hashCalculator.passwordTips.weak', '💡 Tip: Use at least 12 characters combined with numbers, punctuation, symbols, or emoji')}
                 </div>
               )}
             </div>
