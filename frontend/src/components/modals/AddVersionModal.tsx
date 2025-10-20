@@ -107,10 +107,13 @@ export default function AddVersionModal({
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
-  
+
   // Parent info collapse states
   const [fatherExpanded, setFatherExpanded] = useState(false)
   const [motherExpanded, setMotherExpanded] = useState(false)
+
+  // Key for forcing PersonHashCalculator remount on reset
+  const [formResetKey, setFormResetKey] = useState(0)
   // Track history push/pop to close on mobile back like NodeDetailModal
   const pushedRef = useRef(false)
   const closedBySelfRef = useRef(false)
@@ -266,6 +269,8 @@ export default function AddVersionModal({
     setErrorResult(null)
     setFatherExpanded(false)
     setMotherExpanded(false)
+    // Increment key to force remount of PersonHashCalculator components
+    setFormResetKey(prev => prev + 1)
     // Keep modal open for continued use
   }
 
@@ -507,6 +512,7 @@ export default function AddVersionModal({
               {t('addVersion.personInfo', 'Person Information')}
             </h3>
             <PersonHashCalculator
+              key={`person-${formResetKey}`}
               showTitle={false}
               collapsible={false}
               initialValues={existingPersonData}
@@ -552,6 +558,7 @@ export default function AddVersionModal({
             {fatherExpanded && (
               <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
                 <PersonHashCalculator
+                  key={`father-${formResetKey}`}
                   showTitle={false}
                   collapsible={false}
                   className="border-0 shadow-none"
@@ -624,6 +631,7 @@ export default function AddVersionModal({
             {motherExpanded && (
               <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
                 <PersonHashCalculator
+                  key={`mother-${formResetKey}`}
                   showTitle={false}
                   collapsible={false}
                   className="border-0 shadow-none"
