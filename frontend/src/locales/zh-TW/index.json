@@ -665,9 +665,9 @@
     "badge": "人物百科",
     "title": "家族人物百科",
     "subtitle": "探索保存在區塊鏈上的家族成員檔案",
-    "totalPeople": "總人數",
-    "withStories": "有詳細傳記",
-    "withNFTs": "擁有NFT",
+    "totalPeople": "人",
+    "withStories": "傳記",
+    "withNFTs": "NFTs",
     "searchPlaceholder": "按姓名、地點或傳記內容搜尋...",
     "filterByAddress": "按創建者地址篩選...",
     "filterByTag": "按標籤篩選...",
@@ -694,7 +694,8 @@
     "died": "逝世",
     "chunks": "{{count}} 個分片",
     "viewDetails": "查看",
-    "clickToEndorse": "點擊為此版本背書"
+    "clickToEndorse": "點擊為此版本背書",
+    "resetFilters": "重置篩選"
   },
   "storyChunksModal": {
     "fetchError": "載入傳記資料失敗",

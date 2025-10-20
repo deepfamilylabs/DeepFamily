@@ -665,9 +665,9 @@
     "badge": "人物百科",
     "title": "家族人物百科",
     "subtitle": "ブロックチェーンに保存された家族メンバープロフィールを探索",
-    "totalPeople": "総人数",
-    "withStories": "詳細伝記あり",
-    "withNFTs": "NFT所有",
+    "totalPeople": "人",
+    "withStories": "伝記",
+    "withNFTs": "NFTs",
     "searchPlaceholder": "氏名、場所、伝記内容で検索...",
     "filterByAddress": "作成者アドレスでフィルタ...",
     "filterByTag": "タグでフィルタ...",
@@ -694,7 +694,8 @@
     "died": "死去",
     "chunks": "{{count}} 個のシャード",
     "viewDetails": "詳細を見る",
-    "clickToEndorse": "クリックしてこのバージョンをエンドース"
+    "clickToEndorse": "クリックしてこのバージョンをエンドース",
+    "resetFilters": "フィルタをリセット"
   },
   "storyChunksModal": {
     "fetchError": "伝記データ読み込み失敗",

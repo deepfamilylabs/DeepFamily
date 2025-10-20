@@ -666,9 +666,9 @@
     "badge": "People Encyclopedia",
     "title": "Family People Encyclopedia",
     "subtitle": "Explore family member profiles preserved on the blockchain",
-    "totalPeople": "Total People",
-    "withStories": "With Detailed Biographies",
-    "withNFTs": "With NFTs",
+    "totalPeople": "People",
+    "withStories": "Biographies",
+    "withNFTs": "NFTs",
     "searchPlaceholder": "Search by name, location, or biography content...",
     "filterByAddress": "Filter by creator address...",
     "filterByTag": "Filter by tag...",
@@ -695,7 +695,8 @@
     "died": "Died",
     "chunks": "{{count}} chunks",
     "viewDetails": "View",
-    "clickToEndorse": "Click to endorse this version"
+    "clickToEndorse": "Click to endorse this version",
+    "resetFilters": "Reset filters"
   },
   "storyChunksModal": {
     "fetchError": "Failed to load story data",
