@@ -331,15 +331,17 @@
       "birthMonthLabel": "월",
       "birthDayLabel": "일",
       "passphrase": "패스프레이즈",
-      "passphrasePlaceholder": "선택사항: 프라이버시 강화를 위한 패스프레이즈 입력",
+      "passphrasePlaceholder": "가훈이나 암호 등 원하는 문자를 입력하세요. 12자 이상에 기호를 섞으면 더 안전합니다",
       "passphraseHelp": {
         "title": "패스프레이즈 사용 가이드",
         "privacy": "🔒 프라이버시 보호",
         "privacyDesc": "신원 해시에 추가 보호 계층을 추가하여 다른 사람이 이름과 생년월일로 신원을 추측하는 것을 방지합니다.",
         "optional": "✅ 완전히 선택사항",
-        "optionalDesc": "비워둘 수 있지만, 보안 향상을 위해 강한 패스프레이즈 사용을 권장합니다.",
+        "optionalDesc": "비워도 됩니다. 가훈이나 암호 등 어떤 문자도 사용할 수 있습니다. 가족이 같은 패스프레이즈를 공유하면 협업 관리가 가능합니다. 프라이버시 강화를 위해 12자 이상으로 작성하고 안전하게 보관하세요.",
         "remember": "⚠️ 기억해 주세요",
-        "rememberDesc": "패스프레이즈는 복구할 수 없습니다. 잊어버리면 다른 신원 해시가 생성됩니다."
+        "rememberDesc": "패스프레이즈는 복구할 수 없습니다. 잊어버리면 다른 신원 해시가 생성됩니다.",
+        "privacyNoteTitle": "🔐 로컬 처리",
+        "privacyNote": "패스프레이즈는 로컬에서만 해시 계산에 사용되며, 업로드나 저장이 되지 않습니다."
       },
       "passwordStrength": {
         "weak": "약함",
@@ -347,8 +349,9 @@
         "strong": "강함"
       },
       "passwordTips": {
-        "weak": "💡 팁: 8자 이상, 대소문자, 숫자 또는 특수문자를 포함한 비밀번호를 사용하세요"
+        "weak": "💡 팁: 최소 12자 이상으로 작성하고 숫자·구두점·기호·이모지를 섞어 사용하세요"
       },
+      "passphraseCharCount": "앞뒤 공백을 제거한 문자 수: {{count}}",
       "nameInputPlaceholder": "예: 김철수",
       "toggleNo": "아니오",
       "toggleYes": "예",

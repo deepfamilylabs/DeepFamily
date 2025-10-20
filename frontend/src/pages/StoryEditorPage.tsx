@@ -124,7 +124,7 @@ export default function StoryEditorPage() {
     if (!address) throw new Error('No wallet address')
 
     try {
-      // 执行区块链操作
+      // Execute blockchain operation
       const result = await addStoryChunk(
         signer,
         contractAddress,
@@ -197,7 +197,7 @@ export default function StoryEditorPage() {
     if (!address) throw new Error('No wallet address')
 
     try {
-      // 执行区块链操作
+      // Execute blockchain operation
       const result = await updateStoryChunk(
         signer,
         contractAddress,

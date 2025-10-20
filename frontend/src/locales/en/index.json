@@ -331,15 +331,17 @@
       "birthMonthLabel": "Month",
       "birthDayLabel": "Day",
       "passphrase": "Passphrase",
-      "passphrasePlaceholder": "Optional: Enter passphrase for enhanced privacy",
+      "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 12+ characters with mixed symbols recommended",
       "passphraseHelp": {
         "title": "Passphrase Usage Guide",
         "privacy": "🔒 Privacy Protection",
         "privacyDesc": "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
         "optional": "✅ Completely Optional",
-        "optionalDesc": "Can be left empty, but using a strong passphrase is recommended for better security.",
+        "optionalDesc": "Optional; accepts any characters such as mottos or secret codes. Relatives can share one passphrase to collaborate—use 12+ characters and keep it safe for better privacy.",
         "remember": "⚠️ Please Remember",
-        "rememberDesc": "Passphrase cannot be recovered. If forgotten, a different identity hash will be generated."
+        "rememberDesc": "Passphrase cannot be recovered. If forgotten, a different identity hash will be generated.",
+        "privacyNoteTitle": "🔐 Local Only",
+        "privacyNote": "The passphrase is hashed locally only; nothing is uploaded or stored."
       },
       "passwordStrength": {
         "weak": "Weak",
@@ -347,8 +349,9 @@
         "strong": "Strong"
       },
       "passwordTips": {
-        "weak": "💡 Tip: Use 8+ characters with uppercase, lowercase, numbers or special characters"
+        "weak": "💡 Tip: Use at least 12 characters and mix in numbers, punctuation, symbols, or emoji"
       },
+      "passphraseCharCount": "Characters after trim: {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
       "toggleNo": "No",
       "toggleYes": "Yes",

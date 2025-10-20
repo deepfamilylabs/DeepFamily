@@ -331,15 +331,17 @@
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
       "passphrase": "口令",
-      "passphrasePlaceholder": "可选：输入口令以增强隐私保护",
+      "passphrasePlaceholder": "可输入任意字符的家训或暗号，推荐 12+ 字符并混合不同符号",
       "passphraseHelp": {
         "title": "口令作用说明",
         "privacy": "🔒 隐私保护",
         "privacyDesc": "为您的身份哈希添加额外保护层，防止他人通过姓名和生日推测您的身份。",
         "optional": "✅ 完全可选",
-        "optionalDesc": "可以留空，但建议使用强口令提升安全性。",
+        "optionalDesc": "可留空；系统支持任意字符——如家训、暗号等。族人可共享同一口令协作管理；为增强隐私，推荐使用 12+ 字符并妥善保密。",
         "remember": "⚠️ 请牢记",
-        "rememberDesc": "口令无法找回，忘记后将生成不同的身份哈希。"
+        "rememberDesc": "口令无法找回，忘记后将生成不同的身份哈希。",
+        "privacyNoteTitle": "🔐 本地计算",
+        "privacyNote": "口令只在本地参与计算哈希，不会上传或保存。"
       },
       "passwordStrength": {
         "weak": "弱",
@@ -347,8 +349,9 @@
         "strong": "强"
       },
       "passwordTips": {
-        "weak": "💡 建议：使用8位以上密码，包含大小写字母、数字或特殊字符"
+        "weak": "💡 建议：至少使用12个字符，并搭配数字、标点、符号或表情"
       },
+      "passphraseCharCount": "去除首尾空格后字符数：{{count}}",
       "nameInputPlaceholder": "例如：张三",
       "toggleNo": "否",
       "toggleYes": "是",
