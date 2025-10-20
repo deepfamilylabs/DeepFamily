@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Edit2, Clock, User, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard } from 'lucide-react'
-import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, formatHashMiddle } from '../types/graph'
+import { Edit2, Clock, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard, Hash } from 'lucide-react'
+import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, shortHash } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
@@ -393,11 +393,11 @@ export default function PersonPage() {
                       {/* Title row */}
                       <div className="flex items-start justify-between gap-4 mb-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:items-baseline gap-x-2">
+                          <div className="flex flex-wrap items-baseline gap-x-2">
                             <h1 className="text-2xl sm:text-3xl font-normal text-gray-900 dark:text-gray-100" title={data.fullName || `Token #${data.tokenId}`}>
                               {data.fullName || `Token #${data.tokenId}`}
                             </h1>
-                            <span className="text-sm sm:text-3xl text-gray-500 dark:text-gray-400 font-normal">
+                            <span className="text-sm sm:text-3xl text-gray-500 dark:text-gray-400 font-normal whitespace-nowrap">
                               {t('person.encyclopedia', 'Encyclopedia')}
                             </span>
                           </div>
@@ -741,8 +741,8 @@ export default function PersonPage() {
                                         {formatUnixSeconds(chunk.timestamp)}
                                       </span>
                                       <span className="flex items-center gap-1">
-                                        <User size={12} />
-                                        {chunk.lastEditor.slice(0, 6)}...
+                                        <Hash size={12} />
+                                        {shortHash(chunk.chunkHash, 6)}
                                       </span>
                                     </div>
                                   )}
