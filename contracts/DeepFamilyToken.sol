@@ -97,23 +97,23 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
   function mint(address miner) external onlyDeepFamilyContract returns (uint256 reward) {
     if (miner == address(0)) revert ZeroAddress();
 
-    uint256 nextIndex = totalAdditions + 1;
-    reward = getReward(nextIndex);
-
-    if (reward == 0) {
-      recentReward = 0;
-      return 0;
-    }
-
     uint256 supply = totalSupply();
-
     if (supply >= MAX_SUPPLY) {
       recentReward = 0;
       return 0;
     }
 
-    if (supply + reward > MAX_SUPPLY) {
-      reward = MAX_SUPPLY - supply;
+    uint256 nextIndex = totalAdditions + 1;
+    reward = getReward(nextIndex);
+
+    uint256 remaining = MAX_SUPPLY - supply;
+    if (reward == 0 || reward > remaining) {
+      reward = remaining;
+    }
+
+    if (reward == 0) {
+      recentReward = 0;
+      return 0;
     }
 
     totalAdditions = nextIndex;
