@@ -558,6 +558,7 @@
   "storyChunkEditor": {
     "title": "전기 콘텐츠 편집기",
     "stats": "샤드 수: {{count}}, 총 길이: {{length}}",
+    "totalLength": "총 길이",
     "sealed": "봉인됨",
     "seal": "봉인",
     "hashLabel": "해시",

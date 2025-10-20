@@ -558,6 +558,7 @@
   "storyChunkEditor": {
     "title": "伝記コンテンツエディタ",
     "stats": "シャード数: {{count}}, 総長: {{length}}",
+    "totalLength": "総長",
     "sealed": "シーリング済み",
     "seal": "シーリング",
     "hashLabel": "ハッシュ",
