@@ -665,9 +665,9 @@
     "badge": "인물 백과사전",
     "title": "가족 인물 백과사전",
     "subtitle": "블록체인에 저장된 가족 구성원 프로필 탐색",
-    "totalPeople": "총 인원수",
-    "withStories": "상세 전기 있음",
-    "withNFTs": "NFT 소유",
+    "totalPeople": "인물",
+    "withStories": "전기",
+    "withNFTs": "NFTs",
     "searchPlaceholder": "이름, 장소 또는 전기 내용으로 검색...",
     "filterByAddress": "생성자 주소로 필터링...",
     "filterByTag": "태그로 필터링...",
@@ -694,7 +694,8 @@
     "died": "사망",
     "chunks": "{{count}}개 샤드",
     "viewDetails": "보기",
-    "clickToEndorse": "이 버전을 승인하려면 클릭하세요"
+    "clickToEndorse": "이 버전을 승인하려면 클릭하세요",
+    "resetFilters": "필터 초기화"
   },
   "storyChunksModal": {
     "fetchError": "전기 데이터 로드 실패",

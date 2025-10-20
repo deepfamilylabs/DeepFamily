@@ -666,9 +666,9 @@
     "badge": "人物百科",
     "title": "家族人物百科",
     "subtitle": "探索保存在区块链上的家族成员档案",
-    "totalPeople": "总人数",
-    "withStories": "有详细传记",
-    "withNFTs": "拥有NFT",
+    "totalPeople": "人",
+    "withStories": "传记",
+    "withNFTs": "NFTs",
     "searchPlaceholder": "按姓名、地点或传记内容搜索...",
     "filterByAddress": "按创建者地址筛选...",
     "filterByTag": "按标签筛选...",
@@ -695,7 +695,8 @@
     "died": "逝世",
     "chunks": "{{count}} 个分片",
     "viewDetails": "查看",
-    "clickToEndorse": "点击为此版本背书"
+    "clickToEndorse": "点击为此版本背书",
+    "resetFilters": "重置筛选"
   },
   "storyChunksModal": {
     "fetchError": "加载传记数据失败",

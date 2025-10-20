@@ -11,48 +11,60 @@ interface SortButtonProps {
   showSortArrows?: boolean
 }
 
-export default function SortButton({ 
-  label, 
-  isActive, 
-  sortOrder, 
-  onClick, 
+export default function SortButton({
+  label,
+  isActive,
+  sortOrder,
+  onClick,
   onSortOrderChange,
-  showSortArrows = false 
+  showSortArrows = false
 }: SortButtonProps) {
+  const handleClick = () => {
+    if (isActive) {
+      // Toggle sort order if already active
+      onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Activate this sort option
+      onClick()
+    }
+  }
+
   return (
-    <div className={`flex items-center gap-1 rounded-lg transition-colors px-2 sm:px-4 ${
-      isActive
-        ? 'bg-blue-600 text-white shadow-sm'
-        : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-600'
-    }`}>
-      <button
-        onClick={onClick}
-        className="py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
-      >
-        {label}
-      </button>
+    <button
+      onClick={handleClick}
+      className={`
+        group relative inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg
+        text-sm font-medium whitespace-nowrap
+        transition-all duration-200 ease-out
+        ${
+          isActive
+            ? 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 scale-105'
+            : 'bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200'
+        }
+      `}
+      aria-label={`${label} - ${sortOrder === 'asc' ? 'Ascending' : 'Descending'}`}
+    >
+      <span>{label}</span>
       {isActive && showSortArrows && (
-        <div className="flex flex-col -space-y-1">
-          <button
-            onClick={() => onSortOrderChange('asc')}
-            className={`p-0.5 transition-colors ${
-              sortOrder === 'asc' ? 'text-white' : 'text-gray-300 hover:text-gray-100'
+        <div className="flex flex-col -space-y-2 items-center ml-0.5">
+          <ChevronUp
+            className={`w-3.5 h-3.5 transition-all duration-200 ${
+              sortOrder === 'asc'
+                ? 'text-white drop-shadow-sm'
+                : 'text-white/30'
             }`}
-            aria-label="Sort ascending"
-          >
-            <ChevronUp className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => onSortOrderChange('desc')}
-            className={`p-0.5 transition-colors ${
-              sortOrder === 'desc' ? 'text-white' : 'text-gray-300 hover:text-gray-100'
+            strokeWidth={2.5}
+          />
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-all duration-200 ${
+              sortOrder === 'desc'
+                ? 'text-white drop-shadow-sm'
+                : 'text-white/30'
             }`}
-            aria-label="Sort descending"
-          >
-            <ChevronDown className="w-3 h-3" />
-          </button>
+            strokeWidth={2.5}
+          />
         </div>
       )}
-    </div>
+    </button>
   )
 }
