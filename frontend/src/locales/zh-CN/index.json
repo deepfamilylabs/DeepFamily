@@ -514,6 +514,7 @@
     "cancel": "取消",
     "goBack": "返回",
     "close": "关闭",
+    "error": "错误",
     "hashCopied": "已复制哈希",
     "copy": "复制",
     "copied": "已复制"
@@ -615,6 +616,7 @@
       "walletTimeout": "钱包确认超时，请重新打开钱包并完成确认。",
       "walletPending": "钱包中存在待处理请求，请打开钱包确认或取消后再试。",
       "insufficientFunds": "Gas费不足",
+      "noWallet": "未连接钱包。请先连接您的钱包。",
       "unknown": "发生未知错误"
     }
   },
