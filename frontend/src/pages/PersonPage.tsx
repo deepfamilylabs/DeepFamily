@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Edit2, Clock, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard, Hash } from 'lucide-react'
-import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, shortHash } from '../types/graph'
+import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, formatHashMiddle } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
@@ -735,15 +735,26 @@ export default function PersonPage() {
                                     {open ? chunk.content : preview}
                                   </div>
                                   {open && (
-                                    <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                                      <span className="flex items-center gap-1">
+                                    <div className="space-y-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                                         <Clock size={12} />
                                         {formatUnixSeconds(chunk.timestamp)}
-                                      </span>
-                                      <span className="flex items-center gap-1">
-                                        <Hash size={12} />
-                                        {shortHash(chunk.chunkHash, 6)}
-                                      </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                        <Hash size={12} className="flex-shrink-0" />
+                                        <span className="font-mono truncate" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            copyText(chunk.chunkHash)
+                                          }}
+                                          className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                          aria-label={t('search.copy')}
+                                          title={t('search.copy')}
+                                        >
+                                          <Clipboard size={12} />
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
