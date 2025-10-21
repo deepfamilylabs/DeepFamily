@@ -564,7 +564,7 @@
     "sealed": "已封存",
     "seal": "封存",
     "hashLabel": "哈希",
-    "editChunk": "编辑分片 #{{index}}",
+    "editChunk": "编辑分片",
     "addChunk": "添加新分片",
     "contentPlaceholder": "请输入分片内容（最多1000字符）",
     "saving": "保存中...",

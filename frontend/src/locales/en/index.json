@@ -564,7 +564,7 @@
     "sealed": "Sealed",
     "seal": "Seal",
     "hashLabel": "Hash",
-    "editChunk": "Edit Chunk #{{index}}",
+    "editChunk": "Edit Chunk",
     "addChunk": "Add New Chunk",
     "contentPlaceholder": "Enter chunk content (max 1000 characters)",
     "saving": "Saving...",

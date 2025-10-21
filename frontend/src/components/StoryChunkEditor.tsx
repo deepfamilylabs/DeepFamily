@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Plus, Edit2, Save, Lock, Clipboard, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Plus, Edit2, Save, Lock, Clipboard, ArrowLeft, ChevronDown, ChevronUp, ChevronRight, Clock, Hash } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
 import { StoryChunk, StoryMetadata, StoryChunkCreateData, StoryChunkUpdateData, formatUnixSeconds, formatHashMiddle } from '../types/graph'
@@ -266,7 +266,7 @@ export default function StoryChunkEditor({
   }
 
   const Card = (
-      <div className={`relative bg-white dark:bg-gray-900 rounded-lg w-full ${layout === 'page' ? 'max-w-4xl' : 'max-w-[900px] max-h-[90vh]'} overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800`}>
+      <div className={`relative bg-white dark:bg-gray-900 rounded-lg w-full ${layout === 'page' ? 'max-w-7xl' : 'max-w-7xl max-h-[90vh]'} overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800`}>
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3 min-w-0">
             {layout === 'page' && (
@@ -352,22 +352,30 @@ export default function StoryChunkEditor({
           </div>
         )}
         
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-gray-50 dark:bg-gray-950">
-          {(error || localError) && (
-            <div className="bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50 rounded-lg p-4 text-red-800 dark:text-red-300 text-sm">
-              <div className="font-semibold mb-1">{t('common.error', 'Error')}</div>
-              <div>{error || localError}</div>
-            </div>
-          )}
-          
-          {editingChunkIndex !== null || (editingChunkIndex === null && !isSealed) ? (
-            <div ref={formRef} className="bg-white dark:bg-gray-900 rounded-lg p-5 border border-gray-200 dark:border-gray-800">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-800">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 dark:bg-gray-950">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
+            {/* Left column - Main content */}
+            <div className="xl:col-span-3 space-y-4">
+              {/* Error message card */}
+              {(error || localError) && (
+                <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="bg-red-50 dark:bg-red-900/30 border-b border-red-300 dark:border-red-700/50 p-4">
+                    <div className="font-semibold mb-1 text-red-800 dark:text-red-300">{t('common.error', 'Error')}</div>
+                    <div className="text-sm text-red-700 dark:text-red-400">{error || localError}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit form card */}
+              {(editingChunkIndex !== null || (editingChunkIndex === null && !isSealed)) && (
+                <div ref={formRef} className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-800">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   {editingChunkIndex !== null ? (
                     <>
                       <Edit2 size={16} className="text-blue-600 dark:text-blue-400" />
-                      {t('storyChunkEditor.editChunk', 'Edit Chunk #{{index}}', { index: editingChunkIndex })}
+                      {t('storyChunkEditor.editChunk', 'Edit Chunk')} #{editingChunkIndex}
                     </>
                   ) : (
                     <>
@@ -398,7 +406,7 @@ export default function StoryChunkEditor({
                     expectedHash: e.target.value ? computeContentHash(e.target.value) : undefined
                   }))}
                   placeholder={t('storyChunkEditor.contentPlaceholderBytes', 'Enter chunk content (max 1000 bytes, approximately 1000 English characters or ~333 Chinese characters)')}
-                  className="w-full h-40 sm:h-48 p-3 border border-gray-200 dark:border-gray-700 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors text-sm leading-relaxed"
+                  className="w-full h-[500px] p-3 border border-gray-200 dark:border-gray-700 rounded resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors text-sm leading-relaxed"
                   disabled={submitting}
                 />
 
@@ -449,131 +457,220 @@ export default function StoryChunkEditor({
                   {t('storyChunkEditor.cancel', 'Cancel')}
                 </button>
               </div>
-            </div>
-          ) : null}
-          
-          {!isSealed && editingChunkIndex === null && (
-            <button
-              onClick={() => handleStartEdit(null)}
-              className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-600 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 flex items-center justify-center gap-2 transition-colors text-sm font-medium"
-            >
-              <Plus size={18} />
-              {t('storyChunkEditor.addNewChunk', 'Add New Chunk')}
-            </button>
-          )}
-          
-          {sortedChunks.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  {t('storyChunkEditor.chunks', 'Existing Chunks')}
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                    ({sortedChunks.length})
-                  </span>
-                </h3>
-              </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="space-y-3">
-                {sortedChunks.map((chunk) => {
-                  const isExpanded = expandedChunks.has(chunk.chunkIndex)
-                  const contentPreview = chunk.content.length > 150 ? chunk.content.substring(0, 150) + '...' : chunk.content
-                  const needsExpansion = chunk.content.length > 150
+              {/* Loading state */}
+              {loading && (
+                <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+                    <div className="w-12 h-12 border-4 border-blue-200 dark:border-blue-800 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin mb-4"></div>
+                    <p className="text-sm font-medium">{t('storyChunkEditor.loading', 'Loading...')}</p>
+                  </div>
+                </div>
+              )}
 
-                  return (
-                    <div
-                      key={chunk.chunkIndex}
-                      className="group border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 hover:shadow-lg transition-all duration-200 overflow-hidden"
-                    >
-                      <div className="p-4 space-y-3">
-                        {/* Header */}
-                        <div className="flex justify-between items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="px-2.5 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-500/20 dark:to-purple-500/20 text-indigo-700 dark:text-indigo-300 rounded-lg text-sm font-bold">
-                                #{chunk.chunkIndex}
-                              </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                {formatUnixSeconds(chunk.timestamp)}
-                              </span>
+              {/* Empty sealed state */}
+              {!loading && sortedChunks.length === 0 && !error && !localError && isSealed && (
+                <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <Lock size={48} className="mx-auto mb-4 opacity-50" />
+                    <p className="text-sm font-medium">{t('storyChunkEditor.noChunksSealed', 'This story is sealed with no chunks.')}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Show chunk list on mobile (xl:hidden) */}
+              {sortedChunks.length > 0 && (
+                <div className="xl:hidden bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                      <span>{t('storyChunkEditor.chunks', 'Existing Chunks')}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                        {sortedChunks.length}
+                      </span>
+                    </h3>
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    {sortedChunks.map((chunk) => {
+                      const isExpanded = expandedChunks.has(chunk.chunkIndex)
+                      const contentPreview = chunk.content.length > 150 ? chunk.content.substring(0, 150) + '...' : chunk.content
+                      const needsExpansion = chunk.content.length > 150
+
+                      return (
+                        <div
+                          key={chunk.chunkIndex}
+                          className="group border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 hover:shadow-lg transition-all duration-200 overflow-hidden"
+                        >
+                          <div className="p-4 space-y-3">
+                            {/* Header */}
+                            <div className="flex justify-between items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="px-2.5 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-500/20 dark:to-purple-500/20 text-indigo-700 dark:text-indigo-300 rounded-lg text-sm font-bold">
+                                    #{chunk.chunkIndex}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                    {formatUnixSeconds(chunk.timestamp)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                  <span className="font-medium">{t('storyChunkEditor.hashLabel','Hash')}:</span>
+                                  <code className="font-mono px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                                    {formatHash(chunk.chunkHash)}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() => onCopyHash(chunk.chunkHash)}
+                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    aria-label={t('search.copy', 'Copy') as string}
+                                  >
+                                    <Clipboard size={12} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {!isSealed && (
+                                <button
+                                  onClick={() => handleStartEdit(chunk.chunkIndex, chunk.content)}
+                                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                  disabled={submitting}
+                                  aria-label={t('storyChunkEditor.editChunk', 'Edit Chunk #{{index}}', { index: chunk.chunkIndex }) as string}
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                              <span className="font-medium">{t('storyChunkEditor.hashLabel','Hash')}:</span>
-                              <code className="font-mono px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
-                                {formatHash(chunk.chunkHash)}
-                              </code>
+
+                            {/* Content */}
+                            <div className="relative">
+                              <div className={`text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-relaxed ${!isExpanded && needsExpansion ? 'max-h-24 overflow-hidden' : ''}`}>
+                                {isExpanded ? chunk.content : contentPreview}
+                              </div>
+                              {!isExpanded && needsExpansion && (
+                                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-800 to-transparent pointer-events-none" />
+                              )}
+                            </div>
+
+                            {/* Expand/Collapse Button */}
+                            {needsExpansion && (
                               <button
-                                type="button"
-                                onClick={() => onCopyHash(chunk.chunkHash)}
-                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                aria-label={t('search.copy', 'Copy') as string}
+                                onClick={() => toggleChunkExpansion(chunk.chunkIndex)}
+                                className="w-full py-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center justify-center gap-1 transition-colors"
                               >
-                                <Clipboard size={12} />
+                                {isExpanded ? (
+                                  <>
+                                    <ChevronUp size={14} />
+                                    {t('common.showLess', 'Show less')}
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown size={14} />
+                                    {t('common.showMore', 'Show more')}
+                                  </>
+                                )}
                               </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right column - Chunk List (desktop only) */}
+            <div className="hidden xl:block space-y-4" data-testid="chunk-list-sidebar">
+              {sortedChunks.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                      <span>{t('storyChunkEditor.chunks', 'Existing Chunks')}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                        {sortedChunks.length}
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-gray-200 dark:divide-gray-800 max-h-[600px] overflow-y-auto [scrollbar-gutter:stable]">
+                    {sortedChunks.map((chunk) => {
+                      const isExpanded = expandedChunks.has(chunk.chunkIndex)
+                      const preview = chunk.content.length > 60 ? `${chunk.content.slice(0, 60)}...` : chunk.content
+                      return (
+                        <div key={chunk.chunkIndex} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
+                          <div className="flex items-start gap-2">
+                            <button
+                              onClick={() => toggleChunkExpansion(chunk.chunkIndex)}
+                              className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0 hover:text-gray-600 dark:hover:text-gray-300"
+                            >
+                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1 gap-2">
+                                <button
+                                  onClick={() => toggleChunkExpansion(chunk.chunkIndex)}
+                                  className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                >
+                                  #{chunk.chunkIndex}
+                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                                    {chunk.content.length}
+                                  </span>
+                                  {!isSealed && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleStartEdit(chunk.chunkIndex, chunk.content)
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                      disabled={submitting}
+                                      aria-label={t('storyChunkEditor.editChunk')}
+                                      title={t('storyChunkEditor.editChunk')}
+                                    >
+                                      <Edit2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div className={`text-xs text-gray-600 dark:text-gray-400 ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                                {isExpanded ? chunk.content : preview}
+                              </div>
+                              {isExpanded && (
+                                <div className="space-y-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                  <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                                    <Clock size={12} />
+                                    {formatUnixSeconds(chunk.timestamp)}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                    <Hash size={12} className="flex-shrink-0" />
+                                    <span className="font-mono truncate" title={chunk.chunkHash}>{formatHash(chunk.chunkHash)}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onCopyHash(chunk.chunkHash)
+                                      }}
+                                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                      aria-label={t('search.copy')}
+                                      title={t('search.copy')}
+                                    >
+                                      <Clipboard size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
-
-                          {!isSealed && (
-                            <button
-                              onClick={() => handleStartEdit(chunk.chunkIndex, chunk.content)}
-                              className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                              disabled={submitting}
-                              aria-label={t('storyChunkEditor.editChunk', 'Edit Chunk #{{index}}', { index: chunk.chunkIndex }) as string}
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                          )}
                         </div>
-
-                        {/* Content */}
-                        <div className="relative">
-                          <div className={`text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-relaxed ${!isExpanded && needsExpansion ? 'max-h-24 overflow-hidden' : ''}`}>
-                            {isExpanded ? chunk.content : contentPreview}
-                          </div>
-                          {!isExpanded && needsExpansion && (
-                            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-800 to-transparent pointer-events-none" />
-                          )}
-                        </div>
-
-                        {/* Expand/Collapse Button */}
-                        {needsExpansion && (
-                          <button
-                            onClick={() => toggleChunkExpansion(chunk.chunkIndex)}
-                            className="w-full py-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center justify-center gap-1 transition-colors"
-                          >
-                            {isExpanded ? (
-                              <>
-                                <ChevronUp size={14} />
-                                {t('common.showLess', 'Show less')}
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown size={14} />
-                                {t('common.showMore', 'Show more')}
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-          
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
-              <div className="w-12 h-12 border-4 border-blue-200 dark:border-blue-800 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin mb-4"></div>
-              <p className="text-sm font-medium">{t('storyChunkEditor.loading', 'Loading...')}</p>
-            </div>
-          )}
-
-          {!loading && sortedChunks.length === 0 && !error && !localError && isSealed && (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              <Lock size={48} className="mx-auto mb-4 opacity-50" />
-              <p className="text-sm font-medium">{t('storyChunkEditor.noChunksSealed', 'This story is sealed with no chunks.')}</p>
-            </div>
-          )}
+          </div>
         </div>
         
       </div>
