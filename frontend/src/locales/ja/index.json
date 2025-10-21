@@ -563,7 +563,7 @@
     "sealed": "シーリング済み",
     "seal": "シーリング",
     "hashLabel": "ハッシュ",
-    "editChunk": "シャード #{{index}} 編集",
+    "editChunk": "シャード編集",
     "addChunk": "新規シャード追加",
     "contentPlaceholder": "シャード内容を入力してください（最大1000文字）",
     "saving": "保存中...",

@@ -563,7 +563,7 @@
     "sealed": "봉인됨",
     "seal": "봉인",
     "hashLabel": "해시",
-    "editChunk": "샤드 #{{index}} 편집",
+    "editChunk": "샤드 편집",
     "addChunk": "새 샤드 추가",
     "contentPlaceholder": "샤드 내용을 입력하세요(최대 1000자)",
     "saving": "저장 중...",

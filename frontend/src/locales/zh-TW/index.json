@@ -563,7 +563,7 @@
     "sealed": "已封存",
     "seal": "封存",
     "hashLabel": "雜湊",
-    "editChunk": "編輯分片 #{{index}}",
+    "editChunk": "編輯分片",
     "addChunk": "添加新分片",
     "contentPlaceholder": "請輸入分片內容（最多1000字元）",
     "saving": "保存中...",
