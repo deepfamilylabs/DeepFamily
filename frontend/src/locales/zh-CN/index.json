@@ -559,6 +559,8 @@
   },
   "storyChunkEditor": {
     "title": "传记内容编辑器",
+    "titleWithName": "{{name}}的传记",
+    "titleFallback": "传记",
     "stats": "分片数量: {{count}}, 总长度: {{length}}",
     "totalLength": "总长度",
     "sealed": "已封存",
