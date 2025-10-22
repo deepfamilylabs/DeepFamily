@@ -558,6 +558,8 @@
   },
   "storyChunkEditor": {
     "title": "伝記コンテンツエディタ",
+    "titleWithName": "{{name}} の伝記",
+    "titleFallback": "伝記",
     "stats": "シャード数: {{count}}, 総長: {{length}}",
     "totalLength": "総長",
     "sealed": "シーリング済み",

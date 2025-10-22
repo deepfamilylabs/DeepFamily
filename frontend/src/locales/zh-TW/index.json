@@ -558,6 +558,8 @@
   },
   "storyChunkEditor": {
     "title": "傳記分片編輯器",
+    "titleWithName": "{{name}}的傳記",
+    "titleFallback": "傳記",
     "stats": "分片數量: {{count}}, 總長度: {{length}}",
     "totalLength": "總長度",
     "sealed": "已封存",

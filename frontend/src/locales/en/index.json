@@ -559,6 +559,8 @@
   },
   "storyChunkEditor": {
     "title": "Biography Chunk Editor",
+    "titleWithName": "{{name}} Biography",
+    "titleFallback": "Biography",
     "stats": "Chunks: {{count}}, Total Length: {{length}}",
     "totalLength": "Total Length",
     "sealed": "Sealed",
