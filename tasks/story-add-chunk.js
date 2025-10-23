@@ -1,12 +1,14 @@
 const { task } = require("hardhat/config");
 
-// addStoryChunk(tokenId, chunkIndex, content, expectedHash)
-// Only NFT holder; chunkIndex must equal current totalChunks; optional expected hash integrity check.
+// addStoryChunk(tokenId, chunkIndex, chunkType, content, attachmentCID, expectedHash)
+// Only NFT holder; chunkIndex must equal current totalChunks; optional integrity hash check.
 
 task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
   .addParam("tokenid", "NFT tokenId (uint256)")
   .addParam("chunkindex", "Chunk index to add (must equal current totalChunks, starts at 0)")
   .addParam("content", "Chunk content (<=2048 UTF-8 bytes)")
+  .addOptionalParam("type", "Chunk classification (uint8, default 0)", "0")
+  .addOptionalParam("attachment", "Attachment CID (optional)", "")
   .addOptionalParam(
     "exphash",
     "Expected keccak256 hash of raw UTF-8 bytes of content (bytes32, optional)",
@@ -38,6 +40,16 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
       throw new Error("content exceeds 2048 byte limit");
     }
 
+    const chunkType = Number(args.type || '0');
+    if (!Number.isInteger(chunkType) || chunkType < 0 || chunkType > 255) {
+      throw new Error("type must be an integer between 0 and 255");
+    }
+
+    const attachmentCID = args.attachment || '';
+    if (attachmentCID.length > 0 && attachmentCID.length > 256) {
+      throw new Error("attachment CID exceeds 256 characters");
+    }
+
     // Read metadata to validate continuity & sealed state
     let metadata;
     try {
@@ -66,13 +78,20 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
       );
     }
 
-    const tx = await deepFamily.addStoryChunk(tokenId, chunkIndex, content, expectedHash);
+    const tx = await deepFamily.addStoryChunk(
+      tokenId,
+      chunkIndex,
+      chunkType,
+      content,
+      attachmentCID,
+      expectedHash
+    );
     const receipt = await tx.wait();
 
     // Parse StoryChunkAdded event
     try {
       const iface = new ethers.Interface([
-        "event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength)",
+        "event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID)",
       ]);
       const deepAddr = deepDeployment.address.toLowerCase();
       for (const log of receipt.logs || []) {

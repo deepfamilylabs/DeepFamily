@@ -102,7 +102,7 @@ async function addStoryChunks(
     try {
       const content = generateChunkContent(personName, i, useMaxLength);
       const expectedHash = solidityStringHash(content);
-      const tx = await deepFamily.addStoryChunk(tokenId, i, content, expectedHash);
+      const tx = await deepFamily.addStoryChunk(tokenId, i, 0, content, '', expectedHash);
       await tx.wait();
       addedCount++;
       console.log(`  Chunk #${i} added, length: ${utf8ByteLen(content)} bytes`);

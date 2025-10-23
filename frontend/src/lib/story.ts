@@ -35,6 +35,8 @@ export interface AddStoryChunkResult {
       contentLength: number
       chunkHash: string
       editor: string
+      chunkType: number
+      attachmentCID: string
     } | null
   }
 }
@@ -66,7 +68,9 @@ export async function addStoryChunk(
   tokenId: string,
   chunkIndex: number,
   content: string,
-  expectedHash: string
+  expectedHash: string,
+  chunkType = 0,
+  attachmentCID = ''
 ): Promise<AddStoryChunkResult> {
   const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer)
 
@@ -79,7 +83,14 @@ export async function addStoryChunk(
 
     // Send transaction (with wallet confirmation timeout)
     const tx = await withWalletConfirmationTimeout(
-      () => contract.addStoryChunk(tokenId, chunkIndex, content, expectedHash || ethers.ZeroHash),
+      () => contract.addStoryChunk(
+        tokenId,
+        chunkIndex,
+        chunkType,
+        content,
+        attachmentCID,
+        expectedHash || ethers.ZeroHash
+      ),
       'addStoryChunk'
     )
     console.log('✅ Transaction sent:', tx.hash)
@@ -111,7 +122,9 @@ export async function addStoryChunk(
               chunkIndex: Number(parsedEvent.args.chunkIndex),
               contentLength: Number(parsedEvent.args.contentLength),
               chunkHash: parsedEvent.args.chunkHash,
-              editor: parsedEvent.args.editor
+              editor: parsedEvent.args.editor,
+              chunkType: Number(parsedEvent.args.chunkType),
+              attachmentCID: parsedEvent.args.attachmentCID
             }
             parsedChunkIndex = events.StoryChunkAdded.chunkIndex
             parsedContentLength = events.StoryChunkAdded.contentLength
@@ -130,7 +143,9 @@ export async function addStoryChunk(
       chunkHash: events.StoryChunkAdded?.chunkHash || ethers.keccak256(ethers.toUtf8Bytes(content)),
       content: content,
       timestamp: Math.floor(Date.now() / 1000), // Use current time as approximation
-      editor: events.StoryChunkAdded?.editor || await signer.getAddress()
+      editor: events.StoryChunkAdded?.editor || await signer.getAddress(),
+      chunkType: events.StoryChunkAdded?.chunkType ?? chunkType,
+      attachmentCID: events.StoryChunkAdded?.attachmentCID ?? attachmentCID
     }
 
     return {

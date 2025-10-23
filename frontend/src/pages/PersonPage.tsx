@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Edit2, Clock, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard, Hash } from 'lucide-react'
-import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, formatHashMiddle } from '../types/graph'
+import { Edit2, Clock, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard, Hash, Link, User } from 'lucide-react'
+import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, formatHashMiddle, shortAddress } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
@@ -95,6 +95,50 @@ export default function PersonPage() {
 
   const formatDate = (ts?: number) => formatUnixSeconds(ts)
 
+  const chunkTypeOptions = useMemo(() => (
+    [
+      { value: 0, label: t('storyChunkEditor.chunkTypes.narrative', 'Narrative') },
+      { value: 1, label: t('storyChunkEditor.chunkTypes.work', 'Work / Achievement') },
+      { value: 2, label: t('storyChunkEditor.chunkTypes.quote', 'Quote') },
+      { value: 3, label: t('storyChunkEditor.chunkTypes.media', 'Media') },
+      { value: 4, label: t('storyChunkEditor.chunkTypes.timeline', 'Timeline') },
+      { value: 5, label: t('storyChunkEditor.chunkTypes.commentary', 'Commentary') },
+      { value: 6, label: t('storyChunkEditor.chunkTypes.source', 'Source') },
+      { value: 7, label: t('storyChunkEditor.chunkTypes.correction', 'Correction') },
+      { value: 8, label: t('storyChunkEditor.chunkTypes.editorial', 'Editorial') }
+    ]
+  ), [t])
+
+  const convertChunkTypeToNumber = useCallback((type: number | string | null | undefined): number => {
+    if (type === null || type === undefined || type === '') return 0
+    if (typeof type === 'number' && Number.isFinite(type)) return type
+    if (typeof type === 'string') {
+      const trimmed = type.trim()
+      if (!trimmed) return 0
+      const parsed = Number(trimmed)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+    const parsed = Number(type as any)
+    return Number.isFinite(parsed) ? parsed : 0
+  }, [])
+
+  const getChunkTypeLabel = useCallback(
+    (type: number | string | null | undefined) => {
+      const numericType = convertChunkTypeToNumber(type)
+      const match = chunkTypeOptions.find(opt => opt.value === numericType)
+      return match ? match.label : t('storyChunkEditor.chunkTypes.unknown', 'Unknown')
+    },
+    [chunkTypeOptions, convertChunkTypeToNumber, t]
+  )
+
+  const resolveAttachmentUrl = useCallback((cid: string) => {
+    if (!cid) return ''
+    if (cid.startsWith('ipfs://')) {
+      return `https://ipfs.io/ipfs/${cid.slice(7)}`
+    }
+    return cid
+  }, [])
+
   const fullStoryParagraphs = useMemo(() => {
     if (!data?.fullStory) return []
     if (viewMode === 'raw') return []
@@ -186,7 +230,11 @@ export default function PersonPage() {
       owner: prefetched.owner,
       nftCoreInfo: prefetched.nftCoreInfo,
       storyMetadata: prefetched.storyMetadata,
-      storyChunks: prefetched.storyChunks,
+      storyChunks: prefetched.storyChunks?.map(chunk => ({
+        ...chunk,
+        chunkType: convertChunkTypeToNumber(chunk.chunkType),
+        attachmentCID: chunk.attachmentCID ?? ''
+      })),
       fullStory: initialFullStory
     } as StoryDetailData))
     setLoading(false)
@@ -714,18 +762,31 @@ export default function PersonPage() {
                           const preview = chunk.content.length > 60 ? `${chunk.content.slice(0, 60)}...` : chunk.content
                           return (
                             <div key={chunk.chunkIndex} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                              <button
+                              <div
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => toggleChunk(chunk.chunkIndex)}
-                                className="w-full text-left flex items-start gap-2"
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    toggleChunk(chunk.chunkIndex)
+                                  }
+                                }}
+                                className="w-full text-left flex items-start gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                               >
                                 <span className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0">
                                   {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                 </span>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                      #{chunk.chunkIndex}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        #{chunk.chunkIndex}
+                                      </span>
+                                      <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                        {getChunkTypeLabel(chunk.chunkType)}
+                                      </span>
+                                    </div>
                                     <span className="text-xs text-gray-400 dark:text-gray-500">
                                       {chunk.content.length}
                                     </span>
@@ -734,14 +795,35 @@ export default function PersonPage() {
                                     {open ? chunk.content : preview}
                                   </div>
                                   {open && (
-                                    <div className="space-y-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                                    <div className="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
+                                      <span className="inline-flex items-center gap-1">
                                         <Clock size={12} />
                                         {formatUnixSeconds(chunk.timestamp)}
-                                      </div>
-                                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                      </span>
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <User size={12} />
+                                        {chunk.editor ? (
+                                          <>
+                                            <span className="truncate max-w-[140px]" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                copyText(chunk.editor)
+                                              }}
+                                              className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                              aria-label={t('search.copy')}
+                                              title={t('search.copy')}
+                                            >
+                                              <Clipboard size={12} />
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <span>-</span>
+                                        )}
+                                      </span>
+                                      <span className="inline-flex items-center gap-1">
                                         <Hash size={12} className="flex-shrink-0" />
-                                        <span className="font-mono truncate" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
+                                        <span className="font-mono truncate max-w-[140px]" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation()
@@ -753,11 +835,35 @@ export default function PersonPage() {
                                         >
                                           <Clipboard size={12} />
                                         </button>
-                                      </div>
+                                      </span>
+                                      {chunk.attachmentCID && (
+                                        <span className="inline-flex items-center gap-1">
+                                          <Link size={12} />
+                                          <a
+                                            href={resolveAttachmentUrl(chunk.attachmentCID)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="truncate max-w-[180px] underline decoration-dotted hover:text-blue-600 dark:hover:text-blue-400"
+                                          >
+                                            {chunk.attachmentCID}
+                                          </a>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              copyText(chunk.attachmentCID)
+                                            }}
+                                            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                            aria-label={t('search.copy')}
+                                            title={t('search.copy')}
+                                          >
+                                            <Clipboard size={12} />
+                                          </button>
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                 </div>
-                              </button>
+                              </div>
                             </div>
                           )
                         })}

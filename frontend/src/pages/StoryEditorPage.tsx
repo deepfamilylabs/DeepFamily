@@ -3,14 +3,14 @@ import { createPortal } from 'react-dom'
 import { useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash } from 'lucide-react'
+import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash, Link, User } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useWallet } from '../context/WalletContext'
 import { useToast } from '../components/ToastProvider'
 import { addStoryChunk, sealStory, computeStoryHash } from '../lib/story'
 import type { StoryChunk, StoryChunkCreateData, StoryMetadata, NodeData } from '../types/graph'
-import { formatUnixSeconds, formatHashMiddle } from '../types/graph'
+import { formatUnixSeconds, formatHashMiddle, shortAddress } from '../types/graph'
 
 interface PrefetchedState {
   prefetchedStory?: {
@@ -24,6 +24,8 @@ interface PrefetchedState {
 interface ChunkFormData {
   content: string
   expectedHash?: string
+  chunkType: number
+  attachmentCID: string
 }
 
 export default function StoryEditorPage() {
@@ -37,11 +39,32 @@ export default function StoryEditorPage() {
 
   const prefetched = (location.state as PrefetchedState | undefined)?.prefetchedStory
 
+  const convertChunkTypeToNumber = useCallback((type: number | string | null | undefined): number => {
+    if (type === null || type === undefined || type === '') return 0
+    if (typeof type === 'number' && Number.isFinite(type)) return type
+    if (typeof type === 'string') {
+      const trimmed = type.trim()
+      if (!trimmed) return 0
+      const parsed = Number(trimmed)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+    const parsed = Number(type as any)
+    return Number.isFinite(parsed) ? parsed : 0
+  }, [])
+
+  const prefetchedChunks = prefetched?.storyChunks
+    ? prefetched.storyChunks.map((chunk) => ({
+        ...chunk,
+        chunkType: convertChunkTypeToNumber(chunk.chunkType),
+        attachmentCID: chunk.attachmentCID ?? ''
+      }))
+    : undefined
+
   // Ensure window starts at top when entering the editor page
   useEffect(() => { try { window.scrollTo({ top: 0, behavior: 'instant' as any }) } catch { window.scrollTo(0, 0) } }, [])
 
   const [meta, setMeta] = useState<StoryMetadata | undefined>(prefetched?.storyMetadata)
-  const [chunks, setChunks] = useState<StoryChunk[] | undefined>(prefetched?.storyChunks)
+  const [chunks, setChunks] = useState<StoryChunk[] | undefined>(prefetchedChunks)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [dirty, setDirty] = useState<boolean>(false)
@@ -50,8 +73,9 @@ export default function StoryEditorPage() {
   const MAX_CHUNK_BYTES = 2048
   const WARNING_ORANGE_BYTES = MAX_CHUNK_BYTES - 200
   const WARNING_YELLOW_BYTES = MAX_CHUNK_BYTES - 400
+  const MAX_ATTACHMENT_CHARS = 256
 
-  const [formData, setFormData] = useState<ChunkFormData>({ content: '' })
+  const [formData, setFormData] = useState<ChunkFormData>({ content: '', chunkType: 0, attachmentCID: '', expectedHash: undefined })
   const [submitting, setSubmitting] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [showSealConfirm, setShowSealConfirm] = useState(false)
@@ -74,6 +98,37 @@ export default function StoryEditorPage() {
   const formatHash = useCallback((hash?: string) => formatHashMiddle(hash), [])
 
   const getByteLength = useCallback((str: string) => new TextEncoder().encode(str).length, [])
+
+  const chunkTypeOptions = useMemo(() => (
+    [
+      { value: 0, label: t('storyChunkEditor.chunkTypes.narrative', 'Narrative') },
+      { value: 1, label: t('storyChunkEditor.chunkTypes.work', 'Work / Achievement') },
+      { value: 2, label: t('storyChunkEditor.chunkTypes.quote', 'Quote') },
+      { value: 3, label: t('storyChunkEditor.chunkTypes.media', 'Media') },
+      { value: 4, label: t('storyChunkEditor.chunkTypes.timeline', 'Timeline') },
+      { value: 5, label: t('storyChunkEditor.chunkTypes.commentary', 'Commentary') },
+      { value: 6, label: t('storyChunkEditor.chunkTypes.source', 'Source') },
+      { value: 7, label: t('storyChunkEditor.chunkTypes.correction', 'Correction') },
+      { value: 8, label: t('storyChunkEditor.chunkTypes.editorial', 'Editorial') }
+    ]
+  ), [t])
+
+  const getChunkTypeLabel = useCallback(
+    (type: number | string | null | undefined) => {
+      const numericType = convertChunkTypeToNumber(type)
+      const match = chunkTypeOptions.find(opt => opt.value === numericType)
+      return match ? match.label : t('storyChunkEditor.chunkTypes.unknown', 'Unknown')
+    },
+    [chunkTypeOptions, convertChunkTypeToNumber, t]
+  )
+
+  const resolveAttachmentUrl = useCallback((cid: string) => {
+    if (!cid) return ''
+    if (cid.startsWith('ipfs://')) {
+      return `https://ipfs.io/ipfs/${cid.slice(7)}`
+    }
+    return cid
+  }, [])
 
   const copyText = useCallback(async (text: string) => {
     try {
@@ -155,7 +210,10 @@ export default function StoryEditorPage() {
   }, [dirty])
 
   // Dirty detection: changed content vs initial
-  const isDirty = useMemo(() => (formData.content || '').trim().length > 0, [formData.content])
+  const isDirty = useMemo(() => {
+    const trimmed = (formData.content || '').trim()
+    return trimmed.length > 0 || (formData.attachmentCID || '').length > 0 || formData.chunkType !== 0
+  }, [formData.content, formData.attachmentCID, formData.chunkType])
 
   useEffect(() => { setDirty(isDirty) }, [isDirty])
 
@@ -166,7 +224,7 @@ export default function StoryEditorPage() {
   const isSealed = meta?.isSealed || false
 
   const handleCancelEdit = useCallback(() => {
-    setFormData({ content: '' })
+    setFormData({ content: '', chunkType: 0, attachmentCID: '', expectedHash: undefined })
     setLocalError(null)
   }, [])
 
@@ -195,7 +253,9 @@ export default function StoryEditorPage() {
         data.tokenId,
         data.chunkIndex,
         data.content,
-        data.expectedHash || ''
+        data.expectedHash || '',
+        data.chunkType ?? 0,
+        data.attachmentCID ?? ''
       )
 
       // After successful operation, immediately update local state
@@ -327,6 +387,18 @@ export default function StoryEditorPage() {
       return
     }
 
+    const trimmedAttachment = formData.attachmentCID.trim()
+    if (trimmedAttachment.length > MAX_ATTACHMENT_CHARS) {
+      setLocalError(t('storyChunkEditor.attachmentTooLong', 'Attachment CID cannot exceed 256 characters'))
+      return
+    }
+
+    const chunkTypeValue = Number(formData.chunkType || 0)
+    if (!Number.isFinite(chunkTypeValue) || chunkTypeValue < 0 || chunkTypeValue > 255) {
+      setLocalError(t('storyChunkEditor.invalidChunkType', 'Invalid chunk type'))
+      return
+    }
+
     setSubmitting(true)
     setLocalError(null)
 
@@ -339,6 +411,8 @@ export default function StoryEditorPage() {
         chunkIndex: nextIndex,
         content: trimmedContent,
         expectedHash,
+        chunkType: chunkTypeValue,
+        attachmentCID: trimmedAttachment
       })
 
       handleCancelEdit()
@@ -531,6 +605,42 @@ export default function StoryEditorPage() {
                         disabled={submitting}
                       />
 
+                      <div className="grid gap-3 sm:grid-cols-[1fr_3fr]">
+                        <div className="flex flex-col">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {t('storyChunkEditor.chunkTypeLabel', 'Chunk Type')}
+                          </label>
+                          <select
+                            value={formData.chunkType}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              chunkType: Number(e.target.value)
+                            }))}
+                            className="mt-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                            disabled={submitting}
+                          >
+                            {chunkTypeOptions.map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col sm:min-w-0">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {t('storyChunkEditor.attachmentLabel', 'Attachment CID (optional)')}
+                          </label>
+                          <input
+                            value={formData.attachmentCID}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              attachmentCID: e.target.value
+                            }))}
+                            placeholder={t('storyChunkEditor.attachmentPlaceholder', 'CID (e.g. bafy...) or leave empty')}
+                            className="mt-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
+
                       <div className="flex flex-col justify-between gap-3 text-sm sm:flex-row sm:items-center">
                         <div className={`font-medium ${getByteWarningColor(getByteLength(formData.content))}`}>
                           {getByteLength(formData.content)}/{MAX_CHUNK_BYTES} bytes
@@ -632,7 +742,12 @@ export default function StoryEditorPage() {
                             onClick={() => toggleChunkExpansion(chunk.chunkIndex)}
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">#{chunk.chunkIndex}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">#{chunk.chunkIndex}</span>
+                                <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                  {getChunkTypeLabel(chunk.chunkType)}
+                                </span>
+                              </div>
                               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                 <span className="text-xs text-gray-400 dark:text-gray-500">{chunk.content.length}</span>
                               </div>
@@ -645,6 +760,28 @@ export default function StoryEditorPage() {
                                 <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                                   <Clock size={12} />
                                   {formatUnixSeconds(chunk.timestamp)}
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+                                  <User size={12} className="flex-shrink-0" />
+                                  {chunk.editor ? (
+                                    <>
+                                      <span className="truncate" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          copyText(chunk.editor)
+                                        }}
+                                        className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                        aria-label={t('search.copy')}
+                                        title={t('search.copy')}
+                                        type="button"
+                                      >
+                                        <Clipboard size={12} />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span>-</span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                                   <Hash size={12} className="flex-shrink-0" />
@@ -662,6 +799,31 @@ export default function StoryEditorPage() {
                                     <Clipboard size={12} />
                                   </button>
                                 </div>
+                                {chunk.attachmentCID && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                    <Link size={12} className="flex-shrink-0" />
+                                    <a
+                                      href={resolveAttachmentUrl(chunk.attachmentCID)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="truncate underline decoration-dotted hover:text-blue-600 dark:hover:text-blue-400"
+                                    >
+                                      {chunk.attachmentCID}
+                                    </a>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        copyText(chunk.attachmentCID)
+                                      }}
+                                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                      aria-label={t('search.copy')}
+                                      title={t('search.copy')}
+                                      type="button"
+                                    >
+                                      <Clipboard size={12} />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

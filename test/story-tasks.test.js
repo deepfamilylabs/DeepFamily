@@ -87,8 +87,12 @@ describe('Story Tasks Integration', function () {
 
     const chunk0 = await deepFamily.getStoryChunk(1n, 0);
     expect(chunk0.content).to.equal('First chunk content');
+    expect(chunk0.chunkType).to.equal(0);
+    expect(chunk0.attachmentCID).to.equal('');
     const chunk1 = await deepFamily.getStoryChunk(1n, 1);
     expect(chunk1.content).to.equal('Second chunk content');
+    expect(chunk1.chunkType).to.equal(0);
+    expect(chunk1.attachmentCID).to.equal('');
 
     // 7. list-story-chunks (sanity, should not throw)
     await hre.run('list-story-chunks', { tokenid: '1', offset: '0', limit: '10' });

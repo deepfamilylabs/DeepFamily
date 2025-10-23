@@ -12,6 +12,8 @@ export interface StoryChunk {
   content: string
   timestamp: number
   editor: string
+  chunkType: number
+  attachmentCID: string
 }
 
 export interface StoryMetadata {
@@ -27,6 +29,8 @@ export interface StoryChunkCreateData {
   chunkIndex: number
   content: string
   expectedHash?: string
+  chunkType?: number
+  attachmentCID?: string
 }
 
 export interface NodeData {
