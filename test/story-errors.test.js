@@ -2,8 +2,8 @@ const { expect } = require('chai');
 const hre = require('hardhat');
 const { buildBasicInfo } = require('../lib/namePoseidon');
 
-// Additional negative & edge-case tests for story sharding (add/update/seal)
-// Covers: non-owner, index mismatch, oversize, hash mismatch, seal rules, max chunks, zero-chunk seal
+// Additional negative & edge-case tests for story sharding (add/seal)
+// Covers: non-owner, index mismatch, oversize, hash mismatch, seal rules, zero-chunk seal
 
 describe('Story Sharding - Error & Edge Cases', function () {
   this.timeout(90_000);
@@ -64,7 +64,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
 
   it('reverts on oversize content', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    const longStr = 'a'.repeat(1001); // > 1000
+    const longStr = 'a'.repeat(2049); // > 2048
     await expect(
       deepFamily.addStoryChunk(tokenId, 0, longStr, hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidChunkContent');
@@ -78,13 +78,10 @@ describe('Story Sharding - Error & Edge Cases', function () {
     ).to.be.revertedWithCustomError(deepFamily, 'ChunkHashMismatch');
   });
 
-  it('cannot update after sealing', async () => {
+  it('cannot append after sealing', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
     await deepFamily.addStoryChunk(tokenId, 0, 'c0', hre.ethers.ZeroHash);
     await deepFamily.sealStory(tokenId);
-    await expect(
-      deepFamily.updateStoryChunk(tokenId, 0, 'c0-new', hre.ethers.ZeroHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'StoryAlreadySealed');
     await expect(
       deepFamily.addStoryChunk(tokenId, 1, 'c1', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'StoryAlreadySealed');
@@ -98,18 +95,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
     );
   });
 
-  it('enforces MAX_STORY_CHUNKS limit', async () => {
-    const { deepFamily, tokenId } = await deployAndMint();
-    // Add 100 chunks (MAX_STORY_CHUNKS constant)
-    for (let i = 0; i < 100; i++) {
-      await deepFamily.addStoryChunk(tokenId, i, 'x' + i, hre.ethers.ZeroHash);
-    }
-    await expect(
-      deepFamily.addStoryChunk(tokenId, 100, 'overflow', hre.ethers.ZeroHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'ChunkIndexOutOfRange');
-  });
-
-  it('updates fullStoryHash correctly after update', async () => {
+  it('updates fullStoryHash correctly as chunks append', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
     const c0 = 'Chunk Zero';
     const c1 = 'Chunk One';
@@ -118,15 +104,23 @@ describe('Story Sharding - Error & Edge Cases', function () {
     // Compute expected combined hash
     const h0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c0));
     const h1 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c1));
-    let expected = hre.ethers.keccak256(hre.ethers.solidityPacked(['bytes32','bytes32'], [h0, h1]));
+    let expected = hre.ethers.ZeroHash;
+    expected = hre.ethers.keccak256(
+      hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 0n, h0])
+    );
+    expected = hre.ethers.keccak256(
+      hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 1n, h1])
+    );
     let meta = await deepFamily.storyMetadata(tokenId);
     expect(meta.fullStoryHash).to.equal(expected);
 
-    // Update chunk 0
-    const c0New = 'Chunk Zero Updated';
-    await deepFamily.updateStoryChunk(tokenId, 0, c0New, hre.ethers.ZeroHash);
-    const h0New = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c0New));
-    expected = hre.ethers.keccak256(hre.ethers.solidityPacked(['bytes32','bytes32'], [h0New, h1]));
+    // Append chunk 2 and confirm hash expands deterministically
+    const c2 = 'Chunk Two';
+    await deepFamily.addStoryChunk(tokenId, 2, c2, hre.ethers.ZeroHash);
+    const h2 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c2));
+    expected = hre.ethers.keccak256(
+      hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 2n, h2])
+    );
     meta = await deepFamily.storyMetadata(tokenId);
     expect(meta.fullStoryHash).to.equal(expected);
   });

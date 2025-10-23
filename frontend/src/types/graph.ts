@@ -11,7 +11,7 @@ export interface StoryChunk {
   chunkHash: string
   content: string
   timestamp: number
-  lastEditor: string
+  editor: string
 }
 
 export interface StoryMetadata {
@@ -26,13 +26,6 @@ export interface StoryChunkCreateData {
   tokenId: string
   chunkIndex: number
   content: string
-  expectedHash?: string
-}
-
-export interface StoryChunkUpdateData {
-  tokenId: string
-  chunkIndex: number
-  newContent: string
   expectedHash?: string
 }
 

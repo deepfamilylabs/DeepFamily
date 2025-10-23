@@ -11,6 +11,7 @@ import { getRuntimeFamilyTreeConfig } from '../config/familyTreeConfig'
 import { useErrorMonitor } from '../hooks/useErrorMonitor'
 import { useVizOptions } from './VizOptionsContext'
 import { NodeData } from '../types/graph'
+import { computeStoryHash } from '../lib/story'
 
 // Reuse provider instances to avoid repeated network detection / socket exhaustion
 const providerCache = new Map<string, ethers.JsonRpcProvider>()
@@ -820,11 +821,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         let hashMatch: boolean | null = null
         let computedHash: string | undefined
         if (missing.length === 0 && nd.storyMetadata?.totalChunks! > 0 && nd.storyMetadata?.fullStoryHash && nd.storyMetadata.fullStoryHash !== ethers.ZeroHash) {
-          try {
-            const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
-            computedHash = ethers.keccak256(concatenated)
-            hashMatch = computedHash === nd.storyMetadata.fullStoryHash
-          } catch {}
+          computedHash = computeStoryHash(sorted)
+          hashMatch = computedHash === nd.storyMetadata.fullStoryHash
         }
         return {
           chunks: sorted,
@@ -867,7 +865,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
               chunkHash: chunk.chunkHash,
               content: chunk.content,
               timestamp: Number(chunk.timestamp),
-              lastEditor: chunk.lastEditor
+              editor: chunk.editor
             })
           } catch (e) {
             console.warn(`Missing chunk ${i} for token ${tokenId}`)
@@ -894,13 +892,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       let computedHash: string | undefined
       
       if (missing.length === 0 && storyMetadata?.totalChunks > 0 && storyMetadata?.fullStoryHash && storyMetadata.fullStoryHash !== ethers.ZeroHash) {
-        try {
-          const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
-          computedHash = ethers.keccak256(concatenated)
-          hashMatch = computedHash === storyMetadata.fullStoryHash
-        } catch {
-          // ignore
-        }
+        computedHash = computeStoryHash(sorted)
+        hashMatch = computedHash === storyMetadata.fullStoryHash
       }
 
       const storyData = {

@@ -11,8 +11,8 @@
 |----------|-------|------------------|
 | `MAX_LONG_TEXT_LENGTH` | 256 | Max length for tags, IPFS CIDs, names, places, stories |
 | `MAX_QUERY_PAGE_SIZE` | 100 | Gas-optimized pagination limit for all query functions |
-| `MAX_CHUNK_CONTENT_LENGTH` | 1000 | Story chunk size limit (1KB per shard) |
-| `MAX_STORY_CHUNKS` | 100 | Maximum biography shards per NFT (100KB total) |
+| `MAX_CHUNK_CONTENT_LENGTH` | 2048 | Story chunk size limit (≈2KB per shard) |
+| `MAX_STORY_CHUNKS` | — | No protocol cap; chunks append sequentially |
 | `_HASH_LIMBS_REQUIRED` | 6 | Required limbs for person/father/mother hashes in ZK proofs |
 
 ### Core Data Structures
@@ -74,14 +74,14 @@ struct PersonSupplementInfo {
 struct StoryChunk {
     uint256 chunkIndex;   // Chunk index (starts from 0)
     bytes32 chunkHash;    // keccak256(content)
-    string content;       // Chunk content (≤1KB)
+    string content;       // Chunk content (≤2048 bytes)
     uint256 timestamp;    // Creation/update timestamp
-    address lastEditor;   // Last editor address
+    address editor;   // Last editor address
 }
 
 struct StoryMetadata {
     uint256 totalChunks;     // Current total chunks
-    bytes32 fullStoryHash;   // Combined hash of all chunks
+    bytes32 fullStoryHash;   // Rolling hash keccak(previousHash, chunkIndex, chunkHash)
     uint256 lastUpdateTime;  // Last update timestamp
     bool isSealed;           // Immutability flag
     uint256 totalLength;     // Total character count
@@ -174,12 +174,11 @@ function mintPersonNFT(
 #### Story Sharding System
 ```solidity
 function addStoryChunk(uint256 tokenId, uint256 chunkIndex, string calldata content, bytes32 expectedHash) external
-function updateStoryChunk(uint256 tokenId, uint256 chunkIndex, string calldata newContent, bytes32 expectedHash) external
 function sealStory(uint256 tokenId) external
 ```
 
 **Story Management**:
-- Only NFT holders can add/update chunks
+- Only NFT holders can append chunks
 - Chunks must be added sequentially starting from index 0
 - Content hash validation prevents corruption
 - Sealing makes stories permanently immutable
@@ -227,8 +226,6 @@ event TokenRewardDistributed(address indexed miner, bytes32 indexed personHash, 
 #### Story Events
 ```solidity
 event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength);
-
-event StoryChunkUpdated(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 oldHash, bytes32 newHash, address indexed editor);
 
 event StorySealed(uint256 indexed tokenId, uint256 totalChunks, bytes32 fullStoryHash, address indexed sealer);
 ```

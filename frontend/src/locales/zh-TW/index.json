@@ -298,7 +298,7 @@
       "chunkHash": "分片雜湊",
       "content": "內容",
       "timestamp": "時間戳",
-      "lastEditor": "最後編輯者",
+      "editor": "編輯者",
       "contentPreview": "內容預覽",
       "totalChunks": "總分片數"
     },
@@ -567,7 +567,7 @@
     "hashLabel": "雜湊",
     "editChunk": "編輯分片",
     "addChunk": "添加新分片",
-    "contentPlaceholder": "請輸入分片內容（最多1000字元）",
+    "contentPlaceholder": "請輸入分片內容（最多2048位元組）",
     "saving": "保存中...",
     "save": "保存",
     "cancel": "取消",
@@ -575,7 +575,8 @@
     "chunks": "現有分片",
     "loading": "載入中...",
     "contentRequired": "內容不能為空",
-    "contentTooLong": "內容不能超過1000字元",
+    "contentTooLong": "內容不能超過2048位元組",
+    "noChunks": "暫無故事分片",
     "operationFailed": "操作失敗",
     "sealConfirm": "確定要封存傳記嗎？封存後將無法再修改。",
     "sealFailed": "封存失敗",
@@ -589,8 +590,8 @@
       "cancel": "取消",
       "confirm": "確認封存"
     },
-    "contentTooLongBytes": "內容不能超過1000位元組",
-    "contentPlaceholderBytes": "請輸入分片內容（最多1000位元組，約=1000英文或≈333漢字）",
+    "contentTooLongBytes": "內容不能超過2048位元組",
+    "contentPlaceholderBytes": "請輸入分片內容（最多2048位元組，約=2048英文或≈680漢字）",
     "offlineNoData": "離線模式：本地沒有快取該傳記",
     "success": {
       "chunkAdded": "分片 #{{index}} 新增成功（{{bytes}} 位元組）",

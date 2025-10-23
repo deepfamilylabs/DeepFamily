@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom'
 import { useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { X, Plus, Edit2, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash } from 'lucide-react'
+import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useWallet } from '../context/WalletContext'
 import { useToast } from '../components/ToastProvider'
-import { addStoryChunk, updateStoryChunk, sealStory } from '../lib/story'
-import type { StoryChunk, StoryChunkCreateData, StoryChunkUpdateData, StoryMetadata, NodeData } from '../types/graph'
+import { addStoryChunk, sealStory, computeStoryHash } from '../lib/story'
+import type { StoryChunk, StoryChunkCreateData, StoryMetadata, NodeData } from '../types/graph'
 import { formatUnixSeconds, formatHashMiddle } from '../types/graph'
 
 interface PrefetchedState {
@@ -47,13 +47,14 @@ export default function StoryEditorPage() {
   const [dirty, setDirty] = useState<boolean>(false)
 
   // Editor state
-  const [editingChunkIndex, setEditingChunkIndex] = useState<number | null>(null)
+  const MAX_CHUNK_BYTES = 2048
+  const WARNING_ORANGE_BYTES = MAX_CHUNK_BYTES - 200
+  const WARNING_YELLOW_BYTES = MAX_CHUNK_BYTES - 400
+
   const [formData, setFormData] = useState<ChunkFormData>({ content: '' })
   const [submitting, setSubmitting] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [showSealConfirm, setShowSealConfirm] = useState(false)
-  const [editSessionId, setEditSessionId] = useState(0)
-  const [initialEditContent, setInitialEditContent] = useState<string>('')
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [personName, setPersonName] = useState<string | null>(prefetched?.fullName || null)
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null)
@@ -64,17 +65,6 @@ export default function StoryEditorPage() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const validTokenId = useMemo(() => tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined, [tokenId])
-
-  // Helper function to compute fullStoryHash from chunks (matches contract's _updateFullStoryHash logic)
-  const computeFullStoryHash = useCallback((chunkList: StoryChunk[]): string => {
-    if (!chunkList || chunkList.length === 0) {
-      return ethers.ZeroHash
-    }
-    // Sort by chunkIndex and concatenate all chunkHash values
-    const sorted = [...chunkList].sort((a, b) => a.chunkIndex - b.chunkIndex)
-    const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('')
-    return ethers.keccak256(concatenated)
-  }, [])
 
   const computeContentHash = useCallback((content: string): string => {
     // Use encodePacked to match the contract's _hashString function
@@ -165,13 +155,7 @@ export default function StoryEditorPage() {
   }, [dirty])
 
   // Dirty detection: changed content vs initial
-  const isDirty = useMemo(() => {
-    const trimmed = (formData.content || '').trim()
-    if (editingChunkIndex === null) {
-      return trimmed.length > 0
-    }
-    return trimmed !== (initialEditContent || '').trim()
-  }, [formData.content, editingChunkIndex, initialEditContent])
+  const isDirty = useMemo(() => (formData.content || '').trim().length > 0, [formData.content])
 
   useEffect(() => { setDirty(isDirty) }, [isDirty])
 
@@ -181,20 +165,7 @@ export default function StoryEditorPage() {
 
   const isSealed = meta?.isSealed || false
 
-  const handleStartEdit = useCallback((chunkIndex: number | null, initialContent = '') => {
-    setEditingChunkIndex(chunkIndex)
-    setFormData({
-      content: initialContent,
-      expectedHash: initialContent ? computeContentHash(initialContent) : undefined
-    })
-    setInitialEditContent(initialContent)
-    setLocalError(null)
-    setEditSessionId(id => id + 1)
-    scrollToForm()
-  }, [computeContentHash, scrollToForm])
-
   const handleCancelEdit = useCallback(() => {
-    setEditingChunkIndex(null)
     setFormData({ content: '' })
     setLocalError(null)
   }, [])
@@ -232,7 +203,7 @@ export default function StoryEditorPage() {
       setChunks(newChunks)
 
       // Update total chunks count and fullStoryHash in metadata
-      const newFullStoryHash = computeFullStoryHash(newChunks)
+      const newFullStoryHash = computeStoryHash(newChunks)
       const newMeta: StoryMetadata | undefined = meta ? {
         ...meta,
         totalChunks: (meta.totalChunks || 0) + 1,
@@ -282,81 +253,7 @@ export default function StoryEditorPage() {
       toast.error(message)
       throw err
     }
-  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData, computeFullStoryHash])
-
-  const onUpdateChunk = useCallback(async (data: StoryChunkUpdateData) => {
-    if (!contractAddress) throw new Error('Missing contract')
-    if (!signer) throw new Error('No wallet connected')
-    if (!address) throw new Error('No wallet address')
-
-    try {
-      // Execute blockchain operation
-      const result = await updateStoryChunk(
-        signer,
-        contractAddress,
-        data.tokenId,
-        data.chunkIndex,
-        data.newContent,
-        data.expectedHash || ''
-      )
-
-      // After successful operation, immediately update local state and replace chunk at corresponding index
-      const newChunks = chunks ? [...chunks] : []
-      const index = newChunks.findIndex(c => c.chunkIndex === data.chunkIndex)
-      if (index !== -1) {
-        newChunks[index] = result.updatedChunk
-      }
-      setChunks(newChunks)
-
-      // Update last update time and fullStoryHash in metadata
-      const newFullStoryHash = computeFullStoryHash(newChunks)
-      const newMeta: StoryMetadata | undefined = meta ? {
-        ...meta,
-        lastUpdateTime: result.updatedChunk.timestamp,
-        fullStoryHash: newFullStoryHash
-      } : undefined
-      setMeta(newMeta)
-
-      // Synchronize updates to TreeDataContext node data cache
-      if (setNodesData && validTokenId) {
-        setNodesData(prev => {
-          let foundId: string | undefined
-          for (const [id, nd] of Object.entries(prev)) {
-            if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
-              foundId = id
-              break
-            }
-          }
-          if (!foundId) return prev
-
-          const cur = prev[foundId]
-          return {
-            ...prev,
-            [foundId]: {
-              ...cur,
-              storyMetadata: newMeta,
-              storyChunks: newChunks
-            }
-          }
-        })
-      }
-
-      // Show success message with event data if available
-      if (result.events.StoryChunkUpdated) {
-        toast.success(
-          t('storyChunkEditor.success.chunkUpdated', 'Chunk #{{index}} updated successfully', {
-            index: result.events.StoryChunkUpdated.chunkIndex
-          })
-        )
-      } else {
-        toast.success(t('storyChunkEditor.success.chunkUpdatedGeneric', 'Story chunk updated successfully'))
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('storyChunkEditor.operationFailed', 'Operation failed')
-      toast.error(message)
-      throw err
-    }
-  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData, computeFullStoryHash])
+  }, [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData])
 
   const onSealStory = useCallback(async (tid: string) => {
     if (!contractAddress) throw new Error('Missing contract')
@@ -425,8 +322,8 @@ export default function StoryEditorPage() {
       return
     }
     const byteLen = getByteLength(trimmedContent)
-    if (byteLen > 1000) {
-      setLocalError(t('storyChunkEditor.contentTooLongBytes', 'Content cannot exceed 1000 bytes'))
+    if (byteLen > MAX_CHUNK_BYTES) {
+      setLocalError(t('storyChunkEditor.contentTooLongBytes', 'Content cannot exceed 2048 bytes'))
       return
     }
 
@@ -436,22 +333,13 @@ export default function StoryEditorPage() {
     try {
       const expectedHash = computeContentHash(trimmedContent)
 
-      if (editingChunkIndex === null) {
-        const nextIndex = meta?.totalChunks || 0
-        await onAddChunk({
-          tokenId: validTokenId,
-          chunkIndex: nextIndex,
-          content: trimmedContent,
-          expectedHash,
-        })
-      } else {
-        await onUpdateChunk({
-          tokenId: validTokenId,
-          chunkIndex: editingChunkIndex,
-          newContent: trimmedContent,
-          expectedHash,
-        })
-      }
+      const nextIndex = meta?.totalChunks || 0
+      await onAddChunk({
+        tokenId: validTokenId,
+        chunkIndex: nextIndex,
+        content: trimmedContent,
+        expectedHash,
+      })
 
       handleCancelEdit()
     } catch (err: any) {
@@ -470,7 +358,7 @@ export default function StoryEditorPage() {
     } finally {
       setSubmitting(false)
     }
-  }, [validTokenId, formData.content, getByteLength, computeContentHash, editingChunkIndex, meta, onAddChunk, onUpdateChunk, handleCancelEdit, t])
+  }, [validTokenId, formData.content, getByteLength, computeContentHash, meta, onAddChunk, handleCancelEdit, t])
 
   const handleSeal = useCallback(async () => {
     if (!validTokenId) return
@@ -509,16 +397,10 @@ export default function StoryEditorPage() {
     }
   }, [validTokenId, onSealStory, t])
 
-  useEffect(() => {
-    if (editSessionId > 0) {
-      scrollToForm()
-    }
-  }, [editSessionId, scrollToForm])
-
   const getByteWarningColor = (byteLen: number) => {
-    if (byteLen > 1000) return 'text-red-600 dark:text-red-400 font-semibold'
-    if (byteLen > 900) return 'text-orange-600 dark:text-orange-400 font-medium'
-    if (byteLen > 800) return 'text-yellow-600 dark:text-yellow-500'
+    if (byteLen > MAX_CHUNK_BYTES) return 'text-red-600 dark:text-red-400 font-semibold'
+    if (byteLen > WARNING_ORANGE_BYTES) return 'text-orange-600 dark:text-orange-400 font-medium'
+    if (byteLen > WARNING_YELLOW_BYTES) return 'text-yellow-600 dark:text-yellow-500'
     return 'text-gray-500 dark:text-gray-400'
   }
 
@@ -568,7 +450,7 @@ export default function StoryEditorPage() {
     ]
   }, [meta, t])
 
-  const showEditorForm = editingChunkIndex !== null || !isSealed
+  const showEditorForm = !isSealed
   const showError = Boolean(error || localError)
   const showEmptySealed = !loading && sortedChunks.length === 0 && !showError && isSealed
   const errorMessage = error || localError
@@ -619,29 +501,20 @@ export default function StoryEditorPage() {
                   <section ref={formRef} className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-800">
                     <header className="flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-700">
                       <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {editingChunkIndex !== null ? (
-                          <>
-                            <Edit2 size={16} className="text-blue-600 dark:text-blue-400" />
-                            {t('storyChunkEditor.editChunk', 'Edit Chunk')} #{editingChunkIndex}
-                          </>
-                        ) : (
-                          <>
-                            <Plus size={16} className="text-gray-600 dark:text-gray-400" />
-                            {t('storyChunkEditor.addChunk', 'Add New Chunk')}
-                          </>
-                        )}
+                        <>
+                          <Plus size={16} className="text-gray-600 dark:text-gray-400" />
+                          {t('storyChunkEditor.addChunk', 'Add New Chunk')}
+                        </>
                       </h3>
-                      {editingChunkIndex !== null && (
-                        <button
-                          onClick={handleCancelEdit}
-                          disabled={submitting}
-                          className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-                          aria-label={t('common.close', 'Close') as string}
-                          type="button"
-                        >
-                          <X size={18} />
-                        </button>
-                      )}
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={submitting}
+                        className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                        aria-label={t('common.close', 'Close') as string}
+                        type="button"
+                      >
+                        <X size={18} />
+                      </button>
                     </header>
 
                     <div className="space-y-3">
@@ -653,19 +526,19 @@ export default function StoryEditorPage() {
                           content: e.target.value,
                           expectedHash: e.target.value ? computeContentHash(e.target.value) : undefined
                         }))}
-                        placeholder={t('storyChunkEditor.contentPlaceholderBytes', 'Enter chunk content (max 1000 bytes, approximately 1000 English characters or ~333 Chinese characters)')}
+                        placeholder={t('storyChunkEditor.contentPlaceholderBytes', 'Enter chunk content (max 2048 bytes, approximately 2048 English characters or ~680 Chinese characters)')}
                         className="h-[500px] w-full resize-none rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-900 transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
                         disabled={submitting}
                       />
 
                       <div className="flex flex-col justify-between gap-3 text-sm sm:flex-row sm:items-center">
                         <div className={`font-medium ${getByteWarningColor(getByteLength(formData.content))}`}>
-                          {getByteLength(formData.content)}/1000 bytes
-                          {getByteLength(formData.content) > 900 && getByteLength(formData.content) <= 1000 && (
-                            <span className="ml-2 text-xs">({1000 - getByteLength(formData.content)} remaining)</span>
+                          {getByteLength(formData.content)}/{MAX_CHUNK_BYTES} bytes
+                          {getByteLength(formData.content) > WARNING_ORANGE_BYTES && getByteLength(formData.content) <= MAX_CHUNK_BYTES && (
+                            <span className="ml-2 text-xs">({MAX_CHUNK_BYTES - getByteLength(formData.content)} remaining)</span>
                           )}
-                          {getByteLength(formData.content) > 1000 && (
-                            <span className="ml-2 text-xs">({getByteLength(formData.content) - 1000} over limit!)</span>
+                          {getByteLength(formData.content) > MAX_CHUNK_BYTES && (
+                            <span className="ml-2 text-xs">({getByteLength(formData.content) - MAX_CHUNK_BYTES} over limit!)</span>
                           )}
                         </div>
 
@@ -691,7 +564,7 @@ export default function StoryEditorPage() {
                     <footer className="flex flex-col gap-2 pt-2 sm:flex-row">
                       <button
                         onClick={handleSubmit}
-                        disabled={submitting || !formData.content.trim() || getByteLength(formData.content) > 1000}
+                        disabled={submitting || !formData.content.trim() || getByteLength(formData.content) > MAX_CHUNK_BYTES}
                         className="flex items-center justify-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                         type="button"
                       >
@@ -762,21 +635,6 @@ export default function StoryEditorPage() {
                               <span className="text-sm font-medium text-gray-900 dark:text-gray-100">#{chunk.chunkIndex}</span>
                               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                 <span className="text-xs text-gray-400 dark:text-gray-500">{chunk.content.length}</span>
-                                {!isSealed && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleStartEdit(chunk.chunkIndex, chunk.content)
-                                    }}
-                                    className="rounded p-1 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
-                                    disabled={submitting}
-                                    aria-label={t('storyChunkEditor.editChunk')}
-                                    title={t('storyChunkEditor.editChunk')}
-                                    type="button"
-                                  >
-                                    <Edit2 size={14} />
-                                  </button>
-                                )}
                               </div>
                             </div>
                             <p className={`text-xs text-gray-600 dark:text-gray-400 ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
@@ -815,7 +673,7 @@ export default function StoryEditorPage() {
               </section>
             ) : (
               <div className="overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-500">
-                {t('storyChunkEditor.noChunks', 'No story chunks yet.')}
+                {t('storyChunkEditor.noChunks')}
               </div>
             )}
 

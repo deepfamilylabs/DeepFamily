@@ -4,6 +4,21 @@ import type { StoryChunk } from '../types/graph'
 
 const WALLET_CONFIRMATION_TIMEOUT_MS = 30000
 
+export function computeStoryHash(chunks: StoryChunk[]): string {
+  if (!chunks || chunks.length === 0) return ethers.ZeroHash
+  const sorted = [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex)
+  let accumulator = ethers.ZeroHash
+  for (const chunk of sorted) {
+    accumulator = ethers.keccak256(
+      ethers.solidityPacked(
+        ['bytes32', 'uint256', 'bytes32'],
+        [accumulator, BigInt(chunk.chunkIndex), chunk.chunkHash]
+      )
+    )
+  }
+  return accumulator
+}
+
 /**
  * Result from adding a story chunk
  */
@@ -19,25 +34,6 @@ export interface AddStoryChunkResult {
       chunkIndex: number
       contentLength: number
       chunkHash: string
-      editor: string
-    } | null
-  }
-}
-
-/**
- * Result from updating a story chunk
- */
-export interface UpdateStoryChunkResult {
-  chunkIndex: number
-  transactionHash: string
-  blockNumber: number
-  updatedChunk: StoryChunk  // Return updated chunk data for immediate UI update
-  events: {
-    StoryChunkUpdated: {
-      tokenId: string
-      chunkIndex: number
-      oldHash: string
-      newHash: string
       editor: string
     } | null
   }
@@ -134,7 +130,7 @@ export async function addStoryChunk(
       chunkHash: events.StoryChunkAdded?.chunkHash || ethers.keccak256(ethers.toUtf8Bytes(content)),
       content: content,
       timestamp: Math.floor(Date.now() / 1000), // Use current time as approximation
-      lastEditor: events.StoryChunkAdded?.editor || await signer.getAddress()
+      editor: events.StoryChunkAdded?.editor || await signer.getAddress()
     }
 
     return {
@@ -147,93 +143,6 @@ export async function addStoryChunk(
     }
   } catch (error: any) {
     console.error('❌ Add story chunk failed:', error)
-    throw parseStoryContractError(error, contract)
-  }
-}
-
-/**
- * Update an existing story chunk
- */
-export async function updateStoryChunk(
-  signer: JsonRpcSigner,
-  contractAddress: string,
-  tokenId: string,
-  chunkIndex: number,
-  newContent: string,
-  expectedHash: string
-): Promise<UpdateStoryChunkResult> {
-  const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer)
-
-  try {
-    console.log('🚀 Updating story chunk...')
-    console.log('  Token ID:', tokenId)
-    console.log('  Chunk Index:', chunkIndex)
-    console.log('  New Content Length:', newContent.length)
-    console.log('  Expected Hash:', expectedHash)
-
-    // Send transaction (with wallet confirmation timeout)
-    const tx = await withWalletConfirmationTimeout(
-      () => contract.updateStoryChunk(tokenId, chunkIndex, newContent, expectedHash || ethers.ZeroHash),
-      'updateStoryChunk'
-    )
-    console.log('✅ Transaction sent:', tx.hash)
-
-    // Wait for confirmation
-    console.log('⏳ Waiting for confirmation...')
-    const receipt = await tx.wait()
-    console.log('✅ Transaction confirmed in block:', receipt.blockNumber)
-
-    // Parse events
-    const events = {
-      StoryChunkUpdated: null as any
-    }
-
-    let parsedChunkIndex = chunkIndex
-
-    console.log(`🔍 Parsing ${receipt.logs.length} logs...`)
-
-    for (const log of receipt.logs) {
-      try {
-        const parsedEvent = contract.interface.parseLog(log)
-        if (parsedEvent) {
-          console.log(`📊 Event detected: ${parsedEvent.name}`)
-
-          if (parsedEvent.name === 'StoryChunkUpdated') {
-            events.StoryChunkUpdated = {
-              tokenId: parsedEvent.args.tokenId.toString(),
-              chunkIndex: Number(parsedEvent.args.chunkIndex),
-              oldHash: parsedEvent.args.oldHash,
-              newHash: parsedEvent.args.newHash,
-              editor: parsedEvent.args.editor
-            }
-            parsedChunkIndex = events.StoryChunkUpdated.chunkIndex
-            console.log('✅ StoryChunkUpdated event parsed:', events.StoryChunkUpdated)
-          }
-        }
-      } catch (error) {
-        console.log('🔍 Unparseable log:', log.topics)
-        continue
-      }
-    }
-
-    // Build updated chunk data for immediate UI update
-    const updatedChunk: StoryChunk = {
-      chunkIndex: parsedChunkIndex,
-      chunkHash: events.StoryChunkUpdated?.newHash || ethers.keccak256(ethers.toUtf8Bytes(newContent)),
-      content: newContent,
-      timestamp: Math.floor(Date.now() / 1000), // Use current time as approximation
-      lastEditor: events.StoryChunkUpdated?.editor || await signer.getAddress()
-    }
-
-    return {
-      chunkIndex: parsedChunkIndex,
-      transactionHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-      updatedChunk,
-      events
-    }
-  } catch (error: any) {
-    console.error('❌ Update story chunk failed:', error)
     throw parseStoryContractError(error, contract)
   }
 }

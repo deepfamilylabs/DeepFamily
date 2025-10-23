@@ -6,7 +6,7 @@ const { task } = require("hardhat/config");
 task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
   .addParam("tokenid", "NFT tokenId (uint256)")
   .addParam("chunkindex", "Chunk index to add (must equal current totalChunks, starts at 0)")
-  .addParam("content", "Chunk content (<=1000 chars)")
+  .addParam("content", "Chunk content (<=2048 UTF-8 bytes)")
   .addOptionalParam(
     "exphash",
     "Expected keccak256 hash of raw UTF-8 bytes of content (bytes32, optional)",
@@ -34,7 +34,9 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
 
     const content = args.content;
     if (content.length === 0) throw new Error("content cannot be empty");
-    if (content.length > 1000) throw new Error("content exceeds 1000 char limit");
+    if (Buffer.byteLength(content, 'utf8') > 2048) {
+      throw new Error("content exceeds 2048 byte limit");
+    }
 
     // Read metadata to validate continuity & sealed state
     let metadata;

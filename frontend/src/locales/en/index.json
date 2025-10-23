@@ -298,7 +298,7 @@
       "chunkHash": "Chunk Hash",
       "content": "Content",
       "timestamp": "Timestamp",
-      "lastEditor": "Last Editor",
+      "editor": "Editor",
       "contentPreview": "Content Preview",
       "totalChunks": "Total Chunks"
     },
@@ -568,7 +568,7 @@
     "hashLabel": "Hash",
     "editChunk": "Edit Chunk",
     "addChunk": "Add New Chunk",
-    "contentPlaceholder": "Enter chunk content (max 1000 characters)",
+    "contentPlaceholder": "Enter chunk content (max 2048 bytes)",
     "saving": "Saving...",
     "save": "Save",
     "cancel": "Cancel",
@@ -576,7 +576,8 @@
     "chunks": "Existing Chunks",
     "loading": "Loading...",
     "contentRequired": "Content cannot be empty",
-    "contentTooLong": "Content cannot exceed 1000 characters",
+    "contentTooLong": "Content cannot exceed 2048 bytes",
+    "noChunks": "No story chunks yet.",
     "operationFailed": "Operation failed",
     "sealConfirm": "Are you sure you want to seal the biography? Once sealed, it cannot be modified.",
     "sealFailed": "Seal failed",
@@ -590,8 +591,8 @@
       "cancel": "Cancel",
       "confirm": "Confirm Seal"
     },
-    "contentTooLongBytes": "Content must not exceed 1000 bytes",
-    "contentPlaceholderBytes": "Enter chunk content (max 1000 bytes ≈ 1000 ASCII or ~333 CJK chars)",
+    "contentTooLongBytes": "Content must not exceed 2048 bytes",
+    "contentPlaceholderBytes": "Enter chunk content (max 2048 bytes ≈ 2048 ASCII or ~680 CJK chars)",
     "offlineNoData": "Offline mode: story not cached locally",
     "success": {
       "chunkAdded": "Chunk #{{index}} added successfully ({{bytes}} bytes)",

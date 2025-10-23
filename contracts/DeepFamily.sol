@@ -46,7 +46,7 @@ interface INamePoseidonVerifier {
  * @dev Architecture:
  *      - Privacy Layer: Groth16 proofs + Poseidon/keccak256 dual-hash for private submissions (addPersonZK)
  *      - Incentive Layer: DEEP token mining for complete families, endorsement fees route to NFT holders/contributors
- *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + 100-chunk story sharding
+ *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + unlimited story sharding (2KB per chunk)
  *      - Security: Reentrancy guards, paginated queries (max 100), 50+ custom errors, access controls
  */
 contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
@@ -169,8 +169,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 chunkIndex; // Chunk index (starts from 0)
     bytes32 chunkHash; // Chunk content hash (for data integrity verification)
     string content; // Chunk content (limited to reasonable range to control gas costs)
-    uint256 timestamp; // Creation/update timestamp
-    address lastEditor; // Last editor's address
+    uint256 timestamp; // Creation timestamp
+    address editor; // editor's address
   }
 
   /**
@@ -178,7 +178,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   struct StoryMetadata {
     uint256 totalChunks; // Current total number of chunks
-    bytes32 fullStoryHash; // Comprehensive hash of complete story (combination of all chunk hashes)
+    bytes32 fullStoryHash; // Rolling integrity hash (keccak(previousHash, chunkIndex, chunkHash))
     uint256 lastUpdateTime; // Last update timestamp
     bool isSealed; // Whether sealed (no further modifications after sealing, ensuring historical record immutability)
     uint256 totalLength; // Total character count of all chunk contents
@@ -214,6 +214,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /// @dev TokenID => TokenURI, stores NFT metadata URI
   mapping(uint256 => string) private _tokenURIs;
+
   /// @dev TokenID => historical TokenURI array
   mapping(uint256 => string[]) public tokenURIHistory;
 
@@ -227,9 +228,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /// @dev tokenId => chunkIndex => chunk data
   mapping(uint256 => mapping(uint256 => StoryChunk)) public storyChunks;
-
-  /// @dev tokenId => active chunk indices array (for efficient traversal)
-  mapping(uint256 => uint256[]) public activeChunkIndices;
 
   // ========== Statistics Mappings ==========
 
@@ -252,11 +250,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev Maximum results per query page
   uint256 public constant MAX_QUERY_PAGE_SIZE = 100;
 
-  /// @dev Maximum content length per chunk (1KB text)
-  uint256 public constant MAX_CHUNK_CONTENT_LENGTH = 1000;
-
-  /// @dev Maximum number of story chunks per NFT
-  uint256 public constant MAX_STORY_CHUNKS = 100;
+  /// @dev Maximum content length per chunk (2KB text)
+  uint256 public constant MAX_CHUNK_CONTENT_LENGTH = 2048;
 
   /// @dev Maximum basis points the protocol can take from endorsement fees (20%)
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
@@ -413,22 +408,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     bytes32 chunkHash,
     address indexed editor,
     uint256 contentLength
-  );
-
-  /**
-   * @dev Story chunk updated event
-   * @param tokenId NFT TokenID
-   * @param chunkIndex Chunk index
-   * @param oldHash Old chunk hash
-   * @param newHash New chunk hash
-   * @param editor Editor's address
-   */
-  event StoryChunkUpdated(
-    uint256 indexed tokenId,
-    uint256 indexed chunkIndex,
-    bytes32 oldHash,
-    bytes32 newHash,
-    address indexed editor
   );
 
   /**
@@ -1038,7 +1017,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     StoryMetadata storage metadata = storyMetadata[tokenId];
 
     if (metadata.isSealed) revert StoryAlreadySealed();
-    if (metadata.totalChunks >= MAX_STORY_CHUNKS) revert ChunkIndexOutOfRange();
     if (chunkIndex != metadata.totalChunks) revert ChunkIndexOutOfRange();
 
     bytes32 contentHash = _hashString(content);
@@ -1051,64 +1029,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     chunk.chunkHash = contentHash;
     chunk.content = content;
     chunk.timestamp = block.timestamp;
-    chunk.lastEditor = msg.sender;
+    chunk.editor = msg.sender;
 
     metadata.totalChunks = metadata.totalChunks + 1;
     metadata.lastUpdateTime = block.timestamp;
     metadata.totalLength = metadata.totalLength + bytes(content).length;
 
-    activeChunkIndices[tokenId].push(chunkIndex);
-
-    _updateFullStoryHash(tokenId);
+    metadata.fullStoryHash = keccak256(
+      abi.encodePacked(metadata.fullStoryHash, chunkIndex, contentHash)
+    );
 
     emit StoryChunkAdded(tokenId, chunkIndex, contentHash, msg.sender, bytes(content).length);
-  }
-
-  /**
-   * @notice Update existing story chunk
-   * @dev Only NFT holders can update chunks, complete hash will be recalculated after update
-   * @param tokenId NFT TokenID
-   * @param chunkIndex Chunk index
-   * @param newContent New chunk content
-   * @param expectedHash Expected new chunk hash
-   */
-  function updateStoryChunk(
-    uint256 tokenId,
-    uint256 chunkIndex,
-    string calldata newContent,
-    bytes32 expectedHash
-  ) external nonReentrant {
-    if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
-
-    StoryMetadata storage metadata = storyMetadata[tokenId];
-
-    if (metadata.isSealed) revert StoryAlreadySealed();
-    if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
-    if (bytes(newContent).length == 0 || bytes(newContent).length > MAX_CHUNK_CONTENT_LENGTH) {
-      revert InvalidChunkContent();
-    }
-
-    StoryChunk storage chunk = storyChunks[tokenId][chunkIndex];
-
-    bytes32 newHash = _hashString(newContent);
-    if (expectedHash != bytes32(0) && newHash != expectedHash) {
-      revert ChunkHashMismatch();
-    }
-
-    bytes32 oldHash = chunk.chunkHash;
-    uint256 oldLength = bytes(chunk.content).length;
-
-    chunk.chunkHash = newHash;
-    chunk.content = newContent;
-    chunk.timestamp = block.timestamp;
-    chunk.lastEditor = msg.sender;
-
-    metadata.lastUpdateTime = block.timestamp;
-    metadata.totalLength = metadata.totalLength - oldLength + bytes(newContent).length;
-
-    _updateFullStoryHash(tokenId);
-
-    emit StoryChunkUpdated(tokenId, chunkIndex, oldHash, newHash, msg.sender);
   }
 
   /**
@@ -1128,29 +1059,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     metadata.lastUpdateTime = block.timestamp;
 
     emit StorySealed(tokenId, metadata.totalChunks, metadata.fullStoryHash, msg.sender);
-  }
-
-  /**
-   * @dev Internal function to recalculate complete story hash
-   * @param tokenId NFT TokenID
-   */
-  function _updateFullStoryHash(uint256 tokenId) internal {
-    StoryMetadata storage metadata = storyMetadata[tokenId];
-    uint256[] storage indices = activeChunkIndices[tokenId];
-
-    if (indices.length == 0) {
-      metadata.fullStoryHash = bytes32(0);
-      return;
-    }
-
-    bytes memory combinedHashes;
-    for (uint256 i = 0; i < indices.length; i++) {
-      uint256 chunkIndex = indices[i];
-      bytes32 chunkHash = storyChunks[tokenId][chunkIndex].chunkHash;
-      combinedHashes = abi.encodePacked(combinedHashes, chunkHash);
-    }
-
-    metadata.fullStoryHash = keccak256(combinedHashes);
   }
 
   // ========== Query Functions ==========
