@@ -76,7 +76,9 @@ struct StoryChunk {
     bytes32 chunkHash;    // keccak256(content)
     string content;       // Chunk content (≤2048 bytes)
     uint256 timestamp;    // Creation/update timestamp
-    address editor;   // Last editor address
+    address editor;       // Last editor address
+    uint8 chunkType;      // Classification (0=narrative, 1=quote, ...)
+    string attachmentCID; // Optional external attachment CID
 }
 
 struct StoryMetadata {
@@ -173,7 +175,14 @@ function mintPersonNFT(
 
 #### Story Sharding System
 ```solidity
-function addStoryChunk(uint256 tokenId, uint256 chunkIndex, string calldata content, bytes32 expectedHash) external
+function addStoryChunk(
+    uint256 tokenId,
+    uint256 chunkIndex,
+    uint8 chunkType,
+    string calldata content,
+    string calldata attachmentCID,
+    bytes32 expectedHash
+) external
 function sealStory(uint256 tokenId) external
 ```
 
@@ -181,7 +190,23 @@ function sealStory(uint256 tokenId) external
 - Only NFT holders can append chunks
 - Chunks must be added sequentially starting from index 0
 - Content hash validation prevents corruption
+- Optional `chunkType` classifies content (narrative/quote/etc.)
+- Optional `attachmentCID` links to decentralized media evidence
 - Sealing makes stories permanently immutable
+
+**chunkType Mapping**
+
+| Value | Meaning |
+|-------|---------|
+| 0 | Narrative (primary storyline) |
+| 1 | Work / Achievement |
+| 2 | Quote |
+| 3 | Media (photo/audio/video notes) |
+| 4 | Timeline event |
+| 5 | Commentary |
+| 6 | Source / citation |
+| 7 | Correction |
+| 8 | Editorial note |
 
 ### Query Functions (Paginated)
 
@@ -225,7 +250,7 @@ event TokenRewardDistributed(address indexed miner, bytes32 indexed personHash, 
 
 #### Story Events
 ```solidity
-event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength);
+event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID);
 
 event StorySealed(uint256 indexed tokenId, uint256 totalChunks, bytes32 fullStoryHash, address indexed sealer);
 ```

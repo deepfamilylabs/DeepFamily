@@ -97,6 +97,43 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
 
   const personHasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
 
+  const chunkTypeOptions = useMemo(() => (
+    [
+      { value: 0, label: t('storyChunkEditor.chunkTypes.narrative', 'Narrative') },
+      { value: 1, label: t('storyChunkEditor.chunkTypes.work', 'Work / Achievement') },
+      { value: 2, label: t('storyChunkEditor.chunkTypes.quote', 'Quote') },
+      { value: 3, label: t('storyChunkEditor.chunkTypes.media', 'Media') },
+      { value: 4, label: t('storyChunkEditor.chunkTypes.timeline', 'Timeline') },
+      { value: 5, label: t('storyChunkEditor.chunkTypes.commentary', 'Commentary') },
+      { value: 6, label: t('storyChunkEditor.chunkTypes.source', 'Source') },
+      { value: 7, label: t('storyChunkEditor.chunkTypes.correction', 'Correction') },
+      { value: 8, label: t('storyChunkEditor.chunkTypes.editorial', 'Editorial') }
+    ]
+  ), [t])
+
+  const getChunkTypeLabel = useCallback(
+    (type: number | string | null | undefined) => {
+      if (type === null || type === undefined || type === '') {
+        return chunkTypeOptions[0]?.label || t('storyChunkEditor.chunkTypes.unknown', 'Unknown')
+      }
+      const numericType = Number(type)
+      if (Number.isFinite(numericType)) {
+        const match = chunkTypeOptions.find(opt => opt.value === numericType)
+        if (match) return match.label
+      }
+      return t('storyChunkEditor.chunkTypes.unknown', 'Unknown')
+    },
+    [chunkTypeOptions, t]
+  )
+
+  const resolveAttachmentUrl = useCallback((cid: string) => {
+    if (!cid) return ''
+    if (cid.startsWith('ipfs://')) {
+      return `https://ipfs.io/ipfs/${cid.slice(7)}`
+    }
+    return cid
+  }, [])
+
   // Keep local owner state in sync with NodeData updates
   useEffect(() => {
     if (isOpen) setOwner(person.owner)
@@ -755,9 +792,17 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                   : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:border-blue-200 dark:hover:border-blue-700'
                               }`}
                             >
-                              <button
+                              <div
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => toggleChunk(chunk.chunkIndex)}
-                                className="w-full text-left flex items-start gap-3"
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    toggleChunk(chunk.chunkIndex)
+                                  }
+                                }}
+                                className="w-full text-left flex items-start gap-3 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                               >
                                 <span className={`mt-0.5 transition-colors ${isExpanded ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
                                   {isExpanded ? <ChevronDown className="w-4.5 h-4.5" /> : <ChevronRight className="w-4.5 h-4.5" />}
@@ -765,9 +810,14 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
 
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between mb-2">
-                                    <span className={`text-[15px] font-semibold ${isExpanded ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>
-                                      {t('storyChunksModal.chunkTitle', 'Chunk #{{index}}', { index: chunk.chunkIndex })}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-[15px] font-semibold ${isExpanded ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>
+                                        {t('storyChunksModal.chunkTitle', 'Chunk #{{index}}', { index: chunk.chunkIndex })}
+                                      </span>
+                                      <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                        {getChunkTypeLabel(chunk.chunkType)}
+                                      </span>
+                                    </div>
                                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-full">
                                       {chunk.content.length} {t('storyChunksModal.characters', 'chars')}
                                     </span>
@@ -778,19 +828,72 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                   </div>
 
                                   {isExpanded && (
-                                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
+                                      <span className="inline-flex items-center gap-1.5">
                                         <Clock className="w-3.5 h-3.5" />
                                         {formatUnixSeconds(chunk.timestamp)}
                                       </span>
-                                      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                                      <span className="inline-flex items-center gap-1.5">
                                         <User className="w-3.5 h-3.5" />
-                                        {shortAddress(chunk.editor)}
+                                        {chunk.editor ? (
+                                          <>
+                                            <span className="truncate max-w-[140px]" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                copyText(chunk.editor)
+                                              }}
+                                              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                              type="button"
+                                            >
+                                              <Copy className="w-3 h-3" />
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <span>-</span>
+                                        )}
                                       </span>
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <Hash className="w-3.5 h-3.5" />
+                                        <span className="font-mono" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            copyText(chunk.chunkHash)
+                                          }}
+                                          className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                          type="button"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </button>
+                                      </span>
+                                      {chunk.attachmentCID && (
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <Link className="w-3.5 h-3.5" />
+                                          <a
+                                            href={resolveAttachmentUrl(chunk.attachmentCID)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="truncate underline decoration-dotted hover:text-blue-600 dark:hover:text-blue-400"
+                                          >
+                                            {chunk.attachmentCID}
+                                          </a>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              copyText(chunk.attachmentCID)
+                                            }}
+                                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                            type="button"
+                                          >
+                                            <Copy className="w-3 h-3" />
+                                          </button>
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                 </div>
-                              </button>
+                              </div>
                             </div>
                           )
                         })}

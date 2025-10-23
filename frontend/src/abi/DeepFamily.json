@@ -730,6 +730,18 @@
           "internalType": "uint256",
           "name": "contentLength",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "chunkType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "attachmentCID",
+          "type": "string"
         }
       ],
       "name": "StoryChunkAdded",
@@ -1022,8 +1034,18 @@
           "type": "uint256"
         },
         {
+          "internalType": "uint8",
+          "name": "chunkType",
+          "type": "uint8"
+        },
+        {
           "internalType": "string",
           "name": "content",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "attachmentCID",
           "type": "string"
         },
         {
@@ -1443,6 +1465,16 @@
               "internalType": "address",
               "name": "editor",
               "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "chunkType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "attachmentCID",
+              "type": "string"
             }
           ],
           "internalType": "struct DeepFamily.StoryChunk",
@@ -1805,6 +1837,16 @@
               "internalType": "address",
               "name": "editor",
               "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "chunkType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "attachmentCID",
+              "type": "string"
             }
           ],
           "internalType": "struct DeepFamily.StoryChunk[]",
@@ -2415,6 +2457,16 @@
           "internalType": "address",
           "name": "editor",
           "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "chunkType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "attachmentCID",
+          "type": "string"
         }
       ],
       "stateMutability": "view",

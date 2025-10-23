@@ -170,7 +170,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     bytes32 chunkHash; // Chunk content hash (for data integrity verification)
     string content; // Chunk content (limited to reasonable range to control gas costs)
     uint256 timestamp; // Creation timestamp
-    address editor; // editor's address
+    address editor; // Editor's address
+    uint8 chunkType; // Content classification (0=narrative, 1=work, 2=quote, 3=media, 4=timeline, 5=commentary, 6=source, 7=correction, 8=editorial)
+    string attachmentCID; // Optional external attachment CID (IPFS/Arweave)
   }
 
   /**
@@ -401,13 +403,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param chunkHash Chunk hash
    * @param editor Editor's address
    * @param contentLength Chunk content length
+   * @param chunkType Chunk classification (0=narrative, 1=quote, ...)
+   * @param attachmentCID Optional attachment CID (IPFS/Arweave)
    */
   event StoryChunkAdded(
     uint256 indexed tokenId,
     uint256 indexed chunkIndex,
     bytes32 chunkHash,
     address indexed editor,
-    uint256 contentLength
+    uint256 contentLength,
+    uint8 chunkType,
+    string attachmentCID
   );
 
   /**
@@ -1005,7 +1011,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   function addStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex,
+    uint8 chunkType,
     string calldata content,
+    string calldata attachmentCID,
     bytes32 expectedHash
   ) external nonReentrant {
     if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
@@ -1024,12 +1032,16 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       revert ChunkHashMismatch();
     }
 
+    if (bytes(attachmentCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
+
     StoryChunk storage chunk = storyChunks[tokenId][chunkIndex];
     chunk.chunkIndex = chunkIndex;
     chunk.chunkHash = contentHash;
     chunk.content = content;
     chunk.timestamp = block.timestamp;
     chunk.editor = msg.sender;
+    chunk.chunkType = chunkType;
+    chunk.attachmentCID = attachmentCID;
 
     metadata.totalChunks = metadata.totalChunks + 1;
     metadata.lastUpdateTime = block.timestamp;
@@ -1039,7 +1051,15 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       abi.encodePacked(metadata.fullStoryHash, chunkIndex, contentHash)
     );
 
-    emit StoryChunkAdded(tokenId, chunkIndex, contentHash, msg.sender, bytes(content).length);
+    emit StoryChunkAdded(
+      tokenId,
+      chunkIndex,
+      contentHash,
+      msg.sender,
+      bytes(content).length,
+      chunkType,
+      attachmentCID
+    );
   }
 
   /**

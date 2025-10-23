@@ -865,7 +865,9 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
               chunkHash: chunk.chunkHash,
               content: chunk.content,
               timestamp: Number(chunk.timestamp),
-              editor: chunk.editor
+              editor: chunk.editor,
+              chunkType: Number(chunk.chunkType),
+              attachmentCID: chunk.attachmentCID
             })
           } catch (e) {
             console.warn(`Missing chunk ${i} for token ${tokenId}`)

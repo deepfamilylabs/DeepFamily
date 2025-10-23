@@ -50,15 +50,17 @@ describe('Story Sharding - Error & Edge Cases', function () {
   it('reverts when non-owner adds chunk', async () => {
     const { deepFamily, other, tokenId } = await deployAndMint();
     await expect(
-      deepFamily.connect(other).addStoryChunk(tokenId, 0, 'content', hre.ethers.ZeroHash)
+      deepFamily
+        .connect(other)
+        .addStoryChunk(tokenId, 0, 0, 'content', '', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'MustBeNFTHolder');
   });
 
   it('reverts on index mismatch (skipping index)', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    await deepFamily.addStoryChunk(tokenId, 0, 'c0', hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 0, 0, 'c0', '', hre.ethers.ZeroHash);
     await expect(
-      deepFamily.addStoryChunk(tokenId, 2, 'c2', hre.ethers.ZeroHash)
+      deepFamily.addStoryChunk(tokenId, 2, 0, 'c2', '', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'ChunkIndexOutOfRange');
   });
 
@@ -66,7 +68,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
     const { deepFamily, tokenId } = await deployAndMint();
     const longStr = 'a'.repeat(2049); // > 2048
     await expect(
-      deepFamily.addStoryChunk(tokenId, 0, longStr, hre.ethers.ZeroHash)
+      deepFamily.addStoryChunk(tokenId, 0, 0, longStr, '', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidChunkContent');
   });
 
@@ -74,16 +76,16 @@ describe('Story Sharding - Error & Edge Cases', function () {
     const { deepFamily, tokenId } = await deployAndMint();
     const wrongHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes('DIFFERENT'));
     await expect(
-      deepFamily.addStoryChunk(tokenId, 0, 'Real Content', wrongHash)
+      deepFamily.addStoryChunk(tokenId, 0, 0, 'Real Content', '', wrongHash)
     ).to.be.revertedWithCustomError(deepFamily, 'ChunkHashMismatch');
   });
 
   it('cannot append after sealing', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    await deepFamily.addStoryChunk(tokenId, 0, 'c0', hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 0, 0, 'c0', '', hre.ethers.ZeroHash);
     await deepFamily.sealStory(tokenId);
     await expect(
-      deepFamily.addStoryChunk(tokenId, 1, 'c1', hre.ethers.ZeroHash)
+      deepFamily.addStoryChunk(tokenId, 1, 0, 'c1', '', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'StoryAlreadySealed');
   });
 
@@ -99,8 +101,8 @@ describe('Story Sharding - Error & Edge Cases', function () {
     const { deepFamily, tokenId } = await deployAndMint();
     const c0 = 'Chunk Zero';
     const c1 = 'Chunk One';
-    await deepFamily.addStoryChunk(tokenId, 0, c0, hre.ethers.ZeroHash);
-    await deepFamily.addStoryChunk(tokenId, 1, c1, hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 0, 0, c0, '', hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 1, 0, c1, '', hre.ethers.ZeroHash);
     // Compute expected combined hash
     const h0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c0));
     const h1 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c1));
@@ -116,12 +118,21 @@ describe('Story Sharding - Error & Edge Cases', function () {
 
     // Append chunk 2 and confirm hash expands deterministically
     const c2 = 'Chunk Two';
-    await deepFamily.addStoryChunk(tokenId, 2, c2, hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 2, 0, c2, '', hre.ethers.ZeroHash);
     const h2 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c2));
     expected = hre.ethers.keccak256(
       hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 2n, h2])
     );
     meta = await deepFamily.storyMetadata(tokenId);
     expect(meta.fullStoryHash).to.equal(expected);
+  });
+
+  it('records chunkType and attachment CID when provided', async () => {
+    const { deepFamily, tokenId } = await deployAndMint();
+    const attachment = 'ipfs://exampleAttachmentCID';
+    await deepFamily.addStoryChunk(tokenId, 0, 3, 'Source citation entry', attachment, hre.ethers.ZeroHash);
+    const chunk = await deepFamily.getStoryChunk(tokenId, 0);
+    expect(chunk.chunkType).to.equal(3);
+    expect(chunk.attachmentCID).to.equal(attachment);
   });
 });
