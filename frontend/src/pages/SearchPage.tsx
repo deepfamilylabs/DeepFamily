@@ -716,12 +716,12 @@ export default function SearchPage() {
                   </button>
                 </div>
                 <div className="flex items-center gap-1 overflow-hidden">
-                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.lastEditor')}:</span>
-                  <HashInline value={String(chunk.lastEditor || '')} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
-                  {chunk.lastEditor && (
+                  <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.storyChunksQuery.editor')}:</span>
+                  <HashInline value={String(chunk.editor || '')} className="font-mono text-xs text-gray-800 dark:text-gray-300" />
+                  {chunk.editor && (
                     <button
                       aria-label={t('search.copy')}
-                      onClick={() => onCopy(String(chunk.lastEditor || ''))}
+                      onClick={() => onCopy(String(chunk.editor || ''))}
                       className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
                     >
                       <Clipboard size={14} />

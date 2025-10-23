@@ -298,7 +298,7 @@
       "chunkHash": "分片哈希",
       "content": "内容",
       "timestamp": "时间戳",
-      "lastEditor": "最后编辑者",
+      "editor": "编辑者",
       "contentPreview": "内容预览",
       "totalChunks": "总分片数"
     },
@@ -568,7 +568,7 @@
     "hashLabel": "哈希",
     "editChunk": "编辑分片",
     "addChunk": "添加新分片",
-    "contentPlaceholder": "请输入分片内容（最多1000字符）",
+    "contentPlaceholder": "请输入分片内容（最多2048字节）",
     "saving": "保存中...",
     "save": "保存",
     "cancel": "取消",
@@ -576,7 +576,8 @@
     "chunks": "现有分片",
     "loading": "加载中...",
     "contentRequired": "内容不能为空",
-    "contentTooLong": "内容不能超过1000字符",
+    "contentTooLong": "内容不能超过2048字节",
+    "noChunks": "暂无故事分片",
     "operationFailed": "操作失败",
     "sealConfirm": "确定要封存传记吗？封存后将无法再修改。",
     "sealFailed": "封存失败",
@@ -590,8 +591,8 @@
       "cancel": "取消",
       "confirm": "确认封存"
     },
-    "contentTooLongBytes": "内容不能超过1000字节",
-    "contentPlaceholderBytes": "请输入分片内容（最多1000字节，约=1000英文或≈333汉字）",
+    "contentTooLongBytes": "内容不能超过2048字节",
+    "contentPlaceholderBytes": "请输入分片内容（最多2048字节，约=2048英文或≈680汉字）",
     "offlineNoData": "离线模式：本地没有缓存该传记",
     "success": {
       "chunkAdded": "分片 #{{index}} 添加成功（{{bytes}} 字节）",

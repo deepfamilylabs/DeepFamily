@@ -298,7 +298,7 @@
       "chunkHash": "シャードハッシュ",
       "content": "内容",
       "timestamp": "タイムスタンプ",
-      "lastEditor": "最終編集者",
+      "editor": "編集者",
       "contentPreview": "内容プレビュー",
       "totalChunks": "総シャード数"
     },
@@ -567,7 +567,7 @@
     "hashLabel": "ハッシュ",
     "editChunk": "シャード編集",
     "addChunk": "新規シャード追加",
-    "contentPlaceholder": "シャード内容を入力してください（最大1000文字）",
+    "contentPlaceholder": "シャード内容を入力してください（最大2048バイト）",
     "saving": "保存中...",
     "save": "保存",
     "cancel": "キャンセル",
@@ -575,7 +575,8 @@
     "chunks": "既存シャード",
     "loading": "読み込み中...",
     "contentRequired": "内容を空にすることはできません",
-    "contentTooLong": "内容は1000文字を超えることはできません",
+    "contentTooLong": "内容は2048バイトを超えることはできません",
+    "noChunks": "まだストーリーチャンクがありません。",
     "operationFailed": "操作失敗",
     "sealConfirm": "伝記をシーリングしますか？シーリング後は修正できません。",
     "sealFailed": "シーリング失敗",
@@ -589,8 +590,8 @@
       "cancel": "キャンセル",
       "confirm": "シーリング確認"
     },
-    "contentTooLongBytes": "内容は1000バイトを超えることはできません",
-    "contentPlaceholderBytes": "シャード内容を入力してください（最大1000バイト、約1000英字または約333漢字）",
+    "contentTooLongBytes": "内容は2048バイトを超えることはできません",
+    "contentPlaceholderBytes": "シャード内容を入力してください（最大2048バイト、約2048英字または約680漢字）",
     "offlineNoData": "オフラインモード：この伝記のローカルキャッシュが存在しません",
     "success": {
       "chunkAdded": "チャンク #{{index}} を正常に追加しました（{{bytes}} バイト）",

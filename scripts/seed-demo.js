@@ -15,9 +15,9 @@ function dlog(...args) {
   if (DEBUG_ENABLED) console.log("[DEBUG]", ...args);
 }
 
-// Story chunk constants and helpers
-const MAX_CHUNK_CONTENT_LENGTH = 1000;
-const MAX_STORY_CHUNKS = 100;
+// Story chunk constants and helpers (demo defaults; contract allows 2048 bytes per chunk)
+const MAX_CHUNK_CONTENT_LENGTH = 2048;
+const DEFAULT_STORY_CHUNKS = 100;
 
 function utf8ByteLen(str) {
   return Buffer.byteLength(str, "utf8");
@@ -781,7 +781,7 @@ async function main() {
       if (mintedNFTs.length >= 3) {
         storyChunkTargets.push({
           ...mintedNFTs[2],
-          chunks: MAX_STORY_CHUNKS,
+          chunks: DEFAULT_STORY_CHUNKS,
           useMaxLength: true,
           sealed: true,
         }); // max chunks + seal

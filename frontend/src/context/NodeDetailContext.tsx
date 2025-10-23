@@ -124,7 +124,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
                   chunkHash: chunk.chunkHash,
                   content: chunk.content,
                   timestamp: Number(chunk.timestamp),
-                  lastEditor: chunk.lastEditor
+                  editor: chunk.editor
                 })
               }
             }

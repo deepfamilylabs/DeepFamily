@@ -11,7 +11,6 @@ require("./tasks/networks-list");
 
 // Register story-related task scripts used by tests
 require("./tasks/story-add-chunk");
-require("./tasks/story-update-chunk");
 require("./tasks/story-list-chunks");
 require("./tasks/story-seal");
 

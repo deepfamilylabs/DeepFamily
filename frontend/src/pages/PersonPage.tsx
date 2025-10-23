@@ -7,6 +7,7 @@ import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
 import { ethers } from 'ethers'
+import { computeStoryHash } from '../lib/story'
 
 function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex);
@@ -19,9 +20,7 @@ function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   let hashMatch: boolean | null = null; let computedHash: string | undefined;
   if (missing.length===0 && metadata.totalChunks>0 && metadata.fullStoryHash && metadata.fullStoryHash !== ethers.ZeroHash){
     try {
-      // Contract logic: concatenation of all chunkHash (bytes32) values then keccak256
-      const concatenated = '0x' + sorted.map(c => c.chunkHash.replace(/^0x/, '')).join('');
-      computedHash = ethers.keccak256(concatenated);
+      computedHash = computeStoryHash(sorted);
       hashMatch = computedHash === metadata.fullStoryHash;
     } catch { /* ignore */ }
   }

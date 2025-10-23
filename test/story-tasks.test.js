@@ -2,9 +2,9 @@ const { expect } = require('chai');
 const hre = require('hardhat');
 const { buildBasicInfo } = require('../lib/namePoseidon');
 
-// This test exercises the newly added Hardhat tasks for story sharding:
-// add-story-chunk, update-story-chunk, seal-story, list-story-chunks
-// Flow: add-person -> endorse -> mint-nft -> add chunks -> update chunk -> list -> seal -> ensure further mutation fails.
+// This test exercises the Hardhat tasks for story sharding:
+// add-story-chunk, seal-story, list-story-chunks
+// Flow: add-person -> endorse -> mint-nft -> append chunks -> list -> seal -> ensure further mutation fails.
 
 describe('Story Tasks Integration', function () {
   this.timeout(60_000);
@@ -80,20 +80,13 @@ describe('Story Tasks Integration', function () {
       content: 'Second chunk content',
     });
 
-    // 6. update first chunk (index 0)
-    await hre.run('update-story-chunk', {
-      tokenid: '1',
-      chunkindex: '0',
-      content: 'First chunk content (updated)',
-    });
-
     // Verify metadata and chunks directly via contract
     const meta = await deepFamily.getStoryMetadata(1n);
     expect(meta.totalChunks).to.equal(2n);
     expect(meta.isSealed).to.equal(false);
 
     const chunk0 = await deepFamily.getStoryChunk(1n, 0);
-    expect(chunk0.content).to.equal('First chunk content (updated)');
+    expect(chunk0.content).to.equal('First chunk content');
     const chunk1 = await deepFamily.getStoryChunk(1n, 1);
     expect(chunk1.content).to.equal('Second chunk content');
 

@@ -298,7 +298,7 @@
       "chunkHash": "샤드 해시",
       "content": "내용",
       "timestamp": "타임스탬프",
-      "lastEditor": "마지막 편집자",
+      "editor": "편집자",
       "contentPreview": "내용 미리보기",
       "totalChunks": "총 샤드 수"
     },
@@ -567,7 +567,7 @@
     "hashLabel": "해시",
     "editChunk": "샤드 편집",
     "addChunk": "새 샤드 추가",
-    "contentPlaceholder": "샤드 내용을 입력하세요(최대 1000자)",
+    "contentPlaceholder": "샤드 내용을 입력하세요(최대 2048바이트)",
     "saving": "저장 중...",
     "save": "저장",
     "cancel": "취소",
@@ -575,7 +575,8 @@
     "chunks": "기존 샤드",
     "loading": "로딩 중...",
     "contentRequired": "내용은 비워둘 수 없습니다",
-    "contentTooLong": "내용은 1000자를 초과할 수 없습니다",
+    "contentTooLong": "내용은 2048바이트를 초과할 수 없습니다",
+    "noChunks": "스토리 청크가 아직 없습니다.",
     "operationFailed": "작업 실패",
     "sealConfirm": "전기를 봉인하시겠습니까? 봉인 후에는 더 이상 수정할 수 없습니다.",
     "sealFailed": "봉인 실패",
@@ -589,8 +590,8 @@
       "cancel": "취소",
       "confirm": "봉인 확인"
     },
-    "contentTooLongBytes": "내용은 1000바이트를 초과할 수 없습니다",
-    "contentPlaceholderBytes": "샤드 내용을 입력하세요(최대 1000바이트, 약=1000영문 또는 ≈333자)",
+    "contentTooLongBytes": "내용은 2048바이트를 초과할 수 없습니다",
+    "contentPlaceholderBytes": "샤드 내용을 입력하세요(최대 2048바이트, 약=2048영문 또는 ≈680자)",
     "offlineNoData": "오프라인 모드: 로컬에 해당 전기 캐시 없음",
     "success": {
       "chunkAdded": "청크 #{{index}} 추가 성공 ({{bytes}} 바이트)",

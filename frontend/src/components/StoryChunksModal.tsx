@@ -785,7 +785,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                       </span>
                                       <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                                         <User className="w-3.5 h-3.5" />
-                                        {shortAddress(chunk.lastEditor)}
+                                        {shortAddress(chunk.editor)}
                                       </span>
                                     </div>
                                   )}
