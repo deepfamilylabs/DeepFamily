@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash, Link, User, Check, FileText } from 'lucide-react'
+import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash, Link, User, Check, FileText, HelpCircle } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useWallet } from '../context/WalletContext'
@@ -84,6 +84,7 @@ export default function StoryEditorPage() {
   const [personName, setPersonName] = useState<string | null>(prefetched?.fullName || null)
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null)
   const [showChunkTypeDropdown, setShowChunkTypeDropdown] = useState(false)
+  const [showChunkTypeHelp, setShowChunkTypeHelp] = useState(false)
 
   // Refs
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -611,10 +612,20 @@ export default function StoryEditorPage() {
 
                       <div className="grid gap-3 sm:grid-cols-[1fr_3fr]">
                         <div className="flex flex-col">
-                          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            {t('storyChunkEditor.chunkTypeLabel', 'Chunk Type')}
-                          </label>
-                          <div ref={chunkTypeDropdownRef} className="relative mt-1">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              {t('storyChunkEditor.chunkTypeLabel', 'Chunk Type')}
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setShowChunkTypeHelp(true)}
+                              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                              aria-label="Help"
+                            >
+                              <HelpCircle size={14} />
+                            </button>
+                          </div>
+                          <div ref={chunkTypeDropdownRef} className="relative">
                             <button
                               type="button"
                               onClick={() => !submitting && setShowChunkTypeDropdown(!showChunkTypeDropdown)}
@@ -1026,6 +1037,297 @@ export default function StoryEditorPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Chunk Type Help Modal */}
+      {showChunkTypeHelp && createPortal(
+        <div
+          className="fixed inset-0 z-[1002] flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setShowChunkTypeHelp(false)}
+          data-chunk-help-dialog
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl border border-gray-200 dark:border-gray-800 max-h-[75vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
+                  <HelpCircle size={20} className="text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {t('storyChunkEditor.chunkTypeHelp.title', 'Story Chunk Types Guide')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowChunkTypeHelp(false)}
+                className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                aria-label="Close"
+                type="button"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-6 space-y-6">
+              {/* Introduction */}
+              <div className="prose dark:prose-invert max-w-none">
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {t('storyChunkEditor.chunkTypeHelp.intro', 'Story chunks are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple chunks of the same type in any order.')}
+                </p>
+              </div>
+
+              {/* Opening Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.opening', 'Opening')}
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                    {(() => {
+                      const Icon = getChunkTypeIcon(0)
+                      return <Icon size={16} className={getChunkTypeColorClass(0) + ' flex-shrink-0 mt-0.5'} />
+                    })()}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {t('chunkTypes.summary', 'Summary')}
+                      </span>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                        {t('storyChunkEditor.chunkTypeHelp.summaryDesc', 'Brief overview of the person\'s life and significance')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Early Years Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.earlyYears', 'Early Years')}
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {(() => {
+                        const Icon = getChunkTypeIcon(1)
+                        return <Icon size={16} className={getChunkTypeColorClass(1) + ' flex-shrink-0 mt-0.5'} />
+                      })()}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {t('chunkTypes.earlyLife', 'Early Life')}
+                        </span>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                          {t('storyChunkEditor.chunkTypeHelp.earlyLifeDesc', 'Birth, childhood, family background')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {(() => {
+                        const Icon = getChunkTypeIcon(2)
+                        return <Icon size={16} className={getChunkTypeColorClass(2) + ' flex-shrink-0 mt-0.5'} />
+                      })()}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {t('chunkTypes.education', 'Education')}
+                        </span>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                          {t('storyChunkEditor.chunkTypeHelp.educationDesc', 'Schools, degrees, mentors, academic training')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Main Narrative Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.mainNarrative', 'Main Narrative')}
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {(() => {
+                        const Icon = getChunkTypeIcon(3)
+                        return <Icon size={16} className={getChunkTypeColorClass(3) + ' flex-shrink-0 mt-0.5'} />
+                      })()}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {t('chunkTypes.lifeEvents', 'Life Events')}
+                        </span>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                          {t('storyChunkEditor.chunkTypeHelp.lifeEventsDesc', 'Chronological life story from birth to present/death. Can include career, family, society - a complete timeline.')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Specialized Topics Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.specializedTopics', 'Specialized Topics')}
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 italic">
+                  {t('storyChunkEditor.chunkTypeHelp.specializedDesc', 'Thematic deep dives extracted from life narrative')}
+                </p>
+                <div className="space-y-2">
+                  {[
+                    { value: 4, key: 'career', desc: 'Professional history, positions, job transitions' },
+                    { value: 5, key: 'works', desc: 'Publications, creations, products, projects' },
+                    { value: 6, key: 'achievements', desc: 'Awards, honors, recognitions, milestones' },
+                    { value: 7, key: 'philosophy', desc: 'Beliefs, values, theoretical contributions' },
+                    { value: 8, key: 'quotes', desc: 'Famous sayings, memorable statements' },
+                  ].map(({ value, key, desc }) => {
+                    const Icon = getChunkTypeIcon(value)
+                    return (
+                      <div key={value} className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <Icon size={16} className={getChunkTypeColorClass(value) + ' flex-shrink-0 mt-0.5'} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {t(`chunkTypes.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                            </span>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                              {t(`storyChunkEditor.chunkTypeHelp.${key}Desc`, desc)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Personal Life Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.personalLife', 'Personal Life')}
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    { value: 9, key: 'family', desc: 'Spouse, children, close relatives' },
+                    { value: 10, key: 'lifestyle', desc: 'Hobbies, habits, interests, daily routines' },
+                    { value: 11, key: 'relations', desc: 'Friendships, mentorships, collaborations, rivalries' },
+                  ].map(({ value, key, desc }) => {
+                    const Icon = getChunkTypeIcon(value)
+                    return (
+                      <div key={value} className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <Icon size={16} className={getChunkTypeColorClass(value) + ' flex-shrink-0 mt-0.5'} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {t(`chunkTypes.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                            </span>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                              {t(`storyChunkEditor.chunkTypeHelp.${key}Desc`, desc)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Social Engagement Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.socialEngagement', 'Social Engagement')}
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    { value: 12, key: 'activities', desc: 'Public service, charity, speeches, social causes' },
+                    { value: 13, key: 'anecdotes', desc: 'Interesting stories, lesser-known facts' },
+                    { value: 14, key: 'controversies', desc: 'Disputes, criticisms, scandals' },
+                  ].map(({ value, key, desc }) => {
+                    const Icon = getChunkTypeIcon(value)
+                    return (
+                      <div key={value} className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <Icon size={16} className={getChunkTypeColorClass(value) + ' flex-shrink-0 mt-0.5'} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {t(`chunkTypes.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                            </span>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                              {t(`storyChunkEditor.chunkTypeHelp.${key}Desc`, desc)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Closing Section */}
+              <section>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.closing', 'Closing')}
+                </h4>
+                <div className="space-y-2">
+                  {[
+                    { value: 15, key: 'legacy', desc: 'Historical impact, influence, commemorations' },
+                    { value: 16, key: 'gallery', desc: 'Photos, images, multimedia' },
+                    { value: 17, key: 'references', desc: 'Sources, citations, bibliography' },
+                    { value: 18, key: 'notes', desc: 'Additional remarks, corrections, clarifications' },
+                  ].map(({ value, key, desc }) => {
+                    const Icon = getChunkTypeIcon(value)
+                    return (
+                      <div key={value} className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <Icon size={16} className={getChunkTypeColorClass(value) + ' flex-shrink-0 mt-0.5'} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {t(`chunkTypes.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                            </span>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                              {t(`storyChunkEditor.chunkTypeHelp.${key}Desc`, desc)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Usage Notes */}
+              <section className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wide">
+                  {t('storyChunkEditor.chunkTypeHelp.usageNotes', 'Usage Notes')}
+                </h4>
+                <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                    <span>{t('storyChunkEditor.chunkTypeHelp.note1', 'These are content type tags, not exclusive chapters - you can have multiple chunks of the same type')}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                    <span>{t('storyChunkEditor.chunkTypeHelp.note2', 'Types are not mutually exclusive - feel free to use types in any order')}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                    <span>{t('storyChunkEditor.chunkTypeHelp.note3', 'Life Events: For chronological narrative (birth → childhood → adulthood → death)')}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                    <span>{t('storyChunkEditor.chunkTypeHelp.note4', 'Career: For focused professional history (jobs, companies, positions)')}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                    <span>{t('storyChunkEditor.chunkTypeHelp.note5', 'Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline')}</span>
+                  </li>
+                </ul>
+              </section>
             </div>
           </div>
         </div>,

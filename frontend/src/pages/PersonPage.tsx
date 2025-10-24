@@ -76,10 +76,11 @@ export default function PersonPage() {
   const [error, setError] = useState<string | null>(null)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<'sections' | 'paragraph' | 'raw'>('sections')
-  const [activeSection, setActiveSection] = useState<number | null>(null)
+  const [activeSection, setActiveSection] = useState<string | number | null>(null)
   const prefetched = (location.state as any)?.prefetchedStory as Partial<StoryDetailData> | undefined
   const dataRef = useRef<StoryDetailData | null>(null)
-  const sectionRefs = useRef<Map<number, HTMLElement>>(new Map())
+  const sectionRefs = useRef<Map<string | number, HTMLElement>>(new Map())
+  const [leftNavHeight, setLeftNavHeight] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     try {
@@ -88,6 +89,20 @@ export default function PersonPage() {
       window.scrollTo(0, 0)
     }
   }, [tokenId])
+
+  useEffect(() => {
+    const mainEl = document.querySelector('.xl\\:col-span-3.space-y-6') as HTMLElement | null
+    if (!mainEl) return
+    const update = () => setLeftNavHeight(mainEl.getBoundingClientRect().height)
+    update()
+    const ro = new ResizeObserver(() => update())
+    ro.observe(mainEl)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [viewMode, data?.storyChunks?.length])
 
   // Dynamic title: person name + archive
   useEffect(()=>{
@@ -360,40 +375,77 @@ export default function PersonPage() {
     fetchStoryData()
   }, [fetchStoryData])
 
-  // Scroll spy for sections
+  // Scroll spy for sections (supports top-level anchors and prioritizes group sections)
   useEffect(() => {
     if (viewMode !== 'sections' || groupedChunks.length === 0) return
 
     const handleScroll = () => {
-      const scrollPosition = window.scrollY + 100 // offset for header
-      
-      let currentSection: number | null = null
-      sectionRefs.current.forEach((element, type) => {
-        const { offsetTop, offsetHeight } = element
-        if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
-          currentSection = type
-        }
+      const scrollPosition = window.scrollY + 80 // align with scrollToSection offset
+
+      const entries: Array<{ key: string | number; top: number }> = []
+      sectionRefs.current.forEach((el, key) => {
+        entries.push({ key, top: el.offsetTop })
       })
-      
-      if (currentSection !== null && currentSection !== activeSection) {
-        setActiveSection(currentSection)
+
+      let nextActive: string | number | null = null
+
+      // 1) Prioritize numeric group sections, compute ranges by next section top
+      const numericEntries = entries.filter(e => typeof e.key === 'number').sort((a, b) => a.top - b.top)
+      for (let i = 0; i < numericEntries.length; i++) {
+        const curr = numericEntries[i]
+        const nextTop = i < numericEntries.length - 1 ? numericEntries[i + 1].top : Number.POSITIVE_INFINITY
+        if (scrollPosition >= curr.top && scrollPosition < nextTop) {
+          nextActive = curr.key
+          break
+        }
+      }
+      // If at document bottom, force last numeric group active
+      if (nextActive === null && numericEntries.length) {
+        const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
+        if (nearBottom) {
+          nextActive = numericEntries[numericEntries.length - 1].key
+        }
+      }
+
+      // 2) Basic Info
+      if (nextActive === null) {
+        const basic = entries.find(e => e.key === 'basicInfo')
+        if (basic && scrollPosition >= basic.top) {
+          const anchorTops = entries.filter(e => typeof e.key === 'number' || e.key === 'profileTop').map(e => e.top)
+          const firstAnchorTop = anchorTops.length ? Math.min(...anchorTops) : Number.POSITIVE_INFINITY
+          if (scrollPosition < firstAnchorTop) nextActive = 'basicInfo'
+        }
+      }
+
+      // 3) Person Profile container
+      if (nextActive === null) {
+        const prof = entries.find(e => e.key === 'profileTop')
+        if (prof && scrollPosition >= prof.top) {
+          const firstGroupTop = numericEntries.length ? numericEntries[0].top : Number.POSITIVE_INFINITY
+          if (scrollPosition < firstGroupTop) nextActive = 'profileTop'
+        }
+      }
+
+      if (nextActive !== null && nextActive !== activeSection) {
+        setActiveSection(nextActive)
       }
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll() // Initial check
-    
+
     return () => window.removeEventListener('scroll', handleScroll)
   }, [viewMode, groupedChunks, activeSection])
 
   // Scroll to section
-  const scrollToSection = useCallback((type: number) => {
-    const element = sectionRefs.current.get(type)
+  const scrollToSection = useCallback((key: number | string) => {
+    const element = sectionRefs.current.get(key)
     if (element) {
+      setActiveSection(key) // immediate highlight on click
       const top = element.offsetTop - 80 // offset for header
       window.scrollTo({ top, behavior: 'smooth' })
     }
-  }, [])
+  }, [setActiveSection])
 
   const copyText = useCallback(async (text: string) => {
     try {
@@ -481,14 +533,57 @@ export default function PersonPage() {
         <>
           {/* Section Navigation - Left Sidebar (only for sections mode with chunks) */}
           {viewMode === 'sections' && groupedChunks.length > 0 && (
-            <div className="hidden xl:block fixed left-4 top-24 w-56 max-h-[calc(100vh-120px)] overflow-y-auto z-10">
-              <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900">
+            <div className="hidden xl:block fixed left-[calc((100vw-1280px)/2-204px)] top-[104px] w-56 max-h-[calc(100vh-104px-64px)] z-10" style={{ height: leftNavHeight ? `${leftNavHeight}px` : undefined }}>
+              <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col h-full">
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 rounded-t-lg">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {t('person.sectionNav', '目录')}
                   </h4>
                 </div>
-                <div>
+                <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable] overscroll-y-contain">
+                  {/* 一级：基本信息 */}
+                  {(() => {
+                    const isActive = activeSection === 'basicInfo'
+                    return (
+                      <button
+                        onClick={() => scrollToSection('basicInfo')}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                          isActive
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent'
+                        }`}
+                      >
+                        <User size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'} />
+                        <span className={`flex-1 truncate ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {t('person.basicInfo','基本信息')}
+                        </span>
+                      </button>
+                    )
+                  })()}
+
+                  {/* 一级：人物资料 */}
+                  {(() => {
+                    const isGroupActive = typeof activeSection === 'number' || activeSection === 'profileTop'
+                    const totalCount = data?.storyChunks?.length || 0
+                    return (
+                      <button
+                        onClick={() => scrollToSection('profileTop')}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                          isGroupActive
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent'
+                        }`}
+                      >
+                        <Layers size={14} className={isGroupActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'} />
+                        <span className={`flex-1 truncate ${isGroupActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {t('person.profileData','Profile Data')}
+                        </span>
+                        <span className={`text-xs ${isGroupActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>{totalCount}</span>
+                      </button>
+                    )
+                  })()}
+
+                  {/* 二级：人物资料下的分组 */}
                   {groupedChunks.map(({ type, chunks }) => {
                     const ChunkIcon = getChunkTypeIcon(type)
                     const colorClass = getChunkTypeColorClass(type)
@@ -499,7 +594,7 @@ export default function PersonPage() {
                       <button
                         key={type}
                         onClick={() => scrollToSection(type)}
-                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors pl-7 ${
                           isActive 
                             ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400' 
                             : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent'
@@ -521,7 +616,7 @@ export default function PersonPage() {
           )}
           
           {/* Existing body content below */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start pb-[67vh]">
               <div className="xl:col-span-3 space-y-6">
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
                   {data && (data.fullName || data.nftCoreInfo) && (
@@ -568,7 +663,17 @@ export default function PersonPage() {
                       <div className="-mx-5 border-t border-gray-200 dark:border-gray-800 mb-4"></div>
 
                       {/* Basic Info section */}
-                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                      <h3
+                        ref={(el) => {
+                          if (el) {
+                            sectionRefs.current.set('basicInfo', el)
+                          } else {
+                            sectionRefs.current.delete('basicInfo')
+                          }
+                        }}
+                        id="basic-info"
+                        className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 scroll-mt-20"
+                      >
                         {t('person.basicInfo','Basic Info')}
                       </h3>
                       <div className="space-y-3 text-sm sm:text-base">
@@ -700,7 +805,17 @@ export default function PersonPage() {
                     })()}
                     
                     {viewMode === 'sections' && groupedChunks.length > 0 ? (
-                      <div className="space-y-6">
+                      <div
+                        ref={(el) => {
+                          if (el) {
+                            sectionRefs.current.set('profileTop', el)
+                          } else {
+                            sectionRefs.current.delete('profileTop')
+                          }
+                        }}
+                        id="person-profile-top"
+                        className="space-y-6"
+                      >
                         {groupedChunks.map(({ type, chunks }) => {
                           const ChunkIcon = getChunkTypeIcon(type)
                           const colorClass = getChunkTypeColorClass(type)
@@ -791,14 +906,6 @@ export default function PersonPage() {
                           <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.totalLength', 'Total Length')}</div>
                           <div className="font-mono font-medium text-gray-900 dark:text-gray-100">{data.storyMetadata.totalLength}</div>
                         </div>
-                        <div>
-                          <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.status', 'Status')}</div>
-                          <div>
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium inline-block ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>
-                              {data.storyMetadata.isSealed ? t('person.sealed', 'Sealed') : t('person.editable', 'Editable')}
-                            </span>
-                          </div>
-                        </div>
                       </div>
                       <div className="text-sm mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
                         <div className="text-gray-500 dark:text-gray-400 mb-1 text-xs">{t('person.lastUpdate', 'Last Update')}</div>
@@ -884,8 +991,8 @@ export default function PersonPage() {
               <div className="space-y-4 xl:sticky xl:top-20 xl:self-start">
                 <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
                   <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
-                      <span>{t('person.chunkList', 'Chunk List')}</span>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                      {t('person.chunkList', 'Chunk List')}
                       {data && data.storyChunks && data.storyChunks.length > 0 && (
                         <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
                           {data.storyChunks.length}
@@ -1045,12 +1152,6 @@ export default function PersonPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.lastUpdate', 'Last Update')}</span>
                         <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{formatDate(data.storyMetadata.lastUpdateTime)}</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-800">
-                        <span className="text-gray-500 dark:text-gray-400 text-xs">{t('person.status', 'Status')}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${data.storyMetadata.isSealed ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}`}>
-                          {data.storyMetadata.isSealed ? t('person.sealed', 'Sealed') : t('person.editable', 'Editable')}
-                        </span>
                       </div>
                     </div>
                     <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
