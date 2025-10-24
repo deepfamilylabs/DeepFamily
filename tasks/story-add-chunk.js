@@ -41,8 +41,8 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
     }
 
     const chunkType = Number(args.type || "0");
-    if (!Number.isInteger(chunkType) || chunkType < 0 || chunkType > 255) {
-      throw new Error("type must be an integer between 0 and 255");
+    if (!Number.isInteger(chunkType) || chunkType < 0 || chunkType > 18) {
+      throw new Error("type must be an integer between 0 and 18 (19 chunk types available)");
     }
 
     const attachmentCID = args.attachment || "";
