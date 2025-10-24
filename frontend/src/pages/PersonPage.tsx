@@ -1,13 +1,14 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Edit2, Clock, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard, Hash, Link, User } from 'lucide-react'
+import { Edit2, Clock, ChevronDown, ChevronRight, FileText, List, GitBranch, Clipboard, Hash, Link, User, Layers } from 'lucide-react'
 import { StoryChunk, StoryMetadata, genderText as genderTextFn, formatYMD, formatUnixSeconds, formatHashMiddle, shortAddress } from '../types/graph'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from '../components/ToastProvider'
 import { ethers } from 'ethers'
 import { computeStoryHash } from '../lib/story'
+import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTypeColorClass, getChunkTypeBorderColorClass } from '../constants/chunkTypes'
 
 function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata){
   const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex);
@@ -74,9 +75,11 @@ export default function PersonPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
-  const [viewMode, setViewMode] = useState<'paragraph' | 'raw'>('paragraph')
+  const [viewMode, setViewMode] = useState<'sections' | 'paragraph' | 'raw'>('sections')
+  const [activeSection, setActiveSection] = useState<number | null>(null)
   const prefetched = (location.state as any)?.prefetchedStory as Partial<StoryDetailData> | undefined
   const dataRef = useRef<StoryDetailData | null>(null)
+  const sectionRefs = useRef<Map<number, HTMLElement>>(new Map())
 
   useEffect(() => {
     try {
@@ -95,19 +98,7 @@ export default function PersonPage() {
 
   const formatDate = (ts?: number) => formatUnixSeconds(ts)
 
-  const chunkTypeOptions = useMemo(() => (
-    [
-      { value: 0, label: t('storyChunkEditor.chunkTypes.narrative', 'Narrative') },
-      { value: 1, label: t('storyChunkEditor.chunkTypes.work', 'Work / Achievement') },
-      { value: 2, label: t('storyChunkEditor.chunkTypes.quote', 'Quote') },
-      { value: 3, label: t('storyChunkEditor.chunkTypes.media', 'Media') },
-      { value: 4, label: t('storyChunkEditor.chunkTypes.timeline', 'Timeline') },
-      { value: 5, label: t('storyChunkEditor.chunkTypes.commentary', 'Commentary') },
-      { value: 6, label: t('storyChunkEditor.chunkTypes.source', 'Source') },
-      { value: 7, label: t('storyChunkEditor.chunkTypes.correction', 'Correction') },
-      { value: 8, label: t('storyChunkEditor.chunkTypes.editorial', 'Editorial') }
-    ]
-  ), [t])
+  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t])
 
   const convertChunkTypeToNumber = useCallback((type: number | string | null | undefined): number => {
     if (type === null || type === undefined || type === '') return 0
@@ -178,6 +169,28 @@ export default function PersonPage() {
     return [...data.storyChunks]
       .sort((a, b) => a.chunkIndex - b.chunkIndex)
       .map(c => c.content)
+  }, [data?.storyChunks])
+
+  // Group chunks by type for sections view
+  const groupedChunks = useMemo(() => {
+    if (!data?.storyChunks || data.storyChunks.length === 0) return []
+    
+    const groups = new Map<number, StoryChunk[]>()
+    data.storyChunks.forEach(chunk => {
+      const type = chunk.chunkType ?? 0
+      if (!groups.has(type)) {
+        groups.set(type, [])
+      }
+      groups.get(type)!.push(chunk)
+    })
+    
+    // Sort groups by type value, then sort chunks within each group by index
+    return Array.from(groups.entries())
+      .sort(([typeA], [typeB]) => typeA - typeB)
+      .map(([type, chunks]) => ({
+        type,
+        chunks: chunks.sort((a, b) => a.chunkIndex - b.chunkIndex)
+      }))
   }, [data?.storyChunks])
 
   const toggleChunk = (idx: number) => {
@@ -347,6 +360,41 @@ export default function PersonPage() {
     fetchStoryData()
   }, [fetchStoryData])
 
+  // Scroll spy for sections
+  useEffect(() => {
+    if (viewMode !== 'sections' || groupedChunks.length === 0) return
+
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 100 // offset for header
+      
+      let currentSection: number | null = null
+      sectionRefs.current.forEach((element, type) => {
+        const { offsetTop, offsetHeight } = element
+        if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+          currentSection = type
+        }
+      })
+      
+      if (currentSection !== null && currentSection !== activeSection) {
+        setActiveSection(currentSection)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll() // Initial check
+    
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [viewMode, groupedChunks, activeSection])
+
+  // Scroll to section
+  const scrollToSection = useCallback((type: number) => {
+    const element = sectionRefs.current.get(type)
+    if (element) {
+      const top = element.offsetTop - 80 // offset for header
+      window.scrollTo({ top, behavior: 'smooth' })
+    }
+  }, [])
+
   const copyText = useCallback(async (text: string) => {
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -431,6 +479,47 @@ export default function PersonPage() {
       {/* Main content only if data present and no error */}
       {!error && data && (
         <>
+          {/* Section Navigation - Left Sidebar (only for sections mode with chunks) */}
+          {viewMode === 'sections' && groupedChunks.length > 0 && (
+            <div className="hidden xl:block fixed left-4 top-24 w-56 max-h-[calc(100vh-120px)] overflow-y-auto z-10">
+              <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {t('person.sectionNav', '目录')}
+                  </h4>
+                </div>
+                <div>
+                  {groupedChunks.map(({ type, chunks }) => {
+                    const ChunkIcon = getChunkTypeIcon(type)
+                    const colorClass = getChunkTypeColorClass(type)
+                    const typeLabel = t(getChunkTypeI18nKey(type), chunkTypeOptions.find(opt => opt.value === type)?.label || 'Unknown')
+                    const isActive = activeSection === type
+                    
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => scrollToSection(type)}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                          isActive 
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400' 
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent'
+                        }`}
+                      >
+                        <ChunkIcon size={14} className={isActive ? 'text-blue-600 dark:text-blue-400' : colorClass} />
+                        <span className={`flex-1 truncate ${isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {typeLabel}
+                        </span>
+                        <span className={`text-xs ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                          {chunks.length}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Existing body content below */}
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
               <div className="xl:col-span-3 space-y-6">
@@ -484,22 +573,22 @@ export default function PersonPage() {
                       </h3>
                       <div className="space-y-3 text-sm sm:text-base">
                         {data.fullName && (
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{t('familyTree.nodeDetail.fullName', 'Full Name')}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                            <span className="text-gray-500 dark:text-gray-400 sm:w-24 flex-shrink-0">{t('familyTree.nodeDetail.fullName', 'Full Name')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-medium">{data.fullName}</span>
                           </div>
                         )}
 
                         {data.nftCoreInfo?.gender !== undefined && data.nftCoreInfo.gender > 0 && (
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{t('familyTree.nodeDetail.gender', 'Gender')}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                            <span className="text-gray-500 dark:text-gray-400 sm:w-24 flex-shrink-0">{t('familyTree.nodeDetail.gender', 'Gender')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-medium">{genderTextFn(data.nftCoreInfo.gender, t as any) || '-'}</span>
                           </div>
                         )}
 
                         {data.nftCoreInfo && (data.nftCoreInfo.birthYear || data.nftCoreInfo.birthPlace) && (
-                          <div className="flex items-start gap-3">
-                            <span className="text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{t('familyTree.nodeDetail.birth', 'Birth')}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                            <span className="text-gray-500 dark:text-gray-400 sm:w-24 flex-shrink-0">{t('familyTree.nodeDetail.birth', 'Birth')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-medium">
                               {(() => {
                                 const d = formatYMD(data.nftCoreInfo!.birthYear, data.nftCoreInfo!.birthMonth, data.nftCoreInfo!.birthDay, data.nftCoreInfo!.isBirthBC)
@@ -511,8 +600,8 @@ export default function PersonPage() {
                         )}
 
                         {data.nftCoreInfo && (data.nftCoreInfo.deathYear || data.nftCoreInfo.deathPlace) && (
-                          <div className="flex items-start gap-3">
-                            <span className="text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{t('familyTree.nodeDetail.death', 'Death')}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                            <span className="text-gray-500 dark:text-gray-400 sm:w-24 flex-shrink-0">{t('familyTree.nodeDetail.death', 'Death')}</span>
                             <span className="text-gray-900 dark:text-gray-100 font-medium">
                               {(() => {
                                 const d = formatYMD(data.nftCoreInfo!.deathYear, data.nftCoreInfo!.deathMonth, data.nftCoreInfo!.deathDay, data.nftCoreInfo!.isDeathBC)
@@ -524,8 +613,8 @@ export default function PersonPage() {
                         )}
 
                         {data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== '' && (
-                          <div className="flex items-start gap-3 pt-1">
-                            <span className="text-gray-500 dark:text-gray-400 w-20 flex-shrink-0">{t('familyTree.nodeDetail.story', 'Story')}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 pt-1">
+                            <span className="text-gray-500 dark:text-gray-400 sm:w-24 flex-shrink-0">{t('familyTree.nodeDetail.story', 'Story')}</span>
                             <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap flex-1 min-w-0">
                               {data.nftCoreInfo.story}
                             </div>
@@ -539,7 +628,7 @@ export default function PersonPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                          {t('person.fullStory', 'Biography')}
+                          {t('person.profileData', 'Profile Data')}
                         </h3>
                         {data?.storyMetadata?.isSealed ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
@@ -566,6 +655,15 @@ export default function PersonPage() {
                       </div>
                       {data && data.fullStory && data.fullStory.length > 0 && (
                         <div className="inline-flex items-center rounded border border-gray-300 dark:border-gray-600">
+                          <button
+                            onClick={() => setViewMode('sections')}
+                            className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${viewMode === 'sections' ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                            title={t('person.viewSections', 'Sections Mode') as string}
+                          >
+                            <Layers size={14} />
+                            <span className="hidden sm:inline">{t('person.sections', 'Sections')}</span>
+                          </button>
+                          <div className="w-px h-4 bg-gray-300 dark:border-gray-600"></div>
                           <button
                             onClick={() => setViewMode('paragraph')}
                             className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${viewMode === 'paragraph' ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
@@ -601,7 +699,49 @@ export default function PersonPage() {
                       )
                     })()}
                     
-                    {viewMode === 'paragraph' && fullStoryParagraphs.length > 0 ? (
+                    {viewMode === 'sections' && groupedChunks.length > 0 ? (
+                      <div className="space-y-6">
+                        {groupedChunks.map(({ type, chunks }) => {
+                          const ChunkIcon = getChunkTypeIcon(type)
+                          const colorClass = getChunkTypeColorClass(type)
+                          const typeLabel = t(getChunkTypeI18nKey(type), chunkTypeOptions.find(opt => opt.value === type)?.label || 'Unknown')
+                          
+                          return (
+                            <div 
+                              key={type} 
+                              ref={(el) => {
+                                if (el) {
+                                  sectionRefs.current.set(type, el)
+                                } else {
+                                  sectionRefs.current.delete(type)
+                                }
+                              }}
+                              id={`section-${type}`}
+                              className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden scroll-mt-20"
+                            >
+                              <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center gap-2">
+                                  <ChunkIcon size={18} className={colorClass} />
+                                  <h4 className={`text-base font-semibold ${colorClass}`}>
+                                    {typeLabel}
+                                  </h4>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-full">
+                                    {chunks.length}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="p-4 space-y-3">
+                                {chunks.map(chunk => (
+                                  <div key={chunk.chunkIndex} className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
+                                    <p className="whitespace-pre-wrap">{chunk.content}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : viewMode === 'paragraph' && fullStoryParagraphs.length > 0 ? (
                       <div className="space-y-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
                         {chunkParagraphs.length > 0 ? (
                           chunkParagraphs.map((content, i) => (
@@ -624,7 +764,7 @@ export default function PersonPage() {
                     ) : (
                       <div className="text-center py-8">
                         <p className="text-gray-400 dark:text-gray-500 text-sm">
-                          {t('person.noStory', 'No biographical content')}
+                          {t('person.noProfileData', 'No profile data')}
                         </p>
                       </div>
                     )}
@@ -772,7 +912,7 @@ export default function PersonPage() {
                                     toggleChunk(chunk.chunkIndex)
                                   }
                                 }}
-                                className="w-full text-left flex items-start gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                                className="w-full text-left flex items-start gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                               >
                                 <span className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0">
                                   {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -783,9 +923,19 @@ export default function PersonPage() {
                                       <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                         #{chunk.chunkIndex}
                                       </span>
-                                      <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                                        {getChunkTypeLabel(chunk.chunkType)}
-                                      </span>
+                                      {(() => {
+                                        const ChunkIcon = getChunkTypeIcon(chunk.chunkType)
+                                        const iconColor = getChunkTypeColorClass(chunk.chunkType)
+                                        const borderColor = getChunkTypeBorderColorClass(chunk.chunkType)
+                                        return (
+                                          <div className="flex items-center gap-1.5">
+                                            <ChunkIcon size={14} className={iconColor} />
+                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide border ${iconColor} ${borderColor} bg-white dark:bg-gray-900`}>
+                                              {getChunkTypeLabel(chunk.chunkType)}
+                                            </span>
+                                          </div>
+                                        )
+                                      })()}
                                     </div>
                                     <span className="text-xs text-gray-400 dark:text-gray-500">
                                       {chunk.content.length}
@@ -795,16 +945,12 @@ export default function PersonPage() {
                                     {open ? chunk.content : preview}
                                   </div>
                                   {open && (
-                                    <div className="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
-                                      <span className="inline-flex items-center gap-1">
-                                        <Clock size={12} />
-                                        {formatUnixSeconds(chunk.timestamp)}
-                                      </span>
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <User size={12} />
+                                    <div className="space-y-1 mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <User size={12} className="flex-shrink-0" />
                                         {chunk.editor ? (
                                           <>
-                                            <span className="truncate max-w-[140px]" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
+                                            <span className="truncate" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation()
@@ -820,33 +966,17 @@ export default function PersonPage() {
                                         ) : (
                                           <span>-</span>
                                         )}
-                                      </span>
-                                      <span className="inline-flex items-center gap-1">
-                                        <Hash size={12} className="flex-shrink-0" />
-                                        <span className="font-mono truncate max-w-[140px]" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            copyText(chunk.chunkHash)
-                                          }}
-                                          className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                          aria-label={t('search.copy')}
-                                          title={t('search.copy')}
-                                        >
-                                          <Clipboard size={12} />
-                                        </button>
-                                      </span>
-                                      {chunk.attachmentCID && (
-                                        <span className="inline-flex items-center gap-1">
-                                          <Link size={12} />
-                                          <a
-                                            href={resolveAttachmentUrl(chunk.attachmentCID)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="truncate max-w-[180px] underline decoration-dotted hover:text-blue-600 dark:hover:text-blue-400"
-                                          >
-                                            {chunk.attachmentCID}
-                                          </a>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <Clock size={12} className="flex-shrink-0" />
+                                        <span>{formatUnixSeconds(chunk.timestamp)}</span>
+                                      </div>
+                                      {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                          <Link size={12} className="flex-shrink-0" />
+                                          <span className="truncate font-mono" title={chunk.attachmentCID}>
+                                            {chunk.attachmentCID.length > 20 ? `${chunk.attachmentCID.slice(0, 8)}...${chunk.attachmentCID.slice(-8)}` : chunk.attachmentCID}
+                                          </span>
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation()
@@ -858,8 +988,23 @@ export default function PersonPage() {
                                           >
                                             <Clipboard size={12} />
                                           </button>
-                                        </span>
+                                        </div>
                                       )}
+                                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <Hash size={12} className="flex-shrink-0" />
+                                        <span className="font-mono truncate" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            copyText(chunk.chunkHash)
+                                          }}
+                                          className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                          aria-label={t('search.copy')}
+                                          title={t('search.copy')}
+                                        >
+                                          <Clipboard size={12} />
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
                                 </div>

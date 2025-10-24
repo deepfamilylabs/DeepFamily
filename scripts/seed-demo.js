@@ -59,6 +59,16 @@ function generateChunkContent(personName, chunkIndex, isMaxLength = false) {
   return truncateUtf8Bytes(content, MAX_CHUNK_CONTENT_LENGTH);
 }
 
+function generateAttachmentCID(chunkIndex, chunkType) {
+  return "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
+}
+
+function generateChunkType(chunkIndex) {
+  // Generate different chunk types based on index for variety
+  const chunkTypes = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // All available chunk types
+  return chunkTypes[chunkIndex % chunkTypes.length];
+}
+
 async function addStoryChunks(
   deepFamily,
   tokenId,
@@ -102,10 +112,21 @@ async function addStoryChunks(
     try {
       const content = generateChunkContent(personName, i, useMaxLength);
       const expectedHash = solidityStringHash(content);
-      const tx = await deepFamily.addStoryChunk(tokenId, i, 0, content, '', expectedHash);
+      const chunkType = generateChunkType(i);
+      const attachmentCID = generateAttachmentCID(i, chunkType);
+      const tx = await deepFamily.addStoryChunk(
+        tokenId,
+        i,
+        chunkType,
+        content,
+        attachmentCID,
+        expectedHash,
+      );
       await tx.wait();
       addedCount++;
-      console.log(`  Chunk #${i} added, length: ${utf8ByteLen(content)} bytes`);
+      console.log(
+        `  Chunk #${i} added, type: ${chunkType}, length: ${utf8ByteLen(content)} bytes, attachment: ${attachmentCID.slice(0, 20)}...`,
+      );
     } catch (error) {
       console.warn(`  Chunk #${i} failed:`, error.message?.slice(0, 180));
     }
@@ -253,7 +274,9 @@ async function seedMultiVersionTestPerson({
   }
   const availableExtras = (extraSigners || []).filter(Boolean);
   if (availableExtras.length < 2) {
-    console.warn("  Skipping multi-version fixture: need at least two extra signers for endorsements");
+    console.warn(
+      "  Skipping multi-version fixture: need at least two extra signers for endorsements",
+    );
     return;
   }
 
@@ -289,10 +312,7 @@ async function seedMultiVersionTestPerson({
         });
         console.log(`  ✓ Added version ${i + 1} (tx: ${result.tx.hash})`);
       } catch (error) {
-        console.warn(
-          `  ✗ Failed to add version ${i + 1}:`,
-          error.message?.slice(0, 160) || error,
-        );
+        console.warn(`  ✗ Failed to add version ${i + 1}:`, error.message?.slice(0, 160) || error);
       }
     }
   } else {
@@ -385,7 +405,7 @@ async function seedMultiVersionTestPerson({
       const endorsementCount = Number(versionInfo[1]);
       const tokenId = versionInfo[2];
       const tokenIdStr =
-        typeof tokenId === "bigint" ? tokenId.toString() : tokenId?.toString?.() ?? "0";
+        typeof tokenId === "bigint" ? tokenId.toString() : (tokenId?.toString?.() ?? "0");
       console.log(
         `  → Version ${versionIndex}: endorsements=${endorsementCount}, tokenId=${tokenIdStr}`,
       );
@@ -435,7 +455,9 @@ async function main() {
   console.log(`  Signer: ${signerAddr}\n`);
   if (extraSigners.length > 0) {
     const extraAddrs = await Promise.all(extraSigners.map((s) => s.getAddress()));
-    console.log(`  Additional endorsers: ${extraAddrs.map((addr) => addr.slice(0, 10) + "...").join(", ")}`);
+    console.log(
+      `  Additional endorsers: ${extraAddrs.map((addr) => addr.slice(0, 10) + "...").join(", ")}`,
+    );
   } else {
     console.log(`  Additional endorsers: none available`);
   }
@@ -505,7 +527,7 @@ async function main() {
   const timingStats = {
     proofGenerations: [],
     transactions: [],
-    totals: []
+    totals: [],
   };
 
   const generations = new Map();
@@ -562,7 +584,9 @@ async function main() {
           timingStats.totals.push(result.timing.total);
         }
 
-        console.log(`  ✓ Main chain: ${chainChildName} (proof: ${result.timing?.proofGeneration}ms, tx: ${result.timing?.transaction}ms, total: ${result.timing?.total}ms)`);
+        console.log(
+          `  ✓ Main chain: ${chainChildName} (proof: ${result.timing?.proofGeneration}ms, tx: ${result.timing?.transaction}ms, total: ${result.timing?.total}ms)`,
+        );
         currentGen.push({
           hash: chainChildHash,
           personData: chainChildData,
@@ -898,8 +922,10 @@ async function main() {
     console.log(`  Total operations: ${timingStats.totals.length}`);
 
     // Calculate averages
-    const avgProof = timingStats.proofGenerations.reduce((a, b) => a + b, 0) / timingStats.proofGenerations.length;
-    const avgTx = timingStats.transactions.reduce((a, b) => a + b, 0) / timingStats.transactions.length;
+    const avgProof =
+      timingStats.proofGenerations.reduce((a, b) => a + b, 0) / timingStats.proofGenerations.length;
+    const avgTx =
+      timingStats.transactions.reduce((a, b) => a + b, 0) / timingStats.transactions.length;
     const avgTotal = timingStats.totals.reduce((a, b) => a + b, 0) / timingStats.totals.length;
 
     // Calculate min/max

@@ -53,7 +53,7 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
 
   /// @dev Mining reward distribution event
   event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions);
-  
+
   /// @dev DeepFamily contract address initialization event
   event DeepFamilyContractInitialized(address indexed deepFamilyContract);
 
