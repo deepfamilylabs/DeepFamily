@@ -36,16 +36,16 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
 
     const content = args.content;
     if (content.length === 0) throw new Error("content cannot be empty");
-    if (Buffer.byteLength(content, 'utf8') > 2048) {
+    if (Buffer.byteLength(content, "utf8") > 2048) {
       throw new Error("content exceeds 2048 byte limit");
     }
 
-    const chunkType = Number(args.type || '0');
+    const chunkType = Number(args.type || "0");
     if (!Number.isInteger(chunkType) || chunkType < 0 || chunkType > 255) {
       throw new Error("type must be an integer between 0 and 255");
     }
 
-    const attachmentCID = args.attachment || '';
+    const attachmentCID = args.attachment || "";
     if (attachmentCID.length > 0 && attachmentCID.length > 256) {
       throw new Error("attachment CID exceeds 256 characters");
     }
@@ -84,7 +84,7 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
       chunkType,
       content,
       attachmentCID,
-      expectedHash
+      expectedHash,
     );
     const receipt = await tx.wait();
 

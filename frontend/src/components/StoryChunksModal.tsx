@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { NodeData, StoryChunk, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
+import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTypeColorClass, getChunkTypeBorderColorClass } from '../constants/chunkTypes'
 // owner/address will be resolved via TreeDataContext caching
 
 interface StoryChunksModalProps {
@@ -97,19 +98,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
 
   const personHasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
 
-  const chunkTypeOptions = useMemo(() => (
-    [
-      { value: 0, label: t('storyChunkEditor.chunkTypes.narrative', 'Narrative') },
-      { value: 1, label: t('storyChunkEditor.chunkTypes.work', 'Work / Achievement') },
-      { value: 2, label: t('storyChunkEditor.chunkTypes.quote', 'Quote') },
-      { value: 3, label: t('storyChunkEditor.chunkTypes.media', 'Media') },
-      { value: 4, label: t('storyChunkEditor.chunkTypes.timeline', 'Timeline') },
-      { value: 5, label: t('storyChunkEditor.chunkTypes.commentary', 'Commentary') },
-      { value: 6, label: t('storyChunkEditor.chunkTypes.source', 'Source') },
-      { value: 7, label: t('storyChunkEditor.chunkTypes.correction', 'Correction') },
-      { value: 8, label: t('storyChunkEditor.chunkTypes.editorial', 'Editorial') }
-    ]
-  ), [t])
+  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t])
 
   const getChunkTypeLabel = useCallback(
     (type: number | string | null | undefined) => {
@@ -802,7 +791,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                     toggleChunk(chunk.chunkIndex)
                                   }
                                 }}
-                                className="w-full text-left flex items-start gap-3 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                                className="w-full text-left flex items-start gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                               >
                                 <span className={`mt-0.5 transition-colors ${isExpanded ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
                                   {isExpanded ? <ChevronDown className="w-4.5 h-4.5" /> : <ChevronRight className="w-4.5 h-4.5" />}
@@ -812,11 +801,21 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
                                       <span className={`text-[15px] font-semibold ${isExpanded ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'}`}>
-                                        {t('storyChunksModal.chunkTitle', 'Chunk #{{index}}', { index: chunk.chunkIndex })}
+                                        #{chunk.chunkIndex}
                                       </span>
-                                      <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                                        {getChunkTypeLabel(chunk.chunkType)}
-                                      </span>
+                                      {(() => {
+                                        const ChunkIcon = getChunkTypeIcon(chunk.chunkType)
+                                        const iconColor = getChunkTypeColorClass(chunk.chunkType)
+                                        const borderColor = getChunkTypeBorderColorClass(chunk.chunkType)
+                                        return (
+                                          <div className="flex items-center gap-1.5">
+                                            <ChunkIcon size={14} className={iconColor} />
+                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide border ${iconColor} ${borderColor} bg-white dark:bg-gray-900`}>
+                                              {getChunkTypeLabel(chunk.chunkType)}
+                                            </span>
+                                          </div>
+                                        )
+                                      })()}
                                     </div>
                                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-full">
                                       {chunk.content.length} {t('storyChunksModal.characters', 'chars')}
@@ -828,22 +827,18 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                   </div>
 
                                   {isExpanded && (
-                                    <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        {formatUnixSeconds(chunk.timestamp)}
-                                      </span>
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <User className="w-3.5 h-3.5" />
+                                    <div className="space-y-1 mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <User className="w-3.5 h-3.5 flex-shrink-0" />
                                         {chunk.editor ? (
                                           <>
-                                            <span className="truncate max-w-[140px]" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
+                                            <span className="truncate" title={chunk.editor}>{shortAddress(chunk.editor)}</span>
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation()
                                                 copyText(chunk.editor)
                                               }}
-                                              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                              className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                               type="button"
                                             >
                                               <Copy className="w-3 h-3" />
@@ -852,44 +847,43 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                                         ) : (
                                           <span>-</span>
                                         )}
-                                      </span>
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <Hash className="w-3.5 h-3.5" />
-                                        <span className="font-mono" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            copyText(chunk.chunkHash)
-                                          }}
-                                          className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                          type="button"
-                                        >
-                                          <Copy className="w-3 h-3" />
-                                        </button>
-                                      </span>
-                                      {chunk.attachmentCID && (
-                                        <span className="inline-flex items-center gap-1.5">
-                                          <Link className="w-3.5 h-3.5" />
-                                          <a
-                                            href={resolveAttachmentUrl(chunk.attachmentCID)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="truncate underline decoration-dotted hover:text-blue-600 dark:hover:text-blue-400"
-                                          >
-                                            {chunk.attachmentCID}
-                                          </a>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                                        <span>{formatUnixSeconds(chunk.timestamp)}</span>
+                                      </div>
+                                      {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                          <Link className="w-3.5 h-3.5 flex-shrink-0" />
+                                          <span className="truncate font-mono" title={chunk.attachmentCID}>
+                                            {chunk.attachmentCID.length > 20 ? `${chunk.attachmentCID.slice(0, 8)}...${chunk.attachmentCID.slice(-8)}` : chunk.attachmentCID}
+                                          </span>
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation()
                                               copyText(chunk.attachmentCID)
                                             }}
-                                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                             type="button"
                                           >
                                             <Copy className="w-3 h-3" />
                                           </button>
-                                        </span>
+                                        </div>
                                       )}
+                                      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        <Hash className="w-3.5 h-3.5 flex-shrink-0" />
+                                        <span className="font-mono truncate" title={chunk.chunkHash}>{formatHashMiddle(chunk.chunkHash)}</span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            copyText(chunk.chunkHash)
+                                          }}
+                                          className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                          type="button"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
                                 </div>

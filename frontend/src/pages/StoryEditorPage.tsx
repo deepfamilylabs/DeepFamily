@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ethers } from 'ethers'
-import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash, Link, User } from 'lucide-react'
+import { X, Plus, Save, Lock, Clipboard, ChevronDown, ChevronRight, Clock, Hash, Link, User, Check, FileText } from 'lucide-react'
 import { useConfig } from '../context/ConfigContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { useWallet } from '../context/WalletContext'
@@ -11,6 +11,7 @@ import { useToast } from '../components/ToastProvider'
 import { addStoryChunk, sealStory, computeStoryHash } from '../lib/story'
 import type { StoryChunk, StoryChunkCreateData, StoryMetadata, NodeData } from '../types/graph'
 import { formatUnixSeconds, formatHashMiddle, shortAddress } from '../types/graph'
+import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTypeColorClass, getChunkTypeBorderColorClass } from '../constants/chunkTypes'
 
 interface PrefetchedState {
   prefetchedStory?: {
@@ -82,11 +83,13 @@ export default function StoryEditorPage() {
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set())
   const [personName, setPersonName] = useState<string | null>(prefetched?.fullName || null)
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null)
+  const [showChunkTypeDropdown, setShowChunkTypeDropdown] = useState(false)
 
   // Refs
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const formRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const chunkTypeDropdownRef = useRef<HTMLDivElement | null>(null)
 
   const validTokenId = useMemo(() => tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined, [tokenId])
 
@@ -99,19 +102,7 @@ export default function StoryEditorPage() {
 
   const getByteLength = useCallback((str: string) => new TextEncoder().encode(str).length, [])
 
-  const chunkTypeOptions = useMemo(() => (
-    [
-      { value: 0, label: t('storyChunkEditor.chunkTypes.narrative', 'Narrative') },
-      { value: 1, label: t('storyChunkEditor.chunkTypes.work', 'Work / Achievement') },
-      { value: 2, label: t('storyChunkEditor.chunkTypes.quote', 'Quote') },
-      { value: 3, label: t('storyChunkEditor.chunkTypes.media', 'Media') },
-      { value: 4, label: t('storyChunkEditor.chunkTypes.timeline', 'Timeline') },
-      { value: 5, label: t('storyChunkEditor.chunkTypes.commentary', 'Commentary') },
-      { value: 6, label: t('storyChunkEditor.chunkTypes.source', 'Source') },
-      { value: 7, label: t('storyChunkEditor.chunkTypes.correction', 'Correction') },
-      { value: 8, label: t('storyChunkEditor.chunkTypes.editorial', 'Editorial') }
-    ]
-  ), [t])
+  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t])
 
   const getChunkTypeLabel = useCallback(
     (type: number | string | null | undefined) => {
@@ -216,6 +207,19 @@ export default function StoryEditorPage() {
   }, [formData.content, formData.attachmentCID, formData.chunkType])
 
   useEffect(() => { setDirty(isDirty) }, [isDirty])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (chunkTypeDropdownRef.current && !chunkTypeDropdownRef.current.contains(event.target as Node)) {
+        setShowChunkTypeDropdown(false)
+      }
+    }
+    if (showChunkTypeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showChunkTypeDropdown])
 
   const sortedChunks = useMemo(() => {
     return [...(chunks || [])].sort((a, b) => a.chunkIndex - b.chunkIndex)
@@ -610,19 +614,56 @@ export default function StoryEditorPage() {
                           <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                             {t('storyChunkEditor.chunkTypeLabel', 'Chunk Type')}
                           </label>
-                          <select
-                            value={formData.chunkType}
-                            onChange={(e) => setFormData(prev => ({
-                              ...prev,
-                              chunkType: Number(e.target.value)
-                            }))}
-                            className="mt-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                            disabled={submitting}
-                          >
-                            {chunkTypeOptions.map(option => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </select>
+                          <div ref={chunkTypeDropdownRef} className="relative mt-1">
+                            <button
+                              type="button"
+                              onClick={() => !submitting && setShowChunkTypeDropdown(!showChunkTypeDropdown)}
+                              disabled={submitting}
+                              className="w-full flex items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-gray-500"
+                            >
+                              {(() => {
+                                const selected = chunkTypeOptions.find(opt => opt.value === formData.chunkType)
+                                const Icon = selected?.icon || FileText
+                                return (
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Icon size={16} className={selected?.color || 'text-gray-400'} />
+                                    <span className="truncate">{selected?.label || 'Select type'}</span>
+                                  </div>
+                                )
+                              })()}
+                              <ChevronDown size={16} className={`flex-shrink-0 transition-transform ${showChunkTypeDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showChunkTypeDropdown && (
+                              <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-900">
+                                <div className="max-h-60 overflow-y-auto py-1">
+                                  {chunkTypeOptions.map(option => {
+                                    const Icon = option.icon
+                                    const isSelected = option.value === formData.chunkType
+                                    return (
+                                      <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => {
+                                          setFormData(prev => ({ ...prev, chunkType: option.value }))
+                                          setShowChunkTypeDropdown(false)
+                                        }}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                                          isSelected
+                                            ? 'bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100'
+                                            : 'text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800'
+                                        }`}
+                                      >
+                                        <Icon size={16} className={option.color} />
+                                        <span className="flex-1 truncate">{option.label}</span>
+                                        {isSelected && <Check size={16} className="flex-shrink-0 text-blue-600 dark:text-blue-400" />}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="flex flex-col sm:min-w-0">
                           <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -725,7 +766,7 @@ export default function StoryEditorPage() {
                     const preview = chunk.content.length > 60 ? `${chunk.content.slice(0, 60)}...` : chunk.content
                     return (
                       <li key={chunk.chunkIndex} className="border-b border-gray-200 dark:border-gray-800 last:border-b-0">
-                        <div className="w-full text-left flex items-start gap-2 p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <div className="w-full text-left flex items-start gap-1.5 p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -744,9 +785,19 @@ export default function StoryEditorPage() {
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">#{chunk.chunkIndex}</span>
-                                <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                                  {getChunkTypeLabel(chunk.chunkType)}
-                                </span>
+                                {(() => {
+                                  const ChunkIcon = getChunkTypeIcon(chunk.chunkType)
+                                  const iconColor = getChunkTypeColorClass(chunk.chunkType)
+                                  const borderColor = getChunkTypeBorderColorClass(chunk.chunkType)
+                                  return (
+                                    <div className="flex items-center gap-1.5">
+                                      <ChunkIcon size={14} className={iconColor} />
+                                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide border ${iconColor} ${borderColor} bg-white dark:bg-gray-900`}>
+                                        {getChunkTypeLabel(chunk.chunkType)}
+                                      </span>
+                                    </div>
+                                  )
+                                })()}
                               </div>
                               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                 <span className="text-xs text-gray-400 dark:text-gray-500">{chunk.content.length}</span>
@@ -756,12 +807,8 @@ export default function StoryEditorPage() {
                               {isExpanded ? chunk.content : preview}
                             </p>
                             {isExpanded && (
-                              <div className="space-y-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                                  <Clock size={12} />
-                                  {formatUnixSeconds(chunk.timestamp)}
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+                              <div className="space-y-1 mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                                   <User size={12} className="flex-shrink-0" />
                                   {chunk.editor ? (
                                     <>
@@ -783,7 +830,29 @@ export default function StoryEditorPage() {
                                     <span>-</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                  <Clock size={12} className="flex-shrink-0" />
+                                  <span>{formatUnixSeconds(chunk.timestamp)}</span>
+                                </div>
+                                {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                    <Link size={12} className="flex-shrink-0" />
+                                    <span className="truncate font-mono">{chunk.attachmentCID}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        copyText(chunk.attachmentCID)
+                                      }}
+                                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                      aria-label={t('search.copy')}
+                                      title={t('search.copy')}
+                                      type="button"
+                                    >
+                                      <Clipboard size={12} />
+                                    </button>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                                   <Hash size={12} className="flex-shrink-0" />
                                   <span className="font-mono truncate" title={chunk.chunkHash}>{formatHash(chunk.chunkHash)}</span>
                                   <button
@@ -799,31 +868,6 @@ export default function StoryEditorPage() {
                                     <Clipboard size={12} />
                                   </button>
                                 </div>
-                                {chunk.attachmentCID && (
-                                  <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                                    <Link size={12} className="flex-shrink-0" />
-                                    <a
-                                      href={resolveAttachmentUrl(chunk.attachmentCID)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="truncate underline decoration-dotted hover:text-blue-600 dark:hover:text-blue-400"
-                                    >
-                                      {chunk.attachmentCID}
-                                    </a>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        copyText(chunk.attachmentCID)
-                                      }}
-                                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                      aria-label={t('search.copy')}
-                                      title={t('search.copy')}
-                                      type="button"
-                                    >
-                                      <Clipboard size={12} />
-                                    </button>
-                                  </div>
-                                )}
                               </div>
                             )}
                           </div>

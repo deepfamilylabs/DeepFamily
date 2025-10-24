@@ -171,7 +171,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string content; // Chunk content (limited to reasonable range to control gas costs)
     uint256 timestamp; // Creation timestamp
     address editor; // Editor's address
-    uint8 chunkType; // Content classification (0=narrative, 1=work, 2=quote, 3=media, 4=timeline, 5=commentary, 6=source, 7=correction, 8=editorial)
+    // Content classification: 0=Summary, 1=Early Life, 2=Biography, 3=Achievements, 4=Works, 5=Philosophy,
+    // 6=Quotes, 7=Anecdotes, 8=Family, 9=Lifestyle, 10=Relations, 11=Activities, 12=Positions,
+    // 13=Controversies, 14=Gallery, 15=Legacy, 16=References, 17=Notes
+    uint8 chunkType;
     string attachmentCID; // Optional external attachment CID (IPFS/Arweave)
   }
 
@@ -1006,6 +1009,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param tokenId NFT TokenID
    * @param chunkIndex Chunk index (must be continuous, starting from 0)
    * @param content Chunk content
+   * @param chunkType Chunk classification
+   * @param attachmentCID Optional attachment CID (IPFS/Arweave)
    * @param expectedHash Expected chunk hash (for client-side validation)
    */
   function addStoryChunk(
