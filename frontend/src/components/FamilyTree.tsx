@@ -124,7 +124,7 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
       return bestVersionCache.get(cacheKey)!
     }
     try {
-      const stats = await contract.listVersionsEndorsementStats(personHash, 0, 100)
+      const stats = await contract.listVersionEndorsements(personHash, 0, 100)
       let bestVersion = 1
       let maxEndorsements = -1
       for (let i = 0; i < stats.versionIndices.length; i++) {
@@ -189,8 +189,8 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     const collectedVersions: number[] = []
 
     try {
-      // First get the total number of versions for this parent using listVersionsEndorsementStats
-      const stats = await contract.listVersionsEndorsementStats(h, 0, 1)
+      // First get the total number of versions for this parent using listVersionEndorsements
+      const stats = await contract.listVersionEndorsements(h, 0, 1)
       const totalVersions = Number(stats.totalVersions || stats[3])
 
       // Query children for v=0 and all parent versions (v=1, v=2, ...)
@@ -268,7 +268,7 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
         const finalChildren: Array<{ hash: string; version: number }> = []
         for (const [, entry] of childMap.entries()) {
           // Always fetch endorsement stats to get totalVersions (for badge display)
-          const stats = await contract.listVersionsEndorsementStats(entry.hash, 0, 100)
+          const stats = await contract.listVersionEndorsements(entry.hash, 0, 100)
 
           const endorsementMap = new Map<number, number>()
           const versionIndices = stats.versionIndices || stats[0]

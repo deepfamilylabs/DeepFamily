@@ -91,6 +91,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error EndorsementFeeTransferFailed();
   error ProtocolFeeTooHigh();
   error AlreadyEndorsed();
+  error NotEndorsed();
 
   // Query-related errors
   error PageSizeExceedsLimit();
@@ -247,6 +248,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev (parent person hash, parent version index) => children version reference array
   mapping(bytes32 => mapping(uint256 => ChildRef[])) public childrenOf;
 
+  /// @dev User address => list of person hashes they have endorsed
+  mapping(address => bytes32[]) private userEndorsedPersons;
+
+  /// @dev User address => person hash => index in userEndorsedPersons array (0 means not endorsed)
+  mapping(address => mapping(bytes32 => uint256)) private userEndorsementIndex;
+
   // ========== System Constants ==========
 
   /// @dev Maximum length for long text (such as life stories)
@@ -320,6 +327,20 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     address protocolRecipient,
     uint256 protocolShare,
     uint256 endorsementFee,
+    uint256 timestamp
+  );
+
+  /**
+   * @dev Endorsement cancelled event
+   * @param personHash Person hash (keccak256 of Poseidon commitment)
+   * @param user User who cancelled the endorsement
+   * @param versionIndex Version index that was endorsed (before cancellation)
+   * @param timestamp Cancellation timestamp
+   */
+  event EndorsementCancelled(
+    bytes32 indexed personHash,
+    address indexed user,
+    uint256 versionIndex,
     uint256 timestamp
   );
 
@@ -869,6 +890,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       if (count > 0) {
         versionEndorsementCount[personHash][prevIdx] = count - 1;
       }
+    } else {
+      userEndorsementIndex[msg.sender][personHash] = userEndorsedPersons[msg.sender].length + 1;
+      userEndorsedPersons[msg.sender].push(personHash);
     }
 
     versionEndorsementCount[personHash][arrayIndex] += 1;
@@ -924,6 +948,43 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       fee,
       block.timestamp
     );
+  }
+
+  /**
+   * @notice Cancel endorsement for a person version
+   * @dev Completely removes the person from user's endorsed list and decrements endorsement count
+   * @param personHash Person hash to cancel endorsement for
+   */
+  function cancelEndorsement(bytes32 personHash) external nonReentrant {
+    if (personHash == bytes32(0)) revert InvalidPersonHash();
+
+    uint256 versionIndex = endorsedVersionIndex[personHash][msg.sender];
+    if (versionIndex == 0) revert NotEndorsed();
+
+    uint256 arrayIndex = versionIndex - 1;
+    uint256 count = versionEndorsementCount[personHash][arrayIndex];
+    if (count > 0) {
+      versionEndorsementCount[personHash][arrayIndex] = count - 1;
+    }
+
+    uint256 index = userEndorsementIndex[msg.sender][personHash];
+    if (index > 0) {
+      uint256 arrayIdx = index - 1;
+      uint256 lastIdx = userEndorsedPersons[msg.sender].length - 1;
+
+      if (arrayIdx != lastIdx) {
+        bytes32 lastPersonHash = userEndorsedPersons[msg.sender][lastIdx];
+        userEndorsedPersons[msg.sender][arrayIdx] = lastPersonHash;
+        userEndorsementIndex[msg.sender][lastPersonHash] = index;
+      }
+
+      userEndorsedPersons[msg.sender].pop();
+      delete userEndorsementIndex[msg.sender][personHash];
+    }
+
+    delete endorsedVersionIndex[personHash][msg.sender];
+
+    emit EndorsementCancelled(personHash, msg.sender, versionIndex, block.timestamp);
   }
 
   /**
@@ -1262,7 +1323,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @return hasMore Whether there are more versions
    * @return nextOffset Suggested starting position for next query
    */
-  function listVersionsEndorsementStats(
+  function listVersionEndorsements(
     bytes32 personHash,
     uint256 offset,
     uint256 limit
@@ -1309,6 +1370,80 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       endorsementCounts,
       tokenIds,
       totalVersions,
+      page.hasMore,
+      page.nextOffset
+    );
+  }
+
+  /**
+   * @notice List all person versions a user has endorsed (paginated)
+   * @dev Returns list of person hashes and their currently endorsed version indices
+   * @param user User address to query
+   * @param offset Starting position (starts from 0)
+   * @param limit Return quantity limit (1-100)
+   * @return personHashes Array of person hashes the user has endorsed
+   * @return versionIndices Array of version indices currently endorsed (starts from 1)
+   * @return endorsementCounts Array of total endorsement counts for each version
+   * @return tokenIds Array of NFT token IDs (0 if not minted)
+   * @return totalCount Total number of persons the user has endorsed
+   * @return hasMore Whether there are more results
+   * @return nextOffset Suggested starting position for next query
+   */
+  function listUserEndorsements(
+    address user,
+    uint256 offset,
+    uint256 limit
+  )
+    external
+    view
+    returns (
+      bytes32[] memory personHashes,
+      uint256[] memory versionIndices,
+      uint256[] memory endorsementCounts,
+      uint256[] memory tokenIds,
+      uint256 totalCount,
+      bool hasMore,
+      uint256 nextOffset
+    )
+  {
+    totalCount = userEndorsedPersons[user].length;
+
+    PaginationResult memory page = _getPaginationParams(totalCount, offset, limit);
+
+    if (page.resultLength == 0) {
+      return (
+        new bytes32[](0),
+        new uint256[](0),
+        new uint256[](0),
+        new uint256[](0),
+        totalCount,
+        page.hasMore,
+        page.nextOffset
+      );
+    }
+
+    personHashes = new bytes32[](page.resultLength);
+    versionIndices = new uint256[](page.resultLength);
+    endorsementCounts = new uint256[](page.resultLength);
+    tokenIds = new uint256[](page.resultLength);
+
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      bytes32 pHash = userEndorsedPersons[user][page.startIndex + i];
+      personHashes[i] = pHash;
+      versionIndices[i] = endorsedVersionIndex[pHash][user];
+
+      if (versionIndices[i] > 0) {
+        endorsementCounts[i] = versionEndorsementCount[pHash][versionIndices[i] - 1];
+        tokenIds[i] = versionToTokenId[pHash][versionIndices[i]];
+      }
+    }
+
+    return (
+      personHashes,
+      versionIndices,
+      endorsementCounts,
+      tokenIds,
+      totalCount,
       page.hasMore,
       page.nextOffset
     );
