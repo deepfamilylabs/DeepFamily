@@ -15,21 +15,20 @@ import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTyp
 
 const MAX_FULL_NAME_BYTES = 256
 const MAX_PAGE_SIZE = 100  
-const DEFAULT_PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 100
 
 const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
 
-const FieldError: React.FC<{ message?: string }> = ({ message }) => (
-  <div
-    className={`text-xs min-h-[1.5rem] leading-snug whitespace-normal break-words w-full ${
-      message ? 'text-red-600' : 'text-transparent'
-    }`}
-  >
-    {message || 'placeholder'}
-  </div>
-)
+const FieldError: React.FC<{ message?: string }> = ({ message }) => {
+  if (!message) return null
+  return (
+    <div className="text-xs text-red-600 dark:text-red-400 leading-snug whitespace-normal break-words w-full mt-0.5">
+      {message}
+    </div>
+  )
+}
 
 const sanitizeNumberInput = (value: unknown) => {
   if (value === '' || value === null || value === undefined) return undefined
@@ -101,7 +100,7 @@ type EndorsementStatsForm = {
 }
 
 type TokenURIHistoryForm = {
-  tokenId?: number
+  tokenId: number
   pageSize: number
 }
 
@@ -111,13 +110,13 @@ type PersonVersionsForm = {
 }
 
 type StoryChunksForm = {
-  tokenId?: number
+  tokenId: number
   pageSize: number
 }
 
 type ChildrenForm = {
   parentHash: string
-  parentVersionIndex?: number
+  parentVersionIndex: number
   pageSize: number
 }
 
@@ -132,24 +131,17 @@ export default function SearchPage() {
         .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
         .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
     }),
-    tokenURIHistory: z
-      .object({
-        tokenId: z
-          .number()
-          .int({ message: t('search.validation.tokenIdRequired') })
-          .min(1, { message: t('search.validation.tokenIdRequired') })
-          .optional(),
-        pageSize: z
-          .number()
-          .int({ message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
-          .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
-          .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
-      })
-      .superRefine((val, ctx) => {
-        if (val.tokenId === undefined) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tokenId'], message: t('search.validation.tokenIdRequired') })
-        }
-      }),
+    tokenURIHistory: z.object({
+      tokenId: z
+        .number({ message: t('search.validation.tokenIdRequired') })
+        .int({ message: t('search.validation.tokenIdRequired') })
+        .min(1, { message: t('search.validation.tokenIdRequired') }),
+      pageSize: z
+        .number()
+        .int({ message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
+        .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
+        .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
+    }),
     personVersions: z.object({
       personHash: z.string().min(1, t('search.validation.hashRequired')).regex(/^0x[a-fA-F0-9]{64}$/, t('search.validation.hashInvalid')),
       pageSize: z
@@ -158,43 +150,29 @@ export default function SearchPage() {
         .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
         .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
     }),
-    storyChunks: z
-      .object({
-        tokenId: z
-          .number()
-          .int({ message: t('search.validation.tokenIdRequired') })
-          .min(1, { message: t('search.validation.tokenIdRequired') })
-          .optional(),
-        pageSize: z
-          .number()
-          .int({ message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
-          .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
-          .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
-      })
-      .superRefine((val, ctx) => {
-        if (val.tokenId === undefined) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tokenId'], message: t('search.validation.tokenIdRequired') })
-        }
-      }),
-    children: z
-      .object({
-        parentHash: z.string().min(1, t('search.validation.hashRequired')).regex(/^0x[a-fA-F0-9]{64}$/, t('search.validation.hashInvalid')),
-        parentVersionIndex: z
-          .number()
-          .int({ message: t('search.validation.versionIndexRequired') })
-          .min(0, { message: t('search.validation.versionIndexRequired') })
-          .optional(),
-        pageSize: z
-          .number()
-          .int({ message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
-          .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
-          .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
-      })
-      .superRefine((val, ctx) => {
-        if (val.parentVersionIndex === undefined) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['parentVersionIndex'], message: t('search.validation.versionIndexRequired') })
-        }
-      }),
+    storyChunks: z.object({
+      tokenId: z
+        .number({ message: t('search.validation.tokenIdRequired') })
+        .int({ message: t('search.validation.tokenIdRequired') })
+        .min(1, { message: t('search.validation.tokenIdRequired') }),
+      pageSize: z
+        .number()
+        .int({ message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
+        .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
+        .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
+    }),
+    children: z.object({
+      parentHash: z.string().min(1, t('search.validation.hashRequired')).regex(/^0x[a-fA-F0-9]{64}$/, t('search.validation.hashInvalid')),
+      parentVersionIndex: z
+        .number({ message: t('search.validation.versionIndexRequired') })
+        .int({ message: t('search.validation.versionIndexRequired') })
+        .min(0, { message: t('search.validation.versionIndexRequired') }),
+      pageSize: z
+        .number()
+        .int({ message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
+        .min(1, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) })
+        .max(MAX_PAGE_SIZE, { message: t('search.validation.pageSizeRange', { max: MAX_PAGE_SIZE }) }),
+    }),
   })
   
   const schemas = createSchemas()
@@ -305,7 +283,7 @@ export default function SearchPage() {
   })
   const { register: reg4, handleSubmit: hs4, formState: { errors: e4 }, watch: w4 } = useForm<TokenURIHistoryForm>({
     resolver: zodResolver(schemas.tokenURIHistory),
-    defaultValues: { tokenId: undefined, pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { tokenId: undefined as any, pageSize: DEFAULT_PAGE_SIZE },
   })
   const { register: reg5, handleSubmit: hs5, formState: { errors: e5 }, watch: w5 } = useForm<PersonVersionsForm>({
     resolver: zodResolver(schemas.personVersions),
@@ -313,11 +291,11 @@ export default function SearchPage() {
   })
   const { register: reg6, handleSubmit: hs6, formState: { errors: e6 }, watch: w6 } = useForm<StoryChunksForm>({
     resolver: zodResolver(schemas.storyChunks),
-    defaultValues: { tokenId: undefined, pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { tokenId: undefined as any, pageSize: DEFAULT_PAGE_SIZE },
   })
   const { register: reg7, handleSubmit: hs7, formState: { errors: e7 }, watch: w7 } = useForm<ChildrenForm>({
     resolver: zodResolver(schemas.children),
-    defaultValues: { parentHash: '', parentVersionIndex: undefined, pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { parentHash: '', parentVersionIndex: undefined as any, pageSize: DEFAULT_PAGE_SIZE },
   })
 
   const endorsementPageSize = useMemo(() => Number(w3('pageSize') || DEFAULT_PAGE_SIZE), [w3])
@@ -662,7 +640,7 @@ export default function SearchPage() {
         </div>
         {openSections.versions && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs5((d) => onQueryPersonVersions(d, 0))} className="flex flex-wrap gap-2 items-start">
+        <form onSubmit={hs5((d) => onQueryPersonVersions(d, 0))} className="flex flex-wrap gap-1.5 sm:gap-2 items-start">
           <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.versionsQuery.personHash')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.versionsQuery.placeholder')}
@@ -681,8 +659,8 @@ export default function SearchPage() {
               <FieldError message={formatNumericError(e5.pageSize?.message, pageSizeValidationMessage)} />
             </div>
           </div>
-          <div className="flex flex-col gap-1 justify-end">
-            <span className="text-xs text-gray-700 dark:text-gray-300 invisible">{t('search.nameQuery.pageSize')}</span>
+          <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
+            <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">{t('search.nameQuery.pageSize')}</span>
             <div className="flex gap-2">
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={versionsLoading}>{t('search.query')}</button>
               <button type="button" onClick={onResetVersionsQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
@@ -763,7 +741,7 @@ export default function SearchPage() {
         </div>
         {openSections.endorsement && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))} className="flex flex-wrap gap-2 items-start">
+        <form onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))} className="flex flex-wrap gap-1.5 sm:gap-2 items-start">
           <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.endorsementQuery.personHash')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.endorsementQuery.placeholder')}
@@ -782,8 +760,8 @@ export default function SearchPage() {
               <FieldError message={formatNumericError(e3.pageSize?.message, pageSizeValidationMessage)} />
             </div>
           </div>
-          <div className="flex flex-col gap-1 justify-end">
-            <span className="text-xs text-gray-700 dark:text-gray-300 invisible">{t('search.nameQuery.pageSize')}</span>
+          <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
+            <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">{t('search.nameQuery.pageSize')}</span>
             <div className="flex gap-2">
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={endorsementLoading}>{t('search.query')}</button>
               <button type="button" onClick={onResetEndorsementQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
@@ -827,7 +805,7 @@ export default function SearchPage() {
         </div>
         {openSections.children && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs7((d) => onQueryChildren(d, 0))} className="flex flex-wrap gap-2 items-start">
+        <form onSubmit={hs7((d) => onQueryChildren(d, 0))} className="flex flex-wrap gap-1.5 sm:gap-2 items-start">
           <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
             <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">{t('search.childrenQuery.parentHash')}</label>
             <input className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30" placeholder={t('search.childrenQuery.parentHashPlaceholder')}
@@ -859,8 +837,8 @@ export default function SearchPage() {
               <FieldError message={formatNumericError(e7.pageSize?.message, pageSizeValidationMessage)} />
             </div>
           </div>
-          <div className="flex flex-col gap-1 justify-end">
-            <span className="text-xs text-gray-700 dark:text-gray-300 invisible">{t('search.nameQuery.pageSize')}</span>
+          <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
+            <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">{t('search.nameQuery.pageSize')}</span>
             <div className="flex gap-2">
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={childrenLoading}>{t('search.query')}</button>
               <button type="button" onClick={onResetChildrenQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
@@ -910,11 +888,11 @@ export default function SearchPage() {
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-indigo-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('storyChunks')}>
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.storyChunksQuery.title')}</h3>
-          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('storyChunks') }} aria-expanded={openSections.storyChunks}>{openSections.storyChunks ? '-' : '+'}</button>
+          <button type="button" className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('storyChunks') }} aria-expanded={openSections.storyChunks}>{openSections.storyChunks ? '−' : '+'}</button>
         </div>
         {openSections.storyChunks && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs6((d) => onQueryStoryChunks(d, 0))} className="flex flex-wrap gap-2 items-start">
+        <form onSubmit={hs6((d) => onQueryStoryChunks(d, 0))} className="flex flex-wrap gap-1.5 sm:gap-2 items-start">
           <div className="basis-auto">
             <div className="flex flex-col gap-1 w-44 sm:w-52">
               <label className="text-xs text-gray-700 dark:text-gray-300">{t('search.storyChunksQuery.tokenId')}</label>
@@ -940,8 +918,8 @@ export default function SearchPage() {
               <FieldError message={formatNumericError(e6.pageSize?.message, pageSizeValidationMessage)} />
             </div>
           </div>
-          <div className="flex flex-col gap-1 justify-end">
-            <span className="text-xs text-gray-700 dark:text-gray-300 invisible">{t('search.nameQuery.pageSize')}</span>
+          <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
+            <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">{t('search.nameQuery.pageSize')}</span>
             <div className="flex gap-2">
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={storyChunksLoading}>{t('search.query')}</button>
               <button type="button" onClick={onResetStoryChunksQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
@@ -1023,11 +1001,11 @@ export default function SearchPage() {
       <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div className="bg-purple-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60" onClick={() => toggle('uri')}>
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('search.uriQuery.title')}</h3>
-          <button type="button" className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('uri') }} aria-expanded={openSections.uri}>{openSections.uri ? '-' : '+'}</button>
+          <button type="button" className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={(e) => { e.stopPropagation(); toggle('uri') }} aria-expanded={openSections.uri}>{openSections.uri ? '−' : '+'}</button>
         </div>
         {openSections.uri && (
           <div className="p-2 space-y-2">
-        <form onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))} className="flex flex-wrap gap-2 items-start">
+        <form onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))} className="flex flex-wrap gap-1.5 sm:gap-2 items-start">
           <div className="basis-auto">
             <div className="flex flex-col gap-1 w-44 sm:w-52">
               <label className="text-xs text-gray-700 dark:text-gray-300">{t('search.uriQuery.tokenId')}</label>
@@ -1053,8 +1031,8 @@ export default function SearchPage() {
               <FieldError message={formatNumericError(e4.pageSize?.message, pageSizeValidationMessage)} />
             </div>
           </div>
-          <div className="flex flex-col gap-1 justify-end">
-            <span className="text-xs text-gray-700 dark:text-gray-300 invisible">{t('search.nameQuery.pageSize')}</span>
+          <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
+            <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">{t('search.nameQuery.pageSize')}</span>
             <div className="flex gap-2">
               <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled={uriLoading}>{t('search.query')}</button>
               <button type="button" onClick={onResetUriQuery} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">{t('search.reset')}</button>
