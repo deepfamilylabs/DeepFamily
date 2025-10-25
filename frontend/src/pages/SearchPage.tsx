@@ -336,7 +336,7 @@ export default function SearchPage() {
       const provider = makeProvider(rpcUrl)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : endorsementOffset
-      const out = await contract.listVersionsEndorsementStats(data.personHash, off, data.pageSize)
+      const out = await contract.listVersionEndorsements(data.personHash, off, data.pageSize)
       const versionIndices: number[] = Array.from(out?.[0] || []).map(Number)
       const endorsementCounts: number[] = Array.from(out?.[1] || []).map(Number)
       const tokenIds: number[] = Array.from(out?.[2] || []).map(Number)

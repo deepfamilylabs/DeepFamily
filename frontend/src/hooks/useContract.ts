@@ -368,11 +368,11 @@ export function useContract() {
     }
   }, [contract, toast, t])
 
-  const listVersionsEndorsementStats = useCallback(async (personHash: string, offset: number, pageSize: number) => {
+  const listVersionEndorsements = useCallback(async (personHash: string, offset: number, pageSize: number) => {
     if (!contract) return null
     
     try {
-      const result = await contract.listVersionsEndorsementStats(personHash, offset, pageSize)
+      const result = await contract.listVersionEndorsements(personHash, offset, pageSize)
       return result
     } catch (error) {
       console.error('Failed to get endorsement stats:', error)
@@ -451,7 +451,7 @@ export function useContract() {
     
     // Read methods
     listPersonVersions,
-    listVersionsEndorsementStats,
+    listVersionEndorsements,
     getVersionDetails,
     getNFTDetails,
     getPersonHash,
