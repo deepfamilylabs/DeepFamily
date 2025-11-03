@@ -1,5 +1,43 @@
 const hre = require("hardhat");
+const path = require("path");
+const fs = require("fs");
 const { DEMO_ROOT_PERSON, computePersonHash, checkPersonExists } = require("../lib/seedHelpers");
+
+// Historical persons preset data
+const HISTORICAL_PERSONS = {
+  "Patrick Joseph Kennedy": {
+    fullName: "Patrick Joseph Kennedy",
+    passphrase: "Kennedy Family-tree",
+    birthYear: 1858,
+    birthMonth: 1,
+    birthDay: 14,
+    gender: 1,
+  },
+  "Joseph Patrick Kennedy Sr": {
+    fullName: "Joseph Patrick Kennedy Sr",
+    passphrase: "Kennedy Family-tree",
+    birthYear: 1888,
+    birthMonth: 9,
+    birthDay: 6,
+    gender: 1,
+  },
+  "John Fitzgerald Kennedy": {
+    fullName: "John Fitzgerald Kennedy",
+    passphrase: "Kennedy Family-tree",
+    birthYear: 1917,
+    birthMonth: 5,
+    birthDay: 29,
+    gender: 1,
+  },
+  "Robert Francis Kennedy": {
+    fullName: "Robert Francis Kennedy",
+    passphrase: "Kennedy Family-tree",
+    birthYear: 1925,
+    birthMonth: 11,
+    birthDay: 20,
+    gender: 1,
+  },
+};
 
 /**
  * Check detailed information for a specific person
@@ -128,9 +166,26 @@ async function main() {
     console.warn(`  Unable to get statistics: ${e.message}`);
   }
 
+  // Display all known root hashes
+  console.log("\n" + "=".repeat(70));
+  console.log("Known Root Hashes");
+  console.log("=".repeat(70));
+
+  console.log("\n📋 Demo Data Root:");
+  const demoRootHash = await computePersonHash({ deepFamily, personData: DEMO_ROOT_PERSON });
+  console.log(`  Name: ${DEMO_ROOT_PERSON.fullName}`);
+  console.log(`  Hash: ${demoRootHash}`);
+
+  console.log("\n📋 Historical Data Roots (Kennedy Family):");
+  for (const [name, personData] of Object.entries(HISTORICAL_PERSONS)) {
+    const hash = await computePersonHash({ deepFamily, personData });
+    console.log(`  ${name}:`);
+    console.log(`    Hash: ${hash}`);
+  }
+
   // Check DemoRoot
   console.log("\n" + "=".repeat(70));
-  console.log("Check Default Test Person");
+  console.log("Check Default Test Person (DemoRoot)");
   console.log("=".repeat(70));
 
   // Use standard demo root person from seedHelpers
@@ -139,8 +194,19 @@ async function main() {
   // If environment variables provided, check custom person
   const customName = process.env.PERSON_NAME;
   const customHash = process.env.PERSON_HASH;
+  const checkHistorical = process.env.CHECK_HISTORICAL === "true";
 
-  if (customHash) {
+  // Quick check for historical persons
+  if (checkHistorical) {
+    console.log("\n" + "=".repeat(70));
+    console.log("Check All Historical Persons (Kennedy Family)");
+    console.log("=".repeat(70));
+
+    for (const [name, personData] of Object.entries(HISTORICAL_PERSONS)) {
+      console.log(`\n--- ${name} ---`);
+      await checkPerson(deepFamily, personData, 1);
+    }
+  } else if (customHash) {
     // Query directly by hash
     console.log("\n" + "=".repeat(70));
     console.log("Check Custom Person (by hash)");
@@ -195,10 +261,16 @@ async function main() {
   console.log("✨ Check Complete");
   console.log("=".repeat(70));
   console.log("\nUsage:");
-  console.log(
-    "  By name: PERSON_NAME='John Doe' PERSON_BIRTH_YEAR=1990 PERSON_GENDER=1 npm run check:root",
-  );
-  console.log("  By hash: PERSON_HASH=0x123... npm run check:root");
+  console.log("  Check all historical persons:");
+  console.log("    CHECK_HISTORICAL=true npm run check:root");
+  console.log("\n  By name:");
+  console.log("    PERSON_NAME='John Doe' PERSON_BIRTH_YEAR=1990 PERSON_GENDER=1 npm run check:root");
+  console.log("\n  By hash:");
+  console.log("    PERSON_HASH=0x123... npm run check:root");
+  console.log("\n  By historical person name:");
+  console.log("    PERSON_NAME='John Fitzgerald Kennedy' PERSON_PASSPHRASE='Kennedy Family-tree' \\");
+  console.log("    PERSON_BIRTH_YEAR=1917 PERSON_BIRTH_MONTH=5 PERSON_BIRTH_DAY=29 PERSON_GENDER=1 \\");
+  console.log("    npm run check:root");
   console.log("");
 }
 
