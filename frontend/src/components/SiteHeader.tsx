@@ -4,6 +4,7 @@ import { Home, Search, Network, Book } from 'lucide-react'
 import HeaderControls from './HeaderControls'
 import Logo from './Logo'
 import PageContainer from './PageContainer'
+import { getBadgeConfig } from '../config/brandBadge'
 
 /**
  * SiteHeader: Unified top navigation/header bar used across all pages.
@@ -14,6 +15,7 @@ export default function SiteHeader() {
   const { t } = useTranslation()
   const location = useLocation()
   const isHomePage = location.pathname === '/'
+  const badgeConfig = getBadgeConfig()
 
   const navClasses = ({ isActive }: { isActive: boolean }) => {
     const baseClasses = 'inline-flex items-center gap-2 px-2 py-2 lg:px-4 lg:py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative group whitespace-nowrap'
@@ -54,6 +56,13 @@ export default function SiteHeader() {
         <NavLink to="/" className={`flex items-center gap-3 font-bold transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
           <Logo className={`w-8 h-8 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-blue-500 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
           <span className={`hidden sm:inline text-xl font-light tracking-widest uppercase ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', letterSpacing: '0.2em' }}>DeepFamily</span>
+          {badgeConfig && (
+            <span className="relative inline-block -ml-1 h-6 align-bottom">
+              <span className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}>
+                {badgeConfig.text}
+              </span>
+            </span>
+          )}
         </NavLink>
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-shrink-0 min-w-0">
           <NavLink to="/" className={navClasses} end>
