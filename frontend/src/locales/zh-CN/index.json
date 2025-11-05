@@ -1093,7 +1093,7 @@
     "component": {
       "title": "安全密钥派生",
       "description": "使用 KDF 算法从个人信息和强口令短语派生安全的以太坊私钥。",
-      "passphraseWarning": "⚠️ 必须使用 20+ 字符的强口令短语！",
+      "passphraseWarning": "⚠️ 推荐使用 15+ 字符的强口令短语！",
       "fillInfoFirst": "请先填写个人信息",
       "nameRequired": "姓名不能为空",
       "success": "✅ 私钥派生成功",
@@ -1127,7 +1127,7 @@
       "improvePassphrase": "改进口令短语",
       "bitsSummary": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}",
       "recommendations": {
-        "empty": "⚠️ 空口令短语：安全性不足。强烈建议使用 18+ 字符的强口令短语",
+        "empty": "⚠️ 空口令短语：安全性不足。强烈建议使用 15+ 字符的强口令短语",
         "weak": "❌ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性不足。建议：15+ 混合字符或 20+ 纯字母",
         "medium": "⚠️ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。低于推荐阈值。建议：18+ 字符并混合符号/表情",
         "strong": "✅ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性良好",
