@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Home, Search, Network, Book, Key } from 'lucide-react'
+import { Home, Search, Network, Book, Zap } from 'lucide-react'
 import HeaderControls from './HeaderControls'
 import Logo from './Logo'
 import PageContainer from './PageContainer'
@@ -81,9 +81,9 @@ export default function SiteHeader() {
             <Search className="w-4 h-4" />
             <span className="hidden lg:inline">{t('navigation.search')}</span>
           </NavLink>
-          <NavLink to="/keygen" className={navClasses}>
-            <Key className="w-4 h-4" />
-            <span className="hidden lg:inline">{t('navigation.keyGen')}</span>
+          <NavLink to="/actions" className={navClasses}>
+            <Zap className="w-4 h-4" />
+            <span className="hidden lg:inline">{t('navigation.actions', 'Actions')}</span>
           </NavLink>
         </nav>
         <HeaderControls variant={isHomePage ? 'home' : 'normal'} />

@@ -1092,7 +1092,7 @@
     "component": {
       "title": "Secure Key Derivation",
       "description": "Derive secure Ethereum private keys from personal information and a strong passphrase using KDF algorithm.",
-      "passphraseWarning": "⚠️ Must use a strong passphrase with 20+ characters!",
+      "passphraseWarning": "⚠️ Must use a strong passphrase with 15+ characters!",
       "fillInfoFirst": "Please fill in personal information first",
       "nameRequired": "Name cannot be empty",
       "success": "✅ Private key derived successfully",
@@ -1126,7 +1126,7 @@
       "improvePassphrase": "Improve Passphrase",
       "bitsSummary": "{{raw}} bits raw / score {{adjusted}}",
       "recommendations": {
-        "empty": "⚠️ Empty passphrase: insufficient security. Strongly recommend 18+ character strong passphrase",
+        "empty": "⚠️ Empty passphrase: insufficient security. Strongly recommend a 15+ character strong passphrase",
         "weak": "❌ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
         "medium": "⚠️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols/emoji",
         "strong": "✅ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Good security",
