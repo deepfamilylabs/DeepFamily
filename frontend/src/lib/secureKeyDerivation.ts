@@ -1,8 +1,9 @@
 /**
  * Secure Key Derivation from PersonHash
  *
- * 利用现有的 PersonHash 计算结果，通过 KDF 强化生成安全私钥
- * 保持向后兼容，但为密钥派生场景提供额外安全层
+ * Leverages existing PersonHash computation results and strengthens them through
+ * KDF (Key Derivation Function) to generate secure private keys. Maintains backward
+ * compatibility while providing an additional security layer for key derivation scenarios.
  */
 
 import { scrypt } from 'scrypt-js';
