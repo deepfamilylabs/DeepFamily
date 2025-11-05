@@ -8,6 +8,7 @@ import { ChevronDown, Clipboard, Eye, EyeOff, Info } from 'lucide-react'
 import { useToast } from './ToastProvider'
 import { formatHashMiddle } from '../types/graph'
 import { poseidon3, poseidon5 } from 'poseidon-lite'
+import { validatePassphraseStrength, normalizeForHash as normalizeForHashUtil, getGraphemeLength as getGraphemeLengthUtil } from '../lib/passphraseStrength'
 
 // Align with contract convention: blank passphrase -> zero salt limbs
 const ZERO_BYTES32 = '0x' + '00'.repeat(32)
@@ -18,28 +19,9 @@ const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
 
-const normalizeForHash = (value: string): string => {
-  if (!value) return ''
-  const trimmed = value.trim()
-  return typeof trimmed.normalize === 'function' ? trimmed.normalize('NFC') : trimmed
-}
-
-const getGraphemeLength = (() => {
-  if (typeof Intl !== 'undefined' && typeof (Intl as any).Segmenter === 'function') {
-    const segmenter = new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' })
-    return (value: string): number => {
-      if (!value) return 0
-      let count = 0
-      for (const _ of segmenter.segment(value)) count += 1
-      return count
-    }
-  }
-
-  return (value: string): number => {
-    if (!value) return 0
-    return Array.from(value).length
-  }
-})()
+// Re-export from shared utility for backward compatibility within this file
+const normalizeForHash = normalizeForHashUtil
+const getGraphemeLength = getGraphemeLengthUtil
 
 // Field error component
 const FieldError: React.FC<{ message?: string }> = ({ message }) => (
@@ -124,38 +106,10 @@ const hashFormSchema = z.object({
 
 export type HashForm = z.infer<typeof hashFormSchema>
 
-// Password strength calculation
-const calculatePasswordStrength = (password: string): { level: 'weak' | 'medium' | 'strong'; score: number } => {
-  const normalized = normalizeForHash(password)
-  const graphemeLength = getGraphemeLength(normalized)
-
-  if (!normalized) return { level: 'weak', score: 0 }
-
-  let score = 0
-
-  if (graphemeLength >= 16) score += 4
-  else if (graphemeLength >= 12) score += 3
-  else if (graphemeLength >= 8) score += 2
-  else if (graphemeLength >= 4) score += 1
-
-  const categories = new Set<string>()
-  if (/\p{L}/u.test(normalized)) categories.add('letter')
-  if (/\p{N}/u.test(normalized)) categories.add('number')
-  if (/\p{S}/u.test(normalized)) categories.add('symbol')
-  if (/\p{P}/u.test(normalized)) categories.add('punctuation')
-  if (/\p{M}/u.test(normalized)) categories.add('mark')
-  if (/\p{Zs}/u.test(normalized)) categories.add('space')
-
-  const diversityCategories = ['letter', 'number', 'symbol', 'punctuation', 'mark']
-  const diversityScore = diversityCategories.reduce((acc, cat) => acc + (categories.has(cat) ? 1 : 0), 0)
-  score += diversityScore
-
-  if (categories.has('space')) score += 1
-  if (graphemeLength >= 20) score += 1
-
-  if (score <= 2) return { level: 'weak', score }
-  if (score <= 5) return { level: 'medium', score }
-  return { level: 'strong', score }
+// Password strength calculation (uses shared utility from passphraseStrength.ts)
+// Note: This is a simple wrapper that maintains backward compatibility with the UI
+const calculatePasswordStrength = (password: string) => {
+  return validatePassphraseStrength(password, false)
 }
 
 // Hash calculation function using Poseidon (matches circuit and contract)
@@ -531,7 +485,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             <input
               type={showPassphrase || !supportsCssMasking ? (showPassphrase ? 'text' : 'password') : 'text'}
               className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-              placeholder={t('search.hashCalculator.passphrasePlaceholder', 'Enter any characters—family mottos or secret phrases. 12+ characters with mixed symbols recommended')}
+              placeholder={t('search.hashCalculator.passphrasePlaceholder', 'Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended')}
               inputMode="text"
               autoCapitalize="none"
               autoComplete="off"
@@ -557,36 +511,60 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             </div>
           )}
 
-          {/* Password strength indicator and tips */}
+          {/* Password strength indicator */}
           {passphrase && passphrase.length > 0 && (
             <div className="mt-1 space-y-1">
               <div className="flex items-center gap-2">
                 <div className="flex gap-1 flex-1">
+                  {/* 5-level indicator bars */}
                   <div className={`h-1 flex-1 rounded ${
                     passwordStrength.level === 'weak' ? 'bg-red-400' :
-                    passwordStrength.level === 'medium' ? 'bg-red-400' : 'bg-green-400'
+                    passwordStrength.entropy >= 50 ? 'bg-red-400' : 'bg-gray-200 dark:bg-gray-600'
                   }`} />
                   <div className={`h-1 flex-1 rounded ${
-                    passwordStrength.level === 'medium' ? 'bg-yellow-400' :
-                    passwordStrength.level === 'strong' ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-600'
+                    passwordStrength.level === 'medium' ? 'bg-orange-400' :
+                    passwordStrength.entropy >= 80 ? 'bg-orange-400' : 'bg-gray-200 dark:bg-gray-600'
                   }`} />
                   <div className={`h-1 flex-1 rounded ${
-                    passwordStrength.level === 'strong' ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-600'
+                    passwordStrength.level === 'strong' ? 'bg-yellow-400' :
+                    passwordStrength.entropy >= 128 ? 'bg-yellow-400' : 'bg-gray-200 dark:bg-gray-600'
+                  }`} />
+                  <div className={`h-1 flex-1 rounded ${
+                    passwordStrength.level === 'very-strong' ? 'bg-green-400' :
+                    passwordStrength.entropy >= 192 ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-600'
+                  }`} />
+                  <div className={`h-1 flex-1 rounded ${
+                    passwordStrength.level === 'excellent' ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
                   }`} />
                 </div>
-                <span className={`text-xs font-medium ${
+                <span className={`text-xs font-medium whitespace-nowrap ${
                   passwordStrength.level === 'weak' ? 'text-red-600 dark:text-red-400' :
-                  passwordStrength.level === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
-                  'text-green-600 dark:text-green-400'
+                  passwordStrength.level === 'medium' ? 'text-orange-600 dark:text-orange-400' :
+                  passwordStrength.level === 'strong' ? 'text-yellow-600 dark:text-yellow-400' :
+                  passwordStrength.level === 'very-strong' ? 'text-green-600 dark:text-green-400' :
+                  'text-blue-600 dark:text-blue-400'
                 }`}>
                   {passwordStrength.level === 'weak' ? t('search.hashCalculator.passwordStrength.weak', 'Weak') :
                    passwordStrength.level === 'medium' ? t('search.hashCalculator.passwordStrength.medium', 'Medium') :
-                   t('search.hashCalculator.passwordStrength.strong', 'Strong')}
+                   passwordStrength.level === 'strong' ? t('search.hashCalculator.passwordStrength.strong', 'Strong') :
+                   passwordStrength.level === 'very-strong' ? t('search.hashCalculator.passwordStrength.veryStrong', 'Very Strong') :
+                   t('search.hashCalculator.passwordStrength.excellent', 'Excellent')}
                 </span>
+              </div>
+              {/* Display entropy */}
+              <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                {t(
+                  'search.hashCalculator.entropyDisplay',
+                  'Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}',
+                  {
+                    raw: Math.round(passwordStrength.rawEntropy),
+                    adjusted: Math.round(passwordStrength.entropy),
+                  }
+                )}
               </div>
               {passwordStrength.level === 'weak' && (
                 <div className="text-xs text-amber-600 dark:text-amber-400">
-                  {t('search.hashCalculator.passwordTips.weak', '💡 Tip: Use at least 12 characters combined with numbers, punctuation, symbols, or emoji')}
+                  {t('search.hashCalculator.passwordTips.weak', '💡 Tip: Use at least 15+ mixed characters or 20+ letters for better security')}
                 </div>
               )}
             </div>
