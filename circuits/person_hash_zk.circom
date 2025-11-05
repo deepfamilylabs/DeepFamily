@@ -41,8 +41,8 @@ template HashToLimbs() {
     limb1 <== limb1Bits.out;
 }
 
-// Fixed-length PersonHasher using fullNameHash (32 bytes)
-template PersonHasher() {
+// Person commitment with dual Poseidon outputs and explicit domain separation
+template PersonCommitment() {
     signal input fullNameHash[32];  // 32-byte keccak256 hash of the full name
     signal input saltHash[32];      // 32-byte keccak256 hash of the passphrase-derived salt
     signal input isBirthBC;
@@ -50,12 +50,19 @@ template PersonHasher() {
     signal input birthMonth;
     signal input birthDay;
     signal input gender;
-    
-    signal output limb0; // high 128 bits of Poseidon(out)
-    signal output limb1; // low 128 bits of Poseidon(out)
-    
-    // Constraint checks
-    // Birth year constrained to 16 bits (0-65535) to prevent packing overflow
+
+    signal output primaryLimb0;    // high 128 bits of primary Poseidon output
+    signal output primaryLimb1;    // low 128 bits of primary Poseidon output
+    signal output secondaryLimb0;  // high 128 bits of secondary Poseidon output
+    signal output secondaryLimb1;  // low 128 bits of secondary Poseidon output
+
+    // Domain separation constants hashed from unique protocol labels
+    var SALTED_NAME_DOMAIN_PRIMARY = 447621024357665903074632115256704697579070658341564497608043648103041050990;
+    var SALTED_NAME_DOMAIN_SECONDARY = 19517420153832580388377732280333130415087647067004616588695803175044816476636;
+    var PERSON_DOMAIN_PRIMARY = 8952727929263341476560614559269420251731862389046777805180612664679563964106;
+    var PERSON_DOMAIN_SECONDARY = 11756112566277107848988887419345263113767817252051989647464836117592952280515;
+
+    // Range constraints for demographic inputs
     component birthYearCheck = Num2Bits(16);
     birthYearCheck.in <== birthYear;
 
@@ -68,7 +75,7 @@ template PersonHasher() {
     // Day: 5 bits allows exactly 0-31
     component birthDayCheck = Num2Bits(5);
     birthDayCheck.in <== birthDay;
-    
+
     // Validate binary and range constraints
     component bcBit = Num2Bits(1);
     bcBit.in <== isBirthBC;
@@ -76,7 +83,7 @@ template PersonHasher() {
     // Gender constrained to 3 bits (0-7)
     component genderCheck = Num2Bits(3);
     genderCheck.in <== gender;
-    
+
     // Convert fullNameHash bytes to two 128-bit field limbs (also validates bytes)
     component nameLimbs = HashToLimbs();
     for (var i = 0; i < 32; i++) {
@@ -88,52 +95,85 @@ template PersonHasher() {
         saltLimbs.hashBytes[i] <== saltHash[i];
     }
 
-    component fullNamePoseidon = Poseidon(5);
-    fullNamePoseidon.inputs[0] <== nameLimbs.limb0;
-    fullNamePoseidon.inputs[1] <== nameLimbs.limb1;
-    fullNamePoseidon.inputs[2] <== saltLimbs.limb0;
-    fullNamePoseidon.inputs[3] <== saltLimbs.limb1;
-    fullNamePoseidon.inputs[4] <== 0; // Domain separator slot
+    // Two domain-separated Poseidon evaluations for salted name commitment
+    component saltedPrimary = Poseidon(5);
+    saltedPrimary.inputs[0] <== nameLimbs.limb0;
+    saltedPrimary.inputs[1] <== nameLimbs.limb1;
+    saltedPrimary.inputs[2] <== saltLimbs.limb0;
+    saltedPrimary.inputs[3] <== saltLimbs.limb1;
+    saltedPrimary.inputs[4] <== SALTED_NAME_DOMAIN_PRIMARY;
 
-    component poseidonNameBits = Num2Bits(256);
-    poseidonNameBits.in <== fullNamePoseidon.out;
+    component saltedSecondary = Poseidon(5);
+    saltedSecondary.inputs[0] <== nameLimbs.limb0;
+    saltedSecondary.inputs[1] <== nameLimbs.limb1;
+    saltedSecondary.inputs[2] <== saltLimbs.limb0;
+    saltedSecondary.inputs[3] <== saltLimbs.limb1;
+    saltedSecondary.inputs[4] <== SALTED_NAME_DOMAIN_SECONDARY;
 
-    component poseidonNameLow = Bits2Num(128);
+    component saltedPrimaryBits = Num2Bits(256);
+    saltedPrimaryBits.in <== saltedPrimary.out;
+    component saltedPrimaryLow = Bits2Num(128);
     for (var i = 0; i < 128; i++) {
-        poseidonNameLow.in[i] <== poseidonNameBits.out[i];
+        saltedPrimaryLow.in[i] <== saltedPrimaryBits.out[i];
+    }
+    component saltedPrimaryHigh = Bits2Num(128);
+    for (var i = 0; i < 128; i++) {
+        saltedPrimaryHigh.in[i] <== saltedPrimaryBits.out[128 + i];
     }
 
-    component poseidonNameHigh = Bits2Num(128);
-    for (var i = 0; i < 128; i++) {
-        poseidonNameHigh.in[i] <== poseidonNameBits.out[128 + i];
+    component saltedSecondaryBits = Num2Bits(256);
+    saltedSecondaryBits.in <== saltedSecondary.out;
+    component saltedSecondaryLow = Bits2Num(128);
+    for (var j = 0; j < 128; j++) {
+        saltedSecondaryLow.in[j] <== saltedSecondaryBits.out[j];
+    }
+    component saltedSecondaryHigh = Bits2Num(128);
+    for (var j = 0; j < 128; j++) {
+        saltedSecondaryHigh.in[j] <== saltedSecondaryBits.out[128 + j];
     }
 
-    // Pack small fields into single field element (saves 4 Poseidon inputs)
-    // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
+    // Pack demographic bits: birthYear (16) | birthMonth (8) | birthDay (8) | gender (3) | isBirthBC (1)
     signal packedData <== birthYear * 16777216 + birthMonth * 65536 + birthDay * 256 + gender * 2 + isBirthBC;
 
-    // Poseidon commitment over SNARK-friendly field elements (reduced from 7 to 3 inputs)
-    component poseidon = Poseidon(3);
-    poseidon.inputs[0] <== poseidonNameHigh.out; // high 128 bits of salted name Poseidon digest
-    poseidon.inputs[1] <== poseidonNameLow.out; // low 128 bits of salted name Poseidon digest
-    poseidon.inputs[2] <== packedData;
+    // Final Poseidon commitments with separate domains to achieve 512-bit output
+    component poseidonPrimary = Poseidon(4);
+    poseidonPrimary.inputs[0] <== saltedPrimaryHigh.out;
+    poseidonPrimary.inputs[1] <== saltedPrimaryLow.out;
+    poseidonPrimary.inputs[2] <== packedData;
+    poseidonPrimary.inputs[3] <== PERSON_DOMAIN_PRIMARY;
 
-    // Split Poseidon output into two 128-bit limbs for public signals
-    component outBits = Num2Bits(256);
-    outBits.in <== poseidon.out;
+    component poseidonSecondary = Poseidon(4);
+    poseidonSecondary.inputs[0] <== saltedSecondaryHigh.out;
+    poseidonSecondary.inputs[1] <== saltedSecondaryLow.out;
+    poseidonSecondary.inputs[2] <== packedData;
+    poseidonSecondary.inputs[3] <== PERSON_DOMAIN_SECONDARY;
 
-    component lowNum = Bits2Num(128);
+    component primaryBits = Num2Bits(256);
+    primaryBits.in <== poseidonPrimary.out;
+    component primaryLow = Bits2Num(128);
     for (var k = 0; k < 128; k++) {
-        lowNum.in[k] <== outBits.out[k]; // LSB first
+        primaryLow.in[k] <== primaryBits.out[k];
+    }
+    component primaryHigh = Bits2Num(128);
+    for (var k = 0; k < 128; k++) {
+        primaryHigh.in[k] <== primaryBits.out[128 + k];
     }
 
-    component highNum = Bits2Num(128);
-    for (var k = 0; k < 128; k++) {
-        highNum.in[k] <== outBits.out[128 + k];
+    component secondaryBits = Num2Bits(256);
+    secondaryBits.in <== poseidonSecondary.out;
+    component secondaryLow = Bits2Num(128);
+    for (var m = 0; m < 128; m++) {
+        secondaryLow.in[m] <== secondaryBits.out[m];
+    }
+    component secondaryHigh = Bits2Num(128);
+    for (var m = 0; m < 128; m++) {
+        secondaryHigh.in[m] <== secondaryBits.out[128 + m];
     }
 
-    limb0 <== highNum.out;
-    limb1 <== lowNum.out;
+    primaryLimb0 <== primaryHigh.out;
+    primaryLimb1 <== primaryLow.out;
+    secondaryLimb0 <== secondaryHigh.out;
+    secondaryLimb1 <== secondaryLow.out;
 }
 
 // Main test circuit
@@ -173,16 +213,22 @@ template PersonHashTest() {
     signal input submitter;
     
     // Outputs
-    signal output person_limb0;
-    signal output person_limb1;
-    signal output father_limb0;
-    signal output father_limb1;
-    signal output mother_limb0;
-    signal output mother_limb1;
+    signal output person_primary_limb0;
+    signal output person_primary_limb1;
+    signal output person_secondary_limb0;
+    signal output person_secondary_limb1;
+    signal output father_primary_limb0;
+    signal output father_primary_limb1;
+    signal output father_secondary_limb0;
+    signal output father_secondary_limb1;
+    signal output mother_primary_limb0;
+    signal output mother_primary_limb1;
+    signal output mother_secondary_limb0;
+    signal output mother_secondary_limb1;
     signal output submitter_out;
     
     // Calculate commitment of person to be added
-    component personHasher = PersonHasher();
+    component personHasher = PersonCommitment();
     for (var i = 0; i < 32; i++) {
         personHasher.fullNameHash[i] <== fullNameHash[i];
         personHasher.saltHash[i] <== saltHash[i];
@@ -194,7 +240,7 @@ template PersonHashTest() {
     personHasher.gender <== gender;
     
     // Calculate father commitment using PersonHasher
-    component fatherHasher = PersonHasher();
+    component fatherHasher = PersonCommitment();
     for (var j = 0; j < 32; j++) {
         fatherHasher.fullNameHash[j] <== father_fullNameHash[j];
         fatherHasher.saltHash[j] <== father_saltHash[j];
@@ -206,7 +252,7 @@ template PersonHashTest() {
     fatherHasher.gender <== father_gender;
     
     // Calculate mother commitment using PersonHasher
-    component motherHasher = PersonHasher();
+    component motherHasher = PersonCommitment();
     for (var t = 0; t < 32; t++) {
         motherHasher.fullNameHash[t] <== mother_fullNameHash[t];
         motherHasher.saltHash[t] <== mother_saltHash[t];
@@ -225,20 +271,30 @@ template PersonHashTest() {
     
     // Use arithmetic constraints for conditional parent output (more efficient than Mux1)
     // If hasFather = 1, output fatherHasher limbs; if hasFather = 0, output 0
-    signal father_limb0_selected <== hasFather * fatherHasher.limb0;
-    signal father_limb1_selected <== hasFather * fatherHasher.limb1;
+    signal father_primary_limb0_selected <== hasFather * fatherHasher.primaryLimb0;
+    signal father_primary_limb1_selected <== hasFather * fatherHasher.primaryLimb1;
+    signal father_secondary_limb0_selected <== hasFather * fatherHasher.secondaryLimb0;
+    signal father_secondary_limb1_selected <== hasFather * fatherHasher.secondaryLimb1;
 
     // If hasMother = 1, output motherHasher limbs; if hasMother = 0, output 0
-    signal mother_limb0_selected <== hasMother * motherHasher.limb0;
-    signal mother_limb1_selected <== hasMother * motherHasher.limb1;
+    signal mother_primary_limb0_selected <== hasMother * motherHasher.primaryLimb0;
+    signal mother_primary_limb1_selected <== hasMother * motherHasher.primaryLimb1;
+    signal mother_secondary_limb0_selected <== hasMother * motherHasher.secondaryLimb0;
+    signal mother_secondary_limb1_selected <== hasMother * motherHasher.secondaryLimb1;
 
     // Final outputs
-    person_limb0 <== personHasher.limb0;
-    person_limb1 <== personHasher.limb1;
-    father_limb0 <== father_limb0_selected;
-    father_limb1 <== father_limb1_selected;
-    mother_limb0 <== mother_limb0_selected;
-    mother_limb1 <== mother_limb1_selected;
+    person_primary_limb0 <== personHasher.primaryLimb0;
+    person_primary_limb1 <== personHasher.primaryLimb1;
+    person_secondary_limb0 <== personHasher.secondaryLimb0;
+    person_secondary_limb1 <== personHasher.secondaryLimb1;
+    father_primary_limb0 <== father_primary_limb0_selected;
+    father_primary_limb1 <== father_primary_limb1_selected;
+    father_secondary_limb0 <== father_secondary_limb0_selected;
+    father_secondary_limb1 <== father_secondary_limb1_selected;
+    mother_primary_limb0 <== mother_primary_limb0_selected;
+    mother_primary_limb1 <== mother_primary_limb1_selected;
+    mother_secondary_limb0 <== mother_secondary_limb0_selected;
+    mother_secondary_limb1 <== mother_secondary_limb1_selected;
     submitter_out <== submitter;
 }
 
