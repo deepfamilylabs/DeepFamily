@@ -26,7 +26,8 @@
     "familyTree": "Tree",
     "search": "Search",
     "people": "People",
-    "actions": "Actions"
+    "actions": "Actions",
+    "keyGen": "KeyGen"
   },
   "home": {
     "title": "Decentralized Digital Family Tree",
@@ -357,13 +358,13 @@
       "birthMonthLabel": "Month",
       "birthDayLabel": "Day",
       "passphrase": "Passphrase",
-      "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 12+ characters with mixed symbols recommended",
+      "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
       "passphraseHelp": {
         "title": "Passphrase Usage Guide",
         "privacy": "🔒 Privacy Protection",
         "privacyDesc": "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
         "optional": "✅ Completely Optional",
-        "optionalDesc": "Optional; accepts any characters such as mottos or secret codes. Relatives can share one passphrase to collaborate—use 12+ characters and keep it safe for better privacy.",
+        "optionalDesc": "Optional; accepts any characters such as mottos or secret codes. Relatives can share one passphrase to collaborate—use 15+ characters and keep it safe for better privacy.",
         "remember": "⚠️ Please Remember",
         "rememberDesc": "Passphrase cannot be recovered. If forgotten, a different identity hash will be generated.",
         "privacyNoteTitle": "🔐 Local Only",
@@ -372,11 +373,14 @@
       "passwordStrength": {
         "weak": "Weak",
         "medium": "Medium",
-        "strong": "Strong"
+        "strong": "Strong",
+        "veryStrong": "Very Strong",
+        "excellent": "Excellent"
       },
       "passwordTips": {
-        "weak": "💡 Tip: Use at least 12 characters and mix in numbers, punctuation, symbols, or emoji"
+        "weak": "💡 Tip: Use at least 15+ mixed characters or 20+ letters for better security"
       },
+      "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
       "passphraseCharCount": "Characters after trim: {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
       "toggleNo": "No",
@@ -1078,5 +1082,66 @@
     "addVersionFailed": "Failed to add person version",
     "mintSuccess": "NFT minted successfully",
     "mintFailed": "Failed to mint NFT"
+  },
+  "keyDerivation": {
+    "title": "🔐 Secure Key Derivation",
+    "subtitle": "Derive Ethereum private keys from personal information and a strong passphrase using KDF algorithm. Deterministic recovery without storing private keys.",
+    "howItWorks": "💡 How It Works",
+    "description": "PersonHash(name, birthday, gender, passphrase) → scrypt KDF (N=131072) → Private Key → Ethereum Address",
+    "note": "Same input always generates same key | KDF provides 131,072× brute-force protection",
+    "component": {
+      "title": "Secure Key Derivation",
+      "description": "Derive secure Ethereum private keys from personal information and a strong passphrase using KDF algorithm.",
+      "passphraseWarning": "⚠️ Must use a strong passphrase with 20+ characters!",
+      "fillInfoFirst": "Please fill in personal information first",
+      "nameRequired": "Name cannot be empty",
+      "success": "✅ Private key derived successfully",
+      "failed": "❌ Private key derivation failed",
+      "passphraseStrength": "Passphrase Strength:",
+      "kdfStrength": "KDF Strength (affects security and computation time)",
+      "presets": {
+        "testing": "Testing",
+        "recommended": "Recommended",
+        "strongest": "Strongest"
+      },
+      "estimatedTime": "Estimated time:",
+      "deriving": "Deriving... ({{progress}}%)",
+      "deriveButton": "Derive Secure Private Key",
+      "derivedSuccess": "Private Key Derived Successfully",
+      "ethereumAddress": "Ethereum Address",
+      "address": "Address",
+      "privateKey": "Private Key (Keep it safe!)",
+      "privateKeyLabel": "Private Key",
+      "copied": "✅ {{label}} copied",
+      "copyFailed": "❌ Copy failed",
+      "securityTips": "⚠️ Security Tips:",
+      "tip1": "Private key controls assets, never reveal to anyone",
+      "tip2": "Remember your name, birthday and passphrase to recover anytime",
+      "tip3": "Any tiny change in information will produce a different private key",
+      "tip4": "Recommended to backup passphrase to a secure location",
+      "weakPassphraseTitle": "Weak Passphrase Warning",
+      "weakPassphraseMessage": "⚠️ Passphrase strength is insufficient!",
+      "weakPassphraseContinue": "Do you still want to continue? (Not recommended)",
+      "proceedAnyway": "Proceed Anyway",
+      "improvePassphrase": "Improve Passphrase",
+      "bitsSummary": "{{raw}} bits raw / score {{adjusted}}",
+      "recommendations": {
+        "empty": "⚠️ Empty passphrase: insufficient security. Strongly recommend 18+ character strong passphrase",
+        "weak": "❌ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
+        "medium": "⚠️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols/emoji",
+        "strong": "✅ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Good security",
+        "veryStrong": "🔐 Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Strong security",
+        "excellent": "🛡️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Excellent security"
+      },
+      "progress": {
+        "computingPersonHash": "Computing PersonHash...",
+        "personHashComputed": "PersonHash computed",
+        "preparingKDF": "Preparing KDF...",
+        "runningScrypt": "Running scrypt KDF (N={{n}})...",
+        "computingKDF": "Computing KDF... ({{progress}}%)",
+        "kdfCompleted": "KDF completed",
+        "keyDerivationComplete": "Key derivation complete"
+      }
+    }
   }
 }

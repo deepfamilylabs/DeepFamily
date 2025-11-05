@@ -9,6 +9,7 @@ import PersonPage from './pages/PersonPage'
 import PeoplePage from './pages/PeoplePage'
 import StoryEditorPage from './pages/StoryEditorPage'
 import ActionsPage from './pages/ActionsPage'
+import KeyDerivationPage from './pages/KeyDerivationPage'
 import { ConfigProvider } from './context/ConfigContext'
 import { ToastProvider } from './components/ToastProvider'
 import { VizOptionsProvider } from './context/VizOptionsContext'
@@ -34,6 +35,8 @@ function TitleUpdater() {
           return `${baseName} - ${t('navigation.people')}`
         case '/actions':
           return `${baseName} - ${t('navigation.actions', 'Actions')}`
+        case '/keygen':
+          return `${baseName} - Secure Key Derivation`
         default:
           if (location.pathname.startsWith('/person/')) {
             return `${t('person.pageTitle', 'Biography Wiki')}`
@@ -61,6 +64,7 @@ function RouterContent() {
         <Route path="search" element={<SearchPage />} />
         <Route path="people" element={<PeoplePage />} />
         <Route path="actions" element={<ActionsPage />} />
+        <Route path="keygen" element={<KeyDerivationPage />} />
         {/* Person and Editor under Layout to keep header/footer */}
         <Route path="person/:tokenId" element={<PersonPage />} />
         <Route path="editor/:tokenId" element={<StoryEditorPage />} />

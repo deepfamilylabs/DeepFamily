@@ -26,7 +26,8 @@
     "familyTree": "家系図",
     "search": "検索",
     "people": "人物",
-    "actions": "操作"
+    "actions": "操作",
+    "keyGen": "鍵"
   },
   "home": {
     "title": "分散型デジタル家系図",
@@ -357,13 +358,13 @@
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
       "passphrase": "パスフレーズ",
-      "passphrasePlaceholder": "家訓や合言葉など任意の文字を入力できます。12文字以上で記号を混ぜると安全です",
+      "passphrasePlaceholder": "家訓や合言葉など任意の文字を入力できます。15文字以上で記号を混ぜると安全です",
       "passphraseHelp": {
         "title": "パスフレーズの役割説明",
         "privacy": "🔒 プライバシー保護",
         "privacyDesc": "あなたの身元ハッシュに追加の保護層を追加し、他の人が名前と生年月日からあなたの身元を推測することを防ぎます。",
         "optional": "✅ 完全にオプション",
-        "optionalDesc": "空欄でも問題ありません。家訓や合言葉など任意の文字列を利用できます。親族で同じパスフレーズを共有すれば協力管理が可能です。プライバシー向上のため12文字以上にし、厳重に保管してください。",
+        "optionalDesc": "空欄でも問題ありません。家訓や合言葉など任意の文字列を利用できます。親族で同じパスフレーズを共有すれば協力管理が可能です。プライバシー向上のため15文字以上にし、厳重に保管してください。",
         "remember": "⚠️ 覚えておいてください",
         "rememberDesc": "パスフレーズは復元できません。忘れると異なる身元ハッシュが生成されます。",
         "privacyNoteTitle": "🔐 ローカル処理",
@@ -372,11 +373,14 @@
       "passwordStrength": {
         "weak": "弱",
         "medium": "中",
-        "strong": "強"
+        "strong": "強",
+        "veryStrong": "非常に強",
+        "excellent": "優秀"
       },
       "passwordTips": {
-        "weak": "💡 ヒント：12文字以上にし、数字・句読点・記号・絵文字などを組み合わせましょう"
+        "weak": "💡 ヒント：15文字以上にし、数字・句読点・記号・絵文字などを組み合わせましょう"
       },
+      "entropyDisplay": "生エントロピー：{{raw}} bits · 調整強度スコア：{{adjusted}}",
       "passphraseCharCount": "前後の空白を除いた文字数：{{count}}",
       "nameInputPlaceholder": "例：田中太郎",
       "toggleNo": "いいえ",
@@ -1080,5 +1084,66 @@
     "addVersionFailed": "人物バージョン追加失敗",
     "mintSuccess": "NFT鋳造成功",
     "mintFailed": "NFT鋳造失敗"
+  },
+  "keyDerivation": {
+    "title": "🔐 安全鍵派生",
+    "subtitle": "KDFアルゴリズムを使用して、個人情報と強力なパスフレーズからイーサリアム秘密鍵を派生します。秘密鍵を保存せずに確定的に回復可能。",
+    "howItWorks": "💡 仕組み",
+    "description": "PersonHash(名前, 誕生日, 性別, パスフレーズ) → scrypt KDF (N=131072) → 秘密鍵 → イーサリアムアドレス",
+    "note": "同じ入力は常に同じ鍵を生成 | KDFは131,072×のブルートフォース保護を提供",
+    "component": {
+      "title": "安全鍵派生",
+      "description": "KDFアルゴリズムを使用して、個人情報と強力なパスフレーズから安全なイーサリアム秘密鍵を派生します。",
+      "passphraseWarning": "⚠️ 20文字以上の強力なパスフレーズを使用する必要があります！",
+      "fillInfoFirst": "まず個人情報を入力してください",
+      "nameRequired": "名前は空にできません",
+      "success": "✅ 秘密鍵の派生に成功しました",
+      "failed": "❌ 秘密鍵の派生に失敗しました",
+      "passphraseStrength": "パスフレーズ強度：",
+      "kdfStrength": "KDF強度（セキュリティと計算時間に影響）",
+      "presets": {
+        "testing": "テスト",
+        "recommended": "推奨",
+        "strongest": "最強"
+      },
+      "estimatedTime": "推定時間：",
+      "deriving": "派生中... ({{progress}}%)",
+      "deriveButton": "安全な秘密鍵を派生",
+      "derivedSuccess": "秘密鍵の派生に成功しました",
+      "ethereumAddress": "イーサリアムアドレス",
+      "address": "アドレス",
+      "privateKey": "秘密鍵（安全に保管してください！）",
+      "privateKeyLabel": "秘密鍵",
+      "copied": "✅ {{label}}をコピーしました",
+      "copyFailed": "❌ コピーに失敗しました",
+      "securityTips": "⚠️ セキュリティのヒント：",
+      "tip1": "秘密鍵は資産を制御します。誰にも公開しないでください",
+      "tip2": "名前、誕生日、パスフレーズを覚えておけば、いつでも回復できます",
+      "tip3": "情報のわずかな変更でも異なる秘密鍵が生成されます",
+      "tip4": "パスフレーズを安全な場所にバックアップすることをお勧めします",
+      "weakPassphraseTitle": "弱いパスフレーズ警告",
+      "weakPassphraseMessage": "⚠️ パスフレーズの強度が不十分です！",
+      "weakPassphraseContinue": "それでも続行しますか？（推奨されません）",
+      "proceedAnyway": "続行する",
+      "improvePassphrase": "パスフレーズを改善",
+      "bitsSummary": "生エントロピー約 {{raw}} bits · 調整強度スコア約 {{adjusted}}",
+      "recommendations": {
+        "empty": "⚠️ 空のパスフレーズは安全ではありません！名前と誕生日が推測される可能性があるため、20文字以上の強力なパスフレーズを追加することを強く推奨します",
+        "weak": "❌ エントロピーが低すぎます（約 {{entropy}} ビット）。推奨：20文字以上を使用し、文字/数字/記号/絵文字を混在させる",
+        "medium": "⚠️ 中程度の強度（約 {{entropy}} ビット）。推奨：25文字以上に増やすか、より多くの記号を使用する",
+        "strong": "✅ 強力なパスフレーズ（約 {{entropy}} ビット）。鍵派生に適しています",
+        "veryStrong": "🔒 非常に強力なパスフレーズ（約 {{entropy}} ビット）。非常に安全です",
+        "excellent": "🛡️ 生エントロピー：約 {{raw}} bits · 調整強度スコア：約 {{adjusted}}。優れたセキュリティ"
+      },
+      "progress": {
+        "computingPersonHash": "PersonHashを計算中...",
+        "personHashComputed": "PersonHash計算完了",
+        "preparingKDF": "KDFを準備中...",
+        "runningScrypt": "scrypt KDFを実行中 (N={{n}})...",
+        "computingKDF": "KDFを計算中... ({{progress}}%)",
+        "kdfCompleted": "KDF計算完了",
+        "keyDerivationComplete": "鍵派生完了"
+      }
+    }
   }
 }
