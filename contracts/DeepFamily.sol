@@ -172,9 +172,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string content; // Chunk content (limited to reasonable range to control gas costs)
     uint256 timestamp; // Creation timestamp
     address editor; // Editor's address
-    // Content classification: 0=Summary, 1=Early Life, 2=Biography, 3=Achievements, 4=Works, 5=Philosophy,
-    // 6=Quotes, 7=Anecdotes, 8=Family, 9=Lifestyle, 10=Relations, 11=Activities, 12=Positions,
-    // 13=Controversies, 14=Gallery, 15=Legacy, 16=References, 17=Notes
+    // Content classification (19 types total):
+    // 0=Summary, 1=Early Life, 2=Education, 3=Life Events, 4=Career, 5=Works, 6=Achievements,
+    // 7=Philosophy, 8=Quotes, 9=Family, 10=Lifestyle, 11=Relations, 12=Activities,
+    // 13=Anecdotes, 14=Controversies, 15=Legacy, 16=Gallery, 17=References, 18=Notes
     uint8 chunkType;
     string attachmentCID; // Optional external attachment CID (IPFS/Arweave)
   }
@@ -427,7 +428,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param chunkHash Chunk hash
    * @param editor Editor's address
    * @param contentLength Chunk content length
-   * @param chunkType Chunk classification (0=narrative, 1=quote, ...)
+   * @param chunkType Chunk classification (0-18: Summary, Early Life, Education, Life Events, Career, Works, Achievements, Philosophy, Quotes, Family, Lifestyle, Relations, Activities, Anecdotes, Controversies, Legacy, Gallery, References, Notes)
    * @param attachmentCID Optional attachment CID (IPFS/Arweave)
    */
   event StoryChunkAdded(

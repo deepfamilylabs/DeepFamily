@@ -19,7 +19,16 @@ const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, 'deployments', 'localhost');
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, '.env.local');
 const require = createRequire(import.meta.url);
 const { computePoseidonDigest } = require(path.join(PROJECT_ROOT, 'lib', 'namePoseidon.js'));
-const { DEMO_ROOT_PERSON } = require(path.join(PROJECT_ROOT, 'lib', 'constants.js'));
+const {
+  loadMultiLanguageRoots,
+  checkPersonExists
+} = require(path.join(PROJECT_ROOT, 'lib', 'seedHelpers.js'));
+
+const LANGUAGE_LABELS = {
+  en: 'English Root (Kennedy Family)',
+  zh: 'Chinese Root (曹操家族)'
+};
+const LANGUAGE_PRIORITY = ['en', 'zh'];
 
 function prepareBasicInfo(basicInfo) {
   const passphrase = basicInfo.passphrase || '';
@@ -39,6 +48,65 @@ function prepareBasicInfo(basicInfo) {
 async function getPersonHashFromBasicInfo(deepFamily, basicInfo) {
   const prepared = prepareBasicInfo(basicInfo);
   return await deepFamily.getPersonHash(prepared);
+}
+
+function getLanguageLabel(lang, rootData = {}) {
+  if (LANGUAGE_LABELS[lang]) return LANGUAGE_LABELS[lang];
+  if (rootData.familyName) return `${lang.toUpperCase()} Root (${rootData.familyName})`;
+  return `${lang.toUpperCase()} Root`;
+}
+
+function pickDefaultRoot(entries) {
+  const prioritized = (predicate) => {
+    for (const lang of LANGUAGE_PRIORITY) {
+      const hit = entries.find(entry => entry.lang === lang && predicate(entry));
+      if (hit) return hit;
+    }
+    return null;
+  };
+
+  return (
+    prioritized(entry => entry.exists) ||
+    entries.find(entry => entry.exists) ||
+    prioritized(() => true) ||
+    entries[0]
+  );
+}
+
+async function collectMultiLanguageRootHashes(deepFamily) {
+  const roots = loadMultiLanguageRoots();
+  const entries = [];
+
+  for (const [lang, rootData] of Object.entries(roots)) {
+    try {
+      const hash = await getPersonHashFromBasicInfo(deepFamily, rootData);
+      const { exists, totalVersions } = await checkPersonExists({
+        deepFamily,
+        personHash: hash
+      });
+
+      entries.push({
+        lang,
+        hash,
+        label: getLanguageLabel(lang, rootData),
+        exists,
+        totalVersions,
+        versionIndex: '1',
+        personData: rootData
+      });
+    } catch (error) {
+      console.warn(`⚠️  Failed to compute ${lang.toUpperCase()} root hash: ${error.message}`);
+    }
+  }
+
+  if (entries.length === 0) {
+    throw new Error('No multi-language root data found. Ensure data/persons JSON files are present.');
+  }
+
+  return {
+    entries,
+    defaultRoot: pickDefaultRoot(entries)
+  };
 }
 
 async function updateLocalConfig() {
@@ -65,9 +133,25 @@ async function updateLocalConfig() {
     const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
     const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
 
-    // Use standard demo root person from seedHelpers
-    const rootPersonHash = await getPersonHashFromBasicInfo(deepFamily, DEMO_ROOT_PERSON);
-    console.log(`🔑 DemoRoot hash: ${rootPersonHash}`);
+    // Compute latest root hashes for all supported languages
+    const { entries: rootEntries, defaultRoot } = await collectMultiLanguageRootHashes(deepFamily);
+
+    console.log('\n🌐 Multi-language root hashes:');
+    rootEntries.forEach(entry => {
+      console.log(`   [${entry.lang.toUpperCase()}] ${entry.label}`);
+      console.log(`      Hash: ${entry.hash}`);
+      if (entry.exists) {
+        console.log(`      ✓ On-chain (versions: ${entry.totalVersions})`);
+      } else {
+        console.log('      ⚠ Not found on-chain yet. Run `npm run seed:historical` after deploying.');
+      }
+    });
+
+    console.log(`\n⭐ Default frontend root: [${defaultRoot.lang.toUpperCase()}] ${defaultRoot.label}`);
+    console.log(`   Hash: ${defaultRoot.hash}`);
+    if (!defaultRoot.exists) {
+      console.log('   ⚠ Default root not found on-chain yet. Frontend tree will stay empty until seeded.');
+    }
 
     // Read current .env.local or create from template
     let envContent = '';
@@ -96,9 +180,16 @@ async function updateLocalConfig() {
     const updates = {
       'VITE_RPC_URL': 'http://127.0.0.1:8545',
       'VITE_CONTRACT_ADDRESS': contractAddress,
-      'VITE_ROOT_PERSON_HASH': rootPersonHash,
-      'VITE_ROOT_VERSION_INDEX': '1'
+      'VITE_ROOT_PERSON_HASH': defaultRoot.hash,
+      'VITE_ROOT_VERSION_INDEX': defaultRoot.versionIndex
     };
+
+    // Record per-language hashes for quick switching in the frontend
+    for (const entry of rootEntries) {
+      const suffix = entry.lang.toUpperCase();
+      updates[`VITE_ROOT_PERSON_HASH_${suffix}`] = entry.hash;
+      updates[`VITE_ROOT_VERSION_INDEX_${suffix}`] = entry.versionIndex;
+    }
 
     // Apply updates
     let updatedContent = envContent;
@@ -125,7 +216,7 @@ async function updateLocalConfig() {
     console.log('\n📋 Current configuration:');
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Contract: ${contractAddress}`);
-    console.log(`   Root Hash: ${rootPersonHash}`);
+    console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
     
     console.log('\n🚀 You can now start the frontend with: npm run dev');
 

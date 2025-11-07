@@ -15,7 +15,7 @@ export default function TreePage() {
   })
   const [editingConfig, setEditingConfig] = useState(false)
 
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { root, loading: loadingContract, progress, contractMessage, refresh } = useTreeData()
 
   const triggerRefresh = useCallback(() => refresh(), [refresh])
@@ -30,6 +30,7 @@ export default function TreePage() {
         <FamilyTreeConfigForm
           editing={editingConfig}
           setEditing={setEditingConfig}
+          locale={i18n.language}
           contractMessage={contractMessage}
           loading={loadingContract}
           onRefresh={triggerRefresh}

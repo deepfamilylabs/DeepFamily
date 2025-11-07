@@ -1,43 +1,11 @@
 const hre = require("hardhat");
 const path = require("path");
 const fs = require("fs");
-const { DEMO_ROOT_PERSON, computePersonHash, checkPersonExists } = require("../lib/seedHelpers");
-
-// Historical persons preset data
-const HISTORICAL_PERSONS = {
-  "Patrick Joseph Kennedy": {
-    fullName: "Patrick Joseph Kennedy",
-    passphrase: "Kennedy Family-tree",
-    birthYear: 1858,
-    birthMonth: 1,
-    birthDay: 14,
-    gender: 1,
-  },
-  "Joseph Patrick Kennedy Sr": {
-    fullName: "Joseph Patrick Kennedy Sr",
-    passphrase: "Kennedy Family-tree",
-    birthYear: 1888,
-    birthMonth: 9,
-    birthDay: 6,
-    gender: 1,
-  },
-  "John Fitzgerald Kennedy": {
-    fullName: "John Fitzgerald Kennedy",
-    passphrase: "Kennedy Family-tree",
-    birthYear: 1917,
-    birthMonth: 5,
-    birthDay: 29,
-    gender: 1,
-  },
-  "Robert Francis Kennedy": {
-    fullName: "Robert Francis Kennedy",
-    passphrase: "Kennedy Family-tree",
-    birthYear: 1925,
-    birthMonth: 11,
-    birthDay: 20,
-    gender: 1,
-  },
-};
+const {
+  computePersonHash,
+  checkPersonExists,
+  getAllRoots
+} = require("../lib/seedHelpers");
 
 /**
  * Check detailed information for a specific person
@@ -166,45 +134,137 @@ async function main() {
     console.warn(`  Unable to get statistics: ${e.message}`);
   }
 
+  // Load all multi-language roots
+  const allRoots = getAllRoots();
+
   // Display all known root hashes
   console.log("\n" + "=".repeat(70));
-  console.log("Known Root Hashes");
+  console.log("Multi-Language Root Hashes");
   console.log("=".repeat(70));
 
-  console.log("\n📋 Demo Data Root:");
-  const demoRootHash = await computePersonHash({ deepFamily, personData: DEMO_ROOT_PERSON });
-  console.log(`  Name: ${DEMO_ROOT_PERSON.fullName}`);
-  console.log(`  Hash: ${demoRootHash}`);
-
-  console.log("\n📋 Historical Data Roots (Kennedy Family):");
-  for (const [name, personData] of Object.entries(HISTORICAL_PERSONS)) {
+  const rootHashes = {};
+  for (const [langKey, personData] of Object.entries(allRoots)) {
     const hash = await computePersonHash({ deepFamily, personData });
-    console.log(`  ${name}:`);
-    console.log(`    Hash: ${hash}`);
+    rootHashes[langKey] = { hash, personData };
+
+    const langLabel = {
+      en: "🇺🇸 English Root (Kennedy Family)",
+      zh: "🇨🇳 Chinese Root (曹操家族)"
+    }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
+
+    console.log(`\n${langLabel}:`);
+    console.log(`  Name: ${personData.fullName}`);
+    if (personData.familyName) {
+      console.log(`  Family: ${personData.familyName}`);
+    }
+    console.log(`  Passphrase: "${personData.passphrase}"`);
+    console.log(`  Birth: ${personData.birthYear}-${String(personData.birthMonth).padStart(2, '0')}-${String(personData.birthDay).padStart(2, '0')}`);
+    console.log(`  Hash: ${hash}`);
   }
 
-  // Check DemoRoot
-  console.log("\n" + "=".repeat(70));
-  console.log("Check Default Test Person (DemoRoot)");
-  console.log("=".repeat(70));
-
-  // Use standard demo root person from seedHelpers
-  await checkPerson(deepFamily, DEMO_ROOT_PERSON, 1);
-
-  // If environment variables provided, check custom person
+  // Check specific root or all roots
   const customName = process.env.PERSON_NAME;
   const customHash = process.env.PERSON_HASH;
-  const checkHistorical = process.env.CHECK_HISTORICAL === "true";
+  const checkAllRoots = process.env.CHECK_ALL_ROOTS === "true";
+  const checkLang = process.env.CHECK_LANG; // e.g., "en", "zh"
 
-  // Quick check for historical persons
-  if (checkHistorical) {
+  // Default behavior: Quick check all language root hashes
+  if (!customName && !customHash && !checkAllRoots && !checkLang) {
     console.log("\n" + "=".repeat(70));
-    console.log("Check All Historical Persons (Kennedy Family)");
+    console.log("Quick Check: All Multi-Language Root Hash Status (Default)");
     console.log("=".repeat(70));
 
-    for (const [name, personData] of Object.entries(HISTORICAL_PERSONS)) {
-      console.log(`\n--- ${name} ---`);
+    const summary = [];
+    for (const [langKey, { hash, personData }] of Object.entries(rootHashes)) {
+      const langLabel = {
+        en: "🇺🇸 EN",
+        zh: "🇨🇳 ZH"
+      }[langKey] || langKey.toUpperCase();
+
+      const existsResult = await checkPersonExists({
+        deepFamily,
+        personHash: hash,
+        versionIndex: 1,
+      });
+
+      const status = existsResult.exists ? "✓" : "✗";
+      const versions = existsResult.exists ? `(${existsResult.totalVersions}v)` : "";
+
+      summary.push({
+        lang: langLabel,
+        name: personData.fullName,
+        hash: hash,
+        exists: existsResult.exists,
+        versions: existsResult.totalVersions,
+        status: status,
+      });
+
+      console.log(
+        `${status} [${langLabel.padEnd(4)}] ${personData.fullName.padEnd(25)} ${versions}`
+      );
+    }
+
+    // Summary statistics
+    const totalRoots = summary.length;
+    const existingRoots = summary.filter((s) => s.exists).length;
+    const totalVersions = summary.reduce((sum, s) => sum + s.versions, 0);
+
+    console.log("\n" + "─".repeat(70));
+    console.log(`Summary: ${existingRoots}/${totalRoots} roots exist on-chain`);
+    console.log(`Total versions across all roots: ${totalVersions}`);
+    console.log("─".repeat(70));
+
+    // Show detailed hashes table
+    console.log("\nDetailed Hash Reference:");
+    for (const item of summary) {
+      console.log(`\n[${item.lang}] ${item.name}`);
+      console.log(`    Hash: ${item.hash}`);
+      console.log(`    Status: ${item.exists ? `Exists (${item.versions} versions)` : "Not found"}`);
+    }
+
+    // Check NFT minting status for existing roots
+    console.log("\n" + "─".repeat(70));
+    console.log("NFT Minting Status:");
+    console.log("─".repeat(70));
+    for (const item of summary) {
+      if (item.exists) {
+        try {
+          const nftId = await deepFamily.personVersionNFT(item.hash, 1);
+          const isMinted = nftId && Number(nftId) !== 0;
+          const mintStatus = isMinted ? `✓ Minted (TokenID: ${nftId.toString()})` : "○ Not minted";
+          console.log(`[${item.lang}] ${item.name.padEnd(25)} ${mintStatus}`);
+        } catch (e) {
+          console.log(`[${item.lang}] ${item.name.padEnd(25)} ○ Not minted`);
+        }
+      }
+    }
+  } else if (checkAllRoots) {
+    // Detailed check all language roots
+    console.log("\n" + "=".repeat(70));
+    console.log("Detailed Check: All Multi-Language Root Nodes");
+    console.log("=".repeat(70));
+
+    for (const [langKey, { personData }] of Object.entries(rootHashes)) {
+      const langLabel = {
+        en: "🇺🇸 English Root",
+        zh: "🇨🇳 Chinese Root"
+      }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
+
+      console.log(`\n${"─".repeat(70)}`);
+      console.log(`${langLabel}: ${personData.fullName}`);
+      console.log("─".repeat(70));
       await checkPerson(deepFamily, personData, 1);
+    }
+  } else if (checkLang) {
+    // Check specific language root
+    console.log("\n" + "=".repeat(70));
+    console.log(`Check ${checkLang.toUpperCase()} Language Root`);
+    console.log("=".repeat(70));
+
+    if (rootHashes[checkLang]) {
+      await checkPerson(deepFamily, rootHashes[checkLang].personData, 1);
+    } else {
+      console.log(`❌ Language '${checkLang}' not found. Available: ${Object.keys(rootHashes).join(", ")}`);
     }
   } else if (customHash) {
     // Query directly by hash
@@ -261,16 +321,19 @@ async function main() {
   console.log("✨ Check Complete");
   console.log("=".repeat(70));
   console.log("\nUsage:");
-  console.log("  Check all historical persons:");
-  console.log("    CHECK_HISTORICAL=true npm run check:root");
-  console.log("\n  By name:");
-  console.log("    PERSON_NAME='John Doe' PERSON_BIRTH_YEAR=1990 PERSON_GENDER=1 npm run check:root");
+  console.log("  Default - Quick check all root hashes:");
+  console.log("    npm run check:root");
+  console.log("\n  Detailed check all language roots:");
+  console.log("    CHECK_ALL_ROOTS=true npm run check:root");
+  console.log("\n  Check specific language root:");
+  console.log("    CHECK_LANG=en npm run check:root      # English (Kennedy)");
+  console.log("    CHECK_LANG=zh npm run check:root      # Simplified Chinese (曹操)");
+  console.log("\n  By custom name:");
+  console.log(
+    "    PERSON_NAME='John Doe' PERSON_BIRTH_YEAR=1990 PERSON_GENDER=1 npm run check:root",
+  );
   console.log("\n  By hash:");
   console.log("    PERSON_HASH=0x123... npm run check:root");
-  console.log("\n  By historical person name:");
-  console.log("    PERSON_NAME='John Fitzgerald Kennedy' PERSON_PASSPHRASE='Kennedy Family-tree' \\");
-  console.log("    PERSON_BIRTH_YEAR=1917 PERSON_BIRTH_MONTH=5 PERSON_BIRTH_DAY=29 PERSON_GENDER=1 \\");
-  console.log("    npm run check:root");
   console.log("");
 }
 

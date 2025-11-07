@@ -21,9 +21,12 @@ interface Props {
   deduplicateChildren: boolean
   setDeduplicateChildren: (value: boolean) => void
   progress?: { created: number; visited: number; depth: number }
+  locale?: string
 }
 
-export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, deduplicateChildren, setDeduplicateChildren, progress }: Props) {
+const LOCALE_NEED_ZH_ROOT = new Set(['ja', 'ko', 'zh-cn', 'zh-tw'])
+
+export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, deduplicateChildren, setDeduplicateChildren, progress, locale }: Props) {
   const { t } = useTranslation()
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
   const { clearAllCaches } = useTreeData()
@@ -74,11 +77,28 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
     localVersion !== rootVersionIndex
   )
 
+  const getLocalizedDefaultRoot = () => {
+    const activeLocale = (locale || '').toLowerCase()
+    const preferZhRoot = LOCALE_NEED_ZH_ROOT.has(activeLocale)
+    const suffix = preferZhRoot ? 'ZH' : 'EN'
+    const env = (import.meta as any).env as Record<string, string | undefined>
+    const hashKey = `VITE_ROOT_PERSON_HASH_${suffix}`
+    const versionKey = `VITE_ROOT_VERSION_INDEX_${suffix}`
+    const localizedHash = env?.[hashKey]
+    const localizedVersion = Number(env?.[versionKey])
+
+    const safeHash = localizedHash && /^0x[a-fA-F0-9]{64}$/.test(localizedHash) ? localizedHash : defaults.rootHash
+    const safeVersion = Number.isFinite(localizedVersion) && localizedVersion > 0 ? localizedVersion : defaults.rootVersionIndex
+
+    return { hash: safeHash, version: safeVersion }
+  }
+
   const resetToDefaults = () => {
+    const localized = getLocalizedDefaultRoot()
     setLocalRpcUrl(defaults.rpcUrl)
     setLocalContractAddress(defaults.contractAddress)
-    setLocalRootHash(defaults.rootHash)
-    setLocalVersion(defaults.rootVersionIndex)
+    setLocalRootHash(localized.hash)
+    setLocalVersion(localized.version)
   }
 
   const applyConfigChanges = () => {

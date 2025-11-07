@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
+import React, { useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 import type { GraphNode } from '../types/graph'
 import { makeNodeId } from '../types/graph'
 import { useNodeDetail } from '../context/NodeDetailContext'
@@ -16,44 +16,11 @@ import { useVizOptions } from '../context/VizOptionsContext'
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
 
 const BASE_NODE_WIDTH = 112
-const MAX_NODE_WIDTH = 168
 const NODE_HEIGHT = 160
 const GAP_X = 24
 const GAP_Y = 220
 const MARGIN_X = 24
 const MARGIN_Y = 0
-const PADDING_X = 12
-const TITLE_START_Y = 26
-const TITLE_LINE_H = 18
-const DIVIDER_GAP = 10
-const BODY_GAP = 12
-const BODY_LINE_H = 16
-const BODY_LINE_GAP = 4
-const FOOTER_BADGE_H = 16
-const FOOTER_PADDING = 12
-const SMALL_CHAR_W = 7
-const COL_GAP = 10
-const STAR_OUTER_R = 9
-const STAR_INNER_R = 4.5
-const TAG_BADGE_H = 16
-const TAG_GAP = 8
-const GENDER_DOT_R = 4
-const GENDER_DOT_GAP = 4
-
-function buildStarPath(cx: number, cy: number, spikes = 5, outerR = STAR_OUTER_R, innerR = STAR_INNER_R): string {
-  const step = Math.PI / spikes
-  let rot = -Math.PI / 2
-  let path = ''
-  for (let i = 0; i < spikes * 2; i++) {
-    const r = (i % 2 === 0) ? outerR : innerR
-    const x = cx + Math.cos(rot) * r
-    const y = cy + Math.sin(rot) * r
-    path += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`)
-    rot += step
-  }
-  path += ' Z'
-  return path
-}
 
 type PositionedNode = { id: string; data: GraphNode; depth: number; x: number; y: number }
 
@@ -92,12 +59,6 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   const idToPos = useMemo(() => { const m = new Map<string, PositionedNode>(); for (const pn of positioned) m.set(pn.id, pn); return m }, [positioned])
   const { nodesData } = useTreeData()
   const { deduplicateChildren } = useVizOptions()
-  const textRefs = useRef<Record<string, SVGTextElement | null>>({})
-  const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
-  useLayoutEffect(() => { const next: Record<string, number> = {}; for (const id of Object.keys(textRefs.current)) { const el = textRefs.current[id]; if (el?.getComputedTextLength) { const computed = Math.ceil(el.getComputedTextLength()) + 16; next[id] = Math.max(BASE_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, computed)) } } if (Object.keys(next).length) setMeasuredWidths(next) }, [positioned])
-  const wrapNameTwoLines = useCallback((name: string, width: number): string[] => { if (!name) return []; const charW = 8; const pad = 16; const maxPerLine = Math.max(3, Math.floor((width - pad) / charW)); if (name.length <= maxPerLine) return [name]; const first = name.slice(0, maxPerLine); const remain = name.slice(maxPerLine); if (remain.length <= maxPerLine - 1) return [first, remain]; const second = remain.slice(0, Math.max(0, maxPerLine - 1)) + '…'; return [first, second] }, [])
-  const truncateByWidth = useCallback((text: string, maxPx: number, charW = SMALL_CHAR_W) => { if (!text) return ''; const maxChars = Math.max(0, Math.floor(maxPx / charW)); if (text.length <= maxChars) return text; if (maxChars <= 1) return '…'; return text.slice(0, maxChars - 1) + '…' }, [])
-  const truncateNoEllipsisByWidth = useCallback((text: string, maxPx: number, charW = SMALL_CHAR_W) => { if (!text) return ''; const maxChars = Math.max(0, Math.floor(maxPx / charW)); return text.slice(0, maxChars) }, [])
   const [hoverId, setHoverId] = useState<string | null>(null)
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
@@ -105,7 +66,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   const containerRef = useRef<HTMLDivElement | null>(null)
   const responsiveHeight = useFamilyTreeHeight()
 
-  const miniNodes = useMemo(() => positioned.map(pn => ({ id: pn.id, x: pn.x, y: pn.y, w: measuredWidths[pn.id] || BASE_NODE_WIDTH, h: NODE_HEIGHT })), [positioned, measuredWidths])
+  const miniNodes = useMemo(() => positioned.map(pn => ({ id: pn.id, x: pn.x, y: pn.y, w: BASE_NODE_WIDTH, h: NODE_HEIGHT })), [positioned])
   const { miniSvgRef, viewportRef, dims } = useMiniMap({ width: 120, height: 90 }, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
     const box = containerRef.current?.getBoundingClientRect(); if (!box) return
     centerOn(gx, gy, box.width, box.height)
@@ -115,11 +76,11 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
     centerOnNode: (id: string) => {
       const pn = idToPos.get(id)
       if (!pn) return
-      const w = measuredWidths[id] || BASE_NODE_WIDTH
+      const w = BASE_NODE_WIDTH
       const box = containerRef.current?.getBoundingClientRect(); if (!box) return
       centerOn(pn.x + w / 2, pn.y + NODE_HEIGHT / 2, box.width, box.height)
     }
-  }), [idToPos, measuredWidths, centerOn])
+  }), [idToPos, centerOn])
 
   return (
     <div
@@ -143,8 +104,8 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
               const childId = makeNodeId(child.personHash, child.versionIndex)
               const childPos = idToPos.get(childId)
               if (!childPos) return null
-              const w1 = measuredWidths[pn.id] || BASE_NODE_WIDTH
-              const w2 = measuredWidths[childId] || BASE_NODE_WIDTH
+              const w1 = BASE_NODE_WIDTH
+              const w2 = BASE_NODE_WIDTH
               const x1 = pn.x + w1 / 2
               const y1 = pn.y + NODE_HEIGHT
               const x2 = childPos.x + w2 / 2
@@ -156,19 +117,16 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
           </g>
           <g>
             {positioned.map(pn => {
-              const w = measuredWidths[pn.id] || BASE_NODE_WIDTH
+              const w = BASE_NODE_WIDTH
               const nd = nodesData[pn.id]
               const mintedFlag = isMinted(nd)
               const shortHashText = shortHash(pn.data.personHash)
               const nameTextRaw = (mintedFlag && nd?.fullName) ? nd.fullName : shortHashText
-              const nameDisplaySingle = truncateNoEllipsisByWidth(nameTextRaw || '', Math.max(0, w - PADDING_X * 2), 8)
-              const nameLines = nameDisplaySingle ? [nameDisplaySingle] : []
               const endorse = nd?.endorsementCount
               const isSel = pn.id === selectedId
               const isHover = hoverId === pn.id
               const versionText = `v${pn.data.versionIndex}`
-              const tagTextRaw = nd?.tag || ''
-              const tagText = truncateNoEllipsisByWidth(tagTextRaw, Math.max(0, w - PADDING_X * 2))
+              const tagText = nd?.tag || ''
               // In deduplicate mode, show totalVersions badge from contract data
               // In non-deduplicate mode, don't show badge (user can see all versions directly)
               const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
@@ -182,12 +140,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                    className="cursor-pointer"
                 >
                   <title>{pn.data.personHash}</title>
-                  {/* Hidden text for width measurement with maximum width constraint */}
-                  <text ref={el => { textRefs.current[pn.id] = el }} opacity={0} className="font-mono pointer-events-none select-none">
-                    <tspan x={8} y={14}>{(mintedFlag && nd?.fullName) ? nd.fullName : shortHashText}</tspan>
-                  </text>
-
-                  <NodeCard w={w} h={NODE_HEIGHT} minted={mintedFlag} selected={isSel} hover={isHover} versionText={versionText} titleText={nameDisplaySingle} tagText={tagText} gender={nd?.gender} birthPlace={nd?.birthPlace} birthDateText={mintedFlag ? birthDateString(nd) : undefined} shortHashText={shortHashText} endorsementCount={endorse} totalVersions={totalVersions} />
+                  <NodeCard w={w} h={NODE_HEIGHT} minted={mintedFlag} selected={isSel} hover={isHover} versionText={versionText} titleText={nameTextRaw} tagText={tagText} gender={nd?.gender} birthPlace={nd?.birthPlace} birthDateText={mintedFlag ? birthDateString(nd) : undefined} shortHashText={shortHashText} endorsementCount={endorse} totalVersions={totalVersions} />
                 </g>
               )
             })}
