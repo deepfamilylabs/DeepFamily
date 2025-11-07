@@ -119,7 +119,7 @@
         "title": "工作流程",
         "subtitle": "五步式價值發現與共識形成機制",
         "step1": "添加人物版本",
-        "step1Desc": "提交父母雜湊承諾 → 獲得挖礦獎勵",
+        "step1Desc": "提交父母雜湊承諾 → 獲得DEEP代幣獎勵",
         "step2": "用戶背書",
         "step2Desc": "支付 DEEP 背書某一版本",
         "step3": "鑄造版本 NFT",
@@ -895,7 +895,9 @@
     "complete": "完整",
     "proofGenerationNote": "ZK證明生成需要複雜的加密計算，請耐心等待...",
     "personInfo": "人物資訊",
-    "personInfoHint": "明文不上鏈，僅用於本地零知識證明"
+    "personInfoHint": "明文不上鏈，僅用於本地零知識證明",
+    "personInfoPrivacy": "人物資訊僅用於本地生成零知識證明，明文不會上鏈，僅雜湊值永久保存。",
+    "parentInfoNotice": "填寫父母資訊本地生成零知識證明建立家族鏈接（僅雜湊值上鏈），可獲DEEP代幣獎勵。父母資訊需與其實際版本完全一致（含口令）才能成功關聯。"
   },
   "mintNFT": {
     "title": "鑄造 NFT",
@@ -913,8 +915,10 @@
     "specifyVersion": "指定要鑄造的版本",
     "specifyVersionDesc": "請輸入要鑄造為 NFT 的人物雜湊和版本序號。",
     "basicInfo": "基本資訊",
+    "basicInfoMustMatch": "您輸入的基本資訊必須與目標版本資料完全一致。合約將在鑄造前進行鏈上驗證。",
     "publicOnChain": "鏈上公開",
     "supplementalInfo": "補充資訊",
+    "supplementalInfoImmutable": "補充資訊將永久保存在區塊鏈上，提交後無法修改，請審慎填寫。",
     "birthPlace": "出生地",
     "birthPlacePlaceholder": "請輸入出生地",
     "deathPlace": "死亡地",

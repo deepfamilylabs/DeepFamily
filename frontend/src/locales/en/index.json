@@ -119,7 +119,7 @@
         "title": "Workflow",
         "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
-        "step1Desc": "Submit parent hash commitments → earn mining rewards",
+        "step1Desc": "Submit parent hash commitments → receive DEEP token rewards",
         "step2": "User Endorsement",
         "step2Desc": "Pay DEEP tokens to endorse a version",
         "step3": "Mint Version NFT",
@@ -895,7 +895,9 @@
     "complete": "Complete",
     "proofGenerationNote": "ZK proof generation requires complex cryptographic calculations. Please wait...",
     "personInfo": "Person Information",
-    "personInfoHint": "Plain text stays off-chain; used only for local ZK proof"
+    "personInfoHint": "Plain text stays off-chain; used only for local ZK proof",
+    "personInfoPrivacy": "Person information is only used locally to generate zero-knowledge proofs. Plain text will not be stored on-chain, only the hash value is permanently recorded.",
+    "parentInfoNotice": "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection."
   },
   "mintNFT": {
     "title": "Mint NFT",
@@ -913,8 +915,10 @@
     "specifyVersion": "Specify Version to Mint",
     "specifyVersionDesc": "Enter the person hash and version index of the version you want to mint as NFT.",
     "basicInfo": "Basic Information",
+    "basicInfoMustMatch": "The basic information you enter must exactly match the target version data. The contract will verify this on-chain before minting.",
     "publicOnChain": "Public on chain",
     "supplementalInfo": "Supplemental Information",
+    "supplementalInfoImmutable": "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
     "birthPlace": "Birth Place",
     "birthPlacePlaceholder": "Enter birth place",
     "deathPlace": "Death Place",

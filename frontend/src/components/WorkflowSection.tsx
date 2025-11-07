@@ -9,7 +9,7 @@ const WorkflowSection: React.FC = () => {
     {
       number: 1,
       title: t('home.valueSystem.advantages.step1', 'Add Person Version'),
-      description: t('home.valueSystem.advantages.step1Desc', 'If both parents exist → receive mining rewards'),
+      description: t('home.valueSystem.advantages.step1Desc', 'Submit parent hash commitments → receive DEEP token rewards'),
       color: 'from-blue-500 to-blue-600'
     },
     {

@@ -996,7 +996,17 @@ export default function MintNFTModal({
                     {t('mintNFT.publicOnChain', 'Public on chain')}
                   </span>
                 </div>
-                
+
+                {/* Verification Notice */}
+                <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-700/50">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                      {t('mintNFT.basicInfoMustMatch', 'The basic information you enter must exactly match the target version data. The contract will verify this on-chain before minting.')}
+                    </p>
+                  </div>
+                </div>
+
                 <PersonHashCalculator
                   showTitle={false}
                   collapsible={false}
@@ -1033,6 +1043,16 @@ export default function MintNFTModal({
               <span className="text-xs text-gray-600 dark:text-gray-400">
                 {t('mintNFT.publicOnChain', 'Public on chain')}
               </span>
+            </div>
+
+            {/* Immutability Warning */}
+            <div className="p-3 bg-amber-50/50 dark:bg-amber-900/20 rounded-lg border border-amber-200/50 dark:border-amber-700/50">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                  {t('mintNFT.supplementalInfoImmutable', 'Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.')}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-4">

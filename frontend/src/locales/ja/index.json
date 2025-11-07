@@ -119,7 +119,7 @@
         "title": "ワークフロー",
         "subtitle": "五段階の価値発見と合意形成メカニズム",
         "step1": "人物バージョン追加",
-        "step1Desc": "親ハッシュコミットメントを提出 → マイニング報酬を獲得",
+        "step1Desc": "親ハッシュコミットメントを提出 → DEEPトークン報酬を獲得",
         "step2": "ユーザーエンドース",
         "step2Desc": "DEEPを支払って特定バージョンをエンドース",
         "step3": "バージョンNFT鋳造",
@@ -895,7 +895,9 @@
     "complete": "完全",
     "proofGenerationNote": "ZK証明生成には複雑な暗号計算が必要です。しばらくお待ちください...",
     "personInfo": "人物情報",
-    "personInfoHint": "平文はチェーンに載りません。ローカルのZK証明のみに使用"
+    "personInfoHint": "平文はチェーンに載りません。ローカルのZK証明のみに使用",
+    "personInfoPrivacy": "人物情報はローカルでゼロ知識証明を生成するためにのみ使用されます。平文はチェーンに保存されず、ハッシュ値のみが永久記録されます。",
+    "parentInfoNotice": "親情報を入力するとローカルでゼロ知識証明を生成して家族リンクを確立し（ハッシュ値のみがチェーンに記録）、DEEPトークン報酬を獲得できます。親情報は実際のバージョンと完全に一致する必要があります（パスフレーズを含む）。"
   },
   "mintNFT": {
     "title": "NFT鋳造",
@@ -913,8 +915,10 @@
     "specifyVersion": "鋳造するバージョンを指定",
     "specifyVersionDesc": "NFTとして鋳造したい人物ハッシュとバージョンインデックスを入力してください。",
     "basicInfo": "基本情報",
+    "basicInfoMustMatch": "入力する基本情報は対象バージョンのデータと完全に一致する必要があります。コントラクトは鋳造前にオンチェーンで検証します。",
     "publicOnChain": "チェーン上で公開",
     "supplementalInfo": "補足情報",
+    "supplementalInfoImmutable": "補足情報はブロックチェーンに永久保存され、送信後の変更はできません。慎重に入力してください。",
     "birthPlace": "出生地",
     "birthPlacePlaceholder": "出生地を入力してください",
     "deathPlace": "死去地",

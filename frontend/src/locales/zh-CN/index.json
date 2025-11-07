@@ -119,7 +119,7 @@
         "title": "工作流程",
         "subtitle": "五步式价值发现与共识形成机制",
         "step1": "添加人物版本",
-        "step1Desc": "提交父母哈希承诺 → 获得挖矿奖励",
+        "step1Desc": "提交父母哈希承诺 → 获得DEEP代币奖励",
         "step2": "用户背书",
         "step2Desc": "支付 DEEP 背书某一版本",
         "step3": "铸造版本 NFT",
@@ -896,7 +896,9 @@
     "complete": "完整",
     "proofGenerationNote": "ZK证明生成需要复杂的加密计算，请耐心等待...",
     "personInfo": "人物信息",
-    "personInfoHint": "明文不上链，仅用于本地零知识证明"
+    "personInfoHint": "明文不上链，仅用于本地零知识证明",
+    "personInfoPrivacy": "人物信息仅用于本地生成零知识证明，明文不会上链，仅哈希值永久保存。",
+    "parentInfoNotice": "填写父母信息本地生成零知识证明建立家族链接（仅哈希值上链），可获DEEP代币奖励。父母信息需与其实际版本完全一致（含口令）才能成功关联。"
   },
   "mintNFT": {
     "title": "铸造 NFT",
@@ -914,8 +916,10 @@
     "specifyVersion": "指定要铸造的版本",
     "specifyVersionDesc": "请输入要铸造为 NFT 的人物哈希和版本序号。",
     "basicInfo": "基本信息",
+    "basicInfoMustMatch": "您输入的基本信息必须与目标版本数据完全一致。合约将在铸造前进行链上验证。",
     "publicOnChain": "链上公开",
     "supplementalInfo": "补充信息",
+    "supplementalInfoImmutable": "补充信息将永久保存在区块链上，提交后无法修改，请审慎填写。",
     "birthPlace": "出生地",
     "birthPlacePlaceholder": "请输入出生地",
     "deathPlace": "死亡地",
