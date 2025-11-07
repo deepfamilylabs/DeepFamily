@@ -12,36 +12,37 @@
  *   node scripts/test-keygen-demo.js
  */
 
-const { scrypt } = require('scrypt-js');
-const { ethers } = require('ethers');
+const { scrypt } = require("scrypt-js");
+const { ethers } = require("ethers");
 
 // Simulate PersonHash computation (simplified version)
 function computePersonHash(fullName, birthYear, birthMonth, birthDay, gender, passphrase) {
-  const normalizedName = fullName.trim().normalize('NFC');
-  const normalizedPass = passphrase.trim().normalize('NFC');
+  const normalizedName = fullName.trim().normalize("NFC");
+  const normalizedPass = passphrase.trim().normalize("NFC");
 
   // Pack personal information
-  const packedData = (BigInt(birthYear) << 24n) |
-                     (BigInt(birthMonth) << 16n) |
-                     (BigInt(birthDay) << 8n) |
-                     (BigInt(gender) << 1n);
+  const packedData =
+    (BigInt(birthYear) << 24n) |
+    (BigInt(birthMonth) << 16n) |
+    (BigInt(birthDay) << 8n) |
+    (BigInt(gender) << 1n);
 
   // Simplified: directly hash all inputs
   const combined = ethers.concat([
     ethers.toUtf8Bytes(normalizedName),
     ethers.toUtf8Bytes(normalizedPass),
-    ethers.toUtf8Bytes(packedData.toString())
+    ethers.toUtf8Bytes(packedData.toString()),
   ]);
 
   return ethers.keccak256(combined);
 }
 
 // KDF Key Derivation (following documented flow)
-async function deriveKey(personHash, userData, purpose, preset = 'BALANCED') {
+async function deriveKey(personHash, userData, purpose, preset = "BALANCED") {
   const params = {
     FAST: { N: 16384, r: 8, p: 1 },
     BALANCED: { N: 131072, r: 8, p: 1 },
-    STRONG: { N: 262144, r: 8, p: 1 }
+    STRONG: { N: 262144, r: 8, p: 1 },
   }[preset];
 
   // Step 9: Compute passphrase hash (security critical!)
@@ -51,12 +52,12 @@ async function deriveKey(personHash, userData, purpose, preset = 'BALANCED') {
 
   // Step 10: Construct purpose salt (includes passphrase hash)
   const saltComponents = [
-    `DeepFamily-${purpose}-v1`,           // Purpose identifier
-    userData.fullName,                     // Full name
+    `DeepFamily-${purpose}-v1`, // Purpose identifier
+    userData.fullName, // Full name
     `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`, // Birth date
-    userData.gender.toString(),            // Gender
-    passphraseHash                         // 🔒 Passphrase hash (prevents pre-computation)
-  ].join(':');
+    userData.gender.toString(), // Gender
+    passphraseHash, // 🔒 Passphrase hash (prevents pre-computation)
+  ].join(":");
 
   // Step 11: Hash salt
   const saltHash = ethers.keccak256(ethers.toUtf8Bytes(saltComponents));
@@ -69,7 +70,7 @@ async function deriveKey(personHash, userData, purpose, preset = 'BALANCED') {
   const derivedBytes = await scrypt(hashBytes, saltBytes, params.N, params.r, params.p, 32);
   const elapsed = Date.now() - startTime;
 
-  const key = '0x' + Buffer.from(derivedBytes).toString('hex');
+  const key = "0x" + Buffer.from(derivedBytes).toString("hex");
   const wallet = new ethers.Wallet(key);
 
   return { key, address: wallet.address, elapsed };
@@ -77,19 +78,20 @@ async function deriveKey(personHash, userData, purpose, preset = 'BALANCED') {
 
 // Main demo
 async function demo() {
-  console.log('========================================');
-  console.log('  PersonHash Secure Key Derivation Demo');
-  console.log('========================================\n');
+  console.log("========================================");
+  console.log("  PersonHash Secure Key Derivation Demo");
+  console.log("========================================\n");
 
   // Scenario 1: Strong passphrase
-  console.log('【Scenario 1】Strong Passphrase User\n');
+  console.log("【Scenario 1】Strong Passphrase User\n");
   const user1 = {
-    fullName: 'John Smith',
+    fullName: "John Smith",
     birthYear: 1990,
     birthMonth: 5,
     birthDay: 15,
     gender: 1,
-    passphrase: 'Spring dawn unaware🌸Birds sing everywhere🐦Night wind and rain🌧️How many flowers fall🌺'
+    passphrase:
+      "Spring dawn unaware🌸Birds sing everywhere🐦Night wind and rain🌧️How many flowers fall🌺",
   };
 
   console.log(`Full Name: ${user1.fullName}`);
@@ -106,18 +108,18 @@ async function demo() {
     user1.birthMonth,
     user1.birthDay,
     user1.gender,
-    user1.passphrase
+    user1.passphrase,
   );
   console.log(`PersonHash: ${hash1}\n`);
 
-  const result1 = await deriveKey(hash1, user1, 'PrivateKey', 'BALANCED');
+  const result1 = await deriveKey(hash1, user1, "PrivateKey", "BALANCED");
   console.log(`✅ Derived Private Key (BALANCED, N=131072):`);
   console.log(`   Elapsed: ${result1.elapsed}ms`);
   console.log(`   Private Key: ${result1.key}`);
   console.log(`   Address: ${result1.address}\n`);
 
   // Scenario 2: Deterministic verification
-  console.log('【Scenario 2】Deterministic Verification - Same Inputs\n');
+  console.log("【Scenario 2】Deterministic Verification - Same Inputs\n");
 
   const hash2 = computePersonHash(
     user1.fullName,
@@ -125,29 +127,31 @@ async function demo() {
     user1.birthMonth,
     user1.birthDay,
     user1.gender,
-    user1.passphrase
+    user1.passphrase,
   );
-  const result2 = await deriveKey(hash2, user1, 'PrivateKey', 'BALANCED');
+  const result2 = await deriveKey(hash2, user1, "PrivateKey", "BALANCED");
 
   console.log(`Derived Again:`);
   console.log(`   Private Key: ${result2.key}`);
   console.log(`   Address: ${result2.address}`);
-  console.log(`\n✅ Completely Identical: ${result1.key === result2.key && result1.address === result2.address}\n`);
+  console.log(
+    `\n✅ Completely Identical: ${result1.key === result2.key && result1.address === result2.address}\n`,
+  );
 
   // Scenario 3: Avalanche effect
-  console.log('【Scenario 3】Avalanche Effect - Minor Change\n');
+  console.log("【Scenario 3】Avalanche Effect - Minor Change\n");
 
   // Passphrase differs by last character
-  const user1Modified = { ...user1, passphrase: user1.passphrase + '!' };
+  const user1Modified = { ...user1, passphrase: user1.passphrase + "!" };
   const hash3 = computePersonHash(
     user1Modified.fullName,
     user1Modified.birthYear,
     user1Modified.birthMonth,
     user1Modified.birthDay,
     user1Modified.gender,
-    user1Modified.passphrase
+    user1Modified.passphrase,
   );
-  const result3 = await deriveKey(hash3, user1Modified, 'PrivateKey', 'FAST');
+  const result3 = await deriveKey(hash3, user1Modified, "PrivateKey", "FAST");
 
   console.log(`Passphrase Change ("...🌺" → "...🌺!"):`);
   console.log(`   Original Key: ${result1.key.substring(0, 20)}...`);
@@ -155,20 +159,22 @@ async function demo() {
   console.log(`   Completely Different: ${result1.key !== result3.key}\n`);
 
   // Scenario 4: Different KDF strength comparison
-  console.log('【Scenario 4】KDF Strength Comparison\n');
+  console.log("【Scenario 4】KDF Strength Comparison\n");
 
-  const presets = ['FAST', 'BALANCED', 'STRONG'];
+  const presets = ["FAST", "BALANCED", "STRONG"];
   for (const preset of presets) {
-    const result = await deriveKey(hash1, user1, 'PrivateKey', preset);
+    const result = await deriveKey(hash1, user1, "PrivateKey", preset);
     const n = { FAST: 16384, BALANCED: 131072, STRONG: 262144 }[preset];
-    console.log(`${preset.padEnd(9)} (N=${n.toString().padEnd(6)}): ${result.elapsed.toString().padStart(4)}ms → ${result.key.substring(0, 20)}...`);
+    console.log(
+      `${preset.padEnd(9)} (N=${n.toString().padEnd(6)}): ${result.elapsed.toString().padStart(4)}ms → ${result.key.substring(0, 20)}...`,
+    );
   }
 
   // Scenario 5: Actual wallet operations
-  console.log('\n【Scenario 5】Actual Wallet Operations\n');
+  console.log("\n【Scenario 5】Actual Wallet Operations\n");
 
   const wallet = new ethers.Wallet(result1.key);
-  const message = 'DeepFamily - My Family Tree Record 2024';
+  const message = "DeepFamily - My Family Tree Record 2024";
   const signature = await wallet.signMessage(message);
   const recovered = ethers.verifyMessage(message, signature);
 
@@ -177,14 +183,14 @@ async function demo() {
   console.log(`Verification Passed: ${recovered === wallet.address}\n`);
 
   // Summary
-  console.log('========================================');
-  console.log('  Summary');
-  console.log('========================================\n');
-  console.log('✅ Deterministic: Same inputs → Same key');
-  console.log('✅ Security: KDF provides 131,072x brute-force protection');
-  console.log('✅ Avalanche Effect: Any minor change → Completely different key');
-  console.log('✅ Practicality: Can be directly used for Ethereum wallets\n');
-  console.log('⚠️  Important: Strong passphrase (20+ characters) is key to security!\n');
+  console.log("========================================");
+  console.log("  Summary");
+  console.log("========================================\n");
+  console.log("✅ Deterministic: Same inputs → Same key");
+  console.log("✅ Security: KDF provides 131,072x brute-force protection");
+  console.log("✅ Avalanche Effect: Any minor change → Completely different key");
+  console.log("✅ Practicality: Can be directly used for Ethereum wallets\n");
+  console.log("⚠️  Important: Strong passphrase (20+ characters) is key to security!\n");
 }
 
 demo().catch(console.error);

@@ -60,14 +60,15 @@ export default function NodeCard(props: NodeCardProps) {
   const hoverStroke = (!selected && hover) ? 'stroke-blue-500 dark:stroke-blue-400' : ''
   const cardShadow = hover ? 'shadow-lg' : 'shadow-md'
 
-  const title = (titleText || '').slice(0, Math.max(0, Math.floor((w - PADDING_X * 2) / 8)))
-  const tag = (tagText || '').slice(0, Math.max(0, Math.floor((w - PADDING_X * 2) / SMALL_CHAR_W)))
+  const innerWidth = w - PADDING_X * 2
+  const hasTitle = Boolean(titleText)
+  const tag = (tagText || '').trim()
 
   const genderClass = getGenderColor(gender, 'SVG_FILL')
 
   const showTag = Boolean(tag)
 
-  const yTag = TITLE_START_Y + (title ? TITLE_TO_TAG_GAP : 0)
+  const yTag = TITLE_START_Y + (hasTitle ? TITLE_TO_TAG_GAP : 0)
   const textW = (tag || '').length * SMALL_CHAR_W
   const padLeft = 6
   const padRight = 6
@@ -84,7 +85,7 @@ export default function NodeCard(props: NodeCardProps) {
   const renderTag = showTag && tagFits
   const dividerY = renderTag
     ? (yTag + TAG_BADGE_H + TAG_GAP)
-    : (TITLE_START_Y + (title ? 1 : 0) * TITLE_LINE_H)
+    : (TITLE_START_Y + (hasTitle ? 1 : 0) * TITLE_LINE_H)
   const dividerSafeY = Math.min(dividerY, bodyY1 - (BODY_LINE_GAP + 6))
 
   return (
@@ -127,31 +128,65 @@ export default function NodeCard(props: NodeCardProps) {
       <circle cx={9} cy={7} r={GENDER_DOT_R} className={genderClass} />
 
       {/* Title */}
-      {title && (
-        <text className="font-medium">
-          <tspan x={PADDING_X} y={TITLE_START_Y} className={`text-[15px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-900 dark:fill-slate-100'}`}>{title}</tspan>
-        </text>
+      {hasTitle && (
+        <foreignObject
+          x={PADDING_X}
+          y={TITLE_START_Y - TITLE_LINE_H + 4}
+          width={innerWidth}
+          height={TITLE_LINE_H + 4}
+          pointerEvents="none"
+        >
+          <div
+            className={`font-medium text-[15px] leading-[18px] ${minted ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-slate-100'} overflow-hidden text-ellipsis whitespace-nowrap`}
+          >
+            {titleText}
+          </div>
+        </foreignObject>
       )}
 
       {/* TAG badge (hidden if insufficient height) */}
       {renderTag && (
         <>
           <rect x={PADDING_X} y={yTag} width={badgeW} height={TAG_BADGE_H} rx={8} ry={8} className={`${minted ? 'fill-emerald-100 dark:fill-emerald-800/60' : 'fill-slate-100 dark:fill-slate-800/60'}`} />
-          <text className="font-mono"><tspan x={PADDING_X + 6} y={yTag + 12} className={`text-[11px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-700 dark:fill-slate-300'}`}>{tag}</tspan></text>
+          <foreignObject x={PADDING_X} y={yTag} width={badgeW} height={TAG_BADGE_H} pointerEvents="none">
+            <div
+              className={`font-mono text-[11px] leading-[16px] ${minted ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'} overflow-hidden text-ellipsis whitespace-nowrap px-[6px]`}
+            >
+              {tag}
+            </div>
+          </foreignObject>
         </>
       )}
 
       {/* Divider line (if title exists, moves up with height compression, at most below body upper boundary) */}
-      {title && dividerSafeY > TITLE_START_Y + 2 && (
+      {hasTitle && dividerSafeY > TITLE_START_Y + 2 && (
         <line x1={PADDING_X} x2={w - PADDING_X} y1={dividerSafeY} y2={dividerSafeY} className="stroke-slate-200 dark:stroke-slate-700" strokeWidth={1} />
       )}
 
       {/* Additional NFT information */}
       {minted && (birthPlace || birthDateText) && (
-        <text className="font-sans">
-          {birthPlace && (<tspan x={PADDING_X} y={bodyY1} className={`text-[12px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-700 dark:fill-slate-300'}`}>{birthPlace.slice(0, Math.max(0, Math.floor((w - PADDING_X * 2) / SMALL_CHAR_W)))}</tspan>)}
-          {birthDateText && (<tspan x={PADDING_X} y={bodyY2} className={`text-[12px] ${minted ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-600 dark:fill-slate-400'}`}>{birthDateText}</tspan>)}
-        </text>
+        <>
+          {birthPlace && (
+            <foreignObject
+              x={PADDING_X}
+              y={bodyY1 - BODY_LINE_H + 2}
+              width={innerWidth}
+              height={BODY_LINE_H + 2}
+              pointerEvents="none"
+            >
+              <div
+                className={`font-sans text-[12px] leading-[16px] ${minted ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'} overflow-hidden text-ellipsis whitespace-nowrap`}
+              >
+                {birthPlace}
+              </div>
+            </foreignObject>
+          )}
+          {birthDateText && (
+            <text className="font-sans">
+              <tspan x={PADDING_X} y={bodyY2} className={`text-[12px] ${minted ? 'fill-emerald-600 dark:fill-emerald-400' : 'fill-slate-600 dark:fill-slate-400'}`}>{birthDateText}</tspan>
+            </text>
+          )}
+        </>
       )}
 
       {/* Bottom: left short hash + right star endorsement */}
@@ -170,5 +205,3 @@ export default function NodeCard(props: NodeCardProps) {
     </>
   )
 }
-
-
