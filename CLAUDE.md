@@ -60,7 +60,7 @@ The system implements a two-layer value model that balances privacy protection w
 - **Limb-Based Verification**: Efficient on-chain ZK proof validation
 
 ### Economic Incentives
-- **Smart Mining**: Rewards only for complete family data (both parents exist)
+- **Smart Mining**: Rewards mint when parent hash commitments are submitted (encourages structured family data without exposing plaintext)
 - **Community Endorsement**: Pay current mining reward to endorse trusted versions
 - **Fee Distribution**: Majority flows to NFT holders or contributors, with a small protocol share (default 5%, max 20%) for sustainability
 - **Progressive Halving**: Advanced tokenomics with 10 halving cycles

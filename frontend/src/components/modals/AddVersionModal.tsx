@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle } from 'lucide-react'
+import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield } from 'lucide-react'
 import { useWallet } from '../../context/WalletContext'
 import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
 import { useConfig } from '../../context/ConfigContext'
@@ -507,10 +507,21 @@ export default function AddVersionModal({
             <div className="flex-1 p-4 sm:p-6 space-y-6">
           
           {/* Person Being Added - Using PersonHashCalculator */}
-          <div className="space-y-2">
+          <div className="space-y-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {t('addVersion.personInfo', 'Person Information')}
             </h3>
+
+            {/* Privacy Notice */}
+            <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
+                  {t('addVersion.personInfoPrivacy', 'Person information is only used locally to generate zero-knowledge proofs. Plain text will not be stored on-chain, only the hash value is permanently recorded.')}
+                </p>
+              </div>
+            </div>
+
             <PersonHashCalculator
               key={`person-${formResetKey}`}
               showTitle={false}
@@ -557,6 +568,16 @@ export default function AddVersionModal({
 
             {fatherExpanded && (
               <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
+                {/* Parent Info Notice */}
+                <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
+                      {t('addVersion.parentInfoNotice', 'Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.')}
+                    </p>
+                  </div>
+                </div>
+
                 <PersonHashCalculator
                   key={`father-${formResetKey}`}
                   showTitle={false}
@@ -630,6 +651,16 @@ export default function AddVersionModal({
 
             {motherExpanded && (
               <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
+                {/* Parent Info Notice */}
+                <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
+                      {t('addVersion.parentInfoNotice', 'Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.')}
+                    </p>
+                  </div>
+                </div>
+
                 <PersonHashCalculator
                   key={`mother-${formResetKey}`}
                   showTitle={false}
@@ -877,7 +908,7 @@ export default function AddVersionModal({
                     </summary>
                     <div className="px-3 pb-3 space-y-2">
                       <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
-                        {t('addVersion.familyComplete', 'Complete family data bonus - both parents exist in the system')}
+                        {t('addVersion.familyComplete', 'Parent hash commitments submitted - token reward earned')}
                       </p>
                       <DataRow
                         label={t('addVersion.miner', 'Miner')}
