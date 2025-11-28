@@ -50,6 +50,12 @@ struct PersonVersion {
 }
 ```
 
+**Parent update constraints**:
+- Father/mother references can be left empty at creation time and later filled via `updatePersonParents()` once reliable parent records exist on-chain.
+- The function only allows a one-way transition from `bytes32(0)` to a non-zero hash; once either parent field (or its version index) is populated it becomes immutable.
+- Only the original `addedBy` contributor (or the contract owner intervening) can call `updatePersonParents()`, preventing third parties from tampering with lineage links.
+- Each update recomputes the lineage hash; if it collides with an existing version the call reverts, preserving per-branch uniqueness.
+
 #### PersonCoreInfo
 ```solidity
 struct PersonCoreInfo {

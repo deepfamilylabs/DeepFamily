@@ -10,26 +10,14 @@
  * - Multi-language support with batch seeding capability
  *
  * Default Behavior:
- *   By default, seeds both English and Simplified Chinese data (en + zh)
- *   This provides good coverage for the main user base with reasonable cost
+ *   By default, seeds zh-family.json
  *
- * Usage:
- *   # Default: Seed English and Simplified Chinese
+ * Usage (env: HISTORICAL_DATA_FILES, default: zh-family.json):
  *   npm run seed:historical
+ *   HISTORICAL_DATA_FILES=zh-family.json,en-family.json npm run seed:historical
  *
- *   # Specific single language only
- *   HISTORICAL_DATA_FILE=en-family.json npm run seed:historical
- *   HISTORICAL_DATA_FILE=zh-family.json npm run seed:historical
- *
- *   # All languages (en, zh)
- *   SEED_ALL_LANGUAGES=true npm run seed:historical
- *
- *   # Custom language selection
- *   LANGUAGES=en,zh npm run seed:historical
- *
- * Available language codes:
- *   en    - English (Kennedy Family) [Default]
- *   zh    - Simplified Chinese (曹操家族) [Default]
+ * Optional for quick testing:
+ *   HISTORICAL_SEED_LIMIT=5 npm run seed:historical   # only process first N members per file
  */
 
 const hre = require("hardhat");
@@ -41,7 +29,7 @@ const {
   endorseVersion,
   mintPersonNFT,
   computePersonHash,
-  checkPersonExists,
+  getPersonProgress,
 } = require("../lib/seedHelpers");
 
 // ========== Constants Configuration ==========
@@ -51,28 +39,18 @@ const MAX_LONG_TEXT_LENGTH = 256;
 
 // Data file paths
 const DATA_DIR = path.join(__dirname, "..", "data", "persons");
-const DEFAULT_DATA_FILE = "en-family.json";
 
 // Environment variables configuration
-const DATA_FILE = process.env.HISTORICAL_DATA_FILE || null; // null means use default multi-language mode
-const SEED_ALL_LANGUAGES = process.env.SEED_ALL_LANGUAGES === "true";
-// Default to Chinese and English if not specified
-const SELECTED_LANGUAGES = process.env.LANGUAGES
-  ? process.env.LANGUAGES.split(",").map(l => l.trim())
-  : ["zh", "en"]; // Default priority: Simplified Chinese then English
-
-// Multi-language family passphrase mapping
-// Maps familyName to standardized passphrase for consistency with seedHelpers
-const FAMILY_PASSPHRASES = {
-  "Kennedy Family": "Kennedy Family-tree",
-  "曹操家族": "曹操家谱",
-};
-
-// Multi-language data files configuration
-const LANGUAGE_CONFIGS = [
-  { lang: "zh", file: "zh-family.json", name: "Chinese (曹操家族)" },
-  { lang: "en", file: "en-family.json", name: "English (Kennedy Family)" },
-];
+// HISTORICAL_DATA_FILES (comma-separated) controls which files to seed; default to ["zh-family.json"]
+const DATA_FILES = process.env.HISTORICAL_DATA_FILES
+  ? process.env.HISTORICAL_DATA_FILES.split(",").map(f => f.trim()).filter(Boolean)
+  : ["zh-family.json"];
+// HISTORICAL_SEED_LIMIT limits how many members to process per file (for quick testing); <=0 or unset means no limit
+const RAW_SEED_MEMBER_LIMIT = process.env.HISTORICAL_SEED_LIMIT;
+const SEED_MEMBER_LIMIT =
+  RAW_SEED_MEMBER_LIMIT !== undefined && RAW_SEED_MEMBER_LIMIT !== ""
+    ? Number(RAW_SEED_MEMBER_LIMIT)
+    : null;
 
 // ========== Utility Functions ==========
 
@@ -282,58 +260,104 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
   // Load historical person data
   const familyData = loadHistoricalData(dataFile);
+  let members = Array.isArray(familyData.members) ? [...familyData.members] : [];
+  if (
+    Number.isFinite(SEED_MEMBER_LIMIT) &&
+    SEED_MEMBER_LIMIT > 0 &&
+    SEED_MEMBER_LIMIT < members.length
+  ) {
+    console.log(
+      `Limiting members to first ${SEED_MEMBER_LIMIT} (of ${members.length}) for testing`
+    );
+    members = members.slice(0, SEED_MEMBER_LIMIT);
+  } else if (Number.isFinite(SEED_MEMBER_LIMIT) && SEED_MEMBER_LIMIT > 0) {
+    console.log(
+      `Seed limit ${SEED_MEMBER_LIMIT} >= available members (${members.length}), no slicing applied`
+    );
+  } else {
+    console.log("No seed limit applied (processing all members in file)");
+  }
+  const totalMembers = members.length;
 
   // Step 1: Token approval
   console.log("Step 1: Preparing token approval...");
   const deepFamilyAddr = deepFamily.target || deepFamily.address;
   const allowance = await token.allowance(signer.address, deepFamilyAddr);
   if (allowance === 0n) {
+    console.log("  ▶ No allowance found, sending approve transaction...");
     const approveTx = await token.approve(deepFamilyAddr, ethers.MaxUint256);
+    console.log(`  ⧗ Approve tx sent: ${approveTx.hash}`);
     await approveTx.wait();
     console.log("✓ Token approved\n");
   } else {
-    console.log("✓ Token already approved\n");
+    console.log(`✓ Token already approved (allowance: ${allowance.toString()})\n`);
   }
 
   // Step 2: Add historical persons
   console.log(`Step 2: Adding ${familyData.familyName} members...`);
+  const expectedPersons = members.length;
+  const expectedMintable = members.filter(m => m.mintNFT !== false).length;
+  console.log(`Targets — persons: ${expectedPersons}, mintable: ${expectedMintable}`);
+  let expectedChunks = 0; // total JSON chunks for mintable persons
 
   const addedPersons = [];
+  let existingPersons = 0;
+  let newlyAddedPersons = 0;
 
-  for (const personInfo of familyData.members) {
-    console.log(`\nProcessing: ${personInfo.fullName} (Gen ${personInfo.generation})`);
+  for (let idx = 0; idx < members.length; idx++) {
+    const personInfo = members[idx];
+    console.log(
+      `\nProcessing [${idx + 1}/${totalMembers}]: ${personInfo.fullName} (Gen ${personInfo.generation})`
+    );
 
     // Create person data
     const personData = createPersonData(personInfo);
 
     // Add passphrase to personData
-    // Priority: 1) individual passphrase, 2) family mapping, 3) default pattern
-    const familyPassphrase = FAMILY_PASSPHRASES[familyData.familyName];
+    // Priority: 1) individual passphrase, 2) familyData.passphrase, 3) default pattern
+    const familyPassphrase = familyData.passphrase;
     const personDataWithPassphrase = {
       ...personData,
       passphrase: personInfo.passphrase || familyPassphrase || `${familyData.familyName}-tree`,
     };
 
     // Compute personHash
+    console.log("  ▶ Computing personHash locally...");
     const personHash = await computePersonHash({
       deepFamily,
       personData: personDataWithPassphrase,
     });
+    console.log(`  ✓ personHash computed: ${personHash.slice(0, 10)}...`);
 
-    // Check if already exists
-    const exists = await checkPersonExists({ deepFamily, personHash });
+    // Check on-chain progress for resume support
+    console.log(
+      `  ▶ Checking on-chain existence for hash ${personHash.slice(0, 10)}...`
+    );
+    const progress = await getPersonProgress({ deepFamily, personHash });
 
-    if (exists.exists) {
-      console.log(`  ○ Already exists: ${personInfo.fullName} (versions: ${exists.totalVersions})`);
+    if (progress.exists) {
+      console.log(
+        `  ○ Already exists on-chain (versions: ${progress.totalVersions}, tokenId: ${progress.tokenId || 0}) — skip addPersonZK`
+      );
+      console.log(
+        `  ➜ Existence result: exists=true, version=${progress.versionIndex || 1}, tokenId=${progress.tokenId || 0}`
+      );
       const savedPerson = {
         ...personInfo,
         hash: personHash,
-        version: 1, // Use first version
+        version: progress.versionIndex || 1,
         personData: personDataWithPassphrase,
+        tokenId: progress.tokenId || 0,
+        storyMetadata: progress.storyMetadata,
+        owner: progress.owner,
+        isExisting: true,
       };
       addedPersons.push(savedPerson);
+      existingPersons++;
       continue;
     }
+    console.log("  ○ Not found on-chain, will add new version");
+    console.log("  ➜ Existence result: exists=false, version will be 1, tokenId=0");
 
     // Find parent data
     let fatherData = null;
@@ -363,7 +387,9 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     }
 
     // Add person (using ZK proof)
-    await addPersonVersion({
+    console.log("  ▶ Generating ZK proof...");
+    const addStart = Date.now();
+    const addResult = await addPersonVersion({
       deepFamily,
       signer,
       personData: personDataWithPassphrase,
@@ -376,14 +402,28 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         personInfo.metadataCID ||
         `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}/${personInfo.fullName.replace(/ /g, "-")}`,
     });
+    const addElapsed = Date.now() - addStart;
+    const proofMs = addResult?.timing?.proofGeneration ?? null;
+    const txMs = addResult?.timing?.transaction ?? null;
+    const txHash = addResult?.tx?.hash || addResult?.receipt?.hash;
+    console.log(
+      `  ✓ addPersonZK submitted (tx: ${txHash || "unknown"}) — proof ${
+        proofMs !== null ? `${proofMs}ms` : "n/a"
+      }, tx wait ${txMs !== null ? `${txMs}ms` : `${addElapsed}ms total`}`
+    );
 
     const savedPerson = {
       ...personInfo,
       hash: personHash,
       version: 1, // Newly added version index is 1
       personData: personDataWithPassphrase,
+      tokenId: 0,
+      storyMetadata: null,
+      owner: signer.address,
+      isExisting: false,
     };
     addedPersons.push(savedPerson);
+    newlyAddedPersons++;
 
     console.log(`✓ Added ${personInfo.fullName}`);
     console.log(`  Hash: ${personHash.slice(0, 10)}...`);
@@ -391,15 +431,24 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
   }
 
   console.log(`\n✓ Family tree complete: ${addedPersons.length} persons added\n`);
+  console.log(
+    `Step 2 summary — new versions added: ${newlyAddedPersons}, skipped existing: ${existingPersons}`
+  );
 
   // Step 3: Mint NFTs and add Story Chunks
   console.log("Step 3: Minting NFTs and adding story chunks...");
+  console.log(
+    `Targets — persons to process: ${addedPersons.length}, mintable: ${addedPersons.filter(p => p.mintNFT !== false).length}`
+  );
 
   let nftCount = 0;
   let skippedCount = 0;
   let totalChunks = 0;
+  let mintedOnChain = 0; // includes existing + newly minted
+  let onChainChunks = 0; // total chunks observed/assumed on chain (per current signer reads)
 
-  for (const person of addedPersons) {
+  for (let idx = 0; idx < addedPersons.length; idx++) {
+    const person = addedPersons[idx];
     // Check if NFT should be minted (defaults to true for backward compatibility)
     const shouldMintNFT = person.mintNFT !== false;
 
@@ -409,36 +458,76 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       continue;
     }
 
-    console.log(`\nProcessing NFT for: ${person.fullName}`);
+    const versionOrigin = person.isExisting ? "existing version (prior run)" : "newly added";
+    console.log(
+      `\nProcessing NFT for: ${person.fullName} [${idx + 1}/${addedPersons.length}] — ${versionOrigin}`
+    );
 
-    // Endorse
-    console.log("  Endorsing...");
-    await endorseVersion({
-      deepFamily,
-      token,
-      signer,
-      personHash: person.hash,
-      versionIndex: person.version,
-      autoApprove: true,
-    });
+    let tokenId = Number(person.tokenId || 0);
+    let storyMetadata = person.storyMetadata || null;
+    console.log(
+      `  ℹ Version info — hash: ${person.hash.slice(0, 10)}..., version: ${person.version}, tokenId: ${tokenId}`
+    );
 
-    // Mint NFT
-    console.log("  Minting NFT...");
-    const supplementInfo = createSupplementInfo(person);
+    if (tokenId > 0) {
+      console.log(`  ○ NFT already minted, tokenId: ${tokenId}`);
+    } else {
+      // Endorse
+      console.log("  ▶ Endorsing version...");
+      const endorseStart = Date.now();
+      const endorseResult = await endorseVersion({
+        deepFamily,
+        token,
+        signer,
+        personHash: person.hash,
+        versionIndex: person.version,
+        autoApprove: true,
+      });
+      const endorseElapsed = Date.now() - endorseStart;
+      const endorseTxHash = endorseResult?.tx?.hash || endorseResult?.receipt?.hash;
+      console.log(
+        `  ✓ Endorsed (tx: ${endorseTxHash || "unknown"}, ${endorseElapsed}ms)`
+      );
 
-    const mintResult = await mintPersonNFT({
-      deepFamily,
-      signer,
-      personHash: person.hash,
-      versionIndex: person.version,
-      tokenURI: `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}-nft/${person.fullName.replace(/ /g, "-")}`,
-      basicInfo: person.personData,
-      supplementInfo,
-    });
+      // Mint NFT
+      console.log("  ▶ Minting NFT...");
+      const mintStart = Date.now();
+      const supplementInfo = createSupplementInfo(person);
 
-    const tokenId = mintResult.tokenId;
-    console.log(`  ✓ NFT minted, tokenId: ${tokenId}`);
-    nftCount++;
+      const mintResult = await mintPersonNFT({
+        deepFamily,
+        signer,
+        personHash: person.hash,
+        versionIndex: person.version,
+        tokenURI: `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}-nft/${person.fullName.replace(/ /g, "-")}`,
+        basicInfo: person.personData,
+        supplementInfo,
+      });
+
+      tokenId = Number(mintResult.tokenId);
+      const mintElapsed = Date.now() - mintStart;
+      const mintTxHash = mintResult?.tx?.hash || mintResult?.receipt?.hash;
+      console.log(
+        `  ✓ NFT minted, tokenId: ${tokenId}, tx: ${mintTxHash || "unknown"} (${mintElapsed}ms)`
+      );
+      nftCount++;
+
+      try {
+        storyMetadata = await deepFamily.getStoryMetadata(tokenId);
+      } catch (e) {
+        storyMetadata = null;
+      }
+
+      person.tokenId = tokenId;
+      person.owner = signer.address;
+    }
+
+    mintedOnChain += tokenId > 0 ? 1 : 0;
+
+    if (tokenId === 0) {
+      console.log("  ⊘ No tokenId available, skip story chunks");
+      continue;
+    }
 
     // Add Story Chunks - all chunks from JSON data
     // Collect available story data chunks from JSON
@@ -501,42 +590,126 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
     if (availableChunks.length === 0) {
       console.log(`  ⊘ No story data available in JSON, skipping chunks`);
-    } else {
-      console.log(`  Adding ${availableChunks.length} story chunks from JSON data...`);
-
-      for (let i = 0; i < availableChunks.length; i++) {
-        const chunk = availableChunks[i];
-        const content = truncateUtf8Bytes(chunk.content, MAX_CHUNK_CONTENT_LENGTH);
-        const expectedHash = solidityStringHash(content);
-        const attachmentCID = `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}-chunk/${person.fullName.replace(/ /g, "-")}/type${chunk.type}-${chunk.arrayIndex}`;
-
-        const chunkTx = await deepFamily.addStoryChunk(
-          tokenId,
-          i, // Use sequential index as chunk index
-          chunk.type, // Chunk type
-          content,
-          attachmentCID,
-          expectedHash,
-        );
-        await chunkTx.wait();
-        totalChunks++;
-      }
-
-      console.log(`  ✓ Added ${availableChunks.length} story chunks (from real JSON data)`);
+      continue;
     }
+
+    const targetChunkCount = availableChunks.length;
+    console.log(`  ▶ Story data prepared from JSON: ${targetChunkCount} chunk(s)`);
+    expectedChunks += targetChunkCount;
+
+    if (!storyMetadata) {
+      try {
+        storyMetadata = await deepFamily.getStoryMetadata(tokenId);
+      } catch (e) {
+        storyMetadata = { totalChunks: 0, isSealed: false };
+      }
+    }
+
+    const existingChunks = Number(storyMetadata?.totalChunks || 0);
+
+    // Ensure signer owns the NFT before writing chunks (reading metadata is permissionless)
+    let owner = person.owner;
+    if (!owner) {
+      try {
+        owner = await deepFamily.ownerOf(tokenId);
+      } catch (e) {
+        owner = null;
+      }
+    }
+
+    if (owner && owner.toLowerCase() !== signer.address.toLowerCase()) {
+      console.log(
+        `  ⊘ Current signer not holder (${owner}), skip story chunks (JSON: ${targetChunkCount}, on-chain: ${existingChunks})`
+      );
+      onChainChunks += existingChunks;
+      continue;
+    }
+
+    if (storyMetadata?.isSealed) {
+      console.log(
+        `  ⊘ Story sealed on-chain, chunks (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`
+      );
+      onChainChunks += existingChunks;
+      continue;
+    }
+
+    if (existingChunks > availableChunks.length) {
+      console.log(
+        `  ⚠ On-chain chunks (${existingChunks}) exceed JSON chunks (${availableChunks.length}), skip writing`
+      );
+      onChainChunks += existingChunks;
+      continue;
+    }
+
+    const pendingChunks = availableChunks.slice(existingChunks);
+    if (pendingChunks.length === 0) {
+      console.log(
+        `  ○ Story already complete on-chain (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`
+      );
+      onChainChunks += existingChunks;
+      continue;
+    }
+
+    console.log(
+      `  Adding ${pendingChunks.length} story chunk(s) (resume from index ${existingChunks})...`
+    );
+
+    for (let i = 0; i < pendingChunks.length; i++) {
+      const chunk = pendingChunks[i];
+      const content = truncateUtf8Bytes(chunk.content, MAX_CHUNK_CONTENT_LENGTH);
+      const expectedHash = solidityStringHash(content);
+      const attachmentCID = `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}-chunk/${person.fullName.replace(/ /g, "-")}/type${chunk.type}-${chunk.arrayIndex}`;
+      const chunkIndex = existingChunks + i;
+
+      console.log(
+        `    ▶ Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex})...`
+      );
+      const chunkStart = Date.now();
+      const chunkTx = await deepFamily.addStoryChunk(
+        tokenId,
+        chunkIndex, // Continue after on-chain chunks
+        chunk.type,
+        content,
+        attachmentCID,
+        expectedHash,
+      );
+      console.log(`    ⧗ Chunk tx sent: ${chunkTx.hash}`);
+      await chunkTx.wait();
+      const chunkElapsed = Date.now() - chunkStart;
+      console.log(
+        `    ✓ Chunk ${chunkIndex} added (tx: ${chunkTx.hash}, ${chunkElapsed}ms)`
+      );
+      totalChunks++;
+    }
+
+    onChainChunks += existingChunks + pendingChunks.length;
+    console.log(
+      `  ✓ Added ${pendingChunks.length} story chunk(s) (JSON target: ${targetChunkCount}, on-chain now: ${existingChunks + pendingChunks.length})`
+    );
   }
 
   console.log("\n" + "=".repeat(60));
   console.log("Seed Complete!");
   console.log("=".repeat(60));
+  const existingMinted = Math.max(mintedOnChain - nftCount, 0);
+  const existingChunksOnChain = Math.max(onChainChunks - totalChunks, 0);
+  const remainingChunks = expectedChunks - onChainChunks;
   console.log(`Family: ${familyData.familyName}`);
-  console.log(`Total persons added: ${addedPersons.length}`);
-  console.log(`NFTs minted: ${nftCount}`);
-  console.log(`NFTs skipped: ${skippedCount}`);
-  console.log(`Total story chunks: ${totalChunks}`);
-  if (nftCount > 0 && totalChunks > 0) {
-    console.log(`Average chunks per NFT: ${(totalChunks / nftCount).toFixed(1)}`);
+  console.log(`Persons processed (JSON vs on-chain): ${expectedPersons} vs ${addedPersons.length}`);
+  console.log(
+    `NFT status — minted this run: ${nftCount}; skipped by config: ${skippedCount}; on-chain total (seen): ${mintedOnChain} (existing: ${existingMinted})`
+  );
+  console.log(
+    `Story chunks — target (JSON mintable): ${expectedChunks}; on-chain seen: ${onChainChunks} (existing: ${existingChunksOnChain}); added this run: ${totalChunks}`
+  );
+  if (remainingChunks > 0) {
+    console.log(`Remaining JSON chunks not on-chain (estimate): ${remainingChunks}`);
+  } else if (expectedChunks > 0) {
+    console.log(`All JSON chunks are already on-chain.`);
   }
+  console.log(
+    `Mintable persons — expected: ${expectedMintable}; on-chain NFTs (seen): ${mintedOnChain}`
+  );
   console.log("=".repeat(60));
 
   return {
@@ -570,97 +743,62 @@ async function main() {
   console.log(`\nUsing signer: ${signer.address}`);
   console.log("=".repeat(70));
 
-  // Determine seeding mode
-  // Priority: explicit DATA_FILE > SEED_ALL_LANGUAGES > default (en,zh)
-  if (DATA_FILE) {
-    // Single language mode: explicit file specified
-    console.log("\n📄 Single Language Mode");
-    console.log("=".repeat(70));
-    console.log(`Data file: ${DATA_FILE}\n`);
+  // Single mode: explicit file list (comma-separated), default ["zh-family.json"]
+  console.log("\n📄 File List Mode");
+  console.log("=".repeat(70));
+  console.log(`Data files: ${DATA_FILES.join(", ")}\n`);
 
-    await seedSingleLanguage(DATA_FILE, deepFamily, token, signer);
-  } else {
-    // Batch mode: seed selected languages (default: en,zh or all if SEED_ALL_LANGUAGES=true)
-    console.log("\n🌐 Batch Seeding Mode: Multiple Languages");
-    console.log("=".repeat(70));
+  const results = [];
+  for (const file of DATA_FILES) {
+    try {
+      console.log(`\n${"━".repeat(70)}`);
+      console.log(`📂 Starting: ${file}`);
+      console.log("━".repeat(70));
 
-    const languagesToSeed = SEED_ALL_LANGUAGES
-      ? LANGUAGE_CONFIGS  // All languages
-      : LANGUAGE_CONFIGS.filter(cfg => SELECTED_LANGUAGES.includes(cfg.lang)); // Default: en,zh
-
-    if (languagesToSeed.length === 0) {
-      console.error("❌ No valid languages selected!");
-      console.error(`Available languages: ${LANGUAGE_CONFIGS.map(c => c.lang).join(", ")}`);
-      process.exit(1);
+      const result = await seedSingleLanguage(file, deepFamily, token, signer);
+      results.push({ file, success: true, ...result });
+      console.log(`✓ ${file} completed successfully`);
+    } catch (error) {
+      console.error(`\n❌ Failed to seed ${file}:`);
+      console.error(error.message);
+      results.push({ file, success: false, error: error.message });
     }
-
-    console.log(`Languages to seed: ${languagesToSeed.map(c => c.name).join(", ")}`);
-    console.log(`Total: ${languagesToSeed.length} families\n`);
-
-    const results = [];
-
-    for (const config of languagesToSeed) {
-      try {
-        console.log(`\n${"━".repeat(70)}`);
-        console.log(`🌍 Starting: ${config.name} (${config.lang})`);
-        console.log("━".repeat(70));
-
-        const result = await seedSingleLanguage(config.file, deepFamily, token, signer);
-        results.push({
-          lang: config.lang,
-          name: config.name,
-          success: true,
-          ...result,
-        });
-
-        console.log(`✓ ${config.name} completed successfully`);
-      } catch (error) {
-        console.error(`\n❌ Failed to seed ${config.name}:`);
-        console.error(error.message);
-        results.push({
-          lang: config.lang,
-          name: config.name,
-          success: false,
-          error: error.message,
-        });
-      }
-    }
-
-    // Print summary
-    console.log("\n" + "=".repeat(70));
-    console.log("📊 BATCH SEEDING SUMMARY");
-    console.log("=".repeat(70));
-
-    let totalPersons = 0;
-    let totalNFTs = 0;
-    let totalChunks = 0;
-    let successCount = 0;
-
-    for (const result of results) {
-      const status = result.success ? "✓" : "✗";
-      console.log(`\n[${status}] ${result.name} (${result.lang})`);
-
-      if (result.success) {
-        console.log(`    Family: ${result.familyName}`);
-        console.log(`    Persons: ${result.personsAdded}`);
-        console.log(`    NFTs: ${result.nftsMinted}`);
-        console.log(`    Chunks: ${result.storyChunks}`);
-        totalPersons += result.personsAdded;
-        totalNFTs += result.nftsMinted;
-        totalChunks += result.storyChunks;
-        successCount++;
-      } else {
-        console.log(`    Error: ${result.error}`);
-      }
-    }
-
-    console.log("\n" + "─".repeat(70));
-    console.log(`Total Results: ${successCount}/${results.length} families succeeded`);
-    console.log(`Total Persons: ${totalPersons}`);
-    console.log(`Total NFTs: ${totalNFTs}`);
-    console.log(`Total Story Chunks: ${totalChunks}`);
-    console.log("=".repeat(70));
   }
+
+  // Print summary
+  console.log("\n" + "=".repeat(70));
+  console.log("📊 FILE LIST SUMMARY");
+  console.log("=".repeat(70));
+
+  let totalPersons = 0;
+  let totalNFTs = 0;
+  let totalChunks = 0;
+  let successCount = 0;
+
+  for (const result of results) {
+    const status = result.success ? "✓" : "✗";
+    console.log(`\n[${status}] ${result.file}`);
+
+    if (result.success) {
+      console.log(`    Family: ${result.familyName}`);
+      console.log(`    Persons: ${result.personsAdded}`);
+      console.log(`    NFTs: ${result.nftsMinted}`);
+      console.log(`    Chunks: ${result.storyChunks}`);
+      totalPersons += result.personsAdded;
+      totalNFTs += result.nftsMinted;
+      totalChunks += result.storyChunks;
+      successCount++;
+    } else {
+      console.log(`    Error: ${result.error}`);
+    }
+  }
+
+  console.log("\n" + "─".repeat(70));
+  console.log(`Total Results: ${successCount}/${results.length} files succeeded`);
+  console.log(`Total Persons: ${totalPersons}`);
+  console.log(`Total NFTs: ${totalNFTs}`);
+  console.log(`Total Story Chunks: ${totalChunks}`);
+  console.log("=".repeat(70));
 
   console.log("\n✨ Seeding process complete!\n");
 }
