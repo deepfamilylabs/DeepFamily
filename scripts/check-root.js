@@ -1,11 +1,7 @@
 const hre = require("hardhat");
 const path = require("path");
 const fs = require("fs");
-const {
-  computePersonHash,
-  checkPersonExists,
-  getAllRoots
-} = require("../lib/seedHelpers");
+const { computePersonHash, checkPersonExists, getAllRoots } = require("../lib/seedHelpers");
 
 /**
  * Check detailed information for a specific person
@@ -147,10 +143,11 @@ async function main() {
     const hash = await computePersonHash({ deepFamily, personData });
     rootHashes[langKey] = { hash, personData };
 
-    const langLabel = {
-      en: "🇺🇸 English Root (Kennedy Family)",
-      zh: "🇨🇳 Chinese Root (曹操家族)"
-    }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
+    const langLabel =
+      {
+        en: "🇺🇸 English Root (Kennedy Family)",
+        zh: "🇨🇳 Chinese Root (曹操家族)",
+      }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
 
     console.log(`\n${langLabel}:`);
     console.log(`  Name: ${personData.fullName}`);
@@ -158,7 +155,9 @@ async function main() {
       console.log(`  Family: ${personData.familyName}`);
     }
     console.log(`  Passphrase: "${personData.passphrase}"`);
-    console.log(`  Birth: ${personData.birthYear}-${String(personData.birthMonth).padStart(2, '0')}-${String(personData.birthDay).padStart(2, '0')}`);
+    console.log(
+      `  Birth: ${personData.birthYear}-${String(personData.birthMonth).padStart(2, "0")}-${String(personData.birthDay).padStart(2, "0")}`,
+    );
     console.log(`  Hash: ${hash}`);
   }
 
@@ -176,10 +175,11 @@ async function main() {
 
     const summary = [];
     for (const [langKey, { hash, personData }] of Object.entries(rootHashes)) {
-      const langLabel = {
-        en: "🇺🇸 EN",
-        zh: "🇨🇳 ZH"
-      }[langKey] || langKey.toUpperCase();
+      const langLabel =
+        {
+          en: "🇺🇸 EN",
+          zh: "🇨🇳 ZH",
+        }[langKey] || langKey.toUpperCase();
 
       const existsResult = await checkPersonExists({
         deepFamily,
@@ -200,7 +200,7 @@ async function main() {
       });
 
       console.log(
-        `${status} [${langLabel.padEnd(4)}] ${personData.fullName.padEnd(25)} ${versions}`
+        `${status} [${langLabel.padEnd(4)}] ${personData.fullName.padEnd(25)} ${versions}`,
       );
     }
 
@@ -219,7 +219,9 @@ async function main() {
     for (const item of summary) {
       console.log(`\n[${item.lang}] ${item.name}`);
       console.log(`    Hash: ${item.hash}`);
-      console.log(`    Status: ${item.exists ? `Exists (${item.versions} versions)` : "Not found"}`);
+      console.log(
+        `    Status: ${item.exists ? `Exists (${item.versions} versions)` : "Not found"}`,
+      );
     }
 
     // Check NFT minting status for existing roots
@@ -245,10 +247,11 @@ async function main() {
     console.log("=".repeat(70));
 
     for (const [langKey, { personData }] of Object.entries(rootHashes)) {
-      const langLabel = {
-        en: "🇺🇸 English Root",
-        zh: "🇨🇳 Chinese Root"
-      }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
+      const langLabel =
+        {
+          en: "🇺🇸 English Root",
+          zh: "🇨🇳 Chinese Root",
+        }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
 
       console.log(`\n${"─".repeat(70)}`);
       console.log(`${langLabel}: ${personData.fullName}`);
@@ -264,7 +267,9 @@ async function main() {
     if (rootHashes[checkLang]) {
       await checkPerson(deepFamily, rootHashes[checkLang].personData, 1);
     } else {
-      console.log(`❌ Language '${checkLang}' not found. Available: ${Object.keys(rootHashes).join(", ")}`);
+      console.log(
+        `❌ Language '${checkLang}' not found. Available: ${Object.keys(rootHashes).join(", ")}`,
+      );
     }
   } else if (customHash) {
     // Query directly by hash
