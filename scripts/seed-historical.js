@@ -10,14 +10,15 @@
  * - Multi-language support with batch seeding capability
  *
  * Default Behavior:
- *   By default, seeds zh-family.json
+ *   HISTORICAL_DATA_FILES must be provided (comma-separated list of JSON files in data/persons/)
  *
- * Usage (env: HISTORICAL_DATA_FILES, default: zh-family.json):
- *   npm run seed:historical
- *   HISTORICAL_DATA_FILES=zh-family.json,en-family.json npm run seed:historical
+ * Usage (env: HISTORICAL_DATA_FILES is required):
+ *   HISTORICAL_DATA_FILES=en-family.json npm run seed         # runs against localhost
+ *   HISTORICAL_DATA_FILES=en-family.json npm run seed:net --net <network>   # target another network
+ *   HISTORICAL_DATA_FILES=en-family.json,zh-family.json npm run seed   # multiple files
  *
  * Optional for quick testing:
- *   HISTORICAL_SEED_LIMIT=5 npm run seed:historical   # only process first N members per file
+ *   HISTORICAL_SEED_LIMIT=5 npm run seed   # only process first N members per file
  */
 
 const hre = require("hardhat");
@@ -30,6 +31,7 @@ const {
   mintPersonNFT,
   computePersonHash,
   getPersonProgress,
+  normalizePersonData,
 } = require("../lib/seedHelpers");
 
 function decodeEthersError(error, contract) {
@@ -46,11 +48,7 @@ function decodeEthersError(error, contract) {
 
   // Fallback to common fields
   return (
-    error?.errorName ||
-    error?.shortMessage ||
-    error?.reason ||
-    error?.message ||
-    "Unknown error"
+    error?.errorName || error?.shortMessage || error?.reason || error?.message || "Unknown error"
   );
 }
 
@@ -63,12 +61,15 @@ const MAX_LONG_TEXT_LENGTH = 256;
 const DATA_DIR = path.join(__dirname, "..", "data", "persons");
 
 // Environment variables configuration
-// HISTORICAL_DATA_FILES (comma-separated) controls which files to seed; default to ["zh-family.json"]
+// HISTORICAL_DATA_FILES (comma-separated) controls which files to seed; required (no default)
 const DATA_FILES = process.env.HISTORICAL_DATA_FILES
   ? process.env.HISTORICAL_DATA_FILES.split(",")
       .map((f) => f.trim())
       .filter(Boolean)
-  : ["zh-family.json"];
+  : [];
+if (DATA_FILES.length === 0) {
+  throw new Error("HISTORICAL_DATA_FILES is required (comma-separated list, e.g., en-family.json)");
+}
 // HISTORICAL_SEED_LIMIT limits how many members to process per file (for quick testing); <=0 or unset means no limit
 const RAW_SEED_MEMBER_LIMIT = process.env.HISTORICAL_SEED_LIMIT;
 const SEED_MEMBER_LIMIT =
@@ -249,11 +250,21 @@ function validateFamilyData(data) {
 function createPersonData(personInfo) {
   return {
     fullName: personInfo.fullName,
-    birthYear: personInfo.birthYear,
-    birthMonth: personInfo.birthMonth || 1,
-    birthDay: personInfo.birthDay || 1,
-    gender: personInfo.gender,
+    birthYear: personInfo.birthYear ?? 0,
+    birthMonth: personInfo.birthMonth ?? 0,
+    birthDay: personInfo.birthDay ?? 0,
+    isBirthBC: personInfo.isBirthBC || false,
+    gender: personInfo.gender ?? 0,
   };
+}
+
+function createPersonDataWithPassphrase(personInfo, _familyData) {
+  const base = createPersonData(personInfo);
+  // Use only provided passphrases; default to empty when none are supplied
+  return normalizePersonData({
+    ...base,
+    passphrase: personInfo.passphrase || "",
+  });
 }
 
 function createSupplementInfo(personInfo) {
@@ -263,9 +274,9 @@ function createSupplementInfo(personInfo) {
   const storyBrief = personInfo.story || "";
 
   return {
-    deathYear: personInfo.deathYear || 0,
-    deathMonth: personInfo.deathMonth || 0,
-    deathDay: personInfo.deathDay || 0,
+    deathYear: personInfo.deathYear ?? 0,
+    deathMonth: personInfo.deathMonth ?? 0,
+    deathDay: personInfo.deathDay ?? 0,
     birthPlace: personInfo.birthPlace || "",
     deathPlace: personInfo.deathPlace || "",
     story: truncateUtf8Bytes(storyBrief, MAX_LONG_TEXT_LENGTH),
@@ -303,6 +314,23 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
   }
   const totalMembers = members.length;
 
+  // Pre-compute root hashes (members without parents)
+  const rootHashes = [];
+  const rootMembers = Array.isArray(familyData.members)
+    ? familyData.members.filter((m) => !m.fatherName && !m.motherName)
+    : [];
+  for (const rootInfo of rootMembers) {
+    try {
+      const rootPersonData = createPersonDataWithPassphrase(rootInfo, familyData);
+      const rootHash = await computePersonHash({ deepFamily, personData: rootPersonData });
+      rootHashes.push({ name: rootInfo.fullName, hash: rootHash });
+    } catch (error) {
+      console.warn(
+        `⚠ Failed to compute root hash for ${rootInfo.fullName}: ${error?.message || "unknown error"}`,
+      );
+    }
+  }
+
   // Step 1: Token approval
   console.log("Step 1: Preparing token approval...");
   const deepFamilyAddr = deepFamily.target || deepFamily.address;
@@ -335,15 +363,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     );
 
     // Create person data
-    const personData = createPersonData(personInfo);
-
-    // Add passphrase to personData
-    // Priority: 1) individual passphrase, 2) familyData.passphrase, 3) default pattern
-    const familyPassphrase = familyData.passphrase;
-    const personDataWithPassphrase = {
-      ...personData,
-      passphrase: personInfo.passphrase || familyPassphrase || `${familyData.familyName}-tree`,
-    };
+    const personDataWithPassphrase = createPersonDataWithPassphrase(personInfo, familyData);
 
     // Compute personHash
     console.log("  ▶ Computing personHash locally...");
@@ -420,10 +440,8 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       motherData,
       fatherVersion,
       motherVersion,
-      tag: personInfo.tag || `gen${personInfo.generation}`,
-      ipfs:
-        personInfo.metadataCID ||
-        `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}/${personInfo.fullName.replace(/ /g, "-")}`,
+      tag: personInfo.tag || "",
+      ipfs: personInfo.metadataCID || "",
     });
     const addElapsed = Date.now() - addStart;
     const proofMs = addResult?.timing?.proofGeneration ?? null;
@@ -441,6 +459,33 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         txBlock ? `, block ${txBlock}` : ""
       }`,
     );
+    let rewardAmount = null;
+    try {
+      const rewardIface = new ethers.Interface([
+        "event TokenRewardDistributed(address indexed miner, bytes32 indexed personHash, uint256 indexed versionIndex, uint256 reward)",
+      ]);
+      const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase();
+      for (const log of addResult?.receipt?.logs || []) {
+        if ((log.address || "").toLowerCase() !== deepAddr) continue;
+        try {
+          const parsed = rewardIface.parseLog(log);
+          if (parsed && parsed.name === "TokenRewardDistributed") {
+            rewardAmount = parsed.args.reward;
+            break;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    if (rewardAmount !== null) {
+      const formattedReward = ethers.formatUnits(rewardAmount, 18);
+      console.log(
+        `  ✓ Token reward received: ${formattedReward} DEEP (${rewardAmount.toString()} wei)`,
+      );
+    } else {
+      console.log(
+        "  ○ No TokenRewardDistributed event found (reward may be zero or parents missing)",
+      );
+    }
 
     const savedPerson = {
       ...personInfo,
@@ -540,7 +585,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
           signer,
           personHash: person.hash,
           versionIndex: person.version,
-          tokenURI: `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}-nft/${person.fullName.replace(/ /g, "-")}`,
+          tokenURI: person.tokenURI || "",
           basicInfo: person.personData,
           supplementInfo,
         });
@@ -706,7 +751,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       const chunk = pendingChunks[i];
       const content = truncateUtf8Bytes(chunk.content, MAX_CHUNK_CONTENT_LENGTH);
       const expectedHash = solidityStringHash(content);
-      const attachmentCID = `ipfs://${familyData.familyName.toLowerCase().replace(/ /g, "-")}-chunk/${person.fullName.replace(/ /g, "-")}/type${chunk.type}-${chunk.arrayIndex}`;
+      const attachmentCID = "";
       const chunkIndex = existingChunks + i;
 
       console.log(
@@ -722,9 +767,30 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         expectedHash,
       );
       console.log(`    ⧗ Chunk tx sent: ${chunkTx.hash}`);
-      await chunkTx.wait();
+      const chunkReceipt = await chunkTx.wait();
       const chunkElapsed = Date.now() - chunkStart;
-      console.log(`    ✓ Chunk ${chunkIndex} added (tx: ${chunkTx.hash}, ${chunkElapsed}ms)`);
+      let emittedHash = expectedHash;
+      try {
+        const chunkEventIface = new ethers.Interface([
+          "event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID)",
+        ]);
+        const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase();
+        for (const log of chunkReceipt?.logs || []) {
+          if ((log.address || "").toLowerCase() !== deepAddr) continue;
+          try {
+            const parsed = chunkEventIface.parseLog(log);
+            if (
+              parsed &&
+              parsed.name === "StoryChunkAdded" &&
+              parsed.args.chunkIndex == chunkIndex
+            ) {
+              emittedHash = parsed.args.chunkHash;
+              break;
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+      console.log(`    ✓ Chunk ${chunkIndex} added (${chunkElapsed}ms) — hash: ${emittedHash}`);
       totalChunks++;
     }
 
@@ -758,12 +824,22 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
   );
   console.log("=".repeat(60));
 
+  if (rootHashes.length > 0) {
+    console.log("\nRoot hash summary:");
+    rootHashes.forEach((entry) => {
+      console.log(`  ${entry.name}: ${entry.hash}`);
+    });
+  } else {
+    console.log("\nRoot hash summary: no parentless members detected, nothing to report");
+  }
+
   return {
     familyName: familyData.familyName,
     personsAdded: addedPersons.length,
     nftsMinted: nftCount,
     nftsSkipped: skippedCount,
     storyChunks: totalChunks,
+    rootHashes,
   };
 }
 
@@ -791,7 +867,7 @@ async function main() {
   console.log(`DeepFamilyToken contract: ${tokenAddr}`);
   console.log("=".repeat(70));
 
-  // Single mode: explicit file list (comma-separated), default ["zh-family.json"]
+  // Single mode: explicit file list (comma-separated)
   console.log("\n📄 File List Mode");
   console.log("=".repeat(70));
   console.log(`Data files: ${DATA_FILES.join(", ")}\n`);
@@ -847,6 +923,30 @@ async function main() {
   console.log(`Total NFTs: ${totalNFTs}`);
   console.log(`Total Story Chunks: ${totalChunks}`);
   console.log("=".repeat(70));
+
+  console.log("\nContract addresses:");
+  console.log(`  DeepFamily: ${deepFamilyAddr}`);
+  console.log(`  DeepFamilyToken: ${tokenAddr}`);
+
+  console.log("\nRoot hashes (per file):");
+  if (results.length === 0) {
+    console.log("  No files processed");
+  } else {
+    for (const result of results) {
+      if (!result.success) {
+        console.log(`  ${result.file}: failed, no root hash`);
+        continue;
+      }
+      if (result.rootHashes && result.rootHashes.length > 0) {
+        console.log(`  ${result.file}:`);
+        result.rootHashes.forEach((entry) => {
+          console.log(`    ${entry.name}: ${entry.hash}`);
+        });
+      } else {
+        console.log(`  ${result.file}: no parentless members detected`);
+      }
+    }
+  }
 
   console.log("\n✨ Seeding process complete!\n");
 }
