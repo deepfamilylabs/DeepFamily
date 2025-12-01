@@ -143,7 +143,7 @@ async function updateLocalConfig() {
       if (entry.exists) {
         console.log(`      ✓ On-chain (versions: ${entry.totalVersions})`);
       } else {
-        console.log('      ⚠ Not found on-chain yet. Run `npm run seed:historical` after deploying.');
+        console.log('      ⚠ Not found on-chain yet. Run `npm run seed` after deploying.');
       }
     });
 
