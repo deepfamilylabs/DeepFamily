@@ -190,8 +190,8 @@ describe('Person Version (add-person) Tests', function () {
 
     const [versions, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 100);
     expect(totalVersions).to.equal(2n);
-    expect(versions[0].tag).to.equal('v1');
-    expect(versions[1].tag).to.equal('v2');
+    expect(versions[0].tagHash).to.equal(hre.ethers.keccak256(hre.ethers.toUtf8Bytes('v1')));
+    expect(versions[1].tagHash).to.equal(hre.ethers.keccak256(hre.ethers.toUtf8Bytes('v2')));
   });
 
   describe('updatePersonParents', () => {
@@ -607,7 +607,7 @@ describe('Person Version (add-person) Tests', function () {
           publicSignals,
           0,
           0,
-          'vCaller',
+          hre.ethers.keccak256(hre.ethers.toUtf8Bytes('vCaller')),
           'ipfs://caller-mismatch',
         ),
     ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch');

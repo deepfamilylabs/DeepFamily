@@ -58,7 +58,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error InvalidMotherVersionIndex();
   error InvalidVersionIndex();
   error InvalidFullName();
-  error InvalidTagLength();
   error InvalidCIDLength();
   error InvalidBirthPlace();
   error InvalidDeathPlace();
@@ -129,7 +128,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 motherVersionIndex; // Mother's version index (0 means unspecified)
     address addedBy; // Address of the person who added this - packed with timestamp in slot 3's first 20 bytes
     uint96 timestamp; // Addition timestamp - packed with addedBy in slot 3's last 12 bytes, sufficient until 2^96 seconds later
-    string tag; // Version tag - dynamic storage
+    bytes32 tagHash; // Version tag commitment (keccak256 of tag string, bytes32(0) means no tag)
     string metadataCID; // IPFS CID - dynamic storage
   }
 
@@ -292,8 +291,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param fatherVersionIndex Father's version index (0 means unspecified)
    * @param motherHash Mother's hash (keccak256 of Poseidon commitment)
    * @param motherVersionIndex Mother's version index (0 means unspecified)
-   * @param tag Version tag
-   */
+   * @param tagHash Version tag commitment (hash of tag string)
+  */
   event PersonVersionAdded(
     bytes32 indexed personHash,
     uint256 indexed versionIndex,
@@ -303,7 +302,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 fatherVersionIndex,
     bytes32 motherHash,
     uint256 motherVersionIndex,
-    string tag
+    bytes32 tagHash
   );
 
   /**
@@ -639,7 +638,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param motherHash Mother's hash
    * @param fatherVersionIndex Father's version index (0 means unspecified)
    * @param motherVersionIndex Mother's version index (0 means unspecified)
-   * @param tag Version tag
+   * @param tagHash Version tag commitment (hash of tag string)
    * @param metadataCID Metadata CID (IPFS Content Identifier)
    */
   function _addPersonInternal(
@@ -648,7 +647,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     bytes32 motherHash,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
+    bytes32 tagHash,
     string calldata metadataCID
   ) internal {
     if (personHash == bytes32(0)) revert InvalidPersonHash();
@@ -658,7 +657,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (motherHash == bytes32(0) && motherVersionIndex != 0) revert InvalidMotherVersionIndex();
     if (fatherVersionIndex > personVersions[fatherHash].length) revert InvalidFatherVersionIndex();
     if (motherVersionIndex > personVersions[motherHash].length) revert InvalidMotherVersionIndex();
-    if (bytes(tag).length > MAX_LONG_TEXT_LENGTH) revert InvalidTagLength();
     if (bytes(metadataCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
     bytes32 versionHash = keccak256(
       abi.encode(
@@ -667,7 +665,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         motherHash,
         fatherVersionIndex,
         motherVersionIndex,
-        tag,
+        tagHash,
         metadataCID
       )
     );
@@ -681,7 +679,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         versionIndex: 0,
         fatherVersionIndex: fatherVersionIndex,
         motherVersionIndex: motherVersionIndex,
-        tag: tag,
+        tagHash: tagHash,
         metadataCID: metadataCID,
         addedBy: msg.sender,
         timestamp: uint96(block.timestamp)
@@ -711,7 +709,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       fatherVersionIndex,
       motherHash,
       motherVersionIndex,
-      tag
+      tagHash
     );
     if (fatherHash != bytes32(0) && motherHash != bytes32(0)) {
       uint256 reward = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).mint(msg.sender);
@@ -745,7 +743,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         version.motherHash,
         version.fatherVersionIndex,
         version.motherVersionIndex,
-        version.tag,
+        version.tagHash,
         version.metadataCID
       )
     );
@@ -797,7 +795,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         version.motherHash,
         version.fatherVersionIndex,
         version.motherVersionIndex,
-        version.tag,
+        version.tagHash,
         version.metadataCID
       )
     );
@@ -826,6 +824,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * 2..3 => fatherHash limbs (hi -> lo)
    * 4..5 => motherHash limbs (hi -> lo)
    * 6    => submitter address (uint160 in lower 160 bits)
+   * @param tagHash keccak256 of the tag string to avoid on-chain plaintext (bytes32(0) allowed for no tag)
    */
   function addPersonZK(
     uint256[2] calldata a,
@@ -834,7 +833,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256[7] calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
+    bytes32 tagHash,
     string calldata metadataCID
   ) external nonReentrant {
     if (publicSignals[6] != uint256(uint160(msg.sender))) revert CallerMismatch();
@@ -861,7 +860,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       motherHash_,
       fatherVersionIndex,
       motherVersionIndex,
-      tag,
+      tagHash,
       metadataCID
     );
   }

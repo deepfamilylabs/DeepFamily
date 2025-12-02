@@ -8,6 +8,7 @@ import PersonStoryCard from '../components/PersonStoryCard'
 import StoryChunksModal from '../components/StoryChunksModal'
 import PageContainer from '../components/PageContainer'
 import SortButton from '../components/SortButton'
+import { ethers } from 'ethers'
 
 type FilterType = 'all' | 'by_create_time' | 'by_name' | 'by_endorsement' | 'by_birth_year'
 type SortOrder = 'asc' | 'desc'
@@ -199,8 +200,7 @@ export default function PeoplePage() {
         person.birthPlace?.toLowerCase().includes(term) ||
         person.deathPlace?.toLowerCase().includes(term) ||
         person.story?.toLowerCase().includes(term) ||
-        person.addedBy?.toLowerCase().includes(term) ||
-        person.tag?.toLowerCase().includes(term)
+        person.addedBy?.toLowerCase().includes(term)
       )
     }
 
@@ -213,11 +213,14 @@ export default function PeoplePage() {
       )
     }
 
-    // Tag filter - match if person's tag is in selected tags
+    // Tag filter - match if person's tagHash matches any selected tag (converted to hash)
     if (selectedTags.length > 0) {
+      const selectedTagHashes = selectedTags.map(tag => 
+        tag ? ethers.keccak256(ethers.toUtf8Bytes(tag)) : ethers.ZeroHash
+      )
       filtered = filtered.filter(person => 
-        selectedTags.some(tag => 
-          person.tag?.toLowerCase().includes(tag.toLowerCase())
+        person.tagHash && selectedTagHashes.some(tagHash => 
+          person.tagHash?.toLowerCase() === tagHash.toLowerCase()
         )
       )
     }

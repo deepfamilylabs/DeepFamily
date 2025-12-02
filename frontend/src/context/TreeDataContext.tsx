@@ -351,7 +351,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                 personHash: n.personHash,
                 versionIndex: Number(n.versionIndex),
                 id,
-                tag: n.tag,
+                tagHash: n.tagHash,
                 ...(cachedTotalVersions !== undefined && { totalVersions: cachedTotalVersions })
               }
               return { ...prev, [id]: newNode }
@@ -565,7 +565,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                   const addedBy = vs.addedBy || vs[6]
                   const timestampRaw = vs.timestamp !== undefined ? vs.timestamp : vs[7]
                   const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
-                  const tag = vs.tag || vs[8] || prev[id]?.tag
+                  const tagHash = vs.tagHash || vs[8] || prev[id]?.tagHash
                   const metadataCID = vs.metadataCID || vs[9]
                   return {
                     ...prev,
@@ -579,7 +579,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                       motherVersionIndex,
                       addedBy,
                       timestamp,
-                      tag,
+                      tagHash,
                       metadataCID
                     }
                   }
@@ -607,7 +607,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
               const addedBy = vs2.addedBy || vs2[6]
               const timestampRaw = vs2.timestamp !== undefined ? vs2.timestamp : vs2[7]
               const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
-              const tag = vs2.tag || vs2[8]
+              const tagHash = vs2.tagHash || vs2[8]
               const metadataCID = vs2.metadataCID || vs2[9]
               const fullName = coreInfo?.supplementInfo?.fullName
               const gender = coreInfo?.basicInfo?.gender !== undefined ? Number(coreInfo.basicInfo.gender) : undefined
@@ -659,7 +659,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                     motherVersionIndex: motherVersionIndex ?? cur.motherVersionIndex,
                     addedBy: addedBy ?? cur.addedBy,
                     timestamp: timestamp ?? cur.timestamp,
-                    tag: (tag || cur.tag),
+                    tagHash: (tagHash || cur.tagHash),
                     metadataCID: metadataCID ?? cur.metadataCID,
                     endorsementCount: endorsementCount2 ?? cur.endorsementCount,
                     tokenId: item.tokenId,
@@ -734,7 +734,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       const addedBy = vs.addedBy || vs[6]
       const timestampRaw = vs.timestamp !== undefined ? vs.timestamp : vs[7]
       const timestamp = timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined
-      const tag = vs.tag || vs[8]
+      const tagHash = vs.tagHash || vs[8]
       const metadataCID = vs.metadataCID || vs[9]
 
       const fullName = coreInfo?.supplementInfo?.fullName
@@ -764,7 +764,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         motherVersionIndex,
         addedBy,
         timestamp,
-        tag,
+        tagHash,
         metadataCID,
         owner: undefined,
         fullName,

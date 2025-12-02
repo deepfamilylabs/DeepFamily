@@ -9,7 +9,7 @@
 
 | Constant | Value | Purpose & Impact |
 |----------|-------|------------------|
-| `MAX_LONG_TEXT_LENGTH` | 256 | Max length for tags, IPFS CIDs, names, places, stories |
+| `MAX_LONG_TEXT_LENGTH` | 256 | Max length for  IPFS CIDs, names, places, stories |
 | `MAX_QUERY_PAGE_SIZE` | 100 | Gas-optimized pagination limit for all query functions |
 | `MAX_CHUNK_CONTENT_LENGTH` | 2048 | Story chunk size limit (≈2KB per shard) |
 | `MAX_STORY_CHUNKS` | — | No protocol cap; chunks append sequentially |
@@ -45,7 +45,7 @@ struct PersonVersion {
     uint256 motherVersionIndex;  // Mother's version reference (0=unspecified)
     address addedBy;             // Contributor address (packed with timestamp)
     uint96 timestamp;            // Addition timestamp (packed with addedBy)
-    string tag;                  // Version tag/description
+    bytes32 tagHash;            // keccak256 of tag string (plaintext)
     string metadataCID;          // IPFS metadata CID
 }
 ```
@@ -133,10 +133,12 @@ function addPersonZK(
     uint256[7] calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
+    bytes32 tagHash,
     string calldata metadataCID
 ) external
 ```
+
+> `tagHash` should be computed (e.g. `keccak256(bytes(tagString))`) so the plaintext tag never appears on-chain; use `bytes32(0)` to omit a tag.
 
 **Verification Process**:
 1. Validates `publicSignals[6] == uint256(uint160(msg.sender))`
@@ -243,7 +245,7 @@ function listStoryChunks(uint256 tokenId, uint256 offset, uint256 limit) externa
 
 #### Core Events
 ```solidity
-event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, string tag);
+event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, bytes32 tagHash);
 
 event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, uint256 endorsementFee, uint256 timestamp);
 

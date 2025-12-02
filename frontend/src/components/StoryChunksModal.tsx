@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ethers } from 'ethers'
 import {
   X,
   User,
@@ -528,7 +529,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
               )}
 
               {/* Blockchain Identity Section */}
-              {(person.personHash || isMinted(person) || person.tag || person.nftTokenURI) && (
+              {(person.personHash || isMinted(person) || (person.tagHash && person.tagHash !== ethers.ZeroHash) || person.nftTokenURI) && (
                 <div className="space-y-3">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 px-1">
                     <Hash className="w-4.5 h-4.5 text-purple-600" />
@@ -592,21 +593,21 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                       </div>
                     )}
 
-                    {person.tag && (
+                    {person.tagHash && person.tagHash !== ethers.ZeroHash && (
                       <div className="flex items-center gap-3 p-3.5 bg-emerald-50/60 dark:bg-emerald-900/10 rounded-xl border border-emerald-200/60 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700/50 transition-colors">
                         <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
                           <Hash className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-1.5">
-                            {t('storyChunksModal.tag', 'Tag')}
+                            {t('storyChunksModal.tagHash', 'Tag Hash')}
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full font-medium">
-                              {person.tag}
+                            <div className="text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full font-mono">
+                              {formatHashMiddle(person.tagHash!)}
                             </div>
                             <button
-                              onClick={() => copyText(person.tag!)}
+                              onClick={() => copyText(person.tagHash!)}
                               className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors flex-shrink-0"
                               title={t('common.copy', 'Copy')}
                             >

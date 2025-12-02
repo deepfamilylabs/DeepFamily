@@ -65,9 +65,9 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
           const addedBy = versionStruct.addedBy || versionStruct[6]
           const timestampRaw = versionStruct.timestamp !== undefined ? versionStruct.timestamp : versionStruct[7]
           const timestamp = Number(timestampRaw)
-          const tag = versionStruct.tag || versionStruct[8]
+          const tagHash = versionStruct.tagHash || versionStruct[8]
           const metadataCID = versionStruct.metadataCID || versionStruct[9]
-          if (!cancelled) setNodesData((prev: any) => prev[id] ? ({ ...prev, [id]: { ...prev[id], fatherHash, motherHash, fatherVersionIndex, motherVersionIndex, addedBy, timestamp, tag: tag || prev[id].tag, metadataCID, endorsementCount: Number(endorsementCountBN), tokenId } }) : prev)
+          if (!cancelled) setNodesData((prev: any) => prev[id] ? ({ ...prev, [id]: { ...prev[id], fatherHash, motherHash, fatherVersionIndex, motherVersionIndex, addedBy, timestamp, tagHash: tagHash || prev[id].tagHash, metadataCID, endorsementCount: Number(endorsementCountBN), tokenId } }) : prev)
         }
         const ndAfter = () => (nodesData?.[id])
         await Promise.resolve()
@@ -87,7 +87,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
           const addedBy = versionStruct2.addedBy || versionStruct2[6]
           const timestampRaw = versionStruct2.timestamp !== undefined ? versionStruct2.timestamp : versionStruct2[7]
           const timestamp = Number(timestampRaw)
-          const tag = versionStruct2.tag || versionStruct2[8]
+          const tagHash = versionStruct2.tagHash || versionStruct2[8]
           const metadataCID = versionStruct2.metadataCID || versionStruct2[9]
           const fullName = coreInfo.supplementInfo.fullName
           const gender = Number(coreInfo.basicInfo.gender)
@@ -138,7 +138,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
             ...prev,
             [id]: {
               ...prev[id],
-              fatherHash, motherHash, fatherVersionIndex, motherVersionIndex, addedBy, timestamp, tag: tag || prev[id].tag, metadataCID,
+              fatherHash, motherHash, fatherVersionIndex, motherVersionIndex, addedBy, timestamp, tagHash: tagHash || prev[id].tagHash, metadataCID,
               endorsementCount: Number(endorsementCountBN2), tokenId: effectiveTokenId,
               fullName, gender, birthYear, birthMonth, birthDay, birthPlace, isBirthBC, deathYear, deathMonth, deathDay, deathPlace, isDeathBC, story, nftTokenURI,
               storyMetadata, storyChunks

@@ -2,7 +2,7 @@
 export interface GraphNode {
   personHash: string
   versionIndex: number
-  tag?: string
+  tagHash?: string
   children?: GraphNode[]
 }
 
@@ -37,7 +37,7 @@ export interface NodeData {
   personHash: string
   versionIndex: number
   id: string // = makeNodeId
-  tag?: string
+  tagHash?: string
   fatherHash?: string
   motherHash?: string
   fatherVersionIndex?: number
@@ -90,7 +90,7 @@ export function shortHash(hash: string, shown = 4): string {
   return `0x${hash.slice(start, start + shown)}…`
 }
 
-export function nodeLabel(node: Pick<GraphNode, 'personHash' | 'versionIndex' | 'tag'>): string {
+export function nodeLabel(node: Pick<GraphNode, 'personHash' | 'versionIndex' | 'tagHash'>): string {
   return `${node.personHash}  v${node.versionIndex}`
 }
 

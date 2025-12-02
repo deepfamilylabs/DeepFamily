@@ -210,7 +210,7 @@ describe('Endorse Tests', function () {
         publicSignals,
         0,
         0,
-        'v1',
+        hre.ethers.keccak256(hre.ethers.toUtf8Bytes('v1')),
         'QmTarget'
       );
 

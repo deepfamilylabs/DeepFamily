@@ -198,10 +198,12 @@ function addPersonZK(
     uint256[7] calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
+    bytes32 tagHash,
     string calldata metadataCID
 ) external
 ```
+
+`tagHash` should be computed (e.g. `keccak256(bytes(tagString))`) to avoid leaking plaintext tags in calldata or events; use `bytes32(0)` if no tag is provided.
 
 #### Verification Process
 1. **Submitter Check**: `publicSignals[6] == uint256(uint160(msg.sender))`

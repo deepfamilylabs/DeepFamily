@@ -242,8 +242,11 @@ export function useContract() {
     tag: string,
     metadataCID: string
   ) => {
+    // Convert tag string to tagHash (bytes32)
+    const tagHash = tag ? ethers.keccak256(ethers.toUtf8Bytes(tag)) : ethers.ZeroHash;
+
     return executeTransaction(
-      () => contract!.addPersonZK(a, b, c, publicSignals, fatherVersionIndex, motherVersionIndex, tag, metadataCID),
+      () => contract!.addPersonZK(a, b, c, publicSignals, fatherVersionIndex, motherVersionIndex, tagHash, metadataCID),
       {
         successMessage: t('contract.addVersionSuccess', 'Person version added successfully'),
         errorMessage: t('contract.addVersionFailed', 'Failed to add person version')

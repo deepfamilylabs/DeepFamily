@@ -70,7 +70,7 @@ task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
     const localHash = ethers.keccak256(ethers.toUtf8Bytes(content));
     if (
       expectedHash &&
-      expectedHash !== "0x" + "0".repeat(64) &&
+      expectedHash !== ethers.ZeroHash &&
       expectedHash.toLowerCase() !== localHash.toLowerCase()
     ) {
       throw new Error(

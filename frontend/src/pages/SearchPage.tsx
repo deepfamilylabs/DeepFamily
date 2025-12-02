@@ -693,7 +693,7 @@ export default function SearchPage() {
                   <div className="min-w-0"><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.addTime')}:</span> <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{version.timestamp ? formatUnixSeconds(version.timestamp) : t('search.versionsQuery.unknown')}</span></div>
                   </div>
                   <div className="text-sm space-y-1">
-                    <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionTag')}:</span> {version.tag || t('search.versionsQuery.none')} {version.metadataCID && <><span className="text-gray-600 dark:text-gray-400 ml-4">{t('search.versionsQuery.metadataCID')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{version.metadataCID}</span></>}</div>
+                    <div><span className="text-gray-600 dark:text-gray-400">{t('search.versionsQuery.versionTag')}:</span> {version.tagHash && version.tagHash !== ethers.ZeroHash ? <span className="font-mono text-xs text-gray-800 dark:text-gray-300">{formatHashMiddle(version.tagHash)}</span> : t('search.versionsQuery.none')} {version.metadataCID && <><span className="text-gray-600 dark:text-gray-400 ml-4">{t('search.versionsQuery.metadataCID')}:</span> <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">{version.metadataCID}</span></>}</div>
                     <div className="flex items-center gap-1 overflow-hidden">
                       <span className="shrink-0 text-gray-600 dark:text-gray-400">{t('search.versionsQuery.fatherHash')}:</span>
                       <HashInline value={version.fatherHash} className="font-mono text-xs text-gray-800 dark:text-gray-300" />

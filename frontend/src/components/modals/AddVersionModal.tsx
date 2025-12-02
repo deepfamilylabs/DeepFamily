@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
+import { ethers } from 'ethers'
 import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield } from 'lucide-react'
 import { useWallet } from '../../context/WalletContext'
 import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
@@ -846,7 +847,7 @@ export default function AddVersionModal({
 
                       {/* Father Info */}
                       {successResult.events.PersonVersionAdded.fatherHash &&
-                       successResult.events.PersonVersionAdded.fatherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                       successResult.events.PersonVersionAdded.fatherHash !== ethers.ZeroHash && (
                         <>
                           <DataRow
                             label={t('addVersion.fatherHash', 'Father Hash')}
@@ -863,7 +864,7 @@ export default function AddVersionModal({
 
                       {/* Mother Info */}
                       {successResult.events.PersonVersionAdded.motherHash &&
-                       successResult.events.PersonVersionAdded.motherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                       successResult.events.PersonVersionAdded.motherHash !== ethers.ZeroHash && (
                         <>
                           <DataRow
                             label={t('addVersion.motherHash', 'Mother Hash')}
@@ -878,11 +879,11 @@ export default function AddVersionModal({
                         </>
                       )}
 
-                      {/* Tag */}
-                      {successResult.events.PersonVersionAdded.tag && (
+                      {/* Tag Hash */}
+                      {successResult.events.PersonVersionAdded.tagHash && (
                         <DataRow
-                          label={t('addVersion.tag', 'Tag')}
-                          value={`"${successResult.events.PersonVersionAdded.tag}"`}
+                          label={t('addVersion.tagHash', 'Tag Hash')}
+                          value={successResult.events.PersonVersionAdded.tagHash}
                           colorClass="green"
                           isPlainText
                         />

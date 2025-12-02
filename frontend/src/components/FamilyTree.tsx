@@ -31,7 +31,7 @@ const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = Re
         </button>
         <HashBadge hash={node.personHash} onNavigate={goDetail} />
         <span className="text-sm text-gray-500 font-medium">v{node.versionIndex}</span>
-        {node.tag ? <span className="text-xs text-blue-600">({node.tag})</span> : null}
+        {node.tagHash ? <span className="text-xs text-blue-600">({node.tagHash})</span> : null}
       </div>
       {open && hasChildren && (
         <ul className="list-none m-0 p-0">
@@ -45,7 +45,7 @@ const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = Re
 }, (prev, next) => (
   prev.node.personHash === next.node.personHash &&
   prev.node.versionIndex === next.node.versionIndex &&
-  prev.node.tag === next.node.tag &&
+  prev.node.tagHash === next.node.tagHash &&
   (prev.node.children?.length || 0) === (next.node.children?.length || 0) &&
   prev.depth === next.depth &&
   prev.isLast === next.isLast
@@ -59,7 +59,7 @@ const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = Re
  * - Concurrency limits / node hard limits
  * - onNode callback (when node is first created)
  */
-export type FilterInput = { personHash: string; versionIndex: number; depth: number; tag?: string }
+export type FilterInput = { personHash: string; versionIndex: number; depth: number; tagHash?: string }
 export type FilterDecision = boolean | { include?: boolean; descend?: boolean }
 export type FetchSubtreeOptions = {
   maxDepth?: number
@@ -95,7 +95,7 @@ export interface WalkerMetrics {
 
 function createTreeLoader(params: { contract: ethers.Contract; pageSize: number; signal?: AbortSignal; onStats?: (m: WalkerMetrics)=>void; metricsRef: React.MutableRefObject<WalkerMetrics>; statsIntervalMs?: number; deduplicateChildren?: boolean; onVersionStats?: (personHash: string, totalVersions: number) => void }) {
   const { contract, pageSize, signal, onStats, metricsRef, statsIntervalMs, deduplicateChildren = true, onVersionStats } = params
-  const versionCache = new Map<string, { tag?: string }>()
+  const versionCache = new Map<string, { tagHash?: string }>()
   const childrenCache = new Map<string, { childHashes: string[]; childVersionIndices: (number|bigint)[]; hasMore: boolean; nextOffset: number; pageOffset: number }>()
   const unversionedChildrenCache = new Map<string, { childHashes: string[]; childVersionIndices: number[] }>()
   const bestVersionCache = new Map<string, number>()
@@ -112,7 +112,7 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     const k = key(h, v)
     const start = performance.now()
     // tags no longer fetched separately; keep structure for potential future fields
-    if (!versionCache.has(k)) { metricsRef.current.versionCacheMisses++; versionCache.set(k, { tag: undefined }) } else { metricsRef.current.versionCacheHits++ }
+    if (!versionCache.has(k)) { metricsRef.current.versionCacheMisses++; versionCache.set(k, { tagHash: undefined }) } else { metricsRef.current.versionCacheHits++ }
     emit(start)
     return versionCache.get(k)!
   }
@@ -362,18 +362,18 @@ async function* walkSubtree(
     if (visited.has(k) || depth > maxDepth || metricsRef.current.created >= hardNodeLimit) return
     visited.add(k)
     metricsRef.current.visited = visited.size
-    const { tag } = await loadVersion(h, v)
-    const { include, descend } = decide({ personHash: h, versionIndex: v, depth, tag })
+    const { tagHash } = await loadVersion(h, v)
+    const { include, descend } = decide({ personHash: h, versionIndex: v, depth, tagHash })
     let node: GraphNode | undefined
     if (include) {
       metricsRef.current.created++
       metricsRef.current.depth = depth
       if (parent) {
-        node = { personHash: h, versionIndex: v, tag, children: [] }
+        node = { personHash: h, versionIndex: v, tagHash, children: [] }
         parent.children = parent.children ? [...parent.children, node] : [node]
       } else {
         node = root
-        node.tag = tag
+        node.tagHash = tagHash
       }
       onNode?.(node)
       onProgress?.({ created: metricsRef.current.created, visited: visited.size, depth })
@@ -417,13 +417,13 @@ async function* walkSubtree(
       const k = key(h,v)
       if (visited.has(k) || depth > maxDepth) continue
       visited.add(k); metricsRef.current.visited = visited.size
-      const { tag } = await loadVersion(h,v)
-      const { include, descend } = decide({ personHash: h, versionIndex: v, depth, tag })
+      const { tagHash } = await loadVersion(h,v)
+      const { include, descend } = decide({ personHash: h, versionIndex: v, depth, tagHash })
       let node: GraphNode | undefined
       if (include) {
         metricsRef.current.created++; metricsRef.current.depth=depth
-        node = parent ? { personHash:h, versionIndex:v, tag, children:[] } : root
-        if (parent) parent.children = parent.children ? [...parent.children, node] : [node]; else root.tag = tag
+        node = parent ? { personHash:h, versionIndex:v, tagHash, children:[] } : root
+        if (parent) parent.children = parent.children ? [...parent.children, node] : [node]; else root.tagHash = tagHash
         onNode?.(node); onProgress?.({ created: metricsRef.current.created, visited: visited.size, depth }); yield node!
       }
       if (!descend || depth >= maxDepth || metricsRef.current.created >= hardNodeLimit) continue
@@ -568,7 +568,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
               </>
             )}
             {name && <span className="text-slate-700 dark:text-slate-200 text-[12px] truncate max-w-[180px]" title={name}>{name}</span>}
-            {node.tag && <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/40 px-1 rounded" title={node.tag}>{node.tag}</span>}
+            {node.tagHash && <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/40 px-1 rounded" title={node.tagHash}>{node.tagHash}</span>}
           </div>
         </div>
       </div>

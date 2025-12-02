@@ -17,6 +17,7 @@
       "deathPlace": "US-MA-Boston",
       "fatherName": null,
       "motherName": null,
+      "tag": "1",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -65,6 +66,8 @@
       "deathPlace": "US-MA-Hyannis Port",
       "fatherName": "Patrick Joseph Kennedy",
       "motherName": null,
+      "tag": "2",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "American businessman, investor, and politician who served as the first chairman of the SEC and U.S. Ambassador to the United Kingdom. Father of President John F. Kennedy."
@@ -97,7 +100,6 @@
           "The Kennedy political dynasty's architect and financier. His wealth funded three sons' political careers. His ambition and methods became cautionary tales about ruthless success. His isolationism and Nazi sympathies were overshadowed by his sons' heroism. Created one of America's most famous families but at tremendous personal cost."
         ]
       },
-      "mintNFT": true,
       "story": "American businessman, investor, and politician who served as the first chairman of the SEC and U.S. Ambassador to the United Kingdom. Father of President John F. Kennedy"
     },
     {
@@ -113,6 +115,8 @@
       "deathPlace": "US-TX-Dallas",
       "fatherName": "Joseph Patrick Kennedy Sr",
       "motherName": null,
+      "tag": "3",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "35th President of the United States, the youngest elected president and the first Catholic president. Led during the Cuban Missile Crisis and initiated the Space Race."
@@ -145,7 +149,6 @@
           "JFK's assassination at age 46 created an enduring mythology around his presidency. His vision for space exploration achieved fruition in 1969 with the moon landing. His rhetoric inspired generations of public servants. His handling of the Cuban Missile Crisis is studied as masterful crisis management. His personal flaws have been revealed over time, complicating his legacy. The Kennedy family's continued prominence in politics stems from his presidency. His death marked the end of American innocence."
         ]
       },
-      "mintNFT": true,
       "story": "35th President of the United States, the youngest elected president and the first Catholic president. Led during the Cuban Missile Crisis and initiated the Space Race"
     },
     {
@@ -161,6 +164,8 @@
       "deathPlace": "US-CA-Los Angeles",
       "fatherName": "Joseph Patrick Kennedy Sr",
       "motherName": null,
+      "tag": "3",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "U.S. Attorney General under his brother President Kennedy and U.S. Senator from New York. Champion of civil rights and social justice, assassinated during his 1968 presidential campaign."
@@ -193,7 +198,6 @@
           "RFK's assassination cut short what many believe would have been a transformative presidency. His connection with poor and minority communities was unique among white politicians of his era. His speeches on violence, poverty, and national purpose remain powerful today. His eleven children continued the Kennedy political tradition with mixed results. He became a symbol of 1960s idealism and the tragedy of what might have been."
         ]
       },
-      "mintNFT": true,
       "story": "U.S. Attorney General under his brother President Kennedy and U.S. Senator from New York. Champion of civil rights and social justice, assassinated during his 1968 presidential campaign"
     },
     {
@@ -209,6 +213,8 @@
       "deathPlace": "US-MA-Hyannis Port",
       "fatherName": "Joseph Patrick Kennedy Sr",
       "motherName": null,
+      "tag": "3",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "U.S. Senator from Massachusetts for 47 years (1962-2009), known as the 'Lion of the Senate'. Champion of healthcare reform, civil rights, and liberal causes despite personal scandals."
@@ -241,7 +247,6 @@
           "Despite never becoming president, Ted Kennedy's legislative legacy may exceed that of his presidential brother. His work on healthcare, civil rights, education, and disability rights improved millions of lives. The Chappaquiddick incident permanently tarnished his personal reputation while his professional reputation grew over decades. He demonstrated that redemption and continued service were possible after scandal. His death marked the end of an era of Kennedy dominance in American politics."
         ]
       },
-      "mintNFT": true,
       "story": "U.S. Senator from Massachusetts for 47 years (1962-2009), known as the 'Lion of the Senate'. Champion of healthcare reform, civil rights, and liberal causes despite personal scandals"
     },
     {
@@ -253,6 +258,8 @@
       "birthPlace": "US-NY-New York City",
       "fatherName": "John Fitzgerald Kennedy",
       "motherName": null,
+      "tag": "4",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "Author, attorney, and diplomat. Daughter of President John F. Kennedy and First Lady Jacqueline Kennedy. Served as U.S. Ambassador to Japan (2013-2017) and currently serves as U.S. Ambassador to Australia."
@@ -276,7 +283,6 @@
           "Married Edwin Schlossberg in 1986, having three children: Rose, Tatiana, and John. Her family has largely stayed out of politics and public life. She is the last surviving member of JFK's immediate family after the death of her brother John Jr. in 1999."
         ]
       },
-      "mintNFT": true,
       "story": "Author, attorney, and diplomat. Daughter of President John F. Kennedy and First Lady Jacqueline Kennedy"
     },
     {
@@ -292,6 +298,8 @@
       "deathPlace": "Atlantic Ocean-MA-Martha's Vineyard",
       "fatherName": "John Fitzgerald Kennedy",
       "motherName": null,
+      "tag": "4",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "Attorney, journalist, and magazine publisher. Son of President John F. Kennedy, known for his striking looks and as 'America's Prince.' Founded George magazine. Died in a plane crash at age 38."
@@ -324,7 +332,6 @@
           "JFK Jr.'s death at 38 cut short a life of enormous potential. His grace under media pressure and attempt to forge his own identity inspired many. He represented the last gasp of Kennedy political glamour. His death marked the end of the Kennedy Camelot era. The mystery and tragedy of his death ensured his legend, much like his father."
         ]
       },
-      "mintNFT": true,
       "story": "Attorney, journalist, and magazine publisher. Son of President John F. Kennedy, known for his striking looks and as 'America's Prince"
     },
     {
@@ -336,6 +343,8 @@
       "birthPlace": "US-MA-Boston",
       "fatherName": "Robert Francis Kennedy",
       "motherName": null,
+      "tag": "4",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "U.S. Representative from Massachusetts (1987-1999) and founder of Citizens Energy Corporation. Eldest son of Robert F. Kennedy."
@@ -359,7 +368,6 @@
           "Married Sheila Rauch in 1979, having twin sons Matthew and Joseph III (who later served in Congress). The marriage was annulled by the Catholic Church in 1997, which his ex-wife contested publicly. Remarried to Beth Kelly in 1993. Has six children total from both marriages."
         ]
       },
-      "mintNFT": true,
       "story": "U.S. Representative from Massachusetts (1987-1999) and founder of Citizens Energy Corporation. Eldest son of Robert F. Kennedy"
     },
     {
@@ -371,6 +379,8 @@
       "birthPlace": "US-DC-Washington",
       "fatherName": "Robert Francis Kennedy",
       "motherName": null,
+      "tag": "4",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "Environmental attorney, author, and activist. Third child of Robert F. Kennedy. Known for environmental advocacy, vaccine skepticism, and controversial political positions."
@@ -397,7 +407,6 @@
           "Married Emily Black in 1982, having two children: Robert III and Kathleen. Divorced in 1994. Married Mary Richardson in 1994, having four children. Mary struggled with depression and alcoholism; she committed suicide in 2012. Married actress Cheryl Hines in 2014. Has six children total."
         ]
       },
-      "mintNFT": true,
       "story": "Environmental attorney, author, and activist. Third child of Robert F. Kennedy"
     },
     {
@@ -409,6 +418,8 @@
       "birthPlace": "US-MA-Boston",
       "fatherName": "Robert Francis Kennedy",
       "motherName": null,
+      "tag": "4",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "First female Lieutenant Governor of Maryland (1995-2003). Eldest child of Robert F. Kennedy. Attorney and public policy advocate."
@@ -429,7 +440,6 @@
           "Married David Townsend in 1973, having four daughters: Meaghan, Maeve, Rose, and Kathleen. Her daughter Maeve and granddaughter Gideon tragically died in a canoeing accident in 2020."
         ]
       },
-      "mintNFT": true,
       "story": "First female Lieutenant Governor of Maryland (1995-2003). Eldest child of Robert F. Kennedy"
     },
     {
@@ -441,6 +451,8 @@
       "birthPlace": "US-CT-Hartford",
       "fatherName": "Edward Moore Kennedy",
       "motherName": null,
+      "tag": "4",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "U.S. Representative from Rhode Island (1995-2011). Son of Senator Ted Kennedy. Mental health and addiction advocate."
@@ -467,7 +479,6 @@
           "Married Amy Savell in 2011, having four children. His decision to leave politics was motivated by desire to be present for his family in ways his father wasn't."
         ]
       },
-      "mintNFT": true,
       "story": "U.S. Representative from Rhode Island (1995-2011). Son of Senator Ted Kennedy"
     },
     {
@@ -479,6 +490,8 @@
       "birthPlace": "US-MA-Boston",
       "fatherName": "Joseph Patrick Kennedy II",
       "motherName": null,
+      "tag": "5",
+      "mintNFT": false,
       "storyData": {
         "summary": [
           "U.S. Representative from Massachusetts (2013-2021) and Special Envoy for Northern Ireland. Great-grandson of Joseph P. Kennedy Sr., continuing the family's political legacy into the 21st century."
@@ -511,7 +524,6 @@
           "Joe Kennedy III's political career represents both the continuation and potential end of Kennedy political dynasty. His Senate primary loss suggested that the Kennedy name alone no longer guarantees political success. His willingness to continue public service after political defeat, however, reflects genuine commitment to family values of service. He may represent the last Kennedy generation to hold major political office, though time will tell if his children or cousins continue the tradition."
         ]
       },
-      "mintNFT": false,
       "story": "U.S. Representative from Massachusetts (2013-2021) and Special Envoy for Northern Ireland. Great-grandson of Joseph P. Kennedy Sr., continuing the family's political legacy into the 21st century"
     },
     {
@@ -523,6 +535,8 @@
       "birthPlace": "US-MA-Cambridge",
       "fatherName": "Robert Francis Kennedy Jr",
       "motherName": null,
+      "tag": "5",
+      "mintNFT": false,
       "storyData": {
         "summary": [
           "Environmental engineer and renewable energy entrepreneur. Son of Robert F. Kennedy Jr., combining family's environmental advocacy tradition with private sector innovation in clean technology."
@@ -555,7 +569,6 @@
           "Thomas Kennedy represents a different path for Kennedy family values - applying idealism and public service orientation through entrepreneurship and technology rather than politics or law. His success in cleantech entrepreneurship has inspired other Kennedy cousins to explore careers outside traditional political service. He demonstrates that the family's commitment to addressing societal challenges can take many forms in the modern economy."
         ]
       },
-      "mintNFT": false,
       "story": "Environmental engineer and renewable energy entrepreneur. Son of Robert F. Kennedy Jr., combining family's environmental advocacy tradition with private sector innovation in clean technology"
     },
     {
@@ -567,6 +580,8 @@
       "birthPlace": "US-NY-New York City",
       "fatherName": "John Fitzgerald Kennedy Jr",
       "motherName": null,
+      "tag": "5",
+      "mintNFT": true,
       "storyData": {
         "summary": [
           "Physician and global health advocate. Fictional daughter of JFK Jr., dedicated to improving healthcare access in underserved communities worldwide through medical practice and non-profit work."
@@ -599,7 +614,6 @@
           "Grace Kennedy embodies a new generation's approach to the family's public service tradition - using professional expertise and global perspective to address humanitarian challenges. Her work in global health has saved countless lives and inspired other Kennedy descendants to pursue careers in medicine and public health. She demonstrates that Kennedy idealism can be expressed through healing and building, not just politics and legislation."
         ]
       },
-      "mintNFT": true,
       "story": "Physician and global health advocate. Fictional daughter of JFK Jr., dedicated to improving healthcare access in underserved communities worldwide through medical practice and non-profit work"
     },
     {
@@ -611,6 +625,8 @@
       "birthPlace": "US-RI-Providence",
       "fatherName": "Patrick Joseph Kennedy II",
       "motherName": null,
+      "tag": "5",
+      "mintNFT": false,
       "storyData": {
         "summary": [
           "Mental health counselor and addiction recovery advocate. Son of Patrick Kennedy II, continuing his father's work on mental health and addiction through direct clinical practice and peer support programs."
@@ -643,7 +659,6 @@
           "Daniel Kennedy represents the transformation of Kennedy family struggles into professional purpose. His work helping others recover from addiction and mental illness gives meaning to his family's pain. He embodies a new form of Kennedy courage - the bravery to be vulnerable, seek help, and use personal challenges to serve others. His emphasis on peer support and lived experience is changing how addiction treatment is delivered."
         ]
       },
-      "mintNFT": false,
       "story": "Mental health counselor and addiction recovery advocate. Son of Patrick Kennedy II, continuing his father's work on mental health and addiction through direct clinical practice and peer support programs"
     },
     {
@@ -655,6 +670,8 @@
       "birthPlace": "US-MA-Boston",
       "fatherName": "Joseph Patrick Kennedy II",
       "motherName": null,
+      "tag": "5",
+      "mintNFT": false,
       "storyData": {
         "summary": [
           "Climate scientist and policy researcher. Daughter of Joseph P. Kennedy II, applying scientific expertise to environmental challenges through research and evidence-based policy advocacy."
@@ -687,7 +704,6 @@
           "Sophia Kennedy represents the application of rigorous scientific expertise to the environmental challenges the Kennedy family has long championed. Her research contributes to humanity's understanding of climate change and improves our ability to predict and prepare for extreme weather. She demonstrates that Kennedy public service can take the form of scientific inquiry and evidence-based advocacy, not just political office or legal work."
         ]
       },
-      "mintNFT": false,
       "story": "Climate scientist and policy researcher. Daughter of Joseph P. Kennedy II, applying scientific expertise to environmental challenges through research and evidence-based policy advocacy"
     },
     {
@@ -699,6 +715,7 @@
       "birthPlace": "US-MA-Boston",
       "fatherName": "Joseph Patrick Kennedy II",
       "motherName": null,
+      "tag": "5",
       "mintNFT": false,
       "storyData": {
         "summary": [
@@ -734,6 +751,7 @@
       "birthPlace": "US-MA-Boston",
       "fatherName": "Robert Francis Kennedy Jr",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -769,6 +787,7 @@
       "birthPlace": "US-NY-Mount Kisco",
       "fatherName": "Robert Francis Kennedy Jr",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -804,6 +823,7 @@
       "birthPlace": "US-NY-Mount Kisco",
       "fatherName": "Robert Francis Kennedy Jr",
       "motherName": null,
+      "tag": "5",
       "mintNFT": false,
       "storyData": {
         "summary": [
@@ -839,6 +859,7 @@
       "birthPlace": "US-NY-Mount Kisco",
       "fatherName": "Robert Francis Kennedy Jr",
       "motherName": null,
+      "tag": "5",
       "mintNFT": false,
       "storyData": {
         "summary": [
@@ -874,6 +895,7 @@
       "birthPlace": "US-NY-Mount Kisco",
       "fatherName": "Robert Francis Kennedy Jr",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -909,6 +931,7 @@
       "birthPlace": "US-MD-Baltimore",
       "fatherName": "Kathleen Kennedy Townsend",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -944,6 +967,7 @@
       "birthPlace": "US-MD-Baltimore",
       "fatherName": "Kathleen Kennedy Townsend",
       "motherName": null,
+      "tag": "5",
       "mintNFT": false,
       "storyData": {
         "summary": [
@@ -979,6 +1003,7 @@
       "birthPlace": "US-RI-Providence",
       "fatherName": "Patrick Joseph Kennedy II",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -1014,6 +1039,7 @@
       "birthPlace": "US-RI-Providence",
       "fatherName": "Patrick Joseph Kennedy II",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -1049,6 +1075,7 @@
       "birthPlace": "US-RI-Providence",
       "fatherName": "Patrick Joseph Kennedy II",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [
@@ -1084,6 +1111,7 @@
       "birthPlace": "US-NY-New York City",
       "fatherName": "Caroline Bouvier Kennedy",
       "motherName": null,
+      "tag": "5",
       "mintNFT": false,
       "storyData": {
         "summary": [
@@ -1119,6 +1147,7 @@
       "birthPlace": "US-NY-New York City",
       "fatherName": "Caroline Bouvier Kennedy",
       "motherName": null,
+      "tag": "5",
       "mintNFT": false,
       "storyData": {
         "summary": [
@@ -1154,6 +1183,7 @@
       "birthPlace": "US-NY-New York City",
       "fatherName": "Caroline Bouvier Kennedy",
       "motherName": null,
+      "tag": "5",
       "mintNFT": true,
       "storyData": {
         "summary": [

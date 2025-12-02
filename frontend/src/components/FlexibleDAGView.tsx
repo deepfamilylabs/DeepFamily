@@ -28,14 +28,14 @@ function FlexibleDAGViewInner({
   const { nodesData } = useTreeData()
   const { deduplicateChildren } = useVizOptions()
 
-  type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
+  type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; tagHash?: string; depth: number }
   type Edge = { from: string; to: string }
   function flatten(root: GraphNode) {
     const nodes: FlattenNode[] = []
     const edges: Edge[] = []
     function rec(n: GraphNode, depth: number, parentId?: string) {
       const id = makeNodeId(n.personHash, n.versionIndex)
-      nodes.push({ id, label: nodeLabel(n), hash: n.personHash, versionIndex: n.versionIndex, tag: n.tag, depth })
+      nodes.push({ id, label: nodeLabel(n), hash: n.personHash, versionIndex: n.versionIndex, tagHash: n.tagHash, depth })
       if (parentId) edges.push({ from: parentId, to: id })
       for (const c of n.children || []) rec(c, depth + 1, id)
     }
@@ -184,7 +184,7 @@ function FlexibleDAGViewInner({
                   hover={Boolean(hover && hover.id === n.id)}
                   versionText={`v${n.versionIndex}`}
                   titleText={(mintedFlag && nd?.fullName) ? nd.fullName : hashShort}
-                  tagText={nd?.tag}
+                  tagText={nd?.tagHash}
                   gender={nd?.gender}
                   birthPlace={nd?.birthPlace}
                   birthDateText={mintedFlag ? birthDateString(nd) : undefined}

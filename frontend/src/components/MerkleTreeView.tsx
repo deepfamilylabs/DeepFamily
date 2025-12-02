@@ -126,7 +126,7 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
               const isSel = pn.id === selectedId
               const isHover = hoverId === pn.id
               const versionText = `v${pn.data.versionIndex}`
-              const tagText = nd?.tag || ''
+              const tagText = nd?.tagHash || ''
               // In deduplicate mode, show totalVersions badge from contract data
               // In non-deduplicate mode, don't show badge (user can see all versions directly)
               const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined

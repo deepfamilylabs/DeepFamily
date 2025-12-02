@@ -12,7 +12,7 @@ import { useVizOptions } from '../context/VizOptionsContext'
 import { getGenderColorHex } from '../constants/genderColors'
 
 // Re-add types lost during refactor
-export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
+export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tagHash?: string; depth: number }
 export type SimLink = d3.SimulationLinkDatum<SimNode> & { source: string | SimNode; target: string | SimNode }
 
 function buildGraph(root: GraphNode) {
@@ -20,7 +20,7 @@ function buildGraph(root: GraphNode) {
   const links: SimLink[] = []
   function rec(n: GraphNode, depth: number) {
     const id = makeNodeId(n.personHash, n.versionIndex)
-    nodes.push({ id, label: nodeLabel(n), hash: n.personHash, versionIndex: n.versionIndex, tag: n.tag, depth })
+    nodes.push({ id, label: nodeLabel(n), hash: n.personHash, versionIndex: n.versionIndex, tagHash: n.tagHash, depth })
     for (const c of n.children || []) { const cid = makeNodeId(c.personHash, c.versionIndex); links.push({ source: id, target: cid }); rec(c, depth + 1) }
   }
   rec(root, 0)

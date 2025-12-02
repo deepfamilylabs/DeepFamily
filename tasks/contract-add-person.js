@@ -115,7 +115,7 @@ task("add-person", "Add a person version using ZK proof")
         publicSignals,
         Number(args.fatherversion),
         Number(args.motherversion),
-        args.tag,
+        ethers.keccak256(ethers.toUtf8Bytes(args.tag || "")),
         args.ipfs,
       );
 
@@ -124,7 +124,7 @@ task("add-person", "Add a person version using ZK proof")
     // Parse events and verify person hash
     try {
       const iface = new ethers.Interface([
-        "event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, string tag)",
+        "event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, bytes32 tagHash)",
       ]);
 
       // Reconstruct expected personHash from proof

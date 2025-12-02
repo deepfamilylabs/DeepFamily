@@ -1,4 +1,4 @@
-import { Contract, JsonRpcSigner, JsonRpcProvider, toUtf8Bytes, keccak256, solidityPackedKeccak256 } from 'ethers'
+import { Contract, JsonRpcSigner, JsonRpcProvider, toUtf8Bytes, keccak256, solidityPackedKeccak256, ZeroHash } from 'ethers'
 import DeepFamilyAbi from '../abi/DeepFamily.json'
 // @ts-ignore
 import * as snarkjs from 'snarkjs'
@@ -97,6 +97,8 @@ export async function submitAddPersonZK(
   tag: string,
   metadataCID: string,
 ) {
+  // Convert tag string to tagHash (bytes32)
+  const tagHash = tag ? keccak256(toUtf8Bytes(tag)) : ZeroHash;
   ensurePublicSignalsShape(publicSignals)
 
   // Debug: Check proof structure
@@ -145,6 +147,7 @@ export async function submitAddPersonZK(
   console.log('  fatherVersionIndex:', fatherVersionIndex)
   console.log('  motherVersionIndex:', motherVersionIndex)
   console.log('  tag:', tag)
+  console.log('  tagHash:', tagHash)
   console.log('  metadataCID:', metadataCID)
   
   // Check public signals length
@@ -174,15 +177,15 @@ export async function submitAddPersonZK(
     console.log('🚀 Estimating gas for contract.addPersonZK...')
     
     // First estimate gas
-    const gasEstimate = await contract.addPersonZK.estimateGas(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tag, metadataCID)
+    const gasEstimate = await contract.addPersonZK.estimateGas(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tagHash, metadataCID)
     console.log('⛽ Estimated gas:', gasEstimate.toString())
-    
+
     // Add 20% buffer to gas estimate
     const gasLimit = gasEstimate * 120n / 100n
     console.log('⛽ Gas limit (with buffer):', gasLimit.toString())
-    
+
     console.log('🚀 Calling contract.addPersonZK...')
-    const tx = await contract.addPersonZK(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tag, metadataCID, {
+    const tx = await contract.addPersonZK(a, b, c, pub, fatherVersionIndex, motherVersionIndex, tagHash, metadataCID, {
       gasLimit: gasLimit
     })
     console.log('✅ Transaction sent successfully:', tx.hash)
@@ -230,7 +233,7 @@ export async function submitAddPersonZK(
                 fatherVersionIndex: Number(parsedEvent.args.fatherVersionIndex),
                 motherHash: parsedEvent.args.motherHash,
                 motherVersionIndex: Number(parsedEvent.args.motherVersionIndex),
-                tag: parsedEvent.args.tag
+                tagHash: parsedEvent.args.tagHash
               }
               personHash = events.PersonVersionAdded.personHash
               versionIndex = events.PersonVersionAdded.versionIndex
