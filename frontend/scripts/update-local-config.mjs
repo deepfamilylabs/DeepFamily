@@ -80,10 +80,14 @@ async function collectMultiLanguageRootHashes(deepFamily) {
   for (const [lang, rootData] of Object.entries(roots)) {
     try {
       const hash = await getPersonHashFromBasicInfo(deepFamily, rootData);
+      console.log(`   [${lang.toUpperCase()}] Computing hash for ${rootData.fullName}: ${hash}`);
+      
       const { exists, totalVersions } = await checkPersonExists({
         deepFamily,
         personHash: hash
       });
+      
+      console.log(`   [${lang.toUpperCase()}] Result - exists: ${exists}, versions: ${totalVersions}`);
 
       entries.push({
         lang,
@@ -96,6 +100,7 @@ async function collectMultiLanguageRootHashes(deepFamily) {
       });
     } catch (error) {
       console.warn(`⚠️  Failed to compute ${lang.toUpperCase()} root hash: ${error.message}`);
+      console.error(error);
     }
   }
 
@@ -131,7 +136,26 @@ async function updateLocalConfig() {
 
     // Connect to contract and get root person hash
     const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+    
+    // Test connection
+    try {
+      const blockNumber = await provider.getBlockNumber();
+      console.log(`✓ Connected to local node (block: ${blockNumber})`);
+    } catch (error) {
+      console.error('❌ Failed to connect to local node:', error.message);
+      console.error('   Make sure Hardhat node is running on http://127.0.0.1:8545');
+      process.exit(1);
+    }
+    
     const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
+    
+    // Verify contract is accessible
+    try {
+      const tokenCounter = await deepFamily.tokenCounter();
+      console.log(`✓ Contract accessible (total NFTs: ${tokenCounter.toString()})\n`);
+    } catch (error) {
+      console.warn(`⚠️  Warning: Could not verify contract (${error.message})\n`);
+    }
 
     // Compute latest root hashes for all supported languages
     const { entries: rootEntries, defaultRoot } = await collectMultiLanguageRootHashes(deepFamily);
