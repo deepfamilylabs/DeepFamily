@@ -66,6 +66,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error InvalidDeathDay();
   error InvalidBirthMonth();
   error InvalidBirthDay();
+  error InvalidBirthYear();
   error InvalidStory();
   error InvalidTokenURI();
   // Added ZK-related errors
@@ -80,6 +81,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error BasicInfoMismatch();
   error CallerMismatch();
   error InvalidParentHash();
+  error MustBeAdult();
 
   // Token-related errors
   error TokenContractNotSet();
@@ -267,6 +269,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /// @dev Basis points denominator (10_000 = 100%)
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
+  /// @dev Minimum age (in years) required to mint an NFT
+  uint256 public constant MINIMUM_MINT_AGE = 18;
+
+  uint256 private constant SECONDS_PER_DAY = 24 * 60 * 60;
+  int256 private constant OFFSET19700101 = 2440588;
 
   /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
@@ -510,7 +517,59 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         resultLength: endIndex - offset,
         nextOffset: endIndex,
         hasMore: endIndex < totalCount
-      });
+    });
+  }
+
+  // ========== Date & Age Utilities ==========
+
+  function _daysToDate(
+    uint256 _days
+  ) internal pure returns (uint256 year, uint256 month, uint256 day) {
+    int256 __days = int256(_days);
+
+    int256 L = __days + 68569 + OFFSET19700101;
+    int256 N = (4 * L) / 146097;
+    L = L - (146097 * N + 3) / 4;
+    int256 _year = (4000 * (L + 1)) / 1461001;
+    L = L - (1461 * _year) / 4 + 31;
+    int256 _month = (80 * L) / 2447;
+    int256 _day = L - (2447 * _month) / 80;
+    L = _month / 11;
+    _month = _month + 2 - 12 * L;
+    _year = 100 * (N - 49) + _year + L;
+
+    year = uint256(_year);
+    month = uint256(_month);
+    day = uint256(_day);
+  }
+
+  function _timestampToDate(
+    uint256 timestamp
+  ) internal pure returns (uint256 year, uint256 month, uint256 day) {
+    uint256 _days = timestamp / SECONDS_PER_DAY;
+    (year, month, day) = _daysToDate(_days);
+  }
+
+  function _enforceAdult(PersonBasicInfo memory basicInfo) internal view {
+    if (basicInfo.isBirthBC) return;
+    if (basicInfo.birthYear == 0) return;
+
+    (uint256 currentYear, uint256 currentMonth, uint256 currentDay) = _timestampToDate(
+      block.timestamp
+    );
+
+    if (basicInfo.birthYear > currentYear) revert InvalidBirthYear();
+
+    uint256 ageYears = currentYear - uint256(basicInfo.birthYear);
+    if (ageYears > MINIMUM_MINT_AGE) return;
+    if (ageYears < MINIMUM_MINT_AGE) revert MustBeAdult();
+
+    if (basicInfo.birthMonth == 0) return;
+    if (currentMonth < basicInfo.birthMonth) revert MustBeAdult();
+    if (currentMonth > basicInfo.birthMonth) return;
+
+    if (basicInfo.birthDay == 0) return;
+    if (currentDay < uint256(basicInfo.birthDay)) revert MustBeAdult();
   }
 
   // ========== Constructor ==========
@@ -910,6 +969,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
     bytes32 computedHash = getPersonHash(coreInfo.basicInfo);
     if (computedHash != personHash) revert BasicInfoMismatch();
+
+    _enforceAdult(coreInfo.basicInfo);
 
     if (!INamePoseidonVerifier(NAME_POSEIDON_VERIFIER).verifyProof(a, b, c, publicSignals))
       revert InvalidZKProof();
