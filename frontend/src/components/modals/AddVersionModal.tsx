@@ -3,11 +3,13 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield } from 'lucide-react'
+import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download } from 'lucide-react'
+import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
 import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
 import { useConfig } from '../../context/ConfigContext'
-import PersonHashCalculator from '../PersonHashCalculator'
+import { generateMetadataCID } from '../../lib/cid'
+import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -24,6 +26,8 @@ type AddVersionFormInput = {
   tag: string
   metadataCID?: string
 }
+
+type AddVersionFormData = z.infer<typeof addVersionSchema>
 
 interface AddVersionModalProps {
   isOpen: boolean
@@ -158,6 +162,7 @@ export default function AddVersionModal({
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
     watch,
     reset
   } = useForm<AddVersionFormInput>({
@@ -202,6 +207,89 @@ export default function AddVersionModal({
       })
     }
   }, [personHash, existingPersonData])
+
+  const computeHashOrZero = (info: typeof personInfo) => {
+    if (!info || !info.fullName?.trim()) return ethers.ZeroHash
+    const hash = computePersonHash(info)
+    return hash && hash.length > 0 ? hash : ethers.ZeroHash
+  }
+
+  /**
+   * Extract and normalize person info, ensuring deterministic field order
+   * Note: Passphrase is removed to avoid leaking sensitive data to metadata
+   */
+  const sanitizeInfo = (info: typeof personInfo) => {
+    if (!info) return null
+    // Explicitly specify field order to ensure CID determinism
+    return {
+      fullName: info.fullName,
+      gender: info.gender,
+      birthYear: info.birthYear,
+      birthMonth: info.birthMonth,
+      birthDay: info.birthDay,
+      isBirthBC: info.isBirthBC
+    }
+  }
+
+  /**
+   * Build metadata payload, strictly following schema-defined field order
+   * Field order must be consistent to ensure same data generates same CID
+   */
+  const buildMetadataPayload = (tagValue: string, processedData: AddVersionFormData) => {
+    const baseEmpty = {
+      fullName: '',
+      gender: 0,
+      birthYear: 0,
+      birthMonth: 0,
+      birthDay: 0,
+      isBirthBC: false
+    }
+
+    const personHashValue = computeHashOrZero(personInfo)
+    const fatherHashValue = computeHashOrZero(fatherInfo)
+    const motherHashValue = computeHashOrZero(motherInfo)
+
+    const personData = sanitizeInfo(personInfo) ?? baseEmpty
+    const fatherData = sanitizeInfo(fatherInfo) ?? baseEmpty
+    const motherData = sanitizeInfo(motherInfo) ?? baseEmpty
+
+    // Strictly build according to deepfamily/person-version@0.1 schema field order
+    return {
+      schema: 'deepfamily/person-version@0.1',
+      tag: tagValue || '',
+      person: {
+        fullName: personData.fullName,
+        gender: personData.gender,
+        birthYear: personData.birthYear,
+        birthMonth: personData.birthMonth,
+        birthDay: personData.birthDay,
+        isBirthBC: personData.isBirthBC,
+        personHash: personHashValue
+      },
+      parents: {
+        father: {
+          fullName: fatherData.fullName,
+          gender: fatherData.gender,
+          birthYear: fatherData.birthYear,
+          birthMonth: fatherData.birthMonth,
+          birthDay: fatherData.birthDay,
+          isBirthBC: fatherData.isBirthBC,
+          personHash: fatherHashValue,
+          versionIndex: processedData.fatherVersionIndex ?? 0
+        },
+        mother: {
+          fullName: motherData.fullName,
+          gender: motherData.gender,
+          birthYear: motherData.birthYear,
+          birthMonth: motherData.birthMonth,
+          birthDay: motherData.birthDay,
+          isBirthBC: motherData.isBirthBC,
+          personHash: motherHashValue,
+          versionIndex: processedData.motherVersionIndex ?? 0
+        }
+      }
+    }
+  }
 
   const handleClose = () => {
     closedBySelfRef.current = true
@@ -274,6 +362,23 @@ export default function AddVersionModal({
     // Keep modal open for continued use
   }
 
+  const handleDownloadMetadata = () => {
+    const processedData = addVersionSchema.parse(watchedValues)
+    const metadataPayload = buildMetadataPayload(processedData.tag, processedData)
+    const metadataJson = JSON.stringify(metadataPayload, null, 2)
+    
+    // Create blob and download
+    const blob = new Blob([metadataJson], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `metadata-${watchedValues.metadataCID || Date.now()}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
 
   const onSubmit = async (data: AddVersionFormInput) => {
     if (!signer) {
@@ -334,6 +439,19 @@ export default function AddVersionModal({
       }
       
       console.log('🔍 Proof verification: VALID')
+
+      setProofGenerationStep(t('addVersion.generatingMetadataCID', 'Generating metadata CID...'))
+
+      const metadataPayload = buildMetadataPayload(processedData.tag, processedData)
+      const metadataJson = JSON.stringify(metadataPayload)
+      console.log('📄 Metadata payload JSON:', metadataJson)
+
+      // Generate CID using configured method
+      const metadataCID = await generateMetadataCID(metadataJson)
+      console.log('🔑 Generated CID:', metadataCID)
+
+      processedData.metadataCID = metadataCID
+      setValue('metadataCID', metadataCID, { shouldDirty: true, shouldValidate: true })
       
       setProofGenerationStep(t('addVersion.submittingToBlockchain', 'Submitting to blockchain...'))
       
@@ -708,27 +826,41 @@ export default function AddVersionModal({
 
           {/* Metadata */}
           <div className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('addVersion.tag', 'Tag')}
-                </label>
-                <input
-                  {...register('tag')}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                  placeholder={t('addVersion.tagPlaceholder', 'Optional tag')}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('addVersion.tag', 'Tag')}
+              </label>
+              <input
+                {...register('tag')}
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                placeholder={t('addVersion.tagPlaceholder', 'Optional tag')}
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('addVersion.metadataCID', 'Metadata CID')}
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('addVersion.metadataCID', 'Metadata CID')}
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({t('addVersion.autoGenerated', 'Auto-generated')})
+                </span>
+              </label>
+              <div className="flex gap-2">
                 <input
                   {...register('metadataCID')}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                  placeholder={t('addVersion.metadataCIDPlaceholder', 'Optional: IPFS CID (Qm... or bafy...)')}
+                  readOnly
+                  className="flex-1 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 text-sm text-gray-600 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-400 outline-none cursor-not-allowed"
+                  placeholder={t('addVersion.metadataCIDPlaceholder', 'Will be auto-generated from metadata')}
                 />
+                <button
+                  type="button"
+                  onClick={handleDownloadMetadata}
+                  disabled={!watchedValues.metadataCID}
+                  className="px-3 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                  title={t('addVersion.downloadMetadata', 'Download metadata JSON')}
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('addVersion.download', 'Download')}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -846,7 +978,7 @@ export default function AddVersionModal({
 
                       {/* Father Info */}
                       {successResult.events.PersonVersionAdded.fatherHash &&
-                       successResult.events.PersonVersionAdded.fatherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                       successResult.events.PersonVersionAdded.fatherHash !== ethers.ZeroHash && (
                         <>
                           <DataRow
                             label={t('addVersion.fatherHash', 'Father Hash')}
@@ -863,7 +995,7 @@ export default function AddVersionModal({
 
                       {/* Mother Info */}
                       {successResult.events.PersonVersionAdded.motherHash &&
-                       successResult.events.PersonVersionAdded.motherHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+                       successResult.events.PersonVersionAdded.motherHash !== ethers.ZeroHash && (
                         <>
                           <DataRow
                             label={t('addVersion.motherHash', 'Mother Hash')}
