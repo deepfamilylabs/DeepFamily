@@ -194,385 +194,154 @@ describe('Person Version (add-person) Tests', function () {
     expect(versions[1].tag).to.equal('v2');
   });
 
-  describe('updatePersonParents', () => {
-    it('allows original submitter to backfill parents sequentially', async () => {
-      const { deepFamily } = await baseSetup();
-      const [deployer] = await hre.ethers.getSigners();
-      const deployerAddress = await deployer.getAddress();
+  it('allows providing parent hash with unknown (0) version index when parent exists', async () => {
+    const { deepFamily } = await baseSetup();
+    const [signer] = await hre.ethers.getSigners();
+    const submitter = await signer.getAddress();
 
-      await hre.run('add-person', {
-        fullname: 'Backfill Father',
-        birthyear: '1960',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmFather'
-      });
-
-      await hre.run('add-person', {
-        fullname: 'Backfill Mother',
-        birthyear: '1965',
-        gender: '2',
-        tag: 'v1',
-        ipfs: 'QmMother'
-      });
-
-      await hre.run('add-person', {
-        fullname: 'Backfill Child',
-        birthyear: '1990',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmChildNoParents'
-      });
-
-      const fatherHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Backfill Father',
-          birthYear: 1960,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-      const motherHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Backfill Mother',
-          birthYear: 1965,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 2,
-        })
-      );
-      const childHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Backfill Child',
-          birthYear: 1990,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-
-      await expect(
-        deepFamily
-          .connect(deployer)
-          .updatePersonParents(
-            childHash,
-            1,
-            fatherHash,
-            1,
-            hre.ethers.ZeroHash,
-            0
-          )
-      )
-        .to.emit(deepFamily, 'PersonParentsUpdated')
-        .withArgs(childHash, 1n, fatherHash, 1n, hre.ethers.ZeroHash, 0n, deployerAddress);
-
-      let [childVersions] = await deepFamily.listPersonVersions(childHash, 0, 10);
-      expect(childVersions[0].fatherHash).to.equal(fatherHash);
-      expect(childVersions[0].fatherVersionIndex).to.equal(1n);
-      expect(childVersions[0].motherHash).to.equal(hre.ethers.ZeroHash);
-
-      let fatherChildren = await deepFamily.listChildren(fatherHash, 1, 0, 10);
-      expect(fatherChildren[0].length).to.equal(1);
-      expect(fatherChildren[0][0]).to.equal(childHash);
-      expect(fatherChildren[1][0]).to.equal(1n);
-
-      await expect(
-        deepFamily
-          .connect(deployer)
-          .updatePersonParents(
-            childHash,
-            1,
-            hre.ethers.ZeroHash,
-            0,
-            motherHash,
-            1
-          )
-      )
-        .to.emit(deepFamily, 'PersonParentsUpdated')
-        .withArgs(childHash, 1n, fatherHash, 1n, motherHash, 1n, deployerAddress);
-
-      [childVersions] = await deepFamily.listPersonVersions(childHash, 0, 10);
-      expect(childVersions[0].motherHash).to.equal(motherHash);
-      expect(childVersions[0].motherVersionIndex).to.equal(1n);
-
-      const motherChildren = await deepFamily.listChildren(motherHash, 1, 0, 10);
-      expect(motherChildren[0].length).to.equal(1);
-      expect(motherChildren[0][0]).to.equal(childHash);
-      expect(motherChildren[1][0]).to.equal(1n);
+    await hre.run('add-person', {
+      fullname: 'Checked Father',
+      birthyear: '1970',
+      gender: '1',
+      tag: 'v1',
+      ipfs: 'QmCheckedFather'
     });
 
-    it('rejects parent updates from non submitter/non owner', async () => {
-      const { deepFamily } = await baseSetup();
-      const [, attacker] = await hre.ethers.getSigners();
+    const childData = {
+      fullName: 'Child Needs Versioned Parent',
+      passphrase: '',
+      isBirthBC: false,
+      birthYear: 2000,
+      birthMonth: 0,
+      birthDay: 0,
+      gender: 1,
+    };
 
-      await hre.run('add-person', {
-        fullname: 'Guarded Father',
-        birthyear: '1955',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmGFather'
-      });
+    const fatherData = {
+      fullName: 'Checked Father',
+      passphrase: '',
+      isBirthBC: false,
+      birthYear: 1970,
+      birthMonth: 0,
+      birthDay: 0,
+      gender: 1,
+    };
 
-      await hre.run('add-person', {
-        fullname: 'Guarded Child',
-        birthyear: '1995',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmGChild'
-      });
+    const { proof, publicSignals } = await generatePersonHashProof(
+      childData,
+      fatherData,
+      null,
+      submitter,
+    );
 
-      const fatherHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Guarded Father',
-          birthYear: 1955,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
+    const tx = await deepFamily
+      .connect(signer)
+      .addPersonZK(
+        proof.a,
+        proof.b,
+        proof.c,
+        publicSignals,
+        0, // father version unknown (0) but allowed when father exists
+        0,
+        'v1',
+        'ipfs://QmChildNeedsVersion',
       );
-      const childHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Guarded Child',
-          birthYear: 1995,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
+    await tx.wait();
 
-      await expect(
-        deepFamily
-          .connect(attacker)
-          .updatePersonParents(
-            childHash,
-            1,
-            fatherHash,
-            1,
-            hre.ethers.ZeroHash,
-            0
-          )
-      ).to.be.revertedWithCustomError(deepFamily, 'UnauthorizedParentUpdate');
+    const childHash = await deepFamily.getPersonHash(
+      buildBasicInfo({
+        fullName: 'Child Needs Versioned Parent',
+        birthYear: 2000,
+        birthMonth: 0,
+        birthDay: 0,
+        gender: 1,
+      })
+    );
+    const fatherHash = await deepFamily.getPersonHash(
+      buildBasicInfo({
+        fullName: 'Checked Father',
+        birthYear: 1970,
+        birthMonth: 0,
+        birthDay: 0,
+        gender: 1,
+      })
+    );
+
+    const [childVersions] = await deepFamily.listPersonVersions(childHash, 0, 10);
+    expect(childVersions[0].fatherHash).to.equal(fatherHash);
+    expect(childVersions[0].fatherVersionIndex).to.equal(0n);
+    expect(childVersions[0].motherHash).to.equal(hre.ethers.ZeroHash);
+
+    const [zeroIdxChildren, zeroIdxVersionRefs] = await deepFamily.listChildren(fatherHash, 0, 0, 10);
+    expect(zeroIdxChildren).to.include(childHash);
+    expect(zeroIdxVersionRefs[zeroIdxChildren.indexOf(childHash)]).to.equal(1n);
+  });
+
+  it('allows re-submitting a ZK version to backfill parents and link trees', async () => {
+    const { deepFamily } = await baseSetup();
+
+    await hre.run('add-person', {
+      fullname: 'Linked Father',
+      birthyear: '1960',
+      gender: '1',
+      tag: 'v1',
+      ipfs: 'QmLinkedFather'
     });
 
-    it('prevents reassigning a parent once set', async () => {
-      const { deepFamily } = await baseSetup();
-      const [deployer] = await hre.ethers.getSigners();
-
-      await hre.run('add-person', {
-        fullname: 'First Father',
-        birthyear: '1940',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmFirstFather'
-      });
-
-      await hre.run('add-person', {
-        fullname: 'Parented Child',
-        birthyear: '1970',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmParented'
-      });
-
-      const fatherHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'First Father',
-          birthYear: 1940,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-      const childHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Parented Child',
-          birthYear: 1970,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-
-      await deepFamily
-        .connect(deployer)
-        .updatePersonParents(
-          childHash,
-          1,
-          fatherHash,
-          1,
-          hre.ethers.ZeroHash,
-          0
-        );
-
-      await expect(
-        deepFamily
-          .connect(deployer)
-          .updatePersonParents(
-            childHash,
-            1,
-            fatherHash,
-            1,
-            hre.ethers.ZeroHash,
-            0
-          )
-      ).to.be.revertedWithCustomError(deepFamily, 'FatherAlreadySet');
+    await hre.run('add-person', {
+      fullname: 'Linked Mother',
+      birthyear: '1962',
+      gender: '2',
+      tag: 'v1',
+      ipfs: 'QmLinkedMother'
     });
 
-    it('allows linking parent with unspecified (zero) version index', async () => {
-      const { deepFamily } = await baseSetup();
-      const [deployer] = await hre.ethers.getSigners();
-      const deployerAddress = await deployer.getAddress();
-
-      await hre.run('add-person', {
-        fullname: 'Zero Index Father',
-        birthyear: '1945',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmZeroFather'
-      });
-
-      await hre.run('add-person', {
-        fullname: 'Zero Index Child',
-        birthyear: '1975',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmZeroChild'
-      });
-
-      const fatherHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Zero Index Father',
-          birthYear: 1945,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-      const childHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Zero Index Child',
-          birthYear: 1975,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-
-      await expect(
-        deepFamily
-          .connect(deployer)
-          .updatePersonParents(
-            childHash,
-            1,
-            fatherHash,
-            0,
-            hre.ethers.ZeroHash,
-            0
-          )
-      )
-        .to.emit(deepFamily, 'PersonParentsUpdated')
-        .withArgs(childHash, 1n, fatherHash, 0n, hre.ethers.ZeroHash, 0n, deployerAddress);
-
-      const [childVersions] = await deepFamily.listPersonVersions(childHash, 0, 10);
-      expect(childVersions[0].fatherHash).to.equal(fatherHash);
-      expect(childVersions[0].fatherVersionIndex).to.equal(0n);
-
-      const zeroVersionChildren = await deepFamily.listChildren(fatherHash, 0, 0, 10);
-      expect(zeroVersionChildren[0].length).to.equal(1);
-      expect(zeroVersionChildren[0][0]).to.equal(childHash);
-      expect(zeroVersionChildren[1][0]).to.equal(1n);
+    await hre.run('add-person', {
+      fullname: 'Child To Link',
+      birthyear: '1990',
+      gender: '1',
+      tag: 'v1',
+      ipfs: 'QmChildInitial'
     });
 
-    it('rejects setting a parent hash equal to the child hash', async () => {
-      const { deepFamily } = await baseSetup();
-      const [deployer] = await hre.ethers.getSigners();
-
-      await hre.run('add-person', {
-        fullname: 'Self Parent',
-        birthyear: '1990',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmSelf'
-      });
-
-      const childHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Self Parent',
-          birthYear: 1990,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-
-      await expect(
-        deepFamily
-          .connect(deployer)
-          .updatePersonParents(
-            childHash,
-            1,
-            childHash,
-            1,
-            hre.ethers.ZeroHash,
-            0
-          )
-      ).to.be.revertedWithCustomError(deepFamily, 'InvalidParentHash');
+    await hre.run('add-person', {
+      fullname: 'Child To Link',
+      birthyear: '1990',
+      gender: '1',
+      fathername: 'Linked Father',
+      fatherbirthyear: '1960',
+      fathergender: '1',
+      fatherversion: '1',
+      mothername: 'Linked Mother',
+      motherbirthyear: '1962',
+      mothergender: '2',
+      motherversion: '1',
+      tag: 'v2-linked',
+      ipfs: 'QmChildLinked'
     });
 
-    it('rejects assigning the same hash to both parents in a single update', async () => {
-      const { deepFamily } = await baseSetup();
-      const [deployer] = await hre.ethers.getSigners();
-
-      await hre.run('add-person', {
-        fullname: 'Dual Parent',
-        birthyear: '1970',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmDualParent'
-      });
-
-      await hre.run('add-person', {
-        fullname: 'Dual Parent Child',
-        birthyear: '2000',
-        gender: '1',
-        tag: 'v1',
-        ipfs: 'QmDualChild'
-      });
-
-      const parentHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Dual Parent',
-          birthYear: 1970,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-
-      const childHash = await deepFamily.getPersonHash(
-        buildBasicInfo({
-          fullName: 'Dual Parent Child',
-          birthYear: 2000,
-          birthMonth: 0,
-          birthDay: 0,
-          gender: 1,
-        })
-      );
-
-      await expect(
-        deepFamily
-          .connect(deployer)
-          .updatePersonParents(
-            childHash,
-            1,
-            parentHash,
-            1,
-            parentHash,
-            1
-          )
-      ).to.be.revertedWithCustomError(deepFamily, 'InvalidParentHash');
+    const childInfo = buildBasicInfo({
+      fullName: 'Child To Link',
+      birthYear: 1990,
+      birthMonth: 0,
+      birthDay: 0,
+      gender: 1,
     });
+    const childHash = await deepFamily.getPersonHash(childInfo);
+
+    const [versions, totalVersions] = await deepFamily.listPersonVersions(childHash, 0, 10);
+    expect(totalVersions).to.equal(2n);
+    expect(versions[0].fatherHash).to.equal(hre.ethers.ZeroHash);
+    expect(versions[0].motherHash).to.equal(hre.ethers.ZeroHash);
+    expect(versions[1].fatherVersionIndex).to.equal(1n);
+    expect(versions[1].motherVersionIndex).to.equal(1n);
+    expect(versions[1].fatherHash).to.not.equal(hre.ethers.ZeroHash);
+    expect(versions[1].motherHash).to.not.equal(hre.ethers.ZeroHash);
+
+    const [fatherChildren] = await deepFamily.listChildren(versions[1].fatherHash, 1, 0, 10);
+    expect(fatherChildren).to.include(childHash);
+    const [motherChildren] = await deepFamily.listChildren(versions[1].motherHash, 1, 0, 10);
+    expect(motherChildren).to.include(childHash);
   });
 
   it('reverts when proof submitter does not match caller', async () => {

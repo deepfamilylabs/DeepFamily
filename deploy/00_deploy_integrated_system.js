@@ -14,6 +14,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     args: [],
     log: true,
     waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
   });
 
   // 2) Deploy PoseidonT4 library first
@@ -22,6 +23,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     args: [],
     log: true,
     waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
   });
 
   log(`PoseidonT4 library deployed at: ${poseidonT4Deployment.address}`);
@@ -32,6 +34,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     args: [],
     log: true,
     waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
   });
 
   log(`PersonHashVerifier deployed at: ${verifierDeployment.address}`);
@@ -43,6 +46,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     args: [],
     log: true,
     waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
   });
 
   log(`NamePoseidonVerifier deployed at: ${nameVerifierDeployment.address}`);
@@ -56,6 +60,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     },
     log: true,
     waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
   });
 
   // 6) Initialize the DeepFamilyToken contract (set DeepFamily address)

@@ -46,7 +46,7 @@ export default function WalletConnectButton({
       return (
         <div className={`inline-flex items-center gap-2 ${className}`}>
           <button
-            onClick={() => window.open('https://metamask.io/download/', '_blank')}
+            onClick={() => window.open('https://fluentwallet.com/', '_blank')}
             className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
               isHomePage
                 ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15'
