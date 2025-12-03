@@ -985,10 +985,9 @@
       "userRejected": "Transaction was rejected by user"
     },
     "missingParentsTitle": "Incomplete Parent Information",
-    "missingBothParents": "Both parent hashes are empty for this version. The creator may submit parent hash commitments later.",
-    "missingFather": "The father hash is empty for this version. The creator may submit a father hash commitment later.",
-    "missingMother": "The mother hash is empty for this version. The creator may submit a mother hash commitment later.",
-    "parentUpdateNote": "Note: Only the original version creator can submit parent hash commitments via the updatePersonParents function."
+    "missingBothParents": "Both parent hashes are empty for this version. Publish a new ZK version with parent hashes (version index can be 0 to defer choosing a parent version).",
+    "missingFather": "The father hash is empty for this version. Publish a new ZK version with the father hash; index 0 lets the UI pick the highest-endorsed father version.",
+    "missingMother": "The mother hash is empty for this version. Publish a new ZK version with the mother hash; index 0 lets the UI pick the highest-endorsed mother version."
   },
   "endorse": {
     "title": "Endorse Version",

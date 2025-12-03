@@ -985,10 +985,9 @@
       "userRejected": "用戶拒絕交易"
     },
     "missingParentsTitle": "父母資訊不完善",
-    "missingBothParents": "此版本的父母雜湊均為空。版本添加者可能會在未來補錄父母雜湊承諾。",
-    "missingFather": "此版本的父親雜湊為空。版本添加者可能會在未來補錄父親雜湊承諾。",
-    "missingMother": "此版本的母親雜湊為空。版本添加者可能會在未來補錄母親雜湊承諾。",
-    "parentUpdateNote": "注意：只有版本的原始添加者可以透過 updatePersonParents 函式補錄父母雜湊承諾。"
+    "missingBothParents": "此版本的父母雜湊均為空。可提交新的 ZK 版本補錄父母雜湊（版本號可填 0，表示父母存在但具體版本待定）。",
+    "missingFather": "此版本的父親雜湊為空。可透過新的 ZK 版本補錄父親雜湊；版本號為 0 時，前端會預設指向背書最高的父親版本。",
+    "missingMother": "此版本的母親雜湊為空。可透過新的 ZK 版本補錄母親雜湊；版本號為 0 時，前端會預設指向背書最高的母親版本。"
   },
   "endorse": {
     "title": "背書版本",
