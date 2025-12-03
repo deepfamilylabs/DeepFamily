@@ -86,7 +86,6 @@ const isValidTokenUri = (v: string) => {
   }
 }
 
-const ZERO_BYTES32 = `0x${'00'.repeat(32)}`
 const MASK_128 = (1n << 128n) - 1n
 
 type MintProofArgs = {
@@ -107,7 +106,7 @@ const splitToLimbs = (hex: string) => {
 const computeNameBinding = (fullName: string, passphrase: string) => {
   const trimmedName = fullName.trim()
   const nameHex = ethers.keccak256(ethers.toUtf8Bytes(trimmedName))
-  const saltHex = passphrase && passphrase.length > 0 ? ethers.keccak256(ethers.toUtf8Bytes(passphrase)) : ZERO_BYTES32
+  const saltHex = passphrase && passphrase.length > 0 ? ethers.keccak256(ethers.toUtf8Bytes(passphrase)) : ethers.ZeroHash
 
   const nameLimbs = splitToLimbs(nameHex)
   const saltLimbs = splitToLimbs(saltHex)
@@ -378,9 +377,8 @@ export default function MintNFTModal({
         setIsAlreadyMinted(tokenId > 0)
 
         // Check for missing parent hashes
-        const ZERO_BYTES32 = `0x${'00'.repeat(32)}`
-        const fatherMissing = !details?.version?.fatherHash || details.version.fatherHash === ZERO_BYTES32
-        const motherMissing = !details?.version?.motherHash || details.version.motherHash === ZERO_BYTES32
+        const fatherMissing = !details?.version?.fatherHash || details.version.fatherHash === ethers.ZeroHash
+        const motherMissing = !details?.version?.motherHash || details.version.motherHash === ethers.ZeroHash
         
         if (fatherMissing || motherMissing) {
           setHasMissingParents({ father: fatherMissing, mother: motherMissing })

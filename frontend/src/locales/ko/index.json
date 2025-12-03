@@ -755,7 +755,7 @@
     "title": "가족 인물 백과사전",
     "subtitle": "블록체인에 저장된 가족 구성원 프로필 탐색",
     "totalPeople": "인물",
-    "withStories": "전기",
+    "withEncyclopedia": "백과",
     "withNFTs": "NFTs",
     "searchPlaceholder": "이름, 장소 또는 전기 내용으로 검색...",
     "filterByAddress": "생성자 주소로 필터링...",

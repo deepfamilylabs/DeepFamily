@@ -11,7 +11,6 @@ import { poseidon3, poseidon5 } from 'poseidon-lite'
 import { validatePassphraseStrength, normalizeForHash as normalizeForHashUtil, getGraphemeLength as getGraphemeLengthUtil } from '../lib/passphraseStrength'
 
 // Align with contract convention: blank passphrase -> zero salt limbs
-const ZERO_BYTES32 = '0x' + '00'.repeat(32)
 
 const MAX_FULL_NAME_BYTES = 256
 
@@ -131,7 +130,7 @@ export function computePersonHash(input: HashForm): string {
   const fullNameHash = ethers.keccak256(ethers.toUtf8Bytes(normalizedFullName))
   const saltHash = normalizedPassphrase.length > 0
     ? ethers.keccak256(ethers.toUtf8Bytes(normalizedPassphrase))
-    : ZERO_BYTES32
+    : ethers.ZeroHash
 
   // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
   const fullNameHashBN = BigInt(fullNameHash)

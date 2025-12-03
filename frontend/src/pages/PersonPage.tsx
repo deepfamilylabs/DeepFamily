@@ -628,7 +628,7 @@ export default function PersonPage() {
                             <h1 className="text-2xl sm:text-3xl font-normal text-gray-900 dark:text-gray-100" title={data.fullName || `Token #${data.tokenId}`}>
                               {data.fullName || `Token #${data.tokenId}`}
                             </h1>
-                            <span className="text-sm sm:text-3xl text-gray-500 dark:text-gray-400 font-normal whitespace-nowrap">
+                            <span className="text-sm sm:text-3xl text-gray-500 dark:text-gray-400 font-display whitespace-nowrap">
                               {t('person.encyclopedia', 'Encyclopedia')}
                             </span>
                           </div>

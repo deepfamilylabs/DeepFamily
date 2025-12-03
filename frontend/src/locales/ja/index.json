@@ -755,7 +755,7 @@
     "title": "家族人物百科",
     "subtitle": "ブロックチェーンに保存された家族メンバープロフィールを探索",
     "totalPeople": "人",
-    "withStories": "伝記",
+    "withEncyclopedia": "百科",
     "withNFTs": "NFTs",
     "searchPlaceholder": "氏名、場所、伝記内容で検索...",
     "filterByAddress": "作成者アドレスでフィルタ...",
