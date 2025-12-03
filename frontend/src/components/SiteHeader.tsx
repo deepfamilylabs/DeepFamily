@@ -18,7 +18,7 @@ export default function SiteHeader() {
   const badgeConfig = getBadgeConfig()
 
   const navClasses = ({ isActive }: { isActive: boolean }) => {
-    const baseClasses = 'inline-flex items-center gap-2 px-2 py-2 lg:px-4 lg:py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 relative group whitespace-nowrap'
+    const baseClasses = 'inline-flex items-center gap-1.5 px-2 py-1.5 lg:px-3.5 lg:py-2 rounded-xl text-xs font-semibold transition-all duration-200 relative group whitespace-nowrap'
     if (isHomePage) {
       return `${baseClasses} ${
         isActive
@@ -53,11 +53,11 @@ export default function SiteHeader() {
         </>
       )}
       <PageContainer className="relative h-16 flex items-center justify-between">
-        <NavLink to="/" className={`flex items-center gap-3 font-bold transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
-          <Logo className={`w-8 h-8 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-blue-500 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
-          <span className={`hidden sm:inline text-xl font-light tracking-widest uppercase ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', letterSpacing: '0.2em' }}>DeepFamily</span>
+        <NavLink to="/" className={`flex items-center gap-1.5 transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
+          <Logo className={`w-7 h-7 flex-shrink-0 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-blue-500 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
+          <span className={`text-[1.6rem] font-display mt-1 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{ lineHeight: '1', fontWeight: 500 }}>Deepfamily</span>
           {badgeConfig && (
-            <span className="relative inline-block -ml-1 h-6 align-bottom">
+            <span className="relative inline-block ml-0.5 h-6 align-bottom">
               <span className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}>
                 {badgeConfig.text}
               </span>
@@ -66,23 +66,23 @@ export default function SiteHeader() {
         </NavLink>
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-shrink-0 min-w-0">
           <NavLink to="/" className={navClasses} end>
-            <Home className="w-4 h-4" /> 
+            <Home className="w-3.5 h-3.5" /> 
             <span className="hidden lg:inline">{t('navigation.home')}</span>
           </NavLink>
           <NavLink to="/familyTree" className={navClasses}>
-            <Network className="w-4 h-4" /> 
+            <Network className="w-3.5 h-3.5" /> 
             <span className="hidden lg:inline">{t('navigation.familyTree')}</span>
           </NavLink>
           <NavLink to="/people" className={navClasses}>
-            <Book className="w-4 h-4" /> 
+            <Book className="w-3.5 h-3.5" /> 
             <span className="hidden lg:inline">{t('navigation.people')}</span>
           </NavLink>
           <NavLink to="/search" className={navClasses}>
-            <Search className="w-4 h-4" />
+            <Search className="w-3.5 h-3.5" />
             <span className="hidden lg:inline">{t('navigation.search')}</span>
           </NavLink>
           <NavLink to="/actions" className={navClasses}>
-            <Zap className="w-4 h-4" />
+            <Zap className="w-3.5 h-3.5" />
             <span className="hidden lg:inline">{t('navigation.actions', 'Actions')}</span>
           </NavLink>
         </nav>
