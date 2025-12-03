@@ -3,6 +3,8 @@ const hre = require('hardhat');
 const { buildBasicInfo } = require('../lib/namePoseidon');
 const { generateNamePoseidonProof } = require('../lib/namePoseidonProof');
 
+const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000);
+
 // Tests for mint-nft task & underlying contract invariants
 
 describe('Mint NFT Tests', function () {
@@ -32,6 +34,44 @@ describe('Mint NFT Tests', function () {
       await hre.run('endorse', { person: personHash, vindex: '1' });
     }
     return { deepFamily, personHash, FULLNAME, fullNameCommitment, basicInfo, proof, publicSignals };
+  }
+
+  async function prepareAgeCase({
+    fullName = 'Age Gate Subject',
+    birthYear = 0,
+    birthMonth = 0,
+    birthDay = 0,
+    birthBC = false,
+  }) {
+    await hre.deployments.fixture(['Integrated']);
+    const deepDeployment = await hre.deployments.get('DeepFamily');
+    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
+    const [signer] = await hre.ethers.getSigners();
+
+    await hre.run('add-person', {
+      fullname: fullName,
+      birthyear: String(birthYear),
+      birthmonth: String(birthMonth),
+      birthday: String(birthDay),
+      birthbc: birthBC ? 'true' : 'false',
+      gender: '1',
+      tag: 'v1',
+      ipfs: 'QmAge',
+    });
+
+    const basicInfo = buildBasicInfo({
+      fullName,
+      isBirthBC: birthBC,
+      birthYear,
+      birthMonth,
+      birthDay,
+      gender: 1,
+    });
+    const personHash = await deepFamily.getPersonHash(basicInfo);
+    const { proof, publicSignals } = await generateNamePoseidonProof(fullName, "", { minter: signer.address });
+    await hre.run('endorse', { person: personHash, vindex: '1' });
+
+    return { deepFamily, personHash, basicInfo, proof, publicSignals, fullName };
   }
 
   it('fails mint through task before endorsement (task layer error)', async () => {
@@ -212,5 +252,130 @@ describe('Mint NFT Tests', function () {
         coreInfo
       )
     ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch');
+  });
+
+  describe('Age gate', () => {
+    function supplement(fullName) {
+      return {
+        fullName,
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story',
+      };
+    }
+
+    async function setNextBlockTimestamp(ts) {
+      const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest');
+      const next = Math.max(Number(latestTs) + 1, ts);
+      await hre.network.provider.send('evm_setNextBlockTimestamp', [next]);
+      await hre.network.provider.send('evm_mine');
+      return next;
+    }
+
+    async function planMintDate() {
+      const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest');
+      const baseYear = new Date(latestTs * 1000).getUTCFullYear();
+      const mintYear = baseYear + 1;
+      const mintMonth = 6; // June
+      const mintDay = 15;
+      const mintTs = toTimestamp(mintYear, mintMonth, mintDay);
+      return { mintYear, mintMonth, mintDay, mintTs };
+    }
+
+    it('reverts when age is 18 but birth month not reached', async () => {
+      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate();
+      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
+        birthYear: mintYear - 18,
+        birthMonth: mintMonth + 1,
+        birthDay: mintDay,
+      });
+      await setNextBlockTimestamp(mintTs);
+
+      await expect(
+        deepFamily.mintPersonNFT(
+          proof.a,
+          proof.b,
+          proof.c,
+          publicSignals,
+          personHash,
+          1,
+          'ipfs://age-under',
+          { basicInfo, supplementInfo: supplement(fullName) }
+        )
+      ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult');
+    });
+
+    it('reverts when age is exactly 18 but birthday day not reached', async () => {
+      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate();
+      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
+        birthYear: mintYear - 18,
+        birthMonth: mintMonth,
+        birthDay: mintDay + 5,
+      });
+      await setNextBlockTimestamp(mintTs);
+
+      await expect(
+        deepFamily.mintPersonNFT(
+          proof.a,
+          proof.b,
+          proof.c,
+          publicSignals,
+          personHash,
+          1,
+          'ipfs://age-day',
+          { basicInfo, supplementInfo: supplement(fullName) }
+        )
+      ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult');
+    });
+
+    it('allows mint when age is exactly 18 with birth day unknown in current month', async () => {
+      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate();
+      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
+        birthYear: mintYear - 18,
+        birthMonth: mintMonth,
+        birthDay: 0,
+      });
+      await setNextBlockTimestamp(mintTs);
+
+      await expect(
+        deepFamily.mintPersonNFT(
+          proof.a,
+          proof.b,
+          proof.c,
+          publicSignals,
+          personHash,
+          1,
+          'ipfs://age-unknown-day',
+          { basicInfo, supplementInfo: supplement(fullName) }
+        )
+      ).to.not.be.reverted;
+    });
+
+    it('allows mint when birth year is unknown (0)', async () => {
+      const { mintTs } = await planMintDate();
+      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
+        birthYear: 0,
+        birthMonth: 0,
+        birthDay: 0,
+      });
+      await setNextBlockTimestamp(mintTs);
+
+      await expect(
+        deepFamily.mintPersonNFT(
+          proof.a,
+          proof.b,
+          proof.c,
+          publicSignals,
+          personHash,
+          1,
+          'ipfs://age-unknown-year',
+          { basicInfo, supplementInfo: supplement(fullName) }
+        )
+      ).to.not.be.reverted;
+    });
   });
 });
