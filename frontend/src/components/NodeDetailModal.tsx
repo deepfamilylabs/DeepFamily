@@ -1,7 +1,8 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Clipboard, Edit2, User, Image, Star, Book } from 'lucide-react'
+import { X, Clipboard, Edit2, User, Image, Star, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ethers } from 'ethers'
 import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
@@ -174,7 +175,7 @@ export default function NodeDetailModal({
     )
   }
   const SmartHash: React.FC<{ text?: string | null }> = ({ text }) => {
-    if (!text) return <span>-</span>
+    if (!text || text === ethers.ZeroHash) return <span>-</span>
     return <span className="block break-all">{text}</span>
   }
 
@@ -272,7 +273,7 @@ export default function NodeDetailModal({
                           className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
                           title={t('familyTree.nodeDetail.viewFullStory', 'View Full Story')}
                         >
-                          <Book className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                           <span className="hidden sm:inline text-[13px] font-semibold text-blue-700 dark:text-blue-400">{t('familyTree.nodeDetail.encyclopedia', 'Encyclopedia')}</span>
                         </button>
                         <button
@@ -314,12 +315,13 @@ export default function NodeDetailModal({
           <div className="space-y-2.5">
             <Row label={t('familyTree.nodeDetail.hash')} value={<SmartHash text={(nodeData?.personHash || fallback.hash)} />} copy={nodeData?.personHash || fallback.hash} color="purple" />
             <Row label={t('familyTree.nodeDetail.version')} value={(nodeData?.versionIndex !== undefined && Number(nodeData.versionIndex) > 0) ? String(nodeData.versionIndex) : '-'} color="purple" />
-            <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash} color="blue" />
+            <Row label={t('familyTree.nodeDetail.father')} value={<SmartHash text={nodeData?.fatherHash} />} copy={nodeData?.fatherHash && nodeData.fatherHash !== ethers.ZeroHash ? nodeData.fatherHash : undefined} color="blue" />
             <Row label={t('familyTree.nodeDetail.fatherVersion')} value={(nodeData && Number(nodeData.fatherVersionIndex) > 0) ? String(nodeData.fatherVersionIndex) : '-'} color="blue" />
-            <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash} color="pink" />
+            <Row label={t('familyTree.nodeDetail.mother')} value={<SmartHash text={nodeData?.motherHash} />} copy={nodeData?.motherHash && nodeData.motherHash !== ethers.ZeroHash ? nodeData.motherHash : undefined} color="pink" />
             <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} color="pink" />
             <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} color="emerald" />
             <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} color="amber" />
+            <Row label={t('familyTree.nodeDetail.tag')} value={nodeData?.tag || '-'} color="slate" />
             <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} color="slate" />
             {/* NFT Section - only when NFT exists */}
             {hasNFT && (

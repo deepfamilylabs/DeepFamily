@@ -7,6 +7,7 @@ import {
   User,
   Calendar,
   Book,
+  BookOpen,
   FileText,
   Clock,
   ChevronDown,
@@ -461,7 +462,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                         className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
                         title={t('storyChunksModal.peopleEncyclopedia', 'People Encyclopedia')}
                       >
-                        <Book className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         <span className="hidden sm:inline text-[13px] font-semibold text-blue-700 dark:text-blue-400">
                           {t('familyTree.nodeDetail.encyclopedia', 'Encyclopedia')}
                         </span>
