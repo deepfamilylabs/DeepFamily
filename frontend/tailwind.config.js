@@ -55,8 +55,9 @@ export default {
         },
       },
       fontFamily: {
-        'display': ['Inter', 'system-ui', 'sans-serif'],
-        'body': ['Inter', 'system-ui', 'sans-serif'],
+        'sans': ['Inter', '-apple-system', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
+        'display': ['Zain', '-apple-system', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        'body': ['Inter', '-apple-system', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       backdropBlur: {
         'xs': '2px',

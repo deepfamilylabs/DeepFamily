@@ -64,7 +64,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
         <button
           onClick={toggleTheme}
           aria-label={theme==='dark' ? (t('theme.switchToLight','Switch to Light') as string) : (t('theme.switchToDark','Switch to Dark') as string)}
-          className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
+          className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
             isHomePage 
               ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
               : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
@@ -82,7 +82,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
       <div className="md:hidden relative" ref={settingsRef}>
         <button
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-          className={`flex items-center gap-1 px-2 py-2 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm ${
+          className={`flex items-center gap-1 px-2 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm ${
             isHomePage 
               ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
               : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
@@ -105,7 +105,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className={`flex items-center justify-between w-full px-4 py-3 text-sm transition-all duration-200 rounded-lg mx-1 ${
+              className={`flex items-center justify-between w-full px-4 py-3 text-xs transition-all duration-200 rounded-lg mx-1 ${
                 isHomePage
                   ? 'text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700/70'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -140,7 +140,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
                   <button
                     key={language.code}
                     onClick={() => handleLanguageChange(language.code)}
-                    className={`flex items-center justify-between w-full px-3 py-2.5 text-sm transition-all duration-200 rounded-lg ${
+                    className={`flex items-center justify-between w-full px-3 py-2.5 text-xs transition-all duration-200 rounded-lg ${
                       i18n.language === language.code
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'

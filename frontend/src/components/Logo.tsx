@@ -21,7 +21,7 @@ export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
       <g 
         fill="currentColor" 
         stroke="currentColor" 
-        strokeWidth="3"
+        strokeWidth="3.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
