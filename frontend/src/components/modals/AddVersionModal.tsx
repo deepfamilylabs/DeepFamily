@@ -623,7 +623,14 @@ export default function AddVersionModal({
         <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0" style={{ touchAction: 'pan-y' }}>
           <form id="add-version-form" onSubmit={handleSubmit(onSubmit)} className="min-h-full flex flex-col">
             <div className="flex-1 p-4 sm:p-6 space-y-6">
-          
+
+          <div className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-300/40 dark:bg-amber-900/20 dark:text-amber-50">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <p className="text-xs leading-relaxed">
+              {t('mintNFT.legalTruthfulNotice', 'Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.')}
+            </p>
+          </div>
+
           {/* Person Being Added - Using PersonHashCalculator */}
           <div className="space-y-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">

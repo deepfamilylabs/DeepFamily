@@ -28,6 +28,8 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - 💰 **Smart Incentives**: DEEP token rewards for complete family data contributions
 - 🤝 **Community Validation**: Endorsement-based governance ensures information quality
 
+> Disclaimer: The DEEP token is solely a platform utility point used to access and operate DeepFamily functionality. It carries no investment attributes, makes no promise of profit or returns, and must not be used to initiate fundraising, wealth‑management, investment plans, or speculative trading of any kind.
+
 ## 🎯 Core Features
 
 ### 🔐 Zero-Knowledge Privacy System
@@ -43,14 +45,14 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - **Story Sharding**: Detailed life stories stored in up to 100×1KB on-chain chunks with immutable sealing
 - **Endorsement Requirement**: Must endorse a version before minting its NFT
 
-### 💰 DEEP Token Economics
+### 💰 DEEP Token Utility Mechanics
 - **Smart Mining**: Rewards mint only when parent hash commitments are submitted (encourages structured family data without exposing plaintext)
 - **Progressive Halving**: 10 halving cycles with expanding periods (1→10→100→1K→10K→100K→1M→10M→100M→Fixed 100M)
 - **100 Billion Cap**: Fixed maximum supply, rewards continue halving asymptotically until cap is reached
 - **Complete Family Incentives**: Encourages connected family trees over isolated entries
 
 ### 🤝 Community Governance
-- **Endorsement Fees**: Pay current mining reward to endorse trusted versions
+- **Endorsement Fees**: Pay current utility issuance level to endorse trusted versions
 - **Fee Distribution**: Majority flows to NFT holders or contributors, with a small protocol share (default 5%, max 20%) for sustainability
 - **Version Competition**: Multiple versions per person, community selects best through endorsements
 - **Quality Signaling**: Endorsement counts indicate version trustworthiness
@@ -92,7 +94,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - Mining rewards for complete family data
 
 **DeepFamilyToken.sol** - DEEP Token
-- ERC20 with progressive halving mining mechanism
+- ERC20 with progressive halving utility issuance mechanism
 - 100 billion supply cap, 10 halving cycles
 - Authorized minting only by DeepFamily contract
 

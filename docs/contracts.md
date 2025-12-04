@@ -287,7 +287,9 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 ## DeepFamilyToken.sol - DEEP ERC20 Mining Token
 
 **Location**: `contracts/DeepFamilyToken.sol`
-**Description**: Standard ERC20 token with progressive halving mining mechanics for family tree protocol incentives.
+**Description**: Standard ERC20 token with progressive halving utility issuance mechanics for family tree protocol incentives.
+
+> Disclaimer: The DEEP token is solely a platform utility point used to access and operate DeepFamily functionality. It carries no investment attributes, makes no promise of profit or returns, and must not be used to initiate fundraising, wealth‑management, investment plans, or speculative trading of any kind.
 
 ### Mining Constants
 

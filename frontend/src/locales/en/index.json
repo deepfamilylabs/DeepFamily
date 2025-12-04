@@ -63,11 +63,11 @@
       },
       "communityEndorsement": {
         "title": "Community Endorsement",
-        "description": "Endorsing with DEEP tokens carries real cost, so endorsers vote with fees to surface trustworthy versions and dilute noise"
+        "description": "Endorsing with DEEP utility points carries real cost, so endorsers vote with fees to surface trustworthy versions and dilute noise"
       },
       "nftValueCreation": {
         "title": "NFT Value Creation",
-        "description": "Backed versions mint into NFT biographies where holders capture future endorsement fees and story traffic, rewarding quality contributions"
+        "description": "Backed versions mint into NFT biographies where holders route future endorsement fees and story traffic, recognizing quality contributions"
       },
       "storyShardingSealing": {
         "title": "Story Sharding & Sealing",
@@ -119,9 +119,9 @@
         "title": "Workflow",
         "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
-        "step1Desc": "Submit parent hash commitments → receive DEEP token rewards",
+        "step1Desc": "Submit parent hash commitments → receive DEEP utility distribution",
         "step2": "User Endorsement",
-        "step2Desc": "Pay DEEP tokens to endorse a version",
+        "step2Desc": "Pay DEEP utility points to endorse a version",
         "step3": "Mint Version NFT",
         "step3Desc": "Endorsers can mint NFTs for corresponding versions",
         "step4": "Write Story Shards",
@@ -129,7 +129,7 @@
         "step5": "Story Sealing",
         "step5Desc": "Seal stories to form immutable on-chain historical records",
         "conclusion": "Value-Driven Collaborative Network",
-        "conclusionDesc": "Through economic incentive mechanisms, achieving natural accumulation and value discovery of high-quality genealogy data"
+        "conclusionDesc": "Through utility-gated actions and contribution-based distributions, enabling organic accumulation and discovery of high-quality genealogy data"
       },
       "privacyLayer": {
         "title": "Privacy Protection Layer",
@@ -140,10 +140,10 @@
       },
       "valueLayer": {
         "title": "Value Confirmation Layer",
-        "description": "Achieving data value confirmation and distribution through economic incentives and consensus mechanisms",
+        "description": "Confirming data quality and routing functional fees through utility-based consensus mechanisms",
         "feature1": "Endorsement consensus mechanism",
         "feature2": "NFT value binding",
-        "feature3": "Revenue rights distribution"
+        "feature3": "Fee routing"
       }
     },
     "features": {
@@ -158,8 +158,8 @@
         "description": "Person versions store parent pointers and timestamps; on-chain deduplication plus endorsement ordering keeps history traceable."
       },
       "endorsementEconomy": {
-        "title": "Endorsement Economy Loop",
-        "description": "Every endorsement costs DEEP and splits between holder, contributor, and protocol, binding trusted consensus to real economic stakes."
+        "title": "Endorsement Utility Loop",
+        "description": "Every endorsement costs DEEP and splits between holder, contributor, and protocol—functional fee routing that ties trust to on-chain actions."
       },
       "personNFT": {
         "title": "NFT Biographies",
@@ -175,31 +175,32 @@
       }
     },
     "tokenomics": {
-      "title": "Incentives & Token Economics",
-      "subtitle": "A DEEP token-powered loop that keeps incentives and data quality aligned",
+      "pill": "Utility & Incentives",
+      "title": "Utility & Incentives",
+      "subtitle": "DEEP utility points gate actions and allocate to complete, verified data—no investment promises",
       "deepToken": {
-        "title": "DEEP Token",
-        "description": "Progressive halving issuance keeps rewards tapering with contributions while maintaining long-term supply discipline."
+        "title": "DEEP Utility Points",
+        "description": "Progressive halving utility issuance used solely for protocol actions; rewards follow contributions while maintaining supply discipline."
       },
       "supply": {
         "title": "Supply Cap",
-        "description": "Supply capped at 100B tokens with no pre-mine; issuance only happens through protocol interactions."
+        "description": "Utility supply capped at 100B with no pre-mine or fundraising; minting only via protocol interactions."
       },
       "mining": {
-        "title": "Mining Trigger",
-        "description": "Rewards mint only when a new person submits parent hash commitments, incentivizing structured completion without exposing parent plaintext."
+        "title": "Issuance Trigger",
+        "description": "Utility rewards mint only when parent hash commitments are submitted, incentivizing structured completion without exposing plaintext."
       },
       "endorsement": {
         "title": "Endorsement Fees",
-        "description": "Fees track the current reward level; the protocol can retain a small share to raise the real cost of self-endorsement."
+        "description": "Fees mirror the current utility issuance level; the protocol can retain a small share to curb self-endorsement and fund operations."
       },
       "distribution": {
         "title": "Fee Distribution",
-        "description": "Fees flow between submitters and NFT holders—before minting they reward the creator, after minting they follow the NFT ownership."
+        "description": "Fees route between submitters and NFT holders based on stage; they are functional transfers, not investment returns."
       },
       "goal": {
-        "title": "Economic Goals",
-        "description": "Use real-cost consensus to reward accurate relationships while suppressing spam and repetitive noise."
+        "title": "Protocol Goals",
+        "description": "Align real costs with data quality to reward accurate relationships while suppressing spam and noise."
       }
     },
     "audience": {
@@ -208,7 +209,7 @@
       "contributors": {
         "title": "Data Contributors",
         "description": "Input, enrich, and verify genealogy data to build a trusted network",
-        "benefit1": "Earn DEEP mining rewards",
+        "benefit1": "Receive DEEP utility distributions",
         "benefit2": "Share in ongoing endorsement fees"
       },
       "researchers": {
@@ -819,8 +820,8 @@
     "walletRequiredDesc": "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
     "walletConnected": "Wallet Connected",
     "whatYouCanDo": "What you can do after connecting:",
-    "feature1": "Add new person versions (earn DEEP tokens)",
-    "feature2": "Endorse quality data and earn rewards",
+    "feature1": "Add new person versions (receive DEEP utility points)",
+    "feature2": "Endorse quality data and route utility fees",
     "feature3": "Mint person versions as NFT collectibles",
     "addVersion": "Add Version",
     "add": "Add",
@@ -830,7 +831,7 @@
     "mintNFTDesc": "Convert endorsed person data into valuable NFT collectibles",
     "endorse": "Endorse",
     "endorsement": "Endorsement",
-    "endorseDesc": "Support quality data by endorsing versions with DEEP tokens",
+    "endorseDesc": "Support quality data by endorsing versions with DEEP utility points",
     "startAddVersion": "Start Adding Version",
     "mintNFTHint": "First search for a person and version to mint as NFT",
     "openMintNFT": "Open NFT Minting",
@@ -875,15 +876,15 @@
     "fatherVersionIndex": "Father Version",
     "motherHash": "Mother Hash",
     "motherVersionIndex": "Mother Version",
-    "tokenReward": "Token Reward Distributed",
-    "familyComplete": "Parent hash commitments submitted - token reward earned",
+    "tokenReward": "Utility Distribution Complete",
+    "familyComplete": "Parent hash commitments submitted - utility points distributed",
     "miner": "Miner",
     "hashPrefix": "Hash",
     "prover": "Prover",
-    "rewardAmount": "Reward Amount",
-    "noTokenReward": "No Token Reward",
-    "tokenRewardCondition": "Token rewards distribute when parent hash commitments are submitted",
-    "tokenRewardTip": "Submit parent hash commitments to earn DEEP token rewards",
+    "rewardAmount": "Utility Amount",
+    "noTokenReward": "No Utility Distribution",
+    "tokenRewardCondition": "Utility points distribute when parent hash commitments are submitted",
+    "tokenRewardTip": "Submit parent hash commitments to receive DEEP utility distributions",
     "failed": "Transaction Failed",
     "errorType": "Error Type",
     "errorMessage": "Message",
@@ -900,7 +901,7 @@
     "personInfo": "Person Information",
     "personInfoHint": "Plain text stays off-chain; used only for local ZK proof",
     "personInfoPrivacy": "Person information is only used locally to generate zero-knowledge proofs. Plain text will not be stored on-chain, only the hash value is permanently recorded.",
-    "parentInfoNotice": "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection."
+    "parentInfoNotice": "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and triggers DEEP utility distribution. Parent info must match their actual versions exactly (incl. passphrase) to establish connection."
   },
   "mintNFT": {
     "title": "Mint NFT",
@@ -920,6 +921,8 @@
     "basicInfo": "Basic Information",
     "basicInfoMustMatch": "The basic information you enter must exactly match the target version data. The contract will verify this on-chain before minting.",
     "publicOnChain": "Public on chain",
+    "legalTruthfulNotice": "Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.",
+    "ageRequirement": "The person minted into an NFT must be 18 years or older. Do not submit minors' identities.",
     "supplementalInfo": "Supplemental Information",
     "supplementalInfoImmutable": "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
     "birthPlace": "Birth Place",
@@ -1000,19 +1003,19 @@
     "versionInfo": "Version Information",
     "fullName": "Full Name",
     "currentEndorsements": "Current Endorsements",
-    "deepTokenFee": "DEEP Token Fee",
-    "yourBalance": "Your DEEP Balance",
+    "deepTokenFee": "DEEP Utility Fee",
+    "yourBalance": "Your DEEP Utility Balance",
     "feeRecipient": "Fee Recipient",
     "feeDistribution": "Fee Distribution",
     "nftMinted": "NFT Minted",
     "feeToNFTHolder": "{{recipientPercent}}% to NFT holder, {{protocolPercent}}% protocol fee",
     "noNFT": "No NFT Yet",
     "feeToCreator": "{{recipientPercent}}% to version creator, {{protocolPercent}}% protocol fee",
-    "feeNote": "DEEP token fee is dynamic based on current mining rewards",
-    "insufficientBalance": "Insufficient DEEP Token Balance",
-    "needMoreTokens": "You need more DEEP tokens to endorse this version",
+    "feeNote": "DEEP utility fee is dynamic based on the current utility reward level",
+    "insufficientBalance": "Insufficient DEEP Utility Balance",
+    "needMoreTokens": "You need more DEEP utility points to endorse this version",
     "endorsementComplete": "Endorsement Complete",
-    "needMoreForNext": "You need more DEEP tokens for additional endorsements",
+    "needMoreForNext": "You need more DEEP utility points for additional endorsements",
     "benefits": "Benefits of Endorsing",
     "benefitQuality": "Help verify and improve data quality",
     "benefitPriority": "Endorsed versions get higher priority in searches",
@@ -1025,9 +1028,9 @@
     "endorse": "Endorse",
     "invalidTarget": "Invalid person hash or version index",
     "invalidTargetDesc": "Please verify the hash and index refer to an existing version",
-    "needApprove": "Allowance too low, please approve DEEP tokens again",
+    "needApprove": "Allowance too low, please approve DEEP utility points again",
     "personHashRequired": "Please provide valid person hash and version index",
-    "insufficientDeepTokens": "Insufficient DEEP tokens for endorsement",
+    "insufficientDeepTokens": "Insufficient DEEP utility points for endorsement",
     "endorsedSuccessfully": "Version endorsed successfully!",
     "successTitle": "Endorsement Successful",
     "successDesc": "Version has been successfully endorsed",
@@ -1055,20 +1058,20 @@
     "canContinueEndorsing": "You can now continue to endorse other versions or close this dialog.",
     "transactionFailed": "Transaction failed. Please check the error message and try again.",
     "transactionFailedDetails": "The transaction was submitted but failed to complete successfully.",
-    "approvingDesc": "Please confirm the token approval in your wallet",
+    "approvingDesc": "Please confirm the DEEP utility approval in your wallet",
     "endorsingDesc": "Processing endorsement on the blockchain...",
     "errors": {
       "invalidTarget": "Invalid person hash or version index",
-      "needApprove": "Allowance too low, please approve DEEP tokens again",
-      "insufficientDeepTokens": "Insufficient DEEP tokens for endorsement",
+      "needApprove": "Allowance too low, please approve DEEP utility points again",
+      "insufficientDeepTokens": "Insufficient DEEP utility points for endorsement",
       "feeTransferFailed": "Failed to transfer endorsement fee",
       "insufficientFunds": "Insufficient funds for transaction",
       "userRejected": "Transaction was rejected by user",
       "walletTimeout": "Wallet confirmation timed out. The wallet popup may have been closed or hidden.",
       "walletTimeoutDetails": "Please try again and make sure to confirm the transaction in your wallet popup window."
     },
-    "approveUnlimited": "Approve unlimited DEEP allowance to avoid future approvals",
-    "approveUnlimitedHint": "Recommended: Each endorsement consumes allowance, unlimited approval avoids repeated authorizations",
+    "approveUnlimited": "Approve unlimited DEEP utility allowance to avoid future approvals",
+    "approveUnlimitedHint": "Recommended: Each endorsement consumes allowance; unlimited approval avoids repeated authorizations",
     "retryTransaction": "Retry Transaction"
   },
   "transaction": {
