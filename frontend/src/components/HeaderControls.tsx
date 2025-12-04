@@ -51,7 +51,7 @@ export default function HeaderControls({ variant = 'home' }: HeaderControlsProps
   const isHomePage = variant === 'home'
 
   return (
-    <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+    <div className="flex items-center gap-2 lg:gap-3 min-w-0">
       {/* Wallet connect button - always show */}
       <WalletConnectButton 
         showBalance={false}
