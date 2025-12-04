@@ -33,6 +33,7 @@ const {
   getPersonProgress,
   normalizePersonData,
 } = require("../lib/seedHelpers");
+const { buildVersionMetadataPayload, generateMetadataCID } = require("../lib/versionMetadata");
 
 function decodeEthersError(error, contract) {
   // Try to parse custom errors using the contract interface
@@ -393,6 +394,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         storyMetadata: progress.storyMetadata,
         owner: progress.owner,
         isExisting: true,
+        metadataCID: personInfo.metadataCID || null,
       };
       addedPersons.push(savedPerson);
       existingPersons++;
@@ -404,12 +406,15 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     // Find parent data
     let fatherData = null;
     let fatherVersion = 0;
+    let fatherHash = ethers.ZeroHash;
+    let fatherRecord = null;
 
     if (personInfo.fatherName) {
-      const father = addedPersons.find((p) => p.fullName === personInfo.fatherName);
-      if (father) {
-        fatherData = father.personData;
-        fatherVersion = father.version;
+      fatherRecord = addedPersons.find((p) => p.fullName === personInfo.fatherName);
+      if (fatherRecord) {
+        fatherData = fatherRecord.personData;
+        fatherVersion = fatherRecord.version;
+        fatherHash = fatherRecord.hash || ethers.ZeroHash;
         console.log(`  Father: ${personInfo.fatherName} (v${fatherVersion})`);
       } else {
         console.log(`  Warning: Father "${personInfo.fatherName}" not found`);
@@ -418,15 +423,41 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
     let motherData = null;
     let motherVersion = 0;
+    let motherHash = ethers.ZeroHash;
+    let motherRecord = null;
 
     if (personInfo.motherName) {
-      const mother = addedPersons.find((p) => p.fullName === personInfo.motherName);
-      if (mother) {
-        motherData = mother.personData;
-        motherVersion = mother.version;
+      motherRecord = addedPersons.find((p) => p.fullName === personInfo.motherName);
+      if (motherRecord) {
+        motherData = motherRecord.personData;
+        motherVersion = motherRecord.version;
+        motherHash = motherRecord.hash || ethers.ZeroHash;
         console.log(`  Mother: ${personInfo.motherName} (v${motherVersion})`);
       }
     }
+
+    // Build deterministic metadata JSON and CID (reuse UI logic)
+    const metadataPayload = buildVersionMetadataPayload({
+      tag: personInfo.tag || "",
+      personInfo: personDataWithPassphrase,
+      fatherInfo: fatherData,
+      motherInfo: motherData,
+      fatherVersionIndex: fatherVersion,
+      motherVersionIndex: motherVersion,
+      personHash,
+      fatherHash,
+      motherHash,
+    });
+    const metadataJson = JSON.stringify(metadataPayload);
+    console.log(`  🧾 Metadata JSON size: ${Buffer.byteLength(metadataJson, "utf8")} bytes`);
+    console.log("  📝 Metadata JSON:", metadataJson);
+    const metadataCID =
+      personInfo.metadataCID && personInfo.metadataCID.length > 0
+        ? personInfo.metadataCID
+        : await generateMetadataCID(metadataJson);
+    console.log(
+      `  ✓ Metadata prepared — CID: ${metadataCID}${personInfo.metadataCID ? " (from JSON)" : ""}`,
+    );
 
     // Add person (using ZK proof)
     console.log("  ▶ Generating ZK proof...");
@@ -441,7 +472,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       fatherVersion,
       motherVersion,
       tag: personInfo.tag || "",
-      ipfs: personInfo.metadataCID || "",
+      ipfs: metadataCID,
     });
     const addElapsed = Date.now() - addStart;
     const proofMs = addResult?.timing?.proofGeneration ?? null;
@@ -496,6 +527,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       storyMetadata: null,
       owner: signer.address,
       isExisting: false,
+      metadataCID,
     };
     addedPersons.push(savedPerson);
     newlyAddedPersons++;
