@@ -158,7 +158,7 @@ export function formatHashMiddle(val?: string, prefix = 10, suffix = 8): string 
   if (!val) return ''
   const isHexLike = /^0x[0-9a-fA-F]+$/.test(val)
   if (isHexLike || val.length > prefix + suffix + 4) {
-    return `${val.slice(0, prefix)}...${val.slice(-suffix)}`
+    return `${val.slice(0, prefix)}…${val.slice(-suffix)}`
   }
   return val
 }
@@ -167,5 +167,5 @@ export function shortAddress(addr?: string, prefix = 8, suffix = 6): string {
   if (!addr) return ''
   const s = addr
   if (s.length <= prefix + suffix + 2) return s
-  return `${s.slice(0, prefix)}...${s.slice(-suffix)}`
+  return `${s.slice(0, prefix)}…${s.slice(-suffix)}`
 }

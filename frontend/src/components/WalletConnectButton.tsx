@@ -107,7 +107,7 @@ export default function WalletConnectButton({
   const isWrongNetwork = chainId && !supportedChainIds.includes(chainId)
 
   return (
-    <div className={`inline-flex items-center gap-2 ${className}`}>
+    <div className={`inline-flex items-center gap-2 min-w-0 ${className}`}>
       {isWrongNetwork && (
         <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${
           isHomePage
@@ -119,7 +119,7 @@ export default function WalletConnectButton({
         </div>
       )}
       
-      <div className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
+      <div className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap min-w-0 ${
         isHomePage 
           ? 'border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15' 
           : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600'
@@ -130,7 +130,7 @@ export default function WalletConnectButton({
         
         {showBalance && balance ? (
           <div className="flex flex-col items-start gap-0.5 min-w-0">
-            <span className="text-xs font-mono max-w-28 lg:max-w-32">
+            <span className="text-xs font-mono max-w-28 lg:max-w-32 whitespace-nowrap overflow-hidden">
               {formatAddress(address)}
             </span>
             <span className={`text-xs opacity-75 ${
@@ -140,7 +140,7 @@ export default function WalletConnectButton({
             </span>
           </div>
         ) : (
-          <span className="text-xs font-mono">
+          <span className="text-xs font-mono whitespace-nowrap overflow-hidden max-w-[130px] sm:max-w-none">
             {formatAddress(address)}
           </span>
         )}
