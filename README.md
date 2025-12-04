@@ -21,6 +21,8 @@
 
 DeepFamily creates the decentralized family tree infrastructure, using zero-knowledge proofs and blockchain immutability to build a collaborative, verifiable, and perpetual family history recording system.
 
+> This is an open-source protocol/tooling suite—feel free to deploy and operate it yourself.
+
 ### 🎯 Core Principles
 - 🔐 **Zero-Knowledge Privacy**: Private family tree construction with selective disclosure through NFT minting
 - 🌍 **Globally Accessible**: Borderless family connections accessible from anywhere in the world
