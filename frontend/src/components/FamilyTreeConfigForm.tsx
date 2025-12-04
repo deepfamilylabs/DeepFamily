@@ -467,10 +467,10 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-200/60 dark:border-slate-700/60"></div>
+            {/* <div className="border-t border-slate-200/60 dark:border-slate-700/60"></div> */}
 
-            {/* Second row: Deduplicate toggle */}
-            <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
+            {/* Second row: Deduplicate toggle - Hidden but logic remains active */}
+            {/* <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Deduplicate Children'}:
               </span>
@@ -496,7 +496,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
                   : (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.disabled') : 'Show all versions')
                 }
               </div>
-            </div>
+            </div> */}
           </div>
         </>
       )}
