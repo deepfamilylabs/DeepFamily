@@ -1072,7 +1072,7 @@ export default function EndorseModal({
               
               {/* Dynamic Fee Note */}
               <p className="text-xs opacity-75 italic">
-                💡 {t('endorse.feeNote', 'DEEP token fee is dynamic based on current mining rewards')}
+                💡 {t('endorse.feeNote', 'DEEP token fee is dynamic based on current utility issuance level')}
               </p>
             </div>
           </div>

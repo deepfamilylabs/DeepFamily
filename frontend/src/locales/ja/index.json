@@ -63,7 +63,7 @@
       },
       "communityEndorsement": {
         "title": "コミュニティエンドースメント",
-        "description": "DEEPトークンのエンドースは実コストが伴うため、費用による投票で信頼できるバージョンが選ばれ、ノイズは自然に希薄化"
+        "description": "DEEPユーティリティポイントでのエンドースは実コストが伴うため、費用による投票で信頼できるバージョンが選ばれ、ノイズは自然に希薄化"
       },
       "nftValueCreation": {
         "title": "NFT価値創造",
@@ -119,9 +119,9 @@
         "title": "ワークフロー",
         "subtitle": "五段階の価値発見と合意形成メカニズム",
         "step1": "人物バージョン追加",
-        "step1Desc": "親ハッシュコミットメントを提出 → DEEPトークン報酬を獲得",
+        "step1Desc": "親ハッシュコミットメントを提出 → DEEPユーティリティ配分を受け取る",
         "step2": "ユーザーエンドース",
-        "step2Desc": "DEEPを支払って特定バージョンをエンドース",
+        "step2Desc": "DEEPユーティリティポイントを支払って特定バージョンをエンドース",
         "step3": "バージョンNFT鋳造",
         "step3Desc": "エンドース者は対応バージョンのNFTを鋳造可能",
         "step4": "ストーリーシャード作成",
@@ -129,7 +129,7 @@
         "step5": "ストーリーシーリング",
         "step5Desc": "ストーリーをシーリングし、不変のオンチェーン歴史記録を形成",
         "conclusion": "価値主導の協力ネットワーク",
-        "conclusionDesc": "経済インセンティブメカニズムにより、高品質家系図データの自然な蓄積と価値発見を実現"
+        "conclusionDesc": "ユーティリティゲートと貢献ベースの配分により、高品質家系図データの自然な蓄積と価値発見を実現"
       },
       "privacyLayer": {
         "title": "プライバシー保護層",
@@ -140,10 +140,10 @@
       },
       "valueLayer": {
         "title": "価値確認層",
-        "description": "経済インセンティブと合意メカニズムによりデータ価値の確認と配分を実現",
+        "description": "機能的インセンティブと合意メカニズムによりデータ確認と手数料ルーティングを実現",
         "feature1": "エンドースメント合意メカニズム",
         "feature2": "NFT価値結合",
-        "feature3": "収益権配分"
+        "feature3": "手数料ルーティング"
       }
     },
     "features": {
@@ -175,31 +175,31 @@
       }
     },
     "tokenomics": {
-      "title": "インセンティブとトークン経済",
-      "subtitle": "DEEPトークンが駆動する持続可能なインセンティブループ",
+      "title": "ユーティリティとインセンティブ",
+      "subtitle": "DEEPユーティリティポイントは権限と報酬にのみ使われ、投資性は一切ありません",
       "deepToken": {
         "title": "DEEPトークン",
-        "description": "段階的なハーフニング発行で貢献に応じて報酬が滑らかに縮小し、長期的な供給規律を維持します。"
+        "description": "段階的なハーフニングで発行されるユーティリティ。プロトコル操作専用で、貢献に応じて配分しつつ供給規律を維持します。"
       },
       "supply": {
         "title": "総供給上限",
-        "description": "上限1000億枚、プリマイニングなし、発行はプロトコル経由でのみ行われます"
+        "description": "ユーティリティ上限は1000億、プリマイニングや資金調達なし。発行はプロトコル操作時のみ。"
       },
       "mining": {
-        "title": "マイニングトリガー",
-        "description": "新規人物が親ハッシュコミットメントを提出したときにのみ報酬が発生し、親の平文を公開せず構造化補完を促します。"
+        "title": "発行トリガー",
+        "description": "親ハッシュのコミット提出時にのみユーティリティ配分が行われ、平文を公開せず構造化補完を促します。"
       },
       "endorsement": {
         "title": "エンドースメント手数料",
-        "description": "手数料は現在の報酬水準に連動し、プロトコルが小さな取り分を設定することで自分自身の背書コストを引き上げられます。"
+        "description": "手数料は現在のユーティリティ配分水準に連動し、自己エンドース抑止と運営のため小さな取り分を設定できます。"
       },
       "distribution": {
         "title": "手数料配分",
-        "description": "手数料は提出者とNFT保有者の間で移動し、鋳造前は作成者、鋳造後は保有者に帰属します。"
+        "description": "手数料は段階に応じて提出者とNFT保有者に流れます。機能的な移転であり、投資リターンではありません。"
       },
       "goal": {
-        "title": "経済目標",
-        "description": "実コストを伴う合意で正確な関係を報いる一方、スパムや重複ノイズを抑制します。"
+        "title": "プロトコル目標",
+        "description": "実コストでデータ品質を整合し、正確な関係を報酬しつつスパムやノイズを抑制します。"
       }
     },
     "audience": {
@@ -208,7 +208,7 @@
       "contributors": {
         "title": "データ貢献者",
         "description": "系譜データを入力・補完・検証し、信頼できる情報ネットワークを構築",
-        "benefit1": "DEEPマイニング報酬を獲得",
+        "benefit1": "DEEPユーティリティ配分を受け取る",
         "benefit2": "背書手数料の分配をシェア"
       },
       "researchers": {
@@ -819,8 +819,8 @@
     "walletRequiredDesc": "ブロックチェーン機能（バージョン追加、エンドースメント参加、NFT鋳造）にアクセスするためウォレットを接続してください。",
     "walletConnected": "ウォレット接続済み",
     "whatYouCanDo": "接続後の可能な操作：",
-    "feature1": "新しい人物バージョンを追加（DEEPトークン報酬を獲得）",
-    "feature2": "優良バージョンをエンドース（DEEPトークンを消費）",
+    "feature1": "新しい人物バージョンを追加（DEEPユーティリティ配分を受け取る）",
+    "feature2": "優良バージョンをエンドース（ユーティリティ用途でDEEPを消費）",
     "feature3": "人物バージョンをNFTコレクションとして鋳造",
     "addVersion": "バージョン追加",
     "add": "追加",
@@ -830,7 +830,7 @@
     "mintNFTDesc": "エンドース済み人物データを価値あるNFTコレクションに変換",
     "endorse": "エンドース",
     "endorsement": "エンドースメント参加",
-    "endorseDesc": "DEEPトークンを使用して優良データバージョンをサポート",
+    "endorseDesc": "DEEPユーティリティポイントを使用して優良データバージョンをサポート",
     "startAddVersion": "バージョン追加開始",
     "mintNFTHint": "まずNFTとして鋳造したい人物とバージョンを検索してください",
     "openMintNFT": "NFT鋳造を開く",
@@ -875,15 +875,15 @@
     "fatherVersionIndex": "父バージョン",
     "motherHash": "母ハッシュ",
     "motherVersionIndex": "母バージョン",
-    "tokenReward": "トークン報酬配布済み",
-    "familyComplete": "親ハッシュコミットメントを提出 - トークン報酬獲得",
+    "tokenReward": "ユーティリティ配分完了",
+    "familyComplete": "親ハッシュコミットメントを提出 - ユーティリティ配分完了",
     "miner": "マイナー",
     "hashPrefix": "ハッシュ",
     "prover": "証明者",
-    "rewardAmount": "報酬金額",
-    "noTokenReward": "トークン報酬なし",
-    "tokenRewardCondition": "親ハッシュコミットメントを提出するとトークン報酬を獲得",
-    "tokenRewardTip": "親ハッシュコミットメントを提出して DEEP トークン報酬を受け取りましょう",
+    "rewardAmount": "ユーティリティ数量",
+    "noTokenReward": "ユーティリティ配分なし",
+    "tokenRewardCondition": "親ハッシュコミットメントを提出するとユーティリティ配分が行われます",
+    "tokenRewardTip": "親ハッシュコミットメントを提出して DEEP ユーティリティ配分を受け取りましょう",
     "failed": "取引失敗",
     "errorType": "エラータイプ",
     "errorMessage": "エラーメッセージ",
@@ -900,7 +900,7 @@
     "personInfo": "人物情報",
     "personInfoHint": "平文はチェーンに載りません。ローカルのZK証明のみに使用",
     "personInfoPrivacy": "人物情報はローカルでゼロ知識証明を生成するためにのみ使用されます。平文はチェーンに保存されず、ハッシュ値のみが永久記録されます。",
-    "parentInfoNotice": "親情報を入力するとローカルでゼロ知識証明を生成して家族リンクを確立し（ハッシュ値のみがチェーンに記録）、DEEPトークン報酬を獲得できます。親情報は実際のバージョンと完全に一致する必要があります（パスフレーズを含む）。"
+    "parentInfoNotice": "親情報を入力するとローカルでゼロ知識証明を生成して家族リンクを確立し（ハッシュ値のみがチェーンに記録）、DEEPユーティリティ配分を受け取れます。親情報は実際のバージョンと完全に一致する必要があります（パスフレーズを含む）。"
   },
   "mintNFT": {
     "title": "NFT鋳造",
@@ -920,6 +920,8 @@
     "basicInfo": "基本情報",
     "basicInfoMustMatch": "入力する基本情報は対象バージョンのデータと完全に一致する必要があります。コントラクトは鋳造前にオンチェーンで検証します。",
     "publicOnChain": "チェーン上で公開",
+    "legalTruthfulNotice": "適法で真実かつ公開する権限のある情報のみを提出し、合意した公開範囲を超える個人情報を含めないでください。",
+    "ageRequirement": "NFTとして鋳造される人物は18歳以上である必要があります。未成年者の情報を提出しないでください。",
     "supplementalInfo": "補足情報",
     "supplementalInfoImmutable": "補足情報はブロックチェーンに永久保存され、送信後の変更はできません。慎重に入力してください。",
     "birthPlace": "出生地",
@@ -1000,19 +1002,19 @@
     "versionInfo": "バージョン情報",
     "fullName": "氏名",
     "currentEndorsements": "現在のエンドースメント数",
-    "deepTokenFee": "DEEP手数料",
-    "yourBalance": "私のDEEP残高",
+    "deepTokenFee": "DEEPユーティリティ手数料",
+    "yourBalance": "私のDEEPユーティリティ残高",
     "feeRecipient": "手数料受取人",
     "feeDistribution": "手数料配分説明",
     "nftMinted": "NFT鋳造済み",
     "feeToNFTHolder": "{{recipientPercent}}% がNFT保有者に、{{protocolPercent}}% がプロトコル手数料",
     "noNFT": "NFT未鋳造",
     "feeToCreator": "{{recipientPercent}}% がバージョン作成者に、{{protocolPercent}}% がプロトコル手数料",
-    "feeNote": "DEEP手数料は現在のマイニング報酬と動的連動",
-    "insufficientBalance": "DEEP残高不足",
+    "feeNote": "DEEP手数料は現在のユーティリティ配分水準に連動して変動します",
+    "insufficientBalance": "DEEPユーティリティ残高不足",
     "needMoreTokens": "残高不足、そのバージョンをエンドースできません",
     "endorsementComplete": "エンドースメント完了",
-    "needMoreForNext": "追加エンドースメントのためさらなるDEEPトークンが必要",
+    "needMoreForNext": "追加エンドースメントのためさらなるDEEPユーティリティポイントが必要",
     "benefits": "エンドースメントのメリット",
     "benefitQuality": "データ品質の検証と向上を支援",
     "benefitPriority": "エンドース済みバージョンは検索で優先度が高い",
@@ -1025,9 +1027,9 @@
     "endorse": "エンドース",
     "invalidTarget": "人物ハッシュまたはバージョンインデックスが無効",
     "invalidTargetDesc": "ハッシュとインデックスがチェーン上の既存バージョンに対応していることを確認してください",
-    "needApprove": "承認額度不足、DEEPを再承認してください",
+    "needApprove": "承認額度不足、DEEPユーティリティポイントを再承認してください",
     "personHashRequired": "有効な人物ハッシュとバージョンインデックスを提供してください",
-    "insufficientDeepTokens": "エンドースメントに必要なDEEPトークン残高が不足しています",
+    "insufficientDeepTokens": "エンドースメントに必要なDEEPユーティリティポイント残高が不足しています",
     "endorsedSuccessfully": "バージョンエンドースメント成功！",
     "successTitle": "承認成功",
     "successDesc": "バージョンが正常に承認されました",
@@ -1059,8 +1061,8 @@
     "endorsingDesc": "ブロックチェーン上でエンドースメントを処理中...",
     "errors": {
       "invalidTarget": "無効な人物ハッシュまたはバージョンインデックス",
-      "needApprove": "承認額度不足、DEEPトークンを再承認してください",
-      "insufficientDeepTokens": "DEEPトークン残高不足",
+      "needApprove": "承認額度不足、DEEPユーティリティポイントを再承認してください",
+      "insufficientDeepTokens": "DEEPユーティリティポイント残高不足",
       "feeTransferFailed": "エンドースメント手数料送金失敗",
       "insufficientFunds": "取引手数料不足",
       "userRejected": "ユーザーが取引を拒否",

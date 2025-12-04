@@ -980,7 +980,22 @@ export default function MintNFTModal({
           {/* Show form content only if NFT hasn't been minted */}
           {!isAlreadyMinted && (
             <>
-              
+              <div className="space-y-2">
+                <div className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-300/40 dark:bg-amber-900/20 dark:text-amber-50">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <p className="text-xs leading-relaxed">
+                    {t('mintNFT.legalTruthfulNotice', 'Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.')}
+                  </p>
+                </div>
+
+                <div className="flex gap-2 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-red-900 dark:border-red-300/40 dark:bg-red-900/20 dark:text-red-50">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <p className="text-xs leading-relaxed">
+                    {t('mintNFT.ageRequirement', 'The person minted into an NFT must be 18 years or older. Do not submit minors\' identities.')}
+                  </p>
+                </div>
+              </div>
+
               {/* Basic Information - Using PersonHashCalculator */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">

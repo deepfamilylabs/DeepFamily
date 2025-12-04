@@ -63,7 +63,7 @@
       },
       "communityEndorsement": {
         "title": "社区背书",
-        "description": "DEEP代币背书需要真实成本，背书者用费用投票沉淀可信版本，让噪声自然被稀释"
+        "description": "使用 DEEP 功能积分背书需要真实成本，背书者用费用投票沉淀可信版本，让噪声自然被稀释"
       },
       "nftValueCreation": {
         "title": "NFT价值创造",
@@ -88,7 +88,7 @@
         "title": "NFT人物百科层",
         "description": "背书版本后可铸造成 NFT 人物百科，铸造即公开，明文上链。故事分片支持详细的链上传记。",
         "feature1": "铸造即公开完整人物百科信息",
-        "feature2": "背书驱动社区共识与经济激励",
+        "feature2": "背书驱动社区共识与功能激励",
         "feature3": "故事分片持续追加并链上确认"
       },
       "flow": {
@@ -119,9 +119,9 @@
         "title": "工作流程",
         "subtitle": "五步式价值发现与共识形成机制",
         "step1": "添加人物版本",
-        "step1Desc": "提交父母哈希承诺 → 获得DEEP代币奖励",
+        "step1Desc": "提交父母哈希承诺 → 获得 DEEP 功能积分发放",
         "step2": "用户背书",
-        "step2Desc": "支付 DEEP 背书某一版本",
+        "step2Desc": "支付 DEEP 功能积分背书某一版本",
         "step3": "铸造版本 NFT",
         "step3Desc": "背书者可铸造对应版本的 NFT",
         "step4": "撰写故事分片",
@@ -129,7 +129,7 @@
         "step5": "故事封存",
         "step5Desc": "故事封存，形成不可更改的链上历史影像",
         "conclusion": "价值驱动的协作网络",
-        "conclusionDesc": "通过经济激励机制，实现高质量谱系数据的自然累积与价值发现"
+        "conclusionDesc": "通过功能门控与贡献分配机制，实现高质量谱系数据的自然累积与价值发现"
       },
       "privacyLayer": {
         "title": "隐私保护层",
@@ -140,10 +140,10 @@
       },
       "valueLayer": {
         "title": "價值確認層",
-        "description": "透過經濟激勵和共識機制實現資料價值的確認與分配",
+        "description": "透過功能型激勵與共識機制完成資料確認與費用路由",
         "feature1": "背書共識機制",
         "feature2": "NFT 價值綁定",
-        "feature3": "收益權分配"
+        "feature3": "费用路由"
       }
     },
     "features": {
@@ -158,8 +158,8 @@
         "description": "人物版本记录父母指针与时间戳，链上去重并按背书排序，确保历史完整可追溯。"
       },
       "endorsementEconomy": {
-        "title": "背书经济循环",
-        "description": "每次背书都需支付 DEEP，费用在持有人、提交者与协议之间结算，把可信共识与真实成本绑定。"
+        "title": "背书功能循环",
+        "description": "每次背书需支付 DEEP，费用在持有人、提交者与协议之间结算，作为功能性费用路由以绑定链上行为的可信共识。"
       },
       "personNFT": {
         "title": "NFT 人物百科",
@@ -175,31 +175,32 @@
       }
     },
     "tokenomics": {
-      "title": "激励与代币经济",
-      "subtitle": "DEEP 代币驱动的可持续激励闭环",
+      "pill": "功能与激励",
+      "title": "功能与激励",
+      "subtitle": "DEEP 功能积分用于权限控制与奖励完整可信数据，不包含任何投资承诺",
       "deepToken": {
-        "title": "DEEP 代币",
-        "description": "渐进式减半发行模型，奖励随有效贡献平滑递减，长期维持发行纪律"
+        "title": "DEEP 功能积分",
+        "description": "渐进式减半的功能积分发行，仅用于协议操作，随贡献发放并保持供给纪律。"
       },
       "supply": {
         "title": "总量上限",
-        "description": "上限 1000 亿代币，无预挖，只能通过协议交互增发"
+        "description": "功能积分上限 1000 亿，无预挖、无募资，仅能通过协议交互增发。"
       },
       "mining": {
-        "title": "挖矿触发",
-        "description": "仅当新增人物同时提交父母哈希承诺时才产出奖励，激励结构化补全且不暴露父母明文"
+        "title": "发放触发",
+        "description": "仅在提交父母哈希承诺时发放功能积分，激励结构化补全且不暴露父母明文。"
       },
       "endorsement": {
         "title": "背书费用",
-        "description": "背书费用随当期奖励动态调整，协议可保留小额份额，提升自我背书的真实成本"
+        "description": "背书费用随当期功能积分发放水平动态调整，协议可保留小额份额以抑制自我背书并支撑运行。"
       },
       "distribution": {
         "title": "费用分配",
-        "description": "收益在提交者与 NFT 持有人之间滚动转移，铸造前归创建者，铸造后归持有人"
+        "description": "费用按阶段在提交者与 NFT 持有人间流转，属于功能性转移，不是投资回报。"
       },
       "goal": {
-        "title": "经济目标",
-        "description": "用真实成本驱动可信背书，奖励准确关系，抑制垃圾和重复噪声"
+        "title": "协议目标",
+        "description": "用真实成本对齐数据质量，奖励准确关系，抑制垃圾和噪声。"
       }
     },
     "audience": {
@@ -208,7 +209,7 @@
       "contributors": {
         "title": "数据贡献者",
         "description": "录入、补全并考证族谱信息，构建可信数据网络",
-        "benefit1": "获得 DEEP 挖矿奖励",
+        "benefit1": "获得 DEEP 功能积分发放",
         "benefit2": "分享背书费用分成"
       },
       "researchers": {
@@ -239,7 +240,7 @@
         "feature3": "NFT铸造功能"
       },
       "token": {
-        "feature1": "ERC20代币合约",
+        "feature1": "ERC20 功能积分合约",
         "feature2": "10个减半阶段",
         "feature3": "总供应量1000亿"
       },
@@ -820,8 +821,8 @@
     "walletRequiredDesc": "连接您的钱包以访问区块链功能，如添加版本、参与背书和铸造 NFT。",
     "walletConnected": "钱包已连接",
     "whatYouCanDo": "连接后您可以：",
-    "feature1": "添加新的人物版本（可获得 DEEP 代币奖励）",
-    "feature2": "背书优质版本（需要消耗 DEEP 代币）",
+    "feature1": "添加新的人物版本（可获得 DEEP 功能积分发放）",
+    "feature2": "背书优质版本（功能性消耗 DEEP 功能积分）",
     "feature3": "将人物版本铸造为 NFT 收藏品",
     "addVersion": "添加版本",
     "add": "添加",
@@ -831,7 +832,7 @@
     "mintNFTDesc": "将背书的人物数据转换为有价值的 NFT 收藏品",
     "endorse": "背书",
     "endorsement": "参与背书",
-    "endorseDesc": "使用 DEEP 代币支持优质数据版本",
+    "endorseDesc": "使用 DEEP 功能积分支持优质数据版本",
     "startAddVersion": "开始添加版本",
     "mintNFTHint": "首先搜索要铸造为 NFT 的人物和版本",
     "openMintNFT": "打开 NFT 铸造",
@@ -876,15 +877,15 @@
     "fatherVersionIndex": "父亲版本",
     "motherHash": "母亲哈希",
     "motherVersionIndex": "母亲版本",
-    "tokenReward": "代币奖励已分发",
-    "familyComplete": "提交父母哈希承诺 - 获得代币奖励",
+    "tokenReward": "功能积分已分发",
+    "familyComplete": "提交父母哈希承诺 - 功能积分已发放",
     "miner": "矿工",
     "hashPrefix": "哈希",
     "prover": "证明者",
-    "rewardAmount": "奖励数量",
-    "noTokenReward": "无代币奖励",
-    "tokenRewardCondition": "提交父母哈希承诺即可获得代币奖励",
-    "tokenRewardTip": "提交父母哈希承诺，即可获得 DEEP 代币奖励",
+    "rewardAmount": "功能积分数量",
+    "noTokenReward": "无功能积分发放",
+    "tokenRewardCondition": "提交父母哈希承诺即可发放功能积分",
+    "tokenRewardTip": "提交父母哈希承诺，即可获得 DEEP 功能积分发放",
     "failed": "交易失败",
     "errorType": "错误类型",
     "errorMessage": "错误信息",
@@ -901,7 +902,7 @@
     "personInfo": "人物信息",
     "personInfoHint": "明文不上链，仅用于本地零知识证明",
     "personInfoPrivacy": "人物信息仅用于本地生成零知识证明，明文不会上链，仅哈希值永久保存。",
-    "parentInfoNotice": "填写父母信息本地生成零知识证明建立家族链接（仅哈希值上链），可获DEEP代币奖励。父母信息需与其实际版本完全一致（含口令）才能成功关联。"
+    "parentInfoNotice": "填写父母信息本地生成零知识证明建立家族链接（仅哈希值上链），可触发 DEEP 功能积分发放。父母信息需与其实际版本完全一致（含口令）才能成功关联。"
   },
   "mintNFT": {
     "title": "铸造 NFT",
@@ -921,6 +922,8 @@
     "basicInfo": "基本信息",
     "basicInfoMustMatch": "您输入的基本信息必须与目标版本数据完全一致。合约将在铸造前进行链上验证。",
     "publicOnChain": "链上公开",
+    "legalTruthfulNotice": "仅提交合法、真实且有权公开的信息，不要包含超出约定公开范围的个人隐私数据。",
+    "ageRequirement": "被铸成 NFT 的人物必须年满 18 岁，请勿提交未成年人身份信息。",
     "supplementalInfo": "补充信息",
     "supplementalInfoImmutable": "补充信息将永久保存在区块链上，提交后无法修改，请审慎填写。",
     "birthPlace": "出生地",
@@ -992,7 +995,7 @@
   },
   "endorse": {
     "title": "背书版本",
-    "description": "通过消耗 DEEP 代币为高质量版本背书",
+    "description": "通过消耗 DEEP 功能积分为高质量版本背书",
     "targetVersion": "目标版本",
     "specifyVersion": "指定要背书的版本",
     "specifyVersionDesc": "请输入要背书的 person hash 与版本序号。",
@@ -1001,19 +1004,19 @@
     "versionInfo": "版本信息",
     "fullName": "姓名",
     "currentEndorsements": "当前背书数",
-    "deepTokenFee": "DEEP 费用",
-    "yourBalance": "我的 DEEP 余额",
+    "deepTokenFee": "DEEP 功能积分费用",
+    "yourBalance": "我的 DEEP 功能积分余额",
     "feeRecipient": "费用接收方",
     "feeDistribution": "费用分配说明",
     "nftMinted": "已铸造 NFT",
     "feeToNFTHolder": "{{recipientPercent}}% 归 NFT 持有人，{{protocolPercent}}% 协议费",
     "noNFT": "尚未铸造 NFT",
     "feeToCreator": "{{recipientPercent}}% 归版本创建者，{{protocolPercent}}% 协议费",
-    "feeNote": "DEEP 费用随当前挖矿奖励动态变化",
+    "feeNote": "DEEP 费用随当前功能积分发放水平动态变化",
     "insufficientBalance": "DEEP 余额不足",
     "needMoreTokens": "余额不足，无法背书该版本",
     "endorsementComplete": "背书完成",
-    "needMoreForNext": "需要更多 DEEP 代币以进行额外背书",
+    "needMoreForNext": "需要更多 DEEP 功能积分以进行额外背书",
     "benefits": "背书的好处",
     "benefitQuality": "帮助验证与提升数据质量",
     "benefitPriority": "被背书版本在搜索中优先级更高",
@@ -1026,9 +1029,9 @@
     "endorse": "背书",
     "invalidTarget": "人物哈希或版本序号无效",
     "invalidTargetDesc": "请确认哈希与索引对应链上已存在的版本",
-    "needApprove": "授权额度不足，请重新授权 DEEP",
+    "needApprove": "授权额度不足，请重新授权 DEEP 功能积分",
     "personHashRequired": "请提供有效的人物哈希和版本索引",
-    "insufficientDeepTokens": "DEEP代币余额不足以进行背书",
+    "insufficientDeepTokens": "DEEP 功能积分余额不足以进行背书",
     "endorsedSuccessfully": "版本背书成功！",
     "successTitle": "背书成功",
     "successDesc": "版本已成功背书",
@@ -1056,12 +1059,12 @@
     "canContinueEndorsing": "您现在可以继续背书其他版本或关闭此对话框。",
     "transactionFailed": "交易失败。请检查错误信息后重试。",
     "transactionFailedDetails": "交易已提交但未能成功完成。",
-    "approvingDesc": "请在钱包中确认代币授权",
+    "approvingDesc": "请在钱包中确认功能积分授权",
     "endorsingDesc": "正在区块链上处理背书...",
     "errors": {
       "invalidTarget": "无效的人物哈希或版本序号",
-      "needApprove": "授权额度不足，请重新授权 DEEP 代币",
-      "insufficientDeepTokens": "DEEP 代币余额不足",
+      "needApprove": "授权额度不足，请重新授权 DEEP 功能积分",
+      "insufficientDeepTokens": "DEEP 功能积分余额不足",
       "feeTransferFailed": "背书费用转账失败",
       "insufficientFunds": "交易手续费不足",
       "userRejected": "用户拒绝交易",
