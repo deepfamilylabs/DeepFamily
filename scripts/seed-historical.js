@@ -35,22 +35,148 @@ const {
 } = require("../lib/seedHelpers");
 const { buildVersionMetadataPayload, generateMetadataCID } = require("../lib/versionMetadata");
 
+function pickRevertData(value) {
+  if (typeof value === "string" && value.startsWith("0x")) {
+    return value;
+  }
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof value.data === "string" &&
+    value.data.startsWith("0x")
+  ) {
+    return value.data;
+  }
+  return null;
+}
+
+function extractRevertData(error) {
+  const candidates = [
+    error?.data,
+    error?.error?.data,
+    error?.error?.data?.data,
+    error?.error?.data?.originalError?.data,
+    error?.data?.data,
+    error?.data?.originalError?.data,
+    error?.info?.error?.data,
+    error?.info?.error?.data?.data,
+    error?.error?.error?.data,
+    error?.error?.error?.data?.data,
+    error?.error?.error?.data?.originalError?.data,
+    error?.receipt?.revertReason,
+    error?.transaction?.revertReason,
+  ];
+
+  for (const candidate of candidates) {
+    const picked = pickRevertData(candidate);
+    if (picked) return picked;
+  }
+  return null;
+}
+
+const STANDARD_ERROR_IFACES = [
+  new ethers.Interface([
+    "error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)",
+    "error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed)",
+    "error ERC20InvalidSender(address sender)",
+    "error ERC20InvalidReceiver(address receiver)",
+    "error ERC20InvalidApprover(address approver)",
+    "error ERC20InvalidSpender(address spender)",
+  ]),
+  new ethers.Interface([
+    "error ERC721IncorrectOwner(address operator, uint256 tokenId, address owner)",
+    "error ERC721InsufficientApproval(address operator, uint256 tokenId)",
+    "error ERC721InvalidApprover(address approver)",
+    "error ERC721InvalidOperator(address operator)",
+    "error ERC721InvalidOwner(address owner)",
+    "error ERC721InvalidReceiver(address receiver)",
+    "error ERC721InvalidSender(address sender)",
+    "error ERC721NonexistentToken(uint256 tokenId)",
+  ]),
+  new ethers.Interface([
+    "error AccessControlUnauthorizedAccount(address account, bytes32 neededRole)",
+    "error OwnableUnauthorizedAccount(address account)",
+  ]),
+];
+
+function formatParsedError(parsed) {
+  if (!parsed) return null;
+  if (!parsed.args || parsed.args.length === 0) return parsed.name;
+  const prettyArgs = parsed.args
+    .map((arg, idx) => {
+      const val = Array.isArray(arg) ? arg.join(",") : arg.toString();
+      return `${idx}:${val}`;
+    })
+    .join(", ");
+  return `${parsed.name}(${prettyArgs})`;
+}
+
 function decodeEthersError(error, contract) {
+  const revertData = extractRevertData(error);
+
   // Try to parse custom errors using the contract interface
-  const data = error?.data || error?.error?.data;
-  if (data && contract?.interface) {
+  if (revertData && contract?.interface) {
     try {
-      const parsed = contract.interface.parseError(data);
+      const parsed = contract.interface.parseError(revertData);
       if (parsed) {
-        return parsed.name;
+        return formatParsedError(parsed);
       }
     } catch (_) {}
   }
 
+  // Parse against common ERC standard errors
+  if (revertData) {
+    for (const iface of STANDARD_ERROR_IFACES) {
+      try {
+        const parsed = iface.parseError(revertData);
+        if (parsed) {
+          return formatParsedError(parsed);
+        }
+      } catch (_) {}
+    }
+  }
+
+  // Decode revert(string)
+  if (revertData && revertData.startsWith("0x08c379a0")) {
+    try {
+      const [revertReason] = ethers.AbiCoder.defaultAbiCoder().decode(
+        ["string"],
+        `0x${revertData.slice(10)}`,
+      );
+      if (revertReason && typeof revertReason === "string") {
+        return revertReason;
+      }
+    } catch (_) {}
+  }
+
+  // Decode panic(uint256)
+  if (revertData && revertData.startsWith("0x4e487b71")) {
+    try {
+      const [panicCode] = ethers.AbiCoder.defaultAbiCoder().decode(
+        ["uint256"],
+        `0x${revertData.slice(10)}`,
+      );
+      return `Panic(${panicCode})`;
+    } catch (_) {}
+  }
+
   // Fallback to common fields
-  return (
-    error?.errorName || error?.shortMessage || error?.reason || error?.message || "Unknown error"
-  );
+  const fallback =
+    error?.errorName ||
+    error?.reason ||
+    error?.shortMessage ||
+    error?.info?.error?.message ||
+    error?.message ||
+    null;
+  const txHash =
+    error?.transactionHash ||
+    error?.receipt?.transactionHash ||
+    error?.receipt?.hash ||
+    error?.tx?.hash;
+  if (fallback && txHash) return `${fallback} (tx: ${txHash})`;
+  if (fallback) return fallback;
+  if (revertData) return `Unknown error (data: ${revertData})`;
+  return "Unknown error";
 }
 
 // ========== Constants Configuration ==========
@@ -583,9 +709,10 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         // Endorse (skip if already endorsed)
         console.log("  ▶ Endorsing version...");
         let alreadyEndorsed = false;
+        let endorsementFee = null;
         try {
           const endorseStart = Date.now();
-          const endorseResult = await endorseVersion({
+          const { tx, receipt, fee } = await endorseVersion({
             deepFamily,
             token,
             signer,
@@ -593,22 +720,36 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
             versionIndex: person.version,
             autoApprove: true,
           });
+          endorsementFee = fee;
           const endorseElapsed = Date.now() - endorseStart;
-          const endorseTxHash = endorseResult?.tx?.hash || endorseResult?.receipt?.hash;
-          console.log(`  ✓ Endorsed (tx: ${endorseTxHash || "unknown"}, ${endorseElapsed}ms)`);
+          const endorseTxHash = tx?.hash || receipt?.hash;
+          const feeStr =
+            endorsementFee !== null ? `, fee: ${ethers.formatUnits(endorsementFee, 18)} DEEP` : "";
+          console.log(
+            `  ✓ Endorsed (tx: ${endorseTxHash || "unknown"}, ${endorseElapsed}ms${feeStr})`,
+          );
         } catch (endorseErr) {
           const reason = decodeEthersError(endorseErr, deepFamily);
           if (reason === "AlreadyEndorsed") {
             alreadyEndorsed = true;
             console.log("  ○ Already endorsed by this signer, skip endorsement step");
           } else {
-            // rethrow to outer catch for this person
-            throw endorseErr;
+            const txHash =
+              endorseErr?.transactionHash ||
+              endorseErr?.receipt?.transactionHash ||
+              endorseErr?.tx?.hash;
+            const revertData = extractRevertData(endorseErr);
+            console.error(`  ❌ Endorsement failed for ${person.fullName} (hash: ${person.hash})`);
+            console.error(`     Reason: ${reason}`);
+            if (txHash) console.error(`     Tx: ${txHash}`);
+            if (revertData) console.error(`     Revert data: ${revertData}`);
+            // Skip minting/story processing for this person, continue with next
+            continue;
           }
         }
 
         // Mint NFT
-        console.log("  ▶ Minting NFT...");
+        console.log("  ▶ Minting NFT (generate proof + submit tx)...");
         const mintStart = Date.now();
         const supplementInfo = createSupplementInfo(person);
 
@@ -631,8 +772,16 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         nftCount++;
       } catch (error) {
         const reason = decodeEthersError(error, deepFamily);
+        const txHash = error?.transactionHash || error?.receipt?.transactionHash || error?.tx?.hash;
+        const revertData = extractRevertData(error);
         console.error(`  ❌ Mint failed for ${person.fullName} (hash: ${person.hash})`);
         console.error(`     Reason: ${reason}`);
+        if (txHash) {
+          console.error(`     Tx: ${txHash}`);
+        }
+        if (revertData) {
+          console.error(`     Revert data: ${revertData}`);
+        }
         // Skip story chunk processing for this person, continue with next
         continue;
       }
