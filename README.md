@@ -17,62 +17,62 @@
 
 ---
 
-## 🌟 Vision & Mission
+## Vision & Mission
 
 DeepFamily creates the decentralized family tree infrastructure, using zero-knowledge proofs and blockchain immutability to build a collaborative, verifiable, and perpetual family history recording system.
 
 > This is an open-source protocol/tooling suite—feel free to deploy and operate it yourself.
 
-### 🎯 Core Principles
-- 🔐 **Zero-Knowledge Privacy**: Private family tree construction with selective disclosure through NFT minting
-- 🌍 **Globally Accessible**: Borderless family connections accessible from anywhere in the world
-- 💎 **Immutable Heritage**: Permanent on-chain storage preserves data across generations
-- 💰 **Smart Incentives**: DEEP token rewards for complete family data contributions
-- 🤝 **Community Validation**: Endorsement-based governance ensures information quality
+### Core Principles
+- **Zero-Knowledge Privacy**: Private family tree construction with selective disclosure through NFT minting
+- **Globally Accessible**: Borderless family connections accessible from anywhere in the world
+- **Immutable Heritage**: Permanent on-chain storage preserves data across generations
+- **Smart Incentives**: DEEP utility point distributions for complete family data contributions
+- **Community Validation**: Endorsement-based governance ensures information quality
 
 > Disclaimer: The DEEP token is solely a platform utility point used to access and operate DeepFamily functionality. It carries no investment attributes, makes no promise of profit or returns, and must not be used to initiate fundraising, wealth‑management, investment plans, or speculative trading of any kind.
 
-## 🎯 Core Features
+## Core Features
 
-### 🔐 Zero-Knowledge Privacy System
+### Zero-Knowledge Privacy System
 - **Private Member Addition**: Uses Groth16 proofs to add family tree members without revealing personal information
 - **Salted Passphrase Unlinkability**: Poseidon(fullName, passphrase) prevents identity inference and family tree pollution
 - **Dual Family Tree Models**: Public trees (shared passphrase) for collaboration, private trees (unique passphrase) for complete protection
 - **Selective Disclosure**: Privacy protection during member addition, **full disclosure when minting NFTs**
 - **Multi-Version Support**: Each person can have multiple verified versions with parent relationship tracking
 
-### 🎨 NFT Value Creation
+### NFT Value Creation
 - **Family Tree NFTs**: Each person version can mint exactly one ERC721 token
 - **Public Information**: **NFT minting reveals full name and biographical data to the community**
 - **Story Sharding**: Detailed life stories stored in up to 100×1KB on-chain chunks with immutable sealing
 - **Endorsement Requirement**: Must endorse a version before minting its NFT
 
-### 💰 DEEP Token Utility Mechanics
-- **Smart Mining**: Rewards mint only when parent hash commitments are submitted (encourages structured family data without exposing plaintext)
+### DEEP Utility Point Mechanics
+- **Utility Issuance**: Rewards mint only when parent hash commitments are submitted (encourages structured family data without exposing plaintext)
 - **Progressive Halving**: 10 halving cycles with expanding periods (1→10→100→1K→10K→100K→1M→10M→100M→Fixed 100M)
 - **100 Billion Cap**: Fixed maximum supply, rewards continue halving asymptotically until cap is reached
 - **Complete Family Incentives**: Encourages connected family trees over isolated entries
 
-### 🤝 Community Governance
+### Community Governance
 - **Endorsement Fees**: Pay current utility issuance level to endorse trusted versions
 - **Fee Distribution**: Majority flows to NFT holders or contributors, with a small protocol share (default 5%, max 20%) for sustainability
 - **Version Competition**: Multiple versions per person, community selects best through endorsements
 - **Quality Signaling**: Endorsement counts indicate version trustworthiness
 
-### 📊 Advanced Data Management
+### Advanced Data Management
 - **Multi-Version System**: Each person supports multiple data versions with duplicate prevention
 - **Paginated Queries**: Gas-optimized queries with 100-record limits
 - **Family Tree Networks**: Complete relationship tracking through personHash/fatherHash/motherHash
 - **Story Sealing**: Biographical data can be permanently locked for historical preservation
 
-## 🏗️ Two-Layer Value System
+## Two-Layer Value System
 
 ### Layer 1: Private Hash Storage
 - Add family tree members with zero-knowledge proofs without revealing personal information
 - **Salted Passphrase System**: `Poseidon(fullName, passphrase)` prevents identity inference and pollution attacks
 - Only cryptographic commitments stored on-chain (personHash, fatherHash, motherHash)
 - **Dual Tree Models**: Public collaborative trees vs. private protected trees with unique passphrases
-- Receive DEEP token rewards for complete family connections
+- Receive DEEP utility point distributions for complete family connections
 
 ### Layer 2: Public NFT Assets
 - Community-endorsed versions can be minted as NFTs
@@ -80,7 +80,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - Story sharding enables detailed on-chain biographies
 - NFTs represent community-validated family tree data
 
-### 🛠️ Technology Stack
+### Technology Stack
 - **Smart Contracts**: Solidity ^0.8.20, OpenZeppelin v5, Poseidon hashing
 - **Zero-Knowledge**: Groth16 proofs, circom circuits, snarkjs integration
 - **Frontend**: React 18, TypeScript, Vite, TailwindCSS, D3.js family tree visualization
@@ -105,14 +105,14 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - NamePoseidonVerifier: Proves name ownership for NFT minting
 
 
-## 🚀 Quick Start
+## Quick Start
 
-### 📋 Prerequisites
+### Prerequisites
 - **Node.js** >= 18.0.0 (required by package.json engines)
 - **npm** or **yarn** package manager
 - **Git** version control
 
-### 🔧 Environment Setup
+### Environment Setup
 1. Clone the repository
    ```bash
    git clone https://github.com/deepfamilylabs/DeepFamily.git
@@ -142,7 +142,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
    # This starts: local node + contract deployment + demo data + frontend
    ```
 
-### 🧪 Testing
+### Testing
 ```bash
 # Run all contract tests
 npm test
@@ -203,15 +203,15 @@ npm run frontend:dev
 ```
 
 
-### 🌐 Access Points
+### Access Points
 - **Frontend dApp**: http://localhost:5173
 - **Local Blockchain RPC**: http://localhost:8545
 - **Contract Deployment**: Check terminal output for deployed addresses
 
 
-## 🚀 Deployment Guide
+## Deployment Guide
 
-### 🌐 Supported Networks
+### Supported Networks
 **Ethereum Family:**
 - Mainnet, Sepolia, Holesky 
 
@@ -224,7 +224,7 @@ npm run frontend:dev
 - BSC: Mainnet, Testnet
 - Conflux eSpace: Mainnet, Testnet
 
-### 📦 Multi-Network Deployment
+### Multi-Network Deployment
 ```bash
 # Deploy to specific network
 npm run deploy:net --net=holesky
@@ -238,38 +238,38 @@ npm run deploy:local
 npm run verify:net --net=holesky
 ```
 
-## 📖 Documentation
+## Documentation
 
 - [Smart Contracts Reference](docs/contracts.md) - Complete contract API and implementation details
 - [Zero-Knowledge Proofs](docs/zk-proofs.md) - ZK proof system and circuit documentation
 - [Frontend Integration](docs/frontend.md) - React component and UI development guide
 
-## 🤝 Contributing
+## Contributing
 
-### 🐛 Bug Reports
+### Bug Reports
 1. Search existing Issues
 2. Open new issue with reproduction steps & env
 3. Include logs & network details
 
-### 💻 Code
+### Code
 1. Fork
 2. Branch: `git checkout -b feat/your-feature`
 3. Commit: `git commit -am 'feat: add X'`
 4. Push: `git push origin feat/your-feature`
 5. Open PR
 
-### 📋 Standards
+### Standards
 - Prettier + Solhint + lint-staged pre-commit (husky)
 - Conventional Commits
 - Tests required for new features
 - Update README / docs when changing core behaviors
 
-## 🌍 Community
+## Community
 
 Links are placeholders until launch:
 - **GitHub**: https://github.com/deepfamilylabs/DeepFamily
 
-## 📄 License
+## License
 
 MIT License (see [LICENSE](LICENSE) for full text). Excerpt:
 ```

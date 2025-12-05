@@ -145,7 +145,7 @@ function endorseVersion(bytes32 personHash, uint256 versionIndex) external
 ```
 
 **Endorsement Mechanics**:
-- Endorsers pay `recentReward` amount in DEEP tokens
+- Endorsers pay `recentReward` amount in DEEP utility points (ERC20)
 - **Fee Distribution**: Majority flows to NFT holder (if minted) or original contributor, with a small protocol share (default 5%, max 20%) for sustainability
 - Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
@@ -273,7 +273,7 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 
 #### Permission Model
 - **Open Submission**: Anyone can add person versions with valid ZK proofs
-- **Endorsement Gating**: Requires DEEP token balance and allowance
+- **Endorsement Gating**: Requires DEEP utility point (ERC20) balance and allowance
 - **NFT Holder Rights**: Exclusive story management and tokenURI updates
 - **Immutability**: Sealed stories cannot be modified by anyone
 
@@ -284,10 +284,10 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 - **ETH Rejection**: Contract rejects direct ETH transfers (receive/fallback revert)
 - **ZK Proof Validation**: Dual verifier system prevents unauthorized submissions
 
-## DeepFamilyToken.sol - DEEP ERC20 Mining Token
+## DeepFamilyToken.sol - DEEP ERC20 Utility Point
 
 **Location**: `contracts/DeepFamilyToken.sol`
-**Description**: Standard ERC20 token with progressive halving utility issuance mechanics for family tree protocol incentives.
+**Description**: Standard ERC20 utility point with progressive halving issuance mechanics for family tree protocol incentives.
 
 > Disclaimer: The DEEP token is solely a platform utility point used to access and operate DeepFamily functionality. It carries no investment attributes, makes no promise of profit or returns, and must not be used to initiate fundraising, wealth‑management, investment plans, or speculative trading of any kind.
 
@@ -384,7 +384,7 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 - `initialize()`: Owner-only, single-use initialization
 
 **Security Features**:
-- Supply cap enforcement (halts at 100B tokens)
+- Supply cap enforcement (halts at 100B utility points)
 - Progressive halving ensures controlled supply distribution
 - Custom error types for precise debugging
 - OpenZeppelin's secure ERC20 base implementation

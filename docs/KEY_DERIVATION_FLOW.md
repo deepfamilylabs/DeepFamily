@@ -1,6 +1,6 @@
 # PersonHash Secure Private Key Derivation Flow
 
-## 📊 Complete Flow Diagram
+## Complete Flow Diagram
 
 ```
 User Input
@@ -175,7 +175,7 @@ User Input
 
 ---
 
-## 🔑 Key Technical Details
+## Key Technical Details
 
 ### 1. Why Use Poseidon Hash?
 
@@ -259,7 +259,7 @@ clearInterval(progressInterval);
 
 **Real vs Simulated:**
 - ✅ **Computation time is real** (1-2 seconds)
-- ⚠️ **Progress percentage is estimated** (smooth transition)
+- **Progress percentage is estimated** (smooth transition)
 - ✅ **Better user experience** (doesn't freeze)
 
 ### 5. How is Determinism Guaranteed?
@@ -287,7 +287,7 @@ key1 === key2 // ✅ true
 
 ---
 
-## 💡 Security Analysis
+## Security Analysis
 
 ### Attack Cost Estimation
 
@@ -326,15 +326,15 @@ Assume attacker knows:
 | **Use Case** | General wallets | DeepFamily identity binding |
 
 **Recommendations:**
-- 🏦 **Finance/Exchanges**: Use BIP39
-- 🌳 **DeepFamily**: Can use PersonHash (requires strong passphrase)
-- 🔒 **Most Secure**: BIP39 + hardware wallet
+- **Finance/Exchanges**: Use BIP39
+- **DeepFamily**: Can use PersonHash (requires strong passphrase)
+- **Most Secure**: BIP39 + hardware wallet
 
 ---
 
-## ⚠️ Usage Guidelines
+## Usage Guidelines
 
-### ✅ Must Do
+### Must Do
 
 1. **Use extremely strong passphrase**
    - Minimum 30 characters
@@ -351,26 +351,26 @@ Assume attacker knows:
    - Re-enter after a week, verify address matches
    - Ensure passphrase is fully memorized
 
-### ❌ Don't Do
+### Don't Do
 
 1. **Don't use weak passphrase**
-   - ❌ "123456"
-   - ❌ "password"
-   - ❌ Common words
+   - "123456"
+   - "password"
+   - Common words
 
 2. **Don't share any information**
-   - ❌ Don't tell anyone your passphrase
-   - ❌ Don't show private key on social media
-   - ❌ Don't screenshot private key and upload to cloud
+   - Don't tell anyone your passphrase
+   - Don't show private key on social media
+   - Don't screenshot private key and upload to cloud
 
 3. **Don't rely on memory alone**
-   - ❌ Don't rely only on memory, must backup
-   - ❌ Don't think "I won't forget"
-   - ❌ Human memory distorts and fades
+   - Don't rely only on memory, must backup
+   - Don't think "I won't forget"
+   - Human memory distorts and fades
 
 ---
 
-## 🎓 Technical Terms
+## Technical Terms
 
 - **keccak256**: Hash algorithm used by Ethereum, outputs 256 bits
 - **Poseidon**: Zero-knowledge proof friendly hash function
