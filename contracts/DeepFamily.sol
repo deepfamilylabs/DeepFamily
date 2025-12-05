@@ -517,7 +517,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
         resultLength: endIndex - offset,
         nextOffset: endIndex,
         hasMore: endIndex < totalCount
-    });
+      });
   }
 
   // ========== Date & Age Utilities ==========
