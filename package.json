@@ -10,7 +10,7 @@
     "test:gas": "REPORT_GAS=true hardhat test",
     "test:coverage": "hardhat coverage",
     "deploy:local": "hardhat deploy --network localhost",
-    "deploy:net": "hardhat deploy --network $npm_config_net",
+    "deploy:net": "hardhat deploy --reset --network $npm_config_net",
     "verify:net": "hardhat verify --network $npm_config_net",
     "check-networks": "hardhat networks:check",
     "list-networks": "hardhat networks:list",
