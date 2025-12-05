@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, Loader2, AlertCircle, Star, X } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
+import { getFriendlyError } from '../../lib/errors'
 
 interface EndorseCompactModalProps {
   isOpen: boolean
@@ -99,77 +100,9 @@ export default function EndorseCompactModal({
       onSuccess?.(result)
     } catch (err: any) {
       setState('error')
-      const parsedMsg = deriveReadableError(err)
-      setErrorMessage(localizeErrorMessage(parsedMsg))
+      const friendly = getFriendlyError(err, t)
+      setErrorMessage(friendly.message)
     }
-  }
-
-  // Try to surface the most helpful revert/custom error message we can find
-  const deriveReadableError = (err: any): string | null => {
-    const unwrap = (msg: unknown) => (typeof msg === 'string' ? msg.trim() : '')
-    const candidates: Array<string | undefined> = [
-      err?.errorName,
-      err?.shortMessage,
-      err?.reason,
-      err?.data?.message,
-      err?.error?.message,
-      err?.info?.error?.message,
-      err?.message
-    ]
-
-    for (const msg of candidates) {
-      const cleaned = unwrap(msg)
-      if (cleaned) return cleaned
-    }
-
-    // If ethers exposes custom error metadata
-    const errorName = err?.data?.errorName || err?.errorName
-    const errorArgs = err?.data?.errorArgs || err?.errorArgs
-    if (errorName) {
-      const argsStr = Array.isArray(errorArgs) ? `(${errorArgs.join(', ')})` : ''
-      return `${errorName}${argsStr}`
-    }
-
-    // Include code if nothing else is available
-    const code = err?.code || err?.error?.code || err?.info?.error?.code
-    if (code) return `Error code: ${code}`
-
-    return null
-  }
-
-  // Map known errors to localized messages; otherwise fall back to raw message or generic
-  const localizeErrorMessage = (msg: string | null): string => {
-    const generic = t('endorse.transactionFailed', 'Transaction failed. Please try again.')
-    if (!msg) return generic
-    const normalized = msg.toLowerCase()
-
-    if (normalized.includes('alreadyendorsed')) {
-      return t('endorse.errors.alreadyEndorsed', 'You already endorsed this version')
-    }
-    if (normalized.includes('invalidpersonhash') || normalized.includes('invalidversionindex') || normalized.includes('invalid target')) {
-      return t('endorse.errors.invalidTarget', 'Invalid person hash or version index')
-    }
-    if (normalized.includes('allowance')) {
-      return t('endorse.errors.needApprove', 'Allowance too low, please approve DEEP tokens again')
-    }
-    if (normalized.includes('insufficient balance') || normalized.includes('erc20insufficientbalance')) {
-      return t('endorse.errors.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement')
-    }
-    if (normalized.includes('insufficient funds')) {
-      return t('endorse.errors.insufficientFunds', 'Insufficient funds for transaction')
-    }
-    if (normalized.includes('feetransfer') || normalized.includes('endorsementfeetransferfailed')) {
-      return t('endorse.errors.feeTransferFailed', 'Failed to transfer endorsement fee')
-    }
-    if (normalized.includes('wallet popup timeout')) {
-      return t('endorse.errors.walletTimeout', 'Wallet confirmation timed out. The wallet popup may have been closed or hidden.')
-    }
-    if (normalized.includes('rejected') || normalized.includes('denied') || normalized.includes('action_rejected')) {
-      return t('endorse.errors.userRejected', 'Transaction was rejected by user')
-    }
-
-    // Unknown message: show localized generic with raw detail so the user still sees context
-    return `${generic} (${msg})`
   }
 
   // Auto-endorse as soon as the modal opens with a valid target

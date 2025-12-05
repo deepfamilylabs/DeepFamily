@@ -10,6 +10,7 @@ import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/z
 import { useConfig } from '../../context/ConfigContext'
 import { generateMetadataCID } from '../../lib/cid'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
+import { getFriendlyError } from '../../lib/errors'
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -485,10 +486,11 @@ export default function AddVersionModal({
       console.error('❌ Add version failed:', error)
       
       // Set error result for display in UI
+      const friendly = getFriendlyError(error, t)
       setErrorResult({
-        type: error.type || 'UNKNOWN_ERROR',
-        message: error.message || 'An unexpected error occurred',
-        details: error.details || error.message || 'Unknown error'
+        type: friendly.type || 'UNKNOWN_ERROR',
+        message: friendly.message,
+        details: friendly.details
       })
       setProofGenerationStep('')
     } finally {
