@@ -512,10 +512,10 @@
       "hideChunks": "샤드 숨기기",
       "encyclopedia": "인물 백과",
       "editStory": "프로필 편집",
-    "edit": "편집",
-    "viewFullStory": "전체 프로필 보기",
-    "mintNFTTooltip": "이 인물을 NFT로 주조",
-    "uri": "URI",
+      "edit": "편집",
+      "viewFullStory": "전체 프로필 보기",
+      "mintNFTTooltip": "이 인물을 NFT로 주조",
+      "uri": "URI",
       "loading": "NFT 정보 로딩 중…",
       "loadErrorPrefix": "NFT 로드 실패",
       "bcPrefix": "기원전",
@@ -549,7 +549,8 @@
     "hashCopied": "해시 복사됨",
     "copy": "복사",
     "copied": "복사됨",
-    "na": "없음"
+    "na": "없음",
+    "retry": "다시 시도"
   },
   "wallet": {
     "connect": "지갑 연결",
@@ -1069,11 +1070,17 @@
       "walletPending": "지갑에 대기 중인 요청이 있습니다. 지갑을 열어 기존 요청을 처리한 뒤 다시 시도하세요.",
       "walletPendingDetails": "지갑 확장 프로그램에서 승인 대기 또는 트랜잭션 대기 항목을 확인하고 승인 또는 거절 후 다시 시도하세요.",
       "walletTimeout": "지갑 확인 타임아웃. 지갑 팝업이 닫히거나 숨겨질 수 있습니다.",
-      "walletTimeoutDetails": "다시 시도하고 지갑 팝업에서 트랜잭션을 확인하세요."
+      "walletTimeoutDetails": "다시 시도하고 지갑 팝업에서 트랜잭션을 확인하세요.",
+      "alreadyEndorsed": "이미 이 버전을 지지했습니다"
     },
     "approveUnlimited": "무제한 DEEP 한도 승인하여 반복 승인 방지",
     "approveUnlimitedHint": "권장사항: 각 승인마다 승인 한도가 소비되므로 무제한 승인으로 반복 작업 방지",
-    "retryTransaction": "트랜잭션 재시도"
+    "retryTransaction": "트랜잭션 재시도",
+    "quickTitle": "버전 지지",
+    "currentCount": "현재 지지 수",
+    "processing": "지지 전송 중...",
+    "success": "지지 완료",
+    "quickWaiting": "지지 준비 중..."
   },
   "transaction": {
     "pending": "트랜잭션 확인 대기 중...",

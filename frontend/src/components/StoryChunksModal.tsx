@@ -22,6 +22,7 @@ import {
   Star,
   Check
 } from 'lucide-react'
+import EndorseCompactModal from './modals/EndorseCompactModal'
 import { NodeData, StoryChunk, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds, shortAddress, formatHashMiddle } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTypeColorClass, getChunkTypeBorderColorClass } from '../constants/chunkTypes'
@@ -52,7 +53,7 @@ interface StoryData {
 
 export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunksModalProps) {
   const { t } = useTranslation()
-  const { getStoryData, getOwnerOf } = useTreeData()
+  const { getStoryData, getOwnerOf, bumpEndorsementCount } = useTreeData()
   const nameContainerRef = useRef<HTMLDivElement | null>(null)
   const nameTextRef = useRef<HTMLSpanElement | null>(null)
   const [marquee, setMarquee] = useState(false)
@@ -74,6 +75,8 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
   const [owner, setOwner] = useState<string | undefined>(person.owner)
+  const [showEndorseModal, setShowEndorseModal] = useState(false)
+  const [endorsementCount, setEndorsementCount] = useState<number>(person.endorsementCount ?? 0)
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
     return window.matchMedia('(min-width: 640px)').matches
@@ -128,6 +131,9 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
   useEffect(() => {
     if (isOpen) setOwner(person.owner)
   }, [person.owner, isOpen])
+  useEffect(() => {
+    setEndorsementCount(person.endorsementCount ?? 0)
+  }, [person.endorsementCount, person.personHash, person.versionIndex])
 
   // Computed meta for compact row under Detailed Story
   const chunksCount = useMemo(() => (
@@ -431,14 +437,11 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                     {genderText && <span className="whitespace-nowrap font-medium">{genderText}</span>}
                     {isMinted(person) && <span className="font-mono whitespace-nowrap font-semibold">#{person.tokenId}</span>}
-                    {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
+                    {endorsementCount > 0 && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          const params = new URLSearchParams()
-                          if (person.personHash) params.set('hash', person.personHash)
-                          if (person.versionIndex) params.set('vi', person.versionIndex.toString())
-                          window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
+                          setShowEndorseModal(true)
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
@@ -447,7 +450,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                       >
                         <Star className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500 dark:text-emerald-400 dark:fill-emerald-400" strokeWidth={0} />
                         <span className="text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          {person.endorsementCount}
+                          {endorsementCount}
                         </span>
                       </button>
                     )}
@@ -482,6 +485,20 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
               </button>
             </div>
           </div>
+          <EndorseCompactModal
+            isOpen={showEndorseModal}
+            onClose={() => setShowEndorseModal(false)}
+            personHash={person.personHash}
+            versionIndex={Number(person.versionIndex || 1)}
+            versionData={{
+              fullName: person.fullName,
+              endorsementCount
+            }}
+            onSuccess={() => {
+              setEndorsementCount((c) => c + 1)
+              bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1)
+            }}
+          />
           {/* Content */}
           <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden" style={{ touchAction: 'pan-y' }}>
             <div className="p-4 sm:p-6 pb-24 sm:pb-6 space-y-6">{/* extra bottom space for safe touch area */}

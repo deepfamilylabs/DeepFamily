@@ -12,6 +12,7 @@ import { isMinted } from '../types/graph'
 import { birthDateString } from '../types/graph'
 import { useFamilyTreeHeight } from '../constants/layout'
 import { useVizOptions } from '../context/VizOptionsContext'
+import EndorseCompactModal from './modals/EndorseCompactModal'
 
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
 
@@ -65,6 +66,13 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const responsiveHeight = useFamilyTreeHeight()
+  const [endorseModal, setEndorseModal] = useState<{
+    open: boolean
+    personHash: string
+    versionIndex: number
+    fullName?: string
+    endorsementCount?: number
+  }>({ open: false, personHash: '', versionIndex: 1 })
 
   const miniNodes = useMemo(() => positioned.map(pn => ({ id: pn.id, x: pn.x, y: pn.y, w: BASE_NODE_WIDTH, h: NODE_HEIGHT })), [positioned])
   const { miniSvgRef, viewportRef, dims } = useMiniMap({ width: 120, height: 90 }, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
@@ -83,71 +91,108 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
   }), [idToPos, centerOn])
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 pt-16"
-      style={{ height: responsiveHeight, overscrollBehavior: 'contain' }}
-    >
-      <ZoomControls className="absolute bottom-[124px] left-3 z-10 md:bottom-[158px]" trackHeight={140} k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <div className="absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
-      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(svgWidth, 800)} ${Math.max(svgHeight, responsiveHeight)}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}>
-        <defs>
-          <linearGradient id="cardGlossGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
-            <stop offset="30%" stopColor="#ffffff" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <g ref={innerRef as any}>
-          <g className="stroke-blue-300/70 dark:stroke-blue-500/60" strokeWidth={2} fill="none">
-            {positioned.map(pn => (pn.data.children || []).map(child => {
-              const childId = makeNodeId(child.personHash, child.versionIndex)
-              const childPos = idToPos.get(childId)
-              if (!childPos) return null
-              const w1 = BASE_NODE_WIDTH
-              const w2 = BASE_NODE_WIDTH
-              const x1 = pn.x + w1 / 2
-              const y1 = pn.y + NODE_HEIGHT
-              const x2 = childPos.x + w2 / 2
-              const y2 = childPos.y
-              const mx = (x1 + x2) / 2
-              const path = `M ${x1} ${y1} C ${mx} ${y1 + 24}, ${mx} ${y2 - 24}, ${x2} ${y2}`
-              return <path key={`${pn.id}->${childId}`} d={path} />
-            }))}
+    <>
+      <div
+        ref={containerRef}
+        className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 pt-16"
+        style={{ height: responsiveHeight, overscrollBehavior: 'contain' }}
+      >
+        <ZoomControls className="absolute bottom-[124px] left-3 z-10 md:bottom-[158px]" trackHeight={140} k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
+        <div className="absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left"><MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} /></div>
+        <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(svgWidth, 800)} ${Math.max(svgHeight, responsiveHeight)}`} className="block min-w-full min-h-full select-none" style={{ touchAction: 'none' }}>
+          <defs>
+            <linearGradient id="cardGlossGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+              <stop offset="30%" stopColor="#ffffff" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <g ref={innerRef as any}>
+            <g className="stroke-blue-300/70 dark:stroke-blue-500/60" strokeWidth={2} fill="none">
+              {positioned.map(pn => (pn.data.children || []).map(child => {
+                const childId = makeNodeId(child.personHash, child.versionIndex)
+                const childPos = idToPos.get(childId)
+                if (!childPos) return null
+                const w1 = BASE_NODE_WIDTH
+                const w2 = BASE_NODE_WIDTH
+                const x1 = pn.x + w1 / 2
+                const y1 = pn.y + NODE_HEIGHT
+                const x2 = childPos.x + w2 / 2
+                const y2 = childPos.y
+                const mx = (x1 + x2) / 2
+                const path = `M ${x1} ${y1} C ${mx} ${y1 + 24}, ${mx} ${y2 - 24}, ${x2} ${y2}`
+                return <path key={`${pn.id}->${childId}`} d={path} />
+              }))}
+            </g>
+            <g>
+              {positioned.map(pn => {
+                const w = BASE_NODE_WIDTH
+                const nd = nodesData[pn.id]
+                const mintedFlag = isMinted(nd)
+                const shortHashText = shortHash(pn.data.personHash)
+                const nameTextRaw = (mintedFlag && nd?.fullName) ? nd.fullName : shortHashText
+                const endorse = nd?.endorsementCount
+                const isSel = pn.id === selectedId
+                const isHover = hoverId === pn.id
+                const versionText = `v${pn.data.versionIndex}`
+                const tagText = nd?.tag || ''
+                // In deduplicate mode, show totalVersions badge from contract data
+                // In non-deduplicate mode, don't show badge (user can see all versions directly)
+                const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
+                const handleEndorse = () => {
+                  setEndorseModal({
+                    open: true,
+                    personHash: pn.data.personHash,
+                    versionIndex: pn.data.versionIndex,
+                    fullName: nd?.fullName,
+                    endorsementCount: endorse
+                  })
+                }
+                return (
+                  <g key={pn.id}
+                     transform={`translate(${pn.x}, ${pn.y})`}
+                     onMouseEnter={() => setHoverId(pn.id)}
+                     onMouseLeave={() => setHoverId(h => (h === pn.id ? null : h))}
+                     onClick={() => openNode({ personHash: pn.data.personHash, versionIndex: pn.data.versionIndex})}
+                     onDoubleClick={() => navigator.clipboard?.writeText(pn.data.personHash).catch(() => {})}
+                     className="cursor-pointer"
+                  >
+                    <title>{pn.data.personHash}</title>
+                    <NodeCard
+                      w={w}
+                      h={NODE_HEIGHT}
+                      minted={mintedFlag}
+                      selected={isSel}
+                      hover={isHover}
+                      versionText={versionText}
+                      titleText={nameTextRaw}
+                      tagText={tagText}
+                      gender={nd?.gender}
+                      birthPlace={nd?.birthPlace}
+                      birthDateText={mintedFlag ? birthDateString(nd) : undefined}
+                      shortHashText={shortHashText}
+                      endorsementCount={endorse}
+                      totalVersions={totalVersions}
+                      onEndorseClick={handleEndorse}
+                    />
+                  </g>
+                )
+              })}
+            </g>
           </g>
-          <g>
-            {positioned.map(pn => {
-              const w = BASE_NODE_WIDTH
-              const nd = nodesData[pn.id]
-              const mintedFlag = isMinted(nd)
-              const shortHashText = shortHash(pn.data.personHash)
-              const nameTextRaw = (mintedFlag && nd?.fullName) ? nd.fullName : shortHashText
-              const endorse = nd?.endorsementCount
-              const isSel = pn.id === selectedId
-              const isHover = hoverId === pn.id
-              const versionText = `v${pn.data.versionIndex}`
-              const tagText = nd?.tag || ''
-              // In deduplicate mode, show totalVersions badge from contract data
-              // In non-deduplicate mode, don't show badge (user can see all versions directly)
-              const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
-              return (
-                <g key={pn.id}
-                   transform={`translate(${pn.x}, ${pn.y})`}
-                   onMouseEnter={() => setHoverId(pn.id)}
-                   onMouseLeave={() => setHoverId(h => (h === pn.id ? null : h))}
-                   onClick={() => openNode({ personHash: pn.data.personHash, versionIndex: pn.data.versionIndex})}
-                   onDoubleClick={() => navigator.clipboard?.writeText(pn.data.personHash).catch(() => {})}
-                   className="cursor-pointer"
-                >
-                  <title>{pn.data.personHash}</title>
-                  <NodeCard w={w} h={NODE_HEIGHT} minted={mintedFlag} selected={isSel} hover={isHover} versionText={versionText} titleText={nameTextRaw} tagText={tagText} gender={nd?.gender} birthPlace={nd?.birthPlace} birthDateText={mintedFlag ? birthDateString(nd) : undefined} shortHashText={shortHashText} endorsementCount={endorse} totalVersions={totalVersions} />
-                </g>
-              )
-            })}
-          </g>
-        </g>
-      </svg>
-    </div>
+        </svg>
+      </div>
+      <EndorseCompactModal
+        isOpen={endorseModal.open}
+        onClose={() => setEndorseModal(m => ({ ...m, open: false }))}
+        personHash={endorseModal.personHash}
+        versionIndex={endorseModal.versionIndex}
+        versionData={{
+          fullName: endorseModal.fullName,
+          endorsementCount: endorseModal.endorsementCount
+        }}
+      />
+    </>
   )
 }
 

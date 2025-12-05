@@ -6,6 +6,7 @@ import { ethers } from 'ethers'
 import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
+import EndorseCompactModal from './modals/EndorseCompactModal'
 
 
 export default function NodeDetailModal({
@@ -55,8 +56,10 @@ export default function NodeDetailModal({
   const [dragOffset, setDragOffset] = React.useState(0)
   const startYRef = React.useRef<number | null>(null)
   const navigate = useNavigate()
-  const { getOwnerOf } = useTreeData()
+  const { getOwnerOf, bumpEndorsementCount } = useTreeData()
   const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner)
+  const [showEndorseModal, setShowEndorseModal] = React.useState(false)
+  const [endorsementCount, setEndorsementCount] = React.useState<number>(nodeData?.endorsementCount ?? 0)
   const handleClose = React.useCallback(() => {
     closedBySelfRef.current = true
     onClose()
@@ -106,6 +109,9 @@ export default function NodeDetailModal({
   React.useEffect(() => { if (open) { requestAnimationFrame(() => setEntered(true)) } else { setEntered(false) } }, [open])
   // Keep local owner state in sync and fetch if missing
   React.useEffect(() => { setOwner(nodeData?.owner) }, [nodeData?.owner])
+  React.useEffect(() => {
+    setEndorsementCount(nodeData?.endorsementCount ?? 0)
+  }, [nodeData?.endorsementCount, nodeData?.personHash, nodeData?.versionIndex])
   React.useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -224,11 +230,7 @@ export default function NodeDetailModal({
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          // Navigate to endorse page with person hash and version index
-                          const params = new URLSearchParams()
-                          if (nodeData?.personHash) params.set('hash', nodeData.personHash)
-                          if (nodeData?.versionIndex) params.set('vi', nodeData.versionIndex.toString())
-                          window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
+                          setShowEndorseModal(true)
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
@@ -237,7 +239,7 @@ export default function NodeDetailModal({
                       >
                         <Star className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500 dark:text-emerald-400 dark:fill-emerald-400" strokeWidth={0} />
                         <span className="text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          {nodeData.endorsementCount ?? 0}
+                          {endorsementCount}
                         </span>
                       </button>
                     )}
@@ -306,6 +308,20 @@ export default function NodeDetailModal({
               </button>
             </div>
           </div>
+          <EndorseCompactModal
+            isOpen={showEndorseModal}
+            onClose={() => setShowEndorseModal(false)}
+            personHash={nodeData?.personHash || fallback.hash}
+            versionIndex={Number(nodeData?.versionIndex || fallback.versionIndex || 1)}
+            versionData={{
+              fullName: nodeData?.fullName,
+              endorsementCount: endorsementCount
+            }}
+            onSuccess={() => {
+              setEndorsementCount(c => c + 1)
+              bumpEndorsementCount(nodeData?.personHash || fallback.hash, Number(nodeData?.versionIndex || fallback.versionIndex || 1), 1)
+            }}
+          />
         {centerHint && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>

@@ -1,4 +1,4 @@
-import { useMemo, useCallback, MouseEvent } from 'react'
+import { useMemo, useCallback, MouseEvent, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTreeData } from '../context/TreeDataContext'
 import {
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { NodeData, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, formatUnixDate, isMinted } from '../types/graph'
 import { shortHash } from '../types/graph'
+import EndorseCompactModal from './modals/EndorseCompactModal'
 
 interface PersonStoryCardProps {
   person: NodeData
@@ -22,10 +23,15 @@ interface PersonStoryCardProps {
 
 export default function PersonStoryCard({ person, onClick }: PersonStoryCardProps) {
   const { t } = useTranslation()
-  const { preloadStoryData } = useTreeData()
+  const { preloadStoryData, bumpEndorsementCount } = useTreeData()
+  const [showEndorseModal, setShowEndorseModal] = useState(false)
+  const [endorsementCount, setEndorsementCount] = useState<number>(person.endorsementCount ?? 0)
 
   const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
   const storyLabel = t('people.viewEncyclopedia', 'View Encyclopedia')
+  useEffect(() => {
+    setEndorsementCount(person.endorsementCount ?? 0)
+  }, [person.endorsementCount, person.personHash, person.versionIndex])
 
   // Preload story data on hover
   const handleMouseEnter = useCallback(() => {
@@ -103,20 +109,17 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
                 {person.tokenId}
               </span>
             )}
-            {person.endorsementCount !== undefined && person.endorsementCount > 0 && (
+            {endorsementCount > 0 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  const params = new URLSearchParams()
-                  if (person.personHash) params.set('hash', person.personHash)
-                  if (person.versionIndex) params.set('vi', person.versionIndex.toString())
-                  window.open(`/actions?tab=endorse&${params.toString()}`, '_blank', 'noopener,noreferrer')
+                  setShowEndorseModal(true)
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-xs font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
                 title={t('people.clickToEndorse', 'Click to endorse this version')}
               >
                 <Star className="w-3 h-3 fill-emerald-500 text-emerald-500" />
-                {person.endorsementCount}
+                {endorsementCount}
               </button>
             )}
           </div>
@@ -192,6 +195,20 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
           )}
         </div>
       </div>
+      <EndorseCompactModal
+        isOpen={showEndorseModal}
+        onClose={() => setShowEndorseModal(false)}
+        personHash={person.personHash}
+        versionIndex={Number(person.versionIndex || 1)}
+        versionData={{
+          fullName: person.fullName,
+          endorsementCount
+        }}
+        onSuccess={() => {
+          setEndorsementCount((c) => c + 1)
+          bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1)
+        }}
+      />
     </div>
   )
 }
