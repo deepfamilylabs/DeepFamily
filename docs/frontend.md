@@ -1,6 +1,6 @@
-# 🎨 Frontend Integration Guide
+# Frontend Integration Guide
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### **Core Technologies**
 | Technology | Version | Purpose |
@@ -22,7 +22,7 @@
 | **SnarkJS** | ^0.7.5 | Zero-knowledge proof generation |
 | **Zod** | ^4.0.17 | Runtime type validation |
 
-## 🏗️ Application Architecture
+## Application Architecture
 
 ### **Project Structure**
 ```
@@ -63,7 +63,7 @@ frontend/src/
 - Global state management for wallet, tree data, and configuration
 - Toast notifications and visualization options
 
-## 🔧 Development Setup
+## Development Setup
 
 ### **Environment Configuration**
 Create `frontend/.env` for production/testnet and `frontend/.env.local` for local development:
@@ -153,7 +153,7 @@ export function syncABIs() {
 **WalletConnectButton.tsx** - Web3 wallet connection with address display and i18n support
 **NodeDetailModal.tsx** - Person detail modal with endorsement and NFT minting functionality
 
-## 🔄 State Management
+## State Management
 
 ### **Context Providers**
 
@@ -165,7 +165,7 @@ export function syncABIs() {
 **useContract.ts** - Smart contract interaction with transaction execution and error handling
 **usePersonData.ts** - Person data fetching with version details and NFT information
 
-## 🌐 User Experience Flow
+## User Experience Flow
 
 ### **User Journey Flow**
 
@@ -174,21 +174,21 @@ export function syncABIs() {
 3. **Person Management** - Individual profiles with version tabs and action buttons
 4. **Story Creation & Editing** - Rich text editor with chunk-based content management
 
-## 🔒 Security & Validation
+## Security & Validation
 
 ### **Validation & Error Handling**
 - **Client-Side Validation**: Zod schemas for person info and story chunks with size limits
 - **Error Mapping**: User-friendly messages for contract errors and transaction failures
 - **Input Validation**: Form validation with comprehensive error feedback
 
-## 🚀 Performance Optimization
+## Performance Optimization
 
 ### **Performance Optimization**
 - **Data Caching**: React Query integration with 5-10 minute cache times
 - **Code Splitting**: Route and component-based lazy loading with Suspense
 - **Event-Driven Updates**: Real-time blockchain event monitoring with query invalidation
 
-## 🌍 Internationalization
+## Internationalization
 
 ### **Internationalization**
 - **Multi-language Support**: English, Chinese, Spanish with automatic language detection
@@ -197,7 +197,7 @@ export function syncABIs() {
 
 ---
 
-## 🎯 Frontend Integration Summary
+## Frontend Integration Summary
 
 ### **Development Best Practices**
 - **TypeScript First**: Complete type safety across the application

@@ -139,47 +139,15 @@ npm run dev:all              # Start complete development environment
 npm run frontend:dev         # Frontend development server only
 ```
 
-### Testing & Quality
-```bash
-npm run test:coverage        # Generate coverage reports
-npm run test:gas            # Gas usage analysis
-npm run lint                # Code quality checks
-npm run size                # Contract size analysis
-```
-
-### Multi-Network Deployment
-```bash
-npm run deploy:holesky      # Holesky testnet (recommended)
-npm run deploy:polygonAmoy  # Polygon testnet
-npm run deploy:confluxTestnet # Conflux testnet
-npm run deploy:mainnet      # Ethereum mainnet
-npm run deploy:polygon      # Polygon mainnet
-npm run deploy:arbitrum     # Arbitrum networks
-```
-
-### Contract Verification
-```bash
-npm run verify:holesky      # Verify on Holesky
-npm run verify:polygon      # Verify on Polygon
-npm run verify:arbitrum     # Verify on Arbitrum
-```
-
 ## Network Support
 
 ### Supported Networks
-- **Ethereum**: Mainnet, Sepolia, Holesky
-- **Layer 2**: Polygon, Arbitrum, Optimism
-- **Alternative**: BSC, Conflux eSpace
+- **Ethereum**: Mainnet, Sepolia, Holesky, Polygon, Arbitrum, Optimism, BSC, Conflux eSpace
 
 ### Environment Configuration
 Required `.env` variables:
 ```bash
 PRIVATE_KEY=                # Deployer wallet private key (secure!)
-INFURA_API_KEY=            # Network RPC access
-ETHERSCAN_API_KEY=         # Ethereum contract verification
-POLYGONSCAN_API_KEY=       # Polygon contract verification
-ARBISCAN_API_KEY=          # Arbitrum contract verification
-BSCSCAN_API_KEY=           # BSC contract verification
 ```
 
 ## Testing & Development Standards
