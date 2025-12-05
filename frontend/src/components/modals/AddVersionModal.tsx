@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download } from 'lucide-react'
+import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download, Star } from 'lucide-react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
 import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
@@ -33,6 +33,7 @@ interface AddVersionModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (result: any) => void
+  onEndorse?: (personHash: string, versionIndex: number) => void
   personHash?: string
   existingPersonData?: {
     fullName?: string
@@ -49,6 +50,7 @@ export default function AddVersionModal({
   isOpen,
   onClose,
   onSuccess,
+  onEndorse,
   personHash,
   existingPersonData
 }: AddVersionModalProps) {
@@ -1140,7 +1142,7 @@ export default function AddVersionModal({
             {/* Submit Buttons */}
             <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
               {successResult ? (
-                // Success state: Show Continue Adding and Close buttons
+                // Success state: Show Close, Continue Adding and Go to Endorse buttons
                 <>
                   <button
                     type="button"
@@ -1155,6 +1157,19 @@ export default function AddVersionModal({
                     className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
                   >
                     {t('addVersion.continueAdding', 'Continue Adding')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onEndorse && successResult.hash && successResult.index) {
+                        // Let the parent component handle closing this modal and opening the endorse modal
+                        onEndorse(successResult.hash, successResult.index)
+                      }
+                    }}
+                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Star className="w-4 h-4" />
+                    {t('addVersion.goToEndorse', 'Go to Endorse')}
                   </button>
                 </>
               ) : (

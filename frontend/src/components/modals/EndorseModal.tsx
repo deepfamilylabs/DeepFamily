@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Star, Coins, AlertCircle, Users, Check, AlertTriangle, ChevronRight } from 'lucide-react'
+import { X, Star, Coins, AlertCircle, Users, Check, AlertTriangle, ChevronRight, Image } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
@@ -10,6 +10,7 @@ interface EndorseModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (result: any) => void
+  onMintNFT?: (personHash: string, versionIndex: number) => void
   personHash?: string
   versionIndex?: number
   onPersonHashChange?: (hash: string) => void
@@ -29,6 +30,7 @@ export default function EndorseModal({
   isOpen,
   onClose,
   onSuccess,
+  onMintNFT,
   personHash,
   versionIndex,
   onPersonHashChange,
@@ -1375,7 +1377,7 @@ export default function EndorseModal({
           {/* Submit Buttons */}
           <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
             {successResult ? (
-              // Success state: Show Continue Endorsing and Close buttons
+              // Success state: Show Close, Continue Endorsing and Go to Mint NFT buttons
               <>
                 <button
                   type="button"
@@ -1391,6 +1393,19 @@ export default function EndorseModal({
                 >
                   <Star className="w-4 h-4" />
                   {t('endorse.continueEndorsing', 'Continue Endorsing')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMintNFT && successResult.personHash && successResult.versionIndex) {
+                      // Let the parent component handle closing this modal and opening the mint NFT modal
+                      onMintNFT(successResult.personHash, successResult.versionIndex)
+                    }
+                  }}
+                  className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Image className="w-4 h-4" />
+                  {t('endorse.goToMintNFT', 'Go to Mint NFT')}
                 </button>
               </>
             ) : (

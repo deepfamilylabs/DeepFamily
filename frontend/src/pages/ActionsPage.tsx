@@ -268,6 +268,20 @@ export default function ActionsPage() {
             console.log('Version added:', result)
             // Modal will show success message and user can close manually
           }}
+          onEndorse={(personHash, versionIndex) => {
+            // Close AddVersionModal and open EndorseModal with the new version's data
+            console.log('🎯 Going to endorse:', { personHash, versionIndex })
+            setAddVersionModal({ isOpen: false })
+            // Use setTimeout to ensure the modal closes before opening the next one
+            setTimeout(() => {
+              console.log('✅ Opening EndorseModal with:', { personHash, versionIndex })
+              setEndorseModal({
+                isOpen: true,
+                personHash: personHash,
+                versionIndex: versionIndex
+              })
+            }, 100)
+          }}
           personHash={addVersionModal.personHash}
           existingPersonData={addVersionModal.existingPersonData}
         />
@@ -292,6 +306,20 @@ export default function ActionsPage() {
           onSuccess={(result) => {
             console.log('Endorsement submitted:', result)
             setEndorseModal({ isOpen: false })
+          }}
+          onMintNFT={(personHash, versionIndex) => {
+            // Close EndorseModal and open MintNFTModal with the endorsed version's data
+            console.log('🎯 Going to mint NFT:', { personHash, versionIndex })
+            setEndorseModal({ isOpen: false })
+            // Use setTimeout to ensure the modal closes before opening the next one
+            setTimeout(() => {
+              console.log('✅ Opening MintNFTModal with:', { personHash, versionIndex })
+              setMintNFTModal({
+                isOpen: true,
+                personHash: personHash,
+                versionIndex: versionIndex
+              })
+            }, 100)
           }}
           personHash={endorseModal.personHash}
           versionIndex={endorseModal.versionIndex}
