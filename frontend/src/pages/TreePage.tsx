@@ -1,9 +1,15 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import FamilyTreeConfigForm from '../components/FamilyTreeConfigForm'
 import ViewContainer from '../components/ViewContainer'
 import { useTreeData } from '../context/TreeDataContext'
 import { useVizOptions } from '../context/VizOptionsContext'
+import { useConfig } from '../context/ConfigContext'
+
+function toBool(val: any) {
+  return val === '1' || val === 'true' || val === true || val === 'yes'
+}
+
 export default function TreePage() {
   const { traversal, setTraversal, deduplicateChildren, setDeduplicateChildren } = useVizOptions()
   const [viewMode, setViewMode] = useState<'dag' | 'tree' | 'force' | 'virtual'>(() => {
@@ -16,7 +22,25 @@ export default function TreePage() {
   const [editingConfig, setEditingConfig] = useState(false)
 
   const { t, i18n } = useTranslation()
-  const { root, loading: loadingContract, progress, contractMessage, refresh } = useTreeData()
+  const { root, loading: loadingContract, progress, contractMessage, refresh, clearAllCaches } = useTreeData()
+  const { contractAddress, rootHash, rootVersionIndex, defaults, update } = useConfig()
+  const forceEnvConfigSync = useMemo(() => toBool((import.meta as any).env.VITE_FORCE_ENV_CONFIG_SYNC), [])
+
+  useEffect(() => {
+    if (!forceEnvConfigSync) return
+    const envContract = (defaults.contractAddress || '').trim()
+    const envRootHash = (defaults.rootHash || '').trim()
+    const envRootVersion = defaults.rootVersionIndex
+    if (!envContract || !envRootHash) return
+
+    const matchesContract = envContract.toLowerCase() === (contractAddress || '').trim().toLowerCase()
+    const matchesRoot = envRootHash.toLowerCase() === (rootHash || '').trim().toLowerCase()
+    if (matchesContract && matchesRoot) return
+
+    clearAllCaches()
+    update({ contractAddress: envContract, rootHash: envRootHash, rootVersionIndex: envRootVersion })
+    refresh()
+  }, [forceEnvConfigSync, defaults.contractAddress, defaults.rootHash, defaults.rootVersionIndex, contractAddress, rootHash, rootVersionIndex, clearAllCaches, update, refresh])
 
   const triggerRefresh = useCallback(() => refresh(), [refresh])
   useEffect(() => { triggerRefresh() }, [triggerRefresh])
