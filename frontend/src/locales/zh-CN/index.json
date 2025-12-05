@@ -513,10 +513,10 @@
       "hideChunks": "隐藏分片",
       "encyclopedia": "人物百科",
       "editStory": "编辑档案",
-    "edit": "编辑",
-    "viewFullStory": "查看完整档案",
-    "mintNFTTooltip": "将此人物铸造成 NFT",
-    "uri": "URI",
+      "edit": "编辑",
+      "viewFullStory": "查看完整档案",
+      "mintNFTTooltip": "将此人物铸造成 NFT",
+      "uri": "URI",
       "loading": "NFT 信息加载中…",
       "loadErrorPrefix": "NFT 加载失败",
       "bcPrefix": "公元前",
@@ -550,7 +550,8 @@
     "hashCopied": "已复制哈希",
     "copy": "复制",
     "copied": "已复制",
-    "na": "无"
+    "na": "无",
+    "retry": "重试"
   },
   "wallet": {
     "connect": "连接钱包",
@@ -1069,11 +1070,17 @@
       "insufficientFunds": "交易手续费不足",
       "userRejected": "用户拒绝交易",
       "walletTimeout": "钱包确认超时。钱包弹窗可能已被关闭或隐藏。",
-      "walletTimeoutDetails": "请重试并确保在钱包弹窗中确认交易。"
+      "walletTimeoutDetails": "请重试并确保在钱包弹窗中确认交易。",
+      "alreadyEndorsed": "你已经背书过该版本"
     },
     "approveUnlimited": "授权无限制 DEEP 额度以避免重复授权",
     "approveUnlimitedHint": "推荐：每次背书都会消耗授权额度，无限制授权避免重复操作",
-    "retryTransaction": "重试交易"
+    "retryTransaction": "重试交易",
+    "quickTitle": "背书版本",
+    "currentCount": "当前背书数",
+    "processing": "正在提交背书...",
+    "success": "背书成功",
+    "quickWaiting": "准备背书中..."
   },
   "transaction": {
     "pending": "交易等待确认中...",

@@ -16,6 +16,7 @@ export interface NodeCardProps {
   shortHashText: string
   endorsementCount?: number
   totalVersions?: number  // Total number of versions for this person
+  onEndorseClick?: () => void
 }
 
 const PADDING_X = 12
@@ -47,7 +48,7 @@ function buildStarPath(cx: number, cy: number, spikes = 5, outerR = 6.5, innerR 
 }
 
 export default function NodeCard(props: NodeCardProps) {
-  const { w, h, minted, selected, hover, versionText, titleText, tagText, gender, birthPlace, birthDateText, shortHashText, endorsementCount, totalVersions } = props
+  const { w, h, minted, selected, hover, versionText, titleText, tagText, gender, birthPlace, birthDateText, shortHashText, endorsementCount, totalVersions, onEndorseClick } = props
 
   // Only show badge when totalVersions is explicitly passed (deduplicate mode) and > 1
   const hasMultipleVersions = typeof totalVersions === 'number' && totalVersions > 1
@@ -195,11 +196,16 @@ export default function NodeCard(props: NodeCardProps) {
       </text>
       {typeof endorsementCount === 'number' && (
         (() => { const txt = String(endorsementCount); const badgeW = Math.max(24, 12 + txt.length * 7); const x = w - badgeW - (FOOTER_PADDING - 2); const y = h - FOOTER_PADDING - FOOTER_BADGE_H; const cx = x + 8; const cy = y + FOOTER_BADGE_H / 2; const starPath = buildStarPath(cx, cy); return (
-          <>
+          <g
+            onClick={(e) => { e.stopPropagation(); onEndorseClick?.() }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="cursor-pointer"
+          >
             <rect x={x} y={y} width={badgeW} height={FOOTER_BADGE_H} rx={8} ry={8} className={`${minted ? 'fill-emerald-100 dark:fill-emerald-800/60' : 'fill-slate-100 dark:fill-slate-800/60'} stroke-transparent`} />
             <path d={starPath} className={`${minted ? 'fill-emerald-500' : 'fill-slate-500'}`} />
-            <text className="font-mono"><tspan x={x + 8 + 8} y={y + 12} textAnchor="start" className={`text-[12px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-700 dark:fill-slate-300'}`}>{txt}</tspan></text>
-          </>
+            <text className="font-mono pointer-events-none"><tspan x={x + 8 + 8} y={y + 12} textAnchor="start" className={`text-[12px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-700 dark:fill-slate-300'}`}>{txt}</tspan></text>
+          </g>
         ) })()
       )}
     </>

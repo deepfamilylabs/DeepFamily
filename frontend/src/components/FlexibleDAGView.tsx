@@ -10,6 +10,7 @@ import NodeCard from './NodeCard'
 import { useTreeData } from '../context/TreeDataContext'
 import { useFamilyTreeHeight } from '../constants/layout'
 import { useVizOptions } from '../context/VizOptionsContext'
+import EndorseCompactModal from './modals/EndorseCompactModal'
 
 export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
 
@@ -27,6 +28,13 @@ function FlexibleDAGViewInner({
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
   const { nodesData } = useTreeData()
   const { deduplicateChildren } = useVizOptions()
+  const [endorseModal, setEndorseModal] = useState<{
+    open: boolean
+    personHash: string
+    versionIndex: number
+    fullName?: string
+    endorsementCount?: number
+  }>({ open: false, personHash: '', versionIndex: 1 })
 
   type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
   type Edge = { from: string; to: string }
@@ -191,12 +199,31 @@ function FlexibleDAGViewInner({
                   shortHashText={hashShort}
                   endorsementCount={endorse}
                   totalVersions={totalVersions}
+                  onEndorseClick={() => {
+                    setEndorseModal({
+                      open: true,
+                      personHash: n.hash,
+                      versionIndex: n.versionIndex,
+                      fullName: nd?.fullName,
+                      endorsementCount: endorse
+                    })
+                  }}
                 />
               </g>
             )
           })}
         </g>
       </svg>
+      <EndorseCompactModal
+        isOpen={endorseModal.open}
+        onClose={() => setEndorseModal(m => ({ ...m, open: false }))}
+        personHash={endorseModal.personHash}
+        versionIndex={endorseModal.versionIndex}
+        versionData={{
+          fullName: endorseModal.fullName,
+          endorsementCount: endorseModal.endorsementCount
+        }}
+      />
     </div>
   )
 }

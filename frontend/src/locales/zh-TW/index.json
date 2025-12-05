@@ -512,10 +512,10 @@
       "hideChunks": "隱藏分片",
       "encyclopedia": "人物百科",
       "editStory": "編輯檔案",
-    "edit": "編輯",
-    "viewFullStory": "查看完整檔案",
-    "mintNFTTooltip": "將此人物鑄造為 NFT",
-    "uri": "URI",
+      "edit": "編輯",
+      "viewFullStory": "查看完整檔案",
+      "mintNFTTooltip": "將此人物鑄造為 NFT",
+      "uri": "URI",
       "loading": "NFT 資訊載入中…",
       "loadErrorPrefix": "NFT 載入失敗",
       "bcPrefix": "公元前",
@@ -549,7 +549,8 @@
     "hashCopied": "已複製雜湊",
     "copy": "複製",
     "copied": "已複製",
-    "na": "無"
+    "na": "無",
+    "retry": "重試"
   },
   "wallet": {
     "connect": "連接錢包",
@@ -1069,11 +1070,17 @@
       "walletPending": "錢包中有待處理的請求，請先在錢包內處理後再試一次。",
       "walletPendingDetails": "請於錢包擴充功能中找到待確認的授權或交易，先確認或取消，再重新嘗試。",
       "walletTimeout": "錢包確認超時。錢包彈窗可能已被關閉或隱藏。",
-      "walletTimeoutDetails": "請重試並確保在錢包彈窗中確認交易。"
+      "walletTimeoutDetails": "請重試並確保在錢包彈窗中確認交易。",
+      "alreadyEndorsed": "你已經背書過此版本"
     },
     "approveUnlimited": "授權無限制 DEEP 額度以避免重複授權",
     "approveUnlimitedHint": "推薦：每次背書都會消耗授權額度，無限制授權避免重複操作",
-    "retryTransaction": "重試交易"
+    "retryTransaction": "重試交易",
+    "quickTitle": "背書版本",
+    "currentCount": "目前背書數",
+    "processing": "正在提交背書...",
+    "success": "背書成功",
+    "quickWaiting": "準備背書中..."
   },
   "transaction": {
     "pending": "交易等待確認中...",

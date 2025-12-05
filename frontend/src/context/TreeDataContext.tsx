@@ -32,6 +32,7 @@ interface TreeDataValue {
   getNodeByTokenId: (tokenId: string) => Promise<NodeData | null>
   getOwnerOf: (tokenId: string) => Promise<string | null>
   clearAllCaches: () => void
+  bumpEndorsementCount: (personHash: string, versionIndex: number, delta?: number) => void
 }
 
 const TreeDataContext = createContext<TreeDataValue | null>(null)
@@ -956,6 +957,39 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     getStoryData(tokenId).catch(() => { /* silent */ })
   }, [getStoryData])
 
+  const bumpEndorsementCount = useCallback((personHash: string, versionIndex: number, delta: number = 1) => {
+    if (!personHash || !Number.isFinite(Number(versionIndex))) return
+    setNodesData(prev => {
+      let changed = false
+      const next: typeof prev = {}
+      for (const [id, nd] of Object.entries(prev)) {
+        if (nd.personHash === personHash && Number(nd.versionIndex) === Number(versionIndex)) {
+          const current = nd.endorsementCount ?? 0
+          next[id] = { ...nd, endorsementCount: current + delta }
+          changed = true
+        } else {
+          next[id] = nd
+        }
+      }
+      if (!changed) {
+        const nid = makeNodeId(personHash, Number(versionIndex))
+        const existing = prev[nid]
+        next[nid] = existing ? { ...existing, endorsementCount: (existing.endorsementCount ?? 0) + delta } : {
+          personHash,
+          versionIndex: Number(versionIndex),
+          id: nid,
+          endorsementCount: delta
+        } as NodeData
+        changed = true
+      }
+      if (changed) {
+        persistNodesData(next)
+        return next
+      }
+      return prev
+    })
+  }, [persistNodesData])
+
 
   // Derive progress from cached/memory root for fast-path refreshes (no streaming)
   useEffect(() => {
@@ -1039,7 +1073,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     clearAllCaches,
     preloadStoryData,
     getNodeByTokenId,
-    getOwnerOf
+    getOwnerOf,
+    bumpEndorsementCount
   }
 
   return <TreeDataContext.Provider value={value}>{children}</TreeDataContext.Provider>

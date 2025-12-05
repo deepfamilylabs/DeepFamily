@@ -12,6 +12,7 @@ import { useNodeDetail } from '../context/NodeDetailContext'
 import { useTreeData } from '../context/TreeDataContext'
 import { LAYOUT, useFamilyTreeHeight } from '../constants/layout'
 import { getGenderColor } from '../constants/genderColors'
+import EndorseCompactModal from './modals/EndorseCompactModal'
 
 const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = React.memo(function Node({ node, depth = 0, isLast = true }) {
   const indentPx = depth * 16
@@ -480,8 +481,9 @@ function flattenTree(root: GraphNode, expanded: Set<string>): FlatRow[] {
 
 export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: number; rowHeight?: number }> = ({ root, height, rowHeight = LAYOUT.ROW_HEIGHT }) => {
   const familyTreeHeight = useFamilyTreeHeight()
-  const { nodesData } = useTreeData() as any
+  const { nodesData, bumpEndorsementCount } = useTreeData() as any
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([root.personHash + ':' + root.versionIndex]))
+  const [endorseModal, setEndorseModal] = useState<{ open: boolean; personHash: string; versionIndex: number; fullName?: string; endorsementCount?: number }>({ open: false, personHash: '', versionIndex: 1 })
   
   const rows = useMemo(() => flattenTree(root, expanded), [root, expanded])
   
@@ -520,9 +522,24 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
         if (r.depth === currentDepth) { ancestorGuides[currentDepth] = !r.isLast; currentDepth-- }
       }
     }
+    const handleRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      if ((e.target as HTMLElement)?.closest?.('[data-endorse-btn="true"]')) return
+      openNode({ personHash: node.personHash, versionIndex: node.versionIndex})
+    }
+    const openEndorseModal = (e: React.MouseEvent | React.TouchEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      setEndorseModal({
+        open: true,
+        personHash: node.personHash,
+        versionIndex: node.versionIndex,
+        fullName: name,
+        endorsementCount: endorse
+      })
+    }
     return (
       <div style={{ ...style }} className={`group font-mono text-[12px] flex items-stretch relative ${isSel ? 'bg-amber-100 dark:bg-amber-900/40' : ''} hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer`}
-           onClick={() => openNode({ personHash: node.personHash, versionIndex: node.versionIndex})}>
+           onClick={handleRowClick}>
         <div className="absolute inset-y-0 left-0 flex pointer-events-none">
           {ancestorGuides.map((show, i) => show ? (
             <div key={i} style={{ width: 16 }} className="flex-shrink-0 relative">
@@ -554,12 +571,21 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
                 : `v${node.versionIndex}`}
             </span>
             {endorse !== undefined && (
-              <span className="inline-flex items-center gap-1" title="Endorsements">
+              <button
+                type="button"
+                data-endorse-btn="true"
+                onClick={openEndorseModal}
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault() }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                className={`inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors ${mintedFlag ? 'hover:bg-emerald-50 dark:hover:bg-emerald-900/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500' : 'hover:bg-slate-100 dark:hover:bg-slate-800/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500'}`}
+                title="Endorsements"
+              >
                 <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" className="flex-shrink-0">
                   <path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15l-5.2 2.8 1-5.9-4.3-4.2 5.9-.9L10 1.5z" className={mintedFlag ? 'fill-emerald-500' : 'fill-slate-500'} />
                 </svg>
                 <span className={`font-mono text-[12px] ${mintedFlag ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}`}>{endorse}</span>
-              </span>
+              </button>
             )}
             {mintedFlag && (
               <>
@@ -573,12 +599,23 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
         </div>
       </div>
     )
-  }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData])
+  }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData, setEndorseModal])
   return (
     <div className="w-full transition-all duration-300 overflow-hidden" style={{ height: familyTreeHeight }}>
       <div className="p-4 pt-16 h-full overflow-x-auto">
         <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'auto'}>{Row}</VirtualList>
       </div>
+      <EndorseCompactModal
+        isOpen={endorseModal.open}
+        onClose={() => setEndorseModal(m => ({ ...m, open: false }))}
+        personHash={endorseModal.personHash}
+        versionIndex={endorseModal.versionIndex}
+        versionData={{
+          fullName: endorseModal.fullName,
+          endorsementCount: endorseModal.endorsementCount
+        }}
+        onSuccess={() => bumpEndorsementCount?.(endorseModal.personHash, endorseModal.versionIndex, 1)}
+      />
     </div>
   )
 }

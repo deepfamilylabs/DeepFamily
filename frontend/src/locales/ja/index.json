@@ -512,10 +512,10 @@
       "hideChunks": "シャード非表示",
       "encyclopedia": "人物百科",
       "editStory": "プロフィール編集",
-    "edit": "編集",
-    "viewFullStory": "完全プロフィール閲覧",
-    "mintNFTTooltip": "この人物をNFTとして鋳造",
-    "uri": "URI",
+      "edit": "編集",
+      "viewFullStory": "完全プロフィール閲覧",
+      "mintNFTTooltip": "この人物をNFTとして鋳造",
+      "uri": "URI",
       "loading": "NFT情報読み込み中…",
       "loadErrorPrefix": "NFT読み込み失敗",
       "bcPrefix": "紀元前",
@@ -549,7 +549,8 @@
     "hashCopied": "ハッシュをコピーしました",
     "copy": "コピー",
     "copied": "コピー済み",
-    "na": "無"
+    "na": "無",
+    "retry": "再試行"
   },
   "wallet": {
     "connect": "ウォレット接続",
@@ -1069,11 +1070,17 @@
       "walletPending": "ウォレットに保留中のリクエストがあります。ウォレットを開き、既存の要求を処理してから再試行してください。",
       "walletPendingDetails": "ウォレット拡張機能で承認待ちまたは取引待ちの項目を確認し、承認または拒否してからもう一度お試しください。",
       "walletTimeout": "ウォレット確認タイムアウト。ウォレットポップアップが閉じられたか隠れた可能性があります。",
-      "walletTimeoutDetails": "再試行し、ウォレットポップアップで取引を確認してください。"
+      "walletTimeoutDetails": "再試行し、ウォレットポップアップで取引を確認してください。",
+      "alreadyEndorsed": "このバージョンはすでにエンドース済みです"
     },
     "approveUnlimited": "無制限DEEP額度承認で重複承認を回避",
     "approveUnlimitedHint": "推奨：各エンドースメントは承認額度を消費します。無制限承認で重複操作を回避",
-    "retryTransaction": "取引再試行"
+    "retryTransaction": "取引再試行",
+    "quickTitle": "バージョンをエンドース",
+    "currentCount": "現在のエンドース数",
+    "processing": "エンドース送信中...",
+    "success": "エンドースに成功",
+    "quickWaiting": "エンドース準備中..."
   },
   "transaction": {
     "pending": "取引確認待ち中...",

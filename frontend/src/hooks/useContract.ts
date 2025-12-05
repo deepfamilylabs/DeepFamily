@@ -33,6 +33,8 @@ export function useContract() {
       onError?: (error: any) => void
       successMessage?: string
       errorMessage?: string
+      suppressSubmittedToast?: boolean
+      suppressSuccessToast?: boolean
       suppressErrorToast?: boolean
     } = {}
   ) => {
@@ -103,14 +105,18 @@ export function useContract() {
         window.removeEventListener('focus', onFocus)
       }
 
-      toast.show(t('transaction.submitted', 'Transaction submitted...'))
+      if (!options.suppressSubmittedToast) {
+        toast.show(t('transaction.submitted', 'Transaction submitted...'))
+      }
 
       console.log('⏳ Waiting for transaction confirmation...')
       const receipt = await tx.wait()
       console.log('✅ Transaction confirmed:', { hash: receipt.hash, blockNumber: receipt.blockNumber, status: receipt.status })
 
       const successMsg = options.successMessage || t('transaction.success', 'Transaction successful')
-      toast.show(successMsg)
+      if (!options.suppressSuccessToast) {
+        toast.show(successMsg)
+      }
 
       options.onSuccess?.(receipt)
       return receipt
@@ -213,7 +219,9 @@ export function useContract() {
         }
       }
       
-      toast.show(errorMsg)
+      if (!options.suppressErrorToast) {
+        toast.show(errorMsg)
+      }
 
       // Create enhanced error with parsed info
       const enhancedError = {
@@ -300,7 +308,8 @@ export function useContract() {
   const endorseVersion = useCallback(async (
     personHash: string,
     versionIndex: number,
-    overrides?: any
+    overrides?: any,
+    txOptions?: { suppressToasts?: boolean }
   ) => {
     return executeTransaction(
       async () => {
@@ -349,7 +358,10 @@ export function useContract() {
       },
       {
         successMessage: t('contract.endorseSuccess', 'Endorsement submitted successfully'),
-        errorMessage: t('contract.endorseFailed', 'Failed to endorse version')
+        errorMessage: t('contract.endorseFailed', 'Failed to endorse version'),
+        suppressSubmittedToast: txOptions?.suppressToasts,
+        suppressSuccessToast: txOptions?.suppressToasts,
+        suppressErrorToast: txOptions?.suppressToasts
       }
     )
   }, [executeTransaction, t, contract])

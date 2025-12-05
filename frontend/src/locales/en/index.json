@@ -513,10 +513,10 @@
       "hideChunks": "Hide Chunks",
       "encyclopedia": "Encyclopedia",
       "editStory": "Edit Story",
-    "edit": "Edit",
-    "viewFullStory": "View Full Story",
-    "mintNFTTooltip": "Mint this person as an NFT",
-    "uri": "URI",
+      "edit": "Edit",
+      "viewFullStory": "View Full Story",
+      "mintNFTTooltip": "Mint this person as an NFT",
+      "uri": "URI",
       "loading": "Loading NFT info…",
       "loadErrorPrefix": "NFT load failed",
       "bcPrefix": "BC",
@@ -550,7 +550,8 @@
     "hashCopied": "Hash copied",
     "copy": "Copy",
     "copied": "Copied",
-    "na": "N/A"
+    "na": "N/A",
+    "retry": "Retry"
   },
   "wallet": {
     "connect": "Connect Wallet",
@@ -1068,11 +1069,17 @@
       "insufficientFunds": "Insufficient funds for transaction",
       "userRejected": "Transaction was rejected by user",
       "walletTimeout": "Wallet confirmation timed out. The wallet popup may have been closed or hidden.",
-      "walletTimeoutDetails": "Please try again and make sure to confirm the transaction in your wallet popup window."
+      "walletTimeoutDetails": "Please try again and make sure to confirm the transaction in your wallet popup window.",
+      "alreadyEndorsed": "You already endorsed this version"
     },
     "approveUnlimited": "Approve unlimited DEEP utility allowance to avoid future approvals",
     "approveUnlimitedHint": "Recommended: Each endorsement consumes allowance; unlimited approval avoids repeated authorizations",
-    "retryTransaction": "Retry Transaction"
+    "retryTransaction": "Retry Transaction",
+    "quickTitle": "Endorse Version",
+    "currentCount": "Current endorsements",
+    "processing": "Submitting endorsement...",
+    "success": "Endorsed successfully",
+    "quickWaiting": "Preparing endorsement..."
   },
   "transaction": {
     "pending": "Transaction pending confirmation...",
