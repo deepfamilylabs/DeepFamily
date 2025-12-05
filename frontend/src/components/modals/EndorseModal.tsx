@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Star, Coins, AlertCircle, Users, Check, AlertTriangle, ChevronRight, Image } from 'lucide-react'
+import { X, Star, Coins, AlertCircle, Check, AlertTriangle, ChevronRight, Image } from 'lucide-react'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
 import { useSearchParams } from 'react-router-dom'
+import { getFriendlyError } from '../../lib/errors'
 
 interface EndorseModalProps {
   isOpen: boolean
@@ -836,40 +837,11 @@ export default function EndorseModal({
         stack: error.stack?.substring(0, 500) // Truncated stack trace
       })
 
-      // Parse error for better user feedback
-      let errorType = 'UNKNOWN_ERROR'
-      let errorMessage = error.message || 'An unexpected error occurred'
-      let errorDetails = error.message || 'Unknown error'
-
-      // Check for specific contract errors
-      if (/InvalidVersionIndex|InvalidPersonHash/i.test(errorMessage)) {
-        errorType = 'INVALID_TARGET'
-        errorMessage = t('endorse.errors.invalidTarget', 'Invalid person hash or version index')
-      } else if (/insufficient allowance|ERC20InsufficientAllowance/i.test(errorMessage)) {
-        errorType = 'INSUFFICIENT_ALLOWANCE'
-        errorMessage = t('endorse.errors.needApprove', 'Allowance too low, please approve DEEP tokens again')
-      } else if (/insufficient funds|ERC20InsufficientBalance/i.test(errorMessage)) {
-        errorType = 'INSUFFICIENT_BALANCE'
-        errorMessage = t('endorse.errors.insufficientDeepTokens', 'Insufficient DEEP tokens for endorsement')
-      } else if (/EndorsementFeeTransferFailed/i.test(errorMessage)) {
-        errorType = 'FEE_TRANSFER_FAILED'
-        errorMessage = t('endorse.errors.feeTransferFailed', 'Failed to transfer endorsement fee')
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        errorType = 'INSUFFICIENT_FUNDS'
-        errorMessage = t('endorse.errors.insufficientFunds', 'Insufficient funds for transaction')
-      } else if (error.code === 'USER_REJECTED') {
-        errorType = 'USER_REJECTED'
-        errorMessage = t('endorse.errors.userRejected', 'Transaction was rejected by user')
-      } else if (/WALLET_POPUP_TIMEOUT/i.test(errorMessage)) {
-        errorType = 'WALLET_TIMEOUT'
-        errorMessage = t('endorse.errors.walletTimeout', 'Wallet confirmation timed out. The wallet popup may have been closed or hidden.')
-        errorDetails = t('endorse.errors.walletTimeoutDetails', 'Please try again and make sure to confirm the transaction in your wallet popup window.')
-      }
-
+      const friendly = getFriendlyError(error, t)
       setErrorResult({
-        type: errorType,
-        message: errorMessage,
-        details: errorDetails
+        type: friendly.reason || friendly.type || error.type || 'UNKNOWN_ERROR',
+        message: friendly.message,
+        details: friendly.details
       })
     } finally {
       setIsApproving(false)

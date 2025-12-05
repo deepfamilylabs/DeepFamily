@@ -11,6 +11,7 @@ import { poseidon5 } from 'poseidon-lite'
 import { useSearchParams } from 'react-router-dom'
 import PersonHashCalculator from '../PersonHashCalculator'
 import EndorseModal from './EndorseModal'
+import { getFriendlyError } from '../../lib/errors'
 import {
   generateNamePoseidonProof,
   verifyNamePoseidonProof,
@@ -698,89 +699,12 @@ export default function MintNFTModal({
         toString: error?.toString?.()
       })
 
-      // Parse error for better user feedback
-      let errorType = 'UNKNOWN_ERROR'
-      // Prefer parsedMessage from useContract.executeTransaction if available
-      const baseMsg =
-        error?.parsedMessage ||
-        error?.shortMessage ||
-        error?.reason ||
-        error?.data?.message ||
-        error?.error?.message ||
-        error?.message ||
-        'An unexpected error occurred'
-
-      // Extract a custom error name if available
-      let customName: string | undefined =
-        error?.customError ||
-        error?.errorName ||
-        error?.data?.errorName ||
-        error?.info?.error?.name
-
-      if (!customName && typeof baseMsg === 'string') {
-        const m = baseMsg.match(/reverted with custom error '([^']+)'/)
-        if (m) customName = m[1].replace('()', '')
-      }
-
-      // Map known custom errors to friendly messages
-      let errorMessage = baseMsg
-      if (customName) {
-        if (customName.includes('VersionAlreadyMinted')) {
-          errorType = 'VERSION_ALREADY_MINTED'
-          errorMessage = t('mintNFT.errors.versionAlreadyMinted', 'This version has already been minted as NFT')
-        } else if (customName.includes('MustEndorseVersionFirst')) {
-          errorType = 'MUST_ENDORSE_FIRST'
-          errorMessage = t('mintNFT.errors.mustEndorseFirst', 'You must endorse this version before minting')
-        } else if (customName.includes('BasicInfoMismatch')) {
-          errorType = 'BASIC_INFO_MISMATCH'
-          errorMessage = t('mintNFT.errors.basicInfoMismatch', 'Person information does not match the version data')
-        } else if (customName.includes('InvalidTokenURI')) {
-          errorType = 'INVALID_TOKEN_URI'
-          errorMessage = t('mintNFT.errors.invalidTokenURI', 'Invalid token URI format')
-        } else if (customName.includes('InvalidStory')) {
-          errorType = 'INVALID_STORY'
-          errorMessage = t('mintNFT.errors.invalidStory', 'Story content is too long')
-        } else if (customName.includes('InvalidBirthPlace')) {
-          errorType = 'INVALID_BIRTH_PLACE'
-          errorMessage = t('mintNFT.errors.invalidBirthPlace', 'Birth place is too long')
-        } else if (customName.includes('InvalidDeathPlace')) {
-          errorType = 'INVALID_DEATH_PLACE'
-          errorMessage = t('mintNFT.errors.invalidDeathPlace', 'Death place is too long')
-        } else {
-          // If we have a custom error name but no mapping, surface it
-          errorType = customName
-          errorMessage = customName
-        }
-      } else if (error?.code === 'INSUFFICIENT_FUNDS') {
-        errorType = 'INSUFFICIENT_FUNDS'
-        errorMessage = t('mintNFT.errors.insufficientFunds', 'Insufficient funds for transaction')
-      } else if (
-        error?.code === 'USER_REJECTED' ||
-        error?.code === 'ACTION_REJECTED' ||
-        (typeof baseMsg === 'string' && baseMsg.toLowerCase().includes('user rejected'))
-      ) {
-        errorType = 'USER_REJECTED'
-        errorMessage = t('mintNFT.errors.userRejected', 'Transaction was rejected by user')
-      }
-
-      const errorDetails = [
-        customName ? `Custom: ${customName}` : null,
-        error?.code ? `Code: ${error.code}` : null,
-        typeof baseMsg === 'string' ? `Message: ${baseMsg}` : null
-      ]
-        .filter(Boolean)
-        .join('\n') || 'Unknown error'
-
-      console.log('🚨 Setting error result:', {
-        type: errorType,
-        message: errorMessage,
-        details: errorDetails
-      })
+      const friendly = getFriendlyError(error, t)
 
       setErrorResult({
-        type: errorType,
-        message: errorMessage,
-        details: errorDetails
+        type: friendly.reason || friendly.type || 'UNKNOWN_ERROR',
+        message: friendly.message,
+        details: friendly.details
       })
     } finally {
       setIsSubmitting(false)
