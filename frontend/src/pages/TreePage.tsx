@@ -31,14 +31,15 @@ export default function TreePage() {
     const envContract = (defaults.contractAddress || '').trim()
     const envRootHash = (defaults.rootHash || '').trim()
     const envRootVersion = defaults.rootVersionIndex
-    if (!envContract || !envRootHash) return
+    if (!envContract) return
 
     const matchesContract = envContract.toLowerCase() === (contractAddress || '').trim().toLowerCase()
-    const matchesRoot = envRootHash.toLowerCase() === (rootHash || '').trim().toLowerCase()
-    if (matchesContract && matchesRoot) return
+    if (matchesContract) return
 
     clearAllCaches()
-    update({ contractAddress: envContract, rootHash: envRootHash, rootVersionIndex: envRootVersion })
+    const nextUpdate: any = { contractAddress: envContract, rootVersionIndex: envRootVersion }
+    if (envRootHash) nextUpdate.rootHash = envRootHash
+    update(nextUpdate)
     refresh()
   }, [forceEnvConfigSync, defaults.contractAddress, defaults.rootHash, defaults.rootVersionIndex, contractAddress, rootHash, rootVersionIndex, clearAllCaches, update, refresh])
 
