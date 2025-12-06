@@ -839,6 +839,7 @@
     "openEndorse": "打開背書"
   },
   "addVersion": {
+    "title": "新增版本",
     "addNewVersion": "新增版本",
     "addPerson": "新增人物",
     "description": "使用零知識證明新增人物",

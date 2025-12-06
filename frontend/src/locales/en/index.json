@@ -840,6 +840,7 @@
     "openEndorse": "Open Endorsement"
   },
   "addVersion": {
+    "title": "Add Version",
     "addNewVersion": "Add New Version",
     "addPerson": "Add Person",
     "description": "Add person with zero-knowledge proof",

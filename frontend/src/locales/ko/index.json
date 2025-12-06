@@ -839,6 +839,7 @@
     "openEndorse": "승인 열기"
   },
   "addVersion": {
+    "title": "버전 추가",
     "addNewVersion": "새 버전 추가",
     "addPerson": "인물 추가",
     "description": "영지식 증명으로 인물 추가",
