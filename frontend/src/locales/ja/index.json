@@ -839,6 +839,7 @@
     "openEndorse": "エンドースメントを開く"
   },
   "addVersion": {
+    "title": "バージョン追加",
     "addNewVersion": "新バージョン追加",
     "addPerson": "人物追加",
     "description": "ゼロ知識証明を使用して人物を追加",

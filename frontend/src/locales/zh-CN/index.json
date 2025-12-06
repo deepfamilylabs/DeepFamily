@@ -841,6 +841,7 @@
     "openEndorse": "打开背书"
   },
   "addVersion": {
+    "title": "添加版本",
     "addNewVersion": "添加新版本",
     "addPerson": "添加人物",
     "description": "使用零知识证明添加人物",
