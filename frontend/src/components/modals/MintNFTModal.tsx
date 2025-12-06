@@ -10,7 +10,6 @@ import { ethers } from 'ethers'
 import { poseidon5 } from 'poseidon-lite'
 import { useSearchParams } from 'react-router-dom'
 import PersonHashCalculator from '../PersonHashCalculator'
-import EndorseModal from './EndorseModal'
 import { getFriendlyError } from '../../lib/errors'
 import {
   generateNamePoseidonProof,
@@ -172,30 +171,19 @@ interface MintNFTModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (tokenId: number) => void
-  personHash?: string
-  versionIndex?: number
-  onPersonHashChange?: (hash: string) => void
-  onVersionIndexChange?: (index: number) => void
-  versionData?: {
-    fullName?: string
-    gender?: number
-    birthYear?: number
-    birthMonth?: number
-    birthDay?: number
-    isBirthBC?: boolean
-    passphrase?: string
-  }
+  onGoEndorse?: (personHash: string, versionIndex: number) => void
+  // Initial data - only used when opening, modal internal state is fully self-contained
+  initialPersonHash?: string
+  initialVersionIndex?: number
 }
 
 export default function MintNFTModal({
   isOpen,
   onClose,
   onSuccess,
-  personHash,
-  versionIndex,
-  onPersonHashChange,
-  onVersionIndexChange,
-  versionData
+  onGoEndorse,
+  initialPersonHash,
+  initialVersionIndex
 }: MintNFTModalProps) {
   const { t } = useTranslation()
   const { address } = useWallet()
@@ -204,6 +192,12 @@ export default function MintNFTModal({
   // Create schema with translations
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t])
   const [searchParams] = useSearchParams()
+  
+  // ===== Internal state - fully self-contained, follows modal lifecycle =====
+  const [personHash, setPersonHash] = useState<string>('')
+  const [versionIndex, setVersionIndex] = useState<number>(1)
+  
+  // UI state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEndorsed, setIsEndorsed] = useState(false)
   const [isAlreadyMinted, setIsAlreadyMinted] = useState(false)
@@ -213,8 +207,9 @@ export default function MintNFTModal({
   const [dragging, setDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const startYRef = useRef<number | null>(null)
-  const [showEndorseModal, setShowEndorseModal] = useState(false)
   const [showEndorseConfirm, setShowEndorseConfirm] = useState(false)
+  
+  // Result state
   const [successResult, setSuccessResult] = useState<{
     tokenId: number
     personHash: string
@@ -222,26 +217,19 @@ export default function MintNFTModal({
     tokenURI: string
     transactionHash: string
     blockNumber: number
-    events: {
-      PersonNFTMinted: any
-    }
+    events: { PersonNFTMinted: any }
   } | null>(null)
   const [errorResult, setErrorResult] = useState<{
     type: string
     message: string
     details: string
   } | null>(null)
+  
+  // Form state
+  const [consents, setConsents] = useState({ public: false, age: false, legal: false })
+  const [consentError, setConsentError] = useState<string | null>(null)
   const [contractError, setContractError] = useState<any>(null)
   const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
-  // Local fallback state when parent does not control inputs
-  const [localPersonHash, setLocalPersonHash] = useState<string>('')
-  const [localVersionIndex, setLocalVersionIndex] = useState<number>(1)
-
-  // Track history push/pop to close on mobile back like NodeDetailModal
-  const pushedRef = useRef(false)
-  const closedBySelfRef = useRef(false)
-  const closedByPopRef = useRef(false)
-  const historyMarkerRef = useRef<{ __dfModal: string; id: string } | null>(null)
   
   // Person basic info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<{
@@ -254,15 +242,19 @@ export default function MintNFTModal({
     passphrase: string
   } | null>(null)
   
-  // Unified target values: prefer props if provided, otherwise local state
-  const targetPersonHash = (personHash ?? localPersonHash)?.trim()
-  const targetVersionIndex = (versionIndex ?? localVersionIndex)
+  // 计算属性
   const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim())
+  const targetPersonHash = personHash?.trim() || ''
+  const targetVersionIndex = versionIndex
   const isPersonHashFormatValid = isBytes32(targetPersonHash)
 
   // Determine validity - always show input mode
-  const hasValidTarget = Boolean(targetPersonHash && targetPersonHash !== '' && targetVersionIndex !== undefined && targetVersionIndex > 0)
+  const hasValidTarget = Boolean(targetPersonHash && isPersonHashFormatValid && targetVersionIndex !== undefined && targetVersionIndex > 0)
   const canEdit = true
+  const allConsentsChecked = consents.public && consents.age && consents.legal
+  const hasPersonInfo = Boolean(personInfo?.fullName?.trim())
+  const hasTargetInputs = hasValidTarget
+  const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid)
 
   // Desktop/mobile detection
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
@@ -289,15 +281,6 @@ export default function MintNFTModal({
     }
   }, [])
 
-  // Enter animation for mobile bottom sheet
-  useEffect(() => { 
-    if (isOpen) { 
-      requestAnimationFrame(() => setEntered(true)) 
-    } else { 
-      setEntered(false) 
-    } 
-  }, [isOpen])
-
   const {
     register,
     handleSubmit,
@@ -308,7 +291,6 @@ export default function MintNFTModal({
   } = useForm({
     resolver: zodResolver(mintNFTSchema),
     defaultValues: {
-      // PersonSupplementInfo
       birthPlace: '',
       isDeathBC: false,
       deathYear: '' as string | number,
@@ -320,44 +302,37 @@ export default function MintNFTModal({
     }
   })
 
-  // Initialize person info from version data
+  // ===== Core: Modal open/close state management =====
   useEffect(() => {
-    if (versionData && isOpen) {
-      setPersonInfo({
-        fullName: versionData.fullName || '',
-        gender: versionData.gender || 0,
-        birthYear: versionData.birthYear || 0,
-        birthMonth: versionData.birthMonth || 0,
-        birthDay: versionData.birthDay || 0,
-        isBirthBC: versionData.isBirthBC || false,
-        passphrase: versionData.passphrase || ''
-      })
+    if (isOpen) {
+      // On open: initialize state
+      setPersonHash(initialPersonHash || '')
+      setVersionIndex(initialVersionIndex || 1)
+      // Animation
+      requestAnimationFrame(() => setEntered(true))
+    } else {
+      // On close: reset all state
+      setEntered(false)
+      reset()
+      setPersonHash('')
+      setVersionIndex(1)
+      setPersonInfo(null)
+      setIsSubmitting(false)
+      setIsEndorsed(false)
+      setIsAlreadyMinted(false)
+      setIsCheckingStatus(false)
+      setHasMissingParents(null)
+      setSuccessResult(null)
+      setErrorResult(null)
+      setContractError(null)
+      setConsents({ public: false, age: false, legal: false })
+      setConsentError(null)
+      setProofGenerationStep('')
+      setShowEndorseConfirm(false)
+      setDragging(false)
+      setDragOffset(0)
     }
-  }, [versionData, isOpen])
-
-  // Initialize from URL parameters and props on open
-  useEffect(() => {
-    if (!isOpen) return
-    try {
-      // Get values from URL parameters
-      const qHash = searchParams.get('hash') || searchParams.get('personHash') || ''
-      const qIndexStr = searchParams.get('vi') || searchParams.get('version') || searchParams.get('versionIndex') || ''
-      const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN
-
-      // Prefer props, then URL params, then keep current local state
-      if (typeof personHash === 'string' && personHash.trim() !== '') {
-        setLocalPersonHash(personHash.trim())
-      } else if (qHash) {
-        setLocalPersonHash(qHash)
-      }
-
-      if (typeof versionIndex === 'number' && versionIndex > 0) {
-        setLocalVersionIndex(versionIndex)
-      } else if (Number.isFinite(qIndex) && qIndex > 0) {
-        setLocalVersionIndex(qIndex)
-      }
-    } catch {}
-  }, [isOpen, personHash, versionIndex, searchParams])
+  }, [isOpen, initialPersonHash, initialVersionIndex, reset])
 
   // Check endorsement and NFT minting status
   useEffect(() => {
@@ -402,87 +377,80 @@ export default function MintNFTModal({
     }
   }, [isOpen, address, targetPersonHash, targetVersionIndex, getVersionDetails, contract, hasValidTarget])
 
-  const handleClose = () => {
-    closedBySelfRef.current = true
-    reset()
-    setIsSubmitting(false)
-    setPersonInfo(null)
-    setIsEndorsed(false)
-    setIsAlreadyMinted(false)
-    setIsCheckingStatus(false)
-    setHasMissingParents(null)
-    setSuccessResult(null)
-    setErrorResult(null)
-    setContractError(null)
-    setProofGenerationStep('')
-    setEntered(false)
-    setDragging(false)
-    setDragOffset(0)
-    onClose()
+  // Simplified close handler - state reset is handled by isOpen useEffect
+  const handleClose = () => onClose()
+
+  // Navigate to endorse modal - simplified version
+  const handleGoEndorse = () => {
+    if (!targetPersonHash || !isPersonHashFormatValid || !targetVersionIndex) {
+      setShowEndorseConfirm(false)
+      return
+    }
+    if (onGoEndorse) {
+      onGoEndorse(targetPersonHash, targetVersionIndex)
+    }
   }
 
-  // Close on Escape
+  const toggleConsent = (key: keyof typeof consents) => {
+    setConsents((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      if (consentError && next.public && next.age && next.legal) setConsentError(null)
+      return next
+    })
+  }
+
+  // Close on Escape key
   useEffect(() => {
     if (!isOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen])
+  }, [isOpen, onClose])
 
-  // Push history state on open so mobile back closes the modal first
+  // Close on mobile back button
   useEffect(() => {
     if (!isOpen) return
     const marker = { __dfModal: 'MintNFTModal', id: Math.random().toString(36).slice(2) }
-    historyMarkerRef.current = marker
-    try {
-      window.history.pushState(marker, '')
-      pushedRef.current = true
-    } catch {}
-    const onPop = () => {
-      const st: any = window.history.state
-      if (!st || st.id !== historyMarkerRef.current?.id) {
-        closedByPopRef.current = true
-        onClose()
-      }
-    }
+    try { window.history.pushState(marker, '') } catch {}
+    const onPop = () => onClose()
     window.addEventListener('popstate', onPop)
     return () => {
       window.removeEventListener('popstate', onPop)
-      if (pushedRef.current && closedBySelfRef.current && !closedByPopRef.current) {
-        try { window.history.back() } catch {}
-      }
-      pushedRef.current = false
-      closedBySelfRef.current = false
-      closedByPopRef.current = false
-      historyMarkerRef.current = null
     }
   }, [isOpen, onClose])
 
+  // Continue minting: reset form state, keep modal open
   const handleContinueMinting = () => {
-    // Reset form and states for new minting
     reset()
+    setPersonHash('')
+    setVersionIndex(1)
     setPersonInfo(null)
     setIsSubmitting(false)
     setSuccessResult(null)
     setErrorResult(null)
     setContractError(null)
     setProofGenerationStep('')
-
-    // Clear target inputs to avoid stale status from previous mint
-    if (onPersonHashChange) onPersonHashChange('')
-    if (onVersionIndexChange) onVersionIndexChange(1)
-    setLocalPersonHash('')
-    setLocalVersionIndex(1)
-
-    // Reset computed statuses
     setIsEndorsed(false)
     setIsAlreadyMinted(false)
     setIsCheckingStatus(false)
     setHasMissingParents(null)
-    // Keep modal open for continued use
+    setConsents({ public: false, age: false, legal: false })
+    setConsentError(null)
   }
 
   const onSubmit = async (data: any) => {
+    if (!allConsentsChecked) {
+      setConsentError(t('mintNFT.consentMissing', 'Please confirm all required checkboxes before minting'))
+      return
+    } else {
+      setConsentError(null)
+    }
+
+    if (!hasTargetInputs) {
+      alert(t('mintNFT.targetRequired', 'Please provide a valid person hash and version index'))
+      return
+    }
+
     if (!address) {
       alert(t('wallet.notConnected', 'Please connect your wallet'))
       return
@@ -755,7 +723,7 @@ export default function MintNFTModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={isDesktop ? undefined : handleClose} style={{ touchAction: 'pan-y' }}>
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -787,7 +755,7 @@ export default function MintNFTModal({
                   {t('mintNFT.title', 'Mint NFT')}
                 </h2>
                 <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  <span className="whitespace-normal">{t('mintNFT.headerOnChainHint', "Plain text will be on-chain")}</span>
+                  <span className="whitespace-normal">{t('mintNFT.headerOnChainHint', "Minting is public: plain text is permanently on-chain and undeletable")}</span>
                 </div>
               </div>
             </div>
@@ -827,12 +795,13 @@ export default function MintNFTModal({
                   </label>
                   <input
                     type="text"
-                    value={targetPersonHash || ''}
-                    onChange={(e) => {
-                      if (onPersonHashChange) onPersonHashChange(e.target.value)
-                      else setLocalPersonHash(e.target.value)
-                    }}
-                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition font-mono"
+                    value={personHash}
+                    onChange={(e) => setPersonHash(e.target.value)}
+                    className={`w-full h-10 rounded-md border bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 outline-none transition font-mono ${
+                      hashInputInvalid
+                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30 dark:border-red-400 dark:focus:border-red-400 dark:focus:ring-red-400/30'
+                        : 'border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30'
+                    }`}
                     placeholder={t('search.versionsQuery.placeholder')}
                   />
                 </div>
@@ -844,12 +813,8 @@ export default function MintNFTModal({
                   <input
                     type="number"
                     min="1"
-                    value={targetVersionIndex || 1}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1
-                      if (onVersionIndexChange) onVersionIndexChange(val)
-                      else setLocalVersionIndex(val)
-                    }}
+                    value={versionIndex}
+                    onChange={(e) => setVersionIndex(parseInt(e.target.value) || 1)}
                     className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                     placeholder="1"
                   />
@@ -857,7 +822,14 @@ export default function MintNFTModal({
               </div>
 
               {/* Inline status chips (endorsed / can mint) */}
-              {hasValidTarget && (
+              {hashInputInvalid && (
+                <div className="mt-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {t('mintNFT.invalidPersonHashFormat', 'Person hash must be 0x-prefixed 32-byte hex (64 hex chars).')}
+                </div>
+              )}
+
+              {!hashInputInvalid && hasValidTarget && (
                 <div className="mt-3">
                   {isCheckingStatus ? (
                     <div className="text-sm text-blue-600 dark:text-blue-400">
@@ -926,9 +898,6 @@ export default function MintNFTModal({
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                     {t('mintNFT.basicInfo', 'Basic Information')}
                   </h3>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">
-                    {t('mintNFT.publicOnChain', 'Public on chain')}
-                  </span>
                 </div>
 
                 {/* Verification Notice */}
@@ -953,7 +922,7 @@ export default function MintNFTModal({
                     birthDay: personInfo.birthDay,
                     isBirthBC: personInfo.isBirthBC,
                     passphrase: personInfo.passphrase
-                  } : versionData}
+                  } : undefined}
                   onFormChange={canEdit ? (formData) => {
                     setPersonInfo({
                       fullName: formData.fullName,
@@ -974,9 +943,6 @@ export default function MintNFTModal({
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                 {t('mintNFT.supplementalInfo', 'Supplemental Information')}
               </h3>
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {t('mintNFT.publicOnChain', 'Public on chain')}
-              </span>
             </div>
 
             {/* Immutability Warning */}
@@ -1133,6 +1099,42 @@ export default function MintNFTModal({
               <p className="text-gray-600 dark:text-gray-300">
                 {t('mintNFT.nftAlreadyMintedDesc', 'This version has already been minted as an NFT. Each version can only be minted once.')}
               </p>
+            </div>
+          )}
+
+          {/* Informed Consent - before success/error results, consistent with AddVersionModal */}
+          {!successResult && !isAlreadyMinted && (
+            <div className="mt-4 p-4 sm:p-5 rounded-lg border border-red-200/80 bg-red-50 dark:border-red-300/40 dark:bg-red-900/15">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300 mt-0.5 shrink-0" />
+                <div className="space-y-3 w-full">
+                  <p className="text-sm font-semibold text-red-900 dark:text-red-50">
+                    {t('mintNFT.consentTitle', 'Informed consent (required)')}
+                  </p>
+                  <div className="space-y-2">
+                    {([
+                      { key: 'public', label: t('mintNFT.consentPublic', 'I understand this mint makes the entered info permanently public on-chain and undeletable.') },
+                      { key: 'age', label: t('mintNFT.consentAge', 'I confirm the person is 18 years or older.') },
+                      { key: 'legal', label: t('mintNFT.consentLegal', 'I confirm the data is lawful, truthful, and authorized for public disclosure without extra private content.') }
+                    ] as const).map(item => (
+                      <label key={item.key} className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={consents[item.key]}
+                          onChange={() => toggleConsent(item.key)}
+                          className="h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="text-xs text-red-900 dark:text-red-50 leading-snug">{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {consentError && (
+                    <p className="text-xs text-red-700 dark:text-red-200 font-medium">
+                      {consentError}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1337,7 +1339,7 @@ export default function MintNFTModal({
                       {hasValidTarget && !isEndorsed ? (
                         <button
                           type="button"
-                          onClick={() => setShowEndorseModal(true)}
+                          onClick={() => setShowEndorseConfirm(true)}
                           disabled={isCheckingStatus}
                           className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
@@ -1346,7 +1348,7 @@ export default function MintNFTModal({
                       ) : (
                         <button
                           type="submit"
-                          disabled={isSubmitting || isCheckingStatus}
+                          disabled={isSubmitting || isCheckingStatus || !allConsentsChecked || !hasPersonInfo || !hasTargetInputs}
                           className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
                           {isSubmitting ?
@@ -1363,21 +1365,6 @@ export default function MintNFTModal({
           </form>
         </div>
         </div>
-        {/* Quick Endorse Modal */}
-        {hasValidTarget && (
-          <EndorseModal
-            isOpen={showEndorseModal}
-            onClose={() => setShowEndorseModal(false)}
-            onSuccess={() => {
-              setIsEndorsed(true)
-              setShowEndorseModal(false)
-            }}
-            personHash={targetPersonHash}
-            versionIndex={targetVersionIndex}
-            versionData={versionData}
-          />
-        )}
-
         {/* Confirm to jump to endorse */}
         {showEndorseConfirm && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowEndorseConfirm(false)}>
@@ -1398,7 +1385,7 @@ export default function MintNFTModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowEndorseConfirm(false); setShowEndorseModal(true) }}
+                  onClick={handleGoEndorse}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
                   {t('mintNFT.goEndorse', 'Go Endorse')}

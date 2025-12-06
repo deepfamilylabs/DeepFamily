@@ -50,7 +50,7 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   '0x5b00bc40': 'ChunkHashMismatch',
   '0xfb8cd7ea': 'StoryNotFound',
   '0xdaffd8a5': 'MustBeNFTHolder',
-  // Generic errors
+  '0xfb8f41b2': 'ERC20InsufficientAllowance',
   '0x08c379a0': 'Error'
 }
 
@@ -104,7 +104,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   NETWORK_ERROR: 'Network error. Please check your connection.',
   USER_REJECTED: 'Transaction was cancelled by user.',
   CALL_EXCEPTION: 'Contract validation failed. Please check input data.',
-  INSUFFICIENT_ALLOWANCE: 'Allowance too low. Please approve tokens again.'
+  ERC20InsufficientAllowance: 'Allowance insufficient. Please re-approve the token allowance.'
 }
 
 const normalizeReason = (val?: string) => {
@@ -113,6 +113,19 @@ const normalizeReason = (val?: string) => {
 }
 
 export const resolveErrorReason = (error: any): string | undefined => {
+  const extractSelectorReason = () => {
+    const dataFields = [error?.data, error?.error?.data, error?.data?.data, error?.error?.error?.data]
+    for (const data of dataFields) {
+      if (typeof data !== 'string' || !data.startsWith('0x') || data.length < 10) continue
+      const selector = data.slice(0, 10)
+      if (ERROR_SELECTOR_MAP[selector]) return ERROR_SELECTOR_MAP[selector]
+    }
+    return undefined
+  }
+
+  const selectorReason = extractSelectorReason()
+  if (selectorReason) return selectorReason
+
   const directReason = normalizeReason(error?.reason)
   if (directReason) return directReason
 
@@ -134,7 +147,7 @@ export const resolveErrorReason = (error: any): string | undefined => {
     return 'OUT_OF_GAS'
   }
 
-  if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) return 'INSUFFICIENT_ALLOWANCE'
+  if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) return 'ERC20InsufficientAllowance'
   if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) return 'INSUFFICIENT_FUNDS'
 
   return undefined
@@ -177,7 +190,7 @@ export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
   const derivedRaw = deriveReadableError(error)
 
   if (reason) {
-    const fallback = humanMessage || 'Transaction failed.'
+    const fallback = humanMessage || REASON_FRIENDLY_MAP[reason] || 'Transaction failed.'
     const translated = t(`errors.contractError.${reason}`, fallback)
     const friendly = typeof translated === 'string' ? translated : fallback
     return {

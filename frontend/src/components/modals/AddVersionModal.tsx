@@ -35,8 +35,8 @@ interface AddVersionModalProps {
   onClose: () => void
   onSuccess?: (result: any) => void
   onEndorse?: (personHash: string, versionIndex: number) => void
-  personHash?: string
-  existingPersonData?: {
+  // Optional: Pre-populated person data (for passing known data when navigating from other pages)
+  initialPersonData?: {
     fullName?: string
     gender?: number
     birthYear?: number
@@ -52,13 +52,14 @@ export default function AddVersionModal({
   onClose,
   onSuccess,
   onEndorse,
-  personHash,
-  existingPersonData
+  initialPersonData
 }: AddVersionModalProps) {
   const { t } = useTranslation()
   const { signer } = useWallet()
   const { contractAddress } = useConfig()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [consents, setConsents] = useState({ hash: false, age: false, legal: false })
+  const [consentError, setConsentError] = useState<string | null>(null)
   const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
   const [successResult, setSuccessResult] = useState<{
     hash: string
@@ -195,21 +196,22 @@ export default function AddVersionModal({
   
   const fatherStatus = getParentInfoStatus('father')
   const motherStatus = getParentInfoStatus('mother')
+  const allConsentsChecked = consents.hash && consents.age && consents.legal
 
-  // Initialize states if existing data is provided
+  // Initialize states if existing data is provided (e.g., from another page)
   useEffect(() => {
-    if (personHash && existingPersonData) {
+    if (initialPersonData) {
       setPersonInfo({
-        fullName: existingPersonData.fullName || '',
-        gender: existingPersonData.gender || 0,
-        birthYear: existingPersonData.birthYear || 0,
-        birthMonth: existingPersonData.birthMonth || 0,
-        birthDay: existingPersonData.birthDay || 0,
-        isBirthBC: existingPersonData.isBirthBC || false,
-        passphrase: existingPersonData.passphrase || ''
+        fullName: initialPersonData.fullName || '',
+        gender: initialPersonData.gender || 0,
+        birthYear: initialPersonData.birthYear || 0,
+        birthMonth: initialPersonData.birthMonth || 0,
+        birthDay: initialPersonData.birthDay || 0,
+        isBirthBC: initialPersonData.isBirthBC || false,
+        passphrase: initialPersonData.passphrase || ''
       })
     }
-  }, [personHash, existingPersonData])
+  }, [initialPersonData])
 
   const computeHashOrZero = (info: typeof personInfo) => {
     if (!info || !info.fullName?.trim()) return ethers.ZeroHash
@@ -306,10 +308,31 @@ export default function AddVersionModal({
     setErrorResult(null)
     setFatherExpanded(false)
     setMotherExpanded(false)
+    setConsents({ hash: false, age: false, legal: false })
+    setConsentError(null)
     setDragging(false)
     setDragOffset(0)
     onClose()
   }
+
+  // Ensure state resets when modal is closed externally
+  useEffect(() => {
+    if (isOpen) return
+    reset()
+    setPersonInfo(null)
+    setFatherInfo(null)
+    setMotherInfo(null)
+    setIsSubmitting(false)
+    setProofGenerationStep('')
+    setSuccessResult(null)
+    setErrorResult(null)
+    setFatherExpanded(false)
+    setMotherExpanded(false)
+    setConsents({ hash: false, age: false, legal: false })
+    setConsentError(null)
+    setDragging(false)
+    setDragOffset(0)
+  }, [isOpen, reset])
 
   // Close on Escape
   useEffect(() => {
@@ -360,9 +383,18 @@ export default function AddVersionModal({
     setErrorResult(null)
     setFatherExpanded(false)
     setMotherExpanded(false)
+    setConsents({ hash: false, age: false, legal: false })
+    setConsentError(null)
     // Increment key to force remount of PersonHashCalculator components
     setFormResetKey(prev => prev + 1)
     // Keep modal open for continued use
+  }
+  const toggleConsent = (key: keyof typeof consents) => {
+    setConsents(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      if (consentError && next.hash && next.age && next.legal) setConsentError(null)
+      return next
+    })
   }
 
   const handleDownloadMetadata = () => {
@@ -384,6 +416,13 @@ export default function AddVersionModal({
 
 
   const onSubmit = async (data: AddVersionFormInput) => {
+    if (!allConsentsChecked) {
+      setConsentError(t('addVersion.consentMissing', 'Please confirm all required checkboxes before submitting'))
+      return
+    } else {
+      setConsentError(null)
+    }
+
     if (!signer) {
       alert(t('wallet.notConnected', 'Please connect your wallet'))
       return
@@ -568,7 +607,7 @@ export default function AddVersionModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={isDesktop ? undefined : handleClose} style={{ touchAction: 'pan-y' }}>
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -597,10 +636,7 @@ export default function AddVersionModal({
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                  {personHash ? 
-                    t('addVersion.addNewVersion', 'Add New Version') : 
-                    t('addVersion.addPerson', 'Add Person')
-                  }
+                  {t('addVersion.title', 'Add Version')}
                 </h2>
                 <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <span className="whitespace-normal">{t('addVersion.personInfoHint', 'Plain text won\'t go on-chain, used only for ZK proof')}</span>
@@ -628,12 +664,20 @@ export default function AddVersionModal({
           <form id="add-version-form" onSubmit={handleSubmit(onSubmit)} className="min-h-full flex flex-col">
             <div className="flex-1 p-4 sm:p-6 space-y-6">
 
-          <div className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-300/40 dark:bg-amber-900/20 dark:text-amber-50">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <p className="text-xs leading-relaxed">
-              {t('mintNFT.legalTruthfulNotice', 'Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.')}
-            </p>
-          </div>
+            <div className="space-y-2">
+              <div className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-300/40 dark:bg-amber-900/20 dark:text-amber-50">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p className="text-xs leading-relaxed">
+                  {t('mintNFT.legalTruthfulNotice', 'Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.')}
+                </p>
+              </div>
+              <div className="flex gap-2 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-red-900 dark:border-red-300/40 dark:bg-red-900/20 dark:text-red-50">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p className="text-xs leading-relaxed">
+                  {t('addVersion.ageRequirement', 'The person being added must be 18 years or older. Do not submit minors\' identities.')}
+                </p>
+              </div>
+            </div>
 
           {/* Person Being Added - Using PersonHashCalculator */}
           <div className="space-y-4">
@@ -655,7 +699,7 @@ export default function AddVersionModal({
               key={`person-${formResetKey}`}
               showTitle={false}
               collapsible={false}
-              initialValues={existingPersonData}
+              initialValues={initialPersonData}
               onFormChange={(formData) => {
                 setPersonInfo({
                   fullName: formData.fullName,
@@ -674,7 +718,7 @@ export default function AddVersionModal({
             <button
               type="button"
               onClick={() => setFatherExpanded(!fatherExpanded)}
-              className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-green-600" />
@@ -875,6 +919,42 @@ export default function AddVersionModal({
               </div>
             </div>
           </div>
+
+          {/* Informed Consent for Add Version */}
+          {!successResult && (
+            <div className="p-4 sm:p-5 rounded-lg border border-red-200/80 bg-red-50 dark:border-red-300/40 dark:bg-red-900/15">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300 mt-0.5 shrink-0" />
+                <div className="space-y-3 w-full">
+                  <p className="text-sm font-semibold text-red-900 dark:text-red-50">
+                    {t('addVersion.consentTitle', 'Informed consent (required)')}
+                  </p>
+                  <div className="space-y-2">
+                    {([
+                      { key: 'hash', label: t('addVersion.consentHash', 'I understand the plaintext stays off-chain, but its hash will be permanently public on-chain and cannot be removed.') },
+                      { key: 'age', label: t('addVersion.consentAge', 'I confirm the person is 18 years or older.') },
+                      { key: 'legal', label: t('addVersion.consentLegal', 'I confirm the data is lawful, truthful, and authorized for disclosure; no extra private content is included.') }
+                    ] as const).map(item => (
+                      <label key={item.key} className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={consents[item.key]}
+                          onChange={() => toggleConsent(item.key)}
+                          className="h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="text-xs text-red-900 dark:text-red-50 leading-snug">{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {consentError && (
+                    <p className="text-xs text-red-700 dark:text-red-200 font-medium">
+                      {consentError}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Progress Indicator */}
           {isSubmitting && proofGenerationStep && !successResult && !errorResult && (
@@ -1186,7 +1266,7 @@ export default function AddVersionModal({
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting || !personInfo?.fullName.trim()}
+                    disabled={isSubmitting || !personInfo?.fullName.trim() || !allConsentsChecked}
                     className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     {isSubmitting ? 
