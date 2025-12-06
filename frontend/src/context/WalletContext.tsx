@@ -2,8 +2,11 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { ethers } from 'ethers'
 import { useToast } from '../components/ToastProvider'
 import { useTranslation } from 'react-i18next'
-import metamaskIcon from '../assets/metamask-icon.svg'
-import fluentIcon from '../assets/fluent-icon.svg'
+import { getAddChainParams } from '../config/networks'
+import { SUPPORTED_WALLETS } from '../config/wallets'
+
+// localStorage key for persisting wallet type
+const WALLET_TYPE_STORAGE_KEY = 'deepfamily_last_wallet_type'
 
 interface WalletState {
   address: string | null
@@ -12,6 +15,9 @@ interface WalletState {
   isConnecting: boolean
   chainId: number | null
   balance: string | null
+  // Track the connected wallet type and raw provider for event listeners
+  connectedWalletId: string | null
+  rawProvider: any | null
 }
 
 export interface WalletOption {
@@ -23,13 +29,16 @@ export interface WalletOption {
 
 interface WalletContextValue extends WalletState {
   connect: () => Promise<void>
-  connectWithProvider: (provider: any) => Promise<void>
+  connectWithProvider: (provider: any, walletId?: string) => Promise<void>
   disconnect: () => void
   switchChain: (chainId: number) => Promise<void>
+  switchOrAddChain: (chainId: number) => Promise<boolean>
   refreshBalance: () => Promise<void>
   getAvailableWallets: () => WalletOption[]
   showWalletSelection: boolean
   setShowWalletSelection: (show: boolean) => void
+  showNetworkSelection: boolean
+  setShowNetworkSelection: (show: boolean) => void
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null)
@@ -52,10 +61,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     signer: null,
     isConnecting: false,
     chainId: null,
-    balance: null
+    balance: null,
+    connectedWalletId: null,
+    rawProvider: null
   })
 
   const [showWalletSelection, setShowWalletSelection] = useState(false)
+  const [showNetworkSelection, setShowNetworkSelection] = useState(false)
 
   const refreshBalance = useCallback(async () => {
     if (!walletState.provider || !walletState.address) return
@@ -75,113 +87,66 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return []
 
     const wallets: WalletOption[] = []
-
-    // Check for ethereum providers
     const eth: any = window.ethereum
-    const conflux: any = (window as any).conflux
 
     console.log('[WalletContext] Detecting wallet providers:', {
       hasEthereum: !!eth,
-      hasConflux: !!conflux,
       isMetaMask: eth?.isMetaMask,
       isFluent: eth?.isFluent,
-      confluxFluent: conflux?.isFluent,
-      ethKeys: eth ? Object.keys(eth) : [],
-      providers: eth?.providers
+      isFluentWallet: eth?.isFluentWallet,
+      hasProviders: Array.isArray(eth?.providers),
+      providersCount: eth?.providers?.length
     })
 
-    if (!eth && !conflux) {
+    if (!eth) {
       console.log('[WalletContext] No wallet providers found')
       return []
     }
 
-    // Check for multiple providers (when multiple wallets are installed)
-    if (Array.isArray(eth?.providers) && eth.providers.length > 0) {
-      console.log('[WalletContext] Multiple providers detected:', eth.providers.length)
+    const addWallet = (provider: any) => {
+      for (const config of SUPPORTED_WALLETS) {
+        if (config.detect(provider) && !wallets.find(w => w.id === config.id)) {
+          console.log(`[WalletContext] ${config.name} detected`)
+          wallets.push({
+            id: config.id,
+            name: config.name,
+            icon: config.icon,
+            provider: provider
+          })
+        }
+      }
+    }
 
+    // Strategy 1: Check providers array (EIP-1193 multi-provider)
+    if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+      console.log('[WalletContext] Checking providers array:', eth.providers.length)
       eth.providers.forEach((provider: any, index: number) => {
         console.log(`[WalletContext] Provider ${index}:`, {
           isMetaMask: provider?.isMetaMask,
           isFluent: provider?.isFluent,
-          constructor: provider?.constructor?.name
+          isFluentWallet: provider?.isFluentWallet
         })
-
-        if (provider && provider.isMetaMask && !provider.isFluent) {
-          console.log('[WalletContext] MetaMask detected in providers array')
-          wallets.push({
-            id: 'metamask',
-            name: 'MetaMask',
-            icon: metamaskIcon,
-            provider: provider
-          })
-        } else if (provider && (provider.isFluent || provider.isFluentWallet)) {
-          console.log('[WalletContext] Fluent Wallet detected in providers array')
-          wallets.push({
-            id: 'fluent',
-            name: 'Fluent Wallet',
-            icon: fluentIcon,
-            provider: provider
-          })
-        }
-      })
-    } else if (eth) {
-      // Single ethereum provider or no providers array
-      console.log('[WalletContext] Single ethereum provider detected')
-
-      if (eth.isMetaMask && !eth.isFluent) {
-        console.log('[WalletContext] MetaMask detected')
-        wallets.push({
-          id: 'metamask',
-          name: 'MetaMask',
-          icon: metamaskIcon,
-          provider: eth
-        })
-      } else if (eth.isFluent || eth.isFluentWallet) {
-        console.log('[WalletContext] Fluent Wallet detected via ethereum provider')
-        wallets.push({
-          id: 'fluent',
-          name: 'Fluent Wallet',
-          icon: fluentIcon,
-          provider: eth
-        })
-      }
-    }
-
-    // Check for Conflux provider (Fluent Wallet)
-    if (conflux && !wallets.find(w => w.id === 'fluent')) {
-      console.log('[WalletContext] Fluent Wallet detected via conflux provider')
-      wallets.push({
-        id: 'fluent',
-        name: 'Fluent Wallet',
-        icon: fluentIcon,
-        provider: conflux
+        addWallet(provider)
       })
     }
 
-    console.log('[WalletContext] Available wallets found:', wallets.map(w => w.name))
+    // Strategy 2: Check window.ethereum itself
+    addWallet(eth)
+
+    // Strategy 3: Check for Fluent's specific injection point
+    const fluentProvider = (window as any).fluent
+    if (fluentProvider) {
+      addWallet(fluentProvider)
+    }
+
+    console.log('[WalletContext] Available wallets found:', wallets.map(w => ({ id: w.id, name: w.name })))
     return wallets
   }, [])
 
-  const getBoundProvider = useCallback((provider?: any) => {
-    if (provider) {
-      return { eth: provider }
-    }
-
-    const wallets = getAvailableWallets()
-    if (wallets.length === 0) return null
-
-    // If only one wallet, use it directly
-    if (wallets.length === 1) {
-      return { eth: wallets[0].provider }
-    }
-
-    // Multiple wallets available, will need selection
-    return null
-  }, [getAvailableWallets])
-
-  const connectWithProvider = useCallback(async (selectedProvider: any) => {
+  const connectWithProvider = useCallback(async (selectedProvider: any, walletId?: string) => {
     console.log('[WalletContext] ConnectWithProvider called with:', {
       selectedProvider: selectedProvider,
+      walletId: walletId,
       isMetaMask: selectedProvider?.isMetaMask,
       isFluent: selectedProvider?.isFluent,
       constructor: selectedProvider?.constructor?.name,
@@ -194,8 +159,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Determine wallet ID if not provided
+    let detectedWalletId = walletId
+    if (!detectedWalletId) {
+      if (selectedProvider.isFluent || selectedProvider.isFluentWallet) {
+        detectedWalletId = 'fluent'
+      } else if (selectedProvider.isMetaMask) {
+        detectedWalletId = 'metamask'
+      } else {
+        detectedWalletId = 'unknown'
+      }
+    }
+
     console.log('[WalletContext] Using selected provider directly:', {
       provider: selectedProvider,
+      walletId: detectedWalletId,
       isMetaMask: selectedProvider?.isMetaMask,
       isFluent: selectedProvider?.isFluent
     })
@@ -214,13 +192,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const address = await signer.getAddress()
       const network = await provider.getNetwork()
 
+      // Save wallet type to localStorage for auto-reconnect
+      try {
+        localStorage.setItem(WALLET_TYPE_STORAGE_KEY, detectedWalletId)
+        console.log('[WalletContext] Saved wallet type to localStorage:', detectedWalletId)
+      } catch (e) {
+        console.warn('[WalletContext] Failed to save wallet type to localStorage:', e)
+      }
+
       const newState: WalletState = {
         address,
         provider,
         signer,
         isConnecting: false,
         chainId: Number(network.chainId),
-        balance: null
+        balance: null,
+        connectedWalletId: detectedWalletId,
+        rawProvider: selectedProvider
       }
 
       setWalletState(newState)
@@ -236,7 +224,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to fetch balance:', balanceError)
       }
 
-      console.log('[WalletContext] Wallet connected successfully:', { address, chainId: Number(network.chainId) })
+      console.log('[WalletContext] Wallet connected successfully:', { address, chainId: Number(network.chainId), walletId: detectedWalletId })
       toast.show(t('wallet.connected', 'Wallet connected successfully'))
     } catch (error: any) {
       console.error('[WalletContext] Failed to connect wallet:', error)
@@ -250,26 +238,26 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         toast.show(t('wallet.connectionFailed', `Failed to connect wallet: ${error.message || 'Unknown error'}`))
       }
     }
-  }, [t, toast, getBoundProvider])
+  }, [t, toast])
 
   const connect = useCallback(async () => {
     const wallets = getAvailableWallets()
     console.log('[WalletContext] Connect initiated, wallets available:', wallets.length)
 
     if (wallets.length === 0) {
-      console.log('[WalletContext] No wallets available for connection')
-      toast.show(t('wallet.noWallet', 'Please install a wallet extension'))
+      console.log('[WalletContext] No wallets available, showing install guide')
+      setShowWalletSelection(true)
       return
     }
 
     if (wallets.length === 1) {
       console.log('[WalletContext] Single wallet detected, connecting directly:', wallets[0].name)
-      await connectWithProvider(wallets[0].provider)
+      await connectWithProvider(wallets[0].provider, wallets[0].id)
     } else {
       console.log('[WalletContext] Multiple wallets detected, showing selection modal')
       setShowWalletSelection(true)
     }
-  }, [t, toast, getAvailableWallets, connectWithProvider])
+  }, [getAvailableWallets, connectWithProvider])
 
   const disconnect = useCallback(() => {
     let shouldNotify = false
@@ -287,25 +275,35 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         signer: null,
         isConnecting: false,
         chainId: null,
-        balance: null
+        balance: null,
+        connectedWalletId: null,
+        rawProvider: null
       }
     })
 
     if (shouldNotify) {
       console.log('[WalletContext] Disconnecting wallet')
+      // Clear saved wallet type from localStorage
+      try {
+        localStorage.removeItem(WALLET_TYPE_STORAGE_KEY)
+        console.log('[WalletContext] Cleared wallet type from localStorage')
+      } catch (e) {
+        console.warn('[WalletContext] Failed to clear wallet type from localStorage:', e)
+      }
       toast.show(t('wallet.disconnected', 'Wallet disconnected'))
     }
   }, [t, toast])
 
   const switchChain = useCallback(async (targetChainId: number) => {
-    const bound = getBoundProvider()
-    if (!bound) {
-      toast.show(t('wallet.noMetaMask', 'Please install MetaMask'))
+    // Use the connected rawProvider instead of getBoundProvider
+    const rawProvider = walletState.rawProvider
+    if (!rawProvider) {
+      toast.show(t('wallet.notConnected', 'Please connect your wallet'))
       return
     }
 
     try {
-      await bound.eth.request({
+      await rawProvider.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${targetChainId.toString(16)}` }],
       })
@@ -322,25 +320,95 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       console.error('[WalletContext] Failed to switch chain:', error)
       if (error.code === 4902) {
         toast.show(t('wallet.chainNotAdded', 'Chain not added to wallet'))
+      } else if (error.code === 4001) {
+        toast.show(t('wallet.rejected', 'Request rejected by user'))
       } else {
         toast.show(t('wallet.chainSwitchFailed', 'Failed to switch chain'))
       }
     }
-  }, [t, toast, getBoundProvider])
+  }, [t, toast, walletState.rawProvider])
 
-  // Listen to account and chain changes
+  // Switch to chain, or add it first if not present in wallet
+  const switchOrAddChain = useCallback(async (targetChainId: number): Promise<boolean> => {
+    const rawProvider = walletState.rawProvider
+    if (!rawProvider) {
+      toast.show(t('wallet.notConnected', 'Please connect your wallet'))
+      return false
+    }
+
+    const chainIdHex = `0x${targetChainId.toString(16)}`
+
+    try {
+      // First try to switch
+      await rawProvider.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }],
+      })
+      
+      console.log('[WalletContext] Chain switched successfully to:', targetChainId)
+      setWalletState(prev => ({ ...prev, chainId: targetChainId }))
+      toast.show(t('wallet.chainSwitched', 'Chain switched successfully'))
+      return true
+    } catch (switchError: any) {
+      // Error 4902: chain not added to wallet
+      if (switchError.code === 4902) {
+        console.log('[WalletContext] Chain not found, attempting to add:', targetChainId)
+        
+        const addChainParams = getAddChainParams(targetChainId)
+        if (!addChainParams) {
+          toast.show(t('wallet.chainNotSupported', 'This network is not supported'))
+          return false
+        }
+
+        try {
+          await rawProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [addChainParams],
+          })
+          
+          console.log('[WalletContext] Chain added successfully:', targetChainId)
+          setWalletState(prev => ({ ...prev, chainId: targetChainId }))
+          toast.show(t('wallet.chainAdded', 'Network added successfully'))
+          return true
+        } catch (addError: any) {
+          console.error('[WalletContext] Failed to add chain:', addError)
+          if (addError.code === 4001) {
+            toast.show(t('wallet.rejected', 'Request rejected by user'))
+          } else {
+            toast.show(t('wallet.chainAddFailed', 'Failed to add network'))
+          }
+          return false
+        }
+      } else if (switchError.code === 4001) {
+        toast.show(t('wallet.rejected', 'Request rejected by user'))
+        return false
+      } else {
+        console.error('[WalletContext] Failed to switch chain:', switchError)
+        toast.show(t('wallet.chainSwitchFailed', 'Failed to switch chain'))
+        return false
+      }
+    }
+  }, [t, toast, walletState.rawProvider])
+
+  // Listen to account and chain changes - use rawProvider from state
   useEffect(() => {
-    const bound = getBoundProvider()
-    if (!bound) return
+    const rawProvider = walletState.rawProvider
+    if (!rawProvider) return
+
+    console.log('[WalletContext] Setting up event listeners for provider:', {
+      walletId: walletState.connectedWalletId,
+      address: walletState.address
+    })
 
     const handleAccountsChanged = (accounts: string[]) => {
+      console.log('[WalletContext] accountsChanged event:', accounts)
       if (accounts.length === 0) {
         disconnect()
       } else if (accounts[0] !== walletState.address) {
         // Account changed, refresh signer/address without prompting
         ;(async () => {
           try {
-            const provider = new ethers.BrowserProvider(bound.eth as any)
+            const provider = new ethers.BrowserProvider(rawProvider as any)
             const signer = await provider.getSigner()
             const address = await signer.getAddress()
             setWalletState(prev => ({ ...prev, provider, signer, address }))
@@ -353,6 +421,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleChainChanged = (chainId: string) => {
+      console.log('[WalletContext] chainChanged event:', chainId)
       setWalletState(prev => ({
         ...prev,
         chainId: parseInt(chainId, 16)
@@ -363,7 +432,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const handleDisconnect = () => { disconnect() }
+    const handleDisconnect = () => {
+      console.log('[WalletContext] disconnect event received')
+      disconnect()
+    }
 
     let cleanupAccountsChanged = () => {}
     let cleanupChainChanged = () => {}
@@ -373,24 +445,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     const trySubscribe = () => {
       try {
-        if (typeof bound.eth.on === 'function') {
-          bound.eth.on('accountsChanged', handleAccountsChanged)
-          cleanupAccountsChanged = () => { try { bound.eth.removeListener?.('accountsChanged', handleAccountsChanged) } catch {} }
+        if (typeof rawProvider.on === 'function') {
+          rawProvider.on('accountsChanged', handleAccountsChanged)
+          cleanupAccountsChanged = () => { try { rawProvider.removeListener?.('accountsChanged', handleAccountsChanged) } catch {} }
         }
-        if (typeof bound.eth.on === 'function') {
-          bound.eth.on('chainChanged', handleChainChanged)
-          cleanupChainChanged = () => { try { bound.eth.removeListener?.('chainChanged', handleChainChanged) } catch {} }
+        if (typeof rawProvider.on === 'function') {
+          rawProvider.on('chainChanged', handleChainChanged)
+          cleanupChainChanged = () => { try { rawProvider.removeListener?.('chainChanged', handleChainChanged) } catch {} }
         }
-        if (typeof bound.eth.on === 'function') {
-          bound.eth.on('disconnect', handleDisconnect)
-          cleanupDisconnect = () => { try { bound.eth.removeListener?.('disconnect', handleDisconnect) } catch {} }
+        if (typeof rawProvider.on === 'function') {
+          rawProvider.on('disconnect', handleDisconnect)
+          cleanupDisconnect = () => { try { rawProvider.removeListener?.('disconnect', handleDisconnect) } catch {} }
         }
+        console.log('[WalletContext] Event listeners registered successfully')
       } catch (error) {
-        console.warn('Failed to add wallet listener:', error)
+        console.warn('[WalletContext] Failed to add wallet listener, falling back to polling:', error)
         // Fallback to polling
         pollTimer = setInterval(async () => {
           try {
-            const accounts: string[] = await bound.eth.request({ method: 'eth_accounts' })
+            const accounts: string[] = await rawProvider.request({ method: 'eth_accounts' })
             if (!accounts || accounts.length === 0) {
               if (walletState.address) disconnect()
             } else if (accounts[0] !== walletState.address) {
@@ -398,7 +471,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             }
           } catch {}
           try {
-            const chainIdHex: string = await bound.eth.request({ method: 'eth_chainId' })
+            const chainIdHex: string = await rawProvider.request({ method: 'eth_chainId' })
             handleChainChanged(chainIdHex)
           } catch {}
         }, 1500)
@@ -408,51 +481,94 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     trySubscribe()
 
     return () => {
+      console.log('[WalletContext] Cleaning up event listeners')
       cleanupAccountsChanged()
       cleanupChainChanged()
       cleanupDisconnect()
       if (pollTimer) { try { clearInterval(pollTimer) } catch {} }
     }
-  }, [walletState.address, disconnect, refreshBalance, getBoundProvider])
+  }, [walletState.rawProvider, walletState.address, walletState.connectedWalletId, disconnect, refreshBalance])
 
-  // Auto-connect if previously connected
+  // Auto-connect if previously connected - use saved wallet type from localStorage
   const isAutoConnectDone = useRef(false)
   useEffect(() => {
     if (isAutoConnectDone.current) return
     
     const autoConnect = async () => {
-      const bound = getBoundProvider()
-      if (!bound) {
+      // Get saved wallet type from localStorage
+      let savedWalletType: string | null = null
+      try {
+        savedWalletType = localStorage.getItem(WALLET_TYPE_STORAGE_KEY)
+        console.log('[WalletContext] Saved wallet type from localStorage:', savedWalletType)
+      } catch (e) {
+        console.warn('[WalletContext] Failed to read wallet type from localStorage:', e)
+      }
+
+      // Only auto-connect if user previously connected (has saved wallet type)
+      // This respects the user's explicit disconnect action
+      if (!savedWalletType) {
+        console.log('[WalletContext] No saved wallet type, skipping auto-connect')
         isAutoConnectDone.current = true
         return
       }
-      
+
+      const wallets = getAvailableWallets()
+      if (wallets.length === 0) {
+        console.log('[WalletContext] No wallets available for auto-connect')
+        isAutoConnectDone.current = true
+        return
+      }
+
+      // Find the wallet that matches the saved type
+      const targetWallet = wallets.find(w => w.id === savedWalletType)
+      if (!targetWallet) {
+        console.log('[WalletContext] Saved wallet type not available:', savedWalletType)
+        // Clear invalid saved type
+        try {
+          localStorage.removeItem(WALLET_TYPE_STORAGE_KEY)
+        } catch {}
+        isAutoConnectDone.current = true
+        return
+      }
+
       try {
-        const accounts = await bound.eth.request({ method: 'eth_accounts' })
+        // Use eth_accounts to check if already connected (doesn't prompt)
+        const accounts = await targetWallet.provider.request({ method: 'eth_accounts' })
         if (accounts && accounts.length > 0) {
+          console.log('[WalletContext] Auto-connecting to wallet:', targetWallet.id)
           // Hydrate state without prompting user
-          const provider = new ethers.BrowserProvider(bound.eth as any)
+          const provider = new ethers.BrowserProvider(targetWallet.provider as any)
           const signer = await provider.getSigner()
           const address = await signer.getAddress()
           const network = await provider.getNetwork()
+          
           setWalletState(prev => ({
             ...prev,
             address,
             provider,
             signer,
             isConnecting: false,
-            chainId: Number(network.chainId)
+            chainId: Number(network.chainId),
+            connectedWalletId: targetWallet.id,
+            rawProvider: targetWallet.provider
           }))
+          
           try {
             const balance = await provider.getBalance(address)
             setWalletState(prev => ({ ...prev, balance: ethers.formatEther(balance) }))
           } catch {}
+          
+          console.log('[WalletContext] Auto-connect successful:', { address, walletId: targetWallet.id })
         } else {
-          console.log('[WalletContext] No previously connected accounts found')
+          console.log('[WalletContext] No previously connected accounts found for wallet:', targetWallet.id)
+          // Clear saved wallet type if no accounts connected
+          try {
+            localStorage.removeItem(WALLET_TYPE_STORAGE_KEY)
+          } catch {}
         }
         isAutoConnectDone.current = true
       } catch (error) {
-        console.warn('Auto-connect failed:', error)
+        console.warn('[WalletContext] Auto-connect failed:', error)
         isAutoConnectDone.current = true
       }
     }
@@ -468,10 +584,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     connectWithProvider,
     disconnect,
     switchChain,
+    switchOrAddChain,
     refreshBalance,
     getAvailableWallets,
     showWalletSelection,
-    setShowWalletSelection
+    setShowWalletSelection,
+    showNetworkSelection,
+    setShowNetworkSelection
   }
 
   return (
