@@ -13,7 +13,8 @@ export default function WalletSelectionLayer() {
 
   const handleSelect = (wallet: WalletOption) => {
     setShowWalletSelection(false)
-    connectWithProvider(wallet.provider)
+    // Pass both provider and wallet id for proper tracking
+    connectWithProvider(wallet.provider, wallet.id)
   }
 
   return (
