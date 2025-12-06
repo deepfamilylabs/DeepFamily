@@ -375,7 +375,7 @@ export function useContract() {
       return result
     } catch (error) {
       console.error('Failed to list person versions:', error)
-      toast.show(t('contract.queryFailed', 'Failed to query data'))
+      console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
   }, [contract, toast, t])
@@ -388,7 +388,7 @@ export function useContract() {
       return result
     } catch (error) {
       console.error('Failed to get endorsement stats:', error)
-      toast.show(t('contract.queryFailed', 'Failed to query data'))
+      console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
   }, [contract, toast, t])
@@ -401,7 +401,7 @@ export function useContract() {
       return result
     } catch (error) {
       console.error('Failed to get version details:', error)
-      toast.show(t('contract.queryFailed', 'Failed to query data'))
+      console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
   }, [contract, toast, t])
@@ -414,7 +414,7 @@ export function useContract() {
       return result
     } catch (error) {
       console.error('Failed to get NFT details:', error)
-      toast.show(t('contract.queryFailed', 'Failed to query data'))
+      console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
   }, [contract, toast, t])

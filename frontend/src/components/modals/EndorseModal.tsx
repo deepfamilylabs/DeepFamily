@@ -12,19 +12,9 @@ interface EndorseModalProps {
   onClose: () => void
   onSuccess?: (result: any) => void
   onMintNFT?: (personHash: string, versionIndex: number) => void
-  personHash?: string
-  versionIndex?: number
-  onPersonHashChange?: (hash: string) => void
-  onVersionIndexChange?: (index: number) => void
-  versionData?: {
-    fullName?: string
-    gender?: number
-    birthYear?: number
-    endorsementCount?: number
-    isNFTMinted?: boolean
-    nftHolder?: string
-    versionCreator?: string
-  }
+  // Initial data - only used when opening, modal internal state is fully self-contained
+  initialPersonHash?: string
+  initialVersionIndex?: number
 }
 
 export default function EndorseModal({
@@ -32,44 +22,42 @@ export default function EndorseModal({
   onClose,
   onSuccess,
   onMintNFT,
-  personHash,
-  versionIndex,
-  onPersonHashChange,
-  onVersionIndexChange,
-  versionData
+  initialPersonHash,
+  initialVersionIndex
 }: EndorseModalProps) {
   const { t } = useTranslation()
   const { address, signer } = useWallet()
-  const { endorseVersion, getVersionDetails, contract } = useContract()
+  const { endorseVersion, getVersionDetails, getNFTDetails, contract } = useContract()
   const [searchParams] = useSearchParams()
-  // Track history push/pop to close on mobile back like NodeDetailModal
-  const pushedRef = useRef(false)
-  const closedBySelfRef = useRef(false)
-  const closedByPopRef = useRef(false)
-  const historyMarkerRef = useRef<{ __dfModal: string; id: string } | null>(null)
+  
+  // ===== Internal state - fully self-contained, follows modal lifecycle =====
+  const [personHash, setPersonHash] = useState<string>('')
+  const [versionIndex, setVersionIndex] = useState<number>(1)
+  
+  // UI state
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
+  const [entered, setEntered] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+  const startYRef = useRef<number | null>(null)
+  
+  // Data state
   const [deepTokenFee, setDeepTokenFee] = useState<string>('0')
   const [deepTokenFeeRaw, setDeepTokenFeeRaw] = useState<bigint>(0n)
-  const [currentEndorsementCount, setCurrentEndorsementCount] = useState(versionData?.endorsementCount || 0)
+  const [currentEndorsementCount, setCurrentEndorsementCount] = useState<number>(0)
   const [hasEndorsed, setHasEndorsed] = useState(false)
   const [feeRecipient, setFeeRecipient] = useState<string>('')
   const [userDeepBalance, setUserDeepBalance] = useState<string>('0')
   const [deepTokenAddress, setDeepTokenAddress] = useState<string>('')
   const [deepTokenDecimals, setDeepTokenDecimals] = useState<number>(18)
   const [deepTokenSymbol, setDeepTokenSymbol] = useState<string>('DEEP')
-  const [protocolFeeBps, setProtocolFeeBps] = useState<number>(500) // Default 5% (500 basis points)
-  const [isApproving, setIsApproving] = useState(false)
-  // Removed unlimited approval for user safety - always use exact amount approval
-  const [entered, setEntered] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState(0)
-  const startYRef = useRef<number | null>(null)
+  const [protocolFeeBps, setProtocolFeeBps] = useState<number>(500)
   const [isTargetValidOnChain, setIsTargetValidOnChain] = useState<boolean>(false)
-  const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim())
-  // Local fallback state when parent does not control inputs
-  const [localPersonHash, setLocalPersonHash] = useState<string>('')
-  // Default to 1 so typing only the hash enables the action
-  const [localVersionIndex, setLocalVersionIndex] = useState<number>(1)
+  const [isNFTMinted, setIsNFTMinted] = useState<boolean>(false)
+  const [displayName, setDisplayName] = useState<string>('')
+  
+  // Result state
   const [successResult, setSuccessResult] = useState<{
     personHash: string
     versionIndex: number
@@ -77,23 +65,27 @@ export default function EndorseModal({
     feeRecipient: string
     transactionHash: string
     blockNumber: number
-    events: {
-      PersonVersionEndorsed: any
-    }
+    events: { PersonVersionEndorsed: any }
   } | null>(null)
   const [errorResult, setErrorResult] = useState<{
     type: string
     message: string
     details: string
   } | null>(null)
+  
+  // Track previous target to avoid redundant loading
+  const prevTargetRef = useRef<{ hash: string; index: number }>({ hash: '', index: 0 })
 
-  // Unified target values: prefer props if provided, otherwise local state
-  const targetPersonHash = (personHash ?? localPersonHash)?.trim()
-  const targetVersionIndex = (versionIndex ?? localVersionIndex)
+  // Computed properties
+  const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim())
+  const targetPersonHash = personHash?.trim() || ''
+  const targetVersionIndex = versionIndex
   const isPersonHashFormatValid = isBytes32(targetPersonHash)
 
-  // Determine modes and validity
-  const hasValidTarget = Boolean(targetPersonHash && targetPersonHash !== '' && targetVersionIndex !== undefined && targetVersionIndex > 0)
+  // Computed properties
+  const hasValidTarget = Boolean(targetPersonHash && isPersonHashFormatValid && targetVersionIndex > 0)
+  const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid)
+  
   // Desktop/mobile detection
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
@@ -104,38 +96,77 @@ export default function EndorseModal({
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
     const mql = window.matchMedia('(min-width: 640px)')
     const onChange = (e: MediaQueryListEvent | MediaQueryList) => setIsDesktop((e as MediaQueryListEvent).matches ?? (e as MediaQueryList).matches)
-    try {
-      mql.addEventListener('change', onChange as any)
-    } catch {
-      ;(mql as any).addListener(onChange)
-    }
+    try { mql.addEventListener('change', onChange as any) } catch { (mql as any).addListener(onChange) }
     onChange(mql as any)
     return () => {
-      try {
-        mql.removeEventListener('change', onChange as any)
-      } catch {
-        ;(mql as any).removeListener(onChange)
-      }
+      try { mql.removeEventListener('change', onChange as any) } catch { (mql as any).removeListener(onChange) }
     }
   }, [])
 
-  // Enter animation for mobile bottom sheet
-  useEffect(() => { 
-    if (isOpen) { 
-      requestAnimationFrame(() => setEntered(true)) 
-    } else { 
-      setEntered(false) 
-    } 
-  }, [isOpen])
+  // ===== Core: Modal open/close state management =====
+  useEffect(() => {
+    if (isOpen) {
+      // On open: initialize state
+      setPersonHash(initialPersonHash || '')
+      setVersionIndex(initialVersionIndex || 1)
+      prevTargetRef.current = { hash: initialPersonHash || '', index: initialVersionIndex || 1 }
+      // Animation
+      requestAnimationFrame(() => setEntered(true))
+    } else {
+      // On close: reset all state
+      setEntered(false)
+      setPersonHash('')
+      setVersionIndex(1)
+      setIsSubmitting(false)
+      setIsApproving(false)
+      setSuccessResult(null)
+      setErrorResult(null)
+      setHasEndorsed(false)
+      setCurrentEndorsementCount(0)
+      setIsTargetValidOnChain(false)
+      setIsNFTMinted(false)
+      setDisplayName('')
+      setFeeRecipient('')
+      setDragging(false)
+      setDragOffset(0)
+      prevTargetRef.current = { hash: '', index: 0 }
+    }
+  }, [isOpen, initialPersonHash, initialVersionIndex])
 
-  // Load endorsement details when modal opens (when target is valid)
+  // Clear old data when target changes
+  useEffect(() => {
+    if (!isOpen) return
+    const nextHash = targetPersonHash || ''
+    const nextIndex = targetVersionIndex || 0
+    const changed = prevTargetRef.current.hash !== nextHash || prevTargetRef.current.index !== nextIndex
+    if (!changed) return
+    prevTargetRef.current = { hash: nextHash, index: nextIndex }
+    setDisplayName('')
+    setCurrentEndorsementCount(0)
+    setIsTargetValidOnChain(false)
+    setHasEndorsed(false)
+    setSuccessResult(null)
+    setErrorResult(null)
+    setFeeRecipient('')
+  }, [isOpen, targetPersonHash, targetVersionIndex])
+  
+  // Clear display data when input is invalid
+  useEffect(() => {
+    if (!hasValidTarget) {
+      setDisplayName('')
+      setCurrentEndorsementCount(0)
+      setIsTargetValidOnChain(false)
+      setHasEndorsed(false)
+      setFeeRecipient('')
+    }
+  }, [hasValidTarget])
+
+  // Load endorsement data
   useEffect(() => {
     const loadEndorsementData = async () => {
       if (!isOpen || !address || !contract) return
-      // Always attempt to load token basics (fee + balance), even if target not set yet
-      // Then load target-specific details if hash/index are ready
       try {
-        // Get current DEEP token fee (recentReward)
+        // Load DEEP token information
         const deepTokenContract = await contract.DEEP_FAMILY_TOKEN_CONTRACT()
         setDeepTokenAddress(deepTokenContract)
         const tokenContract = new ethers.Contract(
@@ -162,39 +193,51 @@ export default function EndorseModal({
         setDeepTokenFeeRaw(fee)
         setUserDeepBalance(ethers.formatUnits(balance, decimals))
 
-        // Get protocol endorsement fee in basis points
         try {
           const feeBps = await contract.protocolEndorsementFeeBps()
           setProtocolFeeBps(Number(feeBps))
-        } catch (error) {
-          console.warn('Failed to load protocol fee BPS, using default:', error)
-        }
+        } catch {}
 
-        // Target-specific loads
-        if (hasValidTarget && getVersionDetails && targetPersonHash && targetVersionIndex !== undefined) {
+        // Load target version details
+        if (hasValidTarget && getVersionDetails && targetPersonHash) {
           try {
             const details = await getVersionDetails(targetPersonHash, targetVersionIndex)
             if (details) {
-              setCurrentEndorsementCount(Number(details.endorsementCount))
-              // Determine fee recipient
+              let name = ''
               const tokenId = Number(details.tokenId)
+              
+              if (tokenId > 0 && getNFTDetails) {
+                try {
+                  const nftDetails = await getNFTDetails(tokenId)
+                  name = (nftDetails as any)?.coreInfo?.supplementInfo?.fullName ||
+                         (nftDetails as any)?.coreInfo?.fullName || ''
+                } catch {}
+              }
+              
+              if (!name) {
+                name = (details as any)?.version?.coreInfo?.supplementInfo?.fullName ||
+                       (details as any)?.version?.coreInfo?.fullName ||
+                       (details as any)?.version?.fullName || ''
+              }
+
+              if (name) setDisplayName(name)
+              setCurrentEndorsementCount(Number(details.endorsementCount))
+              
+              setIsNFTMinted(tokenId > 0)
               if (tokenId > 0) {
-                // NFT exists, fee goes to NFT holder
                 const nftHolder = await contract.ownerOf(tokenId)
                 setFeeRecipient(nftHolder)
               } else {
-                // No NFT, fee goes to version creator
-                const versionDetail = details.version
-                setFeeRecipient(versionDetail.addedBy)
+                setFeeRecipient(details.version.addedBy)
               }
               setIsTargetValidOnChain(true)
             } else {
               setIsTargetValidOnChain(false)
             }
-          } catch (e) {
+          } catch {
             setIsTargetValidOnChain(false)
           }
-          // Check if current user has already endorsed this version (placeholder)
+          
           try {
             const endorsedIdx = await contract.endorsedVersionIndex(targetPersonHash, address)
             setHasEndorsed(Number(endorsedIdx) === Number(targetVersionIndex))
@@ -207,107 +250,45 @@ export default function EndorseModal({
       }
     }
     loadEndorsementData()
-  }, [isOpen, address, getVersionDetails, contract, hasValidTarget, targetPersonHash, targetVersionIndex])
+  }, [isOpen, address, getVersionDetails, getNFTDetails, contract, hasValidTarget, targetPersonHash, targetVersionIndex])
 
-  // Initialize from URL parameters and props on open
+  // 简化的关闭处理 - 状态重置由 isOpen useEffect 统一处理
+  const handleClose = () => onClose()
+
+  // Escape 键关闭
   useEffect(() => {
     if (!isOpen) return
-    try {
-      // Get values from URL parameters
-      const qHash = searchParams.get('hash') || searchParams.get('personHash') || ''
-      const qIndexStr = searchParams.get('vi') || searchParams.get('version') || searchParams.get('versionIndex') || ''
-      const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN
-
-      // Prefer props, then URL params, then keep current local state
-      if (typeof personHash === 'string' && personHash.trim() !== '') {
-        setLocalPersonHash(personHash.trim())
-      } else if (qHash) {
-        setLocalPersonHash(qHash)
-      }
-
-      if (typeof versionIndex === 'number' && versionIndex > 0) {
-        setLocalVersionIndex(versionIndex)
-      } else if (Number.isFinite(qIndex) && qIndex > 0) {
-        setLocalVersionIndex(qIndex)
-      }
-    } catch {}
-  }, [isOpen, personHash, versionIndex, searchParams])
-
-  const handleClose = () => {
-    closedBySelfRef.current = true
-    setIsSubmitting(false)
-    setSuccessResult(null)
-    setErrorResult(null)
-    setEntered(false)
-    setDragging(false)
-    setDragOffset(0)
-    onClose()
-  }
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen])
+  }, [isOpen, onClose])
 
-  // Push history state on open so mobile back closes the modal first
+  // Close on mobile back button
   useEffect(() => {
     if (!isOpen) return
     const marker = { __dfModal: 'EndorseModal', id: Math.random().toString(36).slice(2) }
-    historyMarkerRef.current = marker
-    try {
-      window.history.pushState(marker, '')
-      pushedRef.current = true
-    } catch {}
-    const onPop = () => {
-      // Only close if our pushed entry was popped (i.e., new state is not our marker)
-      const st: any = window.history.state
-      if (!st || st.id !== historyMarkerRef.current?.id) {
-        closedByPopRef.current = true
-        onClose()
-      }
-    }
+    try { window.history.pushState(marker, '') } catch {}
+    const onPop = () => onClose()
     window.addEventListener('popstate', onPop)
     return () => {
       window.removeEventListener('popstate', onPop)
-      // If closed by self and we pushed a state, consume the extra history entry
-      if (pushedRef.current && closedBySelfRef.current && !closedByPopRef.current) {
-        try { window.history.back() } catch {}
-      }
-      pushedRef.current = false
-      closedBySelfRef.current = false
-      closedByPopRef.current = false
-      historyMarkerRef.current = null
     }
   }, [isOpen, onClose])
 
+  // Continue endorsing: reset form state, keep modal open
   const handleContinueEndorsing = () => {
-    // Reset form and states for new endorsement
+    setPersonHash('')
+    setVersionIndex(1)
     setIsSubmitting(false)
     setIsApproving(false)
     setSuccessResult(null)
     setErrorResult(null)
     setHasEndorsed(false)
     setCurrentEndorsementCount(0)
+    setDisplayName('')
     setIsTargetValidOnChain(false)
-    
-    // Reset inputs
-    if (onPersonHashChange) onPersonHashChange('')
-    if (onVersionIndexChange) onVersionIndexChange(1)
-    // Also reset local state for uncontrolled usage
-    setLocalPersonHash('')
-    setLocalVersionIndex(1)
-    
-    // Reset other states that might affect the UI
     setFeeRecipient('')
-    setDeepTokenFee('0')
-    setDeepTokenFeeRaw(0n)
-    setUserDeepBalance('0')
-    
-    // Keep modal open for continued use
-    console.log('🔄 Ready for next endorsement')
+    prevTargetRef.current = { hash: '', index: 0 }
   }
 
   const handleEndorse = async (isRetry = false) => {
@@ -804,10 +785,10 @@ export default function EndorseModal({
 
         console.log('📊 Complete transaction log with receipt:', completeTransactionLog)
 
+        const updatedCount = currentEndorsementCount + 1
         applySuccessFromReceipt(result)
-        
-        // Don't call onSuccess automatically to prevent modal from closing
-        // onSuccess?.(result)
+        // Notify parent with latest endorsement count for node refresh
+        onSuccess?.({ ...result, endorsementCount: updatedCount })
       } else {
         // endorseVersion returned null, meaning the transaction failed
         // The error was already handled by executeTransaction and shown via toast
@@ -899,7 +880,7 @@ export default function EndorseModal({
     if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={isDesktop ? undefined : handleClose} style={{ touchAction: 'pan-y' }}>
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -936,17 +917,17 @@ export default function EndorseModal({
               </div>
           </div>
           <button
-              onClick={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                handleClose()
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors flex-shrink-0"
-              aria-label={t('common.close', 'Close')}
-            >
-              <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              handleClose()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors flex-shrink-0"
+            aria-label={t('common.close', 'Close')}
+          >
+            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </button>
           </div>
         </div>
@@ -969,14 +950,49 @@ export default function EndorseModal({
                     </label>
                     <input
                       type="text"
-                      value={targetPersonHash || ''}
-                      onChange={(e) => {
-                        if (onPersonHashChange) onPersonHashChange(e.target.value)
-                        else setLocalPersonHash(e.target.value)
-                      }}
-                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition font-mono"
+                      value={personHash}
+                      onChange={(e) => setPersonHash(e.target.value)}
+                      className={`w-full h-10 rounded-md border bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 outline-none transition font-mono ${
+                        hashInputInvalid
+                          ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30 dark:border-red-400 dark:focus:border-red-400 dark:focus:ring-red-400/30'
+                          : 'border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30'
+                      }`}
                       placeholder={t('search.versionsQuery.placeholder')}
                     />
+                    {hashInputInvalid && (
+                      <div className="mt-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        {t('endorse.invalidPersonHashFormat', 'Person hash must be 0x-prefixed 32-byte hex (64 hex chars).')}
+                      </div>
+                    )}
+                    {!hashInputInvalid && hasValidTarget && (
+                      <div className="mt-3 space-y-1 text-sm">
+                        {isTargetValidOnChain && (
+                          <div className="flex flex-wrap items-center gap-3">
+                            {displayName && (
+                              <div className="font-medium text-gray-900 dark:text-gray-100">{displayName}</div>
+                            )}
+                            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                              <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                {t('endorse.currentEndorsements', 'Current Endorsements')}
+                              </span>
+                              <span className="text-sm font-mono text-purple-800 dark:text-purple-200">
+                                {currentEndorsementCount}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {!isTargetValidOnChain && (
+                          <div className="text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 mt-0.5" />
+                            <div>
+                              <span className="font-medium">{t('endorse.invalidTarget', 'Invalid person hash or version index')}</span>
+                              <div>{t('endorse.invalidTargetDesc', 'Please verify the hash and index refer to an existing version')}</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="w-32">
@@ -986,52 +1002,53 @@ export default function EndorseModal({
                     <input
                       type="number"
                       min="1"
-                      value={targetVersionIndex || 1}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 1
-                        if (onVersionIndexChange) onVersionIndexChange(val)
-                        else setLocalVersionIndex(val)
-                      }}
+                      value={versionIndex}
+                      onChange={(e) => setVersionIndex(parseInt(e.target.value) || 1)}
                       className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
                       placeholder="1"
                     />
                   </div>
                 </div>
               </div>
+              {/* Invalid target warning moved below hash input */}
             </div>
 
 
 
           {/* DEEP Token Fee & Distribution Info */}
           <div className="bg-gradient-to-br from-purple-50 to-amber-50 dark:from-purple-900/20 dark:to-amber-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Coins className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm font-medium text-purple-800 dark:text-purple-200">
-                {t('endorse.deepTokenFee', 'DEEP Token Fee')}: {deepTokenFee} DEEP
-              </span>
-            </div>
-            
             <div className="text-xs text-purple-700 dark:text-purple-300 space-y-2">
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="font-medium text-purple-800 dark:text-purple-200">
+                  {t('endorse.deepTokenFee', 'Endorsement fee')}
+                </span>
+                <span className="font-mono text-purple-800 dark:text-purple-100">{deepTokenFee} DEEP</span>
+              </div>
+
               {/* User Balance */}
-              <div className="flex justify-between">
-                <span>{t('endorse.yourBalance', 'Your DEEP Balance')}:</span>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span>{t('endorse.yourBalance', 'Your balance')}:</span>
                 <span className={`font-mono ${canAffordEndorsement ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {userDeepBalance} DEEP
                 </span>
               </div>
-              
-              {/* Fee Recipient */}
-              <div className="flex justify-between">
-                <span>{t('endorse.feeRecipient', 'Fee Recipient')}:</span>
-                <span className="font-mono">{formatAddress(feeRecipient)}</span>
-              </div>
+
+              {/* Inline insufficient balance warning */}
+              {!canAffordEndorsement && !hasEndorsed && (
+                <div className="flex items-start gap-2 text-red-700 dark:text-red-300">
+                  <AlertCircle className="w-4 h-4 mt-0.5 text-red-600 dark:text-red-400" />
+                  <p className="text-sm">
+                    {t('endorse.needMoreTokens', 'You need more DEEP tokens to endorse this version')}
+                  </p>
+                </div>
+              )}
               
               {/* Distribution Rule */}
               <div className="pt-2 mt-2 border-t border-purple-200/50 dark:border-purple-700/50">
                 <div className="flex items-start gap-2">
                   <span className="font-medium shrink-0">{t('endorse.feeDistribution', 'Fee Distribution')}:</span>
                   <span>
-                    {versionData?.isNFTMinted ? (
+                    {isNFTMinted ? (
                       <>
                         <strong>{t('endorse.nftMinted', 'NFT Minted')}:</strong> {t('endorse.feeToNFTHolder', '{{recipientPercent}}% to NFT holder, {{protocolPercent}}% protocol fee', { recipientPercent: (10000 - protocolFeeBps) / 100, protocolPercent: protocolFeeBps / 100 })}
                       </>
@@ -1044,70 +1061,10 @@ export default function EndorseModal({
                 </div>
               </div>
               
-              {/* Dynamic Fee Note */}
-              <p className="text-xs opacity-75 italic">
-                💡 {t('endorse.feeNote', 'DEEP token fee is dynamic based on current utility issuance level')}
-              </p>
             </div>
           </div>
 
-          {/* Insufficient Balance Warning - only show if user hasn't endorsed yet */}
-          {!canAffordEndorsement && !hasEndorsed && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                <span className="text-sm font-medium text-red-800 dark:text-red-200">
-                  {t('endorse.insufficientBalance', 'Insufficient DEEP Token Balance')}
-                </span>
-              </div>
-              <p className="text-xs text-red-700 dark:text-red-300 mt-1">
-                {t('endorse.needMoreTokens', 'You need more DEEP tokens to endorse this version')}
-              </p>
-            </div>
-          )}
-
           {/* Post-endorsement balance info */}
-          {!canAffordEndorsement && hasEndorsed && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                  {t('endorse.endorsementComplete', 'Endorsement Complete')}
-                </span>
-              </div>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                {t('endorse.needMoreForNext', 'You need more DEEP tokens for additional endorsements')}
-              </p>
-            </div>
-          )}
-
-          {/* Invalid target warning */}
-          {hasValidTarget && isPersonHashFormatValid && !isTargetValidOnChain && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                <span className="text-sm font-medium text-red-800 dark:text-red-200">
-                  {t('endorse.invalidTarget', 'Invalid person hash or version index')}
-                </span>
-              </div>
-              <p className="text-xs text-red-700 dark:text-red-300 mt-1">
-                {t('endorse.invalidTargetDesc', 'Please verify the hash and index refer to an existing version')}
-              </p>
-            </div>
-          )}
-
-          {/* Invalid hash format warning */}
-          {targetPersonHash && !isPersonHashFormatValid && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                <span className="text-sm font-medium text-red-800 dark:text-red-200">
-                  {t('search.validation.hashInvalid', 'Please enter a valid 64-character hexadecimal hash')}
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Endorsement Benefits */}
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
             <h3 className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">

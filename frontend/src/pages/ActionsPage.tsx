@@ -54,7 +54,6 @@ export default function ActionsPage() {
   // Modal states
   const [addVersionModal, setAddVersionModal] = useState<{
     isOpen: boolean
-    personHash?: string
     existingPersonData?: any
   }>({ isOpen: false })
   
@@ -260,72 +259,44 @@ export default function ActionsPage() {
         </div>
 
 
-        {/* Modals */}
+        {/* Modals - Simplified navigation logic:
+            1. Parent component only controls open/close and passes initial data
+            2. Modal internal state is fully self-contained and auto-resets on close
+            3. When navigating: close current modal → open target modal (with data)
+        */}
         <AddVersionModal
           isOpen={addVersionModal.isOpen}
           onClose={() => setAddVersionModal({ isOpen: false })}
-          onSuccess={(result) => {
-            console.log('Version added:', result)
-            // Modal will show success message and user can close manually
-          }}
+          onSuccess={(result) => console.log('Version added:', result)}
           onEndorse={(personHash, versionIndex) => {
-            // Close AddVersionModal and open EndorseModal with the new version's data
-            console.log('🎯 Going to endorse:', { personHash, versionIndex })
             setAddVersionModal({ isOpen: false })
-            // Use setTimeout to ensure the modal closes before opening the next one
-            setTimeout(() => {
-              console.log('✅ Opening EndorseModal with:', { personHash, versionIndex })
-              setEndorseModal({
-                isOpen: true,
-                personHash: personHash,
-                versionIndex: versionIndex
-              })
-            }, 100)
+            setEndorseModal({ isOpen: true, personHash, versionIndex })
           }}
-          personHash={addVersionModal.personHash}
-          existingPersonData={addVersionModal.existingPersonData}
+          initialPersonData={addVersionModal.existingPersonData}
         />
 
         <MintNFTModal
           isOpen={mintNFTModal.isOpen}
           onClose={() => setMintNFTModal({ isOpen: false })}
-          onSuccess={(tokenId) => {
-            console.log('NFT minted:', tokenId)
-            // Modal will show success message and user can continue minting or close manually
+          onSuccess={(tokenId) => console.log('NFT minted:', tokenId)}
+          onGoEndorse={(personHash, versionIndex) => {
+            setMintNFTModal({ isOpen: false })
+            setEndorseModal({ isOpen: true, personHash, versionIndex })
           }}
-          personHash={mintNFTModal.personHash}
-          versionIndex={mintNFTModal.versionIndex}
-          onPersonHashChange={(hash) => setMintNFTModal(prev => ({ ...prev, personHash: hash }))}
-          onVersionIndexChange={(index) => setMintNFTModal(prev => ({ ...prev, versionIndex: index }))}
-          versionData={mintNFTModal.versionData}
+          initialPersonHash={mintNFTModal.personHash}
+          initialVersionIndex={mintNFTModal.versionIndex}
         />
 
         <EndorseModal
           isOpen={endorseModal.isOpen}
           onClose={() => setEndorseModal({ isOpen: false })}
-          onSuccess={(result) => {
-            console.log('Endorsement submitted:', result)
-            setEndorseModal({ isOpen: false })
-          }}
+          onSuccess={(result) => console.log('Endorsement submitted:', result)}
           onMintNFT={(personHash, versionIndex) => {
-            // Close EndorseModal and open MintNFTModal with the endorsed version's data
-            console.log('🎯 Going to mint NFT:', { personHash, versionIndex })
             setEndorseModal({ isOpen: false })
-            // Use setTimeout to ensure the modal closes before opening the next one
-            setTimeout(() => {
-              console.log('✅ Opening MintNFTModal with:', { personHash, versionIndex })
-              setMintNFTModal({
-                isOpen: true,
-                personHash: personHash,
-                versionIndex: versionIndex
-              })
-            }, 100)
+            setMintNFTModal({ isOpen: true, personHash, versionIndex })
           }}
-          personHash={endorseModal.personHash}
-          versionIndex={endorseModal.versionIndex}
-          onPersonHashChange={(hash) => setEndorseModal(prev => ({ ...prev, personHash: hash }))}
-          onVersionIndexChange={(index) => setEndorseModal(prev => ({ ...prev, versionIndex: index }))}
-          versionData={endorseModal.versionData}
+          initialPersonHash={endorseModal.personHash}
+          initialVersionIndex={endorseModal.versionIndex}
         />
       </div>
     </PageContainer>
