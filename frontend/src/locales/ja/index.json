@@ -556,12 +556,14 @@
   "wallet": {
     "connect": "ウォレット接続",
     "connecting": "接続中...",
+    "connectDescription": "ウォレットを接続して続行",
     "disconnect": "接続解除",
     "wrongNetwork": "ネットワークエラー",
     "clickToSwitch": "クリックしてネットワークを切り替え",
     "switchNetwork": "ネットワークを切り替える",
     "currentNetwork": "現在のネットワーク",
     "selectNetworkDesc": "サポートされるネットワークを選択してください:",
+    "networkId": "ネットワーク ID: {{chainId}}",
     "mainnet": "メインネット",
     "testnet": "テストネット",
     "localhost": "ローカル開発",
@@ -578,6 +580,8 @@
     "noWallet": "ウォレット拡張をインストールしてください",
     "selectWallet": "ウォレット選択",
     "noWalletsFound": "ウォレットが見つかりません",
+    "detected": "検出済み",
+    "secureConnection": "セキュア接続",
     "installWallet": "ウォレット拡張をインストールしてください",
     "installWalletTitle": "ウォレットをインストール",
     "installWalletDesc": "本アプリを使うには、以下のいずれかのウォレットをインストールしてください:",
@@ -597,7 +601,8 @@
     "dontClickOutside": "ウォレットポップアップ外をクリックしないでください",
     "checkTaskbar": "ポップアップが見えない場合はタスクバーを確認してください",
     "useAltTab": "Alt+Tabで隠れたウォレットウィンドウを探してください",
-    "waitForConfirm": "取引確認後に閉じてください"
+    "waitForConfirm": "取引確認後に閉じてください",
+    "securityNote": "秘密鍵はウォレット内にあり、私たちがアクセスすることはありません。"
   },
   "theme": {
     "switchToLight": "ライトモードに切り替え",

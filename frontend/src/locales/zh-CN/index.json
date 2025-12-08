@@ -556,12 +556,14 @@
   "wallet": {
     "connect": "连接钱包",
     "connecting": "连接中...",
+    "connectDescription": "连接钱包以继续",
     "disconnect": "断开连接",
     "wrongNetwork": "网络错误",
     "clickToSwitch": "点击切换网络",
     "switchNetwork": "切换网络",
     "currentNetwork": "当前网络",
     "selectNetworkDesc": "请选择一个支持的网络：",
+    "networkId": "网络 ID：{{chainId}}",
     "mainnet": "主网",
     "testnet": "测试网",
     "localhost": "本地开发",
@@ -578,6 +580,8 @@
     "noWallet": "请安装钱包扩展",
     "selectWallet": "选择钱包",
     "noWalletsFound": "未找到钱包",
+    "detected": "已检测",
+    "secureConnection": "安全连接",
     "installWallet": "安装钱包",
     "installWalletTitle": "安装钱包",
     "installWalletDesc": "要使用此应用，请安装以下钱包之一：",
@@ -597,7 +601,8 @@
     "dontClickOutside": "不要点击钱包弹窗外部",
     "checkTaskbar": "如果弹窗消失请检查任务栏",
     "useAltTab": "使用 Alt+Tab 查找隐藏的钱包窗口",
-    "waitForConfirm": "等待交易确认后再关闭"
+    "waitForConfirm": "等待交易确认后再关闭",
+    "securityNote": "私钥仅存于您的钱包，我们无法访问。"
   },
   "theme": {
     "switchToLight": "切换到浅色模式",
