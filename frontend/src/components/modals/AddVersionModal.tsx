@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download, Star } from 'lucide-react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
-import { submitAddPersonZK, generatePersonProof, verifyProof } from '../../lib/zk'
-import { useConfig } from '../../context/ConfigContext'
+import { generatePersonProof, verifyProof } from '../../lib/zk'
+import { useContract } from '../../hooks/useContract'
 import { generateMetadataCID } from '../../lib/cid'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
 import { getFriendlyError } from '../../lib/errors'
@@ -56,7 +56,7 @@ export default function AddVersionModal({
 }: AddVersionModalProps) {
   const { t } = useTranslation()
   const { signer } = useWallet()
-  const { contractAddress } = useConfig()
+  const { addPersonZK, isContractReady } = useContract()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [consents, setConsents] = useState({ hash: false, age: false, legal: false })
   const [consentError, setConsentError] = useState<string | null>(null)
@@ -423,13 +423,8 @@ export default function AddVersionModal({
       setConsentError(null)
     }
 
-    if (!signer) {
+    if (!signer || !isContractReady) {
       alert(t('wallet.notConnected', 'Please connect your wallet'))
-      return
-    }
-
-    if (!contractAddress) {
-      alert(t('addVersion.contractNotConfigured', 'Contract not configured'))
       return
     }
 
@@ -497,9 +492,8 @@ export default function AddVersionModal({
       
       setProofGenerationStep(t('addVersion.submittingToBlockchain', 'Submitting to blockchain...'))
       
-      const result = await submitAddPersonZK(
-        signer,
-        contractAddress,
+      // Use the unified contract hook for blockchain interaction
+      const result = await addPersonZK(
         proof,
         publicSignals,
         processedData.fatherVersionIndex,

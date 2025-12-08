@@ -97,6 +97,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   StoryNotFound: 'Story not found.',
   MustBeNFTHolder: 'NFT holder permission required for this action.',
   rejected: 'Transaction was cancelled by user.',
+  WALLET_POPUP_TIMEOUT: 'Wallet confirmation timed out. Please try again and make sure to confirm in the wallet popup.',
   REPLACEMENT_UNDERPRICED: 'There is a pending transaction with the same nonce. Please raise gas price/priority fee or wait.',
   GAS_ERROR: 'Gas limit or price too low. Please increase gas and retry.',
   OUT_OF_GAS: 'Transaction ran out of gas during execution.',
@@ -149,6 +150,21 @@ export const resolveErrorReason = (error: any): string | undefined => {
 
   if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg)) return 'ERC20InsufficientAllowance'
   if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) return 'INSUFFICIENT_FUNDS'
+
+  // Network errors
+  if (error?.code === 'NETWORK_ERROR' || /network/i.test(msg)) {
+    return 'NETWORK_ERROR'
+  }
+
+  // Wallet popup timeout
+  if (/WALLET_POPUP_TIMEOUT/i.test(msg)) {
+    return 'WALLET_POPUP_TIMEOUT'
+  }
+
+  // General call exception (fallback for contract errors without specific reason)
+  if (error?.code === 'CALL_EXCEPTION') {
+    return 'CALL_EXCEPTION'
+  }
 
   return undefined
 }
