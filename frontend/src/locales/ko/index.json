@@ -433,6 +433,15 @@
       "rpc": "RPC",
       "contract": "계약",
       "root": "루트 노드 해시",
+      "network": "네트워크",
+      "selectNetwork": "네트워크 선택",
+      "customNetwork": "사용자 정의 네트워크",
+      "customNetworks": "사용자 정의",
+      "customNetworkName": "네트워크 이름",
+      "chainId": "체인 ID",
+      "addCustomNetwork": "사용자 정의 저장",
+      "addCustomNetworkHint": "작성 후 저장하면 재사용할 수 있습니다",
+      "customNetworkAdded": "사용자 정의 네트워크가 추가되었습니다",
       "clearAndRefresh": "지우기",
       "strictCacheOnly": "엄격 읽기 전용 캐시",
       "strictCacheOn": "오프라인 모드",
@@ -537,7 +546,11 @@
       "rpc": "유효한 RPC 주소를 입력하세요",
       "contract": "유효한 계약 주소를 입력하세요 (0x + 40자리 16진수)",
       "root": "유효한 루트 해시를 입력하세요 (0x + 64자리 16진수)",
-      "version": "유효한 버전 번호를 입력하세요"
+      "version": "유효한 버전 번호를 입력하세요",
+      "chainIdInvalid": "유효한 체인 ID를 입력하세요",
+      "customNetwork": "네트워크 이름, 유효한 체인 ID 및 RPC URL을 입력하세요",
+      "chainIdConflict": "체인 ID가 이미 기본 네트워크에 존재합니다",
+      "rpcConflict": "RPC가 이미 기본 네트워크에 존재합니다"
     }
   },
   "common": {
@@ -569,8 +582,19 @@
     "localhost": "로컬 개발",
     "networks": {
       "confluxEspace": "Conflux eSpace",
-      "confluxEspaceTestnet": "Conflux eSpace 테스트넷",
-      "localDev": "로컬 개발 네트워크"
+      "confluxEspaceTestnet": "Conflux eSpace Testnet",
+      "localDev": "Localhost",
+      "ethereum": "Ethereum",
+      "sepolia": "Ethereum Sepolia",
+      "holesky": "Ethereum Holesky",
+      "polygon": "Polygon",
+      "polygonAmoy": "Polygon Amoy",
+      "bsc": "BSC",
+      "bscTestnet": "BSC Testnet",
+      "arbitrum": "Arbitrum One",
+      "arbitrumSepolia": "Arbitrum Sepolia",
+      "optimism": "Optimism",
+      "optimismSepolia": "Optimism Sepolia"
     },
     "networkWillBeAdded": "지갑에 없으면 자동으로 추가됩니다",
     "chainAdded": "네트워크가 추가되었습니다",

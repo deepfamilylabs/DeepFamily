@@ -89,7 +89,6 @@ describe('Hash Consistency Tests', function () {
     it(`matches circuit hash for: ${name}`, async () => {
       const expected = computePersonHashCircuitEquivalent(input);
 
-      // The getFullNameHash function no longer exists in the contract
       // We now compare the Poseidon digest directly
       const basicInfo = buildBasicInfo({
         fullName: input.fullName,

@@ -13,7 +13,6 @@ import { makeProvider } from '../utils/provider'
 import PersonHashCalculator from '../components/PersonHashCalculator'
 import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTypeColorClass, getChunkTypeBorderColorClass } from '../constants/chunkTypes'
 
-const MAX_FULL_NAME_BYTES = 256
 const MAX_PAGE_SIZE = 100  
 const DEFAULT_PAGE_SIZE = 100
 
@@ -176,7 +175,7 @@ export default function SearchPage() {
   })
   
   const schemas = createSchemas()
-  const { rpcUrl, contractAddress } = useConfig()
+  const { rpcUrl, contractAddress, chainId } = useConfig()
   const toast = useToast()
 
   const tokenIdValidationMessage = useMemo(() => t('search.validation.tokenIdRequired'), [t])
@@ -333,7 +332,7 @@ export default function SearchPage() {
     }
     setEndorsementLoading(true); setEndorsementError(null)
     try {
-      const provider = makeProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl, chainId)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : endorsementOffset
       const out = await contract.listVersionEndorsements(data.personHash, off, data.pageSize)
@@ -381,7 +380,7 @@ export default function SearchPage() {
     }
     setUriLoading(true); setUriError(null)
     try {
-      const provider = makeProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl, chainId)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : uriOffset
       if (data.tokenId === undefined || !Number.isFinite(data.tokenId)) {
@@ -440,7 +439,7 @@ export default function SearchPage() {
     }
     setVersionsLoading(true); setVersionsError(null)
     try {
-      const provider = makeProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl, chainId)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : versionsOffset
       const out = await contract.listPersonVersions(data.personHash, off, data.pageSize)
@@ -486,7 +485,7 @@ export default function SearchPage() {
     }
     setStoryChunksLoading(true); setStoryChunksError(null)
     try {
-      const provider = makeProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl, chainId)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : storyChunksOffset
       if (data.tokenId === undefined || !Number.isFinite(data.tokenId)) {
@@ -554,7 +553,7 @@ export default function SearchPage() {
     }
     setChildrenLoading(true); setChildrenError(null)
     try {
-      const provider = makeProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl, chainId)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       const off = (startOffset !== undefined) ? startOffset : childrenOffset
       const parentVersionIndex = Number(data.parentVersionIndex)

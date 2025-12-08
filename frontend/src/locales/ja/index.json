@@ -433,6 +433,15 @@
       "rpc": "RPC",
       "contract": "コントラクト",
       "root": "ルートノード ハッシュ",
+      "network": "ネットワーク",
+      "selectNetwork": "ネットワークを選択",
+      "customNetwork": "カスタムネットワーク",
+      "customNetworks": "カスタム",
+      "customNetworkName": "ネットワーク名",
+      "chainId": "チェーン ID",
+      "addCustomNetwork": "カスタムを保存",
+      "addCustomNetworkHint": "入力して保存すると再利用できます",
+      "customNetworkAdded": "カスタムネットワークを追加しました",
       "clearAndRefresh": "クリア",
       "strictCacheOnly": "厳密読み取り専用キャッシュ",
       "strictCacheOn": "オフラインモード",
@@ -537,7 +546,11 @@
       "rpc": "有効なRPCアドレスを入力してください",
       "contract": "有効なコントラクトアドレスを入力してください (0x + 40桁16進数)",
       "root": "有効なルートハッシュを入力してください (0x + 64桁16進数)",
-      "version": "有効なバージョンインデックスを入力してください"
+      "version": "有効なバージョンインデックスを入力してください",
+      "chainIdInvalid": "有効なチェーン ID を入力してください",
+      "customNetwork": "ネットワーク名、有効なチェーン ID、RPC URL を入力してください",
+      "chainIdConflict": "チェーン ID は既に組み込みネットワークに存在します",
+      "rpcConflict": "RPC は既に組み込みネットワークに存在します"
     }
   },
   "common": {
@@ -569,8 +582,19 @@
     "localhost": "ローカル開発",
     "networks": {
       "confluxEspace": "Conflux eSpace",
-      "confluxEspaceTestnet": "Conflux eSpace テストネット",
-      "localDev": "ローカル開発ネットワーク"
+      "confluxEspaceTestnet": "Conflux eSpace Testnet",
+      "localDev": "Localhost",
+      "ethereum": "Ethereum",
+      "sepolia": "Ethereum Sepolia",
+      "holesky": "Ethereum Holesky",
+      "polygon": "Polygon",
+      "polygonAmoy": "Polygon Amoy",
+      "bsc": "BSC",
+      "bscTestnet": "BSC Testnet",
+      "arbitrum": "Arbitrum One",
+      "arbitrumSepolia": "Arbitrum Sepolia",
+      "optimism": "Optimism",
+      "optimismSepolia": "Optimism Sepolia"
     },
     "networkWillBeAdded": "ウォレットにない場合、自動で追加されます",
     "chainAdded": "ネットワークを追加しました",

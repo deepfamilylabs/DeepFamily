@@ -43,7 +43,7 @@ const MULTICALL_ABI = [
 
 export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly } = useConfig()
+  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly, chainId } = useConfig()
   const { traversal, includeVersionDetails, deduplicateChildren } = useVizOptions()
   const [root, setRoot] = useState<GraphNode | null>(null)
   // Synchronous bootstrap for nodesData from localStorage (ensures details available even in strict mode on first paint)
@@ -85,13 +85,14 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   // Provider + contract (memoized & cached)
   const provider = useMemo(() => {
     if (!rpcUrl) return null
-    if (providerCache.has(rpcUrl)) return providerCache.get(rpcUrl) as ethers.JsonRpcProvider
+    const key = `${rpcUrl}::${chainId || 'auto'}`
+    if (providerCache.has(key)) return providerCache.get(key) as ethers.JsonRpcProvider
     try {
-      const p = makeProvider(rpcUrl)
-      providerCache.set(rpcUrl, p)
+      const p = makeProvider(rpcUrl, chainId)
+      providerCache.set(key, p)
       return p
     } catch { return null }
-  }, [rpcUrl])
+  }, [rpcUrl, chainId])
 
   const contract = useMemo(() => {
     if (!provider || !contractAddress) return null

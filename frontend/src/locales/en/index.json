@@ -431,6 +431,15 @@
     },
     "config": {
       "rpc": "RPC",
+      "network": "Network",
+      "selectNetwork": "Select network",
+      "customNetwork": "Custom network",
+      "customNetworks": "Custom",
+      "customNetworkName": "Network name",
+      "chainId": "Chain ID",
+      "addCustomNetwork": "Save custom",
+      "addCustomNetworkHint": "Fill in and save to reuse later",
+      "customNetworkAdded": "Custom network added",
       "contract": "Contract",
       "root": "Root Hash",
       "clearAndRefresh": "Clear",
@@ -537,7 +546,11 @@
       "rpc": "Please enter a valid RPC URL",
       "contract": "Please enter a valid contract address (0x + 40 hex chars)",
       "root": "Please enter a valid root hash (0x + 64 hex chars)",
-      "version": "Please enter a valid version index"
+      "version": "Please enter a valid version index",
+      "chainIdInvalid": "Please enter a valid chain ID",
+      "customNetwork": "Please enter network name, valid chain ID, and RPC URL",
+      "chainIdConflict": "Chain ID already exists in built-in networks",
+      "rpcConflict": "RPC already exists in built-in networks"
     }
   },
   "common": {
@@ -570,7 +583,18 @@
     "networks": {
       "confluxEspace": "Conflux eSpace",
       "confluxEspaceTestnet": "Conflux eSpace Testnet",
-      "localDev": "Localhost"
+      "localDev": "Localhost",
+      "ethereum": "Ethereum",
+      "sepolia": "Ethereum Sepolia",
+      "holesky": "Ethereum Holesky",
+      "polygon": "Polygon",
+      "polygonAmoy": "Polygon Amoy",
+      "bsc": "BSC",
+      "bscTestnet": "BSC Testnet",
+      "arbitrum": "Arbitrum One",
+      "arbitrumSepolia": "Arbitrum Sepolia",
+      "optimism": "Optimism",
+      "optimismSepolia": "Optimism Sepolia"
     },
     "networkWillBeAdded": "If network is not in your wallet, it will be added automatically",
     "chainAdded": "Network added successfully",
