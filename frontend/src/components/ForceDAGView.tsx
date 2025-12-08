@@ -33,7 +33,7 @@ export interface ForceDAGViewHandle { centerOnNode: (id: string) => void }
 function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
   const responsiveHeight = useFamilyTreeHeight()
   const defaultHeight = height || responsiveHeight
-  const { nodesData } = useTreeData() as any
+  const { nodesData, bumpEndorsementCount } = useTreeData() as any
   const { deduplicateChildren } = useVizOptions()
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
@@ -284,6 +284,9 @@ function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number 
         versionData={{
           fullName: endorseModal.fullName,
           endorsementCount: endorseModal.endorsementCount
+        }}
+        onSuccess={() => {
+          bumpEndorsementCount(endorseModal.personHash, endorseModal.versionIndex, 1)
         }}
       />
     </>

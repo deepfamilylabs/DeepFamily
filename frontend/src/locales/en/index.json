@@ -1145,7 +1145,13 @@
     "currentCount": "Current endorsements",
     "processing": "Submitting endorsement...",
     "success": "Endorsed successfully",
-    "quickWaiting": "Preparing endorsement..."
+    "quickWaiting": "Preparing endorsement...",
+    "checkingAllowance": "Checking token allowance...",
+    "confirmInWallet": "Please confirm in your wallet",
+    "fee": "Fee",
+    "tokenInfo": "Token Info",
+    "balanceDetails": "Balance",
+    "required": "Required"
   },
   "transaction": {
     "pending": "Transaction pending confirmation...",

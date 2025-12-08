@@ -1147,7 +1147,13 @@
     "currentCount": "現在のエンドース数",
     "processing": "エンドース送信中...",
     "success": "エンドースに成功",
-    "quickWaiting": "エンドース準備中..."
+    "quickWaiting": "エンドース準備中...",
+    "checkingAllowance": "トークン承認額を確認中...",
+    "confirmInWallet": "ウォレットで確認してください",
+    "fee": "手数料",
+    "tokenInfo": "トークン情報",
+    "balanceDetails": "残高",
+    "required": "必要額"
   },
   "transaction": {
     "pending": "取引確認待ち中...",

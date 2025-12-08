@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, Loader2, AlertCircle, Star, X } from 'lucide-react'
+import { Check, Loader2, AlertCircle, Star, X, ShieldCheck, Coins } from 'lucide-react'
+import { ethers } from 'ethers'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { getFriendlyError } from '../../lib/errors'
@@ -18,7 +19,7 @@ interface EndorseCompactModalProps {
   onSuccess?: (result: any) => void
 }
 
-type EndorseState = 'idle' | 'working' | 'success' | 'error'
+type EndorseState = 'idle' | 'checking' | 'approving' | 'working' | 'success' | 'error'
 
 export default function EndorseCompactModal({
   isOpen,
@@ -29,14 +30,17 @@ export default function EndorseCompactModal({
   onSuccess
 }: EndorseCompactModalProps) {
   const { t } = useTranslation()
-  const { address } = useWallet()
-  const { endorseVersion, getVersionDetails } = useContract()
+  const { address, signer } = useWallet()
+  const { endorseVersion, getVersionDetails, contract } = useContract()
   const [state, setState] = useState<EndorseState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(versionData?.fullName || null)
   const [endorsementCount, setEndorsementCount] = useState<number | null>(versionData?.endorsementCount ?? null)
   const [hasTriggered, setHasTriggered] = useState(false)
+  const [endorsementFee, setEndorsementFee] = useState<string | null>(null)
+  const [userBalance, setUserBalance] = useState<string | null>(null)
+  const [isInsufficientBalance, setIsInsufficientBalance] = useState(false)
 
   const hasValidTarget = useMemo(
     () => Boolean(personHash && /^0x[0-9a-fA-F]{64}$/.test(personHash) && Number(versionIndex) > 0),
@@ -50,6 +54,9 @@ export default function EndorseCompactModal({
     setErrorMessage(null)
     setTxHash(null)
     setHasTriggered(false)
+    setEndorsementFee(null)
+    setUserBalance(null)
+    setIsInsufficientBalance(false)
     if (versionData?.endorsementCount !== undefined) {
       setEndorsementCount(versionData.endorsementCount)
     }
@@ -77,6 +84,10 @@ export default function EndorseCompactModal({
     }
   }, [isOpen, getVersionDetails, personHash, versionIndex, hasValidTarget, versionData?.fullName, versionData?.endorsementCount])
 
+  /**
+   * Check token allowance and approve if needed, then endorse
+   * This logic is adapted from EndorseModal.tsx to ensure proper ERC20 approval
+   */
   const triggerEndorse = async () => {
     if (!address) {
       setErrorMessage(t('wallet.notConnected', 'Please connect your wallet'))
@@ -90,18 +101,193 @@ export default function EndorseCompactModal({
       return
     }
 
+    if (!contract || !signer) {
+      setErrorMessage(t('wallet.notConnected', 'Please connect your wallet'))
+      setState('error')
+      return
+    }
+
     try {
-      setState('working')
+      setState('checking')
       setErrorMessage(null)
+      setIsInsufficientBalance(false)
+
+      // Step 1: Get token contract address from DeepFamily contract
+      console.log('🔍 Getting DEEP token contract address...')
+      const deepTokenAddress = await contract.DEEP_FAMILY_TOKEN_CONTRACT()
+      console.log('✅ Token contract address:', deepTokenAddress)
+
+      // Step 2: Create token contract instance with necessary functions
+      const tokenContract = new ethers.Contract(
+        deepTokenAddress,
+        [
+          'function allowance(address,address) view returns (uint256)',
+          'function approve(address,uint256) returns (bool)',
+          'function recentReward() view returns (uint256)',
+          'function increaseAllowance(address,uint256) returns (bool)',
+          'function balanceOf(address) view returns (uint256)',
+          'function decimals() view returns (uint8)'
+        ],
+        signer
+      )
+
+      // Step 3: Get the endorsement fee (recentReward)
+      console.log('🔍 Getting endorsement fee (recentReward)...')
+      const fee: bigint = await tokenContract.recentReward()
+      let decimals = 18
+      try {
+        decimals = Number(await tokenContract.decimals())
+      } catch {}
+      const feeFormatted = ethers.formatUnits(fee, decimals)
+      console.log('✅ Endorsement fee (recentReward):', feeFormatted, 'DEEP')
+      setEndorsementFee(feeFormatted)
+
+      // Step 4: Check user balance first
+      const balance: bigint = await tokenContract.balanceOf(address)
+      const balanceFormatted = ethers.formatUnits(balance, decimals)
+      console.log('💰 User DEEP balance:', balanceFormatted)
+      setUserBalance(balanceFormatted)
+
+      // Check if balance is sufficient
+      if (balance < fee) {
+        console.error('❌ Insufficient balance:', { balance: balanceFormatted, required: feeFormatted })
+        setIsInsufficientBalance(true)
+        setErrorMessage(t('endorse.insufficientBalance', 'Insufficient DEEP balance') + `: ${balanceFormatted} < ${feeFormatted}`)
+        setState('error')
+        return
+      }
+
+      // If fee is 0, no approval needed - proceed directly to endorse
+      if (fee === 0n) {
+        console.log('✅ No fee required, proceeding to endorse...')
+        setState('working')
+        const result = await endorseVersion(personHash, versionIndex, undefined, { suppressToasts: true })
+        setTxHash(result?.hash || result?.transactionHash || null)
+        setEndorsementCount((prev) => (prev === null ? 1 : prev + 1))
+        setState('success')
+        onSuccess?.(result)
+        return
+      }
+
+      // Step 5: Get spender address (DeepFamily contract)
+      const spender = await contract.getAddress()
+      console.log('📝 Spender address:', spender)
+
+      // Step 6: Check current allowance
+      console.log('🔍 Checking current allowance for DeepFamily contract:', spender)
+      const currentAllowance: bigint = await tokenContract.allowance(address, spender)
+      console.log('🔐 Allowance check:', {
+        currentAllowance: currentAllowance.toString(),
+        currentAllowanceFormatted: ethers.formatUnits(currentAllowance, decimals),
+        required: fee.toString(),
+        requiredFormatted: ethers.formatUnits(fee, decimals),
+        needsApproval: currentAllowance < fee
+      })
+
+      // Step 7: If allowance is insufficient, request approval
+      if (currentAllowance < fee) {
+        console.log('⚠️ Insufficient allowance, requesting approval...')
+        setState('approving')
+
+        // Use direct approve for exact amount (safer than unlimited approval)
+        console.log('📝 Using direct approve for exact amount:', {
+          required: fee.toString(),
+          requiredFormatted: ethers.formatUnits(fee, decimals)
+        })
+
+        let tx
+        try {
+          tx = await tokenContract.approve(spender, fee)
+        } catch (approveError: any) {
+          console.error('❌ Direct approve failed:', approveError)
+          // Fallback: try increaseAllowance if approve fails
+          const delta = fee - currentAllowance
+          if (delta > 0n) {
+            console.log('📈 Fallback: Using increaseAllowance with delta:', delta.toString())
+            tx = await tokenContract.increaseAllowance(spender, delta)
+          } else {
+            throw approveError
+          }
+        }
+
+        console.log('📤 Approval transaction sent:', tx.hash)
+
+        // Wait for approval confirmation
+        const receipt = await tx.wait()
+        console.log('✅ Approval confirmed in block:', receipt.blockNumber)
+
+        // Wait for blockchain state to be updated after approval transaction
+        console.log('⏳ Waiting for blockchain state to update after approval...')
+        let postAllowance: bigint = currentAllowance
+        let retryCount = 0
+        const maxRetries = 32
+
+        while (retryCount < maxRetries && postAllowance < fee) {
+          const waitTime = Math.min(500 + (retryCount * 300), 2000)
+          console.log(`🔍 Post-approval check attempt ${retryCount + 1}/${maxRetries}, waiting ${waitTime}ms...`)
+
+          try {
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+            postAllowance = await tokenContract.allowance(address, spender)
+            console.log(`📊 Post-approval allowance attempt ${retryCount + 1}: ${ethers.formatUnits(postAllowance, decimals)} (need: ${ethers.formatUnits(fee, decimals)})`)
+
+            if (postAllowance >= fee) {
+              console.log(`✅ Post-approval allowance sufficient after ${retryCount + 1} attempts`)
+              break
+            }
+          } catch (error) {
+            console.warn(`❌ Post-approval allowance check failed on attempt ${retryCount + 1}:`, error)
+          }
+
+          retryCount++
+        }
+
+        console.log('✅ APPROVAL FLOW COMPLETED')
+      } else {
+        console.log('⏭️ SKIPPING APPROVAL - sufficient allowance exists')
+      }
+
+      // Step 8: Final allowance check before endorseVersion call
+      console.log('🔍 Final allowance check before endorseVersion...')
+      const finalAllowance: bigint = await tokenContract.allowance(address, spender)
+      const finalRequired: bigint = await tokenContract.recentReward()
+
+      console.log('🔐 Final allowance status:', {
+        finalAllowance: ethers.formatUnits(finalAllowance, decimals),
+        finalRequired: ethers.formatUnits(finalRequired, decimals),
+        sufficient: finalAllowance >= finalRequired
+      })
+
+      if (finalAllowance < finalRequired) {
+        const errorMsg = t('endorse.errors.needApprove', 'Allowance insufficient. Please re-approve the token allowance.')
+        console.error('❌ Final allowance insufficient')
+        throw new Error(errorMsg)
+      }
+
+      console.log('✅ Final allowance check passed')
+
+      // Step 9: Now proceed with endorsement
+      setState('working')
       const result = await endorseVersion(personHash, versionIndex, undefined, { suppressToasts: true })
       setTxHash(result?.hash || result?.transactionHash || null)
       setEndorsementCount((prev) => (prev === null ? 1 : prev + 1))
       setState('success')
       onSuccess?.(result)
     } catch (err: any) {
+      console.error('❌ Endorse flow failed:', err)
       setState('error')
-      const friendly = getFriendlyError(err, t)
-      setErrorMessage(friendly.message)
+      
+      // Check for specific error types
+      const errMsg = err?.message || ''
+      if (errMsg.includes('Insufficient DEEP token balance') || errMsg.includes('insufficient')) {
+        setIsInsufficientBalance(true)
+        setErrorMessage(t('endorse.insufficientBalance', 'Insufficient DEEP balance'))
+      } else if (err?.code === 'ACTION_REJECTED' || err?.code === 4001 || errMsg.includes('user rejected') || errMsg.includes('User denied')) {
+        setErrorMessage(t('endorse.errors.userRejected', 'Transaction was rejected by user'))
+      } else {
+        const friendly = getFriendlyError(err, t)
+        setErrorMessage(friendly.message)
+      }
     }
   }
 
@@ -119,7 +305,26 @@ export default function EndorseCompactModal({
 
   if (!isOpen) return null
 
-  const isProcessing = state === 'working'
+  const isProcessing = state === 'checking' || state === 'approving' || state === 'working'
+
+  // Get status message based on current state
+  const getStatusMessage = () => {
+    switch (state) {
+      case 'checking':
+        return t('endorse.checkingAllowance', 'Checking token allowance...')
+      case 'approving':
+        return t('endorse.approving', 'Approving DEEP tokens...')
+      case 'working':
+        return t('endorse.processing', 'Submitting endorsement...')
+      default:
+        return t('endorse.quickWaiting', 'Preparing endorsement...')
+    }
+  }
+
+  // Check if user can afford endorsement
+  const canAfford = userBalance && endorsementFee 
+    ? parseFloat(userBalance) >= parseFloat(endorsementFee) 
+    : true
 
   return createPortal(
     <div className="fixed inset-0 z-[1300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -167,43 +372,89 @@ export default function EndorseCompactModal({
           )}
         </div>
 
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
-          {state === 'working' && (
-            <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span className="text-sm">{t('endorse.processing', 'Submitting endorsement...')}</span>
+        {/* Token Balance & Fee Info */}
+        {(endorsementFee || userBalance) && (
+          <div className="rounded-xl border border-purple-200 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-900/20 px-4 py-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
+              <Coins className="w-4 h-4" />
+              <span className="font-medium">DEEP {t('endorse.tokenInfo', 'Token Info')}</span>
             </div>
-          )}
-          {state === 'success' && (
-            <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
-              <Check className="w-5 h-5" />
-              <div>
-                <div className="text-sm font-medium">
-                  {t('endorse.success', 'Endorsed successfully')}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {endorsementFee && (
+                <div className="flex flex-col">
+                  <span className="text-gray-500 dark:text-gray-400">{t('endorse.fee', 'Fee')}</span>
+                  <span className="font-mono text-purple-700 dark:text-purple-300">{endorsementFee} DEEP</span>
                 </div>
-                {txHash && (
-                  <code className="block text-xs font-mono text-gray-700 dark:text-gray-200 break-all">
-                    {txHash}
-                  </code>
-                )}
-              </div>
-            </div>
-          )}
-          {state === 'error' && (
-            <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <div className="flex items-center gap-2 flex-wrap text-sm">
-                {errorMessage ? (
-                  <span className="text-gray-700 dark:text-gray-300">{errorMessage}</span>
-                ) : (
-                  <span className="font-medium">
-                    {t('endorse.transactionFailed', 'Transaction failed. Please try again.')}
+              )}
+              {userBalance && (
+                <div className="flex flex-col">
+                  <span className="text-gray-500 dark:text-gray-400">{t('endorse.yourBalance', 'Your Balance')}</span>
+                  <span className={`font-mono ${canAfford ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {userBalance} DEEP
                   </span>
-                )}
+                </div>
+              )}
+            </div>
+            {!canAfford && (
+              <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 mt-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{t('endorse.needMoreTokens', 'You need more DEEP tokens to endorse this version')}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Status panel - only show when not insufficient balance (that's shown above) */}
+        {!(state === 'error' && isInsufficientBalance) && (
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
+            {(state === 'checking' || state === 'approving' || state === 'working') && (
+              <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <div className="flex-1">
+                  <span className="text-sm">{getStatusMessage()}</span>
+                  {state === 'approving' && (
+                    <div className="flex items-center gap-1.5 mt-1 text-xs text-blue-500 dark:text-blue-300">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>{t('endorse.confirmInWallet', 'Please confirm in your wallet')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {state === 'success' && (
+              <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                <Check className="w-5 h-5" />
+                <div>
+                  <div className="text-sm font-medium">
+                    {t('endorse.success', 'Endorsed successfully')}
+                  </div>
+                  {txHash && (
+                    <code className="block text-xs font-mono text-gray-700 dark:text-gray-200 break-all">
+                      {txHash}
+                    </code>
+                  )}
+                </div>
+              </div>
+            )}
+            {state === 'error' && !isInsufficientBalance && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-sm">
+                    <span className="text-gray-700 dark:text-gray-300">{errorMessage || t('endorse.transactionFailed', 'Transaction failed. Please try again.')}</span>
+                  </div>
+                </div>
                 {hasValidTarget && (
                   <button
-                    onClick={triggerEndorse}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 transition"
+                    onClick={() => {
+                      setHasTriggered(false)
+                      setState('idle')
+                      setErrorMessage(null)
+                      setIsInsufficientBalance(false)
+                      // Trigger will happen via useEffect
+                      setTimeout(() => setHasTriggered(false), 0)
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 transition"
                     disabled={isProcessing}
                   >
                     {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -211,14 +462,14 @@ export default function EndorseCompactModal({
                   </button>
                 )}
               </div>
-            </div>
-          )}
-          {state === 'idle' && (
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {t('endorse.quickWaiting', 'Preparing endorsement...')}
-            </div>
-          )}
-        </div>
+            )}
+            {state === 'idle' && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {t('endorse.quickWaiting', 'Preparing endorsement...')}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>,

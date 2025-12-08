@@ -1147,7 +1147,13 @@
     "currentCount": "目前背書數",
     "processing": "正在提交背書...",
     "success": "背書成功",
-    "quickWaiting": "準備背書中..."
+    "quickWaiting": "準備背書中...",
+    "checkingAllowance": "正在檢查代幣授權額度...",
+    "confirmInWallet": "請在錢包中確認",
+    "fee": "費用",
+    "tokenInfo": "代幣資訊",
+    "balanceDetails": "餘額",
+    "required": "所需"
   },
   "transaction": {
     "pending": "交易等待確認中...",

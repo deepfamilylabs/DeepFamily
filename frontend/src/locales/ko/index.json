@@ -1147,7 +1147,13 @@
     "currentCount": "현재 지지 수",
     "processing": "지지 전송 중...",
     "success": "지지 완료",
-    "quickWaiting": "지지 준비 중..."
+    "quickWaiting": "지지 준비 중...",
+    "checkingAllowance": "토큰 승인 한도 확인 중...",
+    "confirmInWallet": "지갑에서 확인해주세요",
+    "fee": "수수료",
+    "tokenInfo": "토큰 정보",
+    "balanceDetails": "잔액",
+    "required": "필요량"
   },
   "transaction": {
     "pending": "트랜잭션 확인 대기 중...",

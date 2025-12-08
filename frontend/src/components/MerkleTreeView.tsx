@@ -58,7 +58,7 @@ function computeLayout(root: GraphNode) {
 function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<MerkleTreeViewHandle>) {
   const { nodes: positioned, width: svgWidth, height: svgHeight } = useMemo(() => computeLayout(root), [root])
   const idToPos = useMemo(() => { const m = new Map<string, PositionedNode>(); for (const pn of positioned) m.set(pn.id, pn); return m }, [positioned])
-  const { nodesData } = useTreeData()
+  const { nodesData, bumpEndorsementCount } = useTreeData()
   const { deduplicateChildren } = useVizOptions()
   const [hoverId, setHoverId] = useState<string | null>(null)
   const { openNode, selected: ctxSelected } = useNodeDetail()
@@ -190,6 +190,9 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
         versionData={{
           fullName: endorseModal.fullName,
           endorsementCount: endorseModal.endorsementCount
+        }}
+        onSuccess={() => {
+          bumpEndorsementCount(endorseModal.personHash, endorseModal.versionIndex, 1)
         }}
       />
     </>

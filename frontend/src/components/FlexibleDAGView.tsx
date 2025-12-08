@@ -26,7 +26,7 @@ function FlexibleDAGViewInner({
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const ctxSelectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
-  const { nodesData } = useTreeData()
+  const { nodesData, bumpEndorsementCount } = useTreeData()
   const { deduplicateChildren } = useVizOptions()
   const [endorseModal, setEndorseModal] = useState<{
     open: boolean
@@ -222,6 +222,9 @@ function FlexibleDAGViewInner({
         versionData={{
           fullName: endorseModal.fullName,
           endorsementCount: endorseModal.endorsementCount
+        }}
+        onSuccess={() => {
+          bumpEndorsementCount(endorseModal.personHash, endorseModal.versionIndex, 1)
         }}
       />
     </div>
