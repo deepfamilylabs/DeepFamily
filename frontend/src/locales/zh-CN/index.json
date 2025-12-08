@@ -433,6 +433,15 @@
       "rpc": "RPC",
       "contract": "合约",
       "root": "根节点哈希",
+      "network": "网络",
+      "selectNetwork": "选择网络",
+      "customNetwork": "自定义网络",
+      "customNetworks": "自定义",
+      "customNetworkName": "网络名称",
+      "chainId": "链 ID",
+      "addCustomNetwork": "保存自定义网络",
+      "addCustomNetworkHint": "填写后保存，可重复使用",
+      "customNetworkAdded": "已添加自定义网络",
       "clearAndRefresh": "清空",
       "strictCacheOnly": "严格只读缓存",
       "strictCacheOn": "离线模式",
@@ -537,7 +546,11 @@
       "rpc": "请输入有效的 RPC 地址",
       "contract": "请输入有效的合约地址 (0x + 40位16进制)",
       "root": "请输入有效的根哈希 (0x + 64位16进制)",
-      "version": "请输入有效的版本序号"
+      "version": "请输入有效的版本序号",
+      "chainIdInvalid": "请输入有效的链 ID",
+      "customNetwork": "请输入网络名称、有效的链 ID 和 RPC URL",
+      "chainIdConflict": "链 ID 已存在于内置网络中",
+      "rpcConflict": "RPC 已存在于内置网络中"
     }
   },
   "common": {
@@ -569,8 +582,19 @@
     "localhost": "本地开发",
     "networks": {
       "confluxEspace": "Conflux eSpace",
-      "confluxEspaceTestnet": "Conflux eSpace 测试网",
-      "localDev": "本地开发网络"
+      "confluxEspaceTestnet": "Conflux eSpace Testnet",
+      "localDev": "Localhost",
+      "ethereum": "Ethereum",
+      "sepolia": "Ethereum Sepolia",
+      "holesky": "Ethereum Holesky",
+      "polygon": "Polygon",
+      "polygonAmoy": "Polygon Amoy",
+      "bsc": "BSC",
+      "bscTestnet": "BSC Testnet",
+      "arbitrum": "Arbitrum One",
+      "arbitrumSepolia": "Arbitrum Sepolia",
+      "optimism": "Optimism",
+      "optimismSepolia": "Optimism Sepolia"
     },
     "networkWillBeAdded": "如果网络不在您的钱包中，将自动添加",
     "chainAdded": "网络添加成功",

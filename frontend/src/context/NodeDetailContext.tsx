@@ -28,7 +28,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
   const [error, setError] = useState<string | null>(null)
   const { nodesData, setNodesData } = useTreeData() as any
   const { includeVersionDetails } = useVizOptions()
-  const { rpcUrl, contractAddress } = useConfig()
+  const { rpcUrl, contractAddress, chainId } = useConfig()
 
   const openNode = useCallback((k: NodeKeyMinimal) => { setSelected(k) }, [])
   const close = useCallback(() => { setSelected(null) }, [])
@@ -47,7 +47,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
       const id = makeNodeId(selected.personHash, selected.versionIndex)
       const nd = nodesData?.[id]
       const needVersion = !nd || nd.addedBy === undefined || nd.fatherHash === undefined || nd.metadataCID === undefined
-      const provider = makeProvider(rpcUrl)
+      const provider = makeProvider(rpcUrl, chainId)
       const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider)
       try {
         setLoading(true)
@@ -154,7 +154,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
     run()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, rpcUrl, contractAddress])
+  }, [selected, rpcUrl, contractAddress, chainId])
   return (
     <Ctx.Provider value={{ open: !!selected, selected, selectedNodeData, loading, error, openNode, close }}>
       {children}

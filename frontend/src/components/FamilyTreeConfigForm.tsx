@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
 import { useTranslation } from 'react-i18next'
 import { useConfig } from '../context/ConfigContext'
@@ -6,6 +6,7 @@ import { formatHashMiddle, shortAddress } from '../types/graph'
 import { Clipboard } from 'lucide-react'
 import { useTreeData } from '../context/TreeDataContext'
 import { useToast } from './ToastProvider'
+import { NETWORK_PRESETS } from '../config/networks'
 
 interface Props {
   editing: boolean
@@ -25,16 +26,42 @@ interface Props {
 }
 
 const LOCALE_NEED_ZH_ROOT = new Set(['ja', 'ko', 'zh-cn', 'zh-tw'])
+const CUSTOM_NETWORKS_KEY = 'ft:customNetworks'
+
+type NetworkOption = {
+  chainId: number
+  name: string
+  rpcUrl: string
+  isCustom?: boolean
+}
 
 export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, deduplicateChildren, setDeduplicateChildren, progress, locale }: Props) {
-  const { t } = useTranslation()
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
+  const { t, i18n } = useTranslation()
+  const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
   const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
+  const [localChainId, setLocalChainId] = useState(chainId)
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress)
   const [localRootHash, setLocalRootHash] = useState(rootHash)
   const [localVersion, setLocalVersion] = useState(rootVersionIndex)
-  const [errors, setErrors] = useState<{ rpc?: string; contract?: string; root?: string }>({})
+  const [errors, setErrors] = useState<{ rpc?: string; chainId?: string; contract?: string; root?: string }>({})
+  const [customNetworks, setCustomNetworks] = useState<NetworkOption[]>(() => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_NETWORKS_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .filter(n => n && typeof n.chainId === 'number' && typeof n.name === 'string' && typeof n.rpcUrl === 'string')
+        .map(n => ({ chainId: n.chainId, name: n.name, rpcUrl: n.rpcUrl, isCustom: true }))
+    } catch {
+      return []
+    }
+  })
+  const [customName, setCustomName] = useState('')
+  const [customChainId, setCustomChainId] = useState<number | ''>('')
+  const [customRpc, setCustomRpc] = useState('')
+  const [customError, setCustomError] = useState<string | null>(null)
   const toast = useToast()
   const copy = async (text: string) => {
     try {
@@ -60,18 +87,48 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
   // sync external changes
   useEffect(() => {
     setLocalRpcUrl(rpcUrl)
+    setLocalChainId(chainId)
     setLocalContractAddress(contractAddress)
     setLocalRootHash(rootHash)
     setLocalVersion(rootVersionIndex)
-  }, [rpcUrl, contractAddress, rootHash, rootVersionIndex])
+  }, [rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex])
 
   // load history when entering edit mode
   useEffect(() => { /* history now from global context; nothing to do here */ }, [editing])
 
   // responsive-only: small screens show shortened text; larger screens show full text
 
+  const presetNetworks = useMemo<NetworkOption[]>(() => (
+    NETWORK_PRESETS.map(n => ({
+      chainId: n.chainId,
+      name: t?.(n.nameKey, n.defaultName) || n.defaultName,
+      rpcUrl: n.rpcUrl
+    }))
+  // Recompute when locale changes
+  ), [t, i18n.language])
+
+  const allNetworks = useMemo<NetworkOption[]>(() => [
+    ...presetNetworks,
+    ...customNetworks
+  ], [presetNetworks, customNetworks])
+
+  const inferNetworkSelection = (rpc: string): number | 'custom' => {
+    const found = allNetworks.find(n => n.rpcUrl === rpc)
+    return found ? found.chainId : 'custom'
+  }
+
+  const [selectedNetwork, setSelectedNetwork] = useState<number | 'custom'>(() => inferNetworkSelection(rpcUrl))
+
+  useEffect(() => {
+    setSelectedNetwork(inferNetworkSelection(localRpcUrl))
+    const found = allNetworks.find(n => n.rpcUrl === localRpcUrl)
+    if (found) setLocalChainId(found.chainId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localRpcUrl, customNetworks, presetNetworks])
+
   const hasDiff = (
     localRpcUrl !== rpcUrl ||
+    localChainId !== chainId ||
     localContractAddress !== contractAddress ||
     localRootHash !== rootHash ||
     localVersion !== rootVersionIndex
@@ -96,6 +153,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
   const resetToDefaults = () => {
     const localized = getLocalizedDefaultRoot()
     setLocalRpcUrl(defaults.rpcUrl)
+    setLocalChainId(defaults.chainId)
     setLocalContractAddress(defaults.contractAddress)
     setLocalRootHash(localized.hash)
     setLocalVersion(localized.version)
@@ -105,6 +163,7 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
     if (!validateAll()) return
     update({
       rpcUrl: localRpcUrl,
+      chainId: localChainId,
       contractAddress: localContractAddress,
       rootHash: localRootHash,
       rootVersionIndex: localVersion,
@@ -137,13 +196,75 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
   const validateAll = () => {
     const next: typeof errors = {}
     if (!isUrl(localRpcUrl)) next.rpc = 'familyTree.validation.rpc'
+    if (!Number.isFinite(localChainId) || (localChainId || 0) <= 0) next.chainId = 'familyTree.validation.chainIdInvalid'
     if (!isAddress(localContractAddress)) next.contract = 'familyTree.validation.contract'
     if (!isHash32(localRootHash)) next.root = 'familyTree.validation.root'
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
-  useEffect(() => { if (editing) validateAll() }, [editing, localRpcUrl, localContractAddress, localRootHash])
+  useEffect(() => { if (editing) validateAll() }, [editing, localRpcUrl, localChainId, localContractAddress, localRootHash])
+
+  const saveCustomNetworks = (list: NetworkOption[]) => {
+    setCustomNetworks(list)
+    try {
+      const serialized = list.map(({ chainId, name, rpcUrl }) => ({ chainId, name, rpcUrl }))
+      localStorage.setItem(CUSTOM_NETWORKS_KEY, JSON.stringify(serialized))
+    } catch {}
+  }
+
+  const addCustomNetwork = () => {
+    setCustomError(null)
+    const chainIdNum = typeof customChainId === 'number' ? customChainId : Number(customChainId)
+    if (!customName.trim() || !Number.isFinite(chainIdNum) || chainIdNum <= 0 || !isUrl(customRpc)) {
+      setCustomError(t('familyTree.validation.customNetwork', 'Please enter network name, valid chain ID, and RPC URL'))
+      return
+    }
+    if (presetNetworks.some(n => n.chainId === chainIdNum)) {
+      setCustomError(t('familyTree.validation.chainIdConflict', 'Chain ID already exists in built-in networks'))
+      return
+    }
+    const trimmedRpc = customRpc.trim()
+    if (presetNetworks.some(n => n.rpcUrl === trimmedRpc)) {
+      setCustomError(t('familyTree.validation.rpcConflict', 'RPC already exists in built-in networks'))
+      return
+    }
+    const newNetwork: NetworkOption = {
+      chainId: chainIdNum,
+      name: customName.trim(),
+      rpcUrl: trimmedRpc,
+      isCustom: true
+    }
+    const filtered = [
+      ...customNetworks.filter(n => n.chainId !== chainIdNum && n.rpcUrl !== trimmedRpc),
+      newNetwork
+    ]
+    saveCustomNetworks(filtered)
+    setLocalRpcUrl(trimmedRpc)
+    setLocalChainId(chainIdNum)
+    setSelectedNetwork(chainIdNum)
+    setCustomName('')
+    setCustomChainId('')
+    setCustomRpc('')
+    toast.show(t('familyTree.config.customNetworkAdded', 'Custom network added'))
+  }
+
+  const handleNetworkChange = (value: string) => {
+    if (value === 'custom') {
+      setSelectedNetwork('custom')
+      setLocalChainId(0)
+      return
+    }
+    const chainId = Number(value)
+    const network = allNetworks.find(n => n.chainId === chainId)
+    if (network) {
+      setSelectedNetwork(chainId)
+      setLocalRpcUrl(network.rpcUrl)
+      setLocalChainId(network.chainId)
+    } else {
+      setSelectedNetwork('custom')
+    }
+  }
 
   // debounce version change (auto apply after 600ms idle, only in non-edit mode)
   useDebounce(localVersion, 600, v => { if (!editing && v !== rootVersionIndex) applyVersion() })
@@ -262,8 +383,73 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
           <div className="flex flex-col lg:flex-row lg:gap-4 gap-4">
             <div className="flex-1">
               <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.rpc')}:</label>
-              <input type="text" value={localRpcUrl} onChange={e => setLocalRpcUrl(e.target.value)} className={`w-full px-3 py-2 text-sm font-mono rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`} />
-              {errors.rpc && <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">{t(errors.rpc, 'RPC format error')}</div>}
+              <div className="space-y-2">
+                <div className="flex flex-col md:flex-row gap-2">
+                  <select
+                    value={selectedNetwork === 'custom' ? 'custom' : String(selectedNetwork)}
+                    onChange={e => handleNetworkChange(e.target.value)}
+                    className="w-full md:w-56 min-w-[190px] px-3 pr-5 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 transition-all duration-200 backdrop-blur-sm shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500"
+                  >
+                    {presetNetworks.map(n => (
+                      <option key={n.chainId} value={n.chainId}>{n.name}</option>
+                    ))}
+                    {customNetworks.length > 0 && (
+                      <optgroup label={t('familyTree.config.customNetworks', 'Custom')}>
+                        {customNetworks.map(n => (
+                          <option key={`custom-${n.chainId}`} value={n.chainId}>{n.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="custom">{t('familyTree.config.customNetwork', 'Custom network')}</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={localRpcUrl}
+                    readOnly
+                    className={`flex-1 px-3 py-2 text-sm font-mono rounded-md border bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? 'border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500' : 'border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500'}`}
+                  />
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{t('familyTree.config.chainId', 'Chain ID')}: {localChainId || t('common.na', 'N/A')}</div>
+                {selectedNetwork === 'custom' && (
+                  <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/50 p-3 space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder={t('familyTree.config.customNetworkName', 'Network name')}
+                        value={customName}
+                        onChange={e => setCustomName(e.target.value)}
+                        className="px-3 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t('familyTree.config.chainId', 'Chain ID')}
+                        value={customChainId}
+                        onChange={e => setCustomChainId(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="px-3 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60"
+                      />
+                      <input
+                        type="text"
+                        placeholder="https://"
+                        value={customRpc}
+                        onChange={e => setCustomRpc(e.target.value)}
+                        className="px-3 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 sm:col-span-1"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {t('familyTree.config.addCustomNetworkHint', 'Fill in and save to reuse later')}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addCustomNetwork}
+                        className="px-3 py-1.5 text-xs rounded-md bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                      >{t('familyTree.config.addCustomNetwork', 'Save custom')}</button>
+                    </div>
+                    {customError && <div className="text-red-500 dark:text-red-400 text-xs font-medium">{customError}</div>}
+                  </div>
+                )}
+                {errors.rpc && <div className="text-red-500 dark:text-red-400 text-xs font-medium">{t(errors.rpc, 'RPC format error')}</div>}
+              </div>
             </div>
             <div className="flex-1">
               <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">{t('familyTree.config.contract')}:</label>

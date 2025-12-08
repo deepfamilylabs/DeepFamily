@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from 'react'
+import { NETWORK_PRESETS } from '../config/networks'
 
 type ConfigValues = {
   rpcUrl: string
   contractAddress: string
   rootHash: string
   rootVersionIndex: number
+  chainId: number
   strictCacheOnly: boolean
 }
 
@@ -26,11 +28,22 @@ function getEnvDefaults(): ConfigValues {
   const rvRaw = (import.meta as any).env.VITE_ROOT_VERSION_INDEX
   let rv = Number(rvRaw)
   if (!Number.isFinite(rv) || rv < 1) rv = 1
+  const inferChainId = () => {
+    const rpc = (import.meta as any).env.VITE_RPC_URL as string
+    if (typeof rpc === 'string') {
+      const normalize = (v: string) => v.trim().toLowerCase().replace(/\/+$/, '')
+      const normalizedRpc = normalize(rpc)
+      const matched = NETWORK_PRESETS.find(p => normalize(p.rpcUrl) === normalizedRpc)
+      if (matched) return matched.chainId
+    }
+    return 0
+  }
   return {
     rpcUrl: (import.meta as any).env.VITE_RPC_URL,
     contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS,
     rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH,
     rootVersionIndex: rv,
+    chainId: inferChainId(),
     strictCacheOnly: false,
   }
 }
@@ -103,13 +116,13 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
 
   const update = (partial: Partial<ConfigValues>) => {
     setState(prev => {
-      const next = { ...prev, ...partial }
-      try {
-        const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly } = next
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly }))
-        if (partial.rootHash && /^0x[a-fA-F0-9]{64}$/.test(partial.rootHash.trim())) {
-          // also record root history globally
-          const normalized = partial.rootHash.trim()
+    const next = { ...prev, ...partial }
+    try {
+      const { rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId, strictCacheOnly } = next
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId, strictCacheOnly }))
+      if (partial.rootHash && /^0x[a-fA-F0-9]{64}$/.test(partial.rootHash.trim())) {
+        // also record root history globally
+        const normalized = partial.rootHash.trim()
           const currentRaw = localStorage.getItem(ROOT_HISTORY_KEY)
           let current: string[] = []
           try { current = currentRaw ? JSON.parse(currentRaw) as string[] : [] } catch { current = [] }
