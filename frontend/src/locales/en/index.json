@@ -1145,6 +1145,7 @@
     "currentCount": "Current endorsements",
     "processing": "Submitting endorsement...",
     "success": "Endorsed successfully",
+    "alreadyEndorsed": "You already endorsed this version",
     "quickWaiting": "Preparing endorsement...",
     "checkingAllowance": "Checking token allowance...",
     "confirmInWallet": "Please confirm in your wallet",
