@@ -556,12 +556,14 @@
   "wallet": {
     "connect": "Connect Wallet",
     "connecting": "Connecting...",
+    "connectDescription": "Connect your wallet to continue",
     "disconnect": "Disconnect",
     "wrongNetwork": "Wrong Network",
     "clickToSwitch": "Click to switch network",
     "switchNetwork": "Switch Network",
     "currentNetwork": "Current network",
     "selectNetworkDesc": "Please select a supported network:",
+    "networkId": "ID: {{chainId}}",
     "mainnet": "Mainnet",
     "testnet": "Testnet",
     "localhost": "Local Dev",
@@ -578,6 +580,8 @@
     "noWallet": "Please install a wallet extension",
     "selectWallet": "Select Wallet",
     "noWalletsFound": "No wallets found",
+    "detected": "Detected",
+    "secureConnection": "Secure connection",
     "installWallet": "Install Wallet",
     "installWalletTitle": "Install a Wallet",
     "installWalletDesc": "To use this application, please install one of the following wallets:",
@@ -597,7 +601,8 @@
     "dontClickOutside": "Don't click outside the wallet popup",
     "checkTaskbar": "Check taskbar if popup disappears",
     "useAltTab": "Use Alt+Tab to find hidden wallet window",
-    "waitForConfirm": "Wait for transaction confirmation before closing"
+    "waitForConfirm": "Wait for transaction confirmation before closing",
+    "securityNote": "Your keys stay in your wallet. We never have access."
   },
   "theme": {
     "switchToLight": "Switch to Light",

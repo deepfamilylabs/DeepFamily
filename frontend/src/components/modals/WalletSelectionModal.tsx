@@ -60,7 +60,7 @@ export default function WalletSelectionModal({
           <button
             onClick={onClose}
             className="absolute right-4 top-4 z-10 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-            aria-label="Close"
+            aria-label={t('common.close', 'Close')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -166,7 +166,7 @@ export default function WalletSelectionModal({
                 {t('wallet.noWalletsFound', 'No wallets found')}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
-                {t('wallet.installWallet', 'Please install a wallet extension like MetaMask or Fluent to continue')}
+                {t('wallet.installWalletDesc', 'Please install a wallet extension like MetaMask or Fluent to continue')}
               </p>
               
               {/* Install buttons */}

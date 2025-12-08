@@ -132,7 +132,7 @@ export default function NetworkSelectionModal({
           <button
             onClick={onClose}
             className="absolute right-4 top-4 z-10 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-            aria-label="Close"
+            aria-label={t('common.close', 'Close')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -153,7 +153,7 @@ export default function NetworkSelectionModal({
                 {t('wallet.switchNetwork', 'Switch Network')}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                {t('wallet.selectNetworkDescription', 'Select a network to connect')}
+                {t('wallet.selectNetworkDesc', 'Select a network to connect')}
               </p>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function NetworkSelectionModal({
                   </div>
                   <div className="flex items-center gap-2 mt-1.5">
                     <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
-                      ID: {network.chainId}
+                      {t('wallet.networkId', 'ID: {{chainId}}', { chainId: network.chainId })}
                     </span>
                     {isActive && (
                       <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">

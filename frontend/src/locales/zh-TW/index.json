@@ -556,12 +556,14 @@
   "wallet": {
     "connect": "連接錢包",
     "connecting": "連接中...",
+    "connectDescription": "連接錢包以繼續",
     "disconnect": "斷開連接",
     "wrongNetwork": "網路錯誤",
     "clickToSwitch": "點擊切換網路",
     "switchNetwork": "切換網路",
     "currentNetwork": "當前網路",
     "selectNetworkDesc": "請選擇一個支持的網路：",
+    "networkId": "網路 ID：{{chainId}}",
     "mainnet": "主網",
     "testnet": "測試網",
     "localhost": "本地開發",
@@ -578,6 +580,8 @@
     "noWallet": "請安裝錢包擴充程式",
     "selectWallet": "選擇錢包",
     "noWalletsFound": "找不到錢包",
+    "detected": "已偵測",
+    "secureConnection": "安全連線",
     "installWallet": "請安裝錢包擴充程式",
     "installWalletTitle": "安裝錢包",
     "installWalletDesc": "要使用此應用，請安裝以下錢包之一：",
@@ -597,7 +601,8 @@
     "dontClickOutside": "不要點擊錢包彈窗外部",
     "checkTaskbar": "如果彈窗消失請檢查任務欄",
     "useAltTab": "使用 Alt+Tab 查找隱藏的錢包窗口",
-    "waitForConfirm": "等待交易確認後再關閉"
+    "waitForConfirm": "等待交易確認後再關閉",
+    "securityNote": "私鑰只保留在您的錢包中，我們無法存取。"
   },
   "theme": {
     "switchToLight": "切換到淺色模式",
