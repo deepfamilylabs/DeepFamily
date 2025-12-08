@@ -27,7 +27,7 @@
     "frontend:preview": "npm run preview --prefix frontend",
     "dev:node": "HARDHAT_DEPLOY_NO_DEPLOY=true hardhat node --hostname 127.0.0.1 --port 8545",
     "dev:deploy": "hardhat deploy --network localhost",
-    "dev:fund": "npx hardhat test scripts/fund-wallet.js --network $npm_config_net",
+    "dev:fund": "npx hardhat test scripts/fund-wallet.js --network localhost",
     "dev:frontend": "npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173",
     "dev:contract": "npm run dev:deploy && npm run seed",
     "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run frontend:config && npm run dev:frontend\"",
