@@ -1147,6 +1147,7 @@
     "currentCount": "현재 지지 수",
     "processing": "지지 전송 중...",
     "success": "지지 완료",
+    "alreadyEndorsed": "이미 이 버전을 지지했습니다",
     "quickWaiting": "지지 준비 중...",
     "checkingAllowance": "토큰 승인 한도 확인 중...",
     "confirmInWallet": "지갑에서 확인해주세요",

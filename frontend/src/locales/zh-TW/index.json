@@ -1147,6 +1147,7 @@
     "currentCount": "目前背書數",
     "processing": "正在提交背書...",
     "success": "背書成功",
+    "alreadyEndorsed": "你已經背書過此版本",
     "quickWaiting": "準備背書中...",
     "checkingAllowance": "正在檢查代幣授權額度...",
     "confirmInWallet": "請在錢包中確認",

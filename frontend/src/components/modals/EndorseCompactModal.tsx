@@ -19,7 +19,7 @@ interface EndorseCompactModalProps {
   onSuccess?: (result: any) => void
 }
 
-type EndorseState = 'idle' | 'checking' | 'approving' | 'working' | 'success' | 'error'
+type EndorseState = 'idle' | 'checking' | 'approving' | 'working' | 'success' | 'already-endorsed' | 'error'
 
 export default function EndorseCompactModal({
   isOpen,
@@ -108,6 +108,17 @@ export default function EndorseCompactModal({
     }
 
     try {
+      // Check existing endorsement before any approval/tx work
+      try {
+        const endorsedIdx = await contract.endorsedVersionIndex(personHash, address)
+        if (Number(endorsedIdx) === Number(versionIndex)) {
+          setState('already-endorsed')
+          return
+        }
+      } catch (checkError) {
+        console.warn('Failed to check existing endorsement status:', checkError)
+      }
+
       setState('checking')
       setErrorMessage(null)
       setIsInsufficientBalance(false)
@@ -421,14 +432,16 @@ export default function EndorseCompactModal({
                 </div>
               </div>
             )}
-            {state === 'success' && (
+            {(state === 'success' || state === 'already-endorsed') && (
               <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
                 <Check className="w-5 h-5" />
                 <div>
                   <div className="text-sm font-medium">
-                    {t('endorse.success', 'Endorsed successfully')}
+                    {state === 'already-endorsed'
+                      ? t('endorse.alreadyEndorsed', 'You already endorsed this version')
+                      : t('endorse.success', 'Endorsed successfully')}
                   </div>
-                  {txHash && (
+                  {state === 'success' && txHash && (
                     <code className="block text-xs font-mono text-gray-700 dark:text-gray-200 break-all">
                       {txHash}
                     </code>

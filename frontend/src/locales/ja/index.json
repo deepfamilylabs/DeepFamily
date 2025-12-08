@@ -1147,6 +1147,7 @@
     "currentCount": "現在のエンドース数",
     "processing": "エンドース送信中...",
     "success": "エンドースに成功",
+    "alreadyEndorsed": "このバージョンはすでにエンドース済みです",
     "quickWaiting": "エンドース準備中...",
     "checkingAllowance": "トークン承認額を確認中...",
     "confirmInWallet": "ウォレットで確認してください",
