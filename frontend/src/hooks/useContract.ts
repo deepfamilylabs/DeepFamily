@@ -106,7 +106,6 @@ export function useContract() {
     }
 
     try {
-      console.log('🔄 Calling contract method...')
 
       // Debug wallet and network state
       if (signer && signer.provider) {
@@ -114,12 +113,6 @@ export function useContract() {
           const network = await signer.provider.getNetwork()
           const signerAddress = await signer.getAddress()
           const balance = await signer.provider.getBalance(signerAddress)
-          console.log('🔍 Wallet state:', {
-            network: network.name || `Chain ID: ${network.chainId}`,
-            signerAddress,
-            balance: ethers.formatEther(balance),
-            providerConnected: !!signer.provider
-          })
         } catch (walletStateError) {
           console.warn('Failed to get wallet state:', walletStateError)
         }
@@ -140,7 +133,6 @@ export function useContract() {
         }, walletTimeout)
       })
 
-      console.log('🏁 Racing between contract call and timeout...')
 
       // Add window focus detection to catch when user switches away
       let windowBlurred = false
@@ -150,7 +142,6 @@ export function useContract() {
       }
       const onFocus = () => {
         if (windowBlurred) {
-          console.log('✅ Window regained focus - user returned')
           windowBlurred = false
         }
       }
@@ -161,7 +152,6 @@ export function useContract() {
       let tx
       try {
         tx = await Promise.race([contractPromise, timeoutPromise])
-        console.log('📤 Transaction sent:', { hash: tx.hash, nonce: tx.nonce })
       } finally {
         window.removeEventListener('blur', onBlur)
         window.removeEventListener('focus', onFocus)
@@ -171,9 +161,7 @@ export function useContract() {
         toast.show(t('transaction.submitted', 'Transaction submitted...'))
       }
 
-      console.log('⏳ Waiting for transaction confirmation...')
       const receipt = await tx.wait()
-      console.log('✅ Transaction confirmed:', { hash: receipt.hash, blockNumber: receipt.blockNumber, status: receipt.status })
 
       const successMsg = options.successMessage || t('transaction.success', 'Transaction successful')
       if (!options.suppressSuccessToast) {
@@ -184,17 +172,6 @@ export function useContract() {
       return receipt
     } catch (error: any) {
       console.error('Transaction failed:', error)
-
-      // Log detailed error information for debugging
-      console.log('Error details:', {
-        code: error.code,
-        action: error.action,
-        reason: error.reason,
-        message: error.message,
-        shortMessage: error.shortMessage,
-        errorInfo: error.info,
-        errorData: error.data
-      })
 
       // Use unified error handling from errors.ts
       const friendly = getFriendlyError(error, t)
@@ -297,32 +274,18 @@ export function useContract() {
     const addPersonArgs = [a, b, c, pub, fatherVersionIndex, motherVersionIndex, tag, metadataCID] as const
 
     // Debug logging
-    console.log('🔍 Contract call parameters:')
-    console.log('  a:', a.map(x => x.toString()))
-    console.log('  b:', b.map(row => row.map(x => x.toString())))
-    console.log('  c:', c.map(x => x.toString()))
-    console.log('  publicSignals:', pub.map(x => x.toString()))
-    console.log('  fatherVersionIndex:', fatherVersionIndex)
-    console.log('  motherVersionIndex:', motherVersionIndex)
-    console.log('  tag:', tag)
-    console.log('  metadataCID:', metadataCID)
 
     // Verify submitter matches signer
     const senderAddress = await signer.getAddress()
     const expectedSubmitter = BigInt(senderAddress)
-    console.log('  Expected submitter:', expectedSubmitter.toString())
-    console.log('  Submitter match:', submitter === expectedSubmitter ? '✅' : '❌ MISMATCH')
 
     try {
-      console.log('🚀 Estimating gas for contract.addPersonZK...')
       let gasLimit: bigint | undefined
 
       // Try to estimate gas, with fallback to 6.5M if estimation fails
       try {
         const gasEstimate = await contract.addPersonZK.estimateGas(...addPersonArgs)
-        console.log('⛽ Estimated gas:', gasEstimate.toString())
         gasLimit = gasEstimate * 120n / 100n
-        console.log('⛽ Gas limit (with 20% buffer):', gasLimit.toString())
       } catch (estimateError: any) {
         console.warn('⚠️ Gas estimation failed, attempting static call and fallback gas limit.', estimateError)
         const decodedReason = extractRevertReason(contract, estimateError)
@@ -334,7 +297,6 @@ export function useContract() {
         try {
           await contract.addPersonZK.staticCall(...addPersonArgs)
           gasLimit = 6_500_000n
-          console.log(`⛽ Static call succeeded after estimate failure; using fallback gas limit: ${gasLimit.toString()}`)
         } catch (staticError: any) {
           const staticReason = extractRevertReason(contract, staticError)
           if (staticReason) {
@@ -344,16 +306,12 @@ export function useContract() {
         }
       }
 
-      console.log('🚀 Calling contract.addPersonZK...')
       const tx = await contract.addPersonZK(...addPersonArgs, gasLimit ? { gasLimit } : {})
-      console.log('✅ Transaction sent successfully:', tx.hash)
 
       toast.show(t('transaction.submitted', 'Transaction submitted...'))
 
       // Wait for transaction confirmation
-      console.log('⏳ Waiting for transaction confirmation...')
       const receipt = await tx.wait()
-      console.log('✅ Transaction confirmed in block:', receipt.blockNumber)
 
       // Parse all events from the transaction receipt
       const events: AddPersonZKResult['events'] = {
@@ -366,13 +324,11 @@ export function useContract() {
       let versionIndex = 0
       let rewardAmount = 0
 
-      console.log(`🔍 Total logs in receipt: ${receipt.logs.length}`)
 
       for (const log of receipt.logs) {
         try {
           const parsedEvent = contract.interface.parseLog(log)
           if (parsedEvent) {
-            console.log(`📊 Event detected: ${parsedEvent.name}`, parsedEvent.args)
 
             switch (parsedEvent.name) {
               case 'PersonHashZKVerified':
@@ -380,7 +336,6 @@ export function useContract() {
                   personHash: parsedEvent.args.personHash,
                   prover: parsedEvent.args.prover
                 }
-                console.log('✅ PersonHashZKVerified:', events.PersonHashZKVerified)
                 break
 
               case 'PersonVersionAdded':
@@ -397,7 +352,6 @@ export function useContract() {
                 }
                 personHash = events.PersonVersionAdded.personHash
                 versionIndex = events.PersonVersionAdded.versionIndex
-                console.log('✅ PersonVersionAdded:', events.PersonVersionAdded)
                 break
 
               case 'TokenRewardDistributed':
@@ -409,31 +363,18 @@ export function useContract() {
                 }
                 // Convert from wei to token units (divide by 10^18)
                 rewardAmount = Number(parsedEvent.args.reward) / Math.pow(10, 18)
-                console.log('🎁 TokenRewardDistributed:', events.TokenRewardDistributed)
-                console.log('💰 Reward amount (converted):', rewardAmount, 'DEEP')
                 break
             }
           }
         } catch {
-          // Log unparseable events for debugging
-          console.log('🔍 Unparseable log:', {
-            address: log.address,
-            topics: log.topics,
-            data: log.data
-          })
           continue
         }
       }
 
-      console.log('📊 All events parsed:', events)
 
       // Additional debugging for TokenRewardDistributed
       if (!events.TokenRewardDistributed) {
-        console.log('⚠️ No TokenRewardDistributed event found')
         if (events.PersonVersionAdded) {
-          console.log('🔍 Father hash:', events.PersonVersionAdded.fatherHash)
-          console.log('🔍 Mother hash:', events.PersonVersionAdded.motherHash)
-          console.log('💡 Token reward requires both parent hashes to exist in system')
         }
       }
 
@@ -538,46 +479,28 @@ export function useContract() {
   ) => {
     return executeTransaction(
       async () => {
-        console.log('🎯 About to call contract.endorseVersion with:', {
-          personHash,
-          versionIndex,
-          overrides,
-          hasContract: !!contract,
-          contractAddress: contract?.target || contract?.address,
-          signerAddress: (contract?.runner as any)?.address || 'unknown'
-        })
-
         // Check if we can call view functions first
         try {
-          console.log('🔍 Testing contract connectivity...')
           const testReward = await contract!.DEEP_FAMILY_TOKEN_CONTRACT()
-          console.log('✅ Contract connectivity test passed:', testReward)
         } catch (connectivityError) {
           console.error('❌ Contract connectivity test failed:', connectivityError)
           throw new Error(`Contract connectivity issue: ${(connectivityError as any)?.message || connectivityError}`)
         }
 
         if (overrides && Object.keys(overrides).length > 0) {
-          console.log('📋 Calling endorseVersion with overrides:', overrides)
 
           // Try to estimate gas first to catch issues early
           try {
-            console.log('⛽ Estimating gas for endorseVersion...')
             const gasEst = await contract!.endorseVersion.estimateGas(personHash, versionIndex, overrides)
-            console.log('⛽ Gas estimation successful:', gasEst.toString())
           } catch (gasError) {
             console.error('❌ Gas estimation failed:', gasError)
             // Don't throw here, just log - sometimes gas estimation fails but actual call works
           }
 
-          console.log('🚀 Making actual endorseVersion call...')
           const result = await contract!.endorseVersion(personHash, versionIndex, overrides)
-          console.log('✅ endorseVersion with overrides completed')
           return result
         } else {
-          console.log('📋 Calling endorseVersion without overrides...')
           const result = await contract!.endorseVersion(personHash, versionIndex)
-          console.log('✅ endorseVersion without overrides completed')
           return result
         }
       },

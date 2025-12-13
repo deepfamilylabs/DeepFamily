@@ -495,8 +495,6 @@ export default function MintNFTModal({
       deathDay: data.deathDay === '' || data.deathDay === undefined ? 0 : Number(data.deathDay),
     }
 
-    console.log('🚀 Starting mint NFT process...')
-
     try {
       setProofGenerationStep(t('mintNFT.preparingProof', 'Preparing proof inputs...'))
 
@@ -534,17 +532,11 @@ export default function MintNFTModal({
         }
       }
 
-      console.log('Full name keccak256:', nameBinding.nameHex)
-      console.log('Passphrase keccak256:', nameBinding.saltHex)
-      console.log('Poseidon digest:', nameBinding.digestHex)
-
       setProofGenerationStep(t('mintNFT.generatingProof', 'Generating zero-knowledge proof... (this may take 30-60 seconds)'))
       if (!address) {
         throw new Error(t('mintNFT.walletRequired', 'Wallet connection required to mint'))
       }
       const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(normalizedFullName, passphrase, address)
-      console.log('🔒 Generated name poseidon proof:', generatedProof)
-      console.log('🔒 Generated public signals:', publicSignals)
 
       setProofGenerationStep(t('mintNFT.verifyingProof', 'Verifying zero-knowledge proof...'))
       const isProofValid = await verifyNamePoseidonProof(generatedProof, publicSignals)
@@ -591,14 +583,6 @@ export default function MintNFTModal({
         }
       } catch {}
 
-      console.log('📞 Calling mintPersonNFT with:', {
-        personHash: finalPersonHash,
-        versionIndex: finalVersionIndex,
-        tokenURI: processedData.tokenURI || '',
-        coreInfo,
-        proof
-      })
-
       const receipt = await mintPersonNFT(
         proof,
         finalPersonHash,
@@ -607,11 +591,7 @@ export default function MintNFTModal({
         coreInfo as any
       )
 
-      console.log('✅ mintPersonNFT returned:', receipt)
-
       if (receipt) {
-        console.log('🎉 NFT minted successfully:', receipt)
-        
         // Extract event data from receipt logs
         let mintedEvent = null
         try {
@@ -661,18 +641,6 @@ export default function MintNFTModal({
       }
     } catch (error: any) {
       console.error('❌ Mint NFT failed:', error)
-      console.log('🔍 Error details:', {
-        message: error?.message,
-        parsedMessage: error?.parsedMessage,
-        code: error?.code,
-        data: error?.data,
-        reason: error?.reason,
-        errorName: error?.errorName,
-        customError: error?.customError,
-        info: error?.info,
-        shortMessage: error?.shortMessage,
-        toString: error?.toString?.()
-      })
 
       const friendly = getFriendlyError(error, t)
 

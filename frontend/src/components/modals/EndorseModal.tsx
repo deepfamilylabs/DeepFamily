@@ -314,11 +314,9 @@ export default function EndorseModal({
 
     // Log retry attempts
     if (isRetry) {
-      console.log('🔄 Retrying endorsement transaction...')
     }
 
     try {
-      console.log('🔄 Starting endorsement process for:', targetPersonHash, 'version:', targetVersionIndex)
       
       // Early success if already endorsed the same version; skip approvals entirely
       try {
@@ -334,20 +332,13 @@ export default function EndorseModal({
       } catch {}
 
       // Ensure ERC20 allowance for endorsement fee
-      console.log('🔍 Starting allowance check process...')
       if (!contract || !deepTokenAddress || !signer) {
         console.error('❌ Contract not ready:', { contract: !!contract, deepTokenAddress, signer: !!signer })
         throw new Error('Contract not ready')
       }
       const spender = await contract.getAddress()
-      console.log('📝 Spender address:', spender)
 
       // IMPORTANT: Double-check if this is really a fresh wallet connection
-      console.log('🔍 Wallet verification:', {
-        userAddress: address,
-        claimsToBeNewConnection: 'User says they cleared all approvals and reconnected',
-        timeToVerify: new Date().toISOString()
-      })
       const tokenContract = new ethers.Contract(
         deepTokenAddress,
         [
@@ -362,29 +353,13 @@ export default function EndorseModal({
       // Re-fetch latest fee (it may change dynamically)
       const latestFee: bigint = await tokenContract.recentReward()
       const required: bigint = latestFee > 0n ? latestFee : deepTokenFeeRaw
-      console.log('💰 Fee details:', { latestFee: latestFee.toString(), required: required.toString(), deepTokenFeeRaw: deepTokenFeeRaw.toString() })
       
       const currentAllowance: bigint = await tokenContract.allowance(address, spender)
-      console.log('🔐 Allowance check:', {
-        currentAllowance: currentAllowance.toString(),
-        currentAllowanceFormatted: ethers.formatUnits(currentAllowance, deepTokenDecimals),
-        required: required.toString(),
-        requiredFormatted: ethers.formatUnits(required, deepTokenDecimals),
-        needsApproval: currentAllowance < required,
-        spender: spender,
-        tokenHolder: address
-      })
 
       // Check user's DEEP token balance before proceeding
       let userBalance: bigint = 0n
       try {
         userBalance = await tokenContract.balanceOf(address)
-        console.log('💰 Current token balance:', {
-          balance: userBalance.toString(),
-          formatted: ethers.formatUnits(userBalance, deepTokenDecimals),
-          required: ethers.formatUnits(required, deepTokenDecimals),
-          sufficient: userBalance >= required
-        })
       } catch (balanceError) {
         console.warn('Failed to check token balance:', balanceError)
       }
@@ -395,23 +370,10 @@ export default function EndorseModal({
         if (userBalance < required) {
           throw new Error(`Insufficient DEEP token balance: have ${ethers.formatUnits(userBalance, deepTokenDecimals)}, need ${ethers.formatUnits(required, deepTokenDecimals)}`)
         }
-        console.log('🔍 Analysis: Previous endorsement likely consumed all allowance. This is normal ERC20 behavior.')
       } else if (currentAllowance > 0n) {
-        console.log('✅ Existing allowance found:', {
-          allowance: ethers.formatUnits(currentAllowance, deepTokenDecimals),
-          source: 'Likely from previous approval or token reward from adding family data'
-        })
       }
 
-      console.log('🎯 Approval decision point:', {
-        currentAllowance: currentAllowance.toString(),
-        required: required.toString(),
-        needsApproval: currentAllowance < required,
-        aboutToEnterApproval: currentAllowance < required
-      })
-
       if (currentAllowance < required) {
-        console.log('🚀 ENTERING APPROVAL FLOW - allowance insufficient')
         setIsApproving(true)
 
         // Log comprehensive approval transaction data before sending
@@ -429,29 +391,19 @@ export default function EndorseModal({
         try {
           if (signer && signer.provider) {
             approvalData.nonce = await signer.provider.getTransactionCount(address, 'pending')
-            console.log('📊 Current nonce for approval:', approvalData.nonce)
           } else if (signer && typeof signer.getNonce === 'function') {
             approvalData.nonce = await signer.getNonce()
-            console.log('📊 Current nonce for approval (fallback):', approvalData.nonce)
           }
         } catch (error) {
           console.warn('Failed to get nonce for approval:', error)
         }
 
-        console.log('📝 Token approval transaction data:', approvalData)
 
         let tx
         try {
           {
             // Use direct approve for exact amount (safer than unlimited approval)
             // This is more reliable than increaseAllowance for precise amount approval
-            console.log('📝 Using direct approve for exact amount:', {
-              required: required.toString(),
-              requiredFormatted: ethers.formatUnits(required, deepTokenDecimals),
-              currentAllowance: currentAllowance.toString(),
-              reason: 'Exact amount approval for user safety'
-            })
-
             try {
               tx = await tokenContract.approve(spender, required)
             } catch (approveError) {
@@ -459,7 +411,6 @@ export default function EndorseModal({
               // Fallback: try increaseAllowance if approve fails
               const delta = required - currentAllowance
               if (delta > 0n) {
-                console.log('📈 Fallback: Using increaseAllowance with delta:', delta.toString())
                 tx = await tokenContract.increaseAllowance(spender, delta)
               } else {
                 throw approveError
@@ -476,46 +427,9 @@ export default function EndorseModal({
         try {
           const receipt = await tx.wait()
 
-          // Log complete approval transaction details including receipt data
-          const completeApprovalLog = {
-            ...approvalData,
-            actualApprovalAmount:
-              (tx.data?.includes('increaseAllowance') ? (required - currentAllowance).toString() : required.toString()),
-            receipt: {
-              transactionHash: receipt.hash || receipt.transactionHash,
-              blockNumber: receipt.blockNumber,
-              blockHash: receipt.blockHash,
-              transactionIndex: receipt.transactionIndex,
-              gasUsed: receipt.gasUsed?.toString(),
-              effectiveGasPrice: receipt.effectiveGasPrice?.toString(),
-              cumulativeGasUsed: receipt.cumulativeGasUsed?.toString(),
-              status: receipt.status,
-              statusSuccess: receipt.status === 1,
-              logs: receipt.logs?.length || 0,
-              confirmations: receipt.confirmations,
-              rawReceipt: receipt
-            },
-            gasDetails: {
-              gasUsed: receipt.gasUsed?.toString(),
-              effectiveGasPrice: receipt.effectiveGasPrice?.toString(),
-              gasCost: receipt.gasUsed && receipt.effectiveGasPrice ?
-                (receipt.gasUsed * receipt.effectiveGasPrice).toString() : undefined
-            },
-            completedAt: new Date().toISOString()
-          }
-
-          console.log('✅ Token approval completed with receipt:', completeApprovalLog)
-
           // Immediately verify the approval was successful
-          console.log('🔍 Immediately checking allowance after approval...')
           try {
             const immediateAllowance = await tokenContract.allowance(address, spender)
-            console.log('📊 Immediate post-approval allowance:', {
-              allowance: immediateAllowance.toString(),
-              formatted: ethers.formatUnits(immediateAllowance, deepTokenDecimals),
-              expected: required.toString(),
-              matches: immediateAllowance >= required
-            })
           } catch (immediateCheckError) {
             console.error('❌ Failed to check immediate allowance:', immediateCheckError)
           }
@@ -525,22 +439,18 @@ export default function EndorseModal({
         }
         // Wait for blockchain state to be updated after approval transaction
         // This is crucial for the final allowance check to pass
-        console.log('⏳ Waiting for blockchain state to update after approval...')
         let postAllowance: bigint = currentAllowance
         let retryCount = 0
         const maxRetries = 32
 
         while (retryCount < maxRetries && postAllowance < required) {
           const waitTime = Math.min(500 + (retryCount * 300), 2000) // 500ms, 800ms, 1100ms, 1400ms, 1700ms, 2000ms...
-          console.log(`🔍 Post-approval check attempt ${retryCount + 1}/${maxRetries}, waiting ${waitTime}ms...`)
 
           try {
             await new Promise(resolve => setTimeout(resolve, waitTime))
             postAllowance = await tokenContract.allowance(address, spender)
-            console.log(`📊 Post-approval allowance attempt ${retryCount + 1}: ${ethers.formatUnits(postAllowance, deepTokenDecimals)} (need: ${ethers.formatUnits(required, deepTokenDecimals)})`)
 
             if (postAllowance >= required) {
-              console.log(`✅ Post-approval allowance sufficient after ${retryCount + 1} attempts`)
               break
             }
           } catch (error) {
@@ -549,14 +459,11 @@ export default function EndorseModal({
 
           retryCount++
         }
-        console.log('✅ APPROVAL FLOW COMPLETED')
         setIsApproving(false)
       } else {
-        console.log('⏭️ SKIPPING APPROVAL - sufficient allowance exists')
       }
 
       // Final allowance check before endorseVersion call
-      console.log('🔍 Final allowance check before endorseVersion...')
       let finalAllowance: bigint = 0n
       let finalRequired: bigint = 0n
 
@@ -564,31 +471,22 @@ export default function EndorseModal({
         finalAllowance = await tokenContract.allowance(address, spender)
         finalRequired = await tokenContract.recentReward()
 
-        console.log('🔐 Final allowance status:', {
-          finalAllowance: ethers.formatUnits(finalAllowance, deepTokenDecimals),
-          finalRequired: ethers.formatUnits(finalRequired, deepTokenDecimals),
-          sufficient: finalAllowance >= finalRequired
-        })
-
         if (finalAllowance < finalRequired) {
           const errorMsg = `Final allowance check failed: have ${ethers.formatUnits(finalAllowance, deepTokenDecimals)}, need ${ethers.formatUnits(finalRequired, deepTokenDecimals)}`
           console.error('❌ Final allowance insufficient:', errorMsg)
           throw new Error(errorMsg)
         }
 
-        console.log('✅ Final allowance check passed')
       } catch (checkError) {
         console.error('❌ Final allowance check failed:', checkError)
         throw checkError
       }
 
       // Preflight: staticCall to catch reverts before wallet pops (ethers v6)
-      console.log('🔍 Running preflight check...')
       try {
         const fn: any = (contract as any)?.endorseVersion?.staticCall
         if (typeof fn === 'function') {
           await fn(targetPersonHash!, targetVersionIndex!)
-          console.log('✅ Preflight check passed')
         } else {
           console.warn('⚠️ staticCall not available, skipping preflight check')
         }
@@ -617,7 +515,6 @@ export default function EndorseModal({
         try {
           // Clear any pending/pseudo-error state
           setErrorResult(null)
-          console.log('📋 endorseVersion result:', result)
           // Extract event data from receipt
           let endorsedEvent: any = null
           try {
@@ -677,37 +574,18 @@ export default function EndorseModal({
         }
       }
 
-      console.log('🚀 Calling endorseVersion with overrides:', overrides)
-
-      // Log comprehensive transaction data before sending
-      const transactionData: any = {
-        personHash: targetPersonHash!,
-        versionIndex: targetVersionIndex!,
-        endorser: address,
-        endorsementFee: deepTokenFee,
-        feeRecipient: feeRecipient,
-        userBalance: userDeepBalance,
-        overrides: overrides,
-        timestamp: new Date().toISOString()
-      }
 
       // Get nonce from signer if available - use 'pending' to get latest nonce including pending transactions
       let nonce: number | undefined
       try {
         if (signer && signer.provider) {
           nonce = await signer.provider.getTransactionCount(address, 'pending')
-          transactionData.nonce = nonce
-          console.log('📊 Current nonce for endorsement:', nonce)
         } else if (signer && typeof signer.getNonce === 'function') {
           nonce = await signer.getNonce()
-          transactionData.nonce = nonce
-          console.log('📊 Current nonce for endorsement (fallback):', nonce)
         }
       } catch (error) {
         console.warn('Failed to get nonce:', error)
       }
-
-      console.log('📊 Complete endorsement transaction data:', transactionData)
 
       const endorsePromise = endorseVersion(targetPersonHash!, targetVersionIndex!, overrides)
 
@@ -728,9 +606,7 @@ export default function EndorseModal({
 
       let result: any = null
       try {
-        console.log('⏳ Waiting for endorseVersion promise...')
         result = await endorsePromise
-        console.log('✅ endorseVersion promise resolved:', result)
       } catch (endorseError: any) {
         console.error('❌ endorseVersion promise rejected:', endorseError)
         clearTimeout(timeout)
@@ -753,38 +629,8 @@ export default function EndorseModal({
         return
       }
 
-      console.log('📋 endorseVersion result:', result)
 
       if (result) {
-        console.log('🎉 Endorsement successful:', result)
-
-        // Log complete transaction details including receipt data
-        const completeTransactionLog = {
-          ...transactionData,
-          receipt: {
-            transactionHash: result.hash || result.transactionHash,
-            blockNumber: result.blockNumber,
-            blockHash: result.blockHash,
-            transactionIndex: result.transactionIndex,
-            gasUsed: result.gasUsed?.toString(),
-            effectiveGasPrice: result.effectiveGasPrice?.toString(),
-            cumulativeGasUsed: result.cumulativeGasUsed?.toString(),
-            status: result.status,
-            logs: result.logs?.length || 0,
-            confirmations: result.confirmations
-          },
-          gasDetails: {
-            gasLimit: overrides.gasLimit?.toString(),
-            gasUsed: result.gasUsed?.toString(),
-            effectiveGasPrice: result.effectiveGasPrice?.toString(),
-            gasCost: result.gasUsed && result.effectiveGasPrice ?
-              (result.gasUsed * result.effectiveGasPrice).toString() : undefined
-          },
-          completedAt: new Date().toISOString()
-        }
-
-        console.log('📊 Complete transaction log with receipt:', completeTransactionLog)
-
         const updatedCount = currentEndorsementCount + 1
         applySuccessFromReceipt(result)
         // Notify parent with latest endorsement count for node refresh
@@ -801,22 +647,6 @@ export default function EndorseModal({
       }
     } catch (error: any) {
       console.error('❌ Endorse failed:', error)
-
-      // Log comprehensive error details for debugging
-      console.log('Comprehensive error analysis:', {
-        errorType: typeof error,
-        errorCode: error.code,
-        errorAction: error.action,
-        errorReason: error.reason,
-        errorMessage: error.message,
-        shortMessage: error.shortMessage,
-        isUserRejection: error.code === 'ACTION_REJECTED' || error.code === 4001 ||
-                        error.message?.includes('user rejected') ||
-                        error.message?.includes('User denied'),
-        hasInfo: !!error.info,
-        hasData: !!error.data,
-        stack: error.stack?.substring(0, 500) // Truncated stack trace
-      })
 
       const friendly = getFriendlyError(error, t)
       setErrorResult({
@@ -877,7 +707,7 @@ export default function EndorseModal({
 
   const canAffordEndorsement = parseFloat(userDeepBalance) >= parseFloat(deepTokenFee)
 
-    if (!isOpen) return null
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={isDesktop ? undefined : handleClose} style={{ touchAction: 'pan-y' }}>

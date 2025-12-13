@@ -188,24 +188,10 @@ export async function generatePersonProof(
       submitter: BigInt(submitterAddress).toString()
     }
 
-    console.log('📊 Circuit input prepared:', {
-      fullNameHashLength: input.fullNameHash.length,
-      saltHashLength: input.saltHash.length,
-      hasFather: input.hasFather,
-      hasMother: input.hasMother,
-      submitterLength: input.submitter.length,
-      submitter: input.submitter
-    })
-
     const { wasm, zkey } = await loadPersonHashArtifacts()
 
     // Generate proof using snarkjs
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey)
-
-    console.log('🔍 Generated proof object:', proof)
-    console.log('🔍 Generated publicSignals:', publicSignals)
-    console.log('🔍 Proof type:', typeof proof)
-    console.log('🔍 Proof keys:', Object.keys(proof || {}))
 
     return { proof, publicSignals }
   } catch (error) {
