@@ -970,6 +970,7 @@
     "encryptionPassword": "메타데이터 암호화 비밀번호(AES-GCM, 로컬 암호화)",
     "encryptionHint": "체인에는 암호화된 CID만 저장됩니다",
     "usePassphraseForEncryption": "메타데이터 암호화에 신원 패스프레이즈 사용",
+    "passphraseMissingForEncryption": "신원 패스프레이즈가 비어 있습니다. 아래에 암호화 비밀번호를 입력하거나 위에서 패스프레이즈를 설정해주세요.",
     "encryptionPasswordAuto": "메타데이터 CID는 신원 패스프레이즈를 재사용합니다. 별도 비밀번호를 쓰려면 토글을 끄세요.",
     "encryptionPasswordPlaceholder": "최소 8자 이상",
     "encryptionPasswordConfirm": "비밀번호 확인",
@@ -1037,6 +1038,7 @@
     "timestamp": "타임스탬프",
     "mintingDesc": "블록체인에서 독특한 NFT를 생성하는 중...",
     "processing": "처리 중...",
+    "preparingProof": "증명 입력 준비 중...",
     "generatingProof": "영지식 증명 생성 중...",
     "verifyingProof": "영지식 증명 검증 중...",
     "proofVerified": "영지식 증명이 검증되었습니다. 트랜잭션 제출 중...",
@@ -1048,6 +1050,7 @@
     "errorMessage": "오류 메시지",
     "errorDetails": "상세 정보",
     "eventDetails": "이벤트 세부정보",
+    "transactionInfo": "트랜잭션 정보",
     "validation": {
       "birthPlaceTooLong": "출생지가 너무 깁니다",
       "deathPlaceTooLong": "사망지가 너무 깁니다",

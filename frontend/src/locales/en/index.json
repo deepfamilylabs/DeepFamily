@@ -970,6 +970,7 @@
     "encryptionPassword": "Metadata Encryption Password (AES-GCM, local encryption)",
     "encryptionHint": "Only encrypted CID stored on-chain",
     "usePassphraseForEncryption": "Use identity passphrase for metadata encryption",
+    "passphraseMissingForEncryption": "Identity passphrase is empty. Please enter an encryption password below or set a passphrase above.",
     "encryptionPasswordAuto": "Metadata CID will reuse the identity passphrase. Turn off the toggle to set a separate password.",
     "encryptionPasswordPlaceholder": "At least 8 characters",
     "encryptionPasswordConfirm": "Confirm password",
@@ -1037,6 +1038,7 @@
     "timestamp": "Timestamp",
     "mintingDesc": "Creating your unique NFT on the blockchain...",
     "processing": "Processing...",
+    "preparingProof": "Preparing proof inputs...",
     "generatingProof": "Generating zero-knowledge proof...",
     "verifyingProof": "Verifying zero-knowledge proof...",
     "proofVerified": "Zero-knowledge proof verified. Submitting transaction...",
@@ -1048,6 +1050,7 @@
     "errorMessage": "Message",
     "errorDetails": "Details",
     "eventDetails": "Event Details",
+    "transactionInfo": "Transaction Info",
     "validation": {
       "birthPlaceTooLong": "Birth place is too long",
       "deathPlaceTooLong": "Death place is too long",

@@ -970,6 +970,7 @@
     "encryptionPassword": "元資料加密口令（AES-GCM，本地加密）",
     "encryptionHint": "鏈上只存密文 CID",
     "usePassphraseForEncryption": "使用身分口令加密元資料",
+    "passphraseMissingForEncryption": "身分口令為空。請在下方輸入加密口令，或在上方填寫身分口令。",
     "encryptionPasswordAuto": "元資料 CID 將沿用身分口令，關閉開關可設定獨立口令。",
     "encryptionPasswordPlaceholder": "至少 8 位口令",
     "encryptionPasswordConfirm": "再次輸入口令",
@@ -1037,6 +1038,7 @@
     "timestamp": "時間戳",
     "mintingDesc": "正在區塊鏈上創建您的獨特 NFT...",
     "processing": "處理中...",
+    "preparingProof": "準備證明輸入...",
     "generatingProof": "生成零知識證明...",
     "verifyingProof": "驗證零知識證明...",
     "proofVerified": "零知識證明已驗證。正在提交交易...",
@@ -1048,6 +1050,7 @@
     "errorMessage": "錯誤訊息",
     "errorDetails": "詳細資訊",
     "eventDetails": "事件詳情",
+    "transactionInfo": "交易資訊",
     "validation": {
       "birthPlaceTooLong": "出生地過長",
       "deathPlaceTooLong": "死亡地過長",

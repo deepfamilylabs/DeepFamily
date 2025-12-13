@@ -233,6 +233,8 @@ export default function AddVersionModal({
   const fatherStatus = getParentInfoStatus('father')
   const motherStatus = getParentInfoStatus('mother')
   const allConsentsChecked = consents.hash && consents.age && consents.legal
+  const hasPersonPassphrase = !!(personInfo?.passphrase && personInfo.passphrase.length > 0)
+  const showManualEncryptionInputs = !usePersonPassphraseForEncryption || !hasPersonPassphrase
 
   // Initialize states if existing data is provided (e.g., from another page)
   useEffect(() => {
@@ -987,15 +989,13 @@ export default function AddVersionModal({
                   <span>{t('addVersion.usePassphraseForEncryption', 'Use identity passphrase for metadata encryption')}</span>
                 </label>
               </div>
-              {usePersonPassphraseForEncryption ? (
-                <div className="space-y-1 text-[11px] text-gray-700 dark:text-gray-200">
-                  <p className="text-amber-800 dark:text-amber-200">{t('addVersion.encryptionNotice', 'Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.')}</p>
-                  {encryptionError && (
-                    <p className="text-xs text-red-600 dark:text-red-300">{encryptionError}</p>
-                  )}
-                </div>
-              ) : (
+              {showManualEncryptionInputs ? (
                 <>
+                  {usePersonPassphraseForEncryption && !hasPersonPassphrase && (
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      {t('addVersion.passphraseMissingForEncryption', 'Identity passphrase is empty. Please enter an encryption password below or set a passphrase above.')}
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="relative">
                       <input
@@ -1051,6 +1051,13 @@ export default function AddVersionModal({
                     {t('addVersion.encryptionNotice', 'Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.')}
                   </p>
                 </>
+              ) : (
+                <div className="space-y-1 text-[11px] text-gray-700 dark:text-gray-200">
+                  <p className="text-amber-800 dark:text-amber-200">{t('addVersion.encryptionNotice', 'Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.')}</p>
+                  {encryptionError && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{encryptionError}</p>
+                  )}
+                </div>
               )}
             </div>
             <div>
