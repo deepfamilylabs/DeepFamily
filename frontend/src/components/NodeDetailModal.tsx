@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
 import EndorseCompactModal from './modals/EndorseCompactModal'
 
-
 export default function NodeDetailModal({
   open,
   onClose,
@@ -195,7 +194,7 @@ export default function NodeDetailModal({
     window.setTimeout(() => setCenterHint(null), 1200)
   }
 
-  return createPortal(
+  const modal = createPortal(
     <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={handleClose} style={{ touchAction: 'pan-y' }}>
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div
@@ -337,8 +336,35 @@ export default function NodeDetailModal({
             <Row label={t('familyTree.nodeDetail.motherVersion')} value={(nodeData && Number(nodeData.motherVersionIndex) > 0) ? String(nodeData.motherVersionIndex) : '-'} color="pink" />
             <Row label={t('familyTree.nodeDetail.addedBy')} value={<SmartAddress text={nodeData?.addedBy} />} copy={nodeData?.addedBy} color="emerald" />
             <Row label={t('familyTree.nodeDetail.timestamp')} value={formatUnixSeconds(nodeData?.timestamp)} color="amber" />
-            <Row label={t('familyTree.nodeDetail.tag')} value={nodeData?.tag || '-'} color="slate" />
-            <Row label={t('familyTree.nodeDetail.cid')} value={nodeData?.metadataCID || '-'} copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined} color="slate" />
+            <Row
+              label={t('familyTree.nodeDetail.tag')}
+              value={nodeData?.tag || '-'}
+              color="slate"
+            />
+            <Row
+              label={t('familyTree.nodeDetail.cid')}
+              value={
+                <div className="flex items-center gap-2">
+                        <span className="block break-all">{nodeData?.metadataCID || '-'}</span>
+                        {nodeData?.metadataCID && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const cid = nodeData?.metadataCID || ''
+                              if (!cid) return
+                              navigate(`/decrypt?cid=${encodeURIComponent(cid)}`)
+                            }}
+                            className="px-2 py-1 text-[12px] rounded-md border border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
+                          >
+                            {t('familyTree.nodeDetail.decrypt', 'Decrypt and View')}
+                          </button>
+                  )}
+                </div>
+              }
+              copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined}
+              color="slate"
+            />
             {/* NFT Section - only when NFT exists */}
             {hasNFT && (
               <div className="pt-4">
@@ -393,4 +419,6 @@ export default function NodeDetailModal({
     </div>,
     document.body
   )
+
+  return modal
 }

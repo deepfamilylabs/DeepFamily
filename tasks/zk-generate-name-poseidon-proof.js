@@ -1,9 +1,12 @@
 const { task } = require("hardhat/config");
 const fs = require("fs");
 const path = require("path");
-const { keccak256, getBytes, toUtf8Bytes, getAddress } = require("ethers");
+const { keccak256, getBytes, getAddress } = require("ethers");
+const { TextEncoder } = require("util");
+const { normalizeNameForHash, normalizePassphraseForHash } = require("../lib/namePoseidon");
 
 const ZERO_BYTES32 = Object.freeze(new Array(32).fill(0));
+const textEncoder = new TextEncoder();
 
 const DEFAULT_WASM_CANDIDATES = [
   path.join(__dirname, "../circuits/name_poseidon_zk_js/name_poseidon_zk.wasm"),
@@ -17,7 +20,7 @@ const DEFAULT_ZKEY_CANDIDATES = [
 ];
 
 function keccakUtf8Bytes(value) {
-  const bytes = getBytes(keccak256(toUtf8Bytes(value)));
+  const bytes = getBytes(keccak256(textEncoder.encode(value)));
   return Array.from(bytes);
 }
 
@@ -66,12 +69,14 @@ function normaliseMinter(minter, fallback = "") {
 }
 
 function buildNamePoseidonInput(fullName, passphrase, minter) {
-  if (typeof fullName !== "string" || fullName.trim().length === 0) {
+  const normalizedName = normalizeNameForHash(fullName);
+  const normalizedPassphrase = normalizePassphraseForHash(
+    typeof passphrase === "string" ? passphrase : "",
+  );
+
+  if (typeof fullName !== "string" || normalizedName.length === 0) {
     throw new Error("Full name must be a non-empty string");
   }
-
-  const normalizedName = fullName.trim();
-  const normalizedPassphrase = typeof passphrase === "string" ? passphrase : "";
 
   return {
     fullNameHash: keccakUtf8Bytes(normalizedName),

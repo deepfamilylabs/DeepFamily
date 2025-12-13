@@ -17,6 +17,7 @@ import {
   formatGroth16ProofForContract,
   toBigIntArray
 } from '../../lib/zk'
+import { normalizeNameForHash, normalizePassphraseForHash } from '../../lib/passphraseStrength'
 
 // Simple themed select component (from PersonHashCalculator)
 const ThemedSelect: React.FC<{
@@ -103,10 +104,16 @@ const splitToLimbs = (hex: string) => {
   }
 }
 
+const textEncoder = new TextEncoder()
+
 const computeNameBinding = (fullName: string, passphrase: string) => {
-  const trimmedName = fullName.trim()
-  const nameHex = ethers.keccak256(ethers.toUtf8Bytes(trimmedName))
-  const saltHex = passphrase && passphrase.length > 0 ? ethers.keccak256(ethers.toUtf8Bytes(passphrase)) : ethers.ZeroHash
+  const normalizedName = normalizeNameForHash(fullName)
+  const normalizedPassphrase = normalizePassphraseForHash(passphrase)
+
+  const nameHex = ethers.keccak256(textEncoder.encode(normalizedName))
+  const saltHex = normalizedPassphrase && normalizedPassphrase.length > 0
+    ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
+    : ethers.ZeroHash
 
   const nameLimbs = splitToLimbs(nameHex)
   const saltLimbs = splitToLimbs(saltHex)
@@ -493,10 +500,10 @@ export default function MintNFTModal({
     try {
       setProofGenerationStep(t('mintNFT.preparingProof', 'Preparing proof inputs...'))
 
-      const trimmedFullName = personInfo.fullName.trim()
+      const normalizedFullName = normalizeNameForHash(personInfo.fullName || '')
       const passphrase = personInfo.passphrase || ''
 
-      if (!trimmedFullName) {
+      if (!normalizedFullName) {
         alert(t('mintNFT.fullNameRequired', 'Full name is required to generate proof'))
         setIsSubmitting(false)
         setProofGenerationStep('')
@@ -504,7 +511,7 @@ export default function MintNFTModal({
       }
 
       // Construct PersonCoreInfo object matching the contract structure
-      const nameBinding = computeNameBinding(trimmedFullName, passphrase)
+      const nameBinding = computeNameBinding(normalizedFullName, passphrase)
 
       const coreInfo = {
         basicInfo: {
@@ -516,7 +523,7 @@ export default function MintNFTModal({
           gender: personInfo.gender
         },
         supplementInfo: {
-          fullName: trimmedFullName,
+          fullName: normalizedFullName,
           birthPlace: processedData.birthPlace,
           isDeathBC: processedData.isDeathBC,
           deathYear: processedData.deathYear,
@@ -535,7 +542,7 @@ export default function MintNFTModal({
       if (!address) {
         throw new Error(t('mintNFT.walletRequired', 'Wallet connection required to mint'))
       }
-      const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(trimmedFullName, passphrase, address)
+      const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(normalizedFullName, passphrase, address)
       console.log('🔒 Generated name poseidon proof:', generatedProof)
       console.log('🔒 Generated public signals:', publicSignals)
 

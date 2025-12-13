@@ -529,6 +529,7 @@
       "loading": "Loading NFT info…",
       "loadErrorPrefix": "NFT load failed",
       "bcPrefix": "BC",
+      "decrypt": "Decrypt and View",
       "genders": {
         "male": "Male",
         "female": "Female",
@@ -960,7 +961,20 @@
     "personInfo": "Person Information",
     "personInfoHint": "Plain text stays off-chain; used only for local ZK proof",
     "personInfoPrivacy": "Person information is only used locally to generate zero-knowledge proofs. Plain text will not be stored on-chain, only the hash value is permanently recorded.",
-    "parentInfoNotice": "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and triggers DEEP utility distribution. Parent info must match their actual versions exactly (incl. passphrase) to establish connection."
+    "parentInfoNotice": "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and triggers DEEP utility distribution. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
+    "encryptionPasswordRequired": "Please enter encryption password",
+    "encryptionPasswordWeak": "Password must be at least 8 characters",
+    "encryptionPasswordMismatch": "Passwords do not match",
+    "encryptionUnavailable": "Encryption is not available in this environment, please try a different browser",
+    "encryptionFailed": "Failed to encrypt or export metadata, please try again",
+    "encryptionPassword": "Metadata Encryption Password (AES-GCM, local encryption)",
+    "encryptionHint": "Only encrypted CID stored on-chain",
+    "usePassphraseForEncryption": "Use identity passphrase for metadata encryption",
+    "encryptionPasswordAuto": "Metadata CID will reuse the identity passphrase. Turn off the toggle to set a separate password.",
+    "encryptionPasswordPlaceholder": "At least 8 characters",
+    "encryptionPasswordConfirm": "Confirm password",
+    "encryptionNotice": "Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.",
+    "generatingMetadataCID": "Generating metadata CID..."
   },
   "mintNFT": {
     "title": "Mint NFT",
@@ -1217,7 +1231,7 @@
       "recommendations": {
         "empty": "⚠️ Empty passphrase: insufficient security. Strongly recommend a 15+ character strong passphrase",
         "weak": "❌ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
-        "medium": "⚠️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols/emoji",
+        "medium": "⚠️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols",
         "strong": "✅ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Good security",
         "veryStrong": "🔐 Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Strong security",
         "excellent": "🛡️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Excellent security"
@@ -1231,6 +1245,36 @@
         "kdfCompleted": "KDF completed",
         "keyDerivationComplete": "Key derivation complete"
       }
+    }
+  },
+  "decryptMetadata": {
+    "title": "Decrypt Metadata",
+    "source": "Fetch Encrypted Data",
+    "sourceDesc": "Enter base URL + CID, or upload encrypted file directly",
+    "baseUrl": "Base URL",
+    "cidPlaceholder": "Paste CID",
+    "fetch": "Fetch Encrypted Data",
+    "upload": "Upload Encrypted File",
+    "password": "Decryption Password (must match encryption password)",
+    "passwordPlaceholder": "Enter decryption password",
+    "hidePassword": "Hide password",
+    "showPassword": "Show password",
+    "payload": "Encrypted Content",
+    "payloadPlaceholder": "Download from above or paste encrypted data text directly",
+    "decrypt": "Decrypt and View",
+    "result": "Decryption Result",
+    "resultPlaceholder": "Decrypted plaintext metadata will be displayed here",
+    "cidRequired": "Please enter CID and base URL",
+    "fetchFailed": "Failed to fetch encrypted metadata, please check CID or network",
+    "readFailed": "Failed to read encrypted file",
+    "passwordRequired": "Please enter decryption password",
+    "payloadRequired": "Please fetch or paste encrypted content first",
+    "cryptoUnavailable": "Web Crypto is not available in this environment",
+    "hashMismatch": "Plaintext hash verification failed, password or file may be incorrect",
+    "decryptFailed": "Decryption failed, please check password or file",
+    "payloadMeta": {
+      "version": "Format Version",
+      "cipher": "Algorithm"
     }
   },
   "errors": {

@@ -10,8 +10,10 @@ import { scrypt } from 'scrypt-js';
 import { ethers } from 'ethers';
 import type { HashForm } from '../components/PersonHashCalculator';
 import { computePersonHash } from '../components/PersonHashCalculator';
-import { validatePassphraseStrength as validatePassphraseStrengthUtil } from './passphraseStrength';
+import { validatePassphraseStrength as validatePassphraseStrengthUtil, normalizePassphraseForHash, normalizeNameForHash } from './passphraseStrength';
 import type { PassphraseStrength } from './passphraseStrength';
+
+const textEncoder = new TextEncoder();
 
 /**
  * KDF parameter configurations
@@ -123,19 +125,22 @@ export async function deriveKeyFromPersonData(
   // Construct salt: purpose identifier + personal info + passphrase hash
   // Important: Salt must include passphrase to prevent attacker precomputation
   // Even if personHash is leaked, cannot reproduce salt without correct passphrase
-  const passphraseHash = input.passphrase
-    ? ethers.keccak256(ethers.toUtf8Bytes(input.passphrase))
+  const normalizedPassphrase = normalizePassphraseForHash(input.passphrase || '');
+  const normalizedFullName = normalizeNameForHash(input.fullName || '');
+
+  const passphraseHash = normalizedPassphrase
+    ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
     : ethers.ZeroHash;
 
   const saltComponents = [
     purposeSalt,
-    input.fullName,
+    normalizedFullName,
     `${input.birthYear}-${input.birthMonth}-${input.birthDay}`,
     input.gender.toString(),
     passphraseHash, // 🔒 Critical: includes passphrase hash
   ].join(':');
 
-  const saltHash = ethers.keccak256(ethers.toUtf8Bytes(saltComponents));
+  const saltHash = ethers.keccak256(textEncoder.encode(saltComponents));
   const baseHashBytes = ethers.getBytes(baseHash);
   const saltBytes = ethers.getBytes(saltHash);
 

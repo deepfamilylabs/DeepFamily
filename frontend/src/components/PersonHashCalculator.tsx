@@ -8,7 +8,7 @@ import { ChevronDown, Clipboard, Eye, EyeOff, Info } from 'lucide-react'
 import { useToast } from './ToastProvider'
 import { formatHashMiddle } from '../types/graph'
 import { poseidon3, poseidon5 } from 'poseidon-lite'
-import { validatePassphraseStrength, normalizeForHash as normalizeForHashUtil, getGraphemeLength as getGraphemeLengthUtil } from '../lib/passphraseStrength'
+import { validatePassphraseStrength, normalizePassphraseForHash, normalizeNameForHash, getGraphemeLength as getGraphemeLengthUtil } from '../lib/passphraseStrength'
 
 // Align with contract convention: blank passphrase -> zero salt limbs
 
@@ -17,9 +17,8 @@ const MAX_FULL_NAME_BYTES = 256
 const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
+const textEncoder = new TextEncoder()
 
-// Re-export from shared utility for backward compatibility within this file
-const normalizeForHash = normalizeForHashUtil
 const getGraphemeLength = getGraphemeLengthUtil
 
 // Field error component
@@ -93,8 +92,8 @@ const optionalPassphrase = z.union([z.string(), z.undefined(), z.null()]).transf
 const hashFormSchema = z.object({
   fullName: z.string()
     .min(1)
-    .refine((val) => normalizeForHash(val).length > 0, 'Name required')
-    .refine((val) => getByteLength(normalizeForHash(val)) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
+    .refine((val) => normalizeNameForHash(val).length > 0, 'Name required')
+    .refine((val) => getByteLength(normalizeNameForHash(val)) <= MAX_FULL_NAME_BYTES, 'Name exceeds max bytes'),
   isBirthBC: z.boolean(),
   birthYear: z.union([z.number().int().min(0).max(10000), z.literal('')]).transform(val => val === '' ? 0 : val),
   birthMonth: z.union([z.number().int().min(0).max(12), z.literal('')]).transform(val => val === '' ? 0 : val),
@@ -115,8 +114,8 @@ const calculatePasswordStrength = (password: string) => {
 export function computePersonHash(input: HashForm): string {
   const { fullName, passphrase, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
 
-  const normalizedFullName = normalizeForHash(fullName)
-  const normalizedPassphrase = typeof passphrase === 'string' ? normalizeForHash(passphrase) : ''
+  const normalizedFullName = normalizeNameForHash(fullName)
+  const normalizedPassphrase = typeof passphrase === 'string' ? normalizePassphraseForHash(passphrase) : ''
 
   // Pack small fields into a single field element to match circuit's packedData
   // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
@@ -127,9 +126,9 @@ export function computePersonHash(input: HashForm): string {
     (isBirthBC ? 1n : 0n)
 
   // Compute fullNameHash exactly like the circuit pre-image
-  const fullNameHash = ethers.keccak256(ethers.toUtf8Bytes(normalizedFullName))
+  const fullNameHash = ethers.keccak256(textEncoder.encode(normalizedFullName))
   const saltHash = normalizedPassphrase.length > 0
-    ? ethers.keccak256(ethers.toUtf8Bytes(normalizedPassphrase))
+    ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
     : ethers.ZeroHash
 
   // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
@@ -204,8 +203,8 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const hashFormSchema = useMemo(() => z.object({
     fullName: z.string()
       .min(1, t('search.validation.required'))
-      .refine((val) => normalizeForHash(val).length > 0, { message: t('search.validation.required') })
-      .refine((val) => getByteLength(normalizeForHash(val)) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
+      .refine((val) => normalizeNameForHash(val).length > 0, { message: t('search.validation.required') })
+      .refine((val) => getByteLength(normalizeNameForHash(val)) <= MAX_FULL_NAME_BYTES, { message: t('search.validation.nameTooLong') }),
     isBirthBC: z.boolean(),
     birthYear: z.union([z.number().int().min(0, t('search.validation.yearRange')).max(9999, t('search.validation.yearRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     birthMonth: z.union([z.number().int().min(0, t('search.validation.monthRange')).max(12, t('search.validation.monthRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
@@ -245,7 +244,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   const gender = watch('gender')
   const passphrase = watch('passphrase')
 
-  const normalizedPassphrase = useMemo(() => normalizeForHash(passphrase || ''), [passphrase])
+  const normalizedPassphrase = useMemo(() => normalizePassphraseForHash(passphrase || ''), [passphrase])
   const passphraseGraphemeLength = useMemo(() => getGraphemeLength(normalizedPassphrase), [normalizedPassphrase])
   const maskedInputStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (showPassphrase || !supportsCssMasking) return undefined
@@ -267,7 +266,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       gender: Number(gender || 0),
       passphrase: passphrase || '',
     }
-    if (!transformedData.fullName.trim()) return ''
+    if (!normalizeNameForHash(transformedData.fullName).length) return ''
     return computePersonHash(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
 

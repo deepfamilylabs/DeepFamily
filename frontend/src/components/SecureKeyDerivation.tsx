@@ -17,6 +17,7 @@ import {
   estimateKDFDuration,
   type KDFPreset
 } from '../lib/secureKeyDerivation';
+import { normalizeNameForHash } from '../lib/passphraseStrength';
 
 interface SecureKeyDerivationProps {
   className?: string;
@@ -61,7 +62,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       return;
     }
 
-    if (!formData.fullName.trim()) {
+    if (!normalizeNameForHash(formData.fullName || '').length) {
       toast.show(t('keyDerivation.component.nameRequired'));
       return;
     }
@@ -124,7 +125,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       return;
     }
 
-    if (!formData.fullName.trim()) {
+    if (!normalizeNameForHash(formData.fullName || '').length) {
       toast.show(t('keyDerivation.component.nameRequired'));
       return;
     }
@@ -316,9 +317,9 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       {/* Generate button */}
       <button
         onClick={handleGenerateKey}
-        disabled={isGenerating || !formData?.fullName.trim()}
+        disabled={isGenerating || !normalizeNameForHash(formData?.fullName || '').length}
         className={`w-full py-3 sm:py-4 rounded-lg font-semibold text-sm sm:text-base text-white transition-all ${
-          isGenerating || !formData?.fullName.trim()
+          isGenerating || !normalizeNameForHash(formData?.fullName || '').length
             ? 'bg-gray-400 cursor-not-allowed'
             : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl'
         }`}

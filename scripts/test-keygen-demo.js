@@ -14,11 +14,26 @@
 
 const { scrypt } = require("scrypt-js");
 const { ethers } = require("ethers");
+const { TextEncoder } = require("util");
+
+const textEncoder = new TextEncoder();
+
+function normalizeNameForHash(value) {
+  if (value === undefined || value === null) return "";
+  const str = String(value).trim();
+  return typeof str.normalize === "function" ? str.normalize("NFC") : str;
+}
+
+function normalizePassphraseForHash(value) {
+  if (value === undefined || value === null) return "";
+  const str = String(value);
+  return typeof str.normalize === "function" ? str.normalize("NFKD") : str;
+}
 
 // Simulate PersonHash computation (simplified version)
 function computePersonHash(fullName, birthYear, birthMonth, birthDay, gender, passphrase) {
-  const normalizedName = fullName.trim().normalize("NFC");
-  const normalizedPass = passphrase.trim().normalize("NFC");
+  const normalizedName = normalizeNameForHash(fullName);
+  const normalizedPass = normalizePassphraseForHash(passphrase);
 
   // Pack personal information
   const packedData =
@@ -29,9 +44,9 @@ function computePersonHash(fullName, birthYear, birthMonth, birthDay, gender, pa
 
   // Simplified: directly hash all inputs
   const combined = ethers.concat([
-    ethers.toUtf8Bytes(normalizedName),
-    ethers.toUtf8Bytes(normalizedPass),
-    ethers.toUtf8Bytes(packedData.toString()),
+    textEncoder.encode(normalizedName),
+    textEncoder.encode(normalizedPass),
+    textEncoder.encode(packedData.toString()),
   ]);
 
   return ethers.keccak256(combined);
@@ -46,21 +61,24 @@ async function deriveKey(personHash, userData, purpose, preset = "BALANCED") {
   }[preset];
 
   // Step 9: Compute passphrase hash (security critical!)
-  const passphraseHash = userData.passphrase
-    ? ethers.keccak256(ethers.toUtf8Bytes(userData.passphrase))
+  const normalizedPassphrase = normalizePassphraseForHash(userData.passphrase);
+  const normalizedFullName = normalizeNameForHash(userData.fullName);
+
+  const passphraseHash = normalizedPassphrase
+    ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
     : ethers.ZeroHash;
 
   // Step 10: Construct purpose salt (includes passphrase hash)
   const saltComponents = [
     `DeepFamily-${purpose}-v1`, // Purpose identifier
-    userData.fullName, // Full name
+    normalizedFullName, // Full name (NFC)
     `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`, // Birth date
     userData.gender.toString(), // Gender
     passphraseHash, // 🔒 Passphrase hash (prevents pre-computation)
   ].join(":");
 
   // Step 11: Hash salt
-  const saltHash = ethers.keccak256(ethers.toUtf8Bytes(saltComponents));
+  const saltHash = ethers.keccak256(textEncoder.encode(saltComponents));
 
   // Step 12: Prepare byte arrays
   const hashBytes = ethers.getBytes(personHash);
@@ -99,7 +117,7 @@ async function demo() {
   console.log(`Passphrase: ${user1.passphrase} (${user1.passphrase.length} characters)`);
 
   // Display passphrase hash (verify salt includes passphrase)
-  const passphraseHashDemo = ethers.keccak256(ethers.toUtf8Bytes(user1.passphrase));
+  const passphraseHashDemo = ethers.keccak256(textEncoder.encode(normalizePassphraseForHash(user1.passphrase)));
   console.log(`Passphrase Hash: ${passphraseHashDemo.substring(0, 20)}... 🔒\n`);
 
   const hash1 = computePersonHash(

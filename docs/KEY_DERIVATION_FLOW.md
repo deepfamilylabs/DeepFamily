@@ -12,8 +12,8 @@ User Input
 [0%] ===== Layer 1: PersonHash Computation =====
      ↓
   Step 1: Data Normalization (5%)
-     ├─ fullName → NFC normalization → "John Smith"
-     └─ passphrase → NFC normalization → "Strong passphrase..."
+     ├─ fullName → NFC normalization (composition, no trimming) → "John Smith"
+     └─ passphrase → NFKD normalization (BIP39-style) → "Strong passphrase..."
      ↓
   Step 2: Pack Birthday and Gender (10%)
      └─ packedData = birthYear<<24 | birthMonth<<16 | birthDay<<8 | gender<<1 | isBirthBC
@@ -21,9 +21,9 @@ User Input
         = 0x07C6050F02
      ↓
   Step 3: keccak256 Hashing (12%)
-     ├─ fullNameHash = keccak256("John Smith")
+     ├─ fullNameHash = keccak256(UTF-8(TextEncoder, "John Smith"))
      │  = 0xa1b2c3d4e5f6...
-     └─ saltHash = keccak256("Strong passphrase...")
+     └─ saltHash = keccak256(UTF-8(TextEncoder, "Strong passphrase..."))
         = 0x1a2b3c4d5e6f...
      ↓
   Step 4: Convert to 128-bit Limbs (14%)
@@ -67,7 +67,7 @@ User Input
 [25%] ===== Layer 2: Prepare KDF Input =====
      ↓
   Step 9: Compute Passphrase Hash (Security Critical!)
-     └─ passphraseHash = keccak256("Strong passphrase...")
+     └─ passphraseHash = keccak256(UTF-8(TextEncoder, NFKD("Strong passphrase...")))
         = 0x1a2b3c4d5e6f...
         🔒 Important: Salt must include passphrase to prevent precomputation attacks
      ↓
@@ -379,7 +379,9 @@ Assume attacker knows:
 - **secp256k1**: Elliptic curve used by Bitcoin/Ethereum
 - **Limbs**: Large integers split into multiple chunks for finite field operations
 - **KDF**: Key Derivation Function
-- **NFC**: Unicode normalization form, ensures same characters have same encoding
+- **NFC (names)**: Unicode normalization form (composition) for names; no trimming applied
+- **NFKD (passphrase)**: Unicode normalization form (BIP39-style) for passphrases; no trimming applied
+- **UTF-8 (TextEncoder)**: All hashes operate on UTF-8 bytes produced via `TextEncoder`
 
 ---
 
