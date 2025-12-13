@@ -75,11 +75,6 @@ export async function addStoryChunk(
   const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer)
 
   try {
-    console.log('🚀 Adding story chunk...')
-    console.log('  Token ID:', tokenId)
-    console.log('  Chunk Index:', chunkIndex)
-    console.log('  Content Length:', content.length)
-    console.log('  Expected Hash:', expectedHash)
 
     // Send transaction (with wallet confirmation timeout)
     const tx = await withWalletConfirmationTimeout(
@@ -93,12 +88,9 @@ export async function addStoryChunk(
       ),
       'addStoryChunk'
     )
-    console.log('✅ Transaction sent:', tx.hash)
 
     // Wait for confirmation
-    console.log('⏳ Waiting for confirmation...')
     const receipt = await tx.wait()
-    console.log('✅ Transaction confirmed in block:', receipt.blockNumber)
 
     // Parse events
     const events = {
@@ -108,13 +100,11 @@ export async function addStoryChunk(
     let parsedChunkIndex = chunkIndex
     let parsedContentLength = content.length
 
-    console.log(`🔍 Parsing ${receipt.logs.length} logs...`)
 
     for (const log of receipt.logs) {
       try {
         const parsedEvent = contract.interface.parseLog(log)
         if (parsedEvent) {
-          console.log(`📊 Event detected: ${parsedEvent.name}`)
 
           if (parsedEvent.name === 'StoryChunkAdded') {
             events.StoryChunkAdded = {
@@ -128,11 +118,9 @@ export async function addStoryChunk(
             }
             parsedChunkIndex = events.StoryChunkAdded.chunkIndex
             parsedContentLength = events.StoryChunkAdded.contentLength
-            console.log('✅ StoryChunkAdded event parsed:', events.StoryChunkAdded)
           }
         }
       } catch (error) {
-        console.log('🔍 Unparseable log:', log.topics)
         continue
       }
     }
@@ -173,20 +161,15 @@ export async function sealStory(
   const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer)
 
   try {
-    console.log('🚀 Sealing story...')
-    console.log('  Token ID:', tokenId)
 
     // Send transaction (with wallet confirmation timeout)
     const tx = await withWalletConfirmationTimeout(
       () => contract.sealStory(tokenId),
       'sealStory'
     )
-    console.log('✅ Transaction sent:', tx.hash)
 
     // Wait for confirmation
-    console.log('⏳ Waiting for confirmation...')
     const receipt = await tx.wait()
-    console.log('✅ Transaction confirmed in block:', receipt.blockNumber)
 
     // Parse events
     const events = {
@@ -196,13 +179,11 @@ export async function sealStory(
     let parsedTotalChunks = 0
     let parsedFullStoryHash = ethers.ZeroHash
 
-    console.log(`🔍 Parsing ${receipt.logs.length} logs...`)
 
     for (const log of receipt.logs) {
       try {
         const parsedEvent = contract.interface.parseLog(log)
         if (parsedEvent) {
-          console.log(`📊 Event detected: ${parsedEvent.name}`)
 
           if (parsedEvent.name === 'StorySealed') {
             events.StorySealed = {
@@ -213,11 +194,9 @@ export async function sealStory(
             }
             parsedTotalChunks = events.StorySealed.totalChunks
             parsedFullStoryHash = events.StorySealed.fullStoryHash
-            console.log('✅ StorySealed event parsed:', events.StorySealed)
           }
         }
       } catch (error) {
-        console.log('🔍 Unparseable log:', log.topics)
         continue
       }
     }
@@ -357,7 +336,6 @@ async function withWalletConfirmationTimeout<T>(
   ;(timeoutError as any).code = 'WALLET_POPUP_TIMEOUT'
   ;(timeoutError as any).action = action
 
-  console.log(`[Wallet] Awaiting confirmation for ${action}...`)
 
   const txPromise = sendTx()
   const timeoutPromise = new Promise<never>((_, reject) => {

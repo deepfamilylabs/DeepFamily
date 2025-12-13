@@ -124,9 +124,7 @@ export default function EndorseCompactModal({
       setIsInsufficientBalance(false)
 
       // Step 1: Get token contract address from DeepFamily contract
-      console.log('🔍 Getting DEEP token contract address...')
       const deepTokenAddress = await contract.DEEP_FAMILY_TOKEN_CONTRACT()
-      console.log('✅ Token contract address:', deepTokenAddress)
 
       // Step 2: Create token contract instance with necessary functions
       const tokenContract = new ethers.Contract(
@@ -143,20 +141,17 @@ export default function EndorseCompactModal({
       )
 
       // Step 3: Get the endorsement fee (recentReward)
-      console.log('🔍 Getting endorsement fee (recentReward)...')
       const fee: bigint = await tokenContract.recentReward()
       let decimals = 18
       try {
         decimals = Number(await tokenContract.decimals())
       } catch {}
       const feeFormatted = ethers.formatUnits(fee, decimals)
-      console.log('✅ Endorsement fee (recentReward):', feeFormatted, 'DEEP')
       setEndorsementFee(feeFormatted)
 
       // Step 4: Check user balance first
       const balance: bigint = await tokenContract.balanceOf(address)
       const balanceFormatted = ethers.formatUnits(balance, decimals)
-      console.log('💰 User DEEP balance:', balanceFormatted)
       setUserBalance(balanceFormatted)
 
       // Check if balance is sufficient
@@ -170,7 +165,6 @@ export default function EndorseCompactModal({
 
       // If fee is 0, no approval needed - proceed directly to endorse
       if (fee === 0n) {
-        console.log('✅ No fee required, proceeding to endorse...')
         setState('working')
         const result = await endorseVersion(personHash, versionIndex, undefined, { suppressToasts: true })
         setTxHash(result?.hash || result?.transactionHash || null)
@@ -182,30 +176,15 @@ export default function EndorseCompactModal({
 
       // Step 5: Get spender address (DeepFamily contract)
       const spender = await contract.getAddress()
-      console.log('📝 Spender address:', spender)
 
       // Step 6: Check current allowance
-      console.log('🔍 Checking current allowance for DeepFamily contract:', spender)
       const currentAllowance: bigint = await tokenContract.allowance(address, spender)
-      console.log('🔐 Allowance check:', {
-        currentAllowance: currentAllowance.toString(),
-        currentAllowanceFormatted: ethers.formatUnits(currentAllowance, decimals),
-        required: fee.toString(),
-        requiredFormatted: ethers.formatUnits(fee, decimals),
-        needsApproval: currentAllowance < fee
-      })
 
       // Step 7: If allowance is insufficient, request approval
       if (currentAllowance < fee) {
-        console.log('⚠️ Insufficient allowance, requesting approval...')
         setState('approving')
 
         // Use direct approve for exact amount (safer than unlimited approval)
-        console.log('📝 Using direct approve for exact amount:', {
-          required: fee.toString(),
-          requiredFormatted: ethers.formatUnits(fee, decimals)
-        })
-
         let tx
         try {
           tx = await tokenContract.approve(spender, fee)
@@ -214,36 +193,29 @@ export default function EndorseCompactModal({
           // Fallback: try increaseAllowance if approve fails
           const delta = fee - currentAllowance
           if (delta > 0n) {
-            console.log('📈 Fallback: Using increaseAllowance with delta:', delta.toString())
             tx = await tokenContract.increaseAllowance(spender, delta)
           } else {
             throw approveError
           }
         }
 
-        console.log('📤 Approval transaction sent:', tx.hash)
 
         // Wait for approval confirmation
         const receipt = await tx.wait()
-        console.log('✅ Approval confirmed in block:', receipt.blockNumber)
 
         // Wait for blockchain state to be updated after approval transaction
-        console.log('⏳ Waiting for blockchain state to update after approval...')
         let postAllowance: bigint = currentAllowance
         let retryCount = 0
         const maxRetries = 32
 
         while (retryCount < maxRetries && postAllowance < fee) {
           const waitTime = Math.min(500 + (retryCount * 300), 2000)
-          console.log(`🔍 Post-approval check attempt ${retryCount + 1}/${maxRetries}, waiting ${waitTime}ms...`)
 
           try {
             await new Promise(resolve => setTimeout(resolve, waitTime))
             postAllowance = await tokenContract.allowance(address, spender)
-            console.log(`📊 Post-approval allowance attempt ${retryCount + 1}: ${ethers.formatUnits(postAllowance, decimals)} (need: ${ethers.formatUnits(fee, decimals)})`)
 
             if (postAllowance >= fee) {
-              console.log(`✅ Post-approval allowance sufficient after ${retryCount + 1} attempts`)
               break
             }
           } catch (error) {
@@ -253,21 +225,12 @@ export default function EndorseCompactModal({
           retryCount++
         }
 
-        console.log('✅ APPROVAL FLOW COMPLETED')
       } else {
-        console.log('⏭️ SKIPPING APPROVAL - sufficient allowance exists')
       }
 
       // Step 8: Final allowance check before endorseVersion call
-      console.log('🔍 Final allowance check before endorseVersion...')
       const finalAllowance: bigint = await tokenContract.allowance(address, spender)
       const finalRequired: bigint = await tokenContract.recentReward()
-
-      console.log('🔐 Final allowance status:', {
-        finalAllowance: ethers.formatUnits(finalAllowance, decimals),
-        finalRequired: ethers.formatUnits(finalRequired, decimals),
-        sufficient: finalAllowance >= finalRequired
-      })
 
       if (finalAllowance < finalRequired) {
         const errorMsg = t('endorse.errors.needApprove', 'Allowance insufficient. Please re-approve the token allowance.')
@@ -275,7 +238,6 @@ export default function EndorseCompactModal({
         throw new Error(errorMsg)
       }
 
-      console.log('✅ Final allowance check passed')
 
       // Step 9: Now proceed with endorsement
       setState('working')

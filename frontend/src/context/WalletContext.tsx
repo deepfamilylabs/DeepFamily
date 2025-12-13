@@ -89,24 +89,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const wallets: WalletOption[] = []
     const eth: any = window.ethereum
 
-    console.log('[WalletContext] Detecting wallet providers:', {
-      hasEthereum: !!eth,
-      isMetaMask: eth?.isMetaMask,
-      isFluent: eth?.isFluent,
-      isFluentWallet: eth?.isFluentWallet,
-      hasProviders: Array.isArray(eth?.providers),
-      providersCount: eth?.providers?.length
-    })
+
 
     if (!eth) {
-      console.log('[WalletContext] No wallet providers found')
       return []
     }
 
     const addWallet = (provider: any) => {
       for (const config of SUPPORTED_WALLETS) {
         if (config.detect(provider) && !wallets.find(w => w.id === config.id)) {
-          console.log(`[WalletContext] ${config.name} detected`)
           wallets.push({
             id: config.id,
             name: config.name,
@@ -119,13 +110,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     // Strategy 1: Check providers array (EIP-1193 multi-provider)
     if (Array.isArray(eth.providers) && eth.providers.length > 0) {
-      console.log('[WalletContext] Checking providers array:', eth.providers.length)
       eth.providers.forEach((provider: any, index: number) => {
-        console.log(`[WalletContext] Provider ${index}:`, {
-          isMetaMask: provider?.isMetaMask,
-          isFluent: provider?.isFluent,
-          isFluentWallet: provider?.isFluentWallet
-        })
+
         addWallet(provider)
       })
     }
@@ -139,19 +125,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       addWallet(fluentProvider)
     }
 
-    console.log('[WalletContext] Available wallets found:', wallets.map(w => ({ id: w.id, name: w.name })))
     return wallets
   }, [])
 
   const connectWithProvider = useCallback(async (selectedProvider: any, walletId?: string) => {
-    console.log('[WalletContext] ConnectWithProvider called with:', {
-      selectedProvider: selectedProvider,
-      walletId: walletId,
-      isMetaMask: selectedProvider?.isMetaMask,
-      isFluent: selectedProvider?.isFluent,
-      constructor: selectedProvider?.constructor?.name,
-      keys: Object.keys(selectedProvider || {})
-    })
+
 
     // Use the selected provider directly instead of getBoundProvider
     if (!selectedProvider) {
@@ -171,12 +149,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    console.log('[WalletContext] Using selected provider directly:', {
-      provider: selectedProvider,
-      walletId: detectedWalletId,
-      isMetaMask: selectedProvider?.isMetaMask,
-      isFluent: selectedProvider?.isFluent
-    })
+
 
     setWalletState(prev => ({ ...prev, isConnecting: true }))
 
@@ -195,7 +168,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Save wallet type to localStorage for auto-reconnect
       try {
         localStorage.setItem(WALLET_TYPE_STORAGE_KEY, detectedWalletId)
-        console.log('[WalletContext] Saved wallet type to localStorage:', detectedWalletId)
       } catch (e) {
         console.warn('[WalletContext] Failed to save wallet type to localStorage:', e)
       }
@@ -224,7 +196,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to fetch balance:', balanceError)
       }
 
-      console.log('[WalletContext] Wallet connected successfully:', { address, chainId: Number(network.chainId), walletId: detectedWalletId })
       toast.show(t('wallet.connected', 'Wallet connected successfully'))
     } catch (error: any) {
       console.error('[WalletContext] Failed to connect wallet:', error)
@@ -242,19 +213,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const connect = useCallback(async () => {
     const wallets = getAvailableWallets()
-    console.log('[WalletContext] Connect initiated, wallets available:', wallets.length)
 
     if (wallets.length === 0) {
-      console.log('[WalletContext] No wallets available, showing install guide')
       setShowWalletSelection(true)
       return
     }
 
     if (wallets.length === 1) {
-      console.log('[WalletContext] Single wallet detected, connecting directly:', wallets[0].name)
       await connectWithProvider(wallets[0].provider, wallets[0].id)
     } else {
-      console.log('[WalletContext] Multiple wallets detected, showing selection modal')
       setShowWalletSelection(true)
     }
   }, [getAvailableWallets, connectWithProvider])
@@ -282,11 +249,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (shouldNotify) {
-      console.log('[WalletContext] Disconnecting wallet')
       // Clear saved wallet type from localStorage
       try {
         localStorage.removeItem(WALLET_TYPE_STORAGE_KEY)
-        console.log('[WalletContext] Cleared wallet type from localStorage')
       } catch (e) {
         console.warn('[WalletContext] Failed to clear wallet type from localStorage:', e)
       }
@@ -308,7 +273,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         params: [{ chainId: `0x${targetChainId.toString(16)}` }],
       })
       
-      console.log('[WalletContext] Chain switched successfully to:', targetChainId)
       // Update chain ID in state
       setWalletState(prev => ({
         ...prev,
@@ -345,14 +309,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         params: [{ chainId: chainIdHex }],
       })
       
-      console.log('[WalletContext] Chain switched successfully to:', targetChainId)
       setWalletState(prev => ({ ...prev, chainId: targetChainId }))
       toast.show(t('wallet.chainSwitched', 'Chain switched successfully'))
       return true
     } catch (switchError: any) {
       // Error 4902: chain not added to wallet
       if (switchError.code === 4902) {
-        console.log('[WalletContext] Chain not found, attempting to add:', targetChainId)
         
         const addChainParams = getAddChainParams(targetChainId)
         if (!addChainParams) {
@@ -366,7 +328,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             params: [addChainParams],
           })
           
-          console.log('[WalletContext] Chain added successfully:', targetChainId)
           setWalletState(prev => ({ ...prev, chainId: targetChainId }))
           toast.show(t('wallet.chainAdded', 'Network added successfully'))
           return true
@@ -395,13 +356,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const rawProvider = walletState.rawProvider
     if (!rawProvider) return
 
-    console.log('[WalletContext] Setting up event listeners for provider:', {
-      walletId: walletState.connectedWalletId,
-      address: walletState.address
-    })
+
 
     const handleAccountsChanged = (accounts: string[]) => {
-      console.log('[WalletContext] accountsChanged event:', accounts)
       if (accounts.length === 0) {
         disconnect()
       } else if (accounts[0] !== walletState.address) {
@@ -421,7 +378,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleChainChanged = (chainId: string) => {
-      console.log('[WalletContext] chainChanged event:', chainId)
       setWalletState(prev => ({
         ...prev,
         chainId: parseInt(chainId, 16)
@@ -433,7 +389,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleDisconnect = () => {
-      console.log('[WalletContext] disconnect event received')
       disconnect()
     }
 
@@ -457,7 +412,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           rawProvider.on('disconnect', handleDisconnect)
           cleanupDisconnect = () => { try { rawProvider.removeListener?.('disconnect', handleDisconnect) } catch {} }
         }
-        console.log('[WalletContext] Event listeners registered successfully')
       } catch (error) {
         console.warn('[WalletContext] Failed to add wallet listener, falling back to polling:', error)
         // Fallback to polling
@@ -481,7 +435,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     trySubscribe()
 
     return () => {
-      console.log('[WalletContext] Cleaning up event listeners')
       cleanupAccountsChanged()
       cleanupChainChanged()
       cleanupDisconnect()
@@ -499,7 +452,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       let savedWalletType: string | null = null
       try {
         savedWalletType = localStorage.getItem(WALLET_TYPE_STORAGE_KEY)
-        console.log('[WalletContext] Saved wallet type from localStorage:', savedWalletType)
       } catch (e) {
         console.warn('[WalletContext] Failed to read wallet type from localStorage:', e)
       }
@@ -507,14 +459,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Only auto-connect if user previously connected (has saved wallet type)
       // This respects the user's explicit disconnect action
       if (!savedWalletType) {
-        console.log('[WalletContext] No saved wallet type, skipping auto-connect')
         isAutoConnectDone.current = true
         return
       }
 
       const wallets = getAvailableWallets()
       if (wallets.length === 0) {
-        console.log('[WalletContext] No wallets available for auto-connect')
         isAutoConnectDone.current = true
         return
       }
@@ -522,7 +472,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Find the wallet that matches the saved type
       const targetWallet = wallets.find(w => w.id === savedWalletType)
       if (!targetWallet) {
-        console.log('[WalletContext] Saved wallet type not available:', savedWalletType)
         // Clear invalid saved type
         try {
           localStorage.removeItem(WALLET_TYPE_STORAGE_KEY)
@@ -535,7 +484,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         // Use eth_accounts to check if already connected (doesn't prompt)
         const accounts = await targetWallet.provider.request({ method: 'eth_accounts' })
         if (accounts && accounts.length > 0) {
-          console.log('[WalletContext] Auto-connecting to wallet:', targetWallet.id)
           // Hydrate state without prompting user
           const provider = new ethers.BrowserProvider(targetWallet.provider as any)
           const signer = await provider.getSigner()
@@ -558,9 +506,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             setWalletState(prev => ({ ...prev, balance: ethers.formatEther(balance) }))
           } catch {}
           
-          console.log('[WalletContext] Auto-connect successful:', { address, walletId: targetWallet.id })
         } else {
-          console.log('[WalletContext] No previously connected accounts found for wallet:', targetWallet.id)
           // Clear saved wallet type if no accounts connected
           try {
             localStorage.removeItem(WALLET_TYPE_STORAGE_KEY)

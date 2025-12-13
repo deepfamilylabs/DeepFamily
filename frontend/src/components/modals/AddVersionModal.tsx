@@ -539,29 +539,18 @@ export default function AddVersionModal({
     setProofGenerationStep(t('addVersion.preparingData', 'Preparing data...'))
 
     try {
-      console.log('🔄 Starting ZK proof generation for person:', personInfo.fullName)
-      
       // Get submitter address
       const submitterAddress = await signer.getAddress()
-      console.log('📝 Submitter address:', submitterAddress)
       
       setProofGenerationStep(t('addVersion.generatingProof', 'Generating zero-knowledge proof... (this may take 30-60 seconds)'))
       
       // Generate ZK proof automatically
-      console.log('🔍 Person info:', personInfo)
-      console.log('🔍 Father info:', fatherInfo)
-      console.log('🔍 Mother info:', motherInfo)
-      console.log('🔍 Submitter address:', submitterAddress)
-      
       const { proof, publicSignals } = await generatePersonProof(
         personInfo,
         fatherInfo && normalizeNameForHash(fatherInfo.fullName || '').length ? fatherInfo : null,
         motherInfo && normalizeNameForHash(motherInfo.fullName || '').length ? motherInfo : null,
         submitterAddress
       )
-      
-      console.log('✅ Proof generated successfully')
-      console.log('📊 Public signals:', publicSignals)
       
       setProofGenerationStep(t('addVersion.verifyingProof', 'Verifying proof...'))
       
@@ -570,14 +559,10 @@ export default function AddVersionModal({
       if (!isValid) {
         throw new Error(t('addVersion.proofVerificationFailed', 'Generated proof verification failed'))
       }
-      
-      console.log('🔍 Proof verification: VALID')
 
       setProofGenerationStep(t('addVersion.generatingMetadataCID', 'Generating metadata CID...'))
 
       const { json: encryptedJson, cid: metadataCID } = await prepareEncryptedMetadata(processedData.tag, processedData, encryptionPassword)
-      console.log('📄 Encrypted metadata payload JSON (stored locally):', encryptedJson ? '[encrypted payload ready]' : '[none]')
-      console.log('🔑 Generated CID from encrypted payload:', metadataCID)
 
       processedData.metadataCID = metadataCID
       setValue('metadataCID', metadataCID, { shouldDirty: true, shouldValidate: true })
@@ -595,7 +580,6 @@ export default function AddVersionModal({
       )
 
       if (result) {
-        console.log('🎉 Person added successfully:', result)
         setSuccessResult({
           hash: result.hash,
           index: result.index,
