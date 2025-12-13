@@ -970,6 +970,7 @@
     "encryptionPassword": "メタデータ暗号化パスワード（AES-GCM、ローカル暗号化）",
     "encryptionHint": "チェーン上には暗号化されたCIDのみが保存されます",
     "usePassphraseForEncryption": "メタデータ暗号化に本人パスフレーズを使用",
+    "passphraseMissingForEncryption": "本人パスフレーズが空です。下で暗号化パスワードを入力するか、上でパスフレーズを設定してください。",
     "encryptionPasswordAuto": "メタデータ CID は本人パスフレーズを再利用します。別のパスワードを使う場合はトグルをオフにしてください。",
     "encryptionPasswordPlaceholder": "8文字以上",
     "encryptionPasswordConfirm": "パスワードを確認",
@@ -1037,6 +1038,7 @@
     "timestamp": "タイムスタンプ",
     "mintingDesc": "ブロックチェーン上でユニークなNFTを作成中...",
     "processing": "処理中...",
+    "preparingProof": "証明入力の準備中...",
     "generatingProof": "ゼロ知識証明を生成中...",
     "verifyingProof": "ゼロ知識証明を検証中...",
     "proofVerified": "ゼロ知識証明が検証されました。取引を送信中...",
@@ -1048,6 +1050,7 @@
     "errorMessage": "エラーメッセージ",
     "errorDetails": "詳細情報",
     "eventDetails": "イベント詳細",
+    "transactionInfo": "取引情報",
     "validation": {
       "birthPlaceTooLong": "出生地が長すぎます",
       "deathPlaceTooLong": "死去地が長すぎます",

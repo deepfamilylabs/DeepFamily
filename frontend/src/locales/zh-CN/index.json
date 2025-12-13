@@ -971,6 +971,7 @@
     "encryptionPassword": "元数据加密口令（AES-GCM，本地加密）",
     "encryptionHint": "链上只存密文 CID",
     "usePassphraseForEncryption": "使用身份口令加密元数据",
+    "passphraseMissingForEncryption": "身份口令为空。请在下方输入加密口令，或在上方填写身份口令。",
     "encryptionPasswordAuto": "元数据 CID 将复用身份口令，关闭开关可设置单独口令。",
     "encryptionPasswordPlaceholder": "至少 8 位口令",
     "encryptionPasswordConfirm": "再次输入口令",
@@ -1038,6 +1039,7 @@
     "timestamp": "时间戳",
     "mintingDesc": "正在区块链上创建您的独特 NFT...",
     "processing": "处理中...",
+    "preparingProof": "准备证明输入...",
     "generatingProof": "生成零知识证明...",
     "verifyingProof": "验证零知识证明...",
     "proofVerified": "零知识证明已验证。正在提交交易...",
@@ -1049,6 +1051,7 @@
     "errorMessage": "错误信息",
     "errorDetails": "详细信息",
     "eventDetails": "事件详情",
+    "transactionInfo": "交易信息",
     "validation": {
       "birthPlaceTooLong": "出生地过长",
       "deathPlaceTooLong": "死亡地过长",
