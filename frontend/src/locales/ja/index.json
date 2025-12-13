@@ -379,7 +379,7 @@
         "excellent": "優秀"
       },
       "passwordTips": {
-        "weak": "💡 ヒント：15文字以上にし、数字・句読点・記号・絵文字などを組み合わせましょう"
+        "weak": "💡 ヒント：15文字以上にし、数字・句読点・記号などを組み合わせましょう"
       },
       "entropyDisplay": "生エントロピー：{{raw}} bits · 調整強度スコア：{{adjusted}}",
       "passphraseCharCount": "前後の空白を除いた文字数：{{count}}",
@@ -529,6 +529,7 @@
       "loading": "NFT情報読み込み中…",
       "loadErrorPrefix": "NFT読み込み失敗",
       "bcPrefix": "紀元前",
+      "decrypt": "復号して表示",
       "genders": {
         "male": "男性",
         "female": "女性",
@@ -960,7 +961,20 @@
     "personInfo": "人物情報",
     "personInfoHint": "平文はチェーンに載りません。ローカルのZK証明のみに使用",
     "personInfoPrivacy": "人物情報はローカルでゼロ知識証明を生成するためにのみ使用されます。平文はチェーンに保存されず、ハッシュ値のみが永久記録されます。",
-    "parentInfoNotice": "親情報を入力するとローカルでゼロ知識証明を生成して家族リンクを確立し（ハッシュ値のみがチェーンに記録）、DEEPユーティリティ配分を受け取れます。親情報は実際のバージョンと完全に一致する必要があります（パスフレーズを含む）。"
+    "parentInfoNotice": "親情報を入力するとローカルでゼロ知識証明を生成して家族リンクを確立し（ハッシュ値のみがチェーンに記録）、DEEPユーティリティ配分を受け取れます。親情報は実際のバージョンと完全に一致する必要があります（パスフレーズを含む）。",
+    "encryptionPasswordRequired": "暗号化パスワードを入力してください",
+    "encryptionPasswordWeak": "パスワードは8文字以上である必要があります",
+    "encryptionPasswordMismatch": "パスワードが一致しません",
+    "encryptionUnavailable": "この環境では暗号化を使用できません。別のブラウザをお試しください",
+    "encryptionFailed": "メタデータの暗号化またはエクスポートに失敗しました。再試行してください",
+    "encryptionPassword": "メタデータ暗号化パスワード（AES-GCM、ローカル暗号化）",
+    "encryptionHint": "チェーン上には暗号化されたCIDのみが保存されます",
+    "usePassphraseForEncryption": "メタデータ暗号化に本人パスフレーズを使用",
+    "encryptionPasswordAuto": "メタデータ CID は本人パスフレーズを再利用します。別のパスワードを使う場合はトグルをオフにしてください。",
+    "encryptionPasswordPlaceholder": "8文字以上",
+    "encryptionPasswordConfirm": "パスワードを確認",
+    "encryptionNotice": "メタデータはCIDを生成する前にローカルで暗号化されます。パスワードを安全に保管してください。失くした場合、復号できません。",
+    "generatingMetadataCID": "メタデータCID生成中..."
   },
   "mintNFT": {
     "title": "NFT鋳造",
@@ -1218,7 +1232,7 @@
       "bitsSummary": "生エントロピー約 {{raw}} bits · 調整強度スコア約 {{adjusted}}",
       "recommendations": {
         "empty": "⚠️ 空のパスフレーズは安全ではありません！名前と誕生日が推測される可能性があるため、15文字以上の強力なパスフレーズを追加することを推奨します",
-        "weak": "❌ エントロピーが低すぎます（約 {{entropy}} ビット）。推奨：15文字以上を使用し、文字/数字/記号/絵文字を混在させる",
+        "weak": "❌ エントロピーが低すぎます（約 {{entropy}} ビット）。推奨：15文字以上を使用し、文字/数字/記号を混在させる",
         "medium": "⚠️ 中程度の強度（約 {{entropy}} ビット）。推奨：25文字以上に増やすか、より多くの記号を使用する",
         "strong": "✅ 強力なパスフレーズ（約 {{entropy}} ビット）。鍵派生に適しています",
         "veryStrong": "🔒 非常に強力なパスフレーズ（約 {{entropy}} ビット）。非常に安全です",
@@ -1233,6 +1247,36 @@
         "kdfCompleted": "KDF計算完了",
         "keyDerivationComplete": "鍵派生完了"
       }
+    }
+  },
+  "decryptMetadata": {
+    "title": "メタデータ復号",
+    "source": "暗号化データを取得",
+    "sourceDesc": "ベースURL + CIDを入力するか、暗号化ファイルを直接アップロード",
+    "baseUrl": "ベースURL",
+    "cidPlaceholder": "CIDを貼り付け",
+    "fetch": "暗号化データをダウンロード",
+    "upload": "暗号化ファイルをアップロード",
+    "password": "復号パスワード（暗号化時と同じ）",
+    "passwordPlaceholder": "復号パスワードを入力",
+    "hidePassword": "パスワードを非表示",
+    "showPassword": "パスワードを表示",
+    "payload": "暗号化コンテンツ",
+    "payloadPlaceholder": "上からダウンロードするか、暗号化データテキストを直接貼り付け",
+    "decrypt": "復号して表示",
+    "result": "復号結果",
+    "resultPlaceholder": "復号成功後、平文メタデータが表示されます",
+    "cidRequired": "CIDとベースURLを入力してください",
+    "fetchFailed": "暗号化メタデータの取得に失敗しました。CIDまたはネットワークを確認してください",
+    "readFailed": "暗号化ファイルの読み込みに失敗しました",
+    "passwordRequired": "復号パスワードを入力してください",
+    "payloadRequired": "まず暗号化コンテンツを取得または貼り付けてください",
+    "cryptoUnavailable": "この環境ではWeb Cryptoを使用できません",
+    "hashMismatch": "平文ハッシュ検証に失敗しました。パスワードまたはファイルが正しくない可能性があります",
+    "decryptFailed": "復号に失敗しました。パスワードまたはファイルを確認してください",
+    "payloadMeta": {
+      "version": "フォーマットバージョン",
+      "cipher": "アルゴリズム"
     }
   },
   "errors": {

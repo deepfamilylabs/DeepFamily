@@ -379,7 +379,7 @@
         "excellent": "優秀"
       },
       "passwordTips": {
-        "weak": "💡 建議：至少使用 15 個字符，並混合數字、標點、符號或表情"
+        "weak": "💡 建議：至少使用 15 個字符，並混合數字、標點與符號"
       },
       "entropyDisplay": "真實熵值：{{raw}} bits · 評估強度評分：{{adjusted}}",
       "passphraseCharCount": "去除首尾空白後的字元數：{{count}}",
@@ -529,6 +529,7 @@
       "loading": "NFT 資訊載入中…",
       "loadErrorPrefix": "NFT 載入失敗",
       "bcPrefix": "公元前",
+      "decrypt": "解密查看",
       "genders": {
         "male": "男",
         "female": "女",
@@ -960,7 +961,20 @@
     "personInfo": "人物資訊",
     "personInfoHint": "明文不上鏈，僅用於本地零知識證明",
     "personInfoPrivacy": "人物資訊僅用於本地生成零知識證明，明文不會上鏈，僅雜湊值永久保存。",
-    "parentInfoNotice": "填寫父母資訊本地生成零知識證明建立家族鏈接（僅雜湊值上鏈），可觸發 DEEP 功能積分發放。父母資訊需與其實際版本完全一致（含口令）才能成功關聯。"
+    "parentInfoNotice": "填寫父母資訊本地生成零知識證明建立家族鏈接（僅雜湊值上鏈），可觸發 DEEP 功能積分發放。父母資訊需與其實際版本完全一致（含口令）才能成功關聯。",
+    "encryptionPasswordRequired": "請填寫加密口令",
+    "encryptionPasswordWeak": "口令至少 8 位",
+    "encryptionPasswordMismatch": "兩次輸入的口令不一致",
+    "encryptionUnavailable": "當前環境無法使用加密，請更換瀏覽器再試",
+    "encryptionFailed": "加密或匯出元資料失敗，請重試",
+    "encryptionPassword": "元資料加密口令（AES-GCM，本地加密）",
+    "encryptionHint": "鏈上只存密文 CID",
+    "usePassphraseForEncryption": "使用身分口令加密元資料",
+    "encryptionPasswordAuto": "元資料 CID 將沿用身分口令，關閉開關可設定獨立口令。",
+    "encryptionPasswordPlaceholder": "至少 8 位口令",
+    "encryptionPasswordConfirm": "再次輸入口令",
+    "encryptionNotice": "元資料先在本地加密再生成 CID，請妥善保管口令，遺失將無法解密。",
+    "generatingMetadataCID": "生成元資料 CID..."
   },
   "mintNFT": {
     "title": "鑄造 NFT",
@@ -1218,7 +1232,7 @@
       "bitsSummary": "原始熵約 {{raw}} bits · 評估強度評分約 {{adjusted}}",
       "recommendations": {
         "empty": "⚠️ 空口令短語不安全！姓名和生日可能被猜測，強烈建議添加 15+ 字元的強口令短語",
-        "weak": "❌ 熵值過低（約 {{entropy}} 位）。建議：使用 15+ 字元，混合字母/數字/符號/表情",
+        "weak": "❌ 熵值過低（約 {{entropy}} 位）。建議：使用 15+ 字元，混合字母/數字/符號",
         "medium": "⚠️ 中等強度（約 {{entropy}} 位）。建議：增加到 25+ 字元或使用更多符號",
         "strong": "✅ 強口令短語（約 {{entropy}} 位）。適用於密鑰派生",
         "veryStrong": "🔒 非常強的口令短語（約 {{entropy}} 位）。高度安全",
@@ -1233,6 +1247,36 @@
         "kdfCompleted": "KDF 計算完成",
         "keyDerivationComplete": "密鑰派生完成"
       }
+    }
+  },
+  "decryptMetadata": {
+    "title": "解密元資料",
+    "source": "獲取加密資料",
+    "sourceDesc": "填寫基礎連結 + CID，或直接上傳加密檔案",
+    "baseUrl": "基礎連結",
+    "cidPlaceholder": "貼上 CID",
+    "fetch": "下載加密資料",
+    "upload": "上傳加密檔案",
+    "password": "解密口令（與加密時一致）",
+    "passwordPlaceholder": "輸入解密口令",
+    "hidePassword": "隱藏口令",
+    "showPassword": "顯示口令",
+    "payload": "加密內容",
+    "payloadPlaceholder": "從上方下載或直接貼上加密資料文字",
+    "decrypt": "解密並查看",
+    "result": "解密結果",
+    "resultPlaceholder": "解密成功後會顯示明文元資料",
+    "cidRequired": "請填寫 CID 和基礎連結",
+    "fetchFailed": "獲取加密元資料失敗，請檢查 CID 或網路",
+    "readFailed": "讀取加密檔案失敗",
+    "passwordRequired": "請輸入解密口令",
+    "payloadRequired": "請先獲取或貼上加密內容",
+    "cryptoUnavailable": "當前環境無法使用 Web Crypto 解密",
+    "hashMismatch": "明文雜湊校驗失敗，口令或檔案可能不一致",
+    "decryptFailed": "解密失敗，請檢查口令或檔案",
+    "payloadMeta": {
+      "version": "格式版本",
+      "cipher": "演算法"
     }
   },
   "errors": {

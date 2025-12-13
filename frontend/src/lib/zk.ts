@@ -1,4 +1,5 @@
-import { toUtf8Bytes, keccak256 } from 'ethers'
+import { keccak256 } from 'ethers'
+import { normalizeNameForHash, normalizePassphraseForHash } from './passphraseStrength'
 // @ts-ignore
 import * as snarkjs from 'snarkjs'
 
@@ -14,6 +15,8 @@ type ZkArtifacts = {
   wasm: Uint8Array
   zkey: Uint8Array
 }
+
+const textEncoder = new TextEncoder()
 
 
 let personHashArtifactsPromise: Promise<ZkArtifacts> | null = null
@@ -106,7 +109,7 @@ export interface PersonData {
 
 // Hash helpers convert UTF-8 string to keccak bytes array (32 elements)
 function keccakStringToBytes(value: string): number[] {
-  const hash = keccak256(toUtf8Bytes(value || ''))
+  const hash = keccak256(textEncoder.encode(value || ''))
   const bytes = new Uint8Array(32)
   for (let i = 0; i < 32; i++) {
     bytes[i] = parseInt(hash.slice(2 + i * 2, 4 + i * 2), 16)
@@ -115,7 +118,8 @@ function keccakStringToBytes(value: string): number[] {
 }
 
 export function hashFullName(fullName: string): number[] {
-  return keccakStringToBytes(fullName)
+  const normalized = normalizeNameForHash(fullName)
+  return keccakStringToBytes(normalized)
 }
 
 type PassphraseInput = string | number | bigint | Array<string | number | bigint> | undefined | null
@@ -124,7 +128,7 @@ export function hashPassphrase(passphrase: PassphraseInput): number[] {
   if (Array.isArray(passphrase)) {
     return passphrase.slice(0, 32).map((v) => Number(v) & 0xff)
   }
-  const normalized = passphrase == null ? '' : String(passphrase)
+  const normalized = passphrase == null ? '' : normalizePassphraseForHash(String(passphrase))
   if (normalized.length === 0) {
     return Array(32).fill(0)
   }
@@ -179,8 +183,8 @@ export async function generatePersonProof(
       mother_birthDay: motherData.birthDay,
       mother_gender: motherData.gender,
       
-      hasFather: father && father.fullName.trim() ? 1 : 0,
-      hasMother: mother && mother.fullName.trim() ? 1 : 0,
+      hasFather: father && normalizeNameForHash(father.fullName || '').length ? 1 : 0,
+      hasMother: mother && normalizeNameForHash(mother.fullName || '').length ? 1 : 0,
       submitter: BigInt(submitterAddress).toString()
     }
 

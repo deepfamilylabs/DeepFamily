@@ -529,6 +529,7 @@
       "loading": "NFT 信息加载中…",
       "loadErrorPrefix": "NFT 加载失败",
       "bcPrefix": "公元前",
+      "decrypt": "解密查看",
       "genders": {
         "male": "男",
         "female": "女",
@@ -961,7 +962,20 @@
     "personInfo": "人物信息",
     "personInfoHint": "明文不上链，仅用于本地零知识证明",
     "personInfoPrivacy": "人物信息仅用于本地生成零知识证明，明文不会上链，仅哈希值永久保存。",
-    "parentInfoNotice": "填写父母信息本地生成零知识证明建立家族链接（仅哈希值上链），可触发 DEEP 功能积分发放。父母信息需与其实际版本完全一致（含口令）才能成功关联。"
+    "parentInfoNotice": "填写父母信息本地生成零知识证明建立家族链接（仅哈希值上链），可触发 DEEP 功能积分发放。父母信息需与其实际版本完全一致（含口令）才能成功关联。",
+    "encryptionPasswordRequired": "请填写加密口令",
+    "encryptionPasswordWeak": "口令至少 8 位",
+    "encryptionPasswordMismatch": "两次输入的口令不一致",
+    "encryptionUnavailable": "当前环境无法使用加密，请更换浏览器再试",
+    "encryptionFailed": "加密或导出元数据失败，请重试",
+    "encryptionPassword": "元数据加密口令（AES-GCM，本地加密）",
+    "encryptionHint": "链上只存密文 CID",
+    "usePassphraseForEncryption": "使用身份口令加密元数据",
+    "encryptionPasswordAuto": "元数据 CID 将复用身份口令，关闭开关可设置单独口令。",
+    "encryptionPasswordPlaceholder": "至少 8 位口令",
+    "encryptionPasswordConfirm": "再次输入口令",
+    "encryptionNotice": "元数据先在本地加密再生成 CID，请妥善保管口令，遗失将无法解密。",
+    "generatingMetadataCID": "生成元数据 CID..."
   },
   "mintNFT": {
     "title": "铸造 NFT",
@@ -1218,7 +1232,7 @@
       "recommendations": {
         "empty": "⚠️ 空口令短语：安全性不足。强烈建议使用 15+ 字符的强口令短语",
         "weak": "❌ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性不足。建议：15+ 混合字符或 20+ 纯字母",
-        "medium": "⚠️ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。低于推荐阈值。建议：18+ 字符并混合符号/表情",
+        "medium": "⚠️ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。低于推荐阈值。建议：18+ 字符并混合符号",
         "strong": "✅ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性良好",
         "veryStrong": "🔐 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性很强",
         "excellent": "🛡️ 原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性极佳"
@@ -1232,6 +1246,36 @@
         "kdfCompleted": "KDF 计算完成",
         "keyDerivationComplete": "密钥派生完成"
       }
+    }
+  },
+  "decryptMetadata": {
+    "title": "解密元数据",
+    "source": "获取加密数据",
+    "sourceDesc": "填写基础链接 + CID，或直接上传加密文件",
+    "baseUrl": "基础链接",
+    "cidPlaceholder": "粘贴 CID",
+    "fetch": "下载加密数据",
+    "upload": "上传加密文件",
+    "password": "解密口令（与加密时一致）",
+    "passwordPlaceholder": "输入解密口令",
+    "hidePassword": "隐藏口令",
+    "showPassword": "显示口令",
+    "payload": "加密内容",
+    "payloadPlaceholder": "从上方下载或直接粘贴加密数据文本",
+    "decrypt": "解密并查看",
+    "result": "解密结果",
+    "resultPlaceholder": "解密成功后会显示明文元数据",
+    "cidRequired": "请填写 CID 和基础链接",
+    "fetchFailed": "获取加密元数据失败，请检查 CID 或网络",
+    "readFailed": "读取加密文件失败",
+    "passwordRequired": "请输入解密口令",
+    "payloadRequired": "请先获取或粘贴加密内容",
+    "cryptoUnavailable": "当前环境无法使用 Web Crypto 解密",
+    "hashMismatch": "明文哈希校验失败，口令或文件可能不一致",
+    "decryptFailed": "解密失败，请检查口令或文件",
+    "payloadMeta": {
+      "version": "格式版本",
+      "cipher": "算法"
     }
   },
   "errors": {

@@ -6,13 +6,21 @@
  */
 
 /**
- * Normalize string for consistent hashing
- * Applies NFC normalization to ensure cross-platform compatibility
+ * Normalize full name for hashing
+ * Uses NFC (canonical composition); no trimming or other mutation
  */
-export const normalizeForHash = (value: string): string => {
+export const normalizeNameForHash = (value: string): string => {
   if (!value) return ''
-  const trimmed = value.trim()
-  return typeof trimmed.normalize === 'function' ? trimmed.normalize('NFC') : trimmed
+  return typeof value.normalize === 'function' ? value.normalize('NFC') : value
+}
+
+/**
+ * Normalize passphrase for hashing
+ * Uses NFKD (BIP39-style); no trimming or other mutation
+ */
+export const normalizePassphraseForHash = (value: string): string => {
+  if (!value) return ''
+  return typeof value.normalize === 'function' ? value.normalize('NFKD') : value
 }
 
 /**
@@ -141,7 +149,7 @@ export function validatePassphraseStrength(
   passphrase: string,
   includeRecommendation: boolean = false
 ): PassphraseStrength {
-  const normalized = normalizeForHash(passphrase)
+  const normalized = normalizePassphraseForHash(passphrase)
 
   if (!normalized) {
     return {

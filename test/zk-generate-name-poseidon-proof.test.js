@@ -2,7 +2,8 @@ const { expect } = require("chai");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { keccak256, getBytes, toUtf8Bytes } = require("ethers");
+const { keccak256, getBytes } = require("ethers");
+const { TextEncoder } = require("util");
 
 const {
   keccakUtf8Bytes,
@@ -10,9 +11,12 @@ const {
   buildNamePoseidonInput,
   resolveExistingFile,
 } = require("../tasks/zk-generate-name-poseidon-proof.js");
+const { normalizeNameForHash, normalizePassphraseForHash } = require("../lib/namePoseidon");
+
+const textEncoder = new TextEncoder();
 
 function referenceKeccakBytes(value) {
-  return Array.from(getBytes(keccak256(toUtf8Bytes(value))));
+  return Array.from(getBytes(keccak256(textEncoder.encode(value))));
 }
 
 describe("zk-generate-name-poseidon-proof helpers", function () {
@@ -42,14 +46,18 @@ describe("zk-generate-name-poseidon-proof helpers", function () {
     it("hashes the full name and zeroizes salt when passphrase omitted", function () {
       const input = buildNamePoseidonInput(" Alice Smith ", "");
 
-      expect(input.fullNameHash).to.deep.equal(referenceKeccakBytes("Alice Smith"));
+      expect(input.fullNameHash).to.deep.equal(
+        referenceKeccakBytes(normalizeNameForHash(" Alice Smith "))
+      );
       expect(input.saltHash).to.deep.equal(zeroBytes32());
     });
 
     it("hashes the passphrase when provided", function () {
       const input = buildNamePoseidonInput("Alice", "hunter2");
 
-      expect(input.saltHash).to.deep.equal(referenceKeccakBytes("hunter2"));
+      expect(input.saltHash).to.deep.equal(
+        referenceKeccakBytes(normalizePassphraseForHash("hunter2"))
+      );
     });
 
     it("rejects empty names", function () {

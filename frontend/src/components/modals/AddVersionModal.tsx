@@ -1,16 +1,18 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download, Star } from 'lucide-react'
+import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download, Star, Eye, EyeOff } from 'lucide-react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
 import { generatePersonProof, verifyProof } from '../../lib/zk'
 import { useContract } from '../../hooks/useContract'
 import { generateMetadataCID } from '../../lib/cid'
+import { encryptMetadataJson, passwordFingerprint, sha256Hex } from '../../lib/metadataCrypto'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
 import { getFriendlyError } from '../../lib/errors'
+import { normalizeNameForHash } from '../../lib/passphraseStrength'
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -29,6 +31,13 @@ type AddVersionFormInput = {
 }
 
 type AddVersionFormData = z.infer<typeof addVersionSchema>
+
+type EncryptedMetadataBundle = {
+  json: string
+  cid: string
+  plainHash: string
+  passwordFingerprint: string
+}
 
 interface AddVersionModalProps {
   isOpen: boolean
@@ -61,6 +70,14 @@ export default function AddVersionModal({
   const [consents, setConsents] = useState({ hash: false, age: false, legal: false })
   const [consentError, setConsentError] = useState<string | null>(null)
   const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
+  const [encryptionPassword, setEncryptionPassword] = useState('')
+  const [confirmEncryptionPassword, setConfirmEncryptionPassword] = useState('')
+  const [encryptionError, setEncryptionError] = useState<string | null>(null)
+  const [usePersonPassphraseForEncryption, setUsePersonPassphraseForEncryption] = useState(true)
+  const [encryptedMetadata, setEncryptedMetadata] = useState<EncryptedMetadataBundle | null>(null)
+  const [showEncryptionPassword, setShowEncryptionPassword] = useState(false)
+  const [showConfirmEncryptionPassword, setShowConfirmEncryptionPassword] = useState(false)
+  const [supportsCssMasking, setSupportsCssMasking] = useState(false)
   const [successResult, setSuccessResult] = useState<{
     hash: string
     index: number
@@ -154,13 +171,31 @@ export default function AddVersionModal({
   }, [])
 
   // Enter animation for mobile bottom sheet
-  useEffect(() => { 
+  useEffect(() => {
     if (isOpen) { 
       requestAnimationFrame(() => setEntered(true)) 
     } else { 
       setEntered(false) 
     } 
   }, [isOpen])
+
+  // Keep metadata encryption password in sync with the identity passphrase when opted in
+  useEffect(() => {
+    if (!usePersonPassphraseForEncryption) return
+    const next = personInfo?.passphrase || ''
+    setEncryptionPassword(next)
+    setConfirmEncryptionPassword(next)
+    setEncryptionError(null)
+  }, [personInfo?.passphrase, usePersonPassphraseForEncryption])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.CSS === 'undefined' || typeof window.CSS.supports !== 'function') {
+      setSupportsCssMasking(false)
+      return
+    }
+    const canMask = window.CSS.supports('-webkit-text-security', 'disc') || window.CSS.supports('text-security', 'disc')
+    setSupportsCssMasking(canMask)
+  }, [])
 
   const {
     register,
@@ -188,9 +223,10 @@ export default function AddVersionModal({
   const getParentInfoStatus = (parentType: 'father' | 'mother') => {
     const info = parentType === 'father' ? fatherInfo : motherInfo
     const versionIndex = parentType === 'father' ? watchedValues.fatherVersionIndex : watchedValues.motherVersionIndex
-    
-    if (!info || !info.fullName.trim()) return 'empty'
-    if (info.fullName.trim() && typeof versionIndex === 'number' && versionIndex > 0) return 'complete'
+
+    const normalizedName = normalizeNameForHash(info?.fullName || '')
+    if (!info || !normalizedName) return 'empty'
+    if (normalizedName && typeof versionIndex === 'number' && versionIndex > 0) return 'complete'
     return 'partial'
   }
   
@@ -214,7 +250,8 @@ export default function AddVersionModal({
   }, [initialPersonData])
 
   const computeHashOrZero = (info: typeof personInfo) => {
-    if (!info || !info.fullName?.trim()) return ethers.ZeroHash
+    const normalizedName = normalizeNameForHash(info?.fullName || '')
+    if (!info || !normalizedName) return ethers.ZeroHash
     const hash = computePersonHash(info)
     return hash && hash.length > 0 ? hash : ethers.ZeroHash
   }
@@ -258,9 +295,9 @@ export default function AddVersionModal({
     const fatherData = sanitizeInfo(fatherInfo) ?? baseEmpty
     const motherData = sanitizeInfo(motherInfo) ?? baseEmpty
 
-    // Strictly build according to deepfamily/person-version@0.1 schema field order
+    // Strictly build according to deepfamily/person-version@1.0 schema field order
     return {
-      schema: 'deepfamily/person-version@0.1',
+      schema: 'deepfamily/person-version@1.0',
       tag: tagValue || '',
       person: {
         fullName: personData.fullName,
@@ -304,6 +341,10 @@ export default function AddVersionModal({
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
+    setEncryptionPassword('')
+    setConfirmEncryptionPassword('')
+    setEncryptionError(null)
+    setEncryptedMetadata(null)
     setSuccessResult(null)
     setErrorResult(null)
     setFatherExpanded(false)
@@ -324,6 +365,10 @@ export default function AddVersionModal({
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
+    setEncryptionPassword('')
+    setConfirmEncryptionPassword('')
+    setEncryptionError(null)
+    setEncryptedMetadata(null)
     setSuccessResult(null)
     setErrorResult(null)
     setFatherExpanded(false)
@@ -379,6 +424,10 @@ export default function AddVersionModal({
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
+    setEncryptionPassword('')
+    setConfirmEncryptionPassword('')
+    setEncryptionError(null)
+    setEncryptedMetadata(null)
     setSuccessResult(null)
     setErrorResult(null)
     setFatherExpanded(false)
@@ -397,21 +446,65 @@ export default function AddVersionModal({
     })
   }
 
-  const handleDownloadMetadata = () => {
-    const processedData = addVersionSchema.parse(watchedValues)
-    const metadataPayload = buildMetadataPayload(processedData.tag, processedData)
-    const metadataJson = JSON.stringify(metadataPayload, null, 2)
-    
-    // Create blob and download
-    const blob = new Blob([metadataJson], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `metadata-${watchedValues.metadataCID || Date.now()}.json`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+  const validateEncryptionPassword = () => {
+    if (!encryptionPassword.trim()) {
+      setEncryptionError(t('addVersion.encryptionPasswordRequired', 'Please enter encryption password'))
+      return false
+    }
+    if (encryptionPassword.length < 8) {
+      setEncryptionError(t('addVersion.encryptionPasswordWeak', 'Password must be at least 8 characters'))
+      return false
+    }
+    if (encryptionPassword !== confirmEncryptionPassword) {
+      setEncryptionError(t('addVersion.encryptionPasswordMismatch', 'Passwords do not match'))
+      return false
+    }
+    setEncryptionError(null)
+    return true
+  }
+
+  const prepareEncryptedMetadata = async (tagValue: string, processedData: AddVersionFormData, password: string) => {
+    const metadataPayload = buildMetadataPayload(tagValue, processedData)
+    const metadataJson = JSON.stringify(metadataPayload)
+    const bundlePlainHash = sha256Hex(metadataJson)
+
+    if (encryptedMetadata && encryptedMetadata.plainHash === bundlePlainHash && encryptedMetadata.passwordFingerprint === passwordFingerprint(password)) {
+      return encryptedMetadata
+    }
+
+    const { payload, plainHash } = await encryptMetadataJson(metadataJson, password)
+    const encryptedJson = JSON.stringify(payload)
+    const cid = await generateMetadataCID(encryptedJson)
+    const bundle = {
+      json: encryptedJson,
+      cid,
+      plainHash,
+      passwordFingerprint: passwordFingerprint(password)
+    }
+    setEncryptedMetadata(bundle)
+    return bundle
+  }
+
+  const handleDownloadMetadata = async () => {
+    try {
+      if (!validateEncryptionPassword()) return
+      const processedData = addVersionSchema.parse(watchedValues)
+      const { json, cid } = await prepareEncryptedMetadata(processedData.tag, processedData, encryptionPassword)
+      setValue('metadataCID', cid, { shouldDirty: true, shouldValidate: true })
+
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `metadata-encrypted-${cid || Date.now()}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      console.error('Download metadata failed', err)
+      alert(t('addVersion.encryptionFailed', 'Failed to encrypt or export metadata, please try again'))
+    }
   }
 
 
@@ -431,8 +524,11 @@ export default function AddVersionModal({
     // Transform the input data to the final form
     const processedData = addVersionSchema.parse(data)
 
-    if (!personInfo || !personInfo.fullName.trim()) {
+    if (!personInfo || !normalizeNameForHash(personInfo.fullName || '')) {
       alert(t('addVersion.personInfoRequired', 'Please fill in person information'))
+      return
+    }
+    if (!validateEncryptionPassword()) {
       return
     }
     // Clear old prompt information
@@ -459,8 +555,8 @@ export default function AddVersionModal({
       
       const { proof, publicSignals } = await generatePersonProof(
         personInfo,
-        fatherInfo && fatherInfo.fullName.trim() ? fatherInfo : null,
-        motherInfo && motherInfo.fullName.trim() ? motherInfo : null,
+        fatherInfo && normalizeNameForHash(fatherInfo.fullName || '').length ? fatherInfo : null,
+        motherInfo && normalizeNameForHash(motherInfo.fullName || '').length ? motherInfo : null,
         submitterAddress
       )
       
@@ -479,13 +575,9 @@ export default function AddVersionModal({
 
       setProofGenerationStep(t('addVersion.generatingMetadataCID', 'Generating metadata CID...'))
 
-      const metadataPayload = buildMetadataPayload(processedData.tag, processedData)
-      const metadataJson = JSON.stringify(metadataPayload)
-      console.log('📄 Metadata payload JSON:', metadataJson)
-
-      // Generate CID using configured method
-      const metadataCID = await generateMetadataCID(metadataJson)
-      console.log('🔑 Generated CID:', metadataCID)
+      const { json: encryptedJson, cid: metadataCID } = await prepareEncryptedMetadata(processedData.tag, processedData, encryptionPassword)
+      console.log('📄 Encrypted metadata payload JSON (stored locally):', encryptedJson ? '[encrypted payload ready]' : '[none]')
+      console.log('🔑 Generated CID from encrypted payload:', metadataCID)
 
       processedData.metadataCID = metadataCID
       setValue('metadataCID', metadataCID, { shouldDirty: true, shouldValidate: true })
@@ -885,7 +977,98 @@ export default function AddVersionModal({
                 placeholder={t('addVersion.tagPlaceholder', 'Optional tag')}
               />
             </div>
-
+            <div className="rounded-lg border border-blue-100 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/20 p-3 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <label className="font-medium text-gray-900 dark:text-gray-100">
+                    {t('addVersion.encryptionPassword', 'Metadata Encryption Password (AES-GCM, local encryption)')}
+                  </label>
+                </div>
+                <label className="flex items-center gap-2 text-[11px] text-gray-700 dark:text-gray-200">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-blue-400 text-blue-600 focus:ring-blue-500"
+                    checked={usePersonPassphraseForEncryption}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setUsePersonPassphraseForEncryption(checked)
+                      if (checked) {
+                        const next = personInfo?.passphrase || ''
+                        setEncryptionPassword(next)
+                        setConfirmEncryptionPassword(next)
+                        if (encryptionError) setEncryptionError(null)
+                      }
+                    }}
+                  />
+                  <span>{t('addVersion.usePassphraseForEncryption', 'Use identity passphrase for metadata encryption')}</span>
+                </label>
+              </div>
+              {usePersonPassphraseForEncryption ? (
+                <div className="space-y-1 text-[11px] text-gray-700 dark:text-gray-200">
+                  <p className="text-amber-800 dark:text-amber-200">{t('addVersion.encryptionNotice', 'Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.')}</p>
+                  {encryptionError && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{encryptionError}</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="relative">
+                      <input
+                        type={showEncryptionPassword || !supportsCssMasking ? (showEncryptionPassword ? 'text' : 'password') : 'text'}
+                        value={encryptionPassword}
+                        onChange={(e) => { setEncryptionPassword(e.target.value); if (encryptionError) setEncryptionError(null) }}
+                        className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                        placeholder={t('addVersion.encryptionPasswordPlaceholder', 'At least 8 characters')}
+                        inputMode="text"
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={showEncryptionPassword || !supportsCssMasking ? undefined : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEncryptionPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                        aria-label={showEncryptionPassword ? 'Hide encryption password' : 'Show encryption password'}
+                      >
+                        {showEncryptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showConfirmEncryptionPassword || !supportsCssMasking ? (showConfirmEncryptionPassword ? 'text' : 'password') : 'text'}
+                        value={confirmEncryptionPassword}
+                        onChange={(e) => { setConfirmEncryptionPassword(e.target.value); if (encryptionError) setEncryptionError(null) }}
+                        className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                        placeholder={t('addVersion.encryptionPasswordConfirm', 'Confirm password')}
+                        inputMode="text"
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={showConfirmEncryptionPassword || !supportsCssMasking ? undefined : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmEncryptionPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                        aria-label={showConfirmEncryptionPassword ? 'Hide encryption password confirmation' : 'Show encryption password confirmation'}
+                      >
+                        {showConfirmEncryptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  {encryptionError && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{encryptionError}</p>
+                  )}
+                  <p className="text-[11px] text-amber-800 dark:text-amber-200 leading-snug">
+                    {t('addVersion.encryptionNotice', 'Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.')}
+                  </p>
+                </>
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {t('addVersion.metadataCID', 'Metadata CID')}
@@ -903,7 +1086,7 @@ export default function AddVersionModal({
                 <button
                   type="button"
                   onClick={handleDownloadMetadata}
-                  disabled={!watchedValues.metadataCID}
+                  disabled={isSubmitting}
                   className="px-3 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                   title={t('addVersion.downloadMetadata', 'Download metadata JSON')}
                 >
@@ -1260,7 +1443,7 @@ export default function AddVersionModal({
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting || !personInfo?.fullName.trim() || !allConsentsChecked}
+                    disabled={isSubmitting || !normalizeNameForHash(personInfo?.fullName || '').length || !allConsentsChecked}
                     className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     {isSubmitting ? 

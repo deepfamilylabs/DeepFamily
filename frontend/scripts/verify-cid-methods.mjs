@@ -8,7 +8,7 @@
 import { generateCIDManual, generateCIDIpfs } from '../src/lib/cid.ts'
 
 // Test data - same as user provided
-const testJSON = '{"schema":"deepfamily/person-version@0.1","tag":"v2","person":{"fullName":"a1","gender":0,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0xe1bb518ea41d7194713607378444fa94b9745c3850ecd884f4f96ccdf01cf1c2"},"parents":{"father":{"fullName":"af","gender":1,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0x280cb833b484c9d88bd9db450c6fc401ce0281c5ce35308a22c4fee829cd9789","versionIndex":0},"mother":{"fullName":"am","gender":2,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0x810cebabcdd9f93367b176271294d83ee77ebc8ef99fadb312202fee39859654","versionIndex":0}}}'
+const testJSON = '{"schema":"deepfamily/person-version@1.0","tag":"v2","person":{"fullName":"a1","gender":0,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0xe1bb518ea41d7194713607378444fa94b9745c3850ecd884f4f96ccdf01cf1c2"},"parents":{"father":{"fullName":"af","gender":1,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0x280cb833b484c9d88bd9db450c6fc401ce0281c5ce35308a22c4fee829cd9789","versionIndex":0},"mother":{"fullName":"am","gender":2,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0x810cebabcdd9f93367b176271294d83ee77ebc8ef99fadb312202fee39859654","versionIndex":0}}}'
 
 console.log('='.repeat(70))
 console.log('  CID Generation Methods Verification')
