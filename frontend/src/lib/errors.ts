@@ -7,6 +7,48 @@ export type FriendlyError = {
   reason?: string
 }
 
+type SafeLogValue = string | number | boolean | null
+
+export type SafeLogError = {
+  name?: string
+  message?: string
+  shortMessage?: string
+  code?: SafeLogValue
+  reason?: string
+  stack?: string
+}
+
+const truncate = (value: string, maxLen: number) => {
+  if (!value) return value
+  if (value.length <= maxLen) return value
+  return value.slice(0, maxLen) + '…'
+}
+
+/**
+ * Return a minimal, whitelisted error shape safe for console logging.
+ * Avoids leaking large nested objects that may contain sensitive UI state.
+ */
+export const sanitizeErrorForLogging = (error: any): SafeLogError => {
+  if (error == null) return { message: String(error) }
+  if (typeof error === 'string') return { message: truncate(error, 500) }
+  if (typeof error === 'number' || typeof error === 'boolean') return { message: String(error) }
+
+  const name = typeof error?.name === 'string' ? truncate(error.name, 120) : undefined
+  const message = typeof error?.message === 'string' ? truncate(error.message, 800) : undefined
+  const shortMessage = typeof error?.shortMessage === 'string' ? truncate(error.shortMessage, 800) : undefined
+  const reason = typeof error?.reason === 'string' ? truncate(error.reason, 200) : undefined
+
+  const codeRaw = error?.code
+  const code: SafeLogValue =
+    typeof codeRaw === 'string' || typeof codeRaw === 'number' || typeof codeRaw === 'boolean'
+      ? codeRaw
+      : null
+
+  const stack = typeof error?.stack === 'string' ? truncate(error.stack, 2000) : undefined
+
+  return { name, message, shortMessage, code, reason, stack }
+}
+
 // Contract selector -> error name
 export const ERROR_SELECTOR_MAP: Record<string, string> = {
   // DeepFamily contract errors (keccak256 selector first 4 bytes)

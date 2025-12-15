@@ -5,7 +5,7 @@ import { useConfig } from '../context/ConfigContext'
 import { useToast } from '../components/ToastProvider'
 import { useTranslation } from 'react-i18next'
 import DeepFamily from '../abi/DeepFamily.json'
-import { extractRevertReason, getFriendlyError } from '../lib/errors'
+import { extractRevertReason, getFriendlyError, sanitizeErrorForLogging } from '../lib/errors'
 
 // Groth16 proof type from snarkjs
 export type Groth16Proof = {
@@ -59,15 +59,6 @@ function toBigInt(v: string | number | bigint): bigint {
   throw new Error('unsupported type')
 }
 
-// Safe stringify for logging BigInt values
-function safeStringify(value: any) {
-  try {
-    return JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2)
-  } catch {
-    return '[unstringifiable]'
-  }
-}
-
 export function useContract() {
   const { signer, provider } = useWallet()
   const { contractAddress } = useConfig()
@@ -114,7 +105,7 @@ export function useContract() {
           const signerAddress = await signer.getAddress()
           const balance = await signer.provider.getBalance(signerAddress)
         } catch (walletStateError) {
-          console.warn('Failed to get wallet state:', walletStateError)
+          console.warn('Failed to get wallet state:', sanitizeErrorForLogging(walletStateError))
         }
       }
 
@@ -170,8 +161,8 @@ export function useContract() {
 
       options.onSuccess?.(receipt)
       return receipt
-    } catch (error: any) {
-      console.error('Transaction failed:', error)
+	    } catch (error: any) {
+	      console.error('Transaction failed:', sanitizeErrorForLogging(error))
 
       // Use unified error handling from errors.ts
       const friendly = getFriendlyError(error, t)
@@ -286,12 +277,12 @@ export function useContract() {
       try {
         const gasEstimate = await contract.addPersonZK.estimateGas(...addPersonArgs)
         gasLimit = gasEstimate * 120n / 100n
-      } catch (estimateError: any) {
-        console.warn('⚠️ Gas estimation failed, attempting static call and fallback gas limit.', estimateError)
-        const decodedReason = extractRevertReason(contract, estimateError)
-        if (decodedReason) {
-          ;(estimateError as any).__dfDecodedReason = decodedReason
-        }
+	      } catch (estimateError: any) {
+	        console.warn('⚠️ Gas estimation failed, attempting static call and fallback gas limit.', sanitizeErrorForLogging(estimateError))
+	        const decodedReason = extractRevertReason(contract, estimateError)
+	        if (decodedReason) {
+	          ;(estimateError as any).__dfDecodedReason = decodedReason
+	        }
 
         // Try staticCall to get a better error message
         try {
@@ -388,38 +379,27 @@ export function useContract() {
         blockNumber: receipt.blockNumber,
         events
       }
-    } catch (contractError: any) {
-      console.error('❌ Contract call failed:', contractError)
-      console.error('📋 Full error object:', safeStringify(contractError))
-      console.error('📋 Error properties:', {
-        code: contractError?.code,
-        reason: contractError?.reason,
-        data: contractError?.data,
-        message: contractError?.message,
-        error: contractError?.error,
-        transaction: contractError?.transaction
-      })
+	    } catch (contractError: any) {
+	      console.error('❌ Contract call failed:', sanitizeErrorForLogging(contractError))
 
-      // Use unified error handling from errors.ts
-      const friendly = getFriendlyError(contractError, t)
+	      // Use unified error handling from errors.ts
+	      const friendly = getFriendlyError(contractError, t)
 
-      console.error('📋 Error analysis:', {
-        type: friendly.type,
-        message: friendly.message,
-        details: friendly.details,
-        reason: friendly.reason,
-        originalError: contractError
-      })
+	      console.error('📋 Error analysis:', {
+	        type: friendly.type,
+	        message: friendly.message,
+	        details: friendly.details,
+	        reason: friendly.reason
+	      })
 
       toast.show(t('contract.addVersionFailed', 'Failed to add person version') + ': ' + friendly.message)
 
       // Throw enhanced error with additional information
-      const enhancedError = new Error(friendly.message)
-      ;(enhancedError as any).type = friendly.type
-      ;(enhancedError as any).details = friendly.details
-      ;(enhancedError as any).originalError = contractError
-      ;(enhancedError as any).reason = friendly.reason
-      ;(enhancedError as any).humanMessage = friendly.message
+	      const enhancedError = new Error(friendly.message)
+	      ;(enhancedError as any).type = friendly.type
+	      ;(enhancedError as any).details = friendly.details
+	      ;(enhancedError as any).reason = friendly.reason
+	      ;(enhancedError as any).humanMessage = friendly.message
 
       throw enhancedError
     }
@@ -483,7 +463,7 @@ export function useContract() {
         try {
           const testReward = await contract!.DEEP_FAMILY_TOKEN_CONTRACT()
         } catch (connectivityError) {
-          console.error('❌ Contract connectivity test failed:', connectivityError)
+        console.error('❌ Contract connectivity test failed:', sanitizeErrorForLogging(connectivityError))
           throw new Error(`Contract connectivity issue: ${(connectivityError as any)?.message || connectivityError}`)
         }
 
@@ -493,7 +473,7 @@ export function useContract() {
           try {
             const gasEst = await contract!.endorseVersion.estimateGas(personHash, versionIndex, overrides)
           } catch (gasError) {
-            console.error('❌ Gas estimation failed:', gasError)
+            console.error('❌ Gas estimation failed:', sanitizeErrorForLogging(gasError))
             // Don't throw here, just log - sometimes gas estimation fails but actual call works
           }
 
@@ -522,7 +502,7 @@ export function useContract() {
       const result = await contract.listPersonVersions(personHash, offset, pageSize)
       return result
     } catch (error) {
-      console.error('Failed to list person versions:', error)
+      console.error('Failed to list person versions:', sanitizeErrorForLogging(error))
       console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
@@ -535,7 +515,7 @@ export function useContract() {
       const result = await contract.listVersionEndorsements(personHash, offset, pageSize)
       return result
     } catch (error) {
-      console.error('Failed to get endorsement stats:', error)
+      console.error('Failed to get endorsement stats:', sanitizeErrorForLogging(error))
       console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
@@ -548,7 +528,7 @@ export function useContract() {
       const result = await contract.getVersionDetails(personHash, versionIndex)
       return result
     } catch (error) {
-      console.error('Failed to get version details:', error)
+      console.error('Failed to get version details:', sanitizeErrorForLogging(error))
       console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
@@ -561,7 +541,7 @@ export function useContract() {
       const result = await contract.getNFTDetails(tokenId)
       return result
     } catch (error) {
-      console.error('Failed to get NFT details:', error)
+      console.error('Failed to get NFT details:', sanitizeErrorForLogging(error))
       console.warn(t('contract.queryFailed', 'Failed to query data'))
       return null
     }
@@ -582,7 +562,7 @@ export function useContract() {
       const result = await contract.getPersonHash(basicInfo)
       return result
     } catch (error) {
-      console.error('Failed to get person hash:', error)
+      console.error('Failed to get person hash:', sanitizeErrorForLogging(error))
       return null
     }
   }, [contract])
