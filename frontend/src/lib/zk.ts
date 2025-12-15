@@ -1,5 +1,6 @@
 import { keccak256 } from 'ethers'
 import { normalizeNameForHash, normalizePassphraseForHash } from './passphraseStrength'
+import { sanitizeErrorForLogging } from './errors'
 // @ts-ignore
 import * as snarkjs from 'snarkjs'
 
@@ -195,7 +196,7 @@ export async function generatePersonProof(
 
     return { proof, publicSignals }
   } catch (error) {
-    console.error('Error generating ZK proof:', error)
+    console.error('Error generating ZK proof:', sanitizeErrorForLogging(error))
     throw new Error(`Failed to generate ZK proof: ${error}`)
   }
 }
@@ -212,7 +213,7 @@ export async function verifyProof(
     const result = await snarkjs.groth16.verify(vKey, publicSignals, proof)
     return result
   } catch (error) {
-    console.error('Error verifying proof:', error)
+    console.error('Error verifying proof:', sanitizeErrorForLogging(error))
     return false
   }
 }
@@ -240,7 +241,7 @@ export async function generateNamePoseidonProof(
 
     return { proof, publicSignals }
   } catch (error) {
-    console.error('Error generating name poseidon ZK proof:', error)
+    console.error('Error generating name poseidon ZK proof:', sanitizeErrorForLogging(error))
     throw new Error(`Failed to generate name poseidon ZK proof: ${error}`)
   }
 }
@@ -254,7 +255,7 @@ export async function verifyNamePoseidonProof(
     const vKey = await vKeyResponse.json()
     return snarkjs.groth16.verify(vKey, publicSignals, proof)
   } catch (error) {
-    console.error('Error verifying name poseidon proof:', error)
+    console.error('Error verifying name poseidon proof:', sanitizeErrorForLogging(error))
     return false
   }
 }

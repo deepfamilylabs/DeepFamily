@@ -44,6 +44,8 @@ personHash = keccak256(Poseidon(fullNameCommitment, packedBirthData))
   - **Public Trees**: Use shared passphrases for collaborative family building
   - **Private Trees**: Use unique passphrases for complete protection and relationship correctness
 
+**Practical Unlinkability & Anti-Pollution**: Each member chooses a private passphrase (“family secret”) that never leaves the client. The full name plus this passphrase are hashed together, producing a unique commitment that is stored on-chain instead of plaintext data. Same name with different passphrases yields distinct commitments, so outsiders cannot correlate records or infer identity, nor can they inject fake nodes pointing to existing people. Relationship proofs run through Groth16 only reveal hashed limbs and the submitter address; names, birthdays, and biographies stay off-chain until the user opts to mint an NFT. NFT minting intentionally discloses the name and story for community verification but does not modify or contaminate the underlying hashed family graph.
+
 ### Core Hash Computation
 
 The system uses this salted dual-hash approach in the contract's `getPersonHash()` function:

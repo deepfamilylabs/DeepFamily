@@ -11,7 +11,8 @@ import { useContract } from '../../hooks/useContract'
 import { generateMetadataCID } from '../../lib/cid'
 import { encryptMetadataJson, passwordFingerprint, sha256Hex } from '../../lib/metadataCrypto'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
-import { getFriendlyError } from '../../lib/errors'
+import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
+import { getFriendlyError, sanitizeErrorForLogging } from '../../lib/errors'
 import { normalizeNameForHash } from '../../lib/passphraseStrength'
 
 const addVersionSchema = z.object({
@@ -37,6 +38,15 @@ type EncryptedMetadataBundle = {
   cid: string
   plainHash: string
   passwordFingerprint: string
+}
+
+type PersonInfoPublic = {
+  fullName: string
+  gender: number
+  birthYear: number
+  birthMonth: number
+  birthDay: number
+  isBirthBC: boolean
 }
 
 interface AddVersionModalProps {
@@ -70,14 +80,11 @@ export default function AddVersionModal({
   const [consents, setConsents] = useState({ hash: false, age: false, legal: false })
   const [consentError, setConsentError] = useState<string | null>(null)
   const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
-  const [encryptionPassword, setEncryptionPassword] = useState('')
-  const [confirmEncryptionPassword, setConfirmEncryptionPassword] = useState('')
   const [encryptionError, setEncryptionError] = useState<string | null>(null)
   const [usePersonPassphraseForEncryption, setUsePersonPassphraseForEncryption] = useState(true)
   const [encryptedMetadata, setEncryptedMetadata] = useState<EncryptedMetadataBundle | null>(null)
   const [showEncryptionPassword, setShowEncryptionPassword] = useState(false)
   const [showConfirmEncryptionPassword, setShowConfirmEncryptionPassword] = useState(false)
-  const [supportsCssMasking, setSupportsCssMasking] = useState(false)
   const [successResult, setSuccessResult] = useState<{
     hash: string
     index: number
@@ -97,36 +104,18 @@ export default function AddVersionModal({
   } | null>(null)
   
   // Person hash and info from PersonHashCalculator
-  const [personInfo, setPersonInfo] = useState<{
-    fullName: string
-    gender: number
-    birthYear: number
-    birthMonth: number
-    birthDay: number
-    isBirthBC: boolean
-    passphrase: string
-  } | null>(null)
+  const [personInfo, setPersonInfo] = useState<PersonInfoPublic | null>(null)
+  const [personHasPassphrase, setPersonHasPassphrase] = useState(false)
+  const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null)
 
   // Father and mother info from PersonHashCalculator components
-  const [fatherInfo, setFatherInfo] = useState<{
-    fullName: string
-    gender: number
-    birthYear: number
-    birthMonth: number
-    birthDay: number
-    isBirthBC: boolean
-    passphrase: string
-  } | null>(null)
+  const [fatherInfo, setFatherInfo] = useState<PersonInfoPublic | null>(null)
+  const fatherCalcRef = useRef<PersonHashCalculatorHandle | null>(null)
 
-  const [motherInfo, setMotherInfo] = useState<{
-    fullName: string
-    gender: number
-    birthYear: number
-    birthMonth: number
-    birthDay: number
-    isBirthBC: boolean
-    passphrase: string
-  } | null>(null)
+  const [motherInfo, setMotherInfo] = useState<PersonInfoPublic | null>(null)
+  const motherCalcRef = useRef<PersonHashCalculatorHandle | null>(null)
+  const encryptionPasswordRef = useRef<HTMLInputElement | null>(null)
+  const confirmEncryptionPasswordRef = useRef<HTMLInputElement | null>(null)
   
   const [entered, setEntered] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -179,24 +168,6 @@ export default function AddVersionModal({
     } 
   }, [isOpen])
 
-  // Keep metadata encryption password in sync with the identity passphrase when opted in
-  useEffect(() => {
-    if (!usePersonPassphraseForEncryption) return
-    const next = personInfo?.passphrase || ''
-    setEncryptionPassword(next)
-    setConfirmEncryptionPassword(next)
-    setEncryptionError(null)
-  }, [personInfo?.passphrase, usePersonPassphraseForEncryption])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.CSS === 'undefined' || typeof window.CSS.supports !== 'function') {
-      setSupportsCssMasking(false)
-      return
-    }
-    const canMask = window.CSS.supports('-webkit-text-security', 'disc') || window.CSS.supports('text-security', 'disc')
-    setSupportsCssMasking(canMask)
-  }, [])
-
   const {
     register,
     handleSubmit,
@@ -233,8 +204,7 @@ export default function AddVersionModal({
   const fatherStatus = getParentInfoStatus('father')
   const motherStatus = getParentInfoStatus('mother')
   const allConsentsChecked = consents.hash && consents.age && consents.legal
-  const hasPersonPassphrase = !!(personInfo?.passphrase && personInfo.passphrase.length > 0)
-  const showManualEncryptionInputs = !usePersonPassphraseForEncryption || !hasPersonPassphrase
+  const showManualEncryptionInputs = !usePersonPassphraseForEncryption || !personHasPassphrase
 
   // Initialize states if existing data is provided (e.g., from another page)
   useEffect(() => {
@@ -245,16 +215,17 @@ export default function AddVersionModal({
         birthYear: initialPersonData.birthYear || 0,
         birthMonth: initialPersonData.birthMonth || 0,
         birthDay: initialPersonData.birthDay || 0,
-        isBirthBC: initialPersonData.isBirthBC || false,
-        passphrase: initialPersonData.passphrase || ''
+        isBirthBC: initialPersonData.isBirthBC || false
       })
+      setPersonHasPassphrase(!!(initialPersonData.passphrase && initialPersonData.passphrase.length > 0))
     }
   }, [initialPersonData])
 
-  const computeHashOrZero = (info: typeof personInfo) => {
-    const normalizedName = normalizeNameForHash(info?.fullName || '')
-    if (!info || !normalizedName) return ethers.ZeroHash
-    const hash = computePersonHash(info)
+  const computeHashOrZero = (calc: PersonHashCalculatorHandle | null) => {
+    const data = calc?.getFormData()
+    const normalizedName = normalizeNameForHash(data?.fullName || '')
+    if (!data || !normalizedName) return ethers.ZeroHash
+    const hash = computePersonHash(data)
     return hash && hash.length > 0 ? hash : ethers.ZeroHash
   }
 
@@ -262,7 +233,7 @@ export default function AddVersionModal({
    * Extract and normalize person info, ensuring deterministic field order
    * Note: Passphrase is removed to avoid leaking sensitive data to metadata
    */
-  const sanitizeInfo = (info: typeof personInfo) => {
+  const sanitizeInfo = (info: PersonInfoPublic | null) => {
     if (!info) return null
     // Explicitly specify field order to ensure CID determinism
     return {
@@ -289,9 +260,9 @@ export default function AddVersionModal({
       isBirthBC: false
     }
 
-    const personHashValue = computeHashOrZero(personInfo)
-    const fatherHashValue = computeHashOrZero(fatherInfo)
-    const motherHashValue = computeHashOrZero(motherInfo)
+    const personHashValue = computeHashOrZero(personCalcRef.current)
+    const fatherHashValue = computeHashOrZero(fatherCalcRef.current)
+    const motherHashValue = computeHashOrZero(motherCalcRef.current)
 
     const personData = sanitizeInfo(personInfo) ?? baseEmpty
     const fatherData = sanitizeInfo(fatherInfo) ?? baseEmpty
@@ -339,12 +310,13 @@ export default function AddVersionModal({
     closedBySelfRef.current = true
     reset()
     setPersonInfo(null)
+    setPersonHasPassphrase(false)
     setFatherInfo(null)
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
-    setEncryptionPassword('')
-    setConfirmEncryptionPassword('')
+    if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = ''
+    if (confirmEncryptionPasswordRef.current) confirmEncryptionPasswordRef.current.value = ''
     setEncryptionError(null)
     setEncryptedMetadata(null)
     setSuccessResult(null)
@@ -363,12 +335,13 @@ export default function AddVersionModal({
     if (isOpen) return
     reset()
     setPersonInfo(null)
+    setPersonHasPassphrase(false)
     setFatherInfo(null)
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
-    setEncryptionPassword('')
-    setConfirmEncryptionPassword('')
+    if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = ''
+    if (confirmEncryptionPasswordRef.current) confirmEncryptionPasswordRef.current.value = ''
     setEncryptionError(null)
     setEncryptedMetadata(null)
     setSuccessResult(null)
@@ -422,12 +395,13 @@ export default function AddVersionModal({
     // Reset form and states for new addition
     reset()
     setPersonInfo(null)
+    setPersonHasPassphrase(false)
     setFatherInfo(null)
     setMotherInfo(null)
     setIsSubmitting(false)
     setProofGenerationStep('')
-    setEncryptionPassword('')
-    setConfirmEncryptionPassword('')
+    if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = ''
+    if (confirmEncryptionPasswordRef.current) confirmEncryptionPasswordRef.current.value = ''
     setEncryptionError(null)
     setEncryptedMetadata(null)
     setSuccessResult(null)
@@ -449,7 +423,14 @@ export default function AddVersionModal({
   }
 
   const validateEncryptionPassword = () => {
-    if (!encryptionPassword.trim()) {
+    const canUseIdentityPassphrase = usePersonPassphraseForEncryption && (personCalcRef.current?.hasPassphrase() ?? false)
+    if (canUseIdentityPassphrase) {
+      setEncryptionError(null)
+      return true
+    }
+    const encryptionPassword = (encryptionPasswordRef.current?.value ?? '').trim()
+    const confirmEncryptionPassword = confirmEncryptionPasswordRef.current?.value ?? ''
+    if (!encryptionPassword) {
       setEncryptionError(t('addVersion.encryptionPasswordRequired', 'Please enter encryption password'))
       return false
     }
@@ -463,6 +444,14 @@ export default function AddVersionModal({
     }
     setEncryptionError(null)
     return true
+  }
+
+  const resolveEncryptionPassword = () => {
+    const canUseIdentityPassphrase = usePersonPassphraseForEncryption && (personCalcRef.current?.hasPassphrase() ?? false)
+    if (canUseIdentityPassphrase) {
+      return personCalcRef.current?.getFormData().passphrase || ''
+    }
+    return (encryptionPasswordRef.current?.value ?? '').trim()
   }
 
   const prepareEncryptedMetadata = async (tagValue: string, processedData: AddVersionFormData, password: string) => {
@@ -491,7 +480,7 @@ export default function AddVersionModal({
     try {
       if (!validateEncryptionPassword()) return
       const processedData = addVersionSchema.parse(watchedValues)
-      const { json, cid } = await prepareEncryptedMetadata(processedData.tag, processedData, encryptionPassword)
+      const { json, cid } = await prepareEncryptedMetadata(processedData.tag, processedData, resolveEncryptionPassword())
       setValue('metadataCID', cid, { shouldDirty: true, shouldValidate: true })
 
       const blob = new Blob([json], { type: 'application/json' })
@@ -504,7 +493,7 @@ export default function AddVersionModal({
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (err: any) {
-      console.error('Download metadata failed', err)
+      console.error('Download metadata failed', sanitizeErrorForLogging(err))
       alert(t('addVersion.encryptionFailed', 'Failed to encrypt or export metadata, please try again'))
     }
   }
@@ -526,7 +515,8 @@ export default function AddVersionModal({
     // Transform the input data to the final form
     const processedData = addVersionSchema.parse(data)
 
-    if (!personInfo || !normalizeNameForHash(personInfo.fullName || '')) {
+    const personPrivate = personCalcRef.current?.getFormData()
+    if (!personPrivate || !normalizeNameForHash(personPrivate.fullName || '')) {
       alert(t('addVersion.personInfoRequired', 'Please fill in person information'))
       return
     }
@@ -548,9 +538,9 @@ export default function AddVersionModal({
       
       // Generate ZK proof automatically
       const { proof, publicSignals } = await generatePersonProof(
-        personInfo,
-        fatherInfo && normalizeNameForHash(fatherInfo.fullName || '').length ? fatherInfo : null,
-        motherInfo && normalizeNameForHash(motherInfo.fullName || '').length ? motherInfo : null,
+        personPrivate,
+        fatherInfo && normalizeNameForHash(fatherInfo.fullName || '').length ? (fatherCalcRef.current?.getFormData() || null) : null,
+        motherInfo && normalizeNameForHash(motherInfo.fullName || '').length ? (motherCalcRef.current?.getFormData() || null) : null,
         submitterAddress
       )
       
@@ -564,7 +554,7 @@ export default function AddVersionModal({
 
       setProofGenerationStep(t('addVersion.generatingMetadataCID', 'Generating metadata CID...'))
 
-      const { json: encryptedJson, cid: metadataCID } = await prepareEncryptedMetadata(processedData.tag, processedData, encryptionPassword)
+      const { json: encryptedJson, cid: metadataCID } = await prepareEncryptedMetadata(processedData.tag, processedData, resolveEncryptionPassword())
 
       processedData.metadataCID = metadataCID
       setValue('metadataCID', metadataCID, { shouldDirty: true, shouldValidate: true })
@@ -594,7 +584,7 @@ export default function AddVersionModal({
         onSuccess?.(result)
       }
     } catch (error: any) {
-      console.error('❌ Add version failed:', error)
+      console.error('❌ Add version failed:', sanitizeErrorForLogging(error))
       
       // Set error result for display in UI
       const friendly = getFriendlyError(error, t)
@@ -768,20 +758,21 @@ export default function AddVersionModal({
             </div>
 
             <PersonHashCalculator
+              ref={personCalcRef}
               key={`person-${formResetKey}`}
               showTitle={false}
               collapsible={false}
               initialValues={initialPersonData}
-              onFormChange={(formData) => {
+              onPublicFormChange={(formData) => {
                 setPersonInfo({
                   fullName: formData.fullName,
                   gender: formData.gender,
                   birthYear: formData.birthYear,
                   birthMonth: formData.birthMonth,
                   birthDay: formData.birthDay,
-                  isBirthBC: formData.isBirthBC,
-                  passphrase: formData.passphrase
+                  isBirthBC: formData.isBirthBC
                 })
+                setPersonHasPassphrase(formData.hasPassphrase)
               }}
             />
           </div>
@@ -790,7 +781,7 @@ export default function AddVersionModal({
             <button
               type="button"
               onClick={() => setFatherExpanded(!fatherExpanded)}
-                className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-green-600" />
@@ -811,23 +802,23 @@ export default function AddVersionModal({
               )}
             </button>
 
-            {fatherExpanded && (
-              <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
-                {/* Parent Info Notice */}
-                <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
-                  <div className="flex items-center gap-2">
+            <div className={`py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3 ${fatherExpanded ? '' : 'hidden'}`}>
+              {/* Parent Info Notice */}
+              <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
+                <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                     <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
                       {t('addVersion.parentInfoNotice', 'Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.')}
                     </p>
                   </div>
-                </div>
+              </div>
 
-                <PersonHashCalculator
-                  key={`father-${formResetKey}`}
-                  showTitle={false}
-                  collapsible={false}
-                  className="border-0 shadow-none"
+              <PersonHashCalculator
+                ref={fatherCalcRef}
+                key={`father-${formResetKey}`}
+                showTitle={false}
+                collapsible={false}
+                className="border-0 shadow-none"
                   initialValues={{
                     fullName: '',
                     gender: 1, // Default to male
@@ -837,18 +828,17 @@ export default function AddVersionModal({
                     isBirthBC: false,
                     passphrase: ''
                   }}
-                  onFormChange={(formData) => {
-                    setFatherInfo({
-                      fullName: formData.fullName,
-                      gender: formData.gender,
-                      birthYear: formData.birthYear,
-                      birthMonth: formData.birthMonth,
-                      birthDay: formData.birthDay,
-                      isBirthBC: formData.isBirthBC,
-                      passphrase: formData.passphrase
-                    })
-                  }}
-                />
+                onPublicFormChange={(formData) => {
+                  setFatherInfo({
+                    fullName: formData.fullName,
+                    gender: formData.gender,
+                    birthYear: formData.birthYear,
+                    birthMonth: formData.birthMonth,
+                    birthDay: formData.birthDay,
+                    isBirthBC: formData.isBirthBC
+                  })
+                }}
+              />
                 
                 <div className="w-40">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
@@ -865,8 +855,7 @@ export default function AddVersionModal({
                   />
                 </div>
               </div>
-            )}
-          </div>
+            </div>
 
           {/* Mother Information - Using PersonHashCalculator */}
           <div className="space-y-2">
@@ -894,11 +883,10 @@ export default function AddVersionModal({
               )}
             </button>
 
-            {motherExpanded && (
-              <div className="py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3">
-                {/* Parent Info Notice */}
-                <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
-                  <div className="flex items-center gap-2">
+            <div className={`py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3 ${motherExpanded ? '' : 'hidden'}`}>
+              {/* Parent Info Notice */}
+              <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
+                <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                     <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
                       {t('addVersion.parentInfoNotice', 'Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.')}
@@ -906,11 +894,12 @@ export default function AddVersionModal({
                   </div>
                 </div>
 
-                <PersonHashCalculator
-                  key={`mother-${formResetKey}`}
-                  showTitle={false}
-                  collapsible={false}
-                  className="border-0 shadow-none"
+              <PersonHashCalculator
+                ref={motherCalcRef}
+                key={`mother-${formResetKey}`}
+                showTitle={false}
+                collapsible={false}
+                className="border-0 shadow-none"
                   initialValues={{
                     fullName: '',
                     gender: 2, // Default to female
@@ -920,18 +909,17 @@ export default function AddVersionModal({
                     isBirthBC: false,
                     passphrase: ''
                   }}
-                  onFormChange={(formData) => {
-                    setMotherInfo({
-                      fullName: formData.fullName,
-                      gender: formData.gender,
-                      birthYear: formData.birthYear,
-                      birthMonth: formData.birthMonth,
-                      birthDay: formData.birthDay,
-                      isBirthBC: formData.isBirthBC,
-                      passphrase: formData.passphrase
-                    })
-                  }}
-                />
+                onPublicFormChange={(formData) => {
+                  setMotherInfo({
+                    fullName: formData.fullName,
+                    gender: formData.gender,
+                    birthYear: formData.birthYear,
+                    birthMonth: formData.birthMonth,
+                    birthDay: formData.birthDay,
+                    isBirthBC: formData.isBirthBC
+                  })
+                }}
+              />
                 
                 <div className="w-40">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
@@ -948,8 +936,7 @@ export default function AddVersionModal({
                   />
                 </div>
               </div>
-            )}
-          </div>
+            </div>
 
           {/* Metadata */}
           <div className="space-y-3">
@@ -975,42 +962,40 @@ export default function AddVersionModal({
                     type="checkbox"
                     className="h-4 w-4 rounded border-blue-400 text-blue-600 focus:ring-blue-500"
                     checked={usePersonPassphraseForEncryption}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setUsePersonPassphraseForEncryption(checked)
-                      if (checked) {
-                        const next = personInfo?.passphrase || ''
-                        setEncryptionPassword(next)
-                        setConfirmEncryptionPassword(next)
-                        if (encryptionError) setEncryptionError(null)
-                      }
-                    }}
-                  />
+	                    onChange={(e) => {
+	                      const checked = e.target.checked
+	                      setUsePersonPassphraseForEncryption(checked)
+	                      if (checked) {
+	                        if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = ''
+	                        if (confirmEncryptionPasswordRef.current) confirmEncryptionPasswordRef.current.value = ''
+	                      }
+	                      if (checked && encryptionError) setEncryptionError(null)
+	                    }}
+	                  />
                   <span>{t('addVersion.usePassphraseForEncryption', 'Use identity passphrase for metadata encryption')}</span>
                 </label>
               </div>
               {showManualEncryptionInputs ? (
                 <>
-                  {usePersonPassphraseForEncryption && !hasPersonPassphrase && (
+                  {usePersonPassphraseForEncryption && !personHasPassphrase && (
                     <p className="text-xs text-amber-800 dark:text-amber-200">
                       {t('addVersion.passphraseMissingForEncryption', 'Identity passphrase is empty. Please enter an encryption password below or set a passphrase above.')}
                     </p>
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="relative">
-                      <input
-                        type={showEncryptionPassword || !supportsCssMasking ? (showEncryptionPassword ? 'text' : 'password') : 'text'}
-                        value={encryptionPassword}
-                        onChange={(e) => { setEncryptionPassword(e.target.value); if (encryptionError) setEncryptionError(null) }}
-                        className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                        placeholder={t('addVersion.encryptionPasswordPlaceholder', 'At least 8 characters')}
-                        inputMode="text"
-                        autoCapitalize="none"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        style={showEncryptionPassword || !supportsCssMasking ? undefined : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
-                      />
+	                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+	                    <div className="relative">
+	                      <input
+	                        type={showEncryptionPassword ? 'text' : 'password'}
+	                        ref={encryptionPasswordRef}
+	                        onChange={() => { if (encryptionError) setEncryptionError(null) }}
+	                        className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+	                        placeholder={t('addVersion.encryptionPasswordPlaceholder', 'At least 8 characters')}
+	                        inputMode="text"
+	                        autoCapitalize="none"
+	                        autoComplete="new-password"
+	                        autoCorrect="off"
+	                        spellCheck={false}
+	                      />
                       <button
                         type="button"
                         onClick={() => setShowEncryptionPassword((v) => !v)}
@@ -1020,19 +1005,18 @@ export default function AddVersionModal({
                         {showEncryptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
-                    <div className="relative">
-                      <input
-                        type={showConfirmEncryptionPassword || !supportsCssMasking ? (showConfirmEncryptionPassword ? 'text' : 'password') : 'text'}
-                        value={confirmEncryptionPassword}
-                        onChange={(e) => { setConfirmEncryptionPassword(e.target.value); if (encryptionError) setEncryptionError(null) }}
-                        className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                        placeholder={t('addVersion.encryptionPasswordConfirm', 'Confirm password')}
-                        inputMode="text"
-                        autoCapitalize="none"
-                        autoComplete="off"
+	                    <div className="relative">
+	                      <input
+	                        type={showConfirmEncryptionPassword ? 'text' : 'password'}
+	                        ref={confirmEncryptionPasswordRef}
+	                        onChange={() => { if (encryptionError) setEncryptionError(null) }}
+	                        className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+	                        placeholder={t('addVersion.encryptionPasswordConfirm', 'Confirm password')}
+	                        inputMode="text"
+	                        autoCapitalize="none"
+	                        autoComplete="new-password"
                         autoCorrect="off"
                         spellCheck={false}
-                        style={showConfirmEncryptionPassword || !supportsCssMasking ? undefined : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
                       />
                       <button
                         type="button"

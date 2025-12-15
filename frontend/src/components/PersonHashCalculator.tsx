@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+/**
+ * PersonHashCalculator
+ *
+ * UI component for computing a deterministic person hash used by DeepFamily ZK flows.
+ * Security note: the passphrase is treated as sensitive input; callers should prefer
+ * `onPublicFormChange`/imperative ref APIs to avoid lifting the passphrase into parent state.
+ */
+import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -104,6 +111,18 @@ const hashFormSchema = z.object({
 
 export type HashForm = z.infer<typeof hashFormSchema>
 
+type PublicHashForm = Omit<HashForm, 'passphrase'> & { hasPassphrase: boolean }
+
+type HashFormInput = {
+  fullName: string
+  isBirthBC: boolean
+  birthYear?: number | ''
+  birthMonth?: number | ''
+  birthDay?: number | ''
+  gender: number
+  passphrase: string | null | undefined
+}
+
 // Password strength calculation (uses shared utility from passphraseStrength.ts)
 // Note: This is a simple wrapper that maintains backward compatibility with the UI
 const calculatePasswordStrength = (password: string) => {
@@ -157,6 +176,7 @@ export function computePersonHash(input: HashForm): string {
 interface PersonHashCalculatorProps {
   className?: string
   onFormChange?: (formData: HashForm) => void
+  onPublicFormChange?: (formData: PublicHashForm) => void
   showTitle?: boolean
   collapsible?: boolean
   isOpen?: boolean
@@ -172,19 +192,25 @@ interface PersonHashCalculatorProps {
   }
 }
 
-export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
+export type PersonHashCalculatorHandle = {
+  getFormData: () => HashForm
+  getPublicFormData: () => PublicHashForm
+  hasPassphrase: () => boolean
+}
+
+export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, PersonHashCalculatorProps>(({
   className = '',
   onFormChange,
+  onPublicFormChange,
   showTitle = true,
   collapsible = false,
   isOpen = true,
   onToggle,
   initialValues
-}) => {
+}, ref) => {
   const { t, i18n } = useTranslation()
   const [internalOpen, setInternalOpen] = useState(true)
   const [showPassphrase, setShowPassphrase] = useState(false)
-  const [supportsCssMasking, setSupportsCssMasking] = useState(false)
   const [showPassphraseHelp, setShowPassphraseHelp] = useState(false)
   const toast = useToast()
 
@@ -222,7 +248,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
     path: ["birthYear"]
   }), [t])
 
-  const { register, formState: { errors }, setValue, watch } = useForm({
+  const { register, formState: { errors }, setValue, watch, getValues } = useForm<HashFormInput>({
     resolver: zodResolver(hashFormSchema),
     defaultValues: { 
       fullName: initialValues?.fullName || '', 
@@ -246,32 +272,43 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
 
   const normalizedPassphrase = useMemo(() => normalizePassphraseForHash(passphrase || ''), [passphrase])
   const passphraseGraphemeLength = useMemo(() => getGraphemeLength(normalizedPassphrase), [normalizedPassphrase])
-  const maskedInputStyle = useMemo<React.CSSProperties | undefined>(() => {
-    if (showPassphrase || !supportsCssMasking) return undefined
-    return { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties
-  }, [showPassphrase, supportsCssMasking])
+  const hasPassphrase = normalizedPassphrase.length > 0
 
   // Calculate password strength
   const passwordStrength = useMemo(() => {
     return calculatePasswordStrength(normalizedPassphrase)
   }, [normalizedPassphrase])
 
-  const computedHash = useMemo(() => {
-    const transformedData: HashForm = {
-      fullName: fullName || '',
-      isBirthBC: isBirthBC || false,
-      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
-      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
-      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
-      gender: Number(gender || 0),
-      passphrase: passphrase || '',
+  const buildTransformedData = (values?: Partial<HashFormInput>): HashForm => {
+    const snapshot = values ?? getValues()
+    return {
+      fullName: snapshot.fullName || '',
+      isBirthBC: snapshot.isBirthBC || false,
+      birthYear: snapshot.birthYear === '' || snapshot.birthYear === undefined ? 0 : Number(snapshot.birthYear),
+      birthMonth: snapshot.birthMonth === '' || snapshot.birthMonth === undefined ? 0 : Number(snapshot.birthMonth),
+      birthDay: snapshot.birthDay === '' || snapshot.birthDay === undefined ? 0 : Number(snapshot.birthDay),
+      gender: Number(snapshot.gender || 0),
+      passphrase: snapshot.passphrase || '',
     }
+  }
+
+  const computedHash = useMemo(() => {
+    const transformedData = buildTransformedData({
+      fullName,
+      isBirthBC,
+      birthYear,
+      birthMonth,
+      birthDay,
+      gender: Number(gender || 0),
+      passphrase,
+    })
     if (!normalizeNameForHash(transformedData.fullName).length) return ''
     return computePersonHash(transformedData)
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
 
   
   const onFormChangeRef = useRef(onFormChange)
+  const onPublicFormChangeRef = useRef(onPublicFormChange)
   
   // Update the ref when onFormChange changes
   useEffect(() => {
@@ -279,27 +316,32 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
   }, [onFormChange])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.CSS === 'undefined' || typeof window.CSS.supports !== 'function') {
-      setSupportsCssMasking(false)
-      return
-    }
-    const canMask = window.CSS.supports('-webkit-text-security', 'disc') || window.CSS.supports('text-security', 'disc')
-    setSupportsCssMasking(canMask)
-  }, [])
+    onPublicFormChangeRef.current = onPublicFormChange
+  }, [onPublicFormChange])
+
+  useImperativeHandle(ref, () => ({
+    getFormData: () => buildTransformedData(),
+    getPublicFormData: () => {
+      const data = buildTransformedData()
+      const { passphrase: _passphrase, ...rest } = data
+      return { ...rest, hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0 }
+    },
+    hasPassphrase: () => normalizePassphraseForHash(getValues().passphrase || '').length > 0,
+  }), [getValues])
 
   useEffect(() => {
-    if (!onFormChangeRef.current) return
-
-    const transformedData: HashForm = {
-      fullName: fullName || '',
-      isBirthBC: isBirthBC || false,
-      birthYear: birthYear === '' || birthYear === undefined ? 0 : Number(birthYear),
-      birthMonth: birthMonth === '' || birthMonth === undefined ? 0 : Number(birthMonth),
-      birthDay: birthDay === '' || birthDay === undefined ? 0 : Number(birthDay),
+    const transformedData = buildTransformedData({
+      fullName,
+      isBirthBC,
+      birthYear,
+      birthMonth,
+      birthDay,
       gender: Number(gender || 0),
-      passphrase: passphrase || '',
-    }
-    onFormChangeRef.current(transformedData)
+      passphrase,
+    })
+    onFormChangeRef.current?.(transformedData)
+    const { passphrase: _passphrase, ...rest } = transformedData
+    onPublicFormChangeRef.current?.({ ...rest, hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0 })
   }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
 
 
@@ -481,16 +523,15 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
           </div>
           <div className="relative">
             <input
-              type={showPassphrase || !supportsCssMasking ? (showPassphrase ? 'text' : 'password') : 'text'}
+              type={showPassphrase ? 'text' : 'password'}
               className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
               placeholder={t('search.hashCalculator.passphrasePlaceholder', 'Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended')}
               inputMode="text"
               autoCapitalize="none"
-              autoComplete="off"
+              autoComplete="new-password"
               autoCorrect="off"
               spellCheck={false}
               lang={i18n.language}
-              style={maskedInputStyle}
               {...register('passphrase')}
             />
             <button
@@ -503,14 +544,14 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
             </button>
           </div>
 
-          {passphrase && passphrase.length > 0 && (
+          {hasPassphrase && (
             <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
               {t('search.hashCalculator.passphraseCharCount', { count: passphraseGraphemeLength })}
             </div>
           )}
 
           {/* Password strength indicator */}
-          {passphrase && passphrase.length > 0 && (
+          {hasPassphrase && (
             <div className="mt-1 space-y-1">
               <div className="flex items-center gap-2">
                 <div className="flex gap-1 flex-1">
@@ -673,7 +714,7 @@ export const PersonHashCalculator: React.FC<PersonHashCalculatorProps> = ({
       )}
     </div>
   )
-}
+})
 
 export default PersonHashCalculator
 

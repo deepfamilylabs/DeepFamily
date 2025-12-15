@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, CloudDownload, FileDown, Link2, Lock, Shield, AlertTriangle, Loader2, ChevronDown } from 'lucide-react'
 import { decryptMetadataPayload, parseEncryptedPayload, EncryptedMetadataPayload } from '../lib/metadataCrypto'
+import { sanitizeErrorForLogging } from '../lib/errors'
 
 const gatewayOptions = [
   'https://ipfs.io/ipfs/',
@@ -18,7 +19,6 @@ export default function DecryptMetadataPage() {
 
   const [cid, setCid] = useState(initialCID)
   const [baseUrl, setBaseUrl] = useState(initialGateway)
-  const [password, setPassword] = useState('')
   const [encryptedJson, setEncryptedJson] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<any | null>(null)
@@ -27,22 +27,13 @@ export default function DecryptMetadataPage() {
   const [isDecrypting, setIsDecrypting] = useState(false)
   const [showGatewayList, setShowGatewayList] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [supportsCssMasking, setSupportsCssMasking] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const passwordRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     setCid(initialCID)
     setBaseUrl(initialGateway || gatewayOptions[0])
   }, [initialCID, initialGateway])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.CSS === 'undefined' || typeof window.CSS.supports !== 'function') {
-      setSupportsCssMasking(false)
-      return
-    }
-    const canMask = window.CSS.supports('-webkit-text-security', 'disc') || window.CSS.supports('text-security', 'disc')
-    setSupportsCssMasking(canMask)
-  }, [])
 
   const buildUrl = () => {
     if (!cid.trim()) return ''
@@ -67,7 +58,7 @@ export default function DecryptMetadataPage() {
       setEncryptedJson(text)
       setPayloadMeta(parseEncryptedPayload(text))
     } catch (err: any) {
-      console.error('Fetch encrypted metadata failed', err)
+      console.error('Fetch encrypted metadata failed', sanitizeErrorForLogging(err))
       setError(t('decryptMetadata.fetchFailed', 'Failed to fetch encrypted metadata, please check CID or network'))
     } finally {
       setIsFetching(false)
@@ -83,13 +74,14 @@ export default function DecryptMetadataPage() {
       setResult(null)
       setPayloadMeta(parseEncryptedPayload(text))
     } catch (err: any) {
-      console.error('Read encrypted file failed', err)
+      console.error('Read encrypted file failed', sanitizeErrorForLogging(err))
       setError(t('decryptMetadata.readFailed', 'Failed to read encrypted file'))
     }
   }
 
   const handleDecrypt = async () => {
-    if (!password.trim()) {
+    const password = (passwordRef.current?.value ?? '').trim()
+    if (!password) {
       setError(t('decryptMetadata.passwordRequired', 'Please enter decryption password'))
       return
     }
@@ -104,7 +96,7 @@ export default function DecryptMetadataPage() {
       setResult(data)
       setPayloadMeta(payload)
     } catch (err: any) {
-      console.error('Decrypt metadata failed', err)
+      console.error('Decrypt metadata failed', sanitizeErrorForLogging(err))
       const message = err?.message || ''
       const localizedMessage =
         message === 'Web Crypto is not available in this environment'
@@ -220,20 +212,19 @@ export default function DecryptMetadataPage() {
                 <Lock className="w-4 h-4 text-blue-600" />
                 {t('decryptMetadata.password', 'Decryption Password (must match encryption password)')}
               </label>
-              <div className="relative">
-                <input
-                  type={showPassword || !supportsCssMasking ? (showPassword ? 'text' : 'password') : 'text'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-3 pr-11 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
-                  placeholder={t('decryptMetadata.passwordPlaceholder', 'Enter decryption password')}
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  style={showPassword || !supportsCssMasking ? undefined : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties}
-                />
+	              <div className="relative">
+	                <input
+	                  type={showPassword ? 'text' : 'password'}
+	                  ref={passwordRef}
+	                  onChange={() => { if (error) setError(null) }}
+	                  className="w-full h-11 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-3 pr-11 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+	                  placeholder={t('decryptMetadata.passwordPlaceholder', 'Enter decryption password')}
+	                  inputMode="text"
+	                  autoCapitalize="none"
+	                  autoComplete="new-password"
+	                  autoCorrect="off"
+	                  spellCheck={false}
+	                />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
