@@ -9,14 +9,15 @@
  * - Fully Deterministic: Same inputs always produce the same key
  *
  * Usage:
- *   node scripts/test-keygen-demo.js
+ *   node scripts/test-keygen-demo.mjs
  */
 
-const { scrypt } = require("scrypt-js");
-const { ethers } = require("ethers");
-const { TextEncoder } = require("util");
+import { ethers } from "ethers";
+import { scrypt as scryptCb } from "node:crypto";
+import { TextEncoder, promisify } from "node:util";
 
 const textEncoder = new TextEncoder();
+const scrypt = promisify(scryptCb);
 
 function normalizeNameForHash(value) {
   if (value === undefined || value === null) return "";
@@ -85,7 +86,12 @@ async function deriveKey(personHash, userData, purpose, preset = "BALANCED") {
   const saltBytes = ethers.getBytes(saltHash);
 
   const startTime = Date.now();
-  const derivedBytes = await scrypt(hashBytes, saltBytes, params.N, params.r, params.p, 32);
+  const derivedBytes = await scrypt(hashBytes, saltBytes, 32, {
+    cost: params.N,
+    blockSize: params.r,
+    parallelization: params.p,
+    maxmem: 1024 * 1024 * 1024,
+  });
   const elapsed = Date.now() - startTime;
 
   const key = "0x" + Buffer.from(derivedBytes).toString("hex");
@@ -117,7 +123,9 @@ async function demo() {
   console.log(`Passphrase: ${user1.passphrase} (${user1.passphrase.length} characters)`);
 
   // Display passphrase hash (verify salt includes passphrase)
-  const passphraseHashDemo = ethers.keccak256(textEncoder.encode(normalizePassphraseForHash(user1.passphrase)));
+  const passphraseHashDemo = ethers.keccak256(
+    textEncoder.encode(normalizePassphraseForHash(user1.passphrase)),
+  );
   console.log(`Passphrase Hash: ${passphraseHashDemo.substring(0, 20)}... 🔒\n`);
 
   const hash1 = computePersonHash(

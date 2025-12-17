@@ -1,6 +1,8 @@
-const { ethers } = require("hardhat");
+import hre from "hardhat";
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
   const [deployer] = await ethers.getSigners();
 
   // Your wallet address
@@ -26,9 +28,7 @@ async function main() {
   console.log(`New balance: ${ethers.formatEther(balance)} ETH`);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -1,7 +1,12 @@
-const { expect } = require('chai');
-const hre = require('hardhat');
-const { buildBasicInfo } = require('../lib/namePoseidon');
-const { generateNamePoseidonProof } = require('../lib/namePoseidonProof');
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import namePoseidon from '../lib/namePoseidon.js'
+import namePoseidonProof from '../lib/namePoseidonProof.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+
+const { buildBasicInfo } = namePoseidon
+const { generateNamePoseidonProof } = namePoseidonProof
 
 const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000);
 
@@ -11,9 +16,7 @@ describe('Mint NFT Tests', function () {
   this.timeout(60_000);
 
   async function prepare(endorsed = true) {
-    await hre.deployments.fixture(['Integrated']);
-    const deepDeployment = await hre.deployments.get('DeepFamily');
-    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer] = await hre.ethers.getSigners();
     const FULLNAME = 'Mint Subject';
     const params = { fullname: FULLNAME, birthyear: '1999', gender: '1', tag: 'v1', ipfs: 'QmMint1' };
@@ -28,7 +31,7 @@ describe('Mint NFT Tests', function () {
     });
     const fullNameCommitment = basicInfo.fullNameCommitment;
     const personHash = await deepFamily.getPersonHash(basicInfo);
-    const proofBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: signer.address });
+    const proofBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: await signer.getAddress() });
     const { proof, publicSignals } = proofBundle;
     if (endorsed) {
       await hre.run('endorse', { person: personHash, vindex: '1' });
@@ -43,9 +46,7 @@ describe('Mint NFT Tests', function () {
     birthDay = 0,
     birthBC = false,
   }) {
-    await hre.deployments.fixture(['Integrated']);
-    const deepDeployment = await hre.deployments.get('DeepFamily');
-    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer] = await hre.ethers.getSigners();
 
     await hre.run('add-person', {
@@ -68,7 +69,7 @@ describe('Mint NFT Tests', function () {
       gender: 1,
     });
     const personHash = await deepFamily.getPersonHash(basicInfo);
-    const { proof, publicSignals } = await generateNamePoseidonProof(fullName, "", { minter: signer.address });
+    const { proof, publicSignals } = await generateNamePoseidonProof(fullName, "", { minter: await signer.getAddress() });
     await hre.run('endorse', { person: personHash, vindex: '1' });
 
     return { deepFamily, personHash, basicInfo, proof, publicSignals, fullName };
@@ -212,9 +213,16 @@ describe('Mint NFT Tests', function () {
       }
     };
 
-    await expect(
-      deepFamily.mintPersonNFT(proof.a, proof.b, proof.c, publicSignals, personHash, 1, 'ipfs://meta', coreInfo)
-    ).to.not.be.reverted;
+    await deepFamily.mintPersonNFT(
+      proof.a,
+      proof.b,
+      proof.c,
+      publicSignals,
+      personHash,
+      1,
+      'ipfs://meta',
+      coreInfo,
+    );
 
     // Verify the NFT was minted
     const tokenCounter = await deepFamily.tokenCounter();
@@ -224,7 +232,7 @@ describe('Mint NFT Tests', function () {
   it('reverts when proof minter does not match caller', async () => {
     const { deepFamily, personHash, FULLNAME, basicInfo } = await prepare(true);
     const [, otherSigner] = await hre.ethers.getSigners();
-    const mismatchBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: otherSigner.address });
+    const mismatchBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: await otherSigner.getAddress() });
 
     const coreInfo = {
       basicInfo,
@@ -271,8 +279,8 @@ describe('Mint NFT Tests', function () {
     async function setNextBlockTimestamp(ts) {
       const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest');
       const next = Math.max(Number(latestTs) + 1, ts);
-      await hre.network.provider.send('evm_setNextBlockTimestamp', [next]);
-      await hre.network.provider.send('evm_mine');
+      await hre.ethers.provider.send('evm_setNextBlockTimestamp', [next]);
+      await hre.ethers.provider.send('evm_mine');
       return next;
     }
 
@@ -341,18 +349,16 @@ describe('Mint NFT Tests', function () {
       });
       await setNextBlockTimestamp(mintTs);
 
-      await expect(
-        deepFamily.mintPersonNFT(
-          proof.a,
-          proof.b,
-          proof.c,
-          publicSignals,
-          personHash,
-          1,
-          'ipfs://age-unknown-day',
-          { basicInfo, supplementInfo: supplement(fullName) }
-        )
-      ).to.not.be.reverted;
+      await deepFamily.mintPersonNFT(
+        proof.a,
+        proof.b,
+        proof.c,
+        publicSignals,
+        personHash,
+        1,
+        'ipfs://age-unknown-day',
+        { basicInfo, supplementInfo: supplement(fullName) },
+      );
     });
 
     it('allows mint when birth year is unknown (0)', async () => {
@@ -364,18 +370,16 @@ describe('Mint NFT Tests', function () {
       });
       await setNextBlockTimestamp(mintTs);
 
-      await expect(
-        deepFamily.mintPersonNFT(
-          proof.a,
-          proof.b,
-          proof.c,
-          publicSignals,
-          personHash,
-          1,
-          'ipfs://age-unknown-year',
-          { basicInfo, supplementInfo: supplement(fullName) }
-        )
-      ).to.not.be.reverted;
+      await deepFamily.mintPersonNFT(
+        proof.a,
+        proof.b,
+        proof.c,
+        publicSignals,
+        personHash,
+        1,
+        'ipfs://age-unknown-year',
+        { basicInfo, supplementInfo: supplement(fullName) },
+      );
     });
   });
 });

@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const path = require("path");
-
-const {
+import { expect } from 'chai'
+import path from 'node:path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import {
   normaliseBytes32Array,
   validatePoseidonInput,
   computeExpectedSignals,
@@ -9,7 +10,10 @@ const {
   parseArgs,
   loadPublicSignals,
   loadJson,
-} = require("../tasks/zk-name-poseidon-check.js");
+} from '../tasks/zk-name-poseidon-check.mjs'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 describe("zk-name-poseidon-check helpers", function () {
   describe("normaliseBytes32Array", function () {
@@ -111,7 +115,6 @@ describe("zk-name-poseidon-check helpers", function () {
       const arrayPath = path.join(__dirname, "../tmp_public_array.json");
       const objectPath = path.join(__dirname, "../tmp_public_object.json");
 
-      const fs = require("fs");
       fs.writeFileSync(arrayPath, JSON.stringify(["1", "2"]));
       fs.writeFileSync(objectPath, JSON.stringify({ publicSignals: [1, 2] }));
 

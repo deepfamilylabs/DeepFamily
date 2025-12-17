@@ -1,7 +1,12 @@
-const { expect } = require('chai');
-const hre = require('hardhat');
-const { buildBasicInfo } = require('../lib/namePoseidon');
-const { generatePersonHashProof } = require('../lib/personHashProof');
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import namePoseidon from '../lib/namePoseidon.js'
+import personHashProof from '../lib/personHashProof.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+
+const { buildBasicInfo } = namePoseidon
+const { generatePersonHashProof } = personHashProof
 
 // Tests focused on add-person (version creation) including validation and duplicate logic
 
@@ -9,9 +14,7 @@ describe('Person Version (add-person) Tests', function () {
   this.timeout(120_000);
 
   async function baseSetup() {
-    await hre.deployments.fixture(['Integrated']);
-    const deepDeployment = await hre.deployments.get('DeepFamily');
-    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     return { deepFamily };
   }
 

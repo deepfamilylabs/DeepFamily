@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
  * Update frontend environment with latest local deployment
- * Reads deployment info from hardhat-deploy and updates .env.local
+ * Reads deployment info from `deployments/localhost` and updates `.env.local`
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 import { ethers } from 'ethers';
+import namePoseidon from '../../lib/namePoseidon.js';
+import seedHelpers from '../../lib/seedHelpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,12 +18,8 @@ const FRONTEND_DIR = path.dirname(__dirname);
 const PROJECT_ROOT = path.dirname(FRONTEND_DIR);
 const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, 'deployments', 'localhost');
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, '.env.local');
-const require = createRequire(import.meta.url);
-const { computePoseidonDigest } = require(path.join(PROJECT_ROOT, 'lib', 'namePoseidon.js'));
-const {
-  loadMultiLanguageRoots,
-  checkPersonExists
-} = require(path.join(PROJECT_ROOT, 'lib', 'seedHelpers.js'));
+const { computePoseidonDigest } = namePoseidon;
+const { loadMultiLanguageRoots, checkPersonExists } = seedHelpers;
 
 const LANGUAGE_LABELS = {
   en: 'English Root (Kennedy Family)',

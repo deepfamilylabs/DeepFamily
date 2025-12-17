@@ -1,8 +1,14 @@
-const { expect } = require('chai');
-const hre = require('hardhat');
-const { buildBasicInfo } = require('../lib/namePoseidon');
-const { generateNamePoseidonProof } = require('../lib/namePoseidonProof');
-const { generatePersonHashProof } = require('../lib/personHashProof');
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import namePoseidon from '../lib/namePoseidon.js'
+import namePoseidonProof from '../lib/namePoseidonProof.js'
+import personHashProof from '../lib/personHashProof.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+
+const { buildBasicInfo } = namePoseidon
+const { generateNamePoseidonProof } = namePoseidonProof
+const { generatePersonHashProof } = personHashProof
 
 const endorsementEventInterface = new hre.ethers.Interface([
   'event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, address recipient, uint256 recipientShare, address protocolRecipient, uint256 protocolShare, uint256 endorsementFee, uint256 timestamp)',
@@ -30,11 +36,7 @@ describe('Endorse Tests', function () {
   this.timeout(180_000);
 
   async function deployContracts() {
-    await hre.deployments.fixture(['Integrated']);
-    const deepDeployment = await hre.deployments.get('DeepFamily');
-    const tokenDeployment = await hre.deployments.get('DeepFamilyToken');
-    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address);
-    const token = await hre.ethers.getContractAt('DeepFamilyToken', tokenDeployment.address);
+    const { deepFamily, token } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const signers = await hre.ethers.getSigners();
     return { deepFamily, token, signers };
   }
@@ -670,9 +672,7 @@ describe('Endorse Tests', function () {
       await deepFamily.connect(endorser).cancelEndorsement(personHash);
 
       // Re-endorse the same version
-      await expect(
-        deepFamily.connect(endorser).endorseVersion(personHash, 1)
-      ).to.not.be.reverted;
+      await deepFamily.connect(endorser).endorseVersion(personHash, 1);
 
       const endorsedVersion = await deepFamily.endorsedVersionIndex(personHash, endorser.address);
       expect(endorsedVersion).to.equal(1n);
@@ -780,9 +780,7 @@ describe('Endorse Tests', function () {
         );
 
       // NFT minted, now try to cancel endorsement
-      await expect(
-        deepFamily.connect(minter).cancelEndorsement(personHash)
-      ).to.not.be.reverted;
+      await deepFamily.connect(minter).cancelEndorsement(personHash);
 
       // Verify endorsement was cancelled
       const endorsedVersion = await deepFamily.endorsedVersionIndex(personHash, minter.address);

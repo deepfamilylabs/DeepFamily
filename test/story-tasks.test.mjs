@@ -1,6 +1,10 @@
-const { expect } = require('chai');
-const hre = require('hardhat');
-const { buildBasicInfo } = require('../lib/namePoseidon');
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import namePoseidon from '../lib/namePoseidon.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+
+const { buildBasicInfo } = namePoseidon
 
 // This test exercises the Hardhat tasks for story sharding:
 // add-story-chunk, seal-story, list-story-chunks
@@ -16,13 +20,13 @@ describe('Story Tasks Integration', function () {
   const IPFS = 'QmTestMetaCID';
 
   beforeEach(async () => {
-    await hre.deployments.fixture(['Integrated']);
+    await hre.networkHelpers.loadFixture(deployIntegratedFixture)
   });
 
   it('runs full lifecycle of story tasks', async () => {
     const [signer] = await hre.ethers.getSigners();
-    const deepDeployment = await hre.deployments.get('DeepFamily');
-    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address, signer);
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const deepFamilyWithSigner = deepFamily.connect(signer)
 
     // 1. add-person
     await hre.run('add-person', {
@@ -41,10 +45,10 @@ describe('Story Tasks Integration', function () {
       birthDay: 0,
       gender: parseInt(GENDER, 10),
     });
-    const personHash = await deepFamily.getPersonHash(basicInfo);
+    const personHash = await deepFamilyWithSigner.getPersonHash(basicInfo);
 
     // Sanity: version count should be 1
-    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 0);
+    const [, totalVersions] = await deepFamilyWithSigner.listPersonVersions(personHash, 0, 0);
     expect(totalVersions).to.equal(1n);
 
     // 2. endorse version 1
@@ -63,7 +67,7 @@ describe('Story Tasks Integration', function () {
     });
 
     // Confirm tokenCounter = 1
-    const tokenCounter = await deepFamily.tokenCounter();
+    const tokenCounter = await deepFamilyWithSigner.tokenCounter();
     expect(tokenCounter).to.equal(1n);
 
     // 4. add first chunk (index 0)
@@ -81,15 +85,15 @@ describe('Story Tasks Integration', function () {
     });
 
     // Verify metadata and chunks directly via contract
-    const meta = await deepFamily.getStoryMetadata(1n);
+    const meta = await deepFamilyWithSigner.getStoryMetadata(1n);
     expect(meta.totalChunks).to.equal(2n);
     expect(meta.isSealed).to.equal(false);
 
-    const chunk0 = await deepFamily.getStoryChunk(1n, 0);
+    const chunk0 = await deepFamilyWithSigner.getStoryChunk(1n, 0);
     expect(chunk0.content).to.equal('First chunk content');
     expect(chunk0.chunkType).to.equal(0);
     expect(chunk0.attachmentCID).to.equal('');
-    const chunk1 = await deepFamily.getStoryChunk(1n, 1);
+    const chunk1 = await deepFamilyWithSigner.getStoryChunk(1n, 1);
     expect(chunk1.content).to.equal('Second chunk content');
     expect(chunk1.chunkType).to.equal(0);
     expect(chunk1.attachmentCID).to.equal('');
@@ -100,7 +104,7 @@ describe('Story Tasks Integration', function () {
     // 8. seal story
     await hre.run('seal-story', { tokenid: '1' });
 
-    const sealedMeta = await deepFamily.getStoryMetadata(1n);
+    const sealedMeta = await deepFamilyWithSigner.getStoryMetadata(1n);
     expect(sealedMeta.isSealed).to.equal(true);
 
     // 9. further modification should fail
