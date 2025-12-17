@@ -36,3 +36,9 @@ frontend/node_modules/
 
 tmp/
 bin/
+
+# Local npm cache/logs (Codex/CI)
+.npm-cache/
+.npm/
+
+.csp*
