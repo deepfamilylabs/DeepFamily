@@ -101,7 +101,7 @@ The system implements a two-layer value model that balances privacy protection w
 
 ### Zero-Knowledge Infrastructure
 - **Circuits**: person_hash_zk.circom (family relationships), name_poseidon_zk.circom (name binding)
-- **Libraries**: circomlib v2.0.5, circomlibjs v0.0.8, keccak256-circom
+- **Libraries**: circomlib v2.0.5, keccak256-circom
 - **Hashing**: Poseidon-lite v0.3, @noble/hashes v1.8
 - **Proof Generation**: snarkjs with Powers of Tau ceremony support
 - **Verifiers**: Auto-generated Solidity verifiers (PersonHashVerifier.sol, NamePoseidonVerifier.sol)
@@ -181,36 +181,36 @@ DeepFamily/
 │   │   └── update-local-config.mjs    # Local config generator
 │   └── public/                    # Static assets
 ├── test/                   # Smart contract tests
-│   ├── contract-person-version.test.js  # Person version management tests
-│   ├── contract-endorse.test.js         # Endorsement system tests
-│   ├── contract-mint-nft.test.js        # NFT minting tests
-│   ├── story-tasks.test.js              # Story sharding tests
-│   ├── story-errors.test.js             # Story error handling tests
-│   ├── zk-hash-consistency.test.js      # ZK hash validation tests
-│   ├── zk-name-poseidon-check.test.js   # Name proof tests
-│   ├── zk-generate-name-poseidon-proof.test.js
-│   └── lib-seed-helpers.test.js         # Seeding utility tests
+│   ├── contract-person-version.test.mjs  # Person version management tests
+│   ├── contract-endorse.test.mjs         # Endorsement system tests
+│   ├── contract-mint-nft.test.mjs        # NFT minting tests
+│   ├── story-tasks.test.mjs              # Story sharding tests
+│   ├── story-errors.test.mjs             # Story error handling tests
+│   ├── zk-hash-consistency.test.mjs      # ZK hash validation tests
+│   ├── zk-name-poseidon-check.test.mjs   # Name proof tests
+│   ├── zk-generate-name-poseidon-proof.test.mjs
+│   └── lib-seed-helpers.test.mjs         # Seeding utility tests
 ├── deploy/                 # Hardhat deployment scripts
 │   └── 00_deploy_integrated_system.js   # Integrated deployment
 ├── tasks/                  # Hardhat tasks
-│   ├── contract-add-person.js           # Add person task
-│   ├── contract-endorse.js              # Endorsement task
-│   ├── contract-mint-nft.js             # NFT minting task
-│   ├── story-add-chunk.js               # Story chunk addition
-│   ├── story-list-chunks.js             # Story chunk listing
-│   ├── story-seal.js                    # Story sealing task
-│   ├── zk-add-person.js                 # ZK person addition
-│   ├── zk-generate-name-poseidon-proof.js
-│   ├── zk-name-poseidon-check.js        # Name proof validation
-│   ├── zk-person-hash-check.js          # Person hash validation
-│   ├── networks-check.js                # Network validation
-│   └── networks-list.js                 # Network listing
+│   ├── contract-add-person.mjs           # Add person task
+│   ├── contract-endorse.mjs              # Endorsement task
+│   ├── contract-mint-nft.mjs             # NFT minting task
+│   ├── story-add-chunk.mjs               # Story chunk addition
+│   ├── story-list-chunks.mjs             # Story chunk listing
+│   ├── story-seal.mjs                    # Story sealing task
+│   ├── zk-add-person.mjs                 # ZK person addition
+│   ├── zk-generate-name-poseidon-proof.mjs
+│   ├── zk-name-poseidon-check.mjs        # Name proof validation
+│   ├── zk-person-hash-check.mjs          # Person hash validation
+│   ├── networks-check.mjs                # Network validation
+│   └── networks-list.mjs                 # Network listing
 ├── scripts/                # Utility scripts
-│   ├── seed-historical.js         # Historical demo data seeding
-│   ├── check-root.js              # Root node validation
-│   ├── fund-wallet.js             # Local wallet funding
-│   ├── verify-data.js             # Data verification
-│   └── test-keygen-demo.js        # Key generation demo
+│   ├── seed-historical.mjs         # Historical demo data seeding
+│   ├── check-root.mjs              # Root node validation
+│   ├── fund-wallet.mjs             # Local wallet funding
+│   ├── verify-data.mjs            # Data verification
+│   └── test-keygen-demo.mjs       # Key generation demo
 └── docs/                   # Technical documentation
 ```
 
@@ -225,6 +225,13 @@ npm run test:gas             # Run tests with gas reporting
 npm run test:coverage        # Generate Solidity coverage report
 npm run dev:all              # Start complete development environment (node + deploy + seed + frontend)
 npm run frontend:dev         # Frontend development server only (localhost:5173)
+```
+
+### Frontend CSP Scan (Playwright)
+```bash
+cd frontend
+npm run csp:scan                     # Default: preview-mode scan (build + preview)
+CSP_SCAN_MODE=dev npm run csp:scan   # Dev-mode scan (vite dev server)
 ```
 
 ### Deployment & Network Management
