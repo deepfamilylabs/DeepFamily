@@ -1,7 +1,10 @@
-const hre = require("hardhat");
-const path = require("path");
-const fs = require("fs");
-const { computePersonHash, checkPersonExists, getAllRoots } = require("../lib/seedHelpers");
+import hre from "hardhat";
+import path from "node:path";
+import fs from "node:fs";
+import seedHelpers from "../lib/seedHelpers.js";
+import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+
+const { computePersonHash, checkPersonExists, getAllRoots } = seedHelpers;
 
 /**
  * Check detailed information for a specific person
@@ -93,33 +96,19 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
 }
 
 async function main() {
-  const { deployments, ethers } = hre;
-  const { get } = deployments;
-
   console.log("=".repeat(70));
   console.log("DeepFamily Person Check Tool");
   console.log("=".repeat(70));
 
-  let dep;
-  try {
-    dep = await get("DeepFamily");
-  } catch {
-    await deployments.fixture(["Integrated"]);
-    dep = await get("DeepFamily");
-  }
-
-  // Get related deployment info
-  const depToken = await get("DeepFamilyToken");
-  const depVerifier = await get("PersonHashVerifier");
-  const depNameVerifier = await get("NamePoseidonVerifier");
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
+  const { deepFamily, token } = await ensureIntegratedSystem(connection, {
+    writeDeployments: true,
+  });
 
   console.log("\nContract addresses:");
-  console.log(`  DeepFamily: ${dep.address}`);
-  console.log(`  DeepFamilyToken: ${depToken.address}`);
-  console.log(`  PersonHashVerifier: ${depVerifier.address}`);
-  console.log(`  NamePoseidonVerifier: ${depNameVerifier.address}`);
-
-  const deepFamily = await ethers.getContractAt("DeepFamily", dep.address);
+  console.log(`  DeepFamily: ${await deepFamily.getAddress()}`);
+  console.log(`  DeepFamilyToken: ${await token.getAddress()}`);
 
   // Display statistics
   try {

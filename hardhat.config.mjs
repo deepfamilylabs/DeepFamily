@@ -1,28 +1,40 @@
-require("@nomicfoundation/hardhat-toolbox");
-require("hardhat-deploy");
-require("hardhat-contract-sizer");
-require("dotenv").config();
-require("./tasks/contract-add-person");
-require("./tasks/contract-endorse");
-require("./tasks/contract-mint-nft");
-require("./tasks/zk-generate-name-poseidon-proof");
-require("./tasks/networks-check");
-require("./tasks/networks-list");
+import hardhatEthers from '@nomicfoundation/hardhat-ethers'
+import hardhatEthersChaiMatchers from '@nomicfoundation/hardhat-ethers-chai-matchers'
+import hardhatMocha from '@nomicfoundation/hardhat-mocha'
+import hardhatNetworkHelpers from '@nomicfoundation/hardhat-network-helpers'
+import hardhatTypechain from '@nomicfoundation/hardhat-typechain'
+import hardhatVerify from '@nomicfoundation/hardhat-verify'
+import 'dotenv/config'
 
-// Register story-related task scripts used by tests
-require("./tasks/story-add-chunk");
-require("./tasks/story-list-chunks");
-require("./tasks/story-seal");
+import addPersonTask from './tasks/contract-add-person.mjs'
+import endorseTask from './tasks/contract-endorse.mjs'
+import mintNftTask from './tasks/contract-mint-nft.mjs'
+import addPersonZkTask from './tasks/zk-add-person.mjs'
+import generateNamePoseidonProofTask from './tasks/zk-generate-name-poseidon-proof.mjs'
+import networksCheckTask from './tasks/networks-check.mjs'
+import networksListTask from './tasks/networks-list.mjs'
+import addStoryChunkTask from './tasks/story-add-chunk.mjs'
+import listStoryChunksTask from './tasks/story-list-chunks.mjs'
+import sealStoryTask from './tasks/story-seal.mjs'
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
 
-/** @type import('hardhat/config').HardhatUserConfig */
-module.exports = {
+/** @type {import('hardhat/config').HardhatUserConfig} */
+export default {
+  plugins: [
+    hardhatEthers,
+    hardhatEthersChaiMatchers,
+    hardhatMocha,
+    hardhatNetworkHelpers,
+    hardhatTypechain,
+    hardhatVerify,
+  ],
   solidity: {
     version: "0.8.20",
+    npmFilesToBuild: ["poseidon-solidity/PoseidonT4.sol"],
     settings: {
       optimizer: {
         enabled: true,
@@ -35,27 +47,42 @@ module.exports = {
   },
   
   networks: {
+    // Default in-process simulated network used by Hardhat 3 when no --network is provided
+    default: {
+      type: "edr-simulated",
+      chainId: 31337,
+      allowUnlimitedContractSize: (process.env.UNLIMITED_SIZE || "true") === "true",
+      gas: "auto",
+      gasPrice: "auto",
+      blockGasLimit: 30000000,
+    },
     // Local development network
     localhost: {
+      type: "http",
       url: "http://127.0.0.1:8545",
       chainId: 31337,
-      gas: 30000000, // 30M gas limit for ZK proof verification
+      // Use estimation by default; Hardhat's JSON-RPC may enforce a per-tx gas cap (~16.7M),
+      // so forcing 30M here can make even small txs fail with "exceeds transaction gas cap".
+      gas: "auto",
       gasPrice: "auto",
       timeout: 1200000,
     },
     
     // Built-in Hardhat network - allow large contracts
     hardhat: {
+      type: "edr-simulated",
       chainId: 31337,
       // Allow unlimited contract size locally; can be controlled via env UNLIMITED_SIZE
       allowUnlimitedContractSize: (process.env.UNLIMITED_SIZE || "true") === "true",
-      gas: 30000000, // 30M gas limit for ZK proof verification
+      // Use estimation by default; forcing a high gas limit can exceed Hardhat's per-tx gas cap.
+      gas: "auto",
       gasPrice: "auto",
       blockGasLimit: 30000000, // Block gas limit
     },
     
     // Ethereum test network
     sepolia: {
+      type: "http",
       url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 11155111,
@@ -65,6 +92,7 @@ module.exports = {
     
     // Holesky testnet (latest Ethereum testnet)
     holesky: {
+      type: "http",
       url: `https://holesky.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 17000,
@@ -74,6 +102,7 @@ module.exports = {
     
     // Ethereum mainnet
     mainnet: {
+      type: "http",
       url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 1,
@@ -83,6 +112,7 @@ module.exports = {
     
     // Polygon Amoy testnet (replacement for Mumbai)
     polygonAmoy: {
+      type: "http",
       url: `https://polygon-amoy.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 80002,
@@ -92,6 +122,7 @@ module.exports = {
     
     // Polygon mainnet
     polygon: {
+      type: "http",
       url: `https://polygon-mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 137,
@@ -101,6 +132,7 @@ module.exports = {
     
     // BSC testnet
     bscTestnet: {
+      type: "http",
       url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 97,
@@ -110,6 +142,7 @@ module.exports = {
     
     // BSC mainnet
     bsc: {
+      type: "http",
       url: "https://bsc-dataseed1.binance.org",
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 56,
@@ -119,6 +152,7 @@ module.exports = {
     
     // Arbitrum testnet
     arbitrumSepolia: {
+      type: "http",
       url: `https://arbitrum-sepolia.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 421614,
@@ -128,6 +162,7 @@ module.exports = {
     
     // Arbitrum mainnet
     arbitrum: {
+      type: "http",
       url: `https://arbitrum-mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 42161,
@@ -137,6 +172,7 @@ module.exports = {
     
     // Optimism testnet
     optimismSepolia: {
+      type: "http",
       url: `https://optimism-sepolia.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 11155420,
@@ -146,6 +182,7 @@ module.exports = {
     
     // Optimism mainnet
     optimism: {
+      type: "http",
       url: `https://optimism-mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 10,
@@ -155,6 +192,7 @@ module.exports = {
     
     // Conflux eSpace testnet
     confluxTestnet: {
+      type: "http",
       url: "https://evmtestnet.confluxrpc.com",
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 71,
@@ -164,6 +202,7 @@ module.exports = {
     
     // Conflux eSpace mainnet
     conflux: {
+      type: "http",
       url: "https://evm.confluxrpc.com",
       accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
       chainId: 1030,
@@ -171,6 +210,25 @@ module.exports = {
       timeout: 1200000,
     },
   },
+  test: {
+    mocha: {
+      timeout: 180000,
+      require: ['./hardhat-test-setup.mjs'],
+    },
+  },
+
+  tasks: [
+    addPersonTask,
+    endorseTask,
+    mintNftTask,
+    addPersonZkTask,
+    generateNamePoseidonProofTask,
+    networksCheckTask,
+    networksListTask,
+    addStoryChunkTask,
+    listStoryChunksTask,
+    sealStoryTask,
+  ],
   
   // Contract verification configuration
   etherscan: {
@@ -294,4 +352,4 @@ module.exports = {
       default: 0,
     },
   },
-};
+}

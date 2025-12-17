@@ -1,17 +1,23 @@
-const { expect } = require("chai");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { keccak256, getBytes } = require("ethers");
-const { TextEncoder } = require("util");
+import { expect } from 'chai'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import { fileURLToPath } from 'node:url'
+import { keccak256, getBytes } from 'ethers'
+import { TextEncoder } from 'node:util'
 
-const {
+import {
   keccakUtf8Bytes,
   zeroBytes32,
   buildNamePoseidonInput,
   resolveExistingFile,
-} = require("../tasks/zk-generate-name-poseidon-proof.js");
-const { normalizeNameForHash, normalizePassphraseForHash } = require("../lib/namePoseidon");
+} from '../tasks/zk-generate-name-poseidon-proof.mjs'
+import namePoseidon from '../lib/namePoseidon.js'
+
+const { normalizeNameForHash, normalizePassphraseForHash } = namePoseidon
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const textEncoder = new TextEncoder();
 

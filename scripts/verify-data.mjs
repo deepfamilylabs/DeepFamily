@@ -1,8 +1,17 @@
-// Support command line argument to specify data file
-const dataFile = process.argv[2] || "en-family.json";
-const dataPath = dataFile.includes("/") ? dataFile : `../data/persons/${dataFile}`;
+// Usage: node scripts/verify-data.mjs [data-file.json]
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const data = require(dataPath);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dataFile = process.argv[2] || "en-family.json";
+const dataPath = dataFile.includes("/")
+  ? dataFile
+  : path.join(__dirname, "..", "data", "persons", dataFile);
+
+const data = JSON.parse(await fs.readFile(dataPath, "utf8"));
 
 console.log("\n" + "=".repeat(70));
 console.log("📊 " + data.familyName + " Final Data Report");

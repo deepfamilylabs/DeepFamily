@@ -1,13 +1,11 @@
-const { expect } = require("chai");
-const hre = require("hardhat");
-const { ethers } = hre;
-const {
-  addPersonVersion,
-  endorseVersion,
-  mintPersonNFT,
-  computePersonHash,
-  checkPersonExists,
-} = require("../lib/seedHelpers");
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import seedHelpers from '../lib/seedHelpers.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+
+const { ethers } = hre
+const { addPersonVersion, endorseVersion, mintPersonNFT, computePersonHash, checkPersonExists } = seedHelpers
 
 describe("SeedHelpers Library Tests", function () {
   this.timeout(120_000);
@@ -16,19 +14,17 @@ describe("SeedHelpers Library Tests", function () {
 
   before(async function () {
     // Deploy contracts
-    await hre.deployments.fixture(["Integrated"]);
+    const { deepFamily: deployedDeepFamily, token: deployedToken } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
 
-    const deepDeployment = await hre.deployments.get("DeepFamily");
-    const tokenDeployment = await hre.deployments.get("DeepFamilyToken");
-
-    [signer] = await ethers.getSigners();
+    ;[signer] = await ethers.getSigners();
     signerAddr = await signer.getAddress();
 
-    deepFamily = await ethers.getContractAt("DeepFamily", deepDeployment.address, signer);
-    token = await ethers.getContractAt("DeepFamilyToken", tokenDeployment.address, signer);
+    deepFamily = deployedDeepFamily.connect(signer)
+    token = deployedToken.connect(signer)
 
-    console.log(`  DeepFamily: ${deepDeployment.address}`);
-    console.log(`  DeepFamilyToken: ${tokenDeployment.address}`);
+    console.log(`  DeepFamily: ${await deepFamily.getAddress()}`);
+    console.log(`  DeepFamilyToken: ${await token.getAddress()}`);
     console.log(`  Signer: ${signerAddr}\n`);
   });
 
@@ -396,4 +392,3 @@ describe("SeedHelpers Library Tests", function () {
     });
   });
 });
-

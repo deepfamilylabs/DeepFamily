@@ -23,7 +23,9 @@ Usage examples
     --zkey ./artifacts/circuits/person_hash_zk_final.zkey --input ./circuits/test/fullname_hash_input.json --submitter 0xYourEOA
 */
 
-const { getAddress, ZeroAddress } = require("ethers");
+import fs from "node:fs";
+import { getAddress, ZeroAddress } from "ethers";
+import { poseidon3, poseidon5 } from "poseidon-lite";
 
 function split128FromBigInt(x) {
   const hi = x >> 128n;
@@ -51,8 +53,6 @@ function be128HiLoFromBytes32(bytes) {
 }
 
 async function buildExpectedSignalsFromInput(input) {
-  const { poseidon } = require("circomlibjs");
-
   function personCommitmentFrom(inputPrefix) {
     const nameBytes = input[`${inputPrefix}fullNameHash`];
     const saltBytes = input[`${inputPrefix}saltHash`] || new Array(32).fill(0);
@@ -65,7 +65,7 @@ async function buildExpectedSignalsFromInput(input) {
     const [nameHi, nameLo] = be128HiLoFromBytes32(nameBytes);
     const [saltHi, saltLo] = be128HiLoFromBytes32(saltBytes);
 
-    const salted = poseidon([nameHi, nameLo, saltHi, saltLo, 0n]);
+    const salted = poseidon5([nameHi, nameLo, saltHi, saltLo, 0n]);
     const saltedBig = BigInt(salted);
     const [saltedHi, saltedLo] = split128FromBigInt(saltedBig);
 
@@ -75,7 +75,7 @@ async function buildExpectedSignalsFromInput(input) {
       (birthDay << 8n) |
       (gender << 1n) |
       (isBirthBC & 1n);
-    const h = poseidon([saltedHi, saltedLo, packedData]);
+    const h = poseidon3([saltedHi, saltedLo, packedData]);
     const hv = BigInt(h);
     const [hi, lo] = split128FromBigInt(hv);
     return [hi, lo];
@@ -115,7 +115,6 @@ async function main() {
     process.exit(1);
   }
 
-  const fs = require("fs");
   const input = JSON.parse(fs.readFileSync(opts.input, "utf8"));
   if (opts.submitter) input.submitter = opts.submitter;
 
@@ -126,7 +125,7 @@ async function main() {
   // Optional snarkjs compare
   if (opts.wasm && opts.zkey && opts.input) {
     try {
-      const snarkjs = require("snarkjs");
+      const snarkjs = await import("snarkjs");
       // Ensure submitter matches
       input.submitter = expected[6].toString();
 
@@ -139,7 +138,7 @@ async function main() {
       console.log("Match:", ok);
       if (!ok) process.exitCode = 1;
     } catch (e) {
-      console.warn("snarkjs compare skipped:", e.message);
+      console.warn("snarkjs compare skipped:", e?.message || String(e));
     }
   }
 }

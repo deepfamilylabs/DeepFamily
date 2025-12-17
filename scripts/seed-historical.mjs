@@ -21,10 +21,19 @@
  *   HISTORICAL_SEED_LIMIT=5 npm run seed   # only process first N members per file
  */
 
-const hre = require("hardhat");
-const { ethers } = hre;
-const path = require("path");
-const fs = require("fs");
+import hre from "hardhat";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import seedHelpers from "../lib/seedHelpers.js";
+import versionMetadata from "../lib/versionMetadata.js";
+import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const connection = await hre.network.connect();
+const { ethers } = connection;
 const {
   addPersonVersion,
   endorseVersion,
@@ -32,8 +41,8 @@ const {
   computePersonHash,
   getPersonProgress,
   normalizePersonData,
-} = require("../lib/seedHelpers");
-const { buildVersionMetadataPayload, generateMetadataCID } = require("../lib/versionMetadata");
+} = seedHelpers;
+const { buildVersionMetadataPayload, generateMetadataCID } = versionMetadata;
 
 function pickRevertData(value) {
   if (typeof value === "string" && value.startsWith("0x")) {
@@ -1029,20 +1038,19 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
  * Supports batch seeding of multiple languages or single language mode
  */
 async function main() {
-  const { ethers, deployments } = hre;
-
   console.log("=".repeat(70));
   console.log("DeepFamily Historical Data Seeding");
   console.log("=".repeat(70));
 
-  // Get contract instances
-  const deepFamilyAddr = (await deployments.get("DeepFamily")).address;
-  const tokenAddr = (await deployments.get("DeepFamilyToken")).address;
-
-  const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyAddr);
-  const token = await ethers.getContractAt("DeepFamilyToken", tokenAddr);
-
   const [signer] = await ethers.getSigners();
+  const { deepFamily, token } = await ensureIntegratedSystem(connection, {
+    writeDeployments: true,
+  });
+  const deepFamilyWithSigner = deepFamily.connect(signer);
+  const tokenWithSigner = token.connect(signer);
+
+  const deepFamilyAddr = await deepFamily.getAddress();
+  const tokenAddr = await token.getAddress();
   console.log(`\nUsing signer: ${signer.address}`);
   console.log(`DeepFamily contract: ${deepFamilyAddr}`);
   console.log(`DeepFamilyToken contract: ${tokenAddr}`);
@@ -1060,7 +1068,7 @@ async function main() {
       console.log(`📂 Starting: ${file}`);
       console.log("━".repeat(70));
 
-      const result = await seedSingleLanguage(file, deepFamily, token, signer);
+      const result = await seedSingleLanguage(file, deepFamilyWithSigner, tokenWithSigner, signer);
       results.push({ file, success: true, ...result });
       console.log(`✓ ${file} completed successfully`);
     } catch (error) {

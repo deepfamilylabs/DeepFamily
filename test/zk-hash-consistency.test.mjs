@@ -1,9 +1,11 @@
-const { expect } = require('chai');
-const hre = require('hardhat');
-const poseidon = require('circomlibjs').poseidon;
-const { computePoseidonDigest, splitToLimbs, buildBasicInfo } = require('../lib/namePoseidon');
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import { poseidon3 } from 'poseidon-lite'
+import namePoseidon from '../lib/namePoseidon.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
 
-const FIELD_MASK_128 = (1n << 128n) - 1n;
+const { computePoseidonDigest, splitToLimbs, buildBasicInfo } = namePoseidon
 
 /**
  * Convert bytes32 hash (as hex string) to the two 128-bit limbs used in the circuit
@@ -30,7 +32,7 @@ function computePersonHashCircuitEquivalent(input) {
   const poseidonLimbs = digestInfo.digestLimbs;
 
   const packedData = packVitalStats(input);
-  const finalPoseidonResult = poseidon([poseidonLimbs.hi, poseidonLimbs.lo, packedData]);
+  const finalPoseidonResult = poseidon3([poseidonLimbs.hi, poseidonLimbs.lo, packedData]);
   const finalPoseidonHex = `0x${finalPoseidonResult.toString(16).padStart(64, '0')}`;
   const finalPoseidonLimbs = splitToLimbs(finalPoseidonHex);
   const personHash = hre.ethers.keccak256(hre.ethers.getBytes(finalPoseidonHex));
@@ -53,9 +55,8 @@ describe('Hash Consistency Tests', function () {
   let deepFamily;
 
   beforeEach(async () => {
-    await hre.deployments.fixture(['Integrated']);
-    const { address } = await hre.deployments.get('DeepFamily');
-    deepFamily = await hre.ethers.getContractAt('DeepFamily', address);
+    const { deepFamily: deployed } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    deepFamily = deployed
   });
 
   const testCases = [

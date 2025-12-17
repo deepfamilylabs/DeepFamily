@@ -18,15 +18,16 @@ Usage examples:
     --zkey ./circuits/name_poseidon_0001.zkey
 */
 
-const fs = require("fs");
-const path = require("path");
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-const {
+import {
   formatBytePreview,
   resolveExistingFile,
   DEFAULT_WASM_CANDIDATES,
   DEFAULT_ZKEY_CANDIDATES,
-} = require("./zk-generate-name-poseidon-proof.js");
+} from "./zk-generate-name-poseidon-proof.mjs";
 
 function split128FromBigInt(value) {
   const hi = value >> 128n;
@@ -112,12 +113,12 @@ function validatePoseidonInput(raw) {
 }
 
 async function computeExpectedSignalsFromHashes(fullNameHash, saltHash, minter) {
-  const { poseidon } = require("circomlibjs");
+  const { poseidon5 } = await import("poseidon-lite");
 
   const nameLimbs = bytes32ToLimbs(fullNameHash);
   const saltLimbs = bytes32ToLimbs(saltHash);
 
-  const poseidonDigest = poseidon([nameLimbs.hi, nameLimbs.lo, saltLimbs.hi, saltLimbs.lo, 0n]);
+  const poseidonDigest = poseidon5([nameLimbs.hi, nameLimbs.lo, saltLimbs.hi, saltLimbs.lo, 0n]);
 
   const poseidonLimbs = split128FromBigInt(poseidonDigest);
 
@@ -225,7 +226,7 @@ function loadPublicSignals(filePath) {
 
 function printUsage() {
   console.log(
-    `Usage: node tasks/zk-name-poseidon-check.js --input <input.json> [options]\n\nOptions:\n  --public <file>    Compare against an existing publicSignals JSON\n  --prove            Generate a fresh proof using snarkjs (requires wasm/zkey)\n  --wasm <file>      Override path to Poseidon circuit wasm\n  --zkey <file>      Override path to Poseidon circuit zkey\n  -h, --help         Show this help message`,
+    `Usage: node tasks/zk-name-poseidon-check.mjs --input <input.json> [options]\n\nOptions:\n  --public <file>    Compare against an existing publicSignals JSON\n  --prove            Generate a fresh proof using snarkjs (requires wasm/zkey)\n  --wasm <file>      Override path to Poseidon circuit wasm\n  --zkey <file>      Override path to Poseidon circuit zkey\n  -h, --help         Show this help message`,
   );
 }
 
@@ -241,7 +242,7 @@ async function maybeGenerateProof(args, input) {
   console.log("  wasm:", wasmPath);
   console.log("  zkey:", zkeyPath);
 
-  const snarkjs = require("snarkjs");
+  const snarkjs = await import("snarkjs");
   const { publicSignals } = await snarkjs.groth16.fullProve(input, wasmPath, zkeyPath);
   return publicSignals.map((x) => x.toString());
 }
@@ -317,11 +318,11 @@ async function runCli(rawArgs = process.argv.slice(2)) {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runCli();
 }
 
-module.exports = {
+export {
   split128FromBigInt,
   normaliseBytes32Array,
   bytes32ToBigInt,

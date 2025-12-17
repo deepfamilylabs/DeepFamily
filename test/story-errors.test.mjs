@@ -1,6 +1,10 @@
-const { expect } = require('chai');
-const hre = require('hardhat');
-const { buildBasicInfo } = require('../lib/namePoseidon');
+import '../hardhat-test-setup.mjs'
+import { expect } from 'chai'
+import hre from 'hardhat'
+import namePoseidon from '../lib/namePoseidon.js'
+import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+
+const { buildBasicInfo } = namePoseidon
 
 // Additional negative & edge-case tests for story sharding (add/seal)
 // Covers: non-owner, index mismatch, oversize, hash mismatch, seal rules, zero-chunk seal
@@ -9,10 +13,9 @@ describe('Story Sharding - Error & Edge Cases', function () {
   this.timeout(90_000);
 
   async function deployAndMint() {
-    await hre.deployments.fixture(['Integrated']);
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer, other] = await hre.ethers.getSigners();
-    const deepDeployment = await hre.deployments.get('DeepFamily');
-    const deepFamily = await hre.ethers.getContractAt('DeepFamily', deepDeployment.address, signer);
+    const deepFamilyWithSigner = deepFamily.connect(signer)
 
     const FULLNAME = 'Edge Person';
     const BIRTH_YEAR = '1970';
@@ -32,7 +35,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
       birthDay: 0,
       gender: parseInt(GENDER, 10),
     });
-    const personHash = await deepFamily.getPersonHash(basicInfo);
+    const personHash = await deepFamilyWithSigner.getPersonHash(basicInfo);
     await hre.run('endorse', { person: personHash, vindex: '1' });
     await hre.run('mint-nft', {
       person: personHash,
@@ -44,7 +47,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
       birthplace: 'City',
       story: 'Edge summary'
     });
-    return { deepFamily, signer, other, tokenId: 1n, personHash };
+    return { deepFamily: deepFamilyWithSigner, signer, other, tokenId: 1n, personHash };
   }
 
   it('reverts when non-owner adds chunk', async () => {
