@@ -4,18 +4,13 @@ import { useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, CloudDownload, FileDown, Link2, Lock, Shield, AlertTriangle, Loader2, ChevronDown } from 'lucide-react'
 import { decryptMetadataPayload, parseEncryptedPayload, EncryptedMetadataPayload } from '../lib/metadataCrypto'
 import { sanitizeErrorForLogging } from '../lib/errors'
-
-const gatewayOptions = [
-  'https://ipfs.io/ipfs/',
-  'https://cloudflare-ipfs.com/ipfs/',
-  'https://dweb.link/ipfs/'
-]
+import { IPFS_GATEWAY_BASE_URLS } from '../config/ipfs'
 
 export default function DecryptMetadataPage() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const initialCID = searchParams.get('cid') || ''
-  const initialGateway = searchParams.get('gateway') || gatewayOptions[0]
+  const initialGateway = searchParams.get('gateway') || IPFS_GATEWAY_BASE_URLS[0]
 
   const [cid, setCid] = useState(initialCID)
   const [baseUrl, setBaseUrl] = useState(initialGateway)
@@ -32,7 +27,7 @@ export default function DecryptMetadataPage() {
 
   useEffect(() => {
     setCid(initialCID)
-    setBaseUrl(initialGateway || gatewayOptions[0])
+    setBaseUrl(initialGateway || IPFS_GATEWAY_BASE_URLS[0])
   }, [initialCID, initialGateway])
 
   const buildUrl = () => {
@@ -153,7 +148,7 @@ export default function DecryptMetadataPage() {
                   </div>
                   {showGatewayList && (
                     <div className="absolute z-30 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
-                      {gatewayOptions.map((g) => (
+                      {IPFS_GATEWAY_BASE_URLS.map((g) => (
                         <button
                           type="button"
                           key={g}
