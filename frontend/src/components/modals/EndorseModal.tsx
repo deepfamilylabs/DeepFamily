@@ -710,7 +710,7 @@ export default function EndorseModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={isDesktop ? undefined : handleClose} style={{ touchAction: 'pan-y' }}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden touch-pan-y" onClick={isDesktop ? undefined : handleClose}>
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -763,7 +763,7 @@ export default function EndorseModal({
         </div>
 
         {/* Form Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0" style={{ touchAction: 'pan-y' }}>
+        <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0 touch-pan-y">
           <div className="flex-1 p-4 sm:p-6 space-y-6">
           
           {/* Person Hash and Version Input (always shown as editable) */}

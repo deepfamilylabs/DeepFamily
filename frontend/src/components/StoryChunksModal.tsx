@@ -385,9 +385,9 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
   useEffect(() => { if (isOpen) { requestAnimationFrame(() => setEntered(true)) } else { setEntered(false) } }, [isOpen])
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden" onClick={onClose} style={{ touchAction: 'pan-y' }}>
+    <div className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden touch-pan-y" onClick={onClose}>
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
-      <div className="flex items-end sm:items-center justify-center h-full w-full p-3 sm:p-4" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex items-end sm:items-center justify-center h-full w-full p-3 pb-[env(safe-area-inset-bottom)] sm:p-4">
         <div
           className={`relative flex flex-col w-full max-w-[860px] h-[92vh] sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full sm:translate-y-0'} will-change-transform`}
           onClick={(e) => e.stopPropagation()}
@@ -500,7 +500,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
             }}
           />
           {/* Content */}
-          <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden" style={{ touchAction: 'pan-y' }}>
+          <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden touch-pan-y">
             <div className="p-4 sm:p-6 pb-24 sm:pb-6 space-y-6">{/* extra bottom space for safe touch area */}
               {/* Life Events Section */}
               {((formatDate.birth || person.birthPlace) || (formatDate.death || person.deathPlace)) && (
