@@ -6,11 +6,31 @@ import { decryptMetadataPayload, parseEncryptedPayload, EncryptedMetadataPayload
 import { sanitizeErrorForLogging } from '../lib/errors'
 import { IPFS_GATEWAY_BASE_URLS } from '../config/ipfs'
 
+const normalizeGatewayBaseUrl = (value: string): string | null => {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  try {
+    const url = new URL(trimmed)
+    const lowerPath = url.pathname.toLowerCase()
+    if (url.pathname === '/' || url.pathname === '') {
+      url.pathname = '/ipfs/'
+    } else if (lowerPath.endsWith('/ipfs')) {
+      url.pathname = `${url.pathname}/`
+    } else if (!url.pathname.endsWith('/')) {
+      url.pathname = `${url.pathname}/`
+    }
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 export default function DecryptMetadataPage() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const initialCID = searchParams.get('cid') || ''
   const initialGateway = searchParams.get('gateway') || IPFS_GATEWAY_BASE_URLS[0]
+  const isDev = import.meta.env.DEV
 
   const [cid, setCid] = useState(initialCID)
   const [baseUrl, setBaseUrl] = useState(initialGateway)
@@ -30,14 +50,25 @@ export default function DecryptMetadataPage() {
     setBaseUrl(initialGateway || IPFS_GATEWAY_BASE_URLS[0])
   }, [initialCID, initialGateway])
 
+  const normalizedBaseUrl = normalizeGatewayBaseUrl(baseUrl) || baseUrl.trim()
+  const isBaseUrlAllowlisted = IPFS_GATEWAY_BASE_URLS.includes(normalizedBaseUrl)
+
   const buildUrl = () => {
     if (!cid.trim()) return ''
-    const trimmed = baseUrl.trim()
-    if (!trimmed) return ''
-    return trimmed.endsWith('/') ? `${trimmed}${cid.trim()}` : `${trimmed}/${cid.trim()}`
+    if (!normalizedBaseUrl) return ''
+    return normalizedBaseUrl.endsWith('/') ? `${normalizedBaseUrl}${cid.trim()}` : `${normalizedBaseUrl}/${cid.trim()}`
   }
 
   const handleFetch = async () => {
+    if (!isDev && !isBaseUrlAllowlisted) {
+      setError(
+        t(
+          'decryptMetadata.gatewayBlockedByCsp',
+          'This gateway is not allowlisted for fetch in strict mode (CSP). Choose a gateway from the list, or use file upload / paste.'
+        )
+      )
+      return
+    }
     const url = buildUrl()
     if (!url) {
       setError(t('decryptMetadata.cidRequired', 'Please enter CID and base URL'))
@@ -134,6 +165,7 @@ export default function DecryptMetadataPage() {
                       onChange={(e) => setBaseUrl(e.target.value)}
                       onFocus={() => setShowGatewayList(true)}
                       onBlur={() => setTimeout(() => setShowGatewayList(false), 120)}
+                      readOnly={!isDev}
                       className="flex-1 min-w-0 h-full bg-transparent border-none outline-none px-3 text-sm"
                       placeholder="https://ipfs.io/ipfs/"
                     />
@@ -165,6 +197,14 @@ export default function DecryptMetadataPage() {
                     </div>
                   )}
                 </div>
+                {!isDev && (
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {t(
+                      'decryptMetadata.gatewayCspHint',
+                      'In preview/production, fetch is restricted by CSP. Choose a gateway from the list, or use file upload / paste for arbitrary sources.'
+                    )}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-gray-700 dark:text-gray-200">CID</label>
@@ -180,7 +220,7 @@ export default function DecryptMetadataPage() {
               <button
                 type="button"
                 onClick={handleFetch}
-                disabled={isFetching}
+                disabled={isFetching || (!isDev && !isBaseUrlAllowlisted)}
                 className="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-blue-600 text-white text-sm font-medium shadow-sm hover:bg-blue-700 transition disabled:opacity-60"
               >
                 {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
