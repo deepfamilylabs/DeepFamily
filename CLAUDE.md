@@ -250,12 +250,12 @@ Notes:
 
 ### Deployment & Network Management
 ```bash
-npm run deploy:local         # Deploy to local Hardhat network
+npm run dev:deploy         # Deploy to local Hardhat network
 npm run deploy:net --net=<network>  # Deploy to specific network (e.g., holesky, polygonAmoy)
 npm run verify:net --net=<network>  # Verify contracts on block explorer
 npm run check-networks       # Validate network configurations
 npm run list-networks        # List all configured networks
-npm run seed                 # Seed demo data to local network
+npm run dev:seed             # Seed demo data to local network
 npm run seed:net --net=<network>  # Seed demo data to specific network
 npm run check:root --net=<network>  # Check root node on network
 ```

@@ -13,12 +13,12 @@
  *   HISTORICAL_DATA_FILES must be provided (comma-separated list of JSON files in data/persons/)
  *
  * Usage (env: HISTORICAL_DATA_FILES is required):
- *   HISTORICAL_DATA_FILES=en-family.json npm run seed         # runs against localhost
+ *   HISTORICAL_DATA_FILES=en-family.json npm run dev:seed     # runs against localhost
  *   HISTORICAL_DATA_FILES=en-family.json npm run seed:net --net <network>   # target another network
- *   HISTORICAL_DATA_FILES=en-family.json,zh-family.json npm run seed   # multiple files
+ *   HISTORICAL_DATA_FILES=en-family.json,zh-family.json npm run dev:seed   # multiple files
  *
  * Optional for quick testing:
- *   HISTORICAL_SEED_LIMIT=5 npm run seed   # only process first N members per file
+ *   HISTORICAL_SEED_LIMIT=5 npm run dev:seed   # only process first N members per file
  */
 
 import hre from "hardhat";

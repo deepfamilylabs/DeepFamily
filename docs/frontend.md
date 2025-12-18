@@ -1,220 +1,144 @@
-# Frontend Integration Guide
+# Frontend Guide
 
-## Technology Stack
+The DeepFamily frontend is a React/Vite SPA that:
+- reads/writes on-chain data via an RPC endpoint (EVM JSON-RPC),
+- loads ZK proof artifacts (wasm/zkey/vkey) for proof workflows,
+- encrypts/decrypts metadata bundles client-side.
 
-### **Core Technologies**
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **React** | 18.2.0 | Modern UI framework with hooks and concurrent features |
-| **TypeScript** | ^5.4.5 | Type safety and enhanced developer experience |
-| **Vite** | ^5.2.0 | Fast build tool and development server |
-| **TailwindCSS** | ^3.4.10 | Utility-first CSS framework for responsive design |
-| **Ethers.js** | ^6.11.1 | Ethereum blockchain interaction library |
-| **React Router** | ^7.8.1 | Client-side routing and navigation |
+## Tech Stack (high level)
+- React + TypeScript + Vite
+- TailwindCSS
+- Ethers.js (chain reads + transactions)
+- SnarkJS (proof workflows)
+- React Hook Form + Zod (form handling + validation)
+- i18next (localization)
 
-### **Specialized Libraries**
-| Library | Purpose | Integration |
-|---------|---------|-------------|
-| **D3.js** | ^7.9.0 | Interactive family tree visualizations |
-| **React Hook Form** | ^7.62.0 | Form state management and validation |
-| **React i18next** | ^15.7.1 | Internationalization and localization |
-| **Lucide React** | ^0.540.0 | Modern icon system |
-| **SnarkJS** | ^0.7.5 | Zero-knowledge proof generation |
-| **Zod** | ^4.0.17 | Runtime type validation |
+## Architecture Overview
 
-## Application Architecture
+**Routing**
+- Pages live under `frontend/src/pages/` and are routed via React Router.
 
-### **Project Structure**
+**State & data access**
+- Providers live under `frontend/src/context/` (wallet/config/tree data).
+- Reusable chain/data logic lives under `frontend/src/hooks/`.
+
+**On-chain integration**
+- Contract ABIs are stored in `frontend/src/abi/`.
+- Contract addresses / chain RPC come from `VITE_*` env vars.
+
+**ZK + crypto isolation**
+- Heavy/sensitive operations run in Web Workers where possible (crypto + proof generation).
+- ZK artifacts are fetched from `/zk/*` at runtime (wasm/zkey/vkey json).
+
+## Quick Start
+
+From repo root:
+- `npm run frontend:dev` (dev server)
+- `npm run frontend:build` (production build)
+- `npm run frontend:preview` (serve build locally)
+
+Or from `frontend/`:
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
+
+## Local Integrated Development (Contracts + UI)
+
+If you want the full local stack (Hardhat node + deploy + seed + UI):
+- From repo root: `npm run dev:all`
+
+If you want to run steps manually:
+- `npm run dev:node` (Hardhat node)
+- `npm run dev:deploy` (deploy integrated system)
+- `npm run dev:seed` (seed demo data)
+- `npm run frontend:config` (generate `frontend/.env.local` from local deployments)
+- `npm run dev:frontend` (start Vite dev server)
+
+## Configuration
+
+The frontend reads configuration from `frontend/.env` (shared) and `frontend/.env.local` (local overrides).
+For the full list and defaults, see `frontend/.env.example`.
+
+**Required (minimum to render the app)**
+```bash
+VITE_RPC_URL=...
+VITE_CONTRACT_ADDRESS=...
+VITE_ROOT_PERSON_HASH=...
+VITE_ROOT_VERSION_INDEX=...
+```
+
+**Common optional**
+- `VITE_MULTICALL_ADDRESS=0x...` (future; optional)
+- Performance knobs: `VITE_DF_PARALLEL`, `VITE_DF_PAGE_SIZE`, `VITE_DF_ENDORSE_BATCH`, `VITE_DF_MAX_DEPTH`, `VITE_DF_HARD_NODE_LIMIT`
+- Debug/caching: `VITE_SHOW_DEBUG`, `VITE_STRICT_CACHE_ONLY`
+
+### Auto-config for localhost
+
+For local development you typically do not edit addresses by hand:
+- `npm run frontend:config` (repo root) or `npm run config:local` (inside `frontend/`)
+- This reads local deployment outputs and writes/updates `frontend/.env.local`.
+
+## ABI Sync (Contracts → Frontend)
+
+ABIs are copied into `frontend/src/abi/` from the Hardhat build outputs so the UI stays in sync with contracts.
+- Script: `frontend/scripts/sync-abi.mjs`
+- Triggered by the frontend lifecycle scripts (dev/build)
+
+If you changed Solidity interfaces and the frontend breaks, re-run the frontend dev/build scripts (or run `node frontend/scripts/sync-abi.mjs`).
+
+## ZK Artifacts
+
+Proof workflows load public artifacts from `/zk/*` at runtime.
+- Inputs: `.wasm`, `.zkey`, and `.vkey.json`
+- See `docs/zk-proofs.md` for artifact generation and verification details.
+
+Default location in this repo:
+- `frontend/public/zk/` (served by Vite as `/zk/…`)
+
+If proof generation/verification fails, first confirm the expected `/zk/*` files are present and served by Vite preview/dev.
+
+## Workers (Crypto + ZK)
+
+The frontend uses workers to keep heavy and sensitive computations out of UI components:
+- Crypto worker entry: `frontend/src/workers/crypto.worker.ts`
+- ZK worker entry: `frontend/src/workers/zk.worker.ts`
+- Client wrappers: `frontend/src/lib/cryptoWorkerClient.ts`, `frontend/src/lib/zkWorkerClient.ts`
+
+Practical expectation: if a change makes a worker crash, the most common cause is accidentally importing React/DOM code into a worker bundle. Keep shared logic in `frontend/src/lib/` and ensure it is worker-safe.
+
+## Source Layout
 ```
 frontend/src/
-├── components/          # Reusable UI Components
-│   ├── FamilyTree.tsx      # Main family tree container
-│   ├── FlexibleDAGView.tsx # Customizable tree layout
-│   ├── ForceDAGView.tsx    # Physics-based tree visualization
-│   ├── NodeDetailModal.tsx # Person information modal
-│   ├── WalletConnectButton.tsx # Web3 wallet integration
-│   └── ...                 # Additional UI components
-├── pages/               # Route Components
-│   ├── Home.tsx            # Landing page
-│   ├── TreePage.tsx        # Family tree visualization
-│   ├── SearchPage.tsx      # Person search interface
-│   ├── PersonPage.tsx      # Individual person details
-│   ├── StoryEditorPage.tsx # Biography editing
-│   └── ...                 # Additional pages
-├── context/            # React Context Providers
-│   ├── WalletContext.tsx   # Web3 wallet state management
-│   ├── TreeDataContext.tsx # Family tree data caching
-│   ├── ConfigContext.tsx   # Application configuration
-│   └── ...                 # Additional context providers
-├── hooks/              # Custom React Hooks
-│   ├── useContract.ts      # Smart contract interaction
-│   ├── usePersonData.ts    # Person data fetching
-│   ├── useTreeData.ts      # Tree data management
-│   └── ...                 # Additional custom hooks
-├── abi/                # Contract ABI Files
-├── types/              # TypeScript Type Definitions
-├── utils/              # Utility Functions
-└── locales/           # Internationalization Files
+├── components/          # UI components
+├── pages/               # Routes
+├── context/             # App providers
+├── hooks/               # Data + contract hooks
+├── lib/                 # Shared logic (worker-safe where possible)
+├── workers/             # Web worker entrypoints (crypto/ZK)
+├── abi/                 # Contract ABIs
+├── types/               # TypeScript types
+├── utils/               # Misc utilities
+└── locales/             # i18n resources
 ```
 
-### **React Application Flow**
-- Multi-provider architecture with nested context providers
-- Route-based navigation with React Router
-- Global state management for wallet, tree data, and configuration
-- Toast notifications and visualization options
+## Security Notes
 
-## Development Setup
+- Sensitive inputs (passphrases/passwords) should not be stored in React state/props or persistent storage.
+- CSP is expected to be strict in preview/production; use report-only to iterate.
 
-### **Environment Configuration**
-Create `frontend/.env` for production/testnet and `frontend/.env.local` for local development:
+See `docs/frontend-security.md` for the threat model, CSP guidance, and handling rules for sensitive inputs.
 
-**Production/Testnet (.env):**
-```bash
-# Conflux eSpace Testnet Configuration
-VITE_RPC_URL=https://evmtestnet.confluxrpc.com
-VITE_CONTRACT_ADDRESS=0x63ea5897C88c9Dac09c3d5Af7a55f1442F08A7E9
+## Security Commands
 
-# Root Node Configuration (Genesis Person)
-VITE_ROOT_PERSON_HASH=0x82ed8e6e1fd21e3dd5413b80e81d2606ae07c16e3372a41468c76178478e1942
-VITE_ROOT_VERSION_INDEX=1
-```
+From repo root:
+- `npm run security:audit` (audit root + frontend prod deps)
+- `npm run security:xss-scan` (cheap grep-based check for common XSS sinks)
 
-**Local Development (.env.local):**
-```bash
-# Local Hardhat Network Configuration
-VITE_RPC_URL=http://127.0.0.1:8545
-VITE_CONTRACT_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+From `frontend/`:
+- `npm run csp:scan` (optional; Playwright-based route scan to collect CSP violations)
 
-# Root Node Configuration (Genesis Person)
-VITE_ROOT_PERSON_HASH=0x82ed8e6e1fd21e3dd5413b80e81d2606ae07c16e3372a41468c76178478e1942
-VITE_ROOT_VERSION_INDEX=1
+## Troubleshooting
 
-# Optional Network Configuration
-# VITE_CHAIN_ID=31337
-# VITE_NETWORK_NAME=localhost
-# VITE_MULTICALL_ADDRESS=0x...
-
-# Optional Performance Tuning for public RPCs to avoid rate limits
-# VITE_DF_PARALLEL=6              # Default parallel requests (default: 6)
-# VITE_DF_PAGE_SIZE=25            # Default page size (default: 25)
-# VITE_DF_ENDORSE_BATCH=40        # Endorsement batch size (default: 40)
-# VITE_DF_MAX_DEPTH=30            # Maximum tree depth (default: 30)
-# VITE_DF_HARD_NODE_LIMIT=20000   # Hard limit on nodes (default: 20000)
-
-# Optional Debug and Cache Settings
-# VITE_SHOW_DEBUG=1               # Enable debug mode in TreePage
-# VITE_STRICT_CACHE_ONLY=true     # Enable strict cache-only mode
-```
-
-
-### **ABI Synchronization System**
-The frontend automatically syncs contract ABIs from Hardhat compilation:
-
-```javascript
-// frontend/scripts/sync-abi.mjs
-import fs from 'fs';
-import path from 'path';
-
-const HARDHAT_ARTIFACTS = '../artifacts/contracts';
-const FRONTEND_ABI_DIR = './src/abi';
-
-// Automatically copy ABIs after contract compilation
-export function syncABIs() {
-  const contracts = ['DeepFamily.sol', 'DeepFamilyToken.sol', 'PersonHashVerifier.sol'];
-
-  contracts.forEach(contractFile => {
-    const artifactPath = path.join(HARDHAT_ARTIFACTS, contractFile);
-    const contractName = contractFile.replace('.sol', '');
-    const artifact = JSON.parse(fs.readFileSync(`${artifactPath}/${contractName}.json`));
-
-    // Extract ABI and write to frontend
-    fs.writeFileSync(
-      path.join(FRONTEND_ABI_DIR, `${contractName}.json`),
-      JSON.stringify(artifact.abi, null, 2)
-    );
-  });
-}
-```
-
-**Automatic ABI Updates**:
-- `npm run predev` and `npm run prebuild` trigger ABI sync
-- Ensures frontend always has latest contract interfaces
-- No manual ABI copying required during development
-
-## 📱 Core Components
-
-### **Family Tree Visualization**
-
-**FlexibleDAGView.tsx** - Customizable tree layout with multiple algorithms (horizontal/vertical/radial)
-**ForceDAGView.tsx** - Physics-based tree using D3 force simulation with interactive drag and zoom
-
-### **Blockchain Integration Components**
-
-**WalletConnectButton.tsx** - Web3 wallet connection with address display and i18n support
-**NodeDetailModal.tsx** - Person detail modal with endorsement and NFT minting functionality
-
-## State Management
-
-### **Context Providers**
-
-**WalletContext.tsx** - Web3 wallet state with connection persistence and network switching
-**TreeDataContext.tsx** - Family tree data management with real-time blockchain event updates
-
-### **Custom Hooks**
-
-**useContract.ts** - Smart contract interaction with transaction execution and error handling
-**usePersonData.ts** - Person data fetching with version details and NFT information
-
-## User Experience Flow
-
-### **User Journey Flow**
-
-1. **Landing & Connection** - Welcome page with wallet connection and recent families preview
-2. **Family Tree Exploration** - Interactive visualization with sidebar controls and node details
-3. **Person Management** - Individual profiles with version tabs and action buttons
-4. **Story Creation & Editing** - Rich text editor with chunk-based content management
-
-## Security & Validation
-
-### **Validation & Error Handling**
-- **Client-Side Validation**: Zod schemas for person info and story chunks with size limits
-- **Error Mapping**: User-friendly messages for contract errors and transaction failures
-- **Input Validation**: Form validation with comprehensive error feedback
-
-## Performance Optimization
-
-### **Performance Optimization**
-- **Data Caching**: React Query integration with 5-10 minute cache times
-- **Code Splitting**: Route and component-based lazy loading with Suspense
-- **Event-Driven Updates**: Real-time blockchain event monitoring with query invalidation
-
-## Internationalization
-
-### **Internationalization**
-- **Multi-language Support**: English, Chinese, Spanish with automatic language detection
-- **Component Integration**: useTranslation hook with dynamic text and date formatting
-- **Fallback Strategy**: English as default with graceful degradation
-
----
-
-## Frontend Integration Summary
-
-### **Development Best Practices**
-- **TypeScript First**: Complete type safety across the application
-- **Component Modularity**: Reusable components with clear prop interfaces
-- **Performance Focus**: Lazy loading, caching, and event-driven updates
-- **User Experience**: Responsive design with comprehensive error handling
-- **Blockchain Integration**: Seamless Web3 wallet and contract interaction
-
-### **Key Features**
-- **Interactive Family Trees**: Multiple visualization options with D3.js
-- **Real-time Updates**: Blockchain event monitoring for live data synchronization
-- **Comprehensive i18n**: Multi-language support for global accessibility
-- **Story Management**: Rich text editing with chunk-based content organization
-- **Progressive Web App**: Mobile-responsive design with offline capability planning
-
-### **Integration Points**
-- **Smart Contracts**: Direct integration with DeepFamily protocol via Ethers.js
-- **IPFS**: Metadata and story storage via decentralized file systems
-- **Wallet Providers**: Support for MetaMask, WalletConnect, and other Web3 wallets
-- **Analytics**: Optional integration with privacy-focused analytics solutions
+- “Network Error” / read failures: verify `VITE_RPC_URL` and `VITE_CONTRACT_ADDRESS`.
+- ABI mismatch errors: re-run ABI sync (see above).
+- Proof errors: confirm `/zk/*` artifacts exist and match the circuit/verifier versions.

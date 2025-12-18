@@ -7,7 +7,7 @@ User Input
   ├─ Name: John Smith
   ├─ Birthday: 1990-05-15
   ├─ Gender: 1 (male)
-  └─ Passphrase: Strong passphrase with emoji🌸and special chars🐦...
+  └─ Passphrase: Strong passphrase with special chars...
      ↓
 [0%] ===== Layer 1: PersonHash Computation =====
      ↓
