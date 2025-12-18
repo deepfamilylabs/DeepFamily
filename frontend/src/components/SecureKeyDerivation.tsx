@@ -4,20 +4,17 @@
  * UI component for deriving secure private keys from PersonHash
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Key, Copy, CheckCircle, AlertTriangle, Loader, Eye, EyeOff } from 'lucide-react';
+import { Key, Copy, Loader, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useToast } from './ToastProvider';
 import { PersonHashCalculator } from './PersonHashCalculator';
-import type { HashForm } from './PersonHashCalculator';
+import type { HashForm, PersonHashCalculatorHandle, PublicHashForm } from './PersonHashCalculator';
 import ConfirmDialog from './ConfirmDialog';
-import {
-  deriveKeyFromPersonData,
-  validatePassphraseStrength,
-  estimateKDFDuration,
-  type KDFPreset
-} from '../lib/secureKeyDerivation';
+import { validatePassphraseStrength, estimateKDFDuration, type KDFPreset } from '../lib/secureKeyDerivation';
 import { normalizeNameForHash } from '../lib/passphraseStrength';
+import { cryptoWorkerCall } from '../lib/cryptoWorkerClient';
+import { sanitizeErrorForLogging } from '../lib/errors';
 
 interface SecureKeyDerivationProps {
   className?: string;
@@ -27,7 +24,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
   const { t } = useTranslation();
   const toast = useToast();
 
-  const [formData, setFormData] = useState<HashForm | null>(null);
+  const [publicFormData, setPublicFormData] = useState<PublicHashForm | null>(null);
   const [kdfPreset, setKdfPreset] = useState<KDFPreset>('BALANCED');
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -36,20 +33,17 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [showWeakPassphraseConfirm, setShowWeakPassphraseConfirm] = useState(false);
+  const [weakPassphraseMessage, setWeakPassphraseMessage] = useState('');
+  const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
-  // Passphrase strength validation
-  const passphraseStrength = useMemo(() => {
-    if (!formData?.passphrase) return null;
-    return validatePassphraseStrength(formData.passphrase);
-  }, [formData?.passphrase]);
-
-  const roundedStrength = useMemo(() => {
-    if (!passphraseStrength) return null;
-    return {
-      raw: Math.round(passphraseStrength.rawEntropy),
-      adjusted: Math.round(passphraseStrength.entropy),
-    };
-  }, [passphraseStrength]);
+  const buildHashFormOrNull = useCallback((): HashForm | null => {
+    const calc = personCalcRef.current;
+    const pub = calc?.getPublicFormData();
+    const secret = calc?.getSecretInputs();
+    if (!calc || !pub || !secret) return null;
+    const { hasPassphrase: _hasPassphrase, ...publicFields } = pub;
+    return { ...publicFields, passphrase: secret.passphrase };
+  }, []);
 
   // Estimate duration
   const estimatedTime = useMemo(() => {
@@ -57,6 +51,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
   }, [kdfPreset]);
 
   const startDerivation = useCallback(async () => {
+    const formData = buildHashFormOrNull();
     if (!formData) {
       toast.show(t('keyDerivation.component.fillInfoFirst'));
       return;
@@ -74,52 +69,33 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
     setDerivedAddress(null);
 
     try {
-      const result = await deriveKeyFromPersonData(
-        formData,
-        'PRIVATE_KEY',
-        kdfPreset,
-        (prog, stage) => {
-          setProgress(prog);
-          // Translate progress stage text
-          let translatedStage = stage;
-          if (stage.includes('Computing PersonHash')) {
-            translatedStage = t('keyDerivation.component.progress.computingPersonHash');
-          } else if (stage.includes('PersonHash computed')) {
-            translatedStage = t('keyDerivation.component.progress.personHashComputed');
-          } else if (stage.includes('Preparing KDF')) {
-            translatedStage = t('keyDerivation.component.progress.preparingKDF');
-          } else if (stage.includes('Running scrypt KDF')) {
-            const nMatch = stage.match(/N=(\d+)/);
-            const n = nMatch ? nMatch[1] : '';
-            translatedStage = t('keyDerivation.component.progress.runningScrypt', { n });
-          } else if (stage.includes('Computing KDF')) {
-            const progressMatch = stage.match(/\((\d+)%\)/);
-            const progressValue = progressMatch ? progressMatch[1] : prog.toString();
-            translatedStage = t('keyDerivation.component.progress.computingKDF', { progress: progressValue });
-          } else if (stage.includes('KDF completed')) {
-            translatedStage = t('keyDerivation.component.progress.kdfCompleted');
-          } else if (stage.includes('Key derivation complete')) {
-            translatedStage = t('keyDerivation.component.progress.keyDerivationComplete');
-          }
-          setProgressStage(translatedStage);
-        }
+      setProgress(25);
+      setProgressStage(t('keyDerivation.component.progress.preparingKDF'));
+      const result = await cryptoWorkerCall(
+        'deriveKey',
+        { input: formData, purpose: 'PRIVATE_KEY', preset: kdfPreset },
+        { timeoutMs: 180_000 }
       );
+
+      setProgress(100);
+      setProgressStage(t('keyDerivation.component.progress.keyDerivationComplete'));
 
       setDerivedKey(result.key);
       setDerivedAddress(result.address || null);
       toast.show(t('keyDerivation.component.success'));
     } catch (error) {
-      console.error('Key derivation failed:', error);
+      console.error('Key derivation failed:', sanitizeErrorForLogging(error));
       toast.show(t('keyDerivation.component.failed'));
     } finally {
       setIsGenerating(false);
       setProgress(0);
       setProgressStage('');
     }
-  }, [formData, kdfPreset, toast, t]);
+  }, [buildHashFormOrNull, kdfPreset, toast, t]);
 
   // Generate private key
   const handleGenerateKey = () => {
+    const formData = buildHashFormOrNull();
     if (!formData) {
       toast.show(t('keyDerivation.component.fillInfoFirst'));
       return;
@@ -130,8 +106,31 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       return;
     }
 
-    // Check passphrase strength
-    if (passphraseStrength && !passphraseStrength.isStrong) {
+    // Check passphrase strength (without lifting passphrase into component state)
+    const strength = validatePassphraseStrength(formData.passphrase || '');
+    if (strength && !strength.isStrong) {
+      const rawBits = Math.round(strength.rawEntropy ?? 0);
+      const adjustedBits = Math.round(strength.entropy ?? 0);
+      const recommendation =
+        adjustedBits === 0
+          ? t('keyDerivation.component.recommendations.empty')
+          : strength.level === 'weak'
+            ? t('keyDerivation.component.recommendations.weak', { raw: rawBits, adjusted: adjustedBits })
+            : strength.level === 'medium'
+              ? t('keyDerivation.component.recommendations.medium', { raw: rawBits, adjusted: adjustedBits })
+              : strength.level === 'strong'
+                ? t('keyDerivation.component.recommendations.strong', { raw: rawBits, adjusted: adjustedBits })
+                : strength.level === 'very-strong'
+                  ? t('keyDerivation.component.recommendations.veryStrong', { raw: rawBits, adjusted: adjustedBits })
+                  : t('keyDerivation.component.recommendations.excellent', { raw: rawBits, adjusted: adjustedBits });
+
+      setWeakPassphraseMessage(
+        [
+          t('keyDerivation.component.weakPassphraseMessage'),
+          recommendation,
+          t('keyDerivation.component.weakPassphraseContinue'),
+        ].join('\n\n')
+      );
       setShowWeakPassphraseConfirm(true);
       return;
     }
@@ -171,41 +170,10 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
         toast.show(t('keyDerivation.component.copyFailed'));
       }
     } catch (err) {
-      console.error('Copy failed:', err);
+      console.error('Copy failed:', sanitizeErrorForLogging(err));
       toast.show(t('keyDerivation.component.copyFailed'));
     }
   };
-
-  const weakPassphraseMessage = useMemo(() => {
-    if (!passphraseStrength) {
-      return `${t('keyDerivation.component.weakPassphraseMessage')}\n\n${t('keyDerivation.component.weakPassphraseContinue')}`;
-    }
-    
-    let recommendationKey: string;
-    let recommendation: string;
-    const rawBits = roundedStrength?.raw ?? 0;
-    const adjustedBits = roundedStrength?.adjusted ?? 0;
-    
-    if (adjustedBits === 0) {
-      recommendation = t('keyDerivation.component.recommendations.empty');
-    } else {
-      recommendationKey = passphraseStrength.level === 'weak' 
-        ? 'keyDerivation.component.recommendations.weak'
-        : passphraseStrength.level === 'medium'
-        ? 'keyDerivation.component.recommendations.medium'
-        : passphraseStrength.level === 'strong'
-        ? 'keyDerivation.component.recommendations.strong'
-        : 'keyDerivation.component.recommendations.veryStrong';
-      
-      recommendation = t(recommendationKey, { raw: rawBits, adjusted: adjustedBits });
-    }
-    
-    return [
-      t('keyDerivation.component.weakPassphraseMessage'),
-      recommendation,
-      t('keyDerivation.component.weakPassphraseContinue')
-    ].join('\n\n');
-  }, [passphraseStrength, roundedStrength, t]);
 
   return (
     <div className={`space-y-4 sm:space-y-6 ${className}`}>
@@ -225,63 +193,11 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
 
       {/* PersonHash Calculator */}
       <PersonHashCalculator
+        ref={personCalcRef}
         showTitle={false}
-        onFormChange={setFormData}
+        onPublicFormChange={setPublicFormData}
         className="border-0 shadow-none"
       />
-
-      {/* Passphrase strength indicator */}
-      {formData?.passphrase && passphraseStrength && roundedStrength && (
-        <div className={`p-3 sm:p-4 rounded-lg border-2 ${
-          passphraseStrength.level === 'excellent'
-            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
-            : passphraseStrength.isStrong
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
-            : 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700'
-        }`}>
-          <div className="flex items-start gap-2 sm:gap-3">
-            {passphraseStrength.level === 'excellent' ? (
-              <CheckCircle className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={18} />
-            ) : passphraseStrength.isStrong ? (
-              <CheckCircle className="text-green-600 dark:text-green-400 flex-shrink-0" size={18} />
-            ) : (
-              <AlertTriangle className="text-amber-600 dark:text-amber-400 flex-shrink-0" size={18} />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-xs sm:text-sm font-semibold mb-1 text-gray-800 dark:text-gray-100 break-words">
-                {t('keyDerivation.component.passphraseStrength')} {passphraseStrength.level.toUpperCase()}
-                <span className="ml-1">({t('keyDerivation.component.bitsSummary', {
-                  raw: roundedStrength.raw,
-                  adjusted: roundedStrength.adjusted
-                })})</span>
-              </div>
-              <div className="text-xs text-gray-600 dark:text-gray-300 break-words">
-                {roundedStrength.adjusted === 0 && t('keyDerivation.component.recommendations.empty')}
-                {roundedStrength.adjusted > 0 && passphraseStrength.level === 'weak' && t('keyDerivation.component.recommendations.weak', {
-                  raw: roundedStrength.raw,
-                  adjusted: roundedStrength.adjusted
-                })}
-                {passphraseStrength.level === 'medium' && t('keyDerivation.component.recommendations.medium', {
-                  raw: roundedStrength.raw,
-                  adjusted: roundedStrength.adjusted
-                })}
-                {passphraseStrength.level === 'strong' && t('keyDerivation.component.recommendations.strong', {
-                  raw: roundedStrength.raw,
-                  adjusted: roundedStrength.adjusted
-                })}
-                {passphraseStrength.level === 'very-strong' && t('keyDerivation.component.recommendations.veryStrong', {
-                  raw: roundedStrength.raw,
-                  adjusted: roundedStrength.adjusted
-                })}
-                {passphraseStrength.level === 'excellent' && t('keyDerivation.component.recommendations.excellent', {
-                  raw: roundedStrength.raw,
-                  adjusted: roundedStrength.adjusted
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* KDF strength selection */}
       <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 sm:p-4 space-y-3">
@@ -317,9 +233,9 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       {/* Generate button */}
       <button
         onClick={handleGenerateKey}
-        disabled={isGenerating || !normalizeNameForHash(formData?.fullName || '').length}
+        disabled={isGenerating || !normalizeNameForHash(publicFormData?.fullName || '').length}
         className={`w-full py-3 sm:py-4 rounded-lg font-semibold text-sm sm:text-base text-white transition-all ${
-          isGenerating || !normalizeNameForHash(formData?.fullName || '').length
+          isGenerating || !normalizeNameForHash(publicFormData?.fullName || '').length
             ? 'bg-gray-400 cursor-not-allowed'
             : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl'
         }`}

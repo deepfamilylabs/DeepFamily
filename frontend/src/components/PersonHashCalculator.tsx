@@ -10,12 +10,11 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { ethers } from 'ethers'
 import { ChevronDown, Clipboard, Eye, EyeOff, Info } from 'lucide-react'
 import { useToast } from './ToastProvider'
 import { formatHashMiddle } from '../types/graph'
-import { poseidon3, poseidon5 } from 'poseidon-lite'
 import { validatePassphraseStrength, normalizePassphraseForHash, normalizeNameForHash, getGraphemeLength as getGraphemeLengthUtil } from '../lib/passphraseStrength'
+import { computeIdentityHash, computePersonHash } from '../lib/identityHash'
 
 // Align with contract convention: blank passphrase -> zero salt limbs
 
@@ -24,8 +23,6 @@ const MAX_FULL_NAME_BYTES = 256
 const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
 }
-const textEncoder = new TextEncoder()
-
 const getGraphemeLength = getGraphemeLengthUtil
 
 // Field error component
@@ -130,50 +127,7 @@ const calculatePasswordStrength = (password: string) => {
 }
 
 // Hash calculation function using Poseidon (matches circuit and contract)
-export function computePersonHash(input: HashForm): string {
-  const { fullName, passphrase, isBirthBC, birthYear, birthMonth, birthDay, gender } = input
-
-  const normalizedFullName = normalizeNameForHash(fullName)
-  const normalizedPassphrase = typeof passphrase === 'string' ? normalizePassphraseForHash(passphrase) : ''
-
-  // Pack small fields into a single field element to match circuit's packedData
-  // Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2^1 + isBirthBC
-  const packedData = (BigInt(birthYear) << 24n) |
-    (BigInt(birthMonth) << 16n) |
-    (BigInt(birthDay) << 8n) |
-    (BigInt(gender) << 1n) |
-    (isBirthBC ? 1n : 0n)
-
-  // Compute fullNameHash exactly like the circuit pre-image
-  const fullNameHash = ethers.keccak256(textEncoder.encode(normalizedFullName))
-  const saltHash = normalizedPassphrase.length > 0
-    ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
-    : ethers.ZeroHash
-
-  // Convert fullNameHash to two 128-bit limbs (matching circuit's HashToLimbs)
-  const fullNameHashBN = BigInt(fullNameHash)
-  const limb0 = fullNameHashBN >> 128n // High 128 bits
-  const limb1 = fullNameHashBN & ((1n << 128n) - 1n) // Low 128 bits
-
-  const saltHashBN = BigInt(saltHash)
-  const saltLimb0 = saltHashBN >> 128n
-  const saltLimb1 = saltHashBN & ((1n << 128n) - 1n)
-
-  const saltedNamePoseidon = poseidon5([limb0, limb1, saltLimb0, saltLimb1, 0n])
-  const saltedNameBN = BigInt(saltedNamePoseidon)
-  const saltedLimb0 = saltedNameBN >> 128n
-  const saltedLimb1 = saltedNameBN & ((1n << 128n) - 1n)
-
-  // Poseidon(3) commitment over SNARK-friendly field elements
-  const poseidonResult = poseidon3([saltedLimb0, saltedLimb1, packedData])
-
-  // Domain-separate with keccak256 to mirror contract wrapping
-  const poseidonHex = '0x' + poseidonResult.toString(16).padStart(64, '0')
-  return ethers.keccak256(poseidonHex)
-}
-
-// Terminology alias: "person hash" in the contract/circuit is the app's "identity hash".
-export const computeIdentityHash = computePersonHash
+export { computePersonHash, computeIdentityHash }
 
 // Component props interface
 interface PersonHashCalculatorProps {

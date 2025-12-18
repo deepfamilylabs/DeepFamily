@@ -10,7 +10,8 @@ import { ethers } from 'ethers'
 import { poseidon5 } from 'poseidon-lite'
 import { useSearchParams } from 'react-router-dom'
 import PersonHashCalculator from '../PersonHashCalculator'
-import { getFriendlyError } from '../../lib/errors'
+import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
+import { getFriendlyError, sanitizeErrorForLogging } from '../../lib/errors'
 import {
   generateNamePoseidonProof,
   verifyNamePoseidonProof,
@@ -246,8 +247,8 @@ export default function MintNFTModal({
     birthMonth: number
     birthDay: number
     isBirthBC: boolean
-    passphrase: string
   } | null>(null)
+  const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null)
   
   // 计算属性
   const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim())
@@ -370,7 +371,7 @@ export default function MintNFTModal({
         }
         
       } catch (error) {
-        console.error('Failed to check status:', error)
+        console.error('Failed to check status:', sanitizeErrorForLogging(error))
         setIsEndorsed(false)
         setIsAlreadyMinted(false)
         setHasMissingParents(null)
@@ -499,7 +500,7 @@ export default function MintNFTModal({
       setProofGenerationStep(t('mintNFT.preparingProof', 'Preparing proof inputs...'))
 
       const normalizedFullName = normalizeNameForHash(personInfo.fullName || '')
-      const passphrase = personInfo.passphrase || ''
+      const passphrase = personCalcRef.current?.getSecretInputs().passphrase || ''
 
       if (!normalizedFullName) {
         alert(t('mintNFT.fullNameRequired', 'Full name is required to generate proof'))
@@ -640,7 +641,7 @@ export default function MintNFTModal({
         if (tokenId > 0) onSuccess?.(tokenId)
       }
     } catch (error: any) {
-      console.error('❌ Mint NFT failed:', error)
+      console.error('❌ Mint NFT failed:', sanitizeErrorForLogging(error))
 
       const friendly = getFriendlyError(error, t)
 
@@ -885,31 +886,30 @@ export default function MintNFTModal({
                   </div>
                 </div>
 
-                <PersonHashCalculator
-                  showTitle={false}
-                  collapsible={false}
-                  className="border-0 shadow-none"
-                  initialValues={personInfo ? {
-                    fullName: personInfo.fullName,
-                    gender: personInfo.gender,
-                    birthYear: personInfo.birthYear,
-                    birthMonth: personInfo.birthMonth,
-                    birthDay: personInfo.birthDay,
-                    isBirthBC: personInfo.isBirthBC,
-                    passphrase: personInfo.passphrase
-                  } : undefined}
-                  onFormChange={canEdit ? (formData) => {
-                    setPersonInfo({
-                      fullName: formData.fullName,
-                      gender: formData.gender,
-                      birthYear: formData.birthYear,
-                      birthMonth: formData.birthMonth,
-                      birthDay: formData.birthDay,
-                      isBirthBC: formData.isBirthBC,
-                      passphrase: formData.passphrase
-                    })
-                  } : undefined}
-                />
+	                <PersonHashCalculator
+	                  ref={personCalcRef}
+	                  showTitle={false}
+	                  collapsible={false}
+	                  className="border-0 shadow-none"
+	                  initialValues={personInfo ? {
+	                    fullName: personInfo.fullName,
+	                    gender: personInfo.gender,
+	                    birthYear: personInfo.birthYear,
+	                    birthMonth: personInfo.birthMonth,
+	                    birthDay: personInfo.birthDay,
+	                    isBirthBC: personInfo.isBirthBC
+	                  } : undefined}
+	                  onPublicFormChange={canEdit ? (formData) => {
+	                    setPersonInfo({
+	                      fullName: formData.fullName,
+	                      gender: formData.gender,
+	                      birthYear: formData.birthYear,
+	                      birthMonth: formData.birthMonth,
+	                      birthDay: formData.birthDay,
+	                      isBirthBC: formData.isBirthBC
+	                    })
+	                  } : undefined}
+	                />
               </div>
 
           {/* Supplemental Information (from PersonSupplementInfo) */}

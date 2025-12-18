@@ -8,12 +8,12 @@ import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
 import { generatePersonProof, verifyProof } from '../../lib/zk'
 import { useContract } from '../../hooks/useContract'
-import { generateMetadataCID } from '../../lib/cid'
-import { encryptMetadataJson, passwordFingerprint, sha256Hex } from '../../lib/metadataCrypto'
+import { sha256Hex } from '../../lib/metadataCrypto'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
 import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
 import { getFriendlyError, sanitizeErrorForLogging } from '../../lib/errors'
 import { normalizeNameForHash } from '../../lib/passphraseStrength'
+import { cryptoWorkerCall } from '../../lib/cryptoWorkerClient'
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -62,7 +62,6 @@ interface AddVersionModalProps {
     birthMonth?: number
     birthDay?: number
     isBirthBC?: boolean
-    passphrase?: string
   }
 }
 
@@ -217,15 +216,17 @@ export default function AddVersionModal({
         birthDay: initialPersonData.birthDay || 0,
         isBirthBC: initialPersonData.isBirthBC || false
       })
-      setPersonHasPassphrase(!!(initialPersonData.passphrase && initialPersonData.passphrase.length > 0))
     }
   }, [initialPersonData])
 
   const computeHashOrZero = (calc: PersonHashCalculatorHandle | null) => {
-    const data = calc?.getFormData()
-    const normalizedName = normalizeNameForHash(data?.fullName || '')
-    if (!data || !normalizedName) return ethers.ZeroHash
-    const hash = computePersonHash(data)
+    if (!calc) return ethers.ZeroHash
+    const publicData = calc?.getPublicFormData()
+    if (!publicData) return ethers.ZeroHash
+    const normalizedName = normalizeNameForHash(publicData.fullName || '')
+    if (!normalizedName) return ethers.ZeroHash
+    const { hasPassphrase: _hasPassphrase, ...publicFields } = publicData
+    const hash = computePersonHash({ ...publicFields, passphrase: calc.getSecretInputs().passphrase })
     return hash && hash.length > 0 ? hash : ethers.ZeroHash
   }
 
@@ -449,7 +450,7 @@ export default function AddVersionModal({
   const resolveEncryptionPassword = () => {
     const canUseIdentityPassphrase = usePersonPassphraseForEncryption && (personCalcRef.current?.hasPassphrase() ?? false)
     if (canUseIdentityPassphrase) {
-      return personCalcRef.current?.getFormData().passphrase || ''
+      return personCalcRef.current?.getSecretInputs().passphrase || ''
     }
     return (encryptionPasswordRef.current?.value ?? '').trim()
   }
@@ -459,18 +460,17 @@ export default function AddVersionModal({
     const metadataJson = JSON.stringify(metadataPayload)
     const bundlePlainHash = sha256Hex(metadataJson)
 
-    if (encryptedMetadata && encryptedMetadata.plainHash === bundlePlainHash && encryptedMetadata.passwordFingerprint === passwordFingerprint(password)) {
+    const { passwordFingerprint } = await cryptoWorkerCall('passwordFingerprint', { password })
+    if (encryptedMetadata && encryptedMetadata.plainHash === bundlePlainHash && encryptedMetadata.passwordFingerprint === passwordFingerprint) {
       return encryptedMetadata
     }
 
-    const { payload, plainHash } = await encryptMetadataJson(metadataJson, password)
-    const encryptedJson = JSON.stringify(payload)
-    const cid = await generateMetadataCID(encryptedJson)
+    const bundleResult = await cryptoWorkerCall('encryptMetadataBundle', { plaintextJson: metadataJson, password })
     const bundle = {
-      json: encryptedJson,
-      cid,
-      plainHash,
-      passwordFingerprint: passwordFingerprint(password)
+      json: bundleResult.encryptedJson,
+      cid: bundleResult.cid,
+      plainHash: bundleResult.plainHash,
+      passwordFingerprint: bundleResult.passwordFingerprint
     }
     setEncryptedMetadata(bundle)
     return bundle
@@ -515,11 +515,15 @@ export default function AddVersionModal({
     // Transform the input data to the final form
     const processedData = addVersionSchema.parse(data)
 
-    const personPrivate = personCalcRef.current?.getFormData()
-    if (!personPrivate || !normalizeNameForHash(personPrivate.fullName || '')) {
+    const personCalc = personCalcRef.current
+    const personPublic = personCalc?.getPublicFormData()
+    const personSecret = personCalc?.getSecretInputs()
+    if (!personCalc || !personPublic || !normalizeNameForHash(personPublic.fullName || '')) {
       alert(t('addVersion.personInfoRequired', 'Please fill in person information'))
       return
     }
+    const { hasPassphrase: _hasPassphrase, ...personPublicFields } = personPublic
+    const personPrivate = { ...personPublicFields, passphrase: personSecret?.passphrase ?? '' }
     if (!validateEncryptionPassword()) {
       return
     }
@@ -539,8 +543,22 @@ export default function AddVersionModal({
       // Generate ZK proof automatically
       const { proof, publicSignals } = await generatePersonProof(
         personPrivate,
-        fatherInfo && normalizeNameForHash(fatherInfo.fullName || '').length ? (fatherCalcRef.current?.getFormData() || null) : null,
-        motherInfo && normalizeNameForHash(motherInfo.fullName || '').length ? (motherCalcRef.current?.getFormData() || null) : null,
+        (() => {
+          const calc = fatherCalcRef.current
+          const pub = calc?.getPublicFormData()
+          const normalized = normalizeNameForHash(pub?.fullName || '')
+          if (!calc || !pub || !normalized) return null
+          const { hasPassphrase: _hp, ...fields } = pub
+          return { ...fields, passphrase: calc.getSecretInputs().passphrase }
+        })(),
+        (() => {
+          const calc = motherCalcRef.current
+          const pub = calc?.getPublicFormData()
+          const normalized = normalizeNameForHash(pub?.fullName || '')
+          if (!calc || !pub || !normalized) return null
+          const { hasPassphrase: _hp, ...fields } = pub
+          return { ...fields, passphrase: calc.getSecretInputs().passphrase }
+        })(),
         submitterAddress
       )
       
@@ -813,24 +831,23 @@ export default function AddVersionModal({
                   </div>
               </div>
 
-              <PersonHashCalculator
-                ref={fatherCalcRef}
-                key={`father-${formResetKey}`}
-                showTitle={false}
-                collapsible={false}
-                className="border-0 shadow-none"
-                  initialValues={{
-                    fullName: '',
-                    gender: 1, // Default to male
-                    birthYear: 0,
-                    birthMonth: 0,
-                    birthDay: 0,
-                    isBirthBC: false,
-                    passphrase: ''
-                  }}
-                onPublicFormChange={(formData) => {
-                  setFatherInfo({
-                    fullName: formData.fullName,
+	              <PersonHashCalculator
+	                ref={fatherCalcRef}
+	                key={`father-${formResetKey}`}
+	                showTitle={false}
+	                collapsible={false}
+	                className="border-0 shadow-none"
+	                  initialValues={{
+	                    fullName: '',
+	                    gender: 1, // Default to male
+	                    birthYear: 0,
+	                    birthMonth: 0,
+	                    birthDay: 0,
+	                    isBirthBC: false
+	                  }}
+	                onPublicFormChange={(formData) => {
+	                  setFatherInfo({
+	                    fullName: formData.fullName,
                     gender: formData.gender,
                     birthYear: formData.birthYear,
                     birthMonth: formData.birthMonth,
@@ -894,24 +911,23 @@ export default function AddVersionModal({
                   </div>
                 </div>
 
-              <PersonHashCalculator
-                ref={motherCalcRef}
-                key={`mother-${formResetKey}`}
-                showTitle={false}
-                collapsible={false}
-                className="border-0 shadow-none"
-                  initialValues={{
-                    fullName: '',
-                    gender: 2, // Default to female
-                    birthYear: 0,
-                    birthMonth: 0,
-                    birthDay: 0,
-                    isBirthBC: false,
-                    passphrase: ''
-                  }}
-                onPublicFormChange={(formData) => {
-                  setMotherInfo({
-                    fullName: formData.fullName,
+	              <PersonHashCalculator
+	                ref={motherCalcRef}
+	                key={`mother-${formResetKey}`}
+	                showTitle={false}
+	                collapsible={false}
+	                className="border-0 shadow-none"
+	                  initialValues={{
+	                    fullName: '',
+	                    gender: 2, // Default to female
+	                    birthYear: 0,
+	                    birthMonth: 0,
+	                    birthDay: 0,
+	                    isBirthBC: false
+	                  }}
+	                onPublicFormChange={(formData) => {
+	                  setMotherInfo({
+	                    fullName: formData.fullName,
                     gender: formData.gender,
                     birthYear: formData.birthYear,
                     birthMonth: formData.birthMonth,
