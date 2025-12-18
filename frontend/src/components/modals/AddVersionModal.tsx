@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next'
 import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Shield, Download, Star, Eye, EyeOff } from 'lucide-react'
 import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
-import { generatePersonProof, verifyProof } from '../../lib/zk'
 import { useContract } from '../../hooks/useContract'
 import { sha256Hex } from '../../lib/metadataCrypto'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
@@ -14,6 +13,7 @@ import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
 import { getFriendlyError, sanitizeErrorForLogging } from '../../lib/errors'
 import { normalizeNameForHash } from '../../lib/passphraseStrength'
 import { cryptoWorkerCall } from '../../lib/cryptoWorkerClient'
+import { zkWorkerCall } from '../../lib/zkWorkerClient'
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -540,32 +540,34 @@ export default function AddVersionModal({
       
       setProofGenerationStep(t('addVersion.generatingProof', 'Generating zero-knowledge proof... (this may take 30-60 seconds)'))
       
-      // Generate ZK proof automatically
-      const { proof, publicSignals } = await generatePersonProof(
-        personPrivate,
-        (() => {
-          const calc = fatherCalcRef.current
-          const pub = calc?.getPublicFormData()
-          const normalized = normalizeNameForHash(pub?.fullName || '')
-          if (!calc || !pub || !normalized) return null
-          const { hasPassphrase: _hp, ...fields } = pub
-          return { ...fields, passphrase: calc.getSecretInputs().passphrase }
-        })(),
-        (() => {
-          const calc = motherCalcRef.current
-          const pub = calc?.getPublicFormData()
-          const normalized = normalizeNameForHash(pub?.fullName || '')
-          if (!calc || !pub || !normalized) return null
-          const { hasPassphrase: _hp, ...fields } = pub
-          return { ...fields, passphrase: calc.getSecretInputs().passphrase }
-        })(),
-        submitterAddress
+      const fatherPrivate = (() => {
+        const calc = fatherCalcRef.current
+        const pub = calc?.getPublicFormData()
+        const normalized = normalizeNameForHash(pub?.fullName || '')
+        if (!calc || !pub || !normalized) return null
+        const { hasPassphrase: _hp, ...fields } = pub
+        return { ...fields, passphrase: calc.getSecretInputs().passphrase }
+      })()
+      const motherPrivate = (() => {
+        const calc = motherCalcRef.current
+        const pub = calc?.getPublicFormData()
+        const normalized = normalizeNameForHash(pub?.fullName || '')
+        if (!calc || !pub || !normalized) return null
+        const { hasPassphrase: _hp, ...fields } = pub
+        return { ...fields, passphrase: calc.getSecretInputs().passphrase }
+      })()
+
+      // Generate ZK proof in worker to avoid keeping sensitive inputs on the main thread.
+      const { proof, publicSignals } = await zkWorkerCall(
+        'generatePersonProof',
+        { person: personPrivate, father: fatherPrivate, mother: motherPrivate, submitterAddress },
+        { timeoutMs: 240_000 }
       )
       
       setProofGenerationStep(t('addVersion.verifyingProof', 'Verifying proof...'))
       
-      // Verify the generated proof
-      const isValid = await verifyProof(proof, publicSignals)
+      // Verify the generated proof (worker)
+      const { ok: isValid } = await zkWorkerCall('verifyPersonProof', { proof, publicSignals }, { timeoutMs: 120_000 })
       if (!isValid) {
         throw new Error(t('addVersion.proofVerificationFailed', 'Generated proof verification failed'))
       }
