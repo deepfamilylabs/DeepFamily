@@ -52,8 +52,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({ k, kToNorm, normToK,
         onClick={onZoomIn} 
         onPointerDown={(e) => { e.stopPropagation() }}
         onTouchStart={(e) => { e.stopPropagation() }}
-        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg"
-        style={{ touchAction: 'manipulation', userSelect: 'none' }}
+        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg touch-manipulation select-none"
       >+</button>
       <div 
         ref={trackRef} 
@@ -78,20 +77,25 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({ k, kToNorm, normToK,
             onPointerDown(pointerEvent as any)
           }
         }}
-        className="relative w-6" 
-        style={{ height: trackHeight, touchAction: 'none', userSelect: 'none' }}
+        className="relative w-6 touch-none select-none" 
+        style={{ height: trackHeight }}
       >
         <div className="absolute left-1/2 -translate-x-1/2 top-1.5 bottom-1.5 w-1.5 rounded-full bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-slate-600 dark:via-slate-500 dark:to-slate-600 shadow-inner backdrop-blur-sm">
-          <div className="absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing" style={{ top: `${(1 - kToNorm(k)) * 100}%`, transform: 'translate(-50%, -50%)' }} />
-          <div className="absolute left-1/2 -translate-x-1/2 w-1.5 bg-gradient-to-t from-blue-400/80 to-indigo-400/60 dark:from-blue-500/70 dark:to-indigo-500/50" style={{ top: `${(1 - kToNorm(k)) * 100}%`, bottom: 0, borderRadius: '999px' }} />
+          <div
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing"
+            style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
+          />
+          <div
+            className="absolute left-1/2 -translate-x-1/2 bottom-0 w-1.5 rounded-full bg-gradient-to-t from-blue-400/80 to-indigo-400/60 dark:from-blue-500/70 dark:to-indigo-500/50"
+            style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
+          />
         </div>
       </div>
       <button 
         onClick={onZoomOut} 
         onPointerDown={(e) => { e.stopPropagation() }}
         onTouchStart={(e) => { e.stopPropagation() }}
-        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg"
-        style={{ touchAction: 'manipulation', userSelect: 'none' }}
+        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg touch-manipulation select-none"
       >-</button>
     </div>
   )

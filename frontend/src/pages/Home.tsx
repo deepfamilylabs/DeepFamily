@@ -35,13 +35,26 @@ const FloatingShapes = memo(() => (
 // Tag strip component
 const TagStrip = memo(() => {
   const { t } = useTranslation()
+  const delayClasses = useMemo(
+    () => [
+      '[animation-delay:0ms]',
+      '[animation-delay:200ms]',
+      '[animation-delay:400ms]',
+      '[animation-delay:600ms]',
+      '[animation-delay:800ms]',
+      '[animation-delay:1000ms]',
+      '[animation-delay:1200ms]',
+      '[animation-delay:1400ms]',
+    ],
+    []
+  )
 
   return (
     <div className={TAG_STRIP_STYLES.container}>
       <div className={TAG_STRIP_STYLES.wrapper}>
         {TAG_DATA.map((tag, index) => (
           <div key={tag.key} className={`${TAG_STRIP_STYLES.tagBase} border ${tag.borderClass}`}>
-            <div className={`${TAG_STRIP_STYLES.dotBase} ${tag.dotClass}`} style={{ animationDelay: `${index * 200}ms` }} />
+            <div className={`${TAG_STRIP_STYLES.dotBase} ${tag.dotClass} ${delayClasses[index] ?? ''}`} />
             <span className={TAG_STRIP_STYLES.text}>
               {t(`home.tagStrip.${tag.key}`)}
             </span>
@@ -176,5 +189,4 @@ export default function Home() {
     </>
   )
 }
-
 

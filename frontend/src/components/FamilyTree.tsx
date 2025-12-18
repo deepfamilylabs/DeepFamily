@@ -25,7 +25,7 @@ const Node: React.FC<{ node: GraphNode; depth?: number; isLast?: boolean }> = Re
   const toggle = useCallback(() => setOpen(o => !o), [])
   return (
     <li>
-      <div className="flex items-center gap-2 group" style={{ marginLeft: indentPx, whiteSpace: 'pre' }}>
+      <div className="flex items-center gap-2 group whitespace-pre" style={{ marginLeft: indentPx }}>
         <span className="text-gray-400 select-none">{branch}</span>
         <button onClick={toggle} className="w-5 h-5 grid place-items-center rounded hover:bg-gray-100 text-gray-500" aria-label={hasChildren ? (open ? 'collapse' : 'expand') : 'leaf'}>
           {hasChildren ? (open ? '▾' : '▸') : '·'}
@@ -542,15 +542,17 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
            onClick={handleRowClick}>
         <div className="absolute inset-y-0 left-0 flex pointer-events-none">
           {ancestorGuides.map((show, i) => show ? (
-            <div key={i} style={{ width: 16 }} className="flex-shrink-0 relative">
+            <div key={i} className="w-4 flex-shrink-0 relative">
               <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-slate-300 dark:bg-slate-600" />
             </div>
-          ) : (<div key={i} style={{ width:16 }} />))}
+          ) : (
+            <div key={i} className="w-4" />
+          ))}
         </div>
         <div style={{ paddingLeft: depth * 16 }} className="flex items-center gap-1 pl-1 pr-2 min-w-[140px] relative" title={node.personHash}>
           <div className="flex items-center">
             {depth>0 && (
-              <div className="relative" style={{ width:16, height: rowHeight }}>
+              <div className="relative w-4" style={{ height: rowHeight }}>
                 <div className="absolute left-1/2 -translate-x-1/2 top-0 w-px h-1/2 bg-slate-300 dark:bg-slate-600" />
                 {!isLast && <div className="absolute left-1/2 -translate-x-1/2 top-1/2 bottom-0 w-px bg-slate-300 dark:bg-slate-600" />}
                 <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 h-px w-1/2 bg-slate-300 dark:bg-slate-600" />
@@ -563,7 +565,7 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
               {hasChildren ? (isOpen ? '−' : '+') : '•'}
             </button>
           </div>
-          <div className="flex items-center gap-2 flex-wrap" style={{ minWidth: 'max-content' }}>
+          <div className="flex items-center gap-2 flex-wrap min-w-max">
             <span className="text-slate-600 dark:text-slate-300">{shortHash(node.personHash)}</span>
             <span className="text-sky-600 dark:text-sky-400">
               {nodesData?.[cacheKey]?.totalVersions && nodesData[cacheKey].totalVersions > 1 
@@ -621,5 +623,9 @@ export const VirtualizedContractTree: React.FC<{ root: GraphNode; height?: numbe
 }
 
 export function ContractTree({ root }: { root: GraphNode }) {
-  return <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}><Node node={root} /></ul>
+  return (
+    <ul className="list-none m-0 p-0">
+      <Node node={root} />
+    </ul>
+  )
 }

@@ -8,12 +8,14 @@ interface LogoProps {
 }
 
 export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
-  const sizeStyle = size ? { width: size, height: size } : undefined
+  const width = size ?? undefined
+  const height = size ?? undefined
   
   return (
     <svg 
       className={className}
-      style={sizeStyle}
+      width={width}
+      height={height}
       viewBox="4 2 32 28" 
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"

@@ -1278,7 +1278,7 @@ export default function MintNFTModal({
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
+            <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 pb-[calc(4rem+env(safe-area-inset-bottom))]">
               {successResult ? (
                 // Success state: Show Continue Minting and Close buttons
                 <>

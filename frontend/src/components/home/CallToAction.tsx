@@ -9,7 +9,7 @@ const CallToAction = memo(() => {
   const { t } = useTranslation();
 
   return (
-    <section className="pt-20 pb-24 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-650 dark:via-indigo-650 dark:to-purple-650 text-white overflow-x-hidden w-full" style={{width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginBottom: '-5rem'}}>
+    <section className="pt-20 pb-24 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-650 dark:via-indigo-650 dark:to-purple-650 text-white overflow-x-hidden w-screen ml-[calc(-50vw+50%)] mb-[-5rem]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-2xl sm:text-2xl md:text-4xl font-bold mb-6 px-4">
           {t('home.cta.title')}

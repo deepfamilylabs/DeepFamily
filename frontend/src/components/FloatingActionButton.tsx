@@ -44,6 +44,7 @@ export default function FloatingActionButton({ className = '' }: FloatingActionB
       tab: 'mint-nft'
     }
   ]
+  const delayClasses = ['[transition-delay:0ms]', '[transition-delay:80ms]', '[transition-delay:160ms]'] as const
 
   const handleActionClick = (tab: string) => {
     setIsOpen(false)
@@ -71,6 +72,7 @@ export default function FloatingActionButton({ className = '' }: FloatingActionB
         }`}>
           {actions.map((action, index) => {
             const Icon = action.icon
+            const delayClass = delayClasses[index] ?? ''
             return (
               <div
                 key={action.id}
@@ -78,10 +80,7 @@ export default function FloatingActionButton({ className = '' }: FloatingActionB
                   isOpen 
                     ? 'translate-y-0 opacity-100' 
                     : 'translate-y-4 opacity-0'
-                }`}
-                style={{ 
-                  transitionDelay: isOpen ? `${index * 80}ms` : '0ms'
-                }}
+                } ${isOpen ? delayClass : ''}`}
               >
                 <button
                   onClick={() => handleActionClick(action.tab)}
