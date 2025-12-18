@@ -1,7 +1,7 @@
 /**
  * PersonHashCalculator
  *
- * UI component for computing a deterministic person hash used by DeepFamily ZK flows.
+ * UI component for computing a deterministic identity hash (contract: getPersonHash) used by DeepFamily ZK flows.
  * Security note: the passphrase is treated as sensitive input; callers should prefer
  * `onPublicFormChange`/imperative ref APIs to avoid lifting the passphrase into parent state.
  */
@@ -111,7 +111,8 @@ const hashFormSchema = z.object({
 
 export type HashForm = z.infer<typeof hashFormSchema>
 
-type PublicHashForm = Omit<HashForm, 'passphrase'> & { hasPassphrase: boolean }
+export type PublicHashForm = Omit<HashForm, 'passphrase'> & { hasPassphrase: boolean }
+export type SecretHashInputs = { passphrase: string }
 
 type HashFormInput = {
   fullName: string
@@ -120,7 +121,6 @@ type HashFormInput = {
   birthMonth?: number | ''
   birthDay?: number | ''
   gender: number
-  passphrase: string | null | undefined
 }
 
 // Password strength calculation (uses shared utility from passphraseStrength.ts)
@@ -172,10 +172,12 @@ export function computePersonHash(input: HashForm): string {
   return ethers.keccak256(poseidonHex)
 }
 
+// Terminology alias: "person hash" in the contract/circuit is the app's "identity hash".
+export const computeIdentityHash = computePersonHash
+
 // Component props interface
 interface PersonHashCalculatorProps {
   className?: string
-  onFormChange?: (formData: HashForm) => void
   onPublicFormChange?: (formData: PublicHashForm) => void
   showTitle?: boolean
   collapsible?: boolean
@@ -188,19 +190,17 @@ interface PersonHashCalculatorProps {
     birthMonth?: number
     birthDay?: number
     isBirthBC?: boolean
-    passphrase?: string
   }
 }
 
 export type PersonHashCalculatorHandle = {
-  getFormData: () => HashForm
   getPublicFormData: () => PublicHashForm
+  getSecretInputs: () => SecretHashInputs
   hasPassphrase: () => boolean
 }
 
 export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, PersonHashCalculatorProps>(({
   className = '',
-  onFormChange,
   onPublicFormChange,
   showTitle = true,
   collapsible = false,
@@ -212,7 +212,9 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
   const [internalOpen, setInternalOpen] = useState(true)
   const [showPassphrase, setShowPassphrase] = useState(false)
   const [showPassphraseHelp, setShowPassphraseHelp] = useState(false)
+  const [passphraseRevision, setPassphraseRevision] = useState(0)
   const toast = useToast()
+  const passphraseInputRef = useRef<HTMLInputElement | null>(null)
 
 
   // Use external state if provided, otherwise use internal state
@@ -236,7 +238,6 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
     birthMonth: z.union([z.number().int().min(0, t('search.validation.monthRange')).max(12, t('search.validation.monthRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     birthDay: z.union([z.number().int().min(0, t('search.validation.dayRange')).max(31, t('search.validation.dayRange')), z.literal('')]).optional().transform(val => val === '' || val === undefined ? 0 : val),
     gender: z.number().int().min(0).max(3),
-    passphrase: optionalPassphrase,
   }).refine((data) => {
     // If AD (Anno Domini), the year must not exceed the current year
     if (!data.isBirthBC && data.birthYear > new Date().getFullYear()) {
@@ -257,7 +258,6 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
       birthMonth: initialValues?.birthMonth || '', 
       birthDay: initialValues?.birthDay || '', 
       gender: initialValues?.gender || 0,
-      passphrase: initialValues?.passphrase || '' 
     },
   })
 
@@ -268,9 +268,8 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
   const birthMonth = watch('birthMonth')
   const birthDay = watch('birthDay')
   const gender = watch('gender')
-  const passphrase = watch('passphrase')
 
-  const normalizedPassphrase = useMemo(() => normalizePassphraseForHash(passphrase || ''), [passphrase])
+  const normalizedPassphrase = useMemo(() => normalizePassphraseForHash(passphraseInputRef.current?.value ?? ''), [passphraseRevision])
   const passphraseGraphemeLength = useMemo(() => getGraphemeLength(normalizedPassphrase), [normalizedPassphrase])
   const hasPassphrase = normalizedPassphrase.length > 0
 
@@ -288,7 +287,7 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
       birthMonth: snapshot.birthMonth === '' || snapshot.birthMonth === undefined ? 0 : Number(snapshot.birthMonth),
       birthDay: snapshot.birthDay === '' || snapshot.birthDay === undefined ? 0 : Number(snapshot.birthDay),
       gender: Number(snapshot.gender || 0),
-      passphrase: snapshot.passphrase || '',
+      passphrase: passphraseInputRef.current?.value ?? '',
     }
   }
 
@@ -300,34 +299,27 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
       birthMonth,
       birthDay,
       gender: Number(gender || 0),
-      passphrase,
     })
     if (!normalizeNameForHash(transformedData.fullName).length) return ''
-    return computePersonHash(transformedData)
-  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
+    return computeIdentityHash(transformedData)
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision])
 
   
-  const onFormChangeRef = useRef(onFormChange)
   const onPublicFormChangeRef = useRef(onPublicFormChange)
   
-  // Update the ref when onFormChange changes
-  useEffect(() => {
-    onFormChangeRef.current = onFormChange
-  }, [onFormChange])
-
   useEffect(() => {
     onPublicFormChangeRef.current = onPublicFormChange
   }, [onPublicFormChange])
 
   useImperativeHandle(ref, () => ({
-    getFormData: () => buildTransformedData(),
     getPublicFormData: () => {
       const data = buildTransformedData()
       const { passphrase: _passphrase, ...rest } = data
       return { ...rest, hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0 }
     },
-    hasPassphrase: () => normalizePassphraseForHash(getValues().passphrase || '').length > 0,
-  }), [getValues])
+    getSecretInputs: () => ({ passphrase: passphraseInputRef.current?.value ?? '' }),
+    hasPassphrase: () => normalizePassphraseForHash(passphraseInputRef.current?.value ?? '').length > 0,
+  }), [getValues, passphraseRevision])
 
   useEffect(() => {
     const transformedData = buildTransformedData({
@@ -337,12 +329,10 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
       birthMonth,
       birthDay,
       gender: Number(gender || 0),
-      passphrase,
     })
-    onFormChangeRef.current?.(transformedData)
     const { passphrase: _passphrase, ...rest } = transformedData
     onPublicFormChangeRef.current?.({ ...rest, hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0 })
-  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphrase])
+  }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision])
 
 
   const content = (
@@ -445,14 +435,14 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
         <div className="w-full mt-2">
           <div className="flex items-center gap-2 mb-1">
             <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-gray-600 dark:text-gray-400 whitespace-normal sm:whitespace-nowrap leading-tight">
-              {t('search.hashCalculator.passphrase', 'Passphrase')}
+              {t('search.hashCalculator.passphrase', 'Identity passphrase')}
             </label>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowPassphraseHelp(!showPassphraseHelp)}
                 className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                aria-label="Passphrase help"
+                aria-label={t('search.hashCalculator.passphraseHelp.buttonAriaLabel', 'Identity passphrase help')}
               >
                 <Info size={14} />
               </button>
@@ -532,13 +522,18 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
               autoCorrect="off"
               spellCheck={false}
               lang={i18n.language}
-              {...register('passphrase')}
+              ref={passphraseInputRef}
+              onChange={() => setPassphraseRevision((r) => r + 1)}
             />
             <button
               type="button"
               onClick={() => setShowPassphrase(!showPassphrase)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
-              aria-label={showPassphrase ? "Hide passphrase" : "Show passphrase"}
+              aria-label={
+                showPassphrase
+                  ? t('search.hashCalculator.passphraseVisibility.hide', 'Hide identity passphrase')
+                  : t('search.hashCalculator.passphraseVisibility.show', 'Show identity passphrase')
+              }
             >
               {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -608,8 +603,6 @@ export const PersonHashCalculator = forwardRef<PersonHashCalculatorHandle, Perso
               )}
             </div>
           )}
-
-          <FieldError message={errors.passphrase?.message} />
         </div>
       </div>
       {computedHash && (

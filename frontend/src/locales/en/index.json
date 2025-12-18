@@ -341,8 +341,8 @@
       "totalChildren": "Total Children"
     },
     "hashCalculator": {
-      "title": "Calculate personHash Locally",
-      "tip": "💡 Tip: Use the tool below to calculate person hash, then copy it to use in the queries below",
+      "title": "Calculate Identity Hash Locally",
+      "tip": "💡 Tip: Use the tool below to calculate your identity hash, then copy it to use in the queries below",
       "name": "Full Name",
       "isBirthBC": "Era",
       "birthYear": "Birth Year",
@@ -358,18 +358,23 @@
       "birthYearLabel": "Birth Year",
       "birthMonthLabel": "Month",
       "birthDayLabel": "Day",
-      "passphrase": "Passphrase",
+      "passphrase": "Identity passphrase",
       "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
       "passphraseHelp": {
-        "title": "Passphrase Usage Guide",
+        "title": "Identity Passphrase Usage Guide",
+        "buttonAriaLabel": "Identity passphrase help",
         "privacy": "🔒 Privacy Protection",
         "privacyDesc": "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
         "optional": "✅ Completely Optional",
-        "optionalDesc": "Optional; accepts any characters such as mottos or secret codes. Relatives can share one passphrase to collaborate—use 15+ characters and keep it safe for better privacy.",
+        "optionalDesc": "Optional; accepts any characters such as mottos or secret codes. Relatives can share one identity passphrase to collaborate—use 15+ characters and keep it safe for better privacy.",
         "remember": "⚠️ Please Remember",
-        "rememberDesc": "Passphrase cannot be recovered. If forgotten, a different identity hash will be generated.",
+        "rememberDesc": "Identity passphrase cannot be recovered. If forgotten, a different identity hash will be generated.",
         "privacyNoteTitle": "🔐 Local Only",
-        "privacyNote": "The passphrase is hashed locally only; nothing is uploaded or stored."
+        "privacyNote": "The identity passphrase is hashed locally only; nothing is uploaded or stored."
+      },
+      "passphraseVisibility": {
+        "show": "Show identity passphrase",
+        "hide": "Hide identity passphrase"
       },
       "passwordStrength": {
         "weak": "Weak",
@@ -391,12 +396,12 @@
       "compute": "Calculate",
       "result": "Result",
       "hashLabel": "Hash:",
-      "description": "Note: Calculation logic is completely consistent with the contract getPersonHash.",
+      "description": "Note: Calculation logic is completely consistent with the contract getPersonHash (identity hash).",
       "bcOptions": {
         "ad": "AD",
         "bc": "BC"
       },
-      "calculatedHash": "Calculated Hash",
+      "calculatedHash": "Identity Hash",
       "contractHash": "Contract Hash",
       "hashesMatch": "Hashes match",
       "hashesNoMatch": "Hashes don't match"
@@ -404,7 +409,7 @@
     "validation": {
       "nameRequired": "Please enter name",
       "nameTooLong": "Name cannot exceed 256 bytes (approximately 256 English characters)",
-      "hashRequired": "Please enter person hash",
+      "hashRequired": "Please enter identity hash",
       "hashInvalid": "Please enter a valid 64-character hexadecimal hash",
       "tokenIdRequired": "Please enter NFT Token ID",
       "versionIndexRequired": "Please enter a valid version index (≥0)",

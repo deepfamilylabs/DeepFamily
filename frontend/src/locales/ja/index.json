@@ -341,8 +341,8 @@
       "totalChildren": "総子供数"
     },
     "hashCalculator": {
-      "title": "ローカル人物ハッシュ計算",
-      "tip": "💡 ヒント：下のツールを使用して人物ハッシュを計算し、下記クエリにコピーして使用",
+      "title": "ローカル身元ハッシュ計算",
+      "tip": "💡 ヒント：下のツールを使用して身元ハッシュを計算し、下記クエリにコピーして使用",
       "name": "フルネーム",
       "isBirthBC": "紀元",
       "birthYear": "生年",
@@ -358,18 +358,23 @@
       "birthYearLabel": "生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
-      "passphrase": "パスフレーズ",
+      "passphrase": "本人パスフレーズ",
       "passphrasePlaceholder": "家訓や合言葉など任意の文字を入力できます。15文字以上で記号を混ぜると安全です",
       "passphraseHelp": {
-        "title": "パスフレーズの役割説明",
+        "title": "本人パスフレーズの使い方",
+        "buttonAriaLabel": "本人パスフレーズのヘルプ",
         "privacy": "🔒 プライバシー保護",
         "privacyDesc": "あなたの身元ハッシュに追加の保護層を追加し、他の人が名前と生年月日からあなたの身元を推測することを防ぎます。",
         "optional": "✅ 完全にオプション",
-        "optionalDesc": "空欄でも問題ありません。家訓や合言葉など任意の文字列を利用できます。親族で同じパスフレーズを共有すれば協力管理が可能です。プライバシー向上のため15文字以上にし、厳重に保管してください。",
+        "optionalDesc": "空欄でも問題ありません。家訓や合言葉など任意の文字列を利用できます。親族で同じ本人パスフレーズを共有すれば協力管理が可能です。プライバシー向上のため15文字以上にし、厳重に保管してください。",
         "remember": "⚠️ 覚えておいてください",
-        "rememberDesc": "パスフレーズは復元できません。忘れると異なる身元ハッシュが生成されます。",
+        "rememberDesc": "本人パスフレーズは復元できません。忘れると異なる身元ハッシュが生成されます。",
         "privacyNoteTitle": "🔐 ローカル処理",
-        "privacyNote": "パスフレーズは端末内でハッシュ化するだけで、アップロードや保存はされません。"
+        "privacyNote": "本人パスフレーズは端末内でハッシュ化するだけで、アップロードや保存はされません。"
+      },
+      "passphraseVisibility": {
+        "show": "本人パスフレーズを表示",
+        "hide": "本人パスフレーズを非表示"
       },
       "passwordStrength": {
         "weak": "弱",
@@ -391,12 +396,12 @@
       "compute": "計算",
       "result": "結果",
       "hashLabel": "ハッシュ:",
-      "description": "説明：計算ロジックはコントラクトgetPersonHashと完全一致。",
+      "description": "説明：計算ロジックはコントラクト getPersonHash（身元ハッシュ）と完全一致。",
       "bcOptions": {
         "ad": "西暦",
         "bc": "紀元前"
       },
-      "calculatedHash": "計算されたハッシュ",
+      "calculatedHash": "身元ハッシュ",
       "contractHash": "コントラクトハッシュ",
       "hashesMatch": "ハッシュ一致",
       "hashesNoMatch": "ハッシュ不一致"
@@ -404,7 +409,7 @@
     "validation": {
       "nameRequired": "名前を入力してください",
       "nameTooLong": "名前は256バイト（約256英字）を超えることはできません",
-      "hashRequired": "人物ハッシュを入力してください",
+      "hashRequired": "身元ハッシュを入力してください",
       "hashInvalid": "有効な64桁16進数ハッシュ値を入力してください",
       "tokenIdRequired": "NFTトークンIDを入力してください",
       "versionIndexRequired": "バージョン番号は0以上で入力してください",

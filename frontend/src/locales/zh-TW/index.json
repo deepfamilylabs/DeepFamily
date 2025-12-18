@@ -341,8 +341,8 @@
       "totalChildren": "總子女數"
     },
     "hashCalculator": {
-      "title": "本地計算人物哈希",
-      "tip": "💡 提示：使用下面的工具計算人物哈希，然後複製到下方的查詢中使用",
+      "title": "本地計算身分雜湊",
+      "tip": "💡 提示：使用下面的工具計算身分雜湊，然後複製到下方的查詢中使用",
       "name": "全名",
       "isBirthBC": "紀元",
       "birthYear": "出生年",
@@ -358,18 +358,23 @@
       "birthYearLabel": "出生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
-      "passphrase": "口令",
+      "passphrase": "身分口令",
       "passphrasePlaceholder": "可輸入任意字符的家訓或暗號，建議 15+ 字並混合不同符號",
       "passphraseHelp": {
-        "title": "口令作用說明",
+        "title": "身分口令說明",
+        "buttonAriaLabel": "身分口令說明",
         "privacy": "🔒 隱私保護",
         "privacyDesc": "為您的身份雜湊添加額外保護層，防止他人通過姓名和生日推測您的身份。",
         "optional": "✅ 完全可選",
-        "optionalDesc": "可留空；系統支援任意字符──如家訓、暗號等。族人可共用同一口令協作管理；為增強隱私，建議使用 15+ 字並妥善保密。",
+        "optionalDesc": "可留空；系統支援任意字符──如家訓、暗號等。族人可共用同一身分口令協作管理；為增強隱私，建議使用 15+ 字並妥善保密。",
         "remember": "⚠️ 請牢記",
-        "rememberDesc": "口令無法找回，忘記後將生成不同的身份雜湊。",
+        "rememberDesc": "身分口令無法找回，忘記後將生成不同的身份雜湊。",
         "privacyNoteTitle": "🔐 本地計算",
-        "privacyNote": "口令僅在本地計算雜湊，不會上傳或保存。"
+        "privacyNote": "身分口令僅在本地計算雜湊，不會上傳或保存。"
+      },
+      "passphraseVisibility": {
+        "show": "顯示身分口令",
+        "hide": "隱藏身分口令"
       },
       "passwordStrength": {
         "weak": "弱",
@@ -391,12 +396,12 @@
       "compute": "計算",
       "result": "結果",
       "hashLabel": "哈希:",
-      "description": "說明：計算邏輯與合約getPersonHash完全一致。",
+      "description": "說明：計算邏輯與合約 getPersonHash（身分雜湊）完全一致。",
       "bcOptions": {
         "ad": "公元",
         "bc": "公元前"
       },
-      "calculatedHash": "計算的雜湊",
+      "calculatedHash": "身分雜湊",
       "contractHash": "合約雜湊",
       "hashesMatch": "雜湊匹配",
       "hashesNoMatch": "雜湊不匹配"
@@ -404,7 +409,7 @@
     "validation": {
       "nameRequired": "請輸入姓名",
       "nameTooLong": "姓名不能超過256字節（約256個英文字符）",
-      "hashRequired": "請輸入人物雜湊",
+      "hashRequired": "請輸入身分雜湊",
       "hashInvalid": "請輸入有效的64位十六進位雜湊值",
       "tokenIdRequired": "請輸入NFT Token ID",
       "versionIndexRequired": "請輸入有效的版本序號（≥0）",
