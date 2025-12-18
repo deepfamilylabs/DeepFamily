@@ -232,7 +232,7 @@ npm run deploy:net --net=polygonAmoy
 npm run deploy:net --net=confluxTestnet
 
 # Local development
-npm run deploy:local
+npm run dev:deploy
 
 # Verify deployed contracts
 npm run verify:net --net=holesky

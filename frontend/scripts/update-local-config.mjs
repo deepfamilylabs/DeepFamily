@@ -115,14 +115,14 @@ async function updateLocalConfig() {
   try {
     // Check if localhost deployments exist
     if (!fs.existsSync(DEPLOYMENTS_DIR)) {
-      console.log('❌ No localhost deployments found. Run `npm run deploy:local` first.');
+      console.log('❌ No localhost deployments found. Run `npm run dev:deploy` first.');
       process.exit(1);
     }
 
     // Read deployment info
     const deepFamilyPath = path.join(DEPLOYMENTS_DIR, 'DeepFamily.json');
     if (!fs.existsSync(deepFamilyPath)) {
-      console.log('❌ DeepFamily contract not deployed. Run `npm run deploy:local` first.');
+      console.log('❌ DeepFamily contract not deployed. Run `npm run dev:deploy` first.');
       process.exit(1);
     }
 
@@ -164,7 +164,7 @@ async function updateLocalConfig() {
       if (entry.exists) {
         console.log(`      ✓ On-chain (versions: ${entry.totalVersions})`);
       } else {
-        console.log('      ⚠ Not found on-chain yet. Run `npm run seed` after deploying.');
+        console.log('      ⚠ Not found on-chain yet. Run `npm run dev:seed` after deploying.');
       }
     });
 
