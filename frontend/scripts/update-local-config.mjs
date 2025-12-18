@@ -216,9 +216,13 @@ async function updateLocalConfig() {
     let updatedContent = envContent;
     for (const [key, value] of Object.entries(updates)) {
       const regex = new RegExp(`^${key}=.*$`, 'm');
+      const commentedRegex = new RegExp(`^#\\s*${key}=.*$`, 'm');
       if (regex.test(updatedContent)) {
         updatedContent = updatedContent.replace(regex, `${key}=${value}`);
         console.log(`✅ Updated ${key}=${value}`);
+      } else if (commentedRegex.test(updatedContent)) {
+        updatedContent = updatedContent.replace(commentedRegex, `${key}=${value}`);
+        console.log(`✅ Enabled ${key}=${value}`);
       } else {
         updatedContent += `\n${key}=${value}`;
         console.log(`➕ Added ${key}=${value}`);

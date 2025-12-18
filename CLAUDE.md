@@ -234,6 +234,20 @@ npm run csp:scan                     # Default: preview-mode scan (build + previ
 CSP_SCAN_MODE=dev npm run csp:scan   # Dev-mode scan (vite dev server)
 ```
 
+Notes:
+- `csp:scan` is a route-level smoke test; it does not click through modals/flows, so CSP issues that only happen after user interaction may not be discovered.
+- When `DEEP_CSP_STYLE_ATTR_NONE=1` is set, violations only appear if a visited route actually renders elements with inline `style=...` (or sets them dynamically); if needed, reproduce the interaction manually in the browser to confirm.
+
+### Frontend CSP Environment Flags
+- `DEEP_CSP_ENFORCE=1`: use `Content-Security-Policy` (enforced) for `vite preview`; otherwise uses `Content-Security-Policy-Report-Only`.
+- `DEEP_CSP_INCLUDE_NETWORK_PRESETS=0`: do not auto-allow `NETWORK_PRESETS` RPC origins in `connect-src` (use `DEEP_CSP_CONNECT_SRC` instead).
+- `DEEP_CSP_INCLUDE_IPFS_GATEWAYS=0`: do not auto-allow IPFS gateway origins in `connect-src`/`img-src` (use `DEEP_CSP_CONNECT_SRC` / `DEEP_CSP_IMG_SRC` instead).
+- `DEEP_CSP_REPORT_FILE`: write CSP reports to a JSONL file (useful for `npm run csp:scan`).
+- `DEEP_CSP_STYLE_ATTR_NONE=1`: set `style-src-attr 'none'` for `vite preview` to audit remaining inline `style={...}` usage.
+- `DEEP_CSP_CONNECT_SRC`: extra `connect-src` origins (space-separated), e.g. `https://rpc.example.com https://ipfs.example.com` (the origin of `VITE_RPC_URL` is already included automatically).
+- `DEEP_CSP_IMG_SRC`: extra `img-src` origins (space-separated), e.g. `https://ipfs.example.com`.
+- `VITE_IPFS_GATEWAY_BASE_URLS`: override the IPFS gateway dropdown list (comma/space/newline-separated); used by both UI and CSP auto-allowlisting.
+
 ### Deployment & Network Management
 ```bash
 npm run deploy:local         # Deploy to local Hardhat network
