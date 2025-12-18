@@ -4,15 +4,13 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "config:local": "node ./scripts/update-local-config.mjs",
-    "sync:abi": "node ./scripts/sync-abi.mjs",
-    "csp:scan": "node ./scripts/csp-scan.mjs",
-    "predev": "npm run sync:abi",
-    "dev": "vite",
+    "dev": "npm run sync:abi && vite",
     "dev:local": "npm run config:local && npm run dev",
-    "prebuild": "npm run sync:abi",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "npm run sync:abi && vite build",
+    "preview": "vite preview",
+    "csp:scan": "node ./scripts/csp-scan.mjs",
+    "config:local": "node ./scripts/update-local-config.mjs",
+    "sync:abi": "node ./scripts/sync-abi.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

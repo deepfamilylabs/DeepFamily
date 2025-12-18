@@ -1,8 +1,7 @@
 import type { Plugin } from 'vite'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NETWORK_PRESETS } from './src/config/networks'
-import { IPFS_GATEWAY_BASE_URLS } from './src/config/ipfs'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -18,6 +17,14 @@ const parseExtraSources = (value: string | undefined): string[] => {
     .filter(Boolean)
 }
 
+const parseList = (value: string | undefined): string[] => {
+  if (!value) return []
+  return value
+    .split(/[\s,]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+}
+
 const urlToOrigin = (url: string): string | null => {
   try {
     return new URL(url).origin
@@ -26,8 +33,8 @@ const urlToOrigin = (url: string): string | null => {
   }
 }
 
-const cspReportPlugin = (): Plugin => {
-  const reportFile = process.env.DEEP_CSP_REPORT_FILE
+const cspReportPlugin = (opts: { reportFile?: string }): Plugin => {
+  const reportFile = opts.reportFile
   const handler = (req: any, res: any) => {
     if (req.method !== 'POST') {
       res.statusCode = 405
@@ -91,33 +98,19 @@ const presetRpcOrigins = uniq(
     .filter((v): v is string => Boolean(v))
 )
 
-const ipfsGatewayOrigins = uniq(
-  IPFS_GATEWAY_BASE_URLS
-    .map(urlToOrigin)
-    .filter((v): v is string => Boolean(v))
-)
+const DEFAULT_IPFS_GATEWAY_BASE_URLS = [
+  'https://ipfs.io/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://dweb.link/ipfs/',
+]
 
-const connectSrc = uniq([
-  "'self'",
-  'http://127.0.0.1:8545',
-  'http://localhost:8545',
-  'ws://localhost:5173',
-  'ws://127.0.0.1:5173',
-  ...presetRpcOrigins,
-  ...ipfsGatewayOrigins,
-  ...parseExtraSources(process.env.DEEP_CSP_CONNECT_SRC)
-])
-
-const imgSrc = uniq([
-  "'self'",
-  'data:',
-  'blob:',
-  ...ipfsGatewayOrigins,
-  ...parseExtraSources(process.env.DEEP_CSP_IMG_SRC)
-])
-
-const buildCsp = (opts: { dev: boolean }): string => {
-  const { dev } = opts
+const buildCsp = (opts: {
+  dev: boolean
+  connectSrc: string[]
+  imgSrc: string[]
+  styleAttrNone: boolean
+}): string => {
+  const { dev, connectSrc, imgSrc, styleAttrNone } = opts
   const scriptSrc = dev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'report-sample'"
     : "script-src 'self' 'wasm-unsafe-eval' 'report-sample'"
@@ -125,6 +118,11 @@ const buildCsp = (opts: { dev: boolean }): string => {
   const styleSrc = dev
     ? "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
     : "style-src 'self' https://fonts.googleapis.com"
+
+  const styleSrcAttr =
+    !dev && styleAttrNone
+      ? "style-src-attr 'none'"
+      : "style-src-attr 'unsafe-inline'"
 
   return [
     "default-src 'self'",
@@ -142,25 +140,80 @@ const buildCsp = (opts: { dev: boolean }): string => {
     `img-src ${imgSrc.join(' ')}`,
     // Dev server injects inline <style> tags; production build should not need this.
     styleSrc,
-    // React uses inline style attributes widely; keep this narrow to attributes only.
-    "style-src-attr 'unsafe-inline'",
+    // React uses inline style attributes widely; allow by default, but support auditing with `DEEP_CSP_STYLE_ATTR_NONE=1`.
+    styleSrcAttr,
     "font-src 'self' data: https://fonts.gstatic.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ].join('; ')
 }
 
-const CSP_DEV = buildCsp({ dev: true })
-const CSP_NON_DEV = buildCsp({ dev: false })
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const getEnv = (key: string): string | undefined => env[key] ?? process.env[key]
+  const flag = (key: string, defaultValue: boolean): boolean => {
+    const value = getEnv(key)
+    if (value == null) return defaultValue
+    return value !== '0' && value !== 'false'
+  }
 
-const CSP_HEADER_NAME = process.env.DEEP_CSP_ENFORCE === '1' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only'
+  const ipfsGatewayBases = (() => {
+    const fromEnv = parseList(getEnv('VITE_IPFS_GATEWAY_BASE_URLS'))
+    return fromEnv.length > 0 ? fromEnv : DEFAULT_IPFS_GATEWAY_BASE_URLS
+  })()
 
-export default defineConfig(({ command }) => {
-  const csp = command === 'serve' ? CSP_DEV : CSP_NON_DEV
+  const ipfsGatewayOrigins = uniq(
+    ipfsGatewayBases
+      .map(urlToOrigin)
+      .filter((v): v is string => Boolean(v))
+  )
+
+  const includeNetworkPresets = flag('DEEP_CSP_INCLUDE_NETWORK_PRESETS', true)
+  const includeIpfsGateways = flag('DEEP_CSP_INCLUDE_IPFS_GATEWAYS', true)
+
+  const rpcOrigin = urlToOrigin(getEnv('VITE_RPC_URL') || '')
+
+  const connectSrcBase = [
+    "'self'",
+    ...(rpcOrigin ? [rpcOrigin] : []),
+    ...(includeNetworkPresets ? presetRpcOrigins : []),
+    ...(includeIpfsGateways ? ipfsGatewayOrigins : []),
+    ...parseExtraSources(getEnv('DEEP_CSP_CONNECT_SRC')),
+  ]
+
+  // Dev needs websocket for Vite HMR; preview/prod should avoid allowing websocket by default.
+  const connectSrcDev = uniq([
+    ...connectSrcBase,
+    'ws://localhost:5173',
+    'ws://127.0.0.1:5173',
+    // Back-compat for local Hardhat defaults when `VITE_RPC_URL` isn't set.
+    ...(rpcOrigin ? [] : ['http://127.0.0.1:8545', 'http://localhost:8545']),
+  ])
+
+  const connectSrcNonDev = uniq(connectSrcBase)
+
+  const imgSrc = uniq([
+    "'self'",
+    'data:',
+    'blob:',
+    ...(includeIpfsGateways ? ipfsGatewayOrigins : []),
+    ...parseExtraSources(getEnv('DEEP_CSP_IMG_SRC'))
+  ])
+
+  const styleAttrNone = getEnv('DEEP_CSP_STYLE_ATTR_NONE') === '1'
+  const cspDev = buildCsp({ dev: true, connectSrc: connectSrcDev, imgSrc, styleAttrNone })
+  const cspNonDev = buildCsp({ dev: false, connectSrc: connectSrcNonDev, imgSrc, styleAttrNone })
+  const csp = command === 'serve' ? cspDev : cspNonDev
+
+  const devCspHeaderName = 'Content-Security-Policy-Report-Only'
+  const previewCspHeaderName =
+    getEnv('DEEP_CSP_ENFORCE') === '1' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only'
+
+  const reportFile = getEnv('DEEP_CSP_REPORT_FILE')
   const inquireShimPath = fileURLToPath(new URL('./src/shims/protobufjs-inquire.ts', import.meta.url))
 
   return {
-    plugins: [react(), cspReportPlugin()],
+    plugins: [react(), cspReportPlugin({ reportFile })],
     resolve: {
       alias: {
         '@protobufjs/inquire': inquireShimPath,
@@ -172,7 +225,7 @@ export default defineConfig(({ command }) => {
       host: 'localhost',
       port: 5173,
       headers: {
-        [CSP_HEADER_NAME]: csp
+        [devCspHeaderName]: csp
       },
       // Better error handling
       hmr: {
@@ -181,7 +234,7 @@ export default defineConfig(({ command }) => {
     },
     preview: {
       headers: {
-        [CSP_HEADER_NAME]: CSP_NON_DEV
+        [previewCspHeaderName]: cspNonDev
       }
     },
     build: {
