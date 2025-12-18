@@ -59,10 +59,16 @@ const createLazyIcon = (iconName: IconName) => {
 
 // Icon loading placeholder
 const IconFallback = memo<{ className?: string; size?: number }>(({ className, size = 24 }) => (
-  <div 
-    className={`inline-block bg-gray-200 dark:bg-gray-700 rounded ${LOADING_ANIMATIONS.PULSE} ${className}`}
-    style={{ width: size, height: size }}
-  />
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    className={`inline-block ${LOADING_ANIMATIONS.PULSE} ${className}`}
+    role="img"
+    aria-label="loading"
+  >
+    <rect x="2" y="2" width="20" height="20" rx="4" className="fill-gray-200 dark:fill-gray-700" />
+  </svg>
 ))
 
 // Main dynamic icon component

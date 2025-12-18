@@ -55,7 +55,7 @@ export default function SiteHeader() {
       <PageContainer className="relative h-16 flex items-center justify-between">
         <NavLink to="/" className={`flex items-center gap-1.5 transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
           <Logo className={`w-7 h-7 flex-shrink-0 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-blue-500 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
-          <span className={`text-[1.6rem] font-display mt-1 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`} style={{ lineHeight: '1', fontWeight: 500 }}>Deepfamily</span>
+          <span className={`text-[1.6rem] font-display mt-1 leading-none font-medium ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`}>Deepfamily</span>
           {badgeConfig && (
             <span className="relative hidden sm:inline-block ml-0.5 h-6 align-bottom pointer-events-none">
               <span className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}>

@@ -37,6 +37,7 @@ type NetworkOption = {
 
 export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, deduplicateChildren, setDeduplicateChildren, progress, locale }: Props) {
   const { t, i18n } = useTranslation()
+  const isDev = import.meta.env.DEV
   const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
   const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
@@ -436,8 +437,18 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
                       />
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {t('familyTree.config.addCustomNetworkHint', 'Fill in and save to reuse later')}
+                      <div className="space-y-1">
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          {t('familyTree.config.addCustomNetworkHint', 'Fill in and save to reuse later')}
+                        </div>
+                        {!isDev && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {t(
+                              'familyTree.config.customNetworkCspHint',
+                              'In preview/production, the RPC origin must be allowlisted by CSP (connect-src). If it fails to connect, add the origin via DEEP_CSP_CONNECT_SRC when running preview/build.'
+                            )}
+                          </div>
+                        )}
                       </div>
                       <button
                         type="button"
@@ -639,12 +650,12 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
                     <span className="text-xs px-3 sm:px-4 py-0.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 sm:gap-5 backdrop-blur-sm shadow-sm flex-shrink-0">
                       <span className="inline-flex flex-col items-start gap-0">
                         <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.nodesLabelFull') : 'Nodes'}</span>
-                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{createdDisplay}</span>
+                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold">{createdDisplay}</span>
                       </span>
                       <span className="h-5 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
                       <span className="inline-flex flex-col items-start gap-0">
                         <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">{statusT ? statusT('familyTree.ui.depthLabelFull') : 'Depth'}</span>
-                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>{depthDisplay}</span>
+                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold">{depthDisplay}</span>
                       </span>
                     </span>
                   )

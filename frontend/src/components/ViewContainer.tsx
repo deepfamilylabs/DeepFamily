@@ -34,7 +34,7 @@ export default function ViewContainer({ viewMode, root, contractMessage, loading
         : viewMode === 'tree' ? <MerkleTreeView root={root as GraphNode} />
         : <VirtualizedContractTree root={root as GraphNode} height={responsiveHeight} rowHeight={LAYOUT.ROW_HEIGHT} />
       ) : (
-        <div className="w-full bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 pt-16 flex items-center justify-center" style={{ minHeight: responsiveHeight }}>
+        <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 pt-16 flex items-center justify-center">
           {loading ? <LoadingSkeleton /> : contractMessage ? <div className="text-sm text-slate-700 dark:text-slate-300">{contractMessage}</div> : <LoadingSkeleton />}
         </div>
       )

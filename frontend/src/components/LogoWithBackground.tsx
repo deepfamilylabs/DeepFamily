@@ -8,20 +8,22 @@ interface LogoWithBackgroundProps {
 }
 
 export default function LogoWithBackground({ className = "w-10 h-10", size }: LogoWithBackgroundProps) {
-  const sizeStyle = size ? { width: size, height: size } : undefined
+  const width = size ?? undefined
+  const height = size ?? undefined
   
   return (
     <svg 
       className={className}
-      style={sizeStyle}
+      width={width}
+      height={height}
       viewBox="0 0 32 32" 
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
         <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style={{stopColor:"#2563eb", stopOpacity:1}} />
-          <stop offset="100%" style={{stopColor:"#1e40af", stopOpacity:1}} />
+          <stop offset="0%" stopColor="#2563eb" stopOpacity={1} />
+          <stop offset="100%" stopColor="#1e40af" stopOpacity={1} />
         </linearGradient>
       </defs>
       

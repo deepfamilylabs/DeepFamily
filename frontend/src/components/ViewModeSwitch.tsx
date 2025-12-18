@@ -1,5 +1,3 @@
-import { useLayoutEffect, useRef, useState, useEffect, useCallback } from 'react'
-
 export type ViewMode = 'tree' | 'dag' | 'force' | 'virtual'
 
 interface ViewModeSwitchProps {
@@ -12,63 +10,21 @@ interface ViewModeSwitchProps {
 const order: ViewMode[] = ['tree', 'dag', 'force', 'virtual']
 
 export default function ViewModeSwitch({ value, onChange, labels, disabled }: ViewModeSwitchProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const btnRefs = useRef<HTMLButtonElement[]>([])
-  const [indicator, setIndicator] = useState<{ left: number; width: number }>({ left: 0, width: 0 })
-  const [animate, setAnimate] = useState(true)
-
-  const measure = useCallback(() => {
-    const idx = order.indexOf(value)
-    const btn = btnRefs.current[idx]
-    const container = containerRef.current
-    if (!btn || !container) return
-    const left = btn.offsetLeft
-    const width = btn.offsetWidth
-    setIndicator(prev => (prev.left !== left || prev.width !== width ? { left, width } : prev))
-  }, [value])
-
-  useLayoutEffect(() => {
-    setAnimate(true)
-    measure()
-  }, [value, measure])
-
-  useLayoutEffect(() => {
-    setAnimate(false)
-    measure()
-    const id = requestAnimationFrame(() => setAnimate(true))
-    return () => cancelAnimationFrame(id)
-  }, [labels.tree, labels.dag, labels.force, labels.virtual, measure])
-
-  useEffect(() => {
-    const ro = new ResizeObserver(() => { setAnimate(false); measure(); requestAnimationFrame(() => setAnimate(true)) })
-    if (containerRef.current) ro.observe(containerRef.current)
-    btnRefs.current.forEach(b => b && ro.observe(b))
-    const onResize = () => { setAnimate(false); measure(); requestAnimationFrame(() => setAnimate(true)) }
-    window.addEventListener('resize', onResize)
-    if ((document as any).fonts?.ready) {
-      ;(document as any).fonts.ready.then(() => { setAnimate(false); measure(); requestAnimationFrame(() => setAnimate(true)) }).catch(() => {})
-    }
-    return () => { ro.disconnect(); window.removeEventListener('resize', onResize) }
-  }, [measure])
-
-
   return (
     <div
-      ref={containerRef}
       className="relative inline-flex h-9 select-none rounded-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-gray-200 dark:border-slate-700 text-xs font-medium overflow-hidden shadow-md p-1 gap-1 max-w-full"
     >
-      <div
-        className={`absolute rounded-md bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 shadow-sm ${animate ? 'transition-all duration-200 ease-out' : ''} z-0`}
-        style={{ top: 4, bottom: 4, left: indicator.left, width: indicator.width }}
-      />
-      {order.map((m, idx) => (
+      {order.map((m) => (
         <button
           key={m}
-          ref={el => { if (el) btnRefs.current[idx] = el }}
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1.5 px-2.5 md:px-2.5 px-2 rounded-md h-full transition-all duration-150 focus:outline-none text-[11px] font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${value === m ? 'text-white scale-[0.98]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-slate-700/50'}`}
+          className={`relative z-10 inline-flex items-center justify-center gap-1.5 px-2.5 md:px-2.5 px-2 rounded-md h-full transition-all duration-150 focus:outline-none text-[11px] font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${
+            value === m
+              ? 'text-white scale-[0.98] bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-slate-700/50'
+          }`}
           title={labels[m]}
         >
           {m === 'tree' && (

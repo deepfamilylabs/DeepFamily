@@ -80,7 +80,6 @@ export default function PersonPage() {
   const prefetched = (location.state as any)?.prefetchedStory as Partial<StoryDetailData> | undefined
   const dataRef = useRef<StoryDetailData | null>(null)
   const sectionRefs = useRef<Map<string | number, HTMLElement>>(new Map())
-  const [leftNavHeight, setLeftNavHeight] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     try {
@@ -89,20 +88,6 @@ export default function PersonPage() {
       window.scrollTo(0, 0)
     }
   }, [tokenId])
-
-  useEffect(() => {
-    const mainEl = document.querySelector('.xl\\:col-span-3.space-y-6') as HTMLElement | null
-    if (!mainEl) return
-    const update = () => setLeftNavHeight(mainEl.getBoundingClientRect().height)
-    update()
-    const ro = new ResizeObserver(() => update())
-    ro.observe(mainEl)
-    window.addEventListener('resize', update)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', update)
-    }
-  }, [viewMode, data?.storyChunks?.length])
 
   // Dynamic title: person name + archive
   useEffect(()=>{
@@ -533,7 +518,7 @@ export default function PersonPage() {
         <>
           {/* Section Navigation - Left Sidebar (only for sections mode with chunks) */}
           {viewMode === 'sections' && groupedChunks.length > 0 && (
-            <div className="hidden xl:block fixed left-[calc((100vw-1280px)/2-204px)] top-[104px] w-56 max-h-[calc(100vh-104px-64px)] z-10" style={{ height: leftNavHeight ? `${leftNavHeight}px` : undefined }}>
+            <div className="hidden xl:block fixed left-[calc((100vw-1280px)/2-204px)] top-[104px] w-56 h-[calc(100vh-104px-64px)] z-10">
               <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col h-full">
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 rounded-t-lg">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
