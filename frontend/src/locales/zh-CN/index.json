@@ -341,8 +341,8 @@
       "totalChildren": "总子女数"
     },
     "hashCalculator": {
-      "title": "本地计算人物哈希",
-      "tip": "💡 提示：使用下面的工具计算人物哈希，然后复制到下方的查询中使用",
+      "title": "本地计算身份哈希",
+      "tip": "💡 提示：使用下面的工具计算身份哈希，然后复制到下方的查询中使用",
       "name": "全名",
       "isBirthBC": "纪元",
       "birthYear": "出生年",
@@ -358,18 +358,23 @@
       "birthYearLabel": "出生年",
       "birthMonthLabel": "月",
       "birthDayLabel": "日",
-      "passphrase": "口令",
+      "passphrase": "身份口令",
       "passphrasePlaceholder": "可输入任意字符的家训或暗号，推荐 15+ 字符并混合不同符号",
       "passphraseHelp": {
-        "title": "口令作用说明",
+        "title": "身份口令说明",
+        "buttonAriaLabel": "身份口令帮助",
         "privacy": "🔒 隐私保护",
         "privacyDesc": "为您的身份哈希添加额外保护层，防止他人通过姓名和生日推测您的身份。",
         "optional": "✅ 完全可选",
-        "optionalDesc": "可留空；系统支持任意字符——如家训、暗号等。族人可共享同一口令协作管理；为增强隐私，推荐使用 15+ 字符并妥善保密。",
+        "optionalDesc": "可留空；系统支持任意字符——如家训、暗号等。族人可共享同一身份口令协作管理；为增强隐私，推荐使用 15+ 字符并妥善保密。",
         "remember": "⚠️ 请牢记",
-        "rememberDesc": "口令无法找回，忘记后将生成不同的身份哈希。",
+        "rememberDesc": "身份口令无法找回，忘记后将生成不同的身份哈希。",
         "privacyNoteTitle": "🔐 本地计算",
-        "privacyNote": "口令只在本地参与计算哈希，不会上传或保存。"
+        "privacyNote": "身份口令只在本地参与计算哈希，不会上传或保存。"
+      },
+      "passphraseVisibility": {
+        "show": "显示身份口令",
+        "hide": "隐藏身份口令"
       },
       "passwordStrength": {
         "weak": "弱",
@@ -391,12 +396,12 @@
       "compute": "计算",
       "result": "结果",
       "hashLabel": "哈希:",
-      "description": "说明：计算逻辑与合约getPersonHash完全一致。",
+      "description": "说明：计算逻辑与合约 getPersonHash（身份哈希）完全一致。",
       "bcOptions": {
         "ad": "公元",
         "bc": "公元前"
       },
-      "calculatedHash": "计算的哈希",
+      "calculatedHash": "身份哈希",
       "contractHash": "合约哈希",
       "hashesMatch": "哈希匹配",
       "hashesNoMatch": "哈希不匹配"
@@ -404,7 +409,7 @@
     "validation": {
       "nameRequired": "请输入姓名",
       "nameTooLong": "姓名不能超过256字节（约256个英文字符）",
-      "hashRequired": "请输入人物哈希",
+      "hashRequired": "请输入身份哈希",
       "hashInvalid": "请输入有效的64位十六进制哈希值",
       "tokenIdRequired": "请输入NFT Token ID",
       "versionIndexRequired": "请输入有效的版本序号（≥0）",
