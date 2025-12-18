@@ -13,11 +13,10 @@ import PersonHashCalculator from '../PersonHashCalculator'
 import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
 import { getFriendlyError, sanitizeErrorForLogging } from '../../lib/errors'
 import {
-  generateNamePoseidonProof,
-  verifyNamePoseidonProof,
   formatGroth16ProofForContract,
   toBigIntArray
 } from '../../lib/zk'
+import { zkWorkerCall } from '../../lib/zkWorkerClient'
 import { normalizeNameForHash, normalizePassphraseForHash } from '../../lib/passphraseStrength'
 
 // Simple themed select component (from PersonHashCalculator)
@@ -537,10 +536,14 @@ export default function MintNFTModal({
       if (!address) {
         throw new Error(t('mintNFT.walletRequired', 'Wallet connection required to mint'))
       }
-      const { proof: generatedProof, publicSignals } = await generateNamePoseidonProof(normalizedFullName, passphrase, address)
+      const { proof: generatedProof, publicSignals } = await zkWorkerCall(
+        'generateNamePoseidonProof',
+        { fullName: normalizedFullName, passphrase, minterAddress: address },
+        { timeoutMs: 240_000 }
+      )
 
       setProofGenerationStep(t('mintNFT.verifyingProof', 'Verifying zero-knowledge proof...'))
-      const isProofValid = await verifyNamePoseidonProof(generatedProof, publicSignals)
+      const { ok: isProofValid } = await zkWorkerCall('verifyNamePoseidonProof', { proof: generatedProof, publicSignals }, { timeoutMs: 120_000 })
       if (!isProofValid) {
         throw new Error(t('mintNFT.proofVerificationFailed', 'Generated proof verification failed'))
       }

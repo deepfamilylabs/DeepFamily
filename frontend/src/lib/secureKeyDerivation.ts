@@ -8,8 +8,7 @@
 
 import { scrypt } from 'scrypt-js';
 import { ethers } from 'ethers';
-import type { HashForm } from '../components/PersonHashCalculator';
-import { computePersonHash } from '../components/PersonHashCalculator';
+import { computeIdentityHash, type IdentityHashInput } from './identityHash';
 import { validatePassphraseStrength as validatePassphraseStrengthUtil, normalizePassphraseForHash, normalizeNameForHash } from './passphraseStrength';
 import type { PassphraseStrength } from './passphraseStrength';
 
@@ -105,7 +104,7 @@ export interface DerivedKey {
  * console.log('Address:', result.address);
  */
 export async function deriveKeyFromPersonData(
-  input: HashForm,
+  input: IdentityHashInput,
   purpose: KeyPurpose = 'PRIVATE_KEY',
   preset: KDFPreset = 'BALANCED',
   onProgress?: (progress: number, stage: string) => void
@@ -114,7 +113,7 @@ export async function deriveKeyFromPersonData(
 
   // Phase 1: Compute base PersonHash (original logic)
   onProgress?.(0, 'Computing PersonHash...');
-  const baseHash = computePersonHash(input);
+  const baseHash = computeIdentityHash(input);
   onProgress?.(20, 'PersonHash computed');
 
   // Phase 2: Prepare KDF input
@@ -240,7 +239,7 @@ export function validatePassphraseStrength(passphrase: string): PassphraseStreng
  * Derive multiple keys for different purposes from the same PersonHash
  */
 export async function deriveMultiPurposeKeys(
-  input: HashForm,
+  input: IdentityHashInput,
   purposes: KeyPurpose[] = ['IDENTITY', 'PRIVATE_KEY', 'ENCRYPTION'],
   preset: KDFPreset = 'BALANCED'
 ): Promise<Record<KeyPurpose, DerivedKey>> {

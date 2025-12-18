@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { generatePersonProof, verifyProof, PersonData } from '../lib/zk'
+import type { PersonData } from '../lib/zk'
+import { zkWorkerCall } from '../lib/zkWorkerClient'
 
 const ZKProofTest: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
@@ -50,18 +51,18 @@ const ZKProofTest: React.FC = () => {
         submitter: '0x1234567890123456789012345678901234567890'
       })
       
-      const { proof, publicSignals } = await generatePersonProof(
+      const { proof, publicSignals } = await zkWorkerCall('generatePersonProof', {
         person,
         father,
         mother,
-        '0x1234567890123456789012345678901234567890'
-      )
+        submitterAddress: '0x1234567890123456789012345678901234567890'
+      })
 
       console.log('✅ Proof generated:', proof)
       console.log('📊 Public signals:', publicSignals)
 
       // Verify proof
-      const isValid = await verifyProof(proof, publicSignals)
+      const { ok: isValid } = await zkWorkerCall('verifyPersonProof', { proof, publicSignals })
       console.log('🔍 Proof verification:', isValid)
       console.log('📝 Proof object structure:', proof)
 
@@ -103,14 +104,14 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
     try {
       console.log('🔄 Testing with no parents...')
 
-      const { proof, publicSignals } = await generatePersonProof(
+      const { proof, publicSignals } = await zkWorkerCall('generatePersonProof', {
         person,
-        null, // No father
-        null, // No mother
-        '0x1234567890123456789012345678901234567890'
-      )
+        father: null,
+        mother: null,
+        submitterAddress: '0x1234567890123456789012345678901234567890'
+      })
 
-      const isValid = await verifyProof(proof, publicSignals)
+      const { ok: isValid } = await zkWorkerCall('verifyPersonProof', { proof, publicSignals })
 
       setResult(`
 🎉 No Parents Test Successful!
