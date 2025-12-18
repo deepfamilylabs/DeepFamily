@@ -272,6 +272,11 @@ npm run frontend:preview     # Preview production build
 npm run frontend:config      # Generate local config from deployed contracts
 ```
 
+`frontend:config` (`cd frontend && npm run config:local`) updates `frontend/.env.local` with `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS`, root hash/index, and per-language root variants.
+
+See also:
+- `docs/multicall.md` (optional `VITE_MULTICALL_ADDRESS` for batching many read calls).
+
 ### Code Quality & Maintenance
 ```bash
 npm run lint                 # Lint Solidity contracts with Solhint
