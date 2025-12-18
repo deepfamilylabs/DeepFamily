@@ -50,10 +50,12 @@ export const passwordFingerprint = (password: string) => {
   return sha256Hex(normalized)
 }
 
-const ensureWebCrypto = () => {
-  if (typeof window === 'undefined' || !window.crypto?.subtle) {
+const getWebCrypto = (): Crypto => {
+  const cryptoObj = (globalThis as any)?.crypto as Crypto | undefined
+  if (!cryptoObj?.subtle) {
     throw new Error('Web Crypto is not available in this environment')
   }
+  return cryptoObj
 }
 
 export const encryptMetadataJson = async (
@@ -66,17 +68,17 @@ export const encryptMetadataJson = async (
     version?: string
   }
 ): Promise<{ payload: EncryptedMetadataPayload; plainHash: string }> => {
-  ensureWebCrypto()
+  const cryptoObj = getWebCrypto()
 
   const normalizedPassword = normalizePassphraseForHash(password || '')
   const salt = new Uint8Array(new ArrayBuffer(16))
   const iv = new Uint8Array(new ArrayBuffer(12))
-  window.crypto.getRandomValues(salt)
-  window.crypto.getRandomValues(iv)
+  cryptoObj.getRandomValues(salt)
+  cryptoObj.getRandomValues(iv)
   const aad = opts?.aad ?? METADATA_AAD
   const iterations = opts?.iterations ?? DEFAULT_ITERATIONS
-  const keyMaterial = await window.crypto.subtle.importKey('raw', encoder.encode(normalizedPassword), 'PBKDF2', false, ['deriveKey'])
-  const key = await window.crypto.subtle.deriveKey(
+  const keyMaterial = await cryptoObj.subtle.importKey('raw', encoder.encode(normalizedPassword), 'PBKDF2', false, ['deriveKey'])
+  const key = await cryptoObj.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
@@ -84,7 +86,7 @@ export const encryptMetadataJson = async (
     ['encrypt']
   )
 
-  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+  const ciphertextBuffer = await cryptoObj.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: encoder.encode(aad) },
     key,
     encoder.encode(plaintext)
@@ -159,7 +161,7 @@ export const decryptMetadataPayload = async (
   hash: string
   payload: EncryptedMetadataPayload
 }> => {
-  ensureWebCrypto()
+  const cryptoObj = getWebCrypto()
 
   const normalizedPassword = normalizePassphraseForHash(password || '')
   if (typeof payloadOrJson === 'string' && payloadOrJson.length > MAX_ENCRYPTED_PAYLOAD_CHARS) {
@@ -195,8 +197,8 @@ export const decryptMetadataPayload = async (
 
   const iterations = opts?.iterations ?? (payload?.kdf?.iter != null ? coerceIterations(payload.kdf.iter) : DEFAULT_ITERATIONS)
 
-  const keyMaterial = await window.crypto.subtle.importKey('raw', encoder.encode(normalizedPassword), 'PBKDF2', false, ['deriveKey'])
-  const key = await window.crypto.subtle.deriveKey(
+  const keyMaterial = await cryptoObj.subtle.importKey('raw', encoder.encode(normalizedPassword), 'PBKDF2', false, ['deriveKey'])
+  const key = await cryptoObj.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
@@ -212,7 +214,7 @@ export const decryptMetadataPayload = async (
   for (let i = 0; i < 16; i += 1) {
     if (tailTag[i] !== tagBytes[i]) throw new Error('Invalid encrypted payload: tag mismatch')
   }
-  const plainBuffer = await window.crypto.subtle.decrypt(
+  const plainBuffer = await cryptoObj.subtle.decrypt(
     { name: 'AES-GCM', iv, additionalData: encoder.encode(aad) },
     key,
     cipherBytes

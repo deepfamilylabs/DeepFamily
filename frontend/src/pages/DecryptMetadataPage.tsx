@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, CloudDownload, FileDown, Link2, Lock, Shield, AlertTriangle, Loader2, ChevronDown } from 'lucide-react'
-import { decryptMetadataPayload, parseEncryptedPayload, EncryptedMetadataPayload } from '../lib/metadataCrypto'
+import { parseEncryptedPayload, EncryptedMetadataPayload } from '../lib/metadataCrypto'
 import { sanitizeErrorForLogging } from '../lib/errors'
 import { IPFS_GATEWAY_BASE_URLS } from '../config/ipfs'
+import { cryptoWorkerCall } from '../lib/cryptoWorkerClient'
 
 const normalizeGatewayBaseUrl = (value: string): string | null => {
   const trimmed = value.trim()
@@ -118,7 +119,7 @@ export default function DecryptMetadataPage() {
     try {
       setIsDecrypting(true)
       setError(null)
-      const { data, payload } = await decryptMetadataPayload(encryptedJson, password)
+      const { data, payload } = await cryptoWorkerCall('decryptMetadataBundle', { payloadOrJson: encryptedJson, password })
       setResult(data)
       setPayloadMeta(payload)
     } catch (err: any) {
