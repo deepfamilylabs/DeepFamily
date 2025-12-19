@@ -2,10 +2,13 @@ import type { Plugin } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NETWORK_PRESETS } from './src/config/networks'
+import { IPFS_GATEWAY_BASE_URLS } from './src/config/ipfs'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const CSP_REPORT_PATH = '/__csp-report'
+const CSP_HEADER = 'Content-Security-Policy'
+const CSP_HEADER_REPORT_ONLY = 'Content-Security-Policy-Report-Only'
 
 const uniq = <T,>(items: T[]): T[] => Array.from(new Set(items))
 
@@ -98,12 +101,6 @@ const presetRpcOrigins = uniq(
     .filter((v): v is string => Boolean(v))
 )
 
-const DEFAULT_IPFS_GATEWAY_BASE_URLS = [
-  'https://ipfs.io/ipfs/',
-  'https://cloudflare-ipfs.com/ipfs/',
-  'https://dweb.link/ipfs/',
-]
-
 const buildCsp = (opts: {
   dev: boolean
   connectSrc: string[]
@@ -159,7 +156,7 @@ export default defineConfig(({ command, mode }) => {
 
   const ipfsGatewayBases = (() => {
     const fromEnv = parseList(getEnv('VITE_IPFS_GATEWAY_BASE_URLS'))
-    return fromEnv.length > 0 ? fromEnv : DEFAULT_IPFS_GATEWAY_BASE_URLS
+    return fromEnv.length > 0 ? fromEnv : [...IPFS_GATEWAY_BASE_URLS]
   })()
 
   const ipfsGatewayOrigins = uniq(
@@ -205,9 +202,11 @@ export default defineConfig(({ command, mode }) => {
   const cspNonDev = buildCsp({ dev: false, connectSrc: connectSrcNonDev, imgSrc, styleAttrNone })
   const csp = command === 'serve' ? cspDev : cspNonDev
 
-  const devCspHeaderName = 'Content-Security-Policy-Report-Only'
-  const previewCspHeaderName =
-    getEnv('DEEP_CSP_ENFORCE') === '1' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only'
+  // Non-dev should default to enforcing CSP; opt out via `DEEP_CSP_ENFORCE=0` / `false`.
+  const enforceNonDevCsp = flag('DEEP_CSP_ENFORCE', true)
+  const previewCspHeaderName = enforceNonDevCsp
+    ? CSP_HEADER
+    : CSP_HEADER_REPORT_ONLY
 
   const reportFile = getEnv('DEEP_CSP_REPORT_FILE')
   const inquireShimPath = fileURLToPath(new URL('./src/shims/protobufjs-inquire.ts', import.meta.url))
@@ -225,7 +224,7 @@ export default defineConfig(({ command, mode }) => {
       host: 'localhost',
       port: 5173,
       headers: {
-        [devCspHeaderName]: csp
+        [CSP_HEADER_REPORT_ONLY]: csp
       },
       // Better error handling
       hmr: {
