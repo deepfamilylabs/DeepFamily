@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npm run sync:abi && vite",
     "dev:local": "npm run config:local && npm run dev",
-    "build": "npm run sync:abi && vite build",
+    "build": "npm run sync:abi && vite build && node ./scripts/generate-pages-headers.mjs",
     "preview": "vite preview",
     "csp:scan": "node ./scripts/csp-scan.mjs",
     "config:local": "node ./scripts/update-local-config.mjs",
