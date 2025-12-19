@@ -15,6 +15,39 @@ const connection = await getOrCreateTestConnection();
 hre.ethers = connection.ethers;
 hre.networkHelpers = connection.networkHelpers;
 
+// Global cleanup function
+const cleanupConnection = async () => {
+  if (globalThis.__deepfamilyTestConnectionPromise) {
+    try {
+      const conn = await globalThis.__deepfamilyTestConnectionPromise;
+      await conn?.close?.();
+    } catch {}
+    globalThis.__deepfamilyTestConnectionPromise = null;
+  }
+};
+
+// Register cleanup for test completion
+if (typeof after === 'function') {
+  after(async function () {
+    await cleanupConnection();
+    // Force exit to prevent hanging
+    setTimeout(() => process.exit(0), 50);
+  });
+}
+
+// Process-level cleanup hooks
+if (typeof process !== 'undefined' && process.on) {
+  process.on('beforeExit', cleanupConnection);
+  process.on('SIGINT', async () => {
+    await cleanupConnection();
+    process.exit(0);
+  });
+  process.on('SIGTERM', async () => {
+    await cleanupConnection();
+    process.exit(0);
+  });
+}
+
 hre.run = async (taskName, args = {}) => {
   const { ethers } = hre;
   const [signer] = await ethers.getSigners();

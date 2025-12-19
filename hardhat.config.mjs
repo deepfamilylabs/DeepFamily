@@ -214,6 +214,11 @@ export default {
     mocha: {
       timeout: 180000,
       require: ['./hardhat-test-setup.mjs'],
+      parallel: false,
+      reporterOptions: {
+        maxDiffSize: 0,
+      },
+      exit: true,
     },
   },
 
@@ -336,6 +341,8 @@ export default {
     timeout: 1200000,
     color: true,
     reporter: "spec",
+    parallel: false,
+    exit: true,
   },
   
   // Typechain configuration
