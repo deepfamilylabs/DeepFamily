@@ -189,6 +189,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 totalLength; // Total character count of all chunk contents
   }
 
+  /**
+   * @dev Pagination calculation result structure
+   */
+  struct PaginationResult {
+    uint256 startIndex; // Start index
+    uint256 endIndex; // End index
+    uint256 resultLength; // Result length
+    uint256 nextOffset; // Next offset
+    bool hasMore; // Whether has more
+  }
+
   // ========== Core Storage Mappings ==========
 
   /// @dev Person hash => version array, stores all version information of a person
@@ -386,8 +397,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string newURI
   );
 
-  // Name discovery event removed for privacy
-
   /**
    * @dev Token mining reward distribution event
    * @param miner Miner's address
@@ -401,8 +410,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 indexed versionIndex,
     uint256 reward
   );
-
-  // ========== Story Sharding Related Events ==========
 
   /**
    * @dev Story chunk added event
@@ -443,7 +450,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param previousBps Previous protocol fee in basis points
    * @param newBps New protocol fee in basis points
    */
-  event ProtocolEndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
+  event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
   // ========== Function Modifiers ==========
 
@@ -469,18 +476,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     _;
   }
 
-  // ========== Internal Utility Structures ==========
-
-  /**
-   * @dev Pagination calculation result structure
-   */
-  struct PaginationResult {
-    uint256 startIndex;
-    uint256 endIndex;
-    uint256 resultLength;
-    uint256 nextOffset;
-    bool hasMore;
-  }
+  // ========== Internal Functions ==========
 
   /**
    * @dev Calculate pagination parameters
@@ -572,6 +568,43 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (currentDay < uint256(basicInfo.birthDay)) revert MustBeAdult();
   }
 
+  /**
+   * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into raw Poseidon digest bytes32 (big-endian: hi128|lo128).
+   */
+  function _packHashFromTwo128(uint256 hi, uint256 lo) internal pure returns (bytes32 h) {
+    unchecked {
+      if ((hi >> 128) != 0 || (lo >> 128) != 0) revert InvalidZKProof();
+      uint256 v = (hi << 128) | lo;
+      h = bytes32(v);
+    }
+  }
+
+  /**
+   * @dev Wrap raw Poseidon digest with keccak256 for domain separation and collision resistance.
+   * Returns zero if input is zero (preserves semantics for non-existent parent hashes).
+   */
+  function _wrapPoseidonHash(bytes32 poseidonDigest) internal pure returns (bytes32) {
+    if (poseidonDigest == bytes32(0)) return bytes32(0);
+    return keccak256(abi.encodePacked(poseidonDigest));
+  }
+
+  /**
+   * @dev Unified single string hash tool (only for single string -> keccak256).
+   * @return Calculated hash value
+   */
+  function _hashString(string memory value) internal pure returns (bytes32) {
+    return keccak256(abi.encodePacked(value));
+  }
+
+  /**
+   * @dev Internal function to set token URI
+   * @param tokenId Token ID
+   * @param _tokenURI URI string
+   */
+  function _setTokenURI(uint256 tokenId, string memory _tokenURI) internal {
+    _tokenURIs[tokenId] = _tokenURI;
+  }
+
   // ========== Constructor ==========
 
   /**
@@ -592,43 +625,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     NAME_POSEIDON_VERIFIER = _namePoseidonVerifier;
   }
 
-  // ========== Admin Functions ==========
-
-  /**
-   * @notice Update protocol fee share for endorsement payments.
-   * @param newBps New protocol fee in basis points (max 20%)
-   */
-  function updateProtocolEndorsementFee(uint256 newBps) external onlyOwner {
-    if (newBps > PROTOCOL_FEE_BPS_MAX) revert ProtocolFeeTooHigh();
-    uint256 previous = protocolEndorsementFeeBps;
-    if (previous == newBps) {
-      return;
-    }
-    protocolEndorsementFeeBps = newBps;
-    emit ProtocolEndorsementFeeUpdated(previous, newBps);
-  }
-
-  // ========== Core Functionality Functions ==========
-
-  /**
-   * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into raw Poseidon digest bytes32 (big-endian: hi128|lo128).
-   */
-  function _packHashFromTwo128(uint256 hi, uint256 lo) internal pure returns (bytes32 h) {
-    unchecked {
-      if ((hi >> 128) != 0 || (lo >> 128) != 0) revert InvalidZKProof();
-      uint256 v = (hi << 128) | lo;
-      h = bytes32(v);
-    }
-  }
-
-  /**
-   * @dev Wrap raw Poseidon digest with keccak256 for domain separation and collision resistance.
-   * Returns zero if input is zero (preserves semantics for non-existent parent hashes).
-   */
-  function _wrapPoseidonHash(bytes32 poseidonDigest) internal pure returns (bytes32) {
-    if (poseidonDigest == bytes32(0)) return bytes32(0);
-    return keccak256(abi.encodePacked(poseidonDigest));
-  }
+  // ========== Public Functions ==========
 
   /**
    * @notice Calculate unique person hash value
@@ -657,14 +654,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     bytes32 poseidonDigest = bytes32(poseidonResult);
 
     return _wrapPoseidonHash(poseidonDigest);
-  }
-
-  /**
-   * @dev Unified single string hash tool (only for single string -> keccak256).
-   * @return Calculated hash value
-   */
-  function _hashString(string memory value) internal pure returns (bytes32) {
-    return keccak256(abi.encodePacked(value));
   }
 
   /**
@@ -1002,7 +991,46 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  // ========== Story Sharding Functionality Functions ==========
+  /**
+   * @dev Override tokenURI function to return stored URI
+   * @param tokenId NFT token ID
+   * @return URI string
+   */
+  function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+    _requireOwned(tokenId);
+    return _tokenURIs[tokenId];
+  }
+
+  /**
+   * @notice Allow current NFT holder to update the token's metadata URI
+   * @param tokenId NFT TokenID
+   * @param newURI New metadata URI (recommended to use ipfs://CID format)
+   */
+  function updateTokenURI(uint256 tokenId, string calldata newURI) external {
+    if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
+    if (bytes(newURI).length > MAX_LONG_TEXT_LENGTH) revert InvalidTokenURI();
+
+    string memory oldURI = _tokenURIs[tokenId];
+    if (bytes(oldURI).length > 0) {
+      tokenURIHistory[tokenId].push(oldURI);
+    }
+    _setTokenURI(tokenId, newURI);
+    emit TokenURIUpdated(tokenId, msg.sender, oldURI, newURI);
+  }
+
+  /**
+   * @notice Update protocol fee share for endorsement payments.
+   * @param newBps New protocol fee in basis points (max 20%)
+   */
+  function updateEndorsementFee(uint256 newBps) external onlyOwner {
+    if (newBps > PROTOCOL_FEE_BPS_MAX) revert ProtocolFeeTooHigh();
+    uint256 previous = protocolEndorsementFeeBps;
+    if (previous == newBps) {
+      return;
+    }
+    protocolEndorsementFeeBps = newBps;
+    emit EndorsementFeeUpdated(previous, newBps);
+  }
 
   /**
    * @notice Add story chunk to NFT
@@ -1114,6 +1142,70 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
+   * @notice Get complete NFT information (combined query)
+   * @dev Requires tokenId to exist; single call returns person hash, version index, version info, core info, endorsement count and URI.
+   * @param tokenId NFT TokenID
+   * @return personHash Corresponding person hash
+   * @return versionIndex Corresponding version index (starts from 1)
+   * @return version Version basic information
+   * @return coreInfo NFT core information
+   * @return endorsementCount Endorsement count
+   * @return nftTokenURI NFT metadata URI
+   */
+  function getNFTDetails(
+    uint256 tokenId
+  )
+    external
+    view
+    returns (
+      bytes32 personHash,
+      uint256 versionIndex,
+      PersonVersion memory version,
+      PersonCoreInfo memory coreInfo,
+      uint256 endorsementCount,
+      string memory nftTokenURI
+    )
+  {
+    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
+    personHash = tokenIdToPerson[tokenId];
+    if (personHash == bytes32(0)) revert InvalidTokenId();
+
+    versionIndex = tokenIdToVersionIndex[tokenId];
+    uint256 arrayIndex = versionIndex - 1;
+
+    version = personVersions[personHash][arrayIndex];
+    coreInfo = nftCoreInfo[tokenId];
+    endorsementCount = versionEndorsementCount[personHash][arrayIndex];
+    nftTokenURI = tokenURI(tokenId);
+  }
+
+  /**
+   * @notice Get NFT's story metadata
+   * @param tokenId NFT TokenID
+   * @return metadata Story metadata
+   */
+  function getStoryMetadata(
+    uint256 tokenId
+  ) external view validTokenId(tokenId) returns (StoryMetadata memory metadata) {
+    metadata = storyMetadata[tokenId];
+  }
+
+  /**
+   * @notice Get detailed information of specified chunk
+   * @param tokenId NFT TokenID
+   * @param chunkIndex Chunk index
+   * @return chunk Chunk information
+   */
+  function getStoryChunk(
+    uint256 tokenId,
+    uint256 chunkIndex
+  ) external view validTokenId(tokenId) returns (StoryChunk memory chunk) {
+    StoryMetadata storage metadata = storyMetadata[tokenId];
+    if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
+    chunk = storyChunks[tokenId][chunkIndex];
+  }
+
+  /**
    * @notice Get children of specified parent version (paginated)
    * @dev When limit=0, only returns total count; supports offset/limit, max page length limited by MAX_QUERY_PAGE_SIZE
    * @param parentHash Parent person hash
@@ -1167,44 +1259,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     }
 
     return (childHashes, childVersionIndices, totalCount, page.hasMore, page.nextOffset);
-  }
-
-  /**
-   * @notice Get complete NFT information (combined query)
-   * @dev Requires tokenId to exist; single call returns person hash, version index, version info, core info, endorsement count and URI.
-   * @param tokenId NFT TokenID
-   * @return personHash Corresponding person hash
-   * @return versionIndex Corresponding version index (starts from 1)
-   * @return version Version basic information
-   * @return coreInfo NFT core information
-   * @return endorsementCount Endorsement count
-   * @return nftTokenURI NFT metadata URI
-   */
-  function getNFTDetails(
-    uint256 tokenId
-  )
-    external
-    view
-    returns (
-      bytes32 personHash,
-      uint256 versionIndex,
-      PersonVersion memory version,
-      PersonCoreInfo memory coreInfo,
-      uint256 endorsementCount,
-      string memory nftTokenURI
-    )
-  {
-    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
-    personHash = tokenIdToPerson[tokenId];
-    if (personHash == bytes32(0)) revert InvalidTokenId();
-
-    versionIndex = tokenIdToVersionIndex[tokenId];
-    uint256 arrayIndex = versionIndex - 1;
-
-    version = personVersions[personHash][arrayIndex];
-    coreInfo = nftCoreInfo[tokenId];
-    endorsementCount = versionEndorsementCount[personHash][arrayIndex];
-    nftTokenURI = tokenURI(tokenId);
   }
 
   /**
@@ -1418,70 +1472,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uris[i] = all[page.startIndex + i];
     }
     return (uris, totalCount, page.hasMore, page.nextOffset);
-  }
-
-  /**
-   * @dev Internal function to set token URI
-   * @param tokenId Token ID
-   * @param _tokenURI URI string
-   */
-  function _setTokenURI(uint256 tokenId, string memory _tokenURI) internal {
-    _tokenURIs[tokenId] = _tokenURI;
-  }
-
-  /**
-   * @dev Override tokenURI function to return stored URI
-   * @param tokenId NFT token ID
-   * @return URI string
-   */
-  function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-    _requireOwned(tokenId);
-    return _tokenURIs[tokenId];
-  }
-
-  /**
-   * @notice Allow current NFT holder to update the token's metadata URI
-   * @param tokenId NFT TokenID
-   * @param newURI New metadata URI (recommended to use ipfs://CID format)
-   */
-  function updateTokenURI(uint256 tokenId, string calldata newURI) external {
-    if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
-    if (bytes(newURI).length > MAX_LONG_TEXT_LENGTH) revert InvalidTokenURI();
-
-    string memory oldURI = _tokenURIs[tokenId];
-    if (bytes(oldURI).length > 0) {
-      tokenURIHistory[tokenId].push(oldURI);
-    }
-    _setTokenURI(tokenId, newURI);
-    emit TokenURIUpdated(tokenId, msg.sender, oldURI, newURI);
-  }
-
-  // ========== Story Sharding Query Functions ==========
-
-  /**
-   * @notice Get NFT's story metadata
-   * @param tokenId NFT TokenID
-   * @return metadata Story metadata
-   */
-  function getStoryMetadata(
-    uint256 tokenId
-  ) external view validTokenId(tokenId) returns (StoryMetadata memory metadata) {
-    metadata = storyMetadata[tokenId];
-  }
-
-  /**
-   * @notice Get detailed information of specified chunk
-   * @param tokenId NFT TokenID
-   * @param chunkIndex Chunk index
-   * @return chunk Chunk information
-   */
-  function getStoryChunk(
-    uint256 tokenId,
-    uint256 chunkIndex
-  ) external view validTokenId(tokenId) returns (StoryChunk memory chunk) {
-    StoryMetadata storage metadata = storyMetadata[tokenId];
-    if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
-    chunk = storyChunks[tokenId][chunkIndex];
   }
 
   /**
