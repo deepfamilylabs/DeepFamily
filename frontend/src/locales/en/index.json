@@ -1314,6 +1314,7 @@
       "InvalidParentHash": "Parent hash is invalid.",
       "MustBeAdult": "Person must be an adult to proceed.",
       "TokenContractNotSet": "Token contract is not configured.",
+      "ERC721NonexistentToken": "Token ID does not exist.",
       "InvalidTokenId": "Token ID is invalid.",
       "EndorsementFeeTransferFailed": "Endorsement fee transfer failed.",
       "ProtocolFeeTooHigh": "Protocol fee exceeds allowed limit.",

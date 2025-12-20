@@ -1316,6 +1316,7 @@
       "InvalidParentHash": "父母雜湊無效。",
       "MustBeAdult": "人物需滿足成年要求。",
       "TokenContractNotSet": "代幣合約未配置。",
+      "ERC721NonexistentToken": "Token ID 無效。",
       "InvalidTokenId": "Token ID 無效。",
       "EndorsementFeeTransferFailed": "背書費用轉帳失敗。",
       "ProtocolFeeTooHigh": "協議費率過高。",

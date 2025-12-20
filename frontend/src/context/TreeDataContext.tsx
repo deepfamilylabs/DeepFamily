@@ -743,8 +743,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       const v = Number(baseRoot.versionIndex)
       if (!h || !/^0x[0-9a-fA-F]{64}$/.test(h) || !Number.isFinite(v) || v <= 0) return
       try {
-        const stats: any = await (contract as any).listVersionEndorsements(h, 0, 1)
-        const tv = stats.totalVersions ?? stats[3]
+        const out: any = await (contract as any).listPersonVersions(h, 0, 0)
+        const tv = out.totalVersions ?? out[1]
         const totalVersions = Number(tv ?? 0)
         if (!Number.isFinite(totalVersions) || totalVersions <= 1) return
         if (cancelled) return
