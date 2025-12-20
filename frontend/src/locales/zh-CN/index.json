@@ -1315,6 +1315,7 @@
       "InvalidParentHash": "父母哈希无效。",
       "MustBeAdult": "人物需满足成年要求。",
       "TokenContractNotSet": "代币合约未配置。",
+      "ERC721NonexistentToken": "Token ID 无效。",
       "InvalidTokenId": "Token ID 无效。",
       "EndorsementFeeTransferFailed": "背书费用转账失败。",
       "ProtocolFeeTooHigh": "协议费率过高。",

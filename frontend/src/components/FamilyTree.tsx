@@ -128,9 +128,9 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     const seen = new Set<string>()
 
     try {
-      // First get the total number of versions for this parent using listVersionEndorsements
-      const stats = await contract.listVersionEndorsements(h, 0, 1)
-      let totalVersions = Number(stats.totalVersions || stats[3])
+      // First get the total number of versions for this parent (lightweight: limit=0)
+      const stats = await contract.listPersonVersions(h, 0, 0)
+      let totalVersions = Number((stats as any).totalVersions ?? (stats as any)[1])
       if (!Number.isFinite(totalVersions) || totalVersions < 0) totalVersions = 0
       if (onVersionStats && totalVersions > 0) onVersionStats(h, totalVersions)
 

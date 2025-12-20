@@ -1316,6 +1316,7 @@
       "InvalidParentHash": "부모 해시가 유효하지 않습니다.",
       "MustBeAdult": "해당 인물은 성인이어야 합니다.",
       "TokenContractNotSet": "토큰 컨트랙트가 설정되지 않았습니다.",
+      "ERC721NonexistentToken": "Token ID가 유효하지 않습니다.",
       "InvalidTokenId": "Token ID가 유효하지 않습니다.",
       "EndorsementFeeTransferFailed": "보증 수수료 전송에 실패했습니다.",
       "ProtocolFeeTooHigh": "프로토콜 수수료가 허용 한도를 초과합니다.",

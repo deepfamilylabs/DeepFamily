@@ -85,7 +85,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   // Token-related errors
   error TokenContractNotSet();
-  error InvalidTokenId();
   error EndorsementFeeTransferFailed();
   error ProtocolFeeTooHigh();
   error AlreadyEndorsed();
@@ -464,15 +463,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (versionIndex == 0 || versionIndex > personVersions[personHash].length) {
       revert InvalidVersionIndex();
     }
-    _;
-  }
-
-  /**
-   * @dev Validates tokenId exists
-   * @param tokenId NFT token ID
-   */
-  modifier validTokenId(uint256 tokenId) {
-    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
     _;
   }
 
@@ -1166,9 +1156,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       string memory nftTokenURI
     )
   {
-    if (_ownerOf(tokenId) == address(0)) revert InvalidTokenId();
+    _requireOwned(tokenId);
     personHash = tokenIdToPerson[tokenId];
-    if (personHash == bytes32(0)) revert InvalidTokenId();
 
     versionIndex = tokenIdToVersionIndex[tokenId];
     uint256 arrayIndex = versionIndex - 1;
@@ -1186,7 +1175,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   function getStoryMetadata(
     uint256 tokenId
-  ) external view validTokenId(tokenId) returns (StoryMetadata memory metadata) {
+  ) external view returns (StoryMetadata memory metadata) {
+    _requireOwned(tokenId);
     metadata = storyMetadata[tokenId];
   }
 
@@ -1199,7 +1189,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   function getStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex
-  ) external view validTokenId(tokenId) returns (StoryChunk memory chunk) {
+  ) external view returns (StoryChunk memory chunk) {
+    _requireOwned(tokenId);
     StoryMetadata storage metadata = storyMetadata[tokenId];
     if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
     chunk = storyChunks[tokenId][chunkIndex];
@@ -1211,7 +1202,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param parentHash Parent person hash
    * @param parentVersionIndex Parent version index (0 = unversioned children, >=1 = specific version)
    * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (1-50)
+   * @param limit Return quantity limit (0-100)
    * @return childHashes Children person hash array
    * @return childVersionIndices Children version index array (one-to-one correspondence with hashes)
    * @return totalCount Total children count
@@ -1266,7 +1257,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Query specified person's version basic information, supports pagination to avoid gas attacks
    * @param personHash Person hash
    * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (1-50)
+   * @param limit Return quantity limit (0-100)
    * @return versions Version information array
    * @return totalVersions Total version count
    * @return hasMore Whether there are more versions
@@ -1286,6 +1277,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
+    if (personHash == bytes32(0)) revert InvalidPersonHash();
     PersonVersion[] storage allVersions = personVersions[personHash];
     totalVersions = allVersions.length;
 
@@ -1309,7 +1301,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Used for frontend display of version credibility ranking, supports pagination to avoid gas attacks
    * @param personHash Person hash
    * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (1-50)
+   * @param limit Return quantity limit (0-100)
    * @return versionIndices Version index array
    * @return endorsementCounts Corresponding endorsement count array
    * @return tokenIds Corresponding NFT TokenID array (0 means not minted)
@@ -1333,6 +1325,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
+    if (personHash == bytes32(0)) revert InvalidPersonHash();
     totalVersions = personVersions[personHash].length;
 
     PaginationResult memory page = _getPaginationParams(totalVersions, offset, limit);
@@ -1374,7 +1367,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @dev Returns list of person hashes and their currently endorsed version indices
    * @param user User address to query
    * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (1-100)
+   * @param limit Return quantity limit (0-100)
    * @return personHashes Array of person hashes the user has endorsed
    * @return versionIndices Array of version indices currently endorsed (starts from 1)
    * @return endorsementCounts Array of total endorsement counts for each version
@@ -1458,6 +1451,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     view
     returns (string[] memory uris, uint256 totalCount, bool hasMore, uint256 nextOffset)
   {
+    _requireOwned(tokenId);
     string[] storage all = tokenURIHistory[tokenId];
     totalCount = all.length;
 
@@ -1491,9 +1485,9 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   )
     external
     view
-    validTokenId(tokenId)
     returns (StoryChunk[] memory chunks, uint256 totalChunks, bool hasMore, uint256 nextOffset)
   {
+    _requireOwned(tokenId);
     StoryMetadata storage metadata = storyMetadata[tokenId];
     totalChunks = metadata.totalChunks;
 

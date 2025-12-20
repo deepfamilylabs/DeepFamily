@@ -508,19 +508,6 @@ export function useContract() {
     }
   }, [contract, toast, t])
 
-  const listVersionEndorsements = useCallback(async (personHash: string, offset: number, pageSize: number) => {
-    if (!contract) return null
-    
-    try {
-      const result = await contract.listVersionEndorsements(personHash, offset, pageSize)
-      return result
-    } catch (error) {
-      console.error('Failed to get endorsement stats:', sanitizeErrorForLogging(error))
-      console.warn(t('contract.queryFailed', 'Failed to query data'))
-      return null
-    }
-  }, [contract, toast, t])
-
   const getVersionDetails = useCallback(async (personHash: string, versionIndex: number) => {
     if (!contract) return null
     
@@ -580,7 +567,6 @@ export function useContract() {
     
     // Read methods
     listPersonVersions,
-    listVersionEndorsements,
     getVersionDetails,
     getNFTDetails,
     getPersonHash,

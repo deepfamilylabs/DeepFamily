@@ -1316,6 +1316,7 @@
       "InvalidParentHash": "親ハッシュが無効です。",
       "MustBeAdult": "人物は成人である必要があります。",
       "TokenContractNotSet": "トークンコントラクトが設定されていません。",
+      "ERC721NonexistentToken": "Token ID が無効です。",
       "InvalidTokenId": "Token ID が無効です。",
       "EndorsementFeeTransferFailed": "背書手数料の送金に失敗しました。",
       "ProtocolFeeTooHigh": "プロトコル手数料が上限を超えています。",
