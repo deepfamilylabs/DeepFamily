@@ -77,7 +77,6 @@ export type FetchSubtreeOptions = {
   adaptiveConcurrency?: boolean
   minParallel?: number
   maxParallel?: number
-  deduplicateChildren?: boolean // true: show highest-endorsed version only, false: keep every version
   onVersionStats?: (personHash: string, totalVersions: number) => void // Callback when totalVersions is fetched
 }
 
@@ -94,12 +93,11 @@ export interface WalkerMetrics {
   parallel: number
 }
 
-function createTreeLoader(params: { contract: ethers.Contract; pageSize: number; signal?: AbortSignal; onStats?: (m: WalkerMetrics)=>void; metricsRef: React.MutableRefObject<WalkerMetrics>; statsIntervalMs?: number; deduplicateChildren?: boolean; onVersionStats?: (personHash: string, totalVersions: number) => void }) {
-  const { contract, pageSize, signal, onStats, metricsRef, statsIntervalMs, deduplicateChildren = true, onVersionStats } = params
+function createTreeLoader(params: { contract: ethers.Contract; pageSize: number; signal?: AbortSignal; onStats?: (m: WalkerMetrics)=>void; metricsRef: React.MutableRefObject<WalkerMetrics>; statsIntervalMs?: number; onVersionStats?: (personHash: string, totalVersions: number) => void }) {
+  const { contract, pageSize, signal, onStats, metricsRef, statsIntervalMs, onVersionStats } = params
   const versionCache = new Map<string, { tag?: string }>()
-  const childrenCache = new Map<string, { childHashes: string[]; childVersionIndices: (number|bigint)[]; hasMore: boolean; nextOffset: number; pageOffset: number }>()
-  const unversionedChildrenCache = new Map<string, { childHashes: string[]; childVersionIndices: number[] }>()
-  const bestVersionCache = new Map<string, number>()
+  const childrenCache = new Map<string, { childHashes: string[]; childVersionIndices: number[]; hasMore: boolean; nextOffset: number; pageOffset: number }>()
+  const allChildrenCache = new Map<string, { childHashes: string[]; childVersionIndices: number[] }>()
   const key = (h: string, v: number) => `${h.toLowerCase()}-v-${v}`
   const checkAbort = () => { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError') }
   let lastStatsEmit = 0
@@ -118,81 +116,23 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     return versionCache.get(k)!
   }
 
-  async function getBestVersion(personHash: string): Promise<number> {
-    checkAbort()
-    const cacheKey = personHash.toLowerCase()
-    if (bestVersionCache.has(cacheKey)) {
-      return bestVersionCache.get(cacheKey)!
-    }
-    try {
-      const stats = await contract.listVersionEndorsements(personHash, 0, 100)
-      let bestVersion = 1
-      let maxEndorsements = -1
-      for (let i = 0; i < stats.versionIndices.length; i++) {
-        const versionIndex = Number(stats.versionIndices[i])
-        const endorsementCount = Number(stats.endorsementCounts[i])
-        if (endorsementCount > maxEndorsements) {
-          maxEndorsements = endorsementCount
-          bestVersion = versionIndex
-        }
-      }
-      bestVersionCache.set(cacheKey, bestVersion)
-      return bestVersion
-    } catch (e) {
-      bestVersionCache.set(cacheKey, 1)
-      return 1
-    }
-  }
-
-  async function loadUnversionedChildren(h: string) {
-    checkAbort()
-    const cacheKey = h.toLowerCase()
-    if (unversionedChildrenCache.has(cacheKey)) {
-      return unversionedChildrenCache.get(cacheKey)!
-    }
-
-    const collectedHashes: string[] = []
-    const collectedVersions: number[] = []
-    let offset = 0
-
-    try {
-      while (true) {
-        checkAbort()
-        const response = await contract.listChildren(h, 0, offset, pageSize)
-        const hashes = response[0] as string[]
-        const versions = response[1] as (number | bigint)[]
-        for (let i = 0; i < hashes.length; i++) {
-          collectedHashes.push(hashes[i])
-          collectedVersions.push(Number(versions[i]))
-        }
-        const hasMore = Boolean(response[3])
-        const nextOffset = Number(response[4])
-        if (!hasMore || nextOffset === offset) break
-        offset = nextOffset
-      }
-    } catch {
-      // Swallow errors and treat as no unversioned children
-    }
-
-    const entry = { childHashes: collectedHashes, childVersionIndices: collectedVersions }
-    unversionedChildrenCache.set(cacheKey, entry)
-    return entry
-  }
-
   async function loadAllChildrenAcrossVersions(h: string): Promise<{ childHashes: string[]; childVersionIndices: number[] }> {
     checkAbort()
-    const cacheKey = `${h.toLowerCase()}:all-versions`
-    if (unversionedChildrenCache.has(cacheKey)) {
-      return unversionedChildrenCache.get(cacheKey)!
+    const cacheKey = h.toLowerCase()
+    if (allChildrenCache.has(cacheKey)) {
+      return allChildrenCache.get(cacheKey)!
     }
 
     const collectedHashes: string[] = []
     const collectedVersions: number[] = []
+    const seen = new Set<string>()
 
     try {
       // First get the total number of versions for this parent using listVersionEndorsements
       const stats = await contract.listVersionEndorsements(h, 0, 1)
-      const totalVersions = Number(stats.totalVersions || stats[3])
+      let totalVersions = Number(stats.totalVersions || stats[3])
+      if (!Number.isFinite(totalVersions) || totalVersions < 0) totalVersions = 0
+      if (onVersionStats && totalVersions > 0) onVersionStats(h, totalVersions)
 
       // Query children for v=0 and all parent versions (v=1, v=2, ...)
       for (let parentVer = 0; parentVer <= totalVersions; parentVer++) {
@@ -203,8 +143,13 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
           const hashes = response[0] as string[]
           const versions = response[1] as (number | bigint)[]
           for (let i = 0; i < hashes.length; i++) {
-            collectedHashes.push(hashes[i])
-            collectedVersions.push(Number(versions[i]))
+            const ch = hashes[i]
+            const cv = Number(versions[i])
+            const sk = `${ch.toLowerCase()}-v-${cv}`
+            if (seen.has(sk)) continue
+            seen.add(sk)
+            collectedHashes.push(ch)
+            collectedVersions.push(cv)
           }
           const hasMore = Boolean(response[3])
           const nextOffset = Number(response[4])
@@ -217,98 +162,25 @@ function createTreeLoader(params: { contract: ethers.Contract; pageSize: number;
     }
 
     const entry = { childHashes: collectedHashes, childVersionIndices: collectedVersions }
-    unversionedChildrenCache.set(cacheKey, entry)
+    allChildrenCache.set(cacheKey, entry)
     return entry
   }
 
   async function loadChildrenPage(h: string, v: number, offset: number) {
     checkAbort()
-    const cacheKey = `${key(h,v)}:o:${offset}:dedup:${deduplicateChildren ? 1 : 0}`
+    const cacheKey = `${h.toLowerCase()}:o:${offset}`
     const start = performance.now()
     if (childrenCache.has(cacheKey)) { metricsRef.current.childrenCacheHits++; emit(start); return childrenCache.get(cacheKey)! }
     metricsRef.current.childrenCacheMisses++
     try {
-      const r = await contract.listChildren(h, v, offset, pageSize)
-      let childHashes = r[0] as string[]
-      let childVersionIndices = r[1] as (number|bigint)[]
-
-      // When deduplication is disabled, load children from ALL parent versions
-      // This ensures all versions are visible (e.g., a child version might be under a specific fatherVersionIndex)
-      if (!deduplicateChildren && offset === 0) {
-        const allChildren = await loadAllChildrenAcrossVersions(h)
-        childHashes = allChildren.childHashes
-        childVersionIndices = allChildren.childVersionIndices
-      } else if (deduplicateChildren && v !== 0) {
-        // When deduplication is enabled, merge unversioned children (v=0) with versioned children
-        // This ensures children added with fatherVersionIndex=0 are visible
-        const zeroChildren = await loadUnversionedChildren(h)
-        if (zeroChildren.childHashes.length) {
-          childHashes = childHashes.concat(zeroChildren.childHashes)
-          childVersionIndices = childVersionIndices.concat(zeroChildren.childVersionIndices)
-        }
-      }
-
-      // Deduplication & version resolution (controlled by deduplicateChildren option)
-      if (deduplicateChildren) {
-        const childMap = new Map<string, { hash: string; versions: number[] }>()
-
-        // First pass: collect all versions of each personHash that exist under this parent
-        for (let i = 0; i < childHashes.length; i++) {
-          const childHash = childHashes[i].toLowerCase()
-          let childVersion = Number(childVersionIndices[i])
-
-          if (childMap.has(childHash)) {
-            const existing = childMap.get(childHash)!
-            existing.versions.push(childVersion)
-          } else {
-            childMap.set(childHash, { hash: childHashes[i], versions: [childVersion] })
-          }
-        }
-
-        // Second pass: for all children, fetch totalVersions and find best version
-        const finalChildren: Array<{ hash: string; version: number }> = []
-        for (const [, entry] of childMap.entries()) {
-          // Always fetch endorsement stats to get totalVersions (for badge display)
-          const stats = await contract.listVersionEndorsements(entry.hash, 0, 100)
-
-          const endorsementMap = new Map<number, number>()
-          const versionIndices = stats.versionIndices || stats[0]
-          const endorsementCounts = stats.endorsementCounts || stats[1]
-          const totalVersions = Number(stats.totalVersions || stats[3] || 0)
-
-          // Store totalVersions for this personHash (needed for multi-version badge)
-          if (onVersionStats && totalVersions > 0) {
-            onVersionStats(entry.hash, totalVersions)
-          }
-
-          for (let i = 0; i < versionIndices.length; i++) {
-            endorsementMap.set(Number(versionIndices[i]), Number(endorsementCounts[i]))
-          }
-
-          if (entry.versions.length > 1) {
-            // Multiple versions under this parent: find best version among them
-            let bestVersion = entry.versions[0]
-            let maxEndorsements = endorsementMap.get(bestVersion) ?? 0
-            for (const ver of entry.versions) {
-              const endorsements = endorsementMap.get(ver) ?? 0
-              if (endorsements > maxEndorsements || (endorsements === maxEndorsements && ver < bestVersion)) {
-                maxEndorsements = endorsements
-                bestVersion = ver
-              }
-            }
-            finalChildren.push({ hash: entry.hash, version: bestVersion })
-          } else {
-            // Only one version under this parent, keep it
-            finalChildren.push({ hash: entry.hash, version: entry.versions[0] })
-          }
-        }
-
-        // Rebuild deduplicated arrays
-        childHashes = finalChildren.map(c => c.hash)
-        childVersionIndices = finalChildren.map(c => c.version)
-      }
-
-      const entry = { childHashes, childVersionIndices, hasMore: Boolean(r[3]), nextOffset: Number(r[4]), pageOffset: offset }
+      const allChildren = await loadAllChildrenAcrossVersions(h)
+      const startIdx = Math.max(0, offset)
+      const endIdx = Math.max(startIdx, startIdx + pageSize)
+      const childHashes = allChildren.childHashes.slice(startIdx, endIdx)
+      const childVersionIndices = allChildren.childVersionIndices.slice(startIdx, endIdx)
+      const hasMore = endIdx < allChildren.childHashes.length
+      const nextOffset = hasMore ? endIdx : offset
+      const entry = { childHashes, childVersionIndices, hasMore, nextOffset, pageOffset: offset }
       childrenCache.set(cacheKey, entry)
       return entry
     } catch {
@@ -346,7 +218,7 @@ async function* walkSubtree(
   const minParallel = Math.max(1, options?.minParallel ?? 1)
   const maxParallel = Math.max(minParallel, options?.maxParallel ?? parallel * 2)
   const metricsRef = { current: { created:0, visited:0, depth:0, versionCacheHits:0, versionCacheMisses:0, childrenCacheHits:0, childrenCacheMisses:0, avgVersionMs:0, avgChildrenMs:0, parallel } as WalkerMetrics }
-  const { loadVersion, loadChildrenPage, key, checkAbort } = createTreeLoader({ contract, pageSize, signal, onStats, metricsRef, statsIntervalMs: options?.statsIntervalMs, deduplicateChildren: options?.deduplicateChildren, onVersionStats: options?.onVersionStats })
+  const { loadVersion, loadChildrenPage, key, checkAbort } = createTreeLoader({ contract, pageSize, signal, onStats, metricsRef, statsIntervalMs: options?.statsIntervalMs, onVersionStats: options?.onVersionStats })
   if (signal?.aborted) throw new DOMException('Aborted','AbortError')
   const visited = new Set<string>()
   const root: GraphNode = { personHash, versionIndex, children: [] }

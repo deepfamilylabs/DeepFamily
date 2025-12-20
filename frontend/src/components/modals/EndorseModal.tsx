@@ -6,6 +6,7 @@ import { useWallet } from '../../context/WalletContext'
 import { ethers } from 'ethers'
 import { useSearchParams } from 'react-router-dom'
 import { getFriendlyError } from '../../lib/errors'
+import { useTreeData } from '../../context/TreeDataContext'
 
 interface EndorseModalProps {
   isOpen: boolean
@@ -28,6 +29,7 @@ export default function EndorseModal({
   const { t } = useTranslation()
   const { address, signer } = useWallet()
   const { endorseVersion, getVersionDetails, getNFTDetails, contract } = useContract()
+  const { bumpEndorsementCount } = useTreeData()
   const [searchParams] = useSearchParams()
   
   // ===== Internal state - fully self-contained, follows modal lifecycle =====
@@ -56,6 +58,12 @@ export default function EndorseModal({
   const [isTargetValidOnChain, setIsTargetValidOnChain] = useState<boolean>(false)
   const [isNFTMinted, setIsNFTMinted] = useState<boolean>(false)
   const [displayName, setDisplayName] = useState<string>('')
+
+  const didPatchCacheRef = useRef(false)
+  useEffect(() => {
+    if (!isOpen) return
+    didPatchCacheRef.current = false
+  }, [isOpen])
   
   // Result state
   const [successResult, setSuccessResult] = useState<{
@@ -544,6 +552,10 @@ export default function EndorseModal({
 
           setCurrentEndorsementCount(prev => prev + 1)
           setHasEndorsed(true)
+          if (!didPatchCacheRef.current && targetPersonHash && targetVersionIndex) {
+            didPatchCacheRef.current = true
+            bumpEndorsementCount(targetPersonHash, Number(targetVersionIndex), 1)
+          }
           // Update user balance (best effort UI hint)
           const newBalance = parseFloat(userDeepBalance) - parseFloat(deepTokenFee)
           if (!Number.isNaN(newBalance)) setUserDeepBalance(newBalance.toString())
