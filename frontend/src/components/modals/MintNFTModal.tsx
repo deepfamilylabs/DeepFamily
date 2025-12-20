@@ -12,12 +12,14 @@ import { useSearchParams } from 'react-router-dom'
 import PersonHashCalculator from '../PersonHashCalculator'
 import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
 import { getFriendlyError, sanitizeErrorForLogging } from '../../lib/errors'
+import { useTreeData } from '../../context/TreeDataContext'
 import {
   formatGroth16ProofForContract,
   toBigIntArray
 } from '../../lib/zk'
 import { zkWorkerCall } from '../../lib/zkWorkerClient'
 import { normalizeNameForHash, normalizePassphraseForHash } from '../../lib/passphraseStrength'
+import { makeNodeId, type NodeData } from '../../types/graph'
 
 // Simple themed select component (from PersonHashCalculator)
 const ThemedSelect: React.FC<{
@@ -195,6 +197,7 @@ export default function MintNFTModal({
   const { t } = useTranslation()
   const { address } = useWallet()
   const { mintPersonNFT, getVersionDetails, contract, getPersonHash } = useContract()
+  const { setNodesData } = useTreeData()
 
   // Create schema with translations
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t])
@@ -237,6 +240,12 @@ export default function MintNFTModal({
   const [consentError, setConsentError] = useState<string | null>(null)
   const [contractError, setContractError] = useState<any>(null)
   const [proofGenerationStep, setProofGenerationStep] = useState<string>('')
+
+  const didPatchCacheRef = useRef(false)
+  useEffect(() => {
+    if (!isOpen) return
+    didPatchCacheRef.current = false
+  }, [isOpen])
   
   // Person basic info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<{
@@ -620,6 +629,24 @@ export default function MintNFTModal({
         
         if (mintedEvent && tokenId === 0) {
           tokenId = Number(mintedEvent.args?.tokenId ?? 0)
+        }
+
+        if (!didPatchCacheRef.current && tokenId > 0 && finalPersonHash && Number.isFinite(finalVersionIndex) && finalVersionIndex > 0) {
+          didPatchCacheRef.current = true
+          try {
+            setNodesData?.(prev => {
+              const id = makeNodeId(finalPersonHash, finalVersionIndex)
+              const cur: NodeData = (prev[id] || { personHash: finalPersonHash!, versionIndex: finalVersionIndex, id }) as any
+              return {
+                ...prev,
+                [id]: {
+                  ...cur,
+                  tokenId: String(tokenId),
+                  nftTokenURI: processedData.tokenURI || cur.nftTokenURI
+                }
+              }
+            })
+          } catch {}
         }
 
         setSuccessResult({

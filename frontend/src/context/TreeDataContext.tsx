@@ -12,6 +12,7 @@ import { useErrorMonitor } from '../hooks/useErrorMonitor'
 import { useVizOptions } from './VizOptionsContext'
 import { NodeData } from '../types/graph'
 import { computeStoryHash } from '../lib/story'
+import { projectDeduplicatedRoot } from '../utils/treeProjection'
 
 // Reuse provider instances to avoid repeated network detection / socket exhaustion
 const providerCache = new Map<string, ethers.JsonRpcProvider>()
@@ -23,6 +24,7 @@ interface TreeDataValue {
   progress?: TreeProgress
   contractMessage: string
   refresh: () => void
+  invalidateTreeRootCache: () => void
   errors: ReturnType<typeof useErrorMonitor>['errors']
   includeVersionDetails: boolean
   nodesData: Record<string, NodeData>
@@ -45,7 +47,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex, strictCacheOnly, chainId } = useConfig()
   const { traversal, includeVersionDetails, deduplicateChildren } = useVizOptions()
-  const [root, setRoot] = useState<GraphNode | null>(null)
+  const [baseRoot, setBaseRoot] = useState<GraphNode | null>(null)
   // Synchronous bootstrap for nodesData from localStorage (ensures details available even in strict mode on first paint)
   const initialNodesDataRef = useRef<Record<string, NodeData> | null>(null)
   if (initialNodesDataRef.current === null) {
@@ -73,14 +75,14 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       setLoadOptionsSnapshot(s => s.includeVersionDetails ? s : { ...s, includeVersionDetails: true })
     }
   }, [includeVersionDetails, loadOptionsSnapshot.includeVersionDetails])
-  const optionsRef = useRef({ traversal, deduplicateChildren })
+  const optionsRef = useRef({ traversal })
   useEffect(() => {
     const o = optionsRef.current
-    if (o.traversal !== traversal || o.deduplicateChildren !== deduplicateChildren) {
-      optionsRef.current = { traversal, deduplicateChildren }
+    if (o.traversal !== traversal) {
+      optionsRef.current = { traversal }
       refresh()
     }
-  }, [traversal, deduplicateChildren, refresh])
+  }, [traversal, refresh])
 
   // Provider + contract (memoized & cached)
   const provider = useMemo(() => {
@@ -112,8 +114,17 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const vizRootKey = useMemo(() => {
     const rh = rootHash || 'no-root'
     const rv = Number(rootVersionIndex) || 0
+    // v2: store the "base root" (all-versions) representation; deduplication is now a view-only projection
+    return `${storageNS}::vizRoot.v2::${rh}::${rv}`
+  }, [storageNS, rootHash, rootVersionIndex])
+
+  const legacyVizRootKey = useMemo(() => {
+    const rh = rootHash || 'no-root'
+    const rv = Number(rootVersionIndex) || 0
     return `${storageNS}::vizRoot::${rh}::${rv}`
   }, [storageNS, rootHash, rootVersionIndex])
+
+  const loadedRootFromLegacyRef = useRef(false)
 
   const persistNodesData = useCallback((data: Record<string, NodeData>) => {
     try { localStorage.setItem(`${storageNS}::nodesData`, JSON.stringify(data)) } catch {}
@@ -140,44 +151,62 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   // Load persisted root tree first (scoped by rootHash+version). If no cache for current key, clear root to avoid stale display
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(vizRootKey)
-      if (raw) {
-        const obj = JSON.parse(raw) as GraphNode
-        const matchesKey = (
-          typeof rootHash === 'string' && obj?.personHash && obj.personHash.toLowerCase() === rootHash.toLowerCase() &&
-          Number(obj?.versionIndex) === Number(rootVersionIndex)
-        )
-        if (matchesKey) {
-          setRoot(obj)
-        } else {
-          // Stale or mis-keyed cache -> remove and clear
-          try { localStorage.removeItem(vizRootKey) } catch {}
-          setRoot(null)
+      const matchesKey = (obj: any) => (
+        typeof rootHash === 'string' && obj?.personHash && obj.personHash.toLowerCase() === rootHash.toLowerCase() &&
+        Number(obj?.versionIndex) === Number(rootVersionIndex)
+      )
+
+      const rawV2 = localStorage.getItem(vizRootKey)
+      if (rawV2) {
+        const obj = JSON.parse(rawV2) as GraphNode
+        if (matchesKey(obj)) {
+          loadedRootFromLegacyRef.current = false
+          setBaseRoot(obj)
+          return
         }
-      } else {
-        // No cache for this rootHash+version -> clear any previous root to prevent stale data
-        setRoot(null)
+        // Stale or mis-keyed cache -> remove and clear
+        try { localStorage.removeItem(vizRootKey) } catch {}
       }
+
+      // Fallback to legacy key (v1) so strict-cache mode can still render offline;
+      // online mode should revalidate and repopulate v2.
+      const rawLegacy = localStorage.getItem(legacyVizRootKey)
+      if (rawLegacy) {
+        const obj = JSON.parse(rawLegacy) as GraphNode
+        if (matchesKey(obj)) {
+          loadedRootFromLegacyRef.current = true
+          setBaseRoot(obj)
+          return
+        }
+      }
+
+      // No cache for this rootHash+version -> clear any previous root to prevent stale data
+      loadedRootFromLegacyRef.current = false
+      setBaseRoot(null)
     } catch {
       /* ignore */
     }
-  }, [vizRootKey, rootHash, rootVersionIndex])
+  }, [vizRootKey, legacyVizRootKey, rootHash, rootVersionIndex])
 
   // Persist root tree whenever it changes (non-null)
   useEffect(() => {
-    if (!root) return
+    if (!baseRoot) return
     // Only persist when the in-memory root matches the current config (rootHash+version)
     const matchesCurrentConfig = (
-      typeof rootHash === 'string' && rootHash.toLowerCase() === String(root.personHash || '').toLowerCase() &&
-      Number(rootVersionIndex) === Number(root.versionIndex)
+      typeof rootHash === 'string' && rootHash.toLowerCase() === String(baseRoot.personHash || '').toLowerCase() &&
+      Number(rootVersionIndex) === Number(baseRoot.versionIndex)
     )
     if (!matchesCurrentConfig) return
-    try { localStorage.setItem(vizRootKey, JSON.stringify(root)) } catch {}
-  }, [root, vizRootKey, rootHash, rootVersionIndex])
+    try { localStorage.setItem(vizRootKey, JSON.stringify(baseRoot)) } catch {}
+    if (loadedRootFromLegacyRef.current) {
+      loadedRootFromLegacyRef.current = false
+      try { localStorage.removeItem(legacyVizRootKey) } catch {}
+    }
+  }, [baseRoot, vizRootKey, legacyVizRootKey, rootHash, rootVersionIndex])
 
   // Hydrate nodesData from localStorage snapshot for nodes present in current root (no network)
   useEffect(() => {
-    if (!root) return
+    if (!baseRoot) return
     try {
       const raw = localStorage.getItem(`${storageNS}::nodesData`)
       if (!raw) return
@@ -193,7 +222,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         }
         return acc
       }
-      const ids = collectIds(root)
+      const ids = collectIds(baseRoot)
       if (!ids.length) return
       setNodesData(prev => {
         let changed = false
@@ -215,7 +244,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         return changed ? next : prev
       })
     } catch {}
-  }, [root, storageNS])
+  }, [baseRoot, storageNS])
 
   // Root + base streaming load
   useEffect(() => {
@@ -225,11 +254,11 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (strictCacheOnly) return
     
     // Check if we already have complete cached data (three-tier cache check)
-    const hasMemoryCache = root &&
-      typeof rootHash === 'string' && root.personHash.toLowerCase() === rootHash.toLowerCase() &&
-      Number(root.versionIndex) === Number(rootVersionIndex)
+    const hasMemoryCache = baseRoot &&
+      typeof rootHash === 'string' && baseRoot.personHash.toLowerCase() === rootHash.toLowerCase() &&
+      Number(baseRoot.versionIndex) === Number(rootVersionIndex)
 
-    if (hasMemoryCache) {
+    if (hasMemoryCache && !loadedRootFromLegacyRef.current) {
       // Memory cache hit - no need to load, but clear any previous error message
       setContractMessage('')
       return
@@ -249,7 +278,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           // Local storage cache hit - accept cached root (even if children may be empty)
           // Root structure is persisted progressively during streaming; accepting it avoids
           // unnecessary network calls on reload when cache is already present.
-          setRoot(cachedRoot)
+          loadedRootFromLegacyRef.current = false
+          setBaseRoot(cachedRoot)
           // Clear any previous error message when using cached data
           setContractMessage('')
           return
@@ -274,7 +304,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       // Only now that config is valid, enter familyTree loading state and clear prior viz state
       setLoading(true)
       setLoadOptionsSnapshot({ includeVersionDetails })
-      setRoot(null)
+      loadedRootFromLegacyRef.current = false
+      setBaseRoot(null)
       // Preserve existing nodesData cache to avoid blowing away PersonPage/story caches
       setContractMessage('')
       setProgress(undefined)
@@ -341,7 +372,6 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           traversal: trv,
           maxDepth: getRuntimeFamilyTreeConfig().DEFAULT_MAX_DEPTH,
           hardNodeLimit: getRuntimeFamilyTreeConfig().DEFAULT_HARD_NODE_LIMIT,
-          deduplicateChildren,
           onProgress: stats => { if (!cancelled) setProgress(stats) },
           onNode: n => {
             if (!rootNode) rootNode = n
@@ -385,7 +415,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           const now = performance.now()
             emitted++
           if (now - lastUpdate > 60 || emitted % 25 === 0) {
-            setRoot(prev => {
+            setBaseRoot(prev => {
               if (!prev) return rootNode ? { ...rootNode } : null
               // shallow compare child count & hash/version to skip redundant updates
               if (prev.personHash === rootNode!.personHash && prev.versionIndex === rootNode!.versionIndex && (prev.children?.length || 0) === (rootNode!.children?.length || 0)) return prev
@@ -395,7 +425,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           }
         }
         if (!cancelled && rootNode) {
-          setRoot(prev => {
+          setBaseRoot(prev => {
             const rn = rootNode as GraphNode
             if (!prev) return { ...rn }
             if (prev.personHash === rn.personHash && prev.versionIndex === rn.versionIndex && (prev.children?.length || 0) === (rn.children?.length || 0)) return prev
@@ -434,25 +464,30 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       controller.abort() 
       setLoading(l => l ? false : l)
     }
-  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, deduplicateChildren, t, push, includeVersionDetails, strictCacheOnly])
+  }, [contract, rootHash, rootVersionIndex, refreshTick, traversal, t, push, includeVersionDetails, strictCacheOnly, provider, vizRootKey])
 
   const nodePairs = useMemo(() => {
-    if (!root) return [] as Array<{ h: string; v: number }>
+    if (!baseRoot) return [] as Array<{ h: string; v: number }>
     const acc: Array<{ h: string, v: number }> = []
-    const stack: GraphNode[] = [root]
+    const stack: GraphNode[] = [baseRoot]
     while (stack.length) {
       const n = stack.pop() as GraphNode
       acc.push({ h: n.personHash, v: Number(n.versionIndex) })
       if (n.children) for (const c of n.children) stack.push(c)
     }
     return acc
-  }, [root])
+  }, [baseRoot])
+
+  const [endorsementsReady, setEndorsementsReady] = useState(false)
+  useEffect(() => {
+    setEndorsementsReady(false)
+  }, [vizRootKey, baseRoot?.personHash, baseRoot?.versionIndex])
 
   // Endorsement counts
   useEffect(() => {
     if (strictCacheOnly) return
     if (!loadOptionsSnapshot.includeVersionDetails) return
-    if (loading || !contract || !root) return
+    if (loading || !contract || !baseRoot) return
     let cancelled = false
     ;(async () => {
       const BATCH = getRuntimeFamilyTreeConfig().ENDORSEMENT_STATS_BATCH
@@ -476,6 +511,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           return !!nd && nd.endorsementCount !== undefined && nd.tokenId !== undefined
         })
         if (allSatisfied) {
+          if (!cancelled) setEndorsementsReady(true)
           // Backfill node details missing from memory but present in local snapshot, maintain nodesData as single source of truth
           if (snapshot) {
             setNodesData(prev => {
@@ -691,9 +727,59 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           if (!stageLoggedRef.current.has('counts_batch')) { stageLoggedRef.current.add('counts_batch'); push(e as any, { stage: 'counts_batch' }) }
         }
       }
+      if (!cancelled) setEndorsementsReady(true)
     })()
     return () => { cancelled = true }
-  }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, root, nodePairs, contractAddress, provider, push, strictCacheOnly])
+  }, [loadOptionsSnapshot.includeVersionDetails, loading, contract, baseRoot, nodePairs, contractAddress, provider, push, strictCacheOnly])
+
+  // Ensure totalVersions is available for the currently selected root version (for T{n}:v{idx} badge),
+  // even when the root has no children (onVersionStats would never fire in that case).
+  useEffect(() => {
+    if (strictCacheOnly) return
+    if (!contract || !baseRoot) return
+    let cancelled = false
+    ;(async () => {
+      const h = baseRoot.personHash
+      const v = Number(baseRoot.versionIndex)
+      if (!h || !/^0x[0-9a-fA-F]{64}$/.test(h) || !Number.isFinite(v) || v <= 0) return
+      try {
+        const stats: any = await (contract as any).listVersionEndorsements(h, 0, 1)
+        const tv = stats.totalVersions ?? stats[3]
+        const totalVersions = Number(tv ?? 0)
+        if (!Number.isFinite(totalVersions) || totalVersions <= 1) return
+        if (cancelled) return
+        setNodesData(prev => {
+          const key = h.toLowerCase()
+          const next = { ...prev }
+          let changed = false
+
+          // Update any existing entries for this personHash.
+          for (const [id, nd] of Object.entries(next)) {
+            if (nd.personHash.toLowerCase() === key && nd.totalVersions !== totalVersions) {
+              next[id] = { ...nd, totalVersions }
+              changed = true
+            }
+          }
+
+          // Ensure the currently selected version entry exists and has totalVersions.
+          const curId = makeNodeId(h, v)
+          const cur = next[curId]
+          if (!cur) {
+            next[curId] = { personHash: h, versionIndex: v, id: curId, totalVersions }
+            changed = true
+          } else if (cur.totalVersions !== totalVersions) {
+            next[curId] = { ...cur, totalVersions }
+            changed = true
+          }
+
+          return changed ? next : prev
+        })
+      } catch {
+        // ignore
+      }
+    })()
+    return () => { cancelled = true }
+  }, [baseRoot, contract, strictCacheOnly])
 
   // Fetch minimal NodeData by tokenId for cold-start deep links (moved above getStoryData to avoid TS hoisting issue)
   const getNodeByTokenId = useCallback(async (tokenId: string): Promise<NodeData | null> => {
@@ -945,13 +1031,25 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   // Clear nodesData + story + owner caches for current namespace
   const clearAllCaches = useCallback(() => {
     setNodesData({})
-    setRoot(null)
+    setBaseRoot(null)
     setProgress(undefined)
     try {
       localStorage.removeItem(`${storageNS}::nodesData`)
       localStorage.removeItem(vizRootKey)
+      localStorage.removeItem(legacyVizRootKey)
     } catch {}
-  }, [])
+  }, [storageNS, vizRootKey, legacyVizRootKey])
+
+  const invalidateTreeRootCache = useCallback(() => {
+    loadedRootFromLegacyRef.current = false
+    setBaseRoot(null)
+    setProgress(undefined)
+    try {
+      localStorage.removeItem(vizRootKey)
+      localStorage.removeItem(legacyVizRootKey)
+    } catch {}
+    refresh()
+  }, [legacyVizRootKey, refresh, vizRootKey])
 
   // Function to preload story data in background
   const preloadStoryData = useCallback((tokenId: string) => {
@@ -994,14 +1092,14 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
   // Derive progress from cached/memory root for fast-path refreshes (no streaming)
   useEffect(() => {
-    if (!root) return
+    if (!baseRoot) return
     if (loading) return
     setProgress(prev => {
       if (prev && prev.created > 0 && prev.depth > 0) return prev
       // compute node count and max depth from current root
       let count = 0
       let maxDepth = 0
-      const stack: Array<{ node: GraphNode; depth: number }> = [{ node: root, depth: 1 }]
+      const stack: Array<{ node: GraphNode; depth: number }> = [{ node: baseRoot, depth: 1 }]
       while (stack.length) {
         const { node, depth } = stack.pop() as { node: GraphNode; depth: number }
         count++
@@ -1012,7 +1110,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       }
       return { created: count, visited: count, depth: maxDepth }
     })
-  }, [refreshTick, root, loading])
+  }, [refreshTick, baseRoot, loading])
 
 
   // Cached ownerOf lookup
@@ -1060,12 +1158,24 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     } catch { return null }
   }, [contract, strictCacheOnly])
 
+  const projectedRoot = useMemo(() => {
+    if (!baseRoot) return null
+    if (!deduplicateChildren) return baseRoot
+    return projectDeduplicatedRoot({
+      root: baseRoot,
+      nodesData,
+      preferStableUntilReady: false,
+      endorsementsReady
+    })
+  }, [baseRoot, deduplicateChildren, endorsementsReady, nodesData])
+
   const value: TreeDataValue = {
-    root,
+    root: projectedRoot,
     loading,
     progress,
     contractMessage,
     refresh,
+    invalidateTreeRootCache,
     errors,
     includeVersionDetails,
     nodesData,

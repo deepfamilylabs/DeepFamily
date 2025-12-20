@@ -7,6 +7,7 @@ import { X, Users, ChevronDown, ChevronRight, UserPlus, Check, AlertTriangle, Sh
 import { ethers } from 'ethers'
 import { useWallet } from '../../context/WalletContext'
 import { useContract } from '../../hooks/useContract'
+import { useTreeData } from '../../context/TreeDataContext'
 import { sha256Hex } from '../../lib/metadataCrypto'
 import PersonHashCalculator, { computePersonHash } from '../PersonHashCalculator'
 import type { PersonHashCalculatorHandle } from '../PersonHashCalculator'
@@ -75,6 +76,7 @@ export default function AddVersionModal({
   const { t } = useTranslation()
   const { signer } = useWallet()
   const { addPersonZK, isContractReady } = useContract()
+  const { invalidateTreeRootCache } = useTreeData()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [consents, setConsents] = useState({ hash: false, age: false, legal: false })
   const [consentError, setConsentError] = useState<string | null>(null)
@@ -601,6 +603,7 @@ export default function AddVersionModal({
           events: result.events
         })
         setProofGenerationStep('')
+        invalidateTreeRootCache()
         onSuccess?.(result)
       }
     } catch (error: any) {
