@@ -4,6 +4,10 @@ export class QueryCache {
   private cache = new Map<string, CacheEntry<any>>()
   private inflight = new Map<string, Promise<any>>()
 
+  getEntry<T>(key: string): CacheEntry<T> | undefined {
+    return this.cache.get(key) as CacheEntry<T> | undefined
+  }
+
   get<T>(key: string, ttlMs: number): T | undefined {
     const entry = this.cache.get(key)
     if (!entry) return undefined
