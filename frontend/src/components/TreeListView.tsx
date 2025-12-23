@@ -9,7 +9,7 @@ import { getGenderColor } from '../constants/genderColors'
 import { buildTreeRows, type TreeRow } from '../utils/treeData'
 import EndorseCompactModal from './modals/EndorseCompactModal'
 
-export default function VirtualizedIdTree({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHeight?: number }) {
+export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHeight?: number }) {
   const familyTreeHeight = useFamilyTreeHeight()
   const { rootId, endorsementsReady, nodesData, edgesUnion, edgesStrict, bumpEndorsementCount } = useTreeData()
   const { openNode, selected } = useNodeDetail()

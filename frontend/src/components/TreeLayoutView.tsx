@@ -14,7 +14,7 @@ import { useVizOptions } from '../context/VizOptionsContext'
 import EndorseCompactModal from './modals/EndorseCompactModal'
 import { buildViewGraphData, type TreeGraphData, type TreeWalkParams } from '../utils/treeData'
 
-export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
+export interface TreeLayoutViewHandle { centerOnNode: (id: string) => void }
 
 const BASE_NODE_WIDTH = 112
 const NODE_HEIGHT = 160
@@ -72,7 +72,7 @@ function computeLayout(params: { graph: TreeGraphData; rootId: NodeId | null }) 
   return { nodes, edges, width, height }
 }
 
-function MerkleTreeViewInner(_: { }, ref: React.Ref<MerkleTreeViewHandle>) {
+function TreeLayoutViewInner(_: { }, ref: React.Ref<TreeLayoutViewHandle>) {
   const { rootId, nodesData, edgesUnion, edgesStrict, endorsementsReady, bumpEndorsementCount } = useTreeData()
   const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions()
   const { graph, nodes: positioned, edges, width: svgWidth, height: svgHeight } = useMemo(() => {
@@ -238,5 +238,5 @@ function MerkleTreeViewInner(_: { }, ref: React.Ref<MerkleTreeViewHandle>) {
   )
 }
 
-const MerkleTreeView = forwardRef(MerkleTreeViewInner)
-export default MerkleTreeView
+const TreeLayoutView = forwardRef(TreeLayoutViewInner)
+export default TreeLayoutView

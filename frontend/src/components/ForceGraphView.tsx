@@ -33,9 +33,9 @@ function buildGraph(params: TreeWalkParams) {
   return { nodes: simNodes, links: simLinks }
 }
 
-export interface ForceDAGViewHandle { centerOnNode: (id: string) => void }
+export interface ForceGraphViewHandle { centerOnNode: (id: string) => void }
 
-function ForceDAGViewInner({ height }: { height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
+function ForceGraphViewInner({ height }: { height?: number }, ref: React.Ref<ForceGraphViewHandle>) {
   const responsiveHeight = useFamilyTreeHeight()
   const defaultHeight = height || responsiveHeight
   const { rootId, nodesData, edgesUnion, edgesStrict, endorsementsReady, bumpEndorsementCount } = useTreeData()
@@ -309,5 +309,5 @@ function ForceDAGViewInner({ height }: { height?: number }, ref: React.Ref<Force
   )
 }
 
-const ForceDAGView = forwardRef(ForceDAGViewInner)
-export default ForceDAGView
+const ForceGraphView = forwardRef(ForceGraphViewInner)
+export default ForceGraphView
