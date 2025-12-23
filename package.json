@@ -19,7 +19,7 @@
     "size": "node -e \"console.error('size is not available after Hardhat 3 migration (hardhat-contract-sizer is Hardhat 2-only).'); process.exit(1)\"",
     "lint": "solhint 'contracts/**/*.sol'",
     "lint:fix": "solhint 'contracts/**/*.sol' --fix",
-    "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.{js,mjs}' 'deploy/**/*.{js,mjs}' 'tasks/**/*.{js,mjs}' 'circuits/**/*.js'",
+    "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.{js,mjs}' 'deploy/**/*.{js,mjs}' 'tasks/**/*.{js,mjs}' 'circuits/**/*.js' 'frontend/src/**/*.{ts,tsx,js,jsx,css,md,json}'",
     "prepare": "husky",
     "frontend:config": "npm run config:local --prefix frontend",
     "frontend:dev": "npm run dev --prefix frontend",
