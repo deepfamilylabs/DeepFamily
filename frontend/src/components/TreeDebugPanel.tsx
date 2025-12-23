@@ -18,6 +18,10 @@ export default function TreeDebugPanel() {
   const env: any = (import.meta as any).env || {}
   const edgeTTL = Number(env.VITE_DF_EDGE_TTL_MS || 120_000)
   const tvTTL = Number(env.VITE_DF_TV_TTL_MS || 60_000)
+  const vdTTL = Number(env.VITE_DF_VD_TTL_MS || 300_000)
+  const nftTTL = Number(env.VITE_DF_NFT_TTL_MS || 86_400_000)
+  const storyTTL = Number(env.VITE_DF_STORY_TTL_MS || 300_000)
+  const queryPageLimit = Number(env.VITE_DF_QUERY_PAGE_LIMIT || 200)
   const idbEnabled = env.VITE_USE_INDEXEDDB_CACHE !== '0' && env.VITE_USE_INDEXEDDB_CACHE !== 'false'
   const [debugStats, setDebugStats] = useState(() => {
     const snap = getDebugStats()
@@ -82,6 +86,10 @@ export default function TreeDebugPanel() {
         <Info label="Edges (Strict)" value={stats.strictCount} title="Strict edge cache entries keyed by parent hash + version." />
         <Info label="Edge TTL" value={formatMs(edgeTTL)} title="Edge cache time-to-live before considered stale." />
         <Info label="TV TTL" value={formatMs(tvTTL)} title="Total-versions cache time-to-live before considered stale." />
+        <Info label="VD TTL" value={formatMs(vdTTL)} title="Version-details time-to-live before considered stale." />
+        <Info label="NFT TTL" value={formatMs(nftTTL)} title="NFT-details time-to-live before considered stale." />
+        <Info label="Story TTL" value={formatMs(storyTTL)} title="Story cache time-to-live before considered stale." />
+        <Info label="Page Limit" value={queryPageLimit} title="Max items per paginated contract query (capped at 100)." />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Info label="Inflight" value={debugStats.inflightCount} title="Active cached queries currently in progress." />

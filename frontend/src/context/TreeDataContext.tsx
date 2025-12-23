@@ -24,8 +24,12 @@ const env: any = (import.meta as any).env || {}
 const EDGE_TTL_MS = Number(env.VITE_DF_EDGE_TTL_MS || 120_000)
 const TOTAL_VERSIONS_TTL_MS = Number(env.VITE_DF_TV_TTL_MS || 60_000)
 const VERSION_DETAILS_TTL_MS = Number(env.VITE_DF_VD_TTL_MS || 300_000)
+const NFT_DETAILS_TTL_MS = Number(env.VITE_DF_NFT_TTL_MS || 86_400_000)
+const STORY_TTL_MS = Number(env.VITE_DF_STORY_TTL_MS || 300_000)
 const USE_INDEXEDDB_CACHE = env.VITE_USE_INDEXEDDB_CACHE !== '0' && env.VITE_USE_INDEXEDDB_CACHE !== 'false'
-const CHILDREN_PAGE_LIMIT = 100
+const QUERY_PAGE_LIMIT = Number(env.VITE_DF_QUERY_PAGE_LIMIT || 200)
+const CHILDREN_PAGE_LIMIT = QUERY_PAGE_LIMIT
+const STORY_PAGE_LIMIT = QUERY_PAGE_LIMIT
 const isStale = (fetchedAt?: number, ttlMs?: number) => {
   if (!Number.isFinite(fetchedAt)) return true
   const ttl = Number(ttlMs ?? 0)
@@ -58,7 +62,7 @@ interface TreeDataValue {
   edgesUnion: EdgeStoreUnion
   edgesStrict: EdgeStoreStrict
   setNodesData?: React.Dispatch<React.SetStateAction<Record<string, NodeData>>>
-  getStoryData: (tokenId: string) => Promise<any>
+  getStoryData: (tokenId: string, opts?: { nodeIdHint?: string }) => Promise<any>
   preloadStoryData: (tokenId: string) => void
   getNodeByTokenId: (tokenId: string) => Promise<NodeData | null>
   getOwnerOf: (tokenId: string) => Promise<string | null>
@@ -166,6 +170,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const fetchRunKeyRef = useRef<string | null>(null)
   const queryCacheRef = useRef(new QueryCache())
   const edgeRevalidateRef = useRef(new Set<string>())
+  const storyRevalidateRef = useRef(new Set<string>())
   const eventInterfaceRef = useRef(new ethers.Interface((DeepFamily as any).abi))
   const api = useMemo(() => (contract ? createDeepFamilyApi(contract, queryCacheRef.current) : null), [contract])
 
@@ -758,7 +763,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
             if (!current || current.fullName !== undefined) continue
             try {
               if (!api) throw new Error('Contract not ready')
-              const nftRet = await api.getNFTDetails(item.tokenId)
+              const nftRet = await api.getNFTDetails(item.tokenId, { ttlMs: NFT_DETAILS_TTL_MS })
               const versionFields = nftRet.version
               const coreFields = nftRet.core
               const endorsementCount2 = nftRet.endorsementCount
@@ -908,7 +913,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
     if (!api) return null
     try {
-      const nftRet = await api.getNFTDetails(tokenId)
+      const nftRet = await api.getNFTDetails(tokenId, { ttlMs: NFT_DETAILS_TTL_MS })
       const { personHash, versionIndex, version: versionFields, core: coreFields } = nftRet
       const endorsementCount = nftRet.endorsementCount
       const nftTokenURI = nftRet.nftTokenURI
@@ -952,7 +957,122 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   }, [api, storageNS])
 
   // Function to get story data (cache solely via NodesData)
-  const getStoryData = useCallback(async (tokenId: string) => {
+  const getStoryData = useCallback(async (tokenId: string, opts?: { nodeIdHint?: string }) => {
+    const scheduleStoryRevalidate = (key: string, run: () => Promise<void>) => {
+      if (storyRevalidateRef.current.has(key)) return
+      storyRevalidateRef.current.add(key)
+      run()
+        .catch(() => {})
+        .finally(() => { storyRevalidateRef.current.delete(key) })
+    }
+
+    const fetchAndStoreStory = async (effectiveTokenId: string, nodeIdToUpdate?: string) => {
+      if (!provider || !contractAddress || !contract) throw new Error('Provider or contract address not available')
+
+      const parseStoryChunk = (chunk: any) => ({
+        chunkIndex: Number(chunk?.chunkIndex ?? chunk?.[0] ?? 0),
+        chunkHash: String(chunk?.chunkHash ?? chunk?.[1] ?? ethers.ZeroHash),
+        content: String(chunk?.content ?? chunk?.[2] ?? ''),
+        timestamp: Number(chunk?.timestamp ?? chunk?.[3] ?? 0),
+        editor: String(chunk?.editor ?? chunk?.[4] ?? ethers.ZeroAddress),
+        chunkType: Number(chunk?.chunkType ?? chunk?.[5] ?? 0),
+        attachmentCID: String(chunk?.attachmentCID ?? chunk?.[6] ?? '')
+      })
+
+      const existingNode = nodeIdToUpdate ? nodesDataRef.current[nodeIdToUpdate] : undefined
+      const existingChunks = Array.isArray(existingNode?.storyChunks) ? existingNode!.storyChunks : []
+      const existingMap = new Map<number, any>()
+      for (const c of existingChunks) {
+        const idx = Number((c as any)?.chunkIndex)
+        if (!Number.isFinite(idx) || idx < 0) continue
+        if (!existingMap.has(idx)) existingMap.set(idx, c)
+      }
+
+      const metadata = await contract!.getStoryMetadata(effectiveTokenId)
+      const storyMetadata = {
+        totalChunks: Number(metadata.totalChunks),
+        totalLength: Number(metadata.totalLength),
+        isSealed: Boolean(metadata.isSealed),
+        lastUpdateTime: Number(metadata.lastUpdateTime),
+        fullStoryHash: metadata.fullStoryHash
+      }
+
+      const total = Number(storyMetadata.totalChunks || 0)
+      if (total > 0) {
+        // Prefer `listStoryChunks` to fetch missing chunks in pages (single RPC per page).
+        // Because story chunks are append-only, most misses are a suffix; we start at the first gap.
+        let offset = 0
+        while (existingMap.has(offset)) offset += 1
+        if (offset < total) {
+          let hasMore = true
+          while (hasMore && offset < total) {
+            const out: any = await contract!.listStoryChunks(effectiveTokenId, offset, STORY_PAGE_LIMIT)
+            const rawChunks: any[] = Array.from(out?.chunks ?? out?.[0] ?? [])
+            for (const raw of rawChunks) {
+              const c = parseStoryChunk(raw)
+              if (Number.isFinite(c.chunkIndex) && c.chunkIndex >= 0) existingMap.set(c.chunkIndex, c)
+            }
+            hasMore = Boolean(out?.hasMore ?? out?.[2])
+            const nextOffset = Number(out?.nextOffset ?? out?.[3] ?? 0)
+            if (!Number.isFinite(nextOffset) || nextOffset <= offset) break
+            offset = nextOffset
+          }
+        }
+      }
+
+      const sorted = Array.from(existingMap.values())
+        .filter(c => Number((c as any)?.chunkIndex) < total)
+        .sort((a, b) => Number((a as any).chunkIndex) - Number((b as any).chunkIndex))
+      const missing: number[] = []
+      if (storyMetadata?.totalChunks) {
+        for (let i = 0; i < storyMetadata.totalChunks; i++) {
+          if (!sorted.find(c => c.chunkIndex === i)) missing.push(i)
+        }
+      }
+      const fullStory = sorted.map(c => c.content).join('')
+      const encoder = new TextEncoder()
+      const computedLength = sorted.reduce((acc, c) => acc + encoder.encode(c.content).length, 0)
+      const lengthMatch = storyMetadata?.totalLength ? computedLength === storyMetadata.totalLength : true
+      let hashMatch: boolean | null = null
+      let computedHash: string | undefined
+      if (missing.length === 0 && storyMetadata?.totalChunks > 0 && storyMetadata?.fullStoryHash && storyMetadata.fullStoryHash !== ethers.ZeroHash) {
+        computedHash = computeStoryHash(sorted)
+        hashMatch = computedHash === storyMetadata.fullStoryHash
+      }
+
+      const storyData = {
+        chunks: sorted,
+        fullStory,
+        integrity: {
+          missing,
+          lengthMatch,
+          hashMatch,
+          computedLength,
+          computedHash
+        },
+        metadata: storyMetadata,
+        loading: false,
+        fetchedAt: Date.now()
+      }
+
+      if (nodeIdToUpdate) {
+        setNodesData(prev => {
+          const cur = prev[nodeIdToUpdate]
+          if (!cur) return prev
+          return {
+            ...prev,
+            [nodeIdToUpdate]: {
+              ...cur,
+              storyMetadata,
+              storyChunks: storyData.chunks,
+              storyFetchedAt: Date.now(),
+            }
+          }
+        })
+      }
+      return storyData
+    }
+
     // Prefer unified dataset (nodesData) if available and fresh
     const findNodeIdByToken = (): string | undefined => {
       for (const [id, nd] of Object.entries(nodesDataRef.current)) {
@@ -960,7 +1080,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
       }
       return undefined
     }
-    let nodeId = findNodeIdByToken()
+    let nodeId = opts?.nodeIdHint || findNodeIdByToken()
     let ndFromLookup: NodeData | undefined
     if (!nodeId) {
       try { const nd = await getNodeByTokenId(tokenId); if (nd) { nodeId = nd.id; ndFromLookup = nd } } catch {}
@@ -968,6 +1088,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     if (nodeId) {
       const nd = ndFromLookup || nodesDataRef.current[nodeId]
       if (nd?.storyMetadata && Array.isArray(nd?.storyChunks)) {
+        const stale = isStale(nd?.storyFetchedAt, STORY_TTL_MS)
         const sorted = [...nd.storyChunks].sort((a,b)=>a.chunkIndex-b.chunkIndex)
         const fullStory = sorted.map(c => c.content).join('')
         const encoder = new TextEncoder()
@@ -984,6 +1105,11 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           computedHash = computeStoryHash(sorted)
           hashMatch = computedHash === nd.storyMetadata.fullStoryHash
         }
+        if (stale) {
+          scheduleStoryRevalidate(`story:${String(tokenId)}`, async () => {
+            await fetchAndStoreStory(String(tokenId), nodeId!)
+          })
+        }
         return {
           chunks: sorted,
           fullStory,
@@ -996,97 +1122,14 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     }
     // legacy in-memory cache removed; rely solely on NodesData
 
-    if (!provider || !contractAddress) {
+    if (!provider || !contractAddress || !contract) {
       throw new Error('Provider or contract address not available')
     }
 
     try {
-      const metadata = await contract!.getStoryMetadata(tokenId)
-      const storyMetadata = {
-        totalChunks: Number(metadata.totalChunks),
-        totalLength: Number(metadata.totalLength),
-        isSealed: Boolean(metadata.isSealed),
-        lastUpdateTime: Number(metadata.lastUpdateTime),
-        fullStoryHash: metadata.fullStoryHash
-      }
-
-      const chunks: any[] = []
-      if (storyMetadata.totalChunks > 0) {
-        for (let i = 0; i < storyMetadata.totalChunks; i++) {
-          try {
-            const chunk = await contract!.getStoryChunk(tokenId, i)
-            chunks.push({
-              chunkIndex: Number(chunk.chunkIndex),
-              chunkHash: chunk.chunkHash,
-              content: chunk.content,
-              timestamp: Number(chunk.timestamp),
-              editor: chunk.editor,
-              chunkType: Number(chunk.chunkType),
-              attachmentCID: chunk.attachmentCID
-            })
-          } catch (e) {
-            console.warn(`Missing chunk ${i} for token ${tokenId}`)
-          }
-        }
-      }
-
-      // Compute story integrity
-      const sorted = [...chunks].sort((a,b)=>a.chunkIndex-b.chunkIndex)
-      const missing: number[] = []
-      
-      if (storyMetadata?.totalChunks) {
-        for (let i = 0; i < storyMetadata.totalChunks; i++) {
-          if (!sorted.find(c => c.chunkIndex === i)) missing.push(i)
-        }
-      }
-      
-      const fullStory = sorted.map(c => c.content).join('')
-      const encoder = new TextEncoder()
-      const computedLength = sorted.reduce((acc, c) => acc + encoder.encode(c.content).length, 0)
-      const lengthMatch = storyMetadata?.totalLength ? computedLength === storyMetadata.totalLength : true
-      
-      let hashMatch: boolean | null = null
-      let computedHash: string | undefined
-      
-      if (missing.length === 0 && storyMetadata?.totalChunks > 0 && storyMetadata?.fullStoryHash && storyMetadata.fullStoryHash !== ethers.ZeroHash) {
-        computedHash = computeStoryHash(sorted)
-        hashMatch = computedHash === storyMetadata.fullStoryHash
-      }
-
-      const storyData = {
-        chunks: chunks.sort((a, b) => a.chunkIndex - b.chunkIndex),
-        fullStory,
-        integrity: {
-          missing,
-          lengthMatch,
-          hashMatch,
-          computedLength,
-          computedHash
-        },
-        metadata: storyMetadata,
-        loading: false,
-        fetchedAt: Date.now()
-      }
-
-      // Backfill unified dataset
       const ensureId = nodeId || findNodeIdByToken()
-      if (ensureId) {
-        setNodesData(prev => {
-          const cur = prev[ensureId!]
-          if (!cur) return prev
-          return {
-            ...prev,
-            [ensureId!]: {
-              ...cur,
-              storyMetadata,
-              storyChunks: storyData.chunks,
-              storyFetchedAt: Date.now(),
-              
-            }
-          }
-        })
-      }
-      return storyData
+      const out = await fetchAndStoreStory(String(tokenId), ensureId)
+      return out
     } catch (error: any) {
       console.error('Failed to fetch story chunks:', error)
       throw error

@@ -11,6 +11,17 @@ import { QueryCache } from '../utils/queryCache'
 
 export interface NodeKeyMinimal { personHash: string; versionIndex: number }
 
+const env: any = (import.meta as any).env || {}
+const VERSION_DETAILS_TTL_MS = Number(env.VITE_DF_VD_TTL_MS || 300_000)
+const NFT_DETAILS_TTL_MS = Number(env.VITE_DF_NFT_TTL_MS || 86_400_000)
+const STORY_TTL_MS = Number(env.VITE_DF_STORY_TTL_MS || 300_000)
+const isStale = (fetchedAt?: number, ttlMs?: number) => {
+  if (!Number.isFinite(fetchedAt)) return true
+  const ttl = Number(ttlMs ?? 0)
+  if (ttl <= 0) return false
+  return Date.now() - Number(fetchedAt) > ttl
+}
+
 interface NodeDetailState {
   open: boolean
   selected: NodeKeyMinimal | null
@@ -27,7 +38,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
   const [selected, setSelected] = useState<NodeKeyMinimal | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { nodesData, setNodesData } = useTreeData() as any
+  const { nodesData, setNodesData, getStoryData } = useTreeData() as any
   const { rpcUrl, contractAddress, chainId } = useConfig()
   const queryCacheRef = useRef(new QueryCache())
 
@@ -56,7 +67,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
         setError(null)
         let tokenId: string | undefined = nd?.tokenId
         if (needVersion) {
-          const ret = await api.getVersionDetails(selected.personHash, selected.versionIndex)
+          const ret = await api.getVersionDetails(selected.personHash, selected.versionIndex, { ttlMs: VERSION_DETAILS_TTL_MS })
           tokenId = ret.tokenId
           const versionFields = ret.version
           const endorsementCount = ret.endorsementCount
@@ -83,41 +94,29 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
         const effectiveTokenId = tokenId || ndCur?.tokenId
         const needNFT = effectiveTokenId && effectiveTokenId !== '0' && (!ndCur || ndCur.fullName === undefined || ndCur.nftTokenURI === undefined || ndCur.story === undefined)
         if (needNFT) {
-          const nftRet = await api.getNFTDetails(effectiveTokenId)
+          const nftRet = await api.getNFTDetails(effectiveTokenId, { ttlMs: NFT_DETAILS_TTL_MS })
           const versionFields = nftRet.version
           const coreFields = nftRet.core
           const endorsementCount2 = nftRet.endorsementCount
           const nftTokenURI = nftRet.nftTokenURI
           
-          let storyMetadata = null
-          let storyChunks = null
-          try {
-            const metadata = await contract.getStoryMetadata(effectiveTokenId)
-            storyMetadata = {
-              totalChunks: Number(metadata.totalChunks),
-              totalLength: Number(metadata.totalLength),
-              isSealed: Boolean(metadata.isSealed),
-              lastUpdateTime: Number(metadata.lastUpdateTime),
-              fullStoryHash: metadata.fullStoryHash
-            }
-            
-            if (storyMetadata.totalChunks > 0) {
-              storyChunks = []
-              for (let i = 0; i < storyMetadata.totalChunks; i++) {
-                const chunk = await contract.getStoryChunk(effectiveTokenId, i)
-                storyChunks.push({
-                  chunkIndex: Number(chunk.chunkIndex),
-                  chunkHash: chunk.chunkHash,
-                  content: chunk.content,
-                  timestamp: Number(chunk.timestamp),
-                  editor: chunk.editor,
-                  chunkType: Number(chunk.chunkType),
-                  attachmentCID: chunk.attachmentCID
-                })
+          let storyMetadata = ndCur?.storyMetadata ?? null
+          let storyChunks = Array.isArray(ndCur?.storyChunks) ? (ndCur?.storyChunks as any) : null
+          let storyFetchedAt = ndCur?.storyFetchedAt
+          const needStory = !!(effectiveTokenId && effectiveTokenId !== '0' && (!storyMetadata || !Array.isArray(storyChunks) || isStale(storyFetchedAt, STORY_TTL_MS)))
+          if (needStory && typeof getStoryData === 'function') {
+            try {
+              const storyRet = await getStoryData(String(effectiveTokenId), { nodeIdHint: id })
+              if (storyRet?.metadata && Array.isArray(storyRet?.chunks)) {
+                storyMetadata = storyRet.metadata
+                storyChunks = storyRet.chunks
               }
+              if (Number.isFinite(storyRet?.fetchedAt) && Number(storyRet.fetchedAt) > 0) {
+                storyFetchedAt = Number(storyRet.fetchedAt)
+              }
+            } catch (e) {
+              console.warn('Failed to fetch story chunks:', e)
             }
-          } catch (e) {
-            console.warn('Failed to fetch story chunks:', e)
           }
           
           if (!cancelled) setNodesData((prev: any) => prev[id] ? ({
@@ -148,7 +147,8 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
               isDeathBC: coreFields.isDeathBC,
               story: coreFields.story,
               nftTokenURI,
-              storyMetadata, storyChunks
+              storyMetadata, storyChunks,
+              storyFetchedAt
             }
           }) : prev)
         }
