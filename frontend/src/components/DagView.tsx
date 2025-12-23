@@ -12,15 +12,15 @@ import { useVizOptions } from '../context/VizOptionsContext'
 import EndorseCompactModal from './modals/EndorseCompactModal'
 import { buildViewGraphData } from '../utils/treeData'
 
-export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
+export interface DagViewHandle { centerOnNode: (id: string) => void }
 
-function FlexibleDAGViewInner({
+function DagViewInner({
   nodeWidth = 200,
   nodeHeight = 120,
 }: {
   nodeWidth?: number
   nodeHeight?: number
-}, ref: React.Ref<FlexibleDAGViewHandle>) {
+}, ref: React.Ref<DagViewHandle>) {
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const ctxSelectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
@@ -183,7 +183,7 @@ function FlexibleDAGViewInner({
                  onClick={() => openNode({ personHash: n.hash, versionIndex: n.versionIndex})}
                  className="cursor-pointer">
                 <title>{n.hash}</title>
-                {/* Hidden text for width measurement, consistent with MerkleTreeView */}
+                {/* Hidden text for width measurement, consistent with TreeLayoutView */}
                 <text ref={el => { textRefs.current[n.id] = el }} opacity={0} className="font-mono pointer-events-none select-none">
                   <tspan x={8} y={14}>{(mintedFlag && nd?.fullName) ? nd.fullName : hashShort}</tspan>
                 </text>
@@ -234,5 +234,5 @@ function FlexibleDAGViewInner({
   )
 }
 
-const FlexibleDAGView = forwardRef(FlexibleDAGViewInner)
-export default FlexibleDAGView
+const DagView = forwardRef(DagViewInner)
+export default DagView

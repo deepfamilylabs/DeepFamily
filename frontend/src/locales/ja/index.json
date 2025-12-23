@@ -425,10 +425,10 @@
   "familyTree": {
     "title": "可視化",
     "viewModes": {
-      "tree": "ツリー図",
+      "tree": "ツリーレイアウト",
       "dag": "有向非循環グラフ",
       "force": "力指向",
-      "virtual": "仮想化"
+      "virtual": "ツリーリスト"
     },
     "versionSelector": {
       "label": "バージョン選択",

@@ -425,10 +425,10 @@
   "familyTree": {
     "title": "FamilyTree",
     "viewModes": {
-      "tree": "Tree",
+      "tree": "Tree Layout",
       "dag": "DAG",
       "force": "Force Directed",
-      "virtual": "Virtualized"
+      "virtual": "Tree List"
     },
     "versionSelector": {
       "label": "Version Selection",

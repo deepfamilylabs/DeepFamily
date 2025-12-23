@@ -425,10 +425,10 @@
   "familyTree": {
     "title": "시각화",
     "viewModes": {
-      "tree": "트리 차트",
+      "tree": "트리 레이아웃",
       "dag": "방향 그래프",
       "force": "힘 방향",
-      "virtual": "가상화"
+      "virtual": "트리 리스트"
     },
     "versionSelector": {
       "label": "버전 선택",

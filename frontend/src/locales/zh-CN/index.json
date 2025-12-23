@@ -425,10 +425,10 @@
   "familyTree": {
     "title": "可视化",
     "viewModes": {
-      "tree": "树图",
+      "tree": "树形布局",
       "dag": "有向无环图",
       "force": "力导向",
-      "virtual": "虚拟化"
+      "virtual": "树形列表"
     },
     "versionSelector": {
       "label": "版本选择",
