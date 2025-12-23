@@ -448,9 +448,6 @@
       "addCustomNetworkHint": "入力して保存すると再利用できます",
       "customNetworkAdded": "カスタムネットワークを追加しました",
       "clearAndRefresh": "クリア",
-      "strictCacheOnly": "厳密読み取り専用キャッシュ",
-      "strictCacheOn": "オフラインモード",
-      "strictCacheOff": "オンラインモード",
       "rootHistory": "ルートハッシュ履歴",
       "reset": "リセット",
       "resetToDefaults": "環境変数デフォルト値にリセット"
@@ -463,14 +460,22 @@
       "traversalBFS": "BFS幅優先：階層順に展開、層構造がより直感的",
       "traversal": "トラバーサル方式",
       "traversalDesc": "DFS深度優先(深層を高速閲覧) / BFS幅優先(階層順展開)",
-      "includeVersionDetails": "詳細読み込み",
-      "includeVersionDetailsDesc": "次回リフレッシュ時にバージョン詳細をバッチ読み込みするかどうかのみ影響（リフレッシュ時にスナップショット固定）。",
       "progressSummary": "ノード {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "ノード",
       "depthLabelFull": "深度",
       "edit": "編集",
       "save": "保存",
       "cancel": "キャンセル",
+      "childrenMode": "子どもモード",
+      "childrenModeTooltip": {
+        "strict": "Strict: 選択した親バージョンに紐づく子のみ",
+        "union": "Union: すべての親バージョンの子を統合"
+      },
+      "strictIncludeV0": "v0 を含める",
+      "strictIncludeV0Tooltip": {
+        "on": "Strict + v0: 未バージョン子を含める（parentVersionIndex=0）",
+        "off": "Strict のみ: 選択した parentVersionIndex のみ"
+      },
       "deduplicateChildren": "子ノード重複除去",
       "deduplicateChildrenTooltip": {
         "enabled": "最高エンドースメントバージョンのみ",

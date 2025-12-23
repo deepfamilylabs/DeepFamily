@@ -7,7 +7,6 @@ type ConfigValues = {
   rootHash: string
   rootVersionIndex: number
   chainId: number
-  strictCacheOnly: boolean
 }
 
 export type AppConfig = ConfigValues & {
@@ -44,7 +43,6 @@ function getEnvDefaults(): ConfigValues {
     rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH,
     rootVersionIndex: rv,
     chainId: inferChainId(),
-    strictCacheOnly: false,
   }
 }
 
@@ -118,8 +116,8 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     setState(prev => {
     const next = { ...prev, ...partial }
     try {
-      const { rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId, strictCacheOnly } = next
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId, strictCacheOnly }))
+      const { rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId } = next
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId }))
       if (partial.rootHash && /^0x[a-fA-F0-9]{64}$/.test(partial.rootHash.trim())) {
         // also record root history globally
         const normalized = partial.rootHash.trim()

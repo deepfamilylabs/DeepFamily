@@ -29,7 +29,7 @@ export default function EndorseModal({
   const { t } = useTranslation()
   const { address, signer } = useWallet()
   const { endorseVersion, getVersionDetails, getNFTDetails, contract } = useContract()
-  const { bumpEndorsementCount } = useTreeData()
+  const { bumpEndorsementCount, invalidateByTx } = useTreeData()
   const [searchParams] = useSearchParams()
   
   // ===== Internal state - fully self-contained, follows modal lifecycle =====
@@ -581,6 +581,10 @@ export default function EndorseModal({
               } : null
             }
           }))
+          invalidateByTx({
+            receipt: result,
+            hints: { personHash: targetPersonHash!, versionIndex: Number(targetVersionIndex) }
+          })
         } catch (e) {
           console.warn('Failed to apply endorsement success from receipt:', e)
         }

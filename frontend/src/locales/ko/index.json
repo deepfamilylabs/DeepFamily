@@ -448,9 +448,6 @@
       "addCustomNetworkHint": "작성 후 저장하면 재사용할 수 있습니다",
       "customNetworkAdded": "사용자 정의 네트워크가 추가되었습니다",
       "clearAndRefresh": "지우기",
-      "strictCacheOnly": "엄격 읽기 전용 캐시",
-      "strictCacheOn": "오프라인 모드",
-      "strictCacheOff": "온라인 모드",
       "rootHistory": "루트 해시 기록",
       "reset": "재설정",
       "resetToDefaults": "환경 변수 기본값으로 재설정"
@@ -463,14 +460,22 @@
       "traversalBFS": "BFS 너비 우선: 레벨별 확장, 계층 구조가 더 직관적",
       "traversal": "순회 방식",
       "traversalDesc": "DFS 깊이 우선(빠르게 깊은 층 확인) / BFS 너비 우선(레벨별 확장)",
-      "includeVersionDetails": "세부정보 로드",
-      "includeVersionDetailsDesc": "다음 새로 고침 시에만 버전 세부정보를 일괄 로드할지 여부에 영향을 줍니다(새로 고침 시 스냅샷 잠김).",
       "progressSummary": "노드 {{created}} / 깊이 {{depth}}",
       "nodesLabelFull": "노드",
       "depthLabelFull": "깊이",
       "edit": "편집",
       "save": "저장",
       "cancel": "취소",
+      "childrenMode": "자식 모드",
+      "childrenModeTooltip": {
+        "strict": "Strict: 선택한 부모 버전에 연결된 자식만",
+        "union": "Union: 모든 부모 버전의 자식을 합침"
+      },
+      "strictIncludeV0": "v0 포함",
+      "strictIncludeV0Tooltip": {
+        "on": "Strict + v0: 미버전 자식 포함 (parentVersionIndex=0)",
+        "off": "Strict only: 선택한 parentVersionIndex만"
+      },
       "deduplicateChildren": "자식 노드 중복 제거",
       "deduplicateChildrenTooltip": {
         "enabled": "최고 승인 버전만",

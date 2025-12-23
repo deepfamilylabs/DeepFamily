@@ -448,9 +448,6 @@
       "addCustomNetworkHint": "填寫後保存，可重複使用",
       "customNetworkAdded": "已添加自定義網路",
       "clearAndRefresh": "清空",
-      "strictCacheOnly": "嚴格唯讀快取",
-      "strictCacheOn": "離線模式",
-      "strictCacheOff": "線上模式",
       "rootHistory": "根雜湊歷史",
       "reset": "重置",
       "resetToDefaults": "重置為環境變數預設值"
@@ -463,14 +460,22 @@
       "traversalBFS": "BFS 廣度優先：按層展開更均衡",
       "traversal": "遍歷方式",
       "traversalDesc": "DFS 深度優先(快看到深層) / BFS 廣度優先(按層展開)",
-      "includeVersionDetails": "載入詳情",
-      "includeVersionDetailsDesc": "僅影響下次重新整理時是否批次載入版本詳情（重新整理時鎖定快照）。",
       "progressSummary": "節點 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "節點",
       "depthLabelFull": "深度",
       "edit": "編輯",
       "save": "保存",
       "cancel": "取消",
+      "childrenMode": "子節點模式",
+      "childrenModeTooltip": {
+        "strict": "嚴格：僅顯示該父版本掛載的子節點",
+        "union": "並集：合併所有父版本的子節點"
+      },
+      "strictIncludeV0": "包含 v0",
+      "strictIncludeV0Tooltip": {
+        "on": "嚴格 + v0：包含未版本化子節點（parentVersionIndex=0）",
+        "off": "嚴格：僅當前選擇的父版本"
+      },
       "deduplicateChildren": "去重子節點",
       "deduplicateChildrenTooltip": {
         "enabled": "僅顯示最高背書版本",

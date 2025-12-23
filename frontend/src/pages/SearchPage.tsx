@@ -13,8 +13,7 @@ import { makeProvider } from '../utils/provider'
 import PersonHashCalculator from '../components/PersonHashCalculator'
 import { getChunkTypeOptions, getChunkTypeI18nKey, getChunkTypeIcon, getChunkTypeColorClass, getChunkTypeBorderColorClass } from '../constants/chunkTypes'
 
-const MAX_PAGE_SIZE = 100  
-const DEFAULT_PAGE_SIZE = 100
+const MAX_PAGE_SIZE = 100
 
 const getByteLength = (str: string): number => {
   return new TextEncoder().encode(str).length
@@ -278,30 +277,30 @@ export default function SearchPage() {
 
   const { register: reg3, handleSubmit: hs3, formState: { errors: e3 }, watch: w3 } = useForm<EndorsementStatsForm>({
     resolver: zodResolver(schemas.endorsementStats),
-    defaultValues: { personHash: '', pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { personHash: '', pageSize: MAX_PAGE_SIZE },
   })
   const { register: reg4, handleSubmit: hs4, formState: { errors: e4 }, watch: w4 } = useForm<TokenURIHistoryForm>({
     resolver: zodResolver(schemas.tokenURIHistory),
-    defaultValues: { tokenId: undefined as any, pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { tokenId: undefined as any, pageSize: MAX_PAGE_SIZE },
   })
   const { register: reg5, handleSubmit: hs5, formState: { errors: e5 }, watch: w5 } = useForm<PersonVersionsForm>({
     resolver: zodResolver(schemas.personVersions),
-    defaultValues: { personHash: '', pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { personHash: '', pageSize: MAX_PAGE_SIZE },
   })
   const { register: reg6, handleSubmit: hs6, formState: { errors: e6 }, watch: w6 } = useForm<StoryChunksForm>({
     resolver: zodResolver(schemas.storyChunks),
-    defaultValues: { tokenId: undefined as any, pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { tokenId: undefined as any, pageSize: MAX_PAGE_SIZE },
   })
   const { register: reg7, handleSubmit: hs7, formState: { errors: e7 }, watch: w7 } = useForm<ChildrenForm>({
     resolver: zodResolver(schemas.children),
-    defaultValues: { parentHash: '', parentVersionIndex: undefined as any, pageSize: DEFAULT_PAGE_SIZE },
+    defaultValues: { parentHash: '', parentVersionIndex: undefined as any, pageSize: MAX_PAGE_SIZE },
   })
 
-  const endorsementPageSize = useMemo(() => Number(w3('pageSize') || DEFAULT_PAGE_SIZE), [w3])
-  const uriPageSize = useMemo(() => Number(w4('pageSize') || DEFAULT_PAGE_SIZE), [w4])
-  const versionsPageSize = useMemo(() => Number(w5('pageSize') || DEFAULT_PAGE_SIZE), [w5])
-  const storyChunksPageSize = useMemo(() => Number(w6('pageSize') || DEFAULT_PAGE_SIZE), [w6])
-  const childrenPageSize = useMemo(() => Number(w7('pageSize') || DEFAULT_PAGE_SIZE), [w7])
+  const endorsementPageSize = useMemo(() => Number(w3('pageSize') || MAX_PAGE_SIZE), [w3])
+  const uriPageSize = useMemo(() => Number(w4('pageSize') || MAX_PAGE_SIZE), [w4])
+  const versionsPageSize = useMemo(() => Number(w5('pageSize') || MAX_PAGE_SIZE), [w5])
+  const storyChunksPageSize = useMemo(() => Number(w6('pageSize') || MAX_PAGE_SIZE), [w6])
+  const childrenPageSize = useMemo(() => Number(w7('pageSize') || MAX_PAGE_SIZE), [w7])
   const getWatchedUriTokenId = () => {
     const raw = w4('tokenId')
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined

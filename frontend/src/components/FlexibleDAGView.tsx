@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react'
-import type { GraphNode } from '../types/graph'
 import { makeNodeId, nodeLabel, isMinted, shortHash } from '../types/graph'
 import { birthDateString } from '../types/graph'
 import { useNodeDetail } from '../context/NodeDetailContext'
@@ -11,23 +10,22 @@ import { useTreeData } from '../context/TreeDataContext'
 import { useFamilyTreeHeight } from '../constants/layout'
 import { useVizOptions } from '../context/VizOptionsContext'
 import EndorseCompactModal from './modals/EndorseCompactModal'
+import { buildViewGraphData } from '../utils/treeData'
 
 export interface FlexibleDAGViewHandle { centerOnNode: (id: string) => void }
 
 function FlexibleDAGViewInner({
-  root,
   nodeWidth = 200,
   nodeHeight = 120,
 }: {
-  root: GraphNode
   nodeWidth?: number
   nodeHeight?: number
 }, ref: React.Ref<FlexibleDAGViewHandle>) {
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const ctxSelectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
-  const { nodesData, bumpEndorsementCount } = useTreeData()
-  const { deduplicateChildren } = useVizOptions()
+  const { rootId, nodesData, edgesUnion, edgesStrict, endorsementsReady, bumpEndorsementCount } = useTreeData()
+  const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions()
   const [endorseModal, setEndorseModal] = useState<{
     open: boolean
     personHash: string
@@ -36,30 +34,35 @@ function FlexibleDAGViewInner({
     endorsementCount?: number
   }>({ open: false, personHash: '', versionIndex: 1 })
 
-  type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
+  type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; depth: number }
   type Edge = { from: string; to: string }
-  function flatten(root: GraphNode) {
-    const nodes: FlattenNode[] = []
-    const edges: Edge[] = []
-    function rec(n: GraphNode, depth: number, parentId?: string) {
-      const id = makeNodeId(n.personHash, n.versionIndex)
-      nodes.push({ id, label: nodeLabel(n), hash: n.personHash, versionIndex: n.versionIndex, tag: n.tag, depth })
-      if (parentId) edges.push({ from: parentId, to: id })
-      for (const c of n.children || []) rec(c, depth + 1, id)
-    }
-    rec(root, 0)
-    return { nodes, edges }
-  }
 
   const { nodes, edges, positions, width, height } = useMemo(() => {
-    const { nodes, edges } = flatten(root)
+    const graph = buildViewGraphData({
+      rootId,
+      childrenMode,
+      strictIncludeUnversionedChildren,
+      deduplicateChildren,
+      endorsementsReady,
+      nodesData,
+      edgesUnion,
+      edgesStrict
+    })
+    const nodes: FlattenNode[] = graph.nodes.map(n => ({
+      id: n.id,
+      label: nodeLabel({ personHash: n.personHash, versionIndex: n.versionIndex }),
+      hash: n.personHash,
+      versionIndex: n.versionIndex,
+      depth: n.depth
+    }))
+    const edges = graph.edges
     const levels: Map<number, FlattenNode[]> = new Map()
-    let maxDepth = 0
-    nodes.forEach(n => { const arr = levels.get(n.depth) || []; arr.push(n); levels.set(n.depth, arr); if (n.depth > maxDepth) maxDepth = n.depth })
+    let maxDepthSeen = 0
+    nodes.forEach(n => { const arr = levels.get(n.depth) || []; arr.push(n); levels.set(n.depth, arr); if (n.depth > maxDepthSeen) maxDepthSeen = n.depth })
     const margin = { left: 24, top: 24, right: 24, bottom: 24 }
     const gapX = nodeWidth + 220
     const gapY = nodeHeight + 22  // Increased vertical spacing from 12 to 40
-    const width = margin.left + margin.right + (maxDepth + 1) * gapX
+    const width = margin.left + margin.right + (maxDepthSeen + 1) * gapX
     const maxPerLevel = Math.max(...Array.from(levels.values()).map(a => a.length)) || 1
     const height = margin.top + margin.bottom + maxPerLevel * gapY
     const positions: Record<string, { x: number; y: number }> = {}
@@ -67,7 +70,7 @@ function FlexibleDAGViewInner({
       arr.forEach((n, idx) => { const x = margin.left + depth * gapX; const y = margin.top + idx * gapY; positions[n.id] = { x, y } })
     })
     return { nodes, edges, positions, width, height }
-  }, [root, nodeWidth, nodeHeight])
+  }, [childrenMode, deduplicateChildren, edgesStrict, edgesUnion, endorsementsReady, nodeHeight, nodeWidth, nodesData, rootId, strictIncludeUnversionedChildren])
 
   const textRefs = useRef<Record<string, SVGTextElement | null>>({})
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})

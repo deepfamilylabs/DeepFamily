@@ -76,7 +76,7 @@ export default function AddVersionModal({
   const { t } = useTranslation()
   const { signer } = useWallet()
   const { addPersonZK, isContractReady } = useContract()
-  const { invalidateTreeRootCache } = useTreeData()
+  const { invalidateByTx } = useTreeData()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [consents, setConsents] = useState({ hash: false, age: false, legal: false })
   const [consentError, setConsentError] = useState<string | null>(null)
@@ -603,7 +603,10 @@ export default function AddVersionModal({
           events: result.events
         })
         setProofGenerationStep('')
-        invalidateTreeRootCache()
+        invalidateByTx({
+          events: { PersonVersionAdded: result?.events?.PersonVersionAdded || null },
+          hints: { personHash: result?.hash, versionIndex: result?.index }
+        })
         onSuccess?.(result)
       }
     } catch (error: any) {
@@ -1416,9 +1419,12 @@ export default function AddVersionModal({
                   <button
                     type="button"
                     onClick={() => {
-                      if (onEndorse && successResult.hash && successResult.index) {
+                      const endorsedHash = successResult.events.PersonVersionAdded?.personHash || successResult.hash
+                      const endorsedIndex = successResult.events.PersonVersionAdded?.versionIndex ?? successResult.index
+                      const hasTarget = !!endorsedHash && Number.isFinite(Number(endorsedIndex)) && Number(endorsedIndex) > 0
+                      if (onEndorse && hasTarget) {
                         // Let the parent component handle closing this modal and opening the endorse modal
-                        onEndorse(successResult.hash, successResult.index)
+                        onEndorse(String(endorsedHash), Number(endorsedIndex))
                       }
                     }}
                     className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
