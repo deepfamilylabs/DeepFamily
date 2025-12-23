@@ -16,6 +16,7 @@ import { deleteBlob, isIndexedDBSupported, readBlob, writeBlob } from '../utils/
 import { createDeepFamilyApi, parseVersionDetailsResult } from '../utils/deepFamilyApi'
 import { QueryCache } from '../utils/queryCache'
 import { getInvalidateKeysAfterPersonVersionAdded } from '../utils/treeInvalidation'
+import { nftKey, parseVdKey, vdKey } from '../utils/queryKeys'
 
 // Reuse provider instances to avoid repeated network detection / socket exhaustion
 const providerCache = new Map<string, ethers.JsonRpcProvider>()
@@ -94,10 +95,6 @@ interface TreeDataValue {
 }
 
 const TreeDataContext = createContext<TreeDataValue | null>(null)
-
-const MULTICALL_ABI = [
-  'function tryAggregate(bool requireSuccess, tuple(address target, bytes callData)[] calls) public returns (tuple(bool success, bytes returnData)[])'
-]
 
 export function TreeDataProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
@@ -449,7 +446,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (!api) throw new Error('Contract not ready')
-        await api.getVersionDetails(rootHash, Number(rootVersionIndex))
+        await api.getVersionDetails(rootHash, Number(rootVersionIndex), { ttlMs: VERSION_DETAILS_TTL_MS })
         setRootExists(true)
       } catch (e: any) {
 	        if (!cancelled) {
@@ -640,9 +637,6 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false
     ;(async () => {
       const iface = new ethers.Interface((DeepFamily as any).abi)
-      const multicallAddress = (import.meta as any).env.VITE_MULTICALL_ADDRESS
-      const useMulticall = !!multicallAddress && provider
-      const multicall = useMulticall ? new ethers.Contract(multicallAddress, MULTICALL_ABI, provider) : null
 
       // Read persisted snapshot (IndexedDB) to assist with cache hits
       let snapshot: Record<string, NodeData> | null = null
@@ -719,50 +713,22 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         if (targets.length === 0) continue
         try {
           const pendingNFTs: Array<{ id: string; tokenId: string }> = []
-          const results: Array<{ ok: boolean; parsed?: ReturnType<typeof parseVersionDetailsResult>; original: { h: string; v: number } }> = []
-
-          if (multicall && useMulticall) {
-            const calls = targets.map(p => ({ target: contractAddress, callData: iface.encodeFunctionData('getVersionDetails', [p.h, p.v]) }))
+          const results = await Promise.all(targets.map(async (original) => {
+            if (!api) return { ok: false as const, original }
             try {
-              const returned = await multicall.tryAggregate(false, calls)
-              returned.forEach((entry: any, idx: number) => {
-                const original = targets[idx]
-                const success = Array.isArray(entry) ? entry[0] : entry.success
-                const returnData = Array.isArray(entry) ? entry[1] : entry.returnData
-                if (success && returnData && returnData !== '0x') {
-                  try {
-                    const decoded: any = iface.decodeFunctionResult('getVersionDetails', returnData)
-                    results.push({ ok: true, parsed: parseVersionDetailsResult(decoded), original })
-                  } catch (e) {
-                    if (!stageLoggedRef.current.has('decode_counts')) { stageLoggedRef.current.add('decode_counts'); push(e as any, { stage: 'decode_counts' }) }
-                    results.push({ ok: false, original })
-                  }
-                } else {
-                  results.push({ ok: false, original })
-                }
-              })
-            } catch (e) {
-              if (!stageLoggedRef.current.has('multicall_tryAggregate_counts')) { stageLoggedRef.current.add('multicall_tryAggregate_counts'); push(e as any, { stage: 'multicall_tryAggregate_counts' }) }
+              const parsed = await api.getVersionDetails(original.h, original.v, { ttlMs: VERSION_DETAILS_TTL_MS })
+              return { ok: true as const, parsed, original }
+            } catch {
+              return { ok: false as const, original }
             }
-          }
-
-          if (results.length === 0) {
-            const direct = await Promise.all(targets.map(async (original) => {
-              try {
-                if (!api) return { ok: false, original }
-                const parsed = await api.getVersionDetails(original.h, original.v)
-                return { ok: true, parsed, original }
-              } catch {
-                return { ok: false, original }
-              }
-            }))
-            results.push(...direct)
-          }
+          }))
 
           results.forEach((entry) => {
-            if (cancelled || !entry.ok || !entry.parsed) return
-            const { parsed, original } = entry
+            if (cancelled || !entry.ok) return
+            const { parsed, original } = entry as { ok: true; parsed: ReturnType<typeof parseVersionDetailsResult>; original: { h: string; v: number } }
             const id = makeNodeId(original.h, original.v)
+            const versionDetailsKey = vdKey(original.h, original.v)
+            const vdFetchedAt = queryCacheRef.current.getEntry(versionDetailsKey)?.fetchedAt ?? Date.now()
             const versionFields = parsed.version
             setNodesData(prev => {
               const tag = versionFields.tag ?? prev[id]?.tag
@@ -780,7 +746,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                   timestamp: versionFields.timestamp,
                   tag,
                   metadataCID: versionFields.metadataCID,
-                  versionDetailsFetchedAt: Date.now()
+                  versionDetailsFetchedAt: vdFetchedAt
                 }
               }
             })
@@ -1367,15 +1333,15 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
 
     for (const ev of parsed.PersonVersionEndorsed) {
       if (!ev.personHash || !Number.isFinite(Number(ev.versionIndex))) continue
-      versionDetailKeys.add(`vd:${ev.personHash.toLowerCase()}:${Number(ev.versionIndex)}`)
+      versionDetailKeys.add(vdKey(ev.personHash, ev.versionIndex))
     }
 
     for (const ev of parsed.PersonNFTMinted) {
       if (ev.tokenId !== undefined && ev.tokenId !== null && String(ev.tokenId) !== '') {
-        nftKeys.add(`nft:${String(ev.tokenId)}`)
+        nftKeys.add(nftKey(ev.tokenId))
       }
-      if (ev.personHash && Number.isFinite(Number(ev.versionIndex))) {
-        versionDetailKeys.add(`vd:${ev.personHash.toLowerCase()}:${Number(ev.versionIndex)}`)
+      if (ev.personHash && typeof ev.versionIndex === 'number' && Number.isFinite(ev.versionIndex) && ev.versionIndex > 0) {
+        versionDetailKeys.add(vdKey(ev.personHash, ev.versionIndex))
       }
     }
 
@@ -1383,10 +1349,10 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     const hintVersion = input.hints?.versionIndex
     const hintTokenId = input.hints?.tokenId
     if (hintTokenId !== undefined && hintTokenId !== null && String(hintTokenId) !== '') {
-      nftKeys.add(`nft:${String(hintTokenId)}`)
+      nftKeys.add(nftKey(hintTokenId))
     }
-    if (hintHash && Number.isFinite(Number(hintVersion))) {
-      versionDetailKeys.add(`vd:${hintHash.toLowerCase()}:${Number(hintVersion)}`)
+    if (hintHash && typeof hintVersion === 'number' && Number.isFinite(hintVersion) && hintVersion > 0) {
+      versionDetailKeys.add(vdKey(hintHash, hintVersion))
     }
 
     for (const key of totalVersionsKeys) {
@@ -1397,6 +1363,30 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
     }
     for (const key of nftKeys) {
       queryCacheRef.current.clear(key)
+    }
+
+    // Mark any node version-details as stale so background revalidation runs.
+    if (versionDetailKeys.size > 0) {
+      const staleIds: string[] = []
+      for (const key of versionDetailKeys) {
+        const parsedKey = parseVdKey(key)
+        if (!parsedKey) continue
+        staleIds.push(makeNodeId(parsedKey.hashLower, parsedKey.versionIndex))
+      }
+      if (staleIds.length) {
+        setNodesData(prev => {
+          let changed = false
+          const next = { ...prev }
+          for (const id of staleIds) {
+            const cur = next[id]
+            if (!cur) continue
+            if (!cur.versionDetailsFetchedAt) continue
+            next[id] = { ...cur, versionDetailsFetchedAt: 0 }
+            changed = true
+          }
+          return changed ? next : prev
+        })
+      }
     }
 
     const invalidation = {

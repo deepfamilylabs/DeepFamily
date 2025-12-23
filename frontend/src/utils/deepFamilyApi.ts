@@ -1,5 +1,6 @@
 import { makeNodeId, type NodeId } from '../types/graph'
 import { QueryCache } from './queryCache'
+import { csKey, cuKey, nftKey, tvKey, vdKey } from './queryKeys'
 
 export type CheckAbort = () => void
 export type CacheHook = () => void
@@ -165,7 +166,7 @@ export function parseNftDetailsResult(ret: any): ParsedNftDetails {
 
 export function createDeepFamilyApi(contract: any, queryCache: QueryCache): DeepFamilyApi {
   const getTotalVersions = async (personHash: string, options: TotalVersionsOptions): Promise<number> => {
-    const key = `tv:${personHash.toLowerCase()}`
+    const key = tvKey(personHash)
     const cached = queryCache.get<number>(key, options.ttlMs)
     if (Number.isFinite(cached)) {
       options.onCacheHit?.()
@@ -189,7 +190,7 @@ export function createDeepFamilyApi(contract: any, queryCache: QueryCache): Deep
   }
 
   const listChildrenStrictAll = async (parentHash: string, parentVersionIndex: number, options: ListChildrenOptions): Promise<NodeId[]> => {
-    const inflightKey = `cs:${parentHash.toLowerCase()}:${parentVersionIndex}`
+    const inflightKey = csKey(parentHash, parentVersionIndex)
     const inflight = queryCache.getInflight<NodeId[]>(inflightKey)
     if (inflight) return inflight
 
@@ -221,7 +222,7 @@ export function createDeepFamilyApi(contract: any, queryCache: QueryCache): Deep
   }
 
   const listChildrenUnionAll = async (parentHash: string, options: ListUnionOptions): Promise<{ childIds: NodeId[]; totalVersions: number }> => {
-    const inflightKey = `cu:${parentHash.toLowerCase()}`
+    const inflightKey = cuKey(parentHash)
     const inflight = queryCache.getInflight<{ childIds: NodeId[]; totalVersions: number }>(inflightKey)
     if (inflight) return inflight
 
@@ -257,7 +258,7 @@ export function createDeepFamilyApi(contract: any, queryCache: QueryCache): Deep
   }
 
   const getVersionDetails = async (personHash: string, versionIndex: number, options?: DetailQueryOptions): Promise<ParsedVersionDetails> => {
-    const key = `vd:${personHash.toLowerCase()}:${Number(versionIndex)}`
+    const key = vdKey(personHash, versionIndex)
     if (options?.ttlMs !== undefined) {
       const cached = queryCache.get<ParsedVersionDetails>(key, options.ttlMs)
       if (cached) {
@@ -283,7 +284,7 @@ export function createDeepFamilyApi(contract: any, queryCache: QueryCache): Deep
   }
 
   const getNFTDetails = async (tokenId: string, options?: DetailQueryOptions): Promise<ParsedNftDetails> => {
-    const key = `nft:${String(tokenId)}`
+    const key = nftKey(tokenId)
     if (options?.ttlMs !== undefined) {
       const cached = queryCache.get<ParsedNftDetails>(key, options.ttlMs)
       if (cached) {

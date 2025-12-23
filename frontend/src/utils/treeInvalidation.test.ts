@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { getInvalidateKeysAfterPersonVersionAdded } from './treeInvalidation'
 import { makeNodeId } from '../types/graph'
 import { unionParentKey } from '../types/treeStore'
+import { tvKey } from './queryKeys'
 
 const sort = (items: string[]) => [...items].sort()
 
@@ -17,9 +18,9 @@ describe('treeInvalidation getInvalidateKeysAfterPersonVersionAdded', () => {
     }
     const out = getInvalidateKeysAfterPersonVersionAdded(ev)
     expect(sort(out.totalVersionsKeys)).toEqual(sort([
-      'tv:0xchild',
-      'tv:0xfather',
-      'tv:0xmother'
+      tvKey('0xchild'),
+      tvKey('0xfather'),
+      tvKey('0xmother')
     ]))
     expect(sort(out.unionKeys)).toEqual(sort([
       unionParentKey('0xfather'),
@@ -66,6 +67,6 @@ describe('treeInvalidation getInvalidateKeysAfterPersonVersionAdded', () => {
     expect(out.unionKeys).toEqual([])
     expect(out.strictKeys).toEqual([])
     expect(out.strictPrefixes).toEqual([])
-    expect(out.totalVersionsKeys).toEqual(['tv:0xchild'])
+    expect(out.totalVersionsKeys).toEqual([tvKey('0xchild')])
   })
 })

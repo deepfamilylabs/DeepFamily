@@ -1,5 +1,6 @@
 import { makeNodeId } from '../types/graph'
 import { unionParentKey } from '../types/treeStore'
+import { tvKey } from './queryKeys'
 
 export interface PersonVersionAddedEvent {
   personHash: string
@@ -28,7 +29,7 @@ export function getInvalidateKeysAfterPersonVersionAdded(ev: PersonVersionAddedE
   ]
   const allHashes = [ev.personHash, ...parents.map(p => p.h)]
   for (const h of allHashes) {
-    if (h && !isZeroHash(h)) totalVersionsKeys.add(`tv:${h.toLowerCase()}`)
+    if (h && !isZeroHash(h)) totalVersionsKeys.add(tvKey(h))
   }
 
   for (const p of parents) {
