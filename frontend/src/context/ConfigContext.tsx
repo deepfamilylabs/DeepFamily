@@ -24,23 +24,27 @@ const ROOT_HISTORY_KEY = 'ft:rootHistory'
 const ConfigContext = createContext<AppConfig | null>(null)
 
 function getEnvDefaults(): ConfigValues {
-  const rvRaw = (import.meta as any).env.VITE_ROOT_VERSION_INDEX
+  const env: any = (import.meta as any).env || {}
+  const rvRaw = env.VITE_ROOT_VERSION_INDEX
   let rv = Number(rvRaw)
   if (!Number.isFinite(rv) || rv < 1) rv = 1
+
+  const rpcUrl = typeof env.VITE_RPC_URL === 'string' ? env.VITE_RPC_URL : ''
+  const contractAddress = typeof env.VITE_CONTRACT_ADDRESS === 'string' ? env.VITE_CONTRACT_ADDRESS : ''
+  const rootHash = typeof env.VITE_ROOT_PERSON_HASH === 'string' ? env.VITE_ROOT_PERSON_HASH : ''
+
   const inferChainId = () => {
-    const rpc = (import.meta as any).env.VITE_RPC_URL as string
-    if (typeof rpc === 'string') {
-      const normalize = (v: string) => v.trim().toLowerCase().replace(/\/+$/, '')
-      const normalizedRpc = normalize(rpc)
-      const matched = NETWORK_PRESETS.find(p => normalize(p.rpcUrl) === normalizedRpc)
-      if (matched) return matched.chainId
-    }
+    if (!rpcUrl) return 0
+    const normalize = (v: string) => v.trim().toLowerCase().replace(/\/+$/, '')
+    const normalizedRpc = normalize(rpcUrl)
+    const matched = NETWORK_PRESETS.find(p => normalize(p.rpcUrl) === normalizedRpc)
+    if (matched) return matched.chainId
     return 0
   }
   return {
-    rpcUrl: (import.meta as any).env.VITE_RPC_URL,
-    contractAddress: (import.meta as any).env.VITE_CONTRACT_ADDRESS,
-    rootHash: (import.meta as any).env.VITE_ROOT_PERSON_HASH,
+    rpcUrl,
+    contractAddress,
+    rootHash,
     rootVersionIndex: rv,
     chainId: inferChainId(),
   }
