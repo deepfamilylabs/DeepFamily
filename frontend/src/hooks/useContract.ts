@@ -78,6 +78,7 @@ export function useContract() {
     
     return null
   }, [contractAddress, signer, provider])
+  const eventInterface = useMemo(() => new ethers.Interface(DeepFamily.abi), [])
 
   const executeTransaction = useCallback(async (
     contractMethod: () => Promise<any>,
@@ -316,49 +317,56 @@ export function useContract() {
       let rewardAmount = 0
 
 
-      for (const log of receipt.logs) {
+      const normalizedContractAddress = contractAddress?.toLowerCase()
+      const parseReceiptLog = (log: any) => {
+        if (!log || !Array.isArray(log.topics)) return null
+        if (normalizedContractAddress && log.address && log.address.toLowerCase() !== normalizedContractAddress) return null
+        if (log.fragment?.name && log.args) {
+          return { name: log.fragment.name, args: log.args }
+        }
         try {
-          const parsedEvent = contract.interface.parseLog(log)
-          if (parsedEvent) {
-
-            switch (parsedEvent.name) {
-              case 'PersonHashZKVerified':
-                events.PersonHashZKVerified = {
-                  personHash: parsedEvent.args.personHash,
-                  prover: parsedEvent.args.prover
-                }
-                break
-
-              case 'PersonVersionAdded':
-                events.PersonVersionAdded = {
-                  personHash: parsedEvent.args.personHash,
-                  versionIndex: Number(parsedEvent.args.versionIndex),
-                  addedBy: parsedEvent.args.addedBy,
-                  timestamp: Number(parsedEvent.args.timestamp),
-                  fatherHash: parsedEvent.args.fatherHash,
-                  fatherVersionIndex: Number(parsedEvent.args.fatherVersionIndex),
-                  motherHash: parsedEvent.args.motherHash,
-                  motherVersionIndex: Number(parsedEvent.args.motherVersionIndex),
-                  tag: parsedEvent.args.tag
-                }
-                personHash = events.PersonVersionAdded.personHash
-                versionIndex = events.PersonVersionAdded.versionIndex
-                break
-
-              case 'TokenRewardDistributed':
-                events.TokenRewardDistributed = {
-                  miner: parsedEvent.args.miner,
-                  personHash: parsedEvent.args.personHash,
-                  versionIndex: Number(parsedEvent.args.versionIndex),
-                  reward: parsedEvent.args.reward.toString()
-                }
-                // Convert from wei to token units (divide by 10^18)
-                rewardAmount = Number(parsedEvent.args.reward) / Math.pow(10, 18)
-                break
-            }
-          }
+          return eventInterface.parseLog(log)
         } catch {
-          continue
+          return null
+        }
+      }
+
+      for (const log of receipt.logs) {
+        const parsedEvent = parseReceiptLog(log)
+        if (!parsedEvent) continue
+
+        switch (parsedEvent.name) {
+          case 'PersonHashZKVerified':
+            events.PersonHashZKVerified = {
+              personHash: parsedEvent.args.personHash,
+              prover: parsedEvent.args.prover
+            }
+            break
+
+          case 'PersonVersionAdded':
+            events.PersonVersionAdded = {
+              personHash: parsedEvent.args.personHash,
+              versionIndex: Number(parsedEvent.args.versionIndex),
+              addedBy: parsedEvent.args.addedBy,
+              timestamp: Number(parsedEvent.args.timestamp),
+              fatherHash: parsedEvent.args.fatherHash,
+              fatherVersionIndex: Number(parsedEvent.args.fatherVersionIndex),
+              motherHash: parsedEvent.args.motherHash,
+              motherVersionIndex: Number(parsedEvent.args.motherVersionIndex),
+              tag: parsedEvent.args.tag
+            }
+            break
+
+          case 'TokenRewardDistributed':
+            events.TokenRewardDistributed = {
+              miner: parsedEvent.args.miner,
+              personHash: parsedEvent.args.personHash,
+              versionIndex: Number(parsedEvent.args.versionIndex),
+              reward: parsedEvent.args.reward.toString()
+            }
+            // Convert from wei to token units (divide by 10^18)
+            rewardAmount = Number(parsedEvent.args.reward) / Math.pow(10, 18)
+            break
         }
       }
 
@@ -403,7 +411,7 @@ export function useContract() {
 
       throw enhancedError
     }
-  }, [contract, signer, toast, t])
+  }, [contract, signer, toast, t, contractAddress, eventInterface])
 
   const mintPersonNFT = useCallback(async (
     proof: {

@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react'
-import type { GraphNode } from '../types/graph'
-import { makeNodeId } from '../types/graph'
+import { makeNodeId, type NodeId } from '../types/graph'
 import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
 import useMiniMap from '../hooks/useMiniMap'
@@ -13,6 +12,7 @@ import { birthDateString } from '../types/graph'
 import { useFamilyTreeHeight } from '../constants/layout'
 import { useVizOptions } from '../context/VizOptionsContext'
 import EndorseCompactModal from './modals/EndorseCompactModal'
+import { buildViewGraphData, type TreeGraphData, type TreeWalkParams } from '../utils/treeData'
 
 export interface MerkleTreeViewHandle { centerOnNode: (id: string) => void }
 
@@ -23,43 +23,78 @@ const GAP_Y = 220
 const MARGIN_X = 24
 const MARGIN_Y = 0
 
-type PositionedNode = { id: string; data: GraphNode; depth: number; x: number; y: number }
+type PositionedNode = { id: NodeId; depth: number; x: number; y: number }
+type Edge = { from: NodeId; to: NodeId }
 
-function computeLayout(root: GraphNode) {
+function computeLayout(params: { graph: TreeGraphData; rootId: NodeId | null }) {
+  const { graph, rootId } = params
   const nodes: PositionedNode[] = []
+  const edges: Edge[] = []
+  if (!rootId) return { nodes, edges, width: 0, height: 0 }
   let nextLeafIndex = 0
-  let maxDepth = 0
+  let maxDepthSeen = 0
   const unitWidth = BASE_NODE_WIDTH + GAP_X
-  function layout(node: GraphNode, depth: number): { x: number; y: number } {
-    maxDepth = Math.max(maxDepth, depth)
-    const children = node.children || []
+  const visited = new Set<NodeId>()
+  function layout(id: NodeId, depth: number): { x: number; y: number } | null {
+    if (visited.has(id)) return null
+    visited.add(id)
+    maxDepthSeen = Math.max(maxDepthSeen, depth)
+    const children = graph.childrenByParent[id] || []
+    const childPositions: Array<{ id: NodeId; pos: { x: number; y: number } }> = []
+    for (const cid of children) {
+      const pos = layout(cid, depth + 1)
+      if (pos) {
+        childPositions.push({ id: cid, pos })
+        edges.push({ from: id, to: cid })
+      }
+    }
     let x: number
     const y = MARGIN_Y + depth * GAP_Y
-    if (children.length === 0) { x = nextLeafIndex * unitWidth; nextLeafIndex += 1 } else {
-      const childPositions = children.map(c => layout(c, depth + 1))
-      const minX = childPositions[0].x
-      const maxX = childPositions[childPositions.length - 1].x
+    if (childPositions.length === 0) {
+      x = nextLeafIndex * unitWidth
+      nextLeafIndex += 1
+    } else {
+      const minX = childPositions[0].pos.x
+      const maxX = childPositions[childPositions.length - 1].pos.x
       x = (minX + maxX) / 2
     }
-    const id = makeNodeId(node.personHash, node.versionIndex)
-    nodes.push({ id, data: node, depth, x, y })
+    nodes.push({ id, depth, x, y })
     return { x, y }
   }
-  layout(root, 0)
+  layout(rootId, 0)
+  if (nodes.length === 0) return { nodes, edges, width: 0, height: 0 }
   let minX = Infinity, maxX = -Infinity
   for (const n of nodes) { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x) }
   const offsetX = MARGIN_X - minX
   for (const n of nodes) n.x += offsetX
   const width = (maxX - minX) + BASE_NODE_WIDTH + MARGIN_X * 2
-  const height = MARGIN_Y * 2 + maxDepth * GAP_Y + NODE_HEIGHT
-  return { nodes, width, height }
+  const height = MARGIN_Y * 2 + maxDepthSeen * GAP_Y + NODE_HEIGHT
+  return { nodes, edges, width, height }
 }
 
-function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<MerkleTreeViewHandle>) {
-  const { nodes: positioned, width: svgWidth, height: svgHeight } = useMemo(() => computeLayout(root), [root])
+function MerkleTreeViewInner(_: { }, ref: React.Ref<MerkleTreeViewHandle>) {
+  const { rootId, nodesData, edgesUnion, edgesStrict, endorsementsReady, bumpEndorsementCount } = useTreeData()
+  const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions()
+  const { graph, nodes: positioned, edges, width: svgWidth, height: svgHeight } = useMemo(() => {
+    const graph = buildViewGraphData({
+      childrenMode,
+      strictIncludeUnversionedChildren,
+      deduplicateChildren,
+      endorsementsReady,
+      nodesData,
+      edgesUnion,
+      edgesStrict,
+      rootId
+    })
+    const layout = computeLayout({ graph, rootId })
+    return { graph, ...layout }
+  }, [childrenMode, deduplicateChildren, edgesStrict, edgesUnion, endorsementsReady, nodesData, rootId, strictIncludeUnversionedChildren])
+  const nodeMetaById = useMemo(() => {
+    const map = new Map<NodeId, { personHash: string; versionIndex: number }>()
+    for (const n of graph.nodes) map.set(n.id, { personHash: n.personHash, versionIndex: n.versionIndex })
+    return map
+  }, [graph.nodes])
   const idToPos = useMemo(() => { const m = new Map<string, PositionedNode>(); for (const pn of positioned) m.set(pn.id, pn); return m }, [positioned])
-  const { nodesData, bumpEndorsementCount } = useTreeData()
-  const { deduplicateChildren } = useVizOptions()
   const [hoverId, setHoverId] = useState<string | null>(null)
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
@@ -109,32 +144,36 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
           </defs>
           <g ref={innerRef as any}>
             <g className="stroke-blue-300/70 dark:stroke-blue-500/60" strokeWidth={2} fill="none">
-              {positioned.map(pn => (pn.data.children || []).map(child => {
-                const childId = makeNodeId(child.personHash, child.versionIndex)
+              {edges.map(edge => {
+                const childId = edge.to
+                const parentId = edge.from
                 const childPos = idToPos.get(childId)
+                const parentPos = idToPos.get(parentId)
+                if (!parentPos) return null
                 if (!childPos) return null
                 const w1 = BASE_NODE_WIDTH
                 const w2 = BASE_NODE_WIDTH
-                const x1 = pn.x + w1 / 2
-                const y1 = pn.y + NODE_HEIGHT
+                const x1 = parentPos.x + w1 / 2
+                const y1 = parentPos.y + NODE_HEIGHT
                 const x2 = childPos.x + w2 / 2
                 const y2 = childPos.y
                 const mx = (x1 + x2) / 2
                 const path = `M ${x1} ${y1} C ${mx} ${y1 + 24}, ${mx} ${y2 - 24}, ${x2} ${y2}`
-                return <path key={`${pn.id}->${childId}`} d={path} />
-              }))}
+                return <path key={`${parentId}->${childId}`} d={path} />
+              })}
             </g>
             <g>
               {positioned.map(pn => {
                 const w = BASE_NODE_WIDTH
                 const nd = nodesData[pn.id]
+                const meta = nodeMetaById.get(pn.id)
                 const mintedFlag = isMinted(nd)
-                const shortHashText = shortHash(pn.data.personHash)
+                const shortHashText = shortHash(meta?.personHash || '')
                 const nameTextRaw = (mintedFlag && nd?.fullName) ? nd.fullName : shortHashText
                 const endorse = nd?.endorsementCount
                 const isSel = pn.id === selectedId
                 const isHover = hoverId === pn.id
-                const versionText = `v${pn.data.versionIndex}`
+                const versionText = `v${meta?.versionIndex ?? 0}`
                 const tagText = nd?.tag || ''
                 // In deduplicate mode, show totalVersions badge from contract data
                 // In non-deduplicate mode, don't show badge (user can see all versions directly)
@@ -142,8 +181,8 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                 const handleEndorse = () => {
                   setEndorseModal({
                     open: true,
-                    personHash: pn.data.personHash,
-                    versionIndex: pn.data.versionIndex,
+                    personHash: meta?.personHash || '',
+                    versionIndex: meta?.versionIndex ?? 0,
                     fullName: nd?.fullName,
                     endorsementCount: endorse
                   })
@@ -153,11 +192,11 @@ function MerkleTreeViewInner({ root }: { root: GraphNode }, ref: React.Ref<Merkl
                      transform={`translate(${pn.x}, ${pn.y})`}
                      onMouseEnter={() => setHoverId(pn.id)}
                      onMouseLeave={() => setHoverId(h => (h === pn.id ? null : h))}
-                     onClick={() => openNode({ personHash: pn.data.personHash, versionIndex: pn.data.versionIndex})}
-                     onDoubleClick={() => navigator.clipboard?.writeText(pn.data.personHash).catch(() => {})}
+                     onClick={() => openNode({ personHash: meta?.personHash || '', versionIndex: meta?.versionIndex ?? 0 })}
+                     onDoubleClick={() => meta?.personHash && navigator.clipboard?.writeText(meta.personHash).catch(() => {})}
                      className="cursor-pointer"
                   >
-                    <title>{pn.data.personHash}</title>
+                    <title>{meta?.personHash}</title>
                     <NodeCard
                       w={w}
                       h={NODE_HEIGHT}

@@ -197,7 +197,7 @@ export default function MintNFTModal({
   const { t } = useTranslation()
   const { address } = useWallet()
   const { mintPersonNFT, getVersionDetails, contract, getPersonHash } = useContract()
-  const { setNodesData } = useTreeData()
+  const { setNodesData, invalidateByTx } = useTreeData()
 
   // Create schema with translations
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t])
@@ -666,6 +666,10 @@ export default function MintNFTModal({
               timestamp: mintedEvent.args?.timestamp || Math.floor(Date.now() / 1000)
             } : null
           }
+        })
+        invalidateByTx({
+          receipt,
+          hints: { personHash: finalPersonHash, versionIndex: finalVersionIndex, tokenId }
         })
         
         if (tokenId > 0) onSuccess?.(tokenId)

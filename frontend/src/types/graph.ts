@@ -1,10 +1,4 @@
-
-export interface GraphNode {
-  personHash: string
-  versionIndex: number
-  tag?: string
-  children?: GraphNode[]
-}
+export type NodeLabelInput = { personHash: string; versionIndex: number }
 
 export interface StoryChunk {
   chunkIndex: number
@@ -90,7 +84,7 @@ export function shortHash(hash: string, shown = 4): string {
   return `0x${hash.slice(start, start + shown)}…`
 }
 
-export function nodeLabel(node: Pick<GraphNode, 'personHash' | 'versionIndex' | 'tag'>): string {
+export function nodeLabel(node: NodeLabelInput): string {
   return `${node.personHash}  v${node.versionIndex}`
 }
 

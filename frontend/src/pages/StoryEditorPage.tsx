@@ -33,7 +33,7 @@ export default function StoryEditorPage() {
   const { tokenId } = useParams<{ tokenId: string }>()
   const location = useLocation()
   const { t } = useTranslation()
-  const { contractAddress, strictCacheOnly } = useConfig()
+  const { contractAddress } = useConfig()
   const { getStoryData, setNodesData, getNodeByTokenId } = useTreeData()
   const { signer, address } = useWallet()
   const toast = useToast()
@@ -176,7 +176,7 @@ export default function StoryEditorPage() {
       if (!data) {
         setMeta(undefined)
         setChunks(undefined)
-        setError(strictCacheOnly ? t('storyChunkEditor.offlineNoData', 'Offline mode: story not cached locally') : t('storyChunkEditor.loading', 'Loading...'))
+        setError(t('storyChunkEditor.loading', 'Loading...'))
         return
       }
       setMeta(data.metadata as StoryMetadata)
@@ -186,7 +186,7 @@ export default function StoryEditorPage() {
     } finally {
       setLoading(false)
     }
-  }, [validTokenId, getStoryData, meta, chunks, t, strictCacheOnly])
+  }, [validTokenId, getStoryData, meta, chunks, t])
 
   useEffect(() => { loadIfNeeded() }, [loadIfNeeded])
 

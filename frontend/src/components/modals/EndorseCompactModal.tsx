@@ -6,6 +6,7 @@ import { ethers } from 'ethers'
 import { useContract } from '../../hooks/useContract'
 import { useWallet } from '../../context/WalletContext'
 import { getFriendlyError } from '../../lib/errors'
+import { useTreeData } from '../../context/TreeDataContext'
 
 interface EndorseCompactModalProps {
   isOpen: boolean
@@ -32,6 +33,7 @@ export default function EndorseCompactModal({
   const { t } = useTranslation()
   const { address, signer } = useWallet()
   const { endorseVersion, getVersionDetails, contract } = useContract()
+  const { invalidateByTx } = useTreeData()
   const [state, setState] = useState<EndorseState>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
@@ -170,6 +172,7 @@ export default function EndorseCompactModal({
         setTxHash(result?.hash || result?.transactionHash || null)
         setEndorsementCount((prev) => (prev === null ? 1 : prev + 1))
         setState('success')
+        invalidateByTx({ receipt: result, hints: { personHash, versionIndex } })
         onSuccess?.(result)
         return
       }
@@ -245,6 +248,7 @@ export default function EndorseCompactModal({
       setTxHash(result?.hash || result?.transactionHash || null)
       setEndorsementCount((prev) => (prev === null ? 1 : prev + 1))
       setState('success')
+      invalidateByTx({ receipt: result, hints: { personHash, versionIndex } })
       onSuccess?.(result)
     } catch (err: any) {
       console.error('❌ Endorse flow failed:', err)

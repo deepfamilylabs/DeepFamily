@@ -448,9 +448,6 @@
       "addCustomNetworkHint": "填写后保存，可重复使用",
       "customNetworkAdded": "已添加自定义网络",
       "clearAndRefresh": "清空",
-      "strictCacheOnly": "严格只读缓存",
-      "strictCacheOn": "离线模式",
-      "strictCacheOff": "在线模式",
       "rootHistory": "根哈希历史",
       "reset": "重置",
       "resetToDefaults": "重置为环境变量默认值"
@@ -463,14 +460,22 @@
       "traversalBFS": "BFS 广度优先：按层级展开，层结构更直观",
       "traversal": "遍历方式",
       "traversalDesc": "DFS 深度优先(快看到深层) / BFS 广度优先(按层展开)",
-      "includeVersionDetails": "加载详情",
-      "includeVersionDetailsDesc": "仅影响下一次刷新时是否批量加载版本详情（刷新时锁定快照）。",
       "progressSummary": "节点 {{created}} / 深度 {{depth}}",
       "nodesLabelFull": "节点",
       "depthLabelFull": "深度",
       "edit": "编辑",
       "save": "保存",
       "cancel": "取消",
+      "childrenMode": "子节点模式",
+      "childrenModeTooltip": {
+        "strict": "严格：仅显示该父版本挂载的子节点",
+        "union": "并集：合并所有父版本的子节点"
+      },
+      "strictIncludeV0": "包含 v0",
+      "strictIncludeV0Tooltip": {
+        "on": "严格 + v0：包含未版本化子节点（parentVersionIndex=0）",
+        "off": "严格：仅当前选择的父版本"
+      },
       "deduplicateChildren": "去重子节点",
       "deduplicateChildrenTooltip": {
         "enabled": "仅显示最高背书版本",

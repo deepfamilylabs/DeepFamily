@@ -68,7 +68,6 @@ export default function PersonPage() {
   // Config used in child components (HashAndIndexLine) via useConfig
   const { getStoryData, getNodeByTokenId, getOwnerOf, nodesData } = useTreeData()
   const config = useConfig()
-  const { strictCacheOnly } = config
   const toast = useToast()
   
   const [data, setData] = useState<StoryDetailData | null>(null)
@@ -296,7 +295,7 @@ export default function PersonPage() {
         const isSealed = Boolean(node.storyMetadata?.isSealed)
         const ttl = isSealed ? 7 * 24 * 60 * 60 * 1000 : 2 * 60 * 1000
         const expired = !fetchedAt || (Date.now() - fetchedAt > ttl)
-        if (!expired || strictCacheOnly) {
+        if (!expired) {
           const { fullStory, integrity } = computeStoryIntegrity(node.storyChunks, node.storyMetadata)
           story = { metadata: node.storyMetadata, chunks: node.storyChunks, fullStory, integrity }
         }
@@ -354,7 +353,7 @@ export default function PersonPage() {
     } finally {
       setLoading(false)
     }
-  }, [tokenId, t, nodesData, strictCacheOnly])
+  }, [tokenId, t, nodesData])
 
   useEffect(() => {
     fetchStoryData()

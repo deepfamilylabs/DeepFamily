@@ -19,6 +19,10 @@ interface Props {
   // Traversal and stats props
   traversal: 'dfs' | 'bfs'
   setTraversal: (t: 'dfs' | 'bfs') => void
+  childrenMode: 'union' | 'strict'
+  setChildrenMode: (v: 'union' | 'strict') => void
+  strictIncludeUnversionedChildren: boolean
+  setStrictIncludeUnversionedChildren: (v: boolean) => void
   deduplicateChildren: boolean
   setDeduplicateChildren: (value: boolean) => void
   progress?: { created: number; visited: number; depth: number }
@@ -39,10 +43,11 @@ function toBool(val: any) {
   return val === '1' || val === 'true' || val === true || val === 'yes'
 }
 
-export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, deduplicateChildren, setDeduplicateChildren, progress, locale }: Props) {
+export default function FamilyTreeConfigForm({ editing, setEditing, contractMessage, loading, onRefresh, t: statusT, traversal, setTraversal, childrenMode, setChildrenMode, strictIncludeUnversionedChildren, setStrictIncludeUnversionedChildren, deduplicateChildren, setDeduplicateChildren, progress, locale }: Props) {
   const { t, i18n } = useTranslation()
   const isDev = import.meta.env.DEV
   const showDeduplicateToggle = useMemo(() => toBool((import.meta as any).env.VITE_SHOW_DEDUPLICATE_TOGGLE), [])
+  const showChildrenModeToggle = useMemo(() => toBool((import.meta as any).env.VITE_SHOW_CHILDREN_MODE_TOGGLE), [])
   const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, update, rootHistory, removeRootFromHistory, clearRootHistory, defaults } = useConfig()
   const { clearAllCaches } = useTreeData()
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl)
@@ -668,35 +673,105 @@ export default function FamilyTreeConfigForm({ editing, setEditing, contractMess
               </div>
             </div>
 
-            {showDeduplicateToggle ? (
+            {(showChildrenModeToggle || showDeduplicateToggle) ? (
               <>
                 <div className="border-t border-slate-200/60 dark:border-slate-700/60"></div>
-                <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                    {statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Deduplicate Children'}:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDeduplicateChildren(!deduplicateChildren)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
-                      deduplicateChildren
-                        ? 'bg-blue-600 dark:bg-blue-500'
-                        : 'bg-slate-300 dark:bg-slate-600'
-                    }`}
-                    aria-label={statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Toggle deduplicate children'}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                        deduplicateChildren ? 'translate-x-[18px]' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                  <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                    {deduplicateChildren 
-                      ? (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.enabled') : 'Highest endorsed version only')
-                      : (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.disabled') : 'Show all versions')
-                    }
-                  </div>
+                <div className="space-y-2">
+                  {showChildrenModeToggle ? (
+                    <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        {statusT ? statusT('familyTree.ui.childrenMode', 'Children Mode') : 'Children Mode'}:
+                      </span>
+                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                        <button
+                          type="button"
+                          aria-label="Union children mode"
+                          onClick={() => setChildrenMode('union')}
+                          className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${
+                            childrenMode === 'union'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                          }`}
+                        >Union</button>
+                        <div className="relative group border-l border-slate-300 dark:border-slate-600">
+                          <button
+                            type="button"
+                            aria-label="Strict children mode"
+                            onClick={() => setChildrenMode('strict')}
+                            className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-lg ${
+                              childrenMode === 'strict'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                            }`}
+                          >Strict</button>
+                        </div>
+                      </div>
+                      <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
+                        {childrenMode === 'strict'
+                          ? (statusT ? statusT('familyTree.ui.childrenModeTooltip.strict', 'Strict: only children attached to this parent version') : 'Strict: only children attached to this parent version')
+                          : (statusT ? statusT('familyTree.ui.childrenModeTooltip.union', 'Union: merge children across all parent versions') : 'Union: merge children across all parent versions')}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {(showChildrenModeToggle && childrenMode === 'strict') ? (
+                    <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        {statusT ? statusT('familyTree.ui.strictIncludeV0', 'Include v0') : 'Include v0'}:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setStrictIncludeUnversionedChildren(!strictIncludeUnversionedChildren)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
+                          strictIncludeUnversionedChildren
+                            ? 'bg-blue-600 dark:bg-blue-500'
+                            : 'bg-slate-300 dark:bg-slate-600'
+                        }`}
+                        aria-label={statusT ? statusT('familyTree.ui.strictIncludeV0', 'Toggle include v0') : 'Toggle include v0'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            strictIncludeUnversionedChildren ? 'translate-x-[18px]' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                      <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
+                        {strictIncludeUnversionedChildren
+                          ? (statusT ? statusT('familyTree.ui.strictIncludeV0Tooltip.on', 'Strict + v0: include unversioned children (parentVersionIndex=0)') : 'Strict + v0: include unversioned children (parentVersionIndex=0)')
+                          : (statusT ? statusT('familyTree.ui.strictIncludeV0Tooltip.off', 'Strict only: exactly parentVersionIndex you selected') : 'Strict only: exactly parentVersionIndex you selected')}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {showDeduplicateToggle ? (
+                    <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        {statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Deduplicate Children'}:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDeduplicateChildren(!deduplicateChildren)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
+                          deduplicateChildren
+                            ? 'bg-blue-600 dark:bg-blue-500'
+                            : 'bg-slate-300 dark:bg-slate-600'
+                        }`}
+                        aria-label={statusT ? statusT('familyTree.ui.deduplicateChildren') : 'Toggle deduplicate children'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            deduplicateChildren ? 'translate-x-[18px]' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                      <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
+                        {deduplicateChildren 
+                          ? (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.enabled') : 'Highest endorsed version only')
+                          : (statusT ? statusT('familyTree.ui.deduplicateChildrenTooltip.disabled') : 'Show all versions')
+                        }
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : null}

@@ -5,26 +5,29 @@ import ViewContainer from '../components/ViewContainer'
 import { useTreeData } from '../context/TreeDataContext'
 import { useVizOptions } from '../context/VizOptionsContext'
 import { useConfig } from '../context/ConfigContext'
+import TreeDebugPanel from '../components/TreeDebugPanel'
 
 function toBool(val: any) {
   return val === '1' || val === 'true' || val === true || val === 'yes'
 }
 
 export default function TreePage() {
-  const { traversal, setTraversal, deduplicateChildren, setDeduplicateChildren } = useVizOptions()
+  const { traversal, setTraversal, deduplicateChildren, setDeduplicateChildren, childrenMode, setChildrenMode, strictIncludeUnversionedChildren, setStrictIncludeUnversionedChildren } = useVizOptions()
   const [viewMode, setViewMode] = useState<'dag' | 'tree' | 'force' | 'virtual'>(() => {
+    const preferFlat = toBool((import.meta as any).env.VITE_USE_FLAT_TREE)
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('df:viewMode')
       if (saved === 'dag' || saved === 'tree' || saved === 'force' || saved === 'virtual') return saved as any
     }
-    return 'tree'
+    return preferFlat ? 'virtual' : 'tree'
   })
   const [editingConfig, setEditingConfig] = useState(false)
 
   const { t, i18n } = useTranslation()
-  const { root, loading: loadingContract, progress, contractMessage, refresh, clearAllCaches } = useTreeData()
+  const { rootId, rootExists, loading: loadingContract, progress, contractMessage, refresh, clearAllCaches } = useTreeData()
   const { contractAddress, rootHash, rootVersionIndex, defaults, update } = useConfig()
   const forceEnvConfigSync = useMemo(() => toBool((import.meta as any).env.VITE_FORCE_ENV_CONFIG_SYNC), [])
+  const showDebugPanel = useMemo(() => toBool((import.meta as any).env.VITE_SHOW_DEBUG), [])
 
   useEffect(() => {
     if (!forceEnvConfigSync) return
@@ -44,7 +47,6 @@ export default function TreePage() {
   }, [forceEnvConfigSync, defaults.contractAddress, defaults.rootHash, defaults.rootVersionIndex, contractAddress, rootHash, rootVersionIndex, clearAllCaches, update, refresh])
 
   const triggerRefresh = useCallback(() => refresh(), [refresh])
-  useEffect(() => { triggerRefresh() }, [triggerRefresh])
 
   useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('df:viewMode', viewMode) }, [viewMode])
 
@@ -62,17 +64,27 @@ export default function TreePage() {
           t={t as any}
           traversal={traversal}
           setTraversal={setTraversal}
+          childrenMode={childrenMode}
+          setChildrenMode={setChildrenMode}
+          strictIncludeUnversionedChildren={strictIncludeUnversionedChildren}
+          setStrictIncludeUnversionedChildren={setStrictIncludeUnversionedChildren}
           deduplicateChildren={deduplicateChildren}
           setDeduplicateChildren={setDeduplicateChildren}
           progress={progress}
         />
       </div>
 
+      {showDebugPanel ? (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden p-4">
+          <TreeDebugPanel />
+        </div>
+      ) : null}
+
       {/* Tree Visualization Card - Minimal Design */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden transition-shadow duration-200 hover:shadow-lg dark:hover:shadow-slate-900/60">
         <ViewContainer
           viewMode={viewMode as any}
-          root={root}
+          hasRoot={!!rootId && rootExists}
           contractMessage={contractMessage}
           loading={loadingContract}
           onViewModeChange={setViewMode}

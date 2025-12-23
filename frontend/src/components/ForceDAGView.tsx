@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import * as d3 from 'd3'
-import type { GraphNode } from '../types/graph'
 import { makeNodeId, nodeLabel, isMinted, shortHash } from '../types/graph'
 import { useTreeData } from '../context/TreeDataContext'
 import { useNodeDetail } from '../context/NodeDetailContext'
@@ -11,33 +10,50 @@ import { useFamilyTreeHeight } from '../constants/layout'
 import { useVizOptions } from '../context/VizOptionsContext'
 import { getGenderColorHex } from '../constants/genderColors'
 import EndorseCompactModal from './modals/EndorseCompactModal'
+import { buildViewGraphData, type TreeWalkParams } from '../utils/treeData'
 
 // Re-add types lost during refactor
 export type SimNode = d3.SimulationNodeDatum & { id: string; label: string; hash: string; versionIndex: number; tag?: string; depth: number }
 export type SimLink = d3.SimulationLinkDatum<SimNode> & { source: string | SimNode; target: string | SimNode }
 
-function buildGraph(root: GraphNode) {
-  const nodes: SimNode[] = []
-  const links: SimLink[] = []
-  function rec(n: GraphNode, depth: number) {
-    const id = makeNodeId(n.personHash, n.versionIndex)
-    nodes.push({ id, label: nodeLabel(n), hash: n.personHash, versionIndex: n.versionIndex, tag: n.tag, depth })
-    for (const c of n.children || []) { const cid = makeNodeId(c.personHash, c.versionIndex); links.push({ source: id, target: cid }); rec(c, depth + 1) }
-  }
-  rec(root, 0)
-  return { nodes, links }
+function buildGraph(params: TreeWalkParams) {
+  const graph = buildViewGraphData(params)
+  const simNodes: SimNode[] = graph.nodes.map(n => {
+    const tag = params.nodesData?.[n.id]?.tag
+    return {
+      id: n.id,
+      label: nodeLabel({ personHash: n.personHash, versionIndex: n.versionIndex }),
+      hash: n.personHash,
+      versionIndex: n.versionIndex,
+      tag,
+      depth: n.depth
+    }
+  })
+  const simLinks: SimLink[] = graph.edges.map(e => ({ source: e.from, target: e.to }))
+  return { nodes: simNodes, links: simLinks }
 }
 
 export interface ForceDAGViewHandle { centerOnNode: (id: string) => void }
 
-function ForceDAGViewInner({ root, height }: { root: GraphNode; height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
+function ForceDAGViewInner({ height }: { height?: number }, ref: React.Ref<ForceDAGViewHandle>) {
   const responsiveHeight = useFamilyTreeHeight()
   const defaultHeight = height || responsiveHeight
-  const { nodesData, bumpEndorsementCount } = useTreeData() as any
-  const { deduplicateChildren } = useVizOptions()
+  const { rootId, nodesData, edgesUnion, edgesStrict, endorsementsReady, bumpEndorsementCount } = useTreeData()
+  const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions()
   const { openNode, selected: ctxSelected } = useNodeDetail()
   const selectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
-  const data = useMemo(() => buildGraph(root), [root])
+  const data = useMemo(() => {
+    return buildGraph({
+      rootId,
+      childrenMode,
+      strictIncludeUnversionedChildren,
+      deduplicateChildren,
+      endorsementsReady,
+      nodesData,
+      edgesUnion,
+      edgesStrict
+    })
+  }, [childrenMode, deduplicateChildren, edgesStrict, edgesUnion, endorsementsReady, nodesData, rootId, strictIncludeUnversionedChildren])
   const gRef = useRef<SVGGElement | null>(null)
   const { transform, zoomIn, zoomOut, setZoom, svgRef, innerRef, kToNorm, normToK, centerOn } = useZoom()
   const NODE_R = 14
