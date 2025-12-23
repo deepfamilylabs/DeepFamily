@@ -22,6 +22,7 @@ const providerCache = new Map<string, ethers.JsonRpcProvider>()
 const env: any = (import.meta as any).env || {}
 const EDGE_TTL_MS = Number(env.VITE_DF_EDGE_TTL_MS || 120_000)
 const TOTAL_VERSIONS_TTL_MS = Number(env.VITE_DF_TV_TTL_MS || 60_000)
+const VERSION_DETAILS_TTL_MS = Number(env.VITE_DF_VD_TTL_MS || 300_000)
 const USE_INDEXEDDB_CACHE = env.VITE_USE_INDEXEDDB_CACHE !== '0' && env.VITE_USE_INDEXEDDB_CACHE !== 'false'
 const CHILDREN_PAGE_LIMIT = 100
 const isStale = (fetchedAt?: number, ttlMs?: number) => {
@@ -653,12 +654,18 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // If all nodes already have required fields (endorsementCount and tokenId) in cache, skip network request
+      const hasRequiredFields = (nd?: NodeData) => !!nd && nd.endorsementCount !== undefined && nd.tokenId !== undefined
+      const isVersionDetailsFresh = (nd?: NodeData) => {
+        if (!hasRequiredFields(nd)) return false
+        return !isStale(nd?.versionDetailsFetchedAt, VERSION_DETAILS_TTL_MS)
+      }
+
+      // If all nodes already have fresh fields (endorsementCount and tokenId) in cache, skip network request
       try {
         const allSatisfied = nodePairs.every(p => {
           const id = makeNodeId(p.h, p.v)
           const nd = nodesDataRef.current[id] || (snapshot ? snapshot[id] : undefined)
-          return !!nd && nd.endorsementCount !== undefined && nd.tokenId !== undefined
+          return isVersionDetailsFresh(nd)
         })
         if (allSatisfied) {
           if (!cancelled) setEndorsementsReady(true)
@@ -671,8 +678,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                 const id = makeNodeId(p.h, p.v)
                 const fromSnap = snapshot![id]
                 const cur = next[id]
-                const hasRequired = (n?: NodeData) => !!n && n.endorsementCount !== undefined && n.tokenId !== undefined
-                if (!hasRequired(cur) && hasRequired(fromSnap)) {
+                if (!hasRequiredFields(cur) && hasRequiredFields(fromSnap)) {
                   next[id] = cur ? { ...cur, ...fromSnap, id: cur.id } : { ...fromSnap }
                   changed = true
                 }
@@ -691,12 +697,10 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
           const id = makeNodeId(p.h, p.v)
           const fromMem = nodesDataRef.current[id]
           const fromSnap = snapshot ? snapshot[id] : undefined
-          const hasRequired = (n?: NodeData) => !!n && n.endorsementCount !== undefined && n.tokenId !== undefined
-          if (hasRequired(fromMem) || hasRequired(fromSnap)) {
-            if (!hasRequired(fromMem) && fromSnap) backfills[id] = fromSnap
-            return false
+          if (hasRequiredFields(fromMem) || hasRequiredFields(fromSnap)) {
+            if (!hasRequiredFields(fromMem) && fromSnap) backfills[id] = fromSnap
           }
-          return true
+          return !isVersionDetailsFresh(fromMem) && !isVersionDetailsFresh(fromSnap)
         })
         if (Object.keys(backfills).length > 0) {
           setNodesData(prev => {
@@ -704,8 +708,7 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
             const next = { ...prev }
             for (const [id, nd] of Object.entries(backfills)) {
               const cur = next[id]
-              const hasRequired = (n?: NodeData) => !!n && n.endorsementCount !== undefined && n.tokenId !== undefined
-              if (!hasRequired(cur)) {
+              if (!hasRequiredFields(cur)) {
                 next[id] = cur ? { ...cur, ...nd, id: cur.id } : nd
                 changed = true
               }
@@ -776,7 +779,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                   addedBy: versionFields.addedBy,
                   timestamp: versionFields.timestamp,
                   tag,
-                  metadataCID: versionFields.metadataCID
+                  metadataCID: versionFields.metadataCID,
+                  versionDetailsFetchedAt: Date.now()
                 }
               }
             })
@@ -847,7 +851,8 @@ export function TreeDataProvider({ children }: { children: React.ReactNode }) {
                     isDeathBC: coreFields.isDeathBC,
                     story: coreFields.story,
                     nftTokenURI,
-                    storyMetadata
+                    storyMetadata,
+                    versionDetailsFetchedAt: Date.now()
                   }
                 }
               })
