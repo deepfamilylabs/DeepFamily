@@ -69,8 +69,8 @@ VITE_ROOT_VERSION_INDEX=...
 
 **Common optional**
 - `VITE_MULTICALL_ADDRESS=0x...` (future; optional)
-- Performance knobs: `VITE_DF_PARALLEL`, `VITE_DF_PAGE_SIZE`, `VITE_DF_ENDORSE_BATCH`, `VITE_DF_MAX_DEPTH`, `VITE_DF_HARD_NODE_LIMIT`
-- Debug/caching: `VITE_SHOW_DEBUG`, `VITE_STRICT_CACHE_ONLY`
+- Performance knobs: `VITE_DF_HARD_NODE_LIMIT`
+- Debug/caching: `VITE_SHOW_DEBUG`, `VITE_STRICT_CACHE_ONLY`, `VITE_USE_INDEXEDDB_CACHE` (tree caches persist in IndexedDB when enabled)
 
 ### Auto-config for localhost
 
