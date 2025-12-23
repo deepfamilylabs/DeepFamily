@@ -68,7 +68,6 @@ VITE_ROOT_VERSION_INDEX=...
 ```
 
 **Common optional**
-- `VITE_MULTICALL_ADDRESS=0x...` (future; optional)
 - Performance knobs: `VITE_DF_HARD_NODE_LIMIT`
 - Debug/caching: `VITE_SHOW_DEBUG`, `VITE_STRICT_CACHE_ONLY`, `VITE_USE_INDEXEDDB_CACHE` (tree caches persist in IndexedDB when enabled)
 
