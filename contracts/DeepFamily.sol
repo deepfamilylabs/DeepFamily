@@ -269,7 +269,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   uint256 public constant MAX_LONG_TEXT_LENGTH = 256;
 
   /// @dev Maximum results per query page
-  uint256 public constant MAX_QUERY_PAGE_SIZE = 100;
+  uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
 
   /// @dev Maximum content length per chunk (2KB text)
   uint256 public constant MAX_CHUNK_CONTENT_LENGTH = 2048;

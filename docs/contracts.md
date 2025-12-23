@@ -10,7 +10,7 @@
 | Constant | Value | Purpose & Impact |
 |----------|-------|------------------|
 | `MAX_LONG_TEXT_LENGTH` | 256 | Max length for tags, IPFS CIDs, names, places, stories |
-| `MAX_QUERY_PAGE_SIZE` | 100 | Gas-optimized pagination limit for all query functions |
+| `MAX_QUERY_PAGE_SIZE` | 200 | Gas-optimized pagination limit for all query functions |
 | `MAX_CHUNK_CONTENT_LENGTH` | 2048 | Story chunk size limit (≈2KB per shard) |
 | `MAX_STORY_CHUNKS` | — | No protocol cap; chunks append sequentially |
 | `_HASH_LIMBS_REQUIRED` | 6 | Required limbs for person/father/mother hashes in ZK proofs |
