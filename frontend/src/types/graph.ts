@@ -41,6 +41,7 @@ export interface NodeData {
   metadataCID?: string
   endorsementCount?: number
   tokenId?: string
+  versionDetailsFetchedAt?: number
   owner?: string
   fullName?: string // coreInfo.fullName
   gender?: number
