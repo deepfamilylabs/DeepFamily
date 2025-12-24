@@ -2,14 +2,12 @@ import type { NodeId, NodeData } from '../types/graph'
 import { makeNodeId, parseNodeId } from '../types/graph'
 import type { EdgeStoreStrict, EdgeStoreUnion } from '../types/treeStore'
 import { unionParentKey } from '../types/treeStore'
+import type { BaseEdge, BaseNode } from '../types/familyTreeTypes'
 
 export type TreeRow = { nodeId: NodeId; depth: number; isLast: boolean; hasChildren: boolean }
-export type TreeWalkNode = { id: NodeId; depth: number }
-export type TreeWalkEdge = { from: NodeId; to: NodeId }
-export type TreeViewNode = { id: NodeId; depth: number; personHash: string; versionIndex: number }
 export type TreeGraphData = {
-  nodes: TreeViewNode[]
-  edges: TreeWalkEdge[]
+  nodes: BaseNode[]
+  edges: BaseEdge[]
   childrenByParent: Record<NodeId, NodeId[]>
 }
 
@@ -141,11 +139,35 @@ export function buildTreeRows(params: {
   return rows
 }
 
+export function buildTreeRowsFromGraph(params: {
+  rootId: NodeId
+  expanded: Set<NodeId>
+  graph: TreeGraphData
+}): TreeRow[] {
+  const { rootId, expanded, graph } = params
+  const rows: TreeRow[] = []
+  const seen = new Set<NodeId>()
+  const stack: Array<{ id: NodeId; depth: number; isLast: boolean }> = [{ id: rootId, depth: 0, isLast: true }]
+  while (stack.length) {
+    const cur = stack.pop()!
+    if (seen.has(cur.id)) continue
+    seen.add(cur.id)
+    const children = graph.childrenByParent[cur.id] || []
+    rows.push({ nodeId: cur.id, depth: cur.depth, isLast: cur.isLast, hasChildren: children.length > 0 })
+    if (!expanded.has(cur.id)) continue
+    if (!children.length) continue
+    for (let i = children.length - 1; i >= 0; i--) {
+      stack.push({ id: children[i], depth: cur.depth + 1, isLast: i === children.length - 1 })
+    }
+  }
+  return rows
+}
+
 function walkTree(params: TreeWalkParams): TreeGraphData {
   const { rootId, childrenMode, strictIncludeUnversionedChildren, deduplicateChildren, endorsementsReady, nodesData, edgesUnion, edgesStrict } = params
   if (!rootId) return { nodes: [], edges: [], childrenByParent: {} }
-  const nodes: TreeViewNode[] = []
-  const edges: TreeWalkEdge[] = []
+  const nodes: BaseNode[] = []
+  const edges: BaseEdge[] = []
   const childrenByParent: Record<NodeId, NodeId[]> = {}
   const visited = new Set<NodeId>()
   const stack: Array<{ id: NodeId; depth: number; parentId?: NodeId }> = [{ id: rootId, depth: 0 }]
@@ -175,11 +197,6 @@ function walkTree(params: TreeWalkParams): TreeGraphData {
   }
 
   return { nodes, edges, childrenByParent }
-}
-
-export function buildTreeWalk(params: TreeWalkParams): { nodes: TreeWalkNode[]; edges: TreeWalkEdge[] } {
-  const { nodes, edges } = walkTree(params)
-  return { nodes: nodes.map(n => ({ id: n.id, depth: n.depth })), edges }
 }
 
 export function buildViewGraphData(params: TreeWalkParams): TreeGraphData {

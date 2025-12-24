@@ -1,5 +1,6 @@
 import React from 'react'
 import { getGenderColor } from '../constants/genderColors'
+import { getFamilyTreeNodeTheme } from '../utils/familyTreeTheme'
 
 export interface NodeCardProps {
   w: number
@@ -53,11 +54,8 @@ export default function NodeCard(props: NodeCardProps) {
   // Only show badge when totalVersions is explicitly passed (deduplicate mode) and > 1
   const hasMultipleVersions = typeof totalVersions === 'number' && totalVersions > 1
 
-  const baseRect = minted
-    ? 'fill-emerald-50 dark:fill-emerald-900/20 stroke-emerald-300 dark:stroke-emerald-400'
-    : selected
-      ? 'fill-amber-50 dark:fill-amber-900/20 stroke-amber-400 dark:stroke-amber-400/80'
-      : 'fill-white/70 dark:fill-slate-900/40 stroke-slate-300 dark:stroke-slate-600'
+  const theme = getFamilyTreeNodeTheme({ minted, selected })
+  const baseRect = theme.baseShapeClass
   const hoverStroke = (!selected && hover) ? 'stroke-blue-500 dark:stroke-blue-400' : ''
   const cardShadow = hover ? 'shadow-lg' : 'shadow-md'
 
@@ -97,7 +95,7 @@ export default function NodeCard(props: NodeCardProps) {
         rx={12}
         ry={12}
         className={`${baseRect} ${hoverStroke} ${cardShadow} transition-colors transition-shadow`}
-        strokeWidth={minted || selected ? 2 : 1}
+        strokeWidth={theme.baseShapeStrokeWidth}
       />
       <rect width={w} height={h} rx={12} ry={12} fill="url(#cardGlossGrad)" className="dark:opacity-0" />
 
@@ -119,7 +117,7 @@ export default function NodeCard(props: NodeCardProps) {
           y={8}
           textAnchor="end"
           dominantBaseline="middle"
-          className={`text-[10px] ${minted ? 'fill-emerald-600 dark:fill-emerald-400' : selected ? 'fill-amber-600 dark:fill-amber-300' : 'fill-slate-600 dark:fill-slate-400'}`}
+          className={`text-[10px] ${theme.versionText.svg}`}
         >
           {hasMultipleVersions ? `T${totalVersions}:${versionText}` : versionText}
         </tspan>
@@ -138,7 +136,7 @@ export default function NodeCard(props: NodeCardProps) {
           pointerEvents="none"
         >
           <div
-            className={`font-medium text-[15px] leading-[18px] ${minted ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-slate-100'} overflow-hidden text-ellipsis whitespace-nowrap`}
+            className={`font-medium text-[15px] leading-[18px] ${theme.titleText.html} overflow-hidden text-ellipsis whitespace-nowrap`}
           >
             {titleText}
           </div>
@@ -148,10 +146,10 @@ export default function NodeCard(props: NodeCardProps) {
       {/* TAG badge (hidden if insufficient height) */}
       {renderTag && (
         <>
-          <rect x={PADDING_X} y={yTag} width={badgeW} height={TAG_BADGE_H} rx={8} ry={8} className={`${minted ? 'fill-emerald-100 dark:fill-emerald-800/60' : 'fill-slate-100 dark:fill-slate-800/60'}`} />
+          <rect x={PADDING_X} y={yTag} width={badgeW} height={TAG_BADGE_H} rx={8} ry={8} className={theme.tagBadgeBgClass} />
           <foreignObject x={PADDING_X} y={yTag} width={badgeW} height={TAG_BADGE_H} pointerEvents="none">
             <div
-              className={`font-mono text-[11px] leading-[16px] ${minted ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'} overflow-hidden text-ellipsis whitespace-nowrap px-[6px]`}
+              className={`font-mono text-[11px] leading-[16px] ${theme.tagBadgeText.html} overflow-hidden text-ellipsis whitespace-nowrap px-[6px]`}
             >
               {tag}
             </div>
@@ -192,7 +190,7 @@ export default function NodeCard(props: NodeCardProps) {
 
       {/* Bottom: left short hash + right star endorsement */}
       <text className="font-mono">
-        <tspan x={PADDING_X} y={h - FOOTER_PADDING - 2} className={`text-[12px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-600 dark:fill-slate-400'}`}>{shortHashText}</tspan>
+        <tspan x={PADDING_X} y={h - FOOTER_PADDING - 2} className={`text-[12px] ${theme.shortHashText.svg}`}>{shortHashText}</tspan>
       </text>
       {typeof endorsementCount === 'number' && (
         (() => { const txt = String(endorsementCount); const badgeW = Math.max(24, 12 + txt.length * 7); const x = w - badgeW - (FOOTER_PADDING - 2); const y = h - FOOTER_PADDING - FOOTER_BADGE_H; const cx = x + 8; const cy = y + FOOTER_BADGE_H / 2; const starPath = buildStarPath(cx, cy); return (
@@ -202,9 +200,9 @@ export default function NodeCard(props: NodeCardProps) {
             onTouchStart={(e) => e.stopPropagation()}
             className="cursor-pointer"
           >
-            <rect x={x} y={y} width={badgeW} height={FOOTER_BADGE_H} rx={8} ry={8} className={`${minted ? 'fill-emerald-100 dark:fill-emerald-800/60' : 'fill-slate-100 dark:fill-slate-800/60'} stroke-transparent`} />
-            <path d={starPath} className={`${minted ? 'fill-emerald-500' : 'fill-slate-500'}`} />
-            <text className="font-mono pointer-events-none"><tspan x={x + 8 + 8} y={y + 12} textAnchor="start" className={`text-[12px] ${minted ? 'fill-emerald-700 dark:fill-emerald-300' : 'fill-slate-700 dark:fill-slate-300'}`}>{txt}</tspan></text>
+            <rect x={x} y={y} width={badgeW} height={FOOTER_BADGE_H} rx={8} ry={8} className={`${theme.endorseBadgeBgClass} stroke-transparent`} />
+            <path d={starPath} className={theme.endorseStarClass} />
+            <text className="font-mono pointer-events-none"><tspan x={x + 8 + 8} y={y + 12} textAnchor="start" className={`text-[12px] ${theme.endorseCountText.svg}`}>{txt}</tspan></text>
           </g>
         ) })()
       )}

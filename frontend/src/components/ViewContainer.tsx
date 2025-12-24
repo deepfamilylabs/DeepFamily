@@ -3,6 +3,7 @@ import LoadingSkeleton from './LoadingSkeleton'
 import ViewModeSwitch from './ViewModeSwitch'
 import TreeListView from './TreeListView'
 import { NodeDetailProvider } from '../context/NodeDetailContext'
+import { EndorseModalProvider } from '../context/EndorseModalContext'
 import { LAYOUT } from '../constants/layout'
 
 const ForceGraphView = React.lazy(() => import('./ForceGraphView'))
@@ -48,9 +49,11 @@ export default function ViewContainer({ viewMode, hasRoot, contractMessage, load
         </div>
       )}
       
-      <NodeDetailProvider>
-        <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
-      </NodeDetailProvider>
+      <EndorseModalProvider>
+        <NodeDetailProvider>
+          <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
+        </NodeDetailProvider>
+      </EndorseModalProvider>
     </div>
   )
 }

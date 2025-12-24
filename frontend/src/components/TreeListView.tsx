@@ -1,22 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { FixedSizeList as VirtualList, type ListChildComponentProps } from 'react-window'
 import { useFamilyTreeHeight, LAYOUT } from '../constants/layout'
-import { useTreeData } from '../context/TreeDataContext'
-import { useNodeDetail } from '../context/NodeDetailContext'
-import { useVizOptions } from '../context/VizOptionsContext'
-import { parseNodeId, shortHash, isMinted, type NodeId } from '../types/graph'
+import { type NodeId } from '../types/graph'
 import { getGenderColor } from '../constants/genderColors'
-import { buildTreeRows, type TreeRow } from '../utils/treeData'
-import EndorseCompactModal from './modals/EndorseCompactModal'
+import type { TreeRow } from '../utils/treeData'
+import { useFamilyTreeViewModel } from '../hooks/useFamilyTreeViewModel'
 
 export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHeight?: number }) {
   const familyTreeHeight = useFamilyTreeHeight()
-  const { rootId, endorsementsReady, nodesData, edgesUnion, edgesStrict, bumpEndorsementCount } = useTreeData()
-  const { openNode, selected } = useNodeDetail()
-  const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions()
-  const selectedKey = selected ? `${selected.personHash}-v-${selected.versionIndex}` : null
+  const vm = useFamilyTreeViewModel()
+  const { rootId } = vm
+  const { treeListRows } = vm.selectors
+  const { openNodeById, openEndorseById } = vm.actions
+  const selectedKey = vm.selectedId
   const [expanded, setExpanded] = useState<Set<NodeId>>(() => new Set(rootId ? [rootId] : []))
-  const [endorseModal, setEndorseModal] = useState<{ open: boolean; personHash: string; versionIndex: number; fullName?: string; endorsementCount?: number }>({ open: false, personHash: '', versionIndex: 1 })
 
   useEffect(() => {
     setExpanded(new Set(rootId ? [rootId] : []))
@@ -24,18 +21,8 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
 
   const rows = useMemo<TreeRow[]>(() => {
     if (!rootId) return []
-    return buildTreeRows({
-      rootId,
-      expanded,
-      childrenMode,
-      strictIncludeUnversionedChildren: childrenMode === 'strict' ? strictIncludeUnversionedChildren : undefined,
-      deduplicateChildren,
-      endorsementsReady,
-      nodesData,
-      edgesUnion,
-      edgesStrict
-    })
-  }, [childrenMode, deduplicateChildren, endorsementsReady, edgesStrict, edgesUnion, expanded, nodesData, rootId, strictIncludeUnversionedChildren])
+    return treeListRows(expanded)
+  }, [expanded, rootId, treeListRows])
 
   const toggle = useCallback((nodeId: NodeId) => {
     setExpanded(prev => {
@@ -49,14 +36,12 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
   const Row = useCallback(({ index, style }: ListChildComponentProps) => {
     const row = rows[index]
     const { nodeId, depth, isLast, hasChildren } = row
-    const parsed = parseNodeId(nodeId)
     const k = nodeId
     const isOpen = expanded.has(nodeId)
-    const nd = nodesData?.[nodeId]
-    const name = nd?.fullName
-    const endorse = nd?.endorsementCount
-    const mintedFlag = isMinted(nd)
-    const gender = nd?.gender as number | undefined
+    const ui = vm.nodeUiById[nodeId]
+    const endorse = ui.endorsementCount
+    const mintedFlag = ui.minted
+    const gender = ui.gender as number | undefined
     const isSel = selectedKey === k
 
     const ancestorGuides: boolean[] = []
@@ -70,19 +55,13 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
 
     const handleRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if ((e.target as HTMLElement)?.closest?.('[data-endorse-btn="true"]')) return
-      openNode({ personHash: parsed.personHash, versionIndex: parsed.versionIndex })
+      openNodeById(nodeId)
     }
 
     const openEndorseModal = (e: React.MouseEvent | React.TouchEvent) => {
       e.stopPropagation()
       e.preventDefault()
-      setEndorseModal({
-        open: true,
-        personHash: parsed.personHash,
-        versionIndex: parsed.versionIndex,
-        fullName: name,
-        endorsementCount: endorse
-      })
+      openEndorseById(nodeId)
     }
 
     return (
@@ -101,7 +80,7 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
           ))}
         </div>
 
-        <div style={{ paddingLeft: depth * 16 }} className="flex items-center gap-1 pl-1 pr-2 min-w-[140px] relative" title={parsed.personHash}>
+        <div style={{ paddingLeft: depth * 16 }} className="flex items-center gap-1 pl-1 pr-2 min-w-[140px] relative" title={ui.personHash}>
           <div className="flex items-center">
             {depth > 0 && (
               <div className="relative w-4" style={{ height: rowHeight }}>
@@ -119,9 +98,9 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
           </div>
 
           <div className="flex items-center gap-2 flex-wrap min-w-max">
-            <span className="text-slate-600 dark:text-slate-300">{shortHash(parsed.personHash)}</span>
+            <span className="text-slate-600 dark:text-slate-300">{ui.shortHashText}</span>
             <span className="text-sky-600 dark:text-sky-400">
-              {nd?.totalVersions && nd.totalVersions > 1 ? `T${nd.totalVersions}:v${parsed.versionIndex}` : `v${parsed.versionIndex}`}
+              {ui.versionTextWithTotal}
             </span>
             {endorse !== undefined && (
               <button
@@ -146,13 +125,13 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
                 <span className={`ml-1 inline-block w-2 h-2 rounded-full ${getGenderColor(gender, 'BG')} ring-1 ring-white dark:ring-slate-900`} />
               </>
             )}
-            {name && <span className="text-slate-700 dark:text-slate-200 text-[12px] truncate max-w-[180px]" title={name}>{name}</span>}
-            {nd?.tag && <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/40 px-1 rounded" title={nd.tag}>{nd.tag}</span>}
+            {ui.fullName && <span className="text-slate-700 dark:text-slate-200 text-[12px] truncate max-w-[180px]" title={ui.fullName}>{ui.fullName}</span>}
+            {ui.tagText && <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/40 px-1 rounded" title={ui.tagText}>{ui.tagText}</span>}
           </div>
         </div>
       </div>
     )
-  }, [rows, expanded, rowHeight, toggle, openNode, selectedKey, nodesData, setEndorseModal])
+  }, [rows, expanded, rowHeight, toggle, openNodeById, selectedKey, openEndorseById, vm.nodeUiById])
 
   if (!rootId) return null
 
@@ -161,17 +140,6 @@ export default function TreeListView({ rowHeight = LAYOUT.ROW_HEIGHT }: { rowHei
       <div className="p-4 pt-16 h-full overflow-x-auto">
         <VirtualList height={familyTreeHeight - 32} itemCount={rows.length} itemSize={rowHeight} width={'auto'}>{Row}</VirtualList>
       </div>
-      <EndorseCompactModal
-        isOpen={endorseModal.open}
-        onClose={() => setEndorseModal(m => ({ ...m, open: false }))}
-        personHash={endorseModal.personHash}
-        versionIndex={endorseModal.versionIndex}
-        versionData={{
-          fullName: endorseModal.fullName,
-          endorsementCount: endorseModal.endorsementCount
-        }}
-        onSuccess={() => bumpEndorsementCount?.(endorseModal.personHash, endorseModal.versionIndex, 1)}
-      />
     </div>
   )
 }
