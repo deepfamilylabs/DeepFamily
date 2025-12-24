@@ -4,7 +4,7 @@ import ViewModeSwitch from './ViewModeSwitch'
 import TreeListView from './TreeListView'
 import { NodeDetailProvider } from '../context/NodeDetailContext'
 import { EndorseModalProvider } from '../context/EndorseModalContext'
-import { LAYOUT } from '../constants/layout'
+import { FamilyTreeViewConfigProvider } from '../context/FamilyTreeViewConfigContext'
 
 const ForceGraphView = React.lazy(() => import('./ForceGraphView'))
 const DagView = React.lazy(() => import('./DagView'))
@@ -28,7 +28,7 @@ export default function ViewContainer({ viewMode, hasRoot, contractMessage, load
         viewMode === 'force' ? <ForceGraphView />
         : viewMode === 'dag' ? <DagView />
         : viewMode === 'tree' ? <TreeLayoutView />
-        : <TreeListView rowHeight={LAYOUT.ROW_HEIGHT} />
+        : <TreeListView />
       ) : (
         <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 pt-16 flex items-center justify-center">
           {loading ? <LoadingSkeleton /> : contractMessage ? <div className="text-sm text-slate-700 dark:text-slate-300">{contractMessage}</div> : <LoadingSkeleton />}
@@ -51,7 +51,9 @@ export default function ViewContainer({ viewMode, hasRoot, contractMessage, load
       
       <EndorseModalProvider>
         <NodeDetailProvider>
-          <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
+          <FamilyTreeViewConfigProvider>
+            <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
+          </FamilyTreeViewConfigProvider>
         </NodeDetailProvider>
       </EndorseModalProvider>
     </div>
