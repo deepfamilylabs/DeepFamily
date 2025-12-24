@@ -1,6 +1,6 @@
-import { useMemo, useCallback, MouseEvent, useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useTreeData } from '../context/TreeDataContext'
+import { useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { useTreeData } from "../context/TreeDataContext";
 import {
   User,
   Calendar,
@@ -10,59 +10,73 @@ import {
   FileText,
   Hash,
   ChevronRight,
-  Eye
-} from 'lucide-react'
-import { NodeData, hasDetailedStory as hasDetailedStoryFn, birthDateString, deathDateString, genderText as genderTextFn, formatUnixDate, isMinted } from '../types/graph'
-import { shortHash } from '../types/graph'
-import EndorseCompactModal from './modals/EndorseCompactModal'
+  Eye,
+} from "lucide-react";
+import {
+  NodeData,
+  hasDetailedStory as hasDetailedStoryFn,
+  birthDateString,
+  deathDateString,
+  genderText as genderTextFn,
+  formatUnixDate,
+  isMinted,
+} from "../types/graph";
+import { shortHash } from "../types/graph";
+import EndorseCompactModal from "./modals/EndorseCompactModal";
 
 interface PersonStoryCardProps {
-  person: NodeData
-  onClick: () => void
+  person: NodeData;
+  onClick: () => void;
 }
 
 export default function PersonStoryCard({ person, onClick }: PersonStoryCardProps) {
-  const { t } = useTranslation()
-  const { preloadStoryData, bumpEndorsementCount } = useTreeData()
-  const [showEndorseModal, setShowEndorseModal] = useState(false)
-  const [endorsementCount, setEndorsementCount] = useState<number>(person.endorsementCount ?? 0)
+  const { t } = useTranslation();
+  const { preloadStoryData, bumpEndorsementCount } = useTreeData();
+  const [showEndorseModal, setShowEndorseModal] = useState(false);
+  const [endorsementCount, setEndorsementCount] = useState<number>(person.endorsementCount ?? 0);
 
-  const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person])
-  const storyLabel = t('people.viewEncyclopedia', 'View Encyclopedia')
+  const hasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person]);
+  const storyLabel = t("people.viewEncyclopedia", "View Encyclopedia");
   useEffect(() => {
-    setEndorsementCount(person.endorsementCount ?? 0)
-  }, [person.endorsementCount, person.personHash, person.versionIndex])
+    setEndorsementCount(person.endorsementCount ?? 0);
+  }, [person.endorsementCount, person.personHash, person.versionIndex]);
 
   // Preload story data on hover
   const handleMouseEnter = useCallback(() => {
     if (person.tokenId && hasDetailedStory) {
-      preloadStoryData(person.tokenId)
+      preloadStoryData(person.tokenId);
     }
-  }, [person.tokenId, hasDetailedStory, preloadStoryData])
+  }, [person.tokenId, hasDetailedStory, preloadStoryData]);
 
   // Format date
-  const formatDate = useMemo(() => ({
-    birth: birthDateString(person),
-    death: deathDateString(person)
-  }), [person])
+  const formatDate = useMemo(
+    () => ({
+      birth: birthDateString(person),
+      death: deathDateString(person),
+    }),
+    [person],
+  );
 
   // Gender display
-  const genderText = useMemo(() => genderTextFn(person.gender, t as any), [person.gender, t])
+  const genderText = useMemo(() => genderTextFn(person.gender, t as any), [person.gender, t]);
 
   // Story preview
   const storyPreview = useMemo(() => {
-    if (!person.story) return ''
-    return person.story.length > 150 ? person.story.substring(0, 150) + '...' : person.story
-  }, [person.story])
+    if (!person.story) return "";
+    return person.story.length > 150 ? person.story.substring(0, 150) + "..." : person.story;
+  }, [person.story]);
 
-  const handleStoryBadgeClick = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    if (!person.tokenId) return
-    preloadStoryData(person.tokenId)
+  const handleStoryBadgeClick = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      if (!person.tokenId) return;
+      preloadStoryData(person.tokenId);
 
-    // Open person encyclopedia page in new tab
-    window.open(`/person/${person.tokenId}`, '_blank', 'noopener,noreferrer')
-  }, [person.tokenId, preloadStoryData])
+      // Open person encyclopedia page in new tab
+      window.open(`/person/${person.tokenId}`, "_blank", "noopener,noreferrer");
+    },
+    [person.tokenId, preloadStoryData],
+  );
 
   return (
     <div
@@ -112,11 +126,11 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
             {endorsementCount > 0 && (
               <button
                 onClick={(e) => {
-                  e.stopPropagation()
-                  setShowEndorseModal(true)
+                  e.stopPropagation();
+                  setShowEndorseModal(true);
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-xs font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
-                title={t('people.clickToEndorse', 'Click to endorse this version')}
+                title={t("people.clickToEndorse", "Click to endorse this version")}
               >
                 <Star className="w-3 h-3 fill-emerald-500 text-emerald-500" />
                 {endorsementCount}
@@ -132,11 +146,11 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="w-3.5 h-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
                 <div className="text-[10px] font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">
-                  {t('people.born', 'Born')}
+                  {t("people.born", "Born")}
                 </div>
               </div>
               <div className="text-xs font-mono text-gray-700 dark:text-gray-300 line-clamp-1">
-                {[formatDate.birth, person.birthPlace].filter(Boolean).join(' · ')}
+                {[formatDate.birth, person.birthPlace].filter(Boolean).join(" · ")}
               </div>
             </div>
           )}
@@ -146,11 +160,11 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                 <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  {t('people.died', 'Died')}
+                  {t("people.died", "Died")}
                 </div>
               </div>
               <div className="text-xs font-mono text-gray-700 dark:text-gray-300 line-clamp-1">
-                {[formatDate.death, person.deathPlace].filter(Boolean).join(' · ')}
+                {[formatDate.death, person.deathPlace].filter(Boolean).join(" · ")}
               </div>
             </div>
           )}
@@ -178,8 +192,8 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
             </div>
             <button
               onClick={(e) => {
-                e.stopPropagation()
-                onClick()
+                e.stopPropagation();
+                onClick();
               }}
               className="flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:gap-1.5 transition-all duration-200 px-2 py-1 -mx-2 -my-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
             >
@@ -190,7 +204,7 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
           {person.storyMetadata && (
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1.5">
               <FileText className="w-3 h-3" />
-              {t('people.chunks', '{{count}} chunks', { count: person.storyMetadata.totalChunks })}
+              {t("people.chunks", "{{count}} chunks", { count: person.storyMetadata.totalChunks })}
             </div>
           )}
         </div>
@@ -202,13 +216,13 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
         versionIndex={Number(person.versionIndex || 1)}
         versionData={{
           fullName: person.fullName,
-          endorsementCount
+          endorsementCount,
         }}
         onSuccess={() => {
-          setEndorsementCount((c) => c + 1)
-          bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1)
+          setEndorsementCount((c) => c + 1);
+          bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1);
         }}
       />
     </div>
-  )
+  );
 }

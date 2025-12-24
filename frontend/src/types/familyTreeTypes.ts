@@ -1,5 +1,5 @@
-import type * as d3 from 'd3'
-import type { NodeId } from './graph'
+import type * as d3 from "d3";
+import type { NodeId } from "./graph";
 
 /**
  * FamilyTree shared types.
@@ -15,25 +15,25 @@ import type { NodeId } from './graph'
  * `id` encodes `{ personHash, versionIndex }` as a single key.
  */
 export type BaseNode = {
-  id: NodeId
-  depth: number
-  personHash: string
-  versionIndex: number
-}
+  id: NodeId;
+  depth: number;
+  personHash: string;
+  versionIndex: number;
+};
 
 /** Canonical edge shape for the FamilyTree graph (view-independent). */
-export type BaseEdge = { from: NodeId; to: NodeId }
+export type BaseEdge = { from: NodeId; to: NodeId };
 
 /** Node with layout coordinates (used by tree/dag layouts). */
-export type PositionedNode = BaseNode & { x: number; y: number }
+export type PositionedNode = BaseNode & { x: number; y: number };
 /** Edge used by positioned layouts (same as BaseEdge). */
-export type PositionedEdge = BaseEdge
+export type PositionedEdge = BaseEdge;
 
 /**
  * Node used by d3-force.
  * d3 mutates/assigns `x/y/vx/vy` during initialization & each tick.
  */
-export type ForceNode = d3.SimulationNodeDatum & BaseNode
+export type ForceNode = d3.SimulationNodeDatum & BaseNode;
 
 /**
  * Link used by d3-force.
@@ -41,8 +41,8 @@ export type ForceNode = d3.SimulationNodeDatum & BaseNode
  * - `from/to` are stable endpoints we keep for keying/debugging (d3 won't mutate these).
  */
 export type ForceLink = d3.SimulationLinkDatum<ForceNode> & {
-  from: NodeId
-  to: NodeId
-  source: NodeId | ForceNode
-  target: NodeId | ForceNode
-}
+  from: NodeId;
+  to: NodeId;
+  source: NodeId | ForceNode;
+  target: NodeId | ForceNode;
+};

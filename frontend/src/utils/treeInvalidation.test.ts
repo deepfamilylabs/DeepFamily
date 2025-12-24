@@ -1,72 +1,64 @@
-import { describe, it, expect } from 'vitest'
-import { getInvalidateKeysAfterPersonVersionAdded } from './treeInvalidation'
-import { makeNodeId } from '../types/graph'
-import { unionParentKey } from '../types/treeStore'
-import { tvKey } from './queryKeys'
+import { describe, it, expect } from "vitest";
+import { getInvalidateKeysAfterPersonVersionAdded } from "./treeInvalidation";
+import { makeNodeId } from "../types/graph";
+import { unionParentKey } from "../types/treeStore";
+import { tvKey } from "./queryKeys";
 
-const sort = (items: string[]) => [...items].sort()
+const sort = (items: string[]) => [...items].sort();
 
-describe('treeInvalidation getInvalidateKeysAfterPersonVersionAdded', () => {
-  it('builds invalidation keys for child and parents', () => {
+describe("treeInvalidation getInvalidateKeysAfterPersonVersionAdded", () => {
+  it("builds invalidation keys for child and parents", () => {
     const ev = {
-      personHash: '0xchild',
+      personHash: "0xchild",
       versionIndex: 1,
-      fatherHash: '0xfather',
+      fatherHash: "0xfather",
       fatherVersionIndex: 2,
-      motherHash: '0xmother',
-      motherVersionIndex: 3
-    }
-    const out = getInvalidateKeysAfterPersonVersionAdded(ev)
-    expect(sort(out.totalVersionsKeys)).toEqual(sort([
-      tvKey('0xchild'),
-      tvKey('0xfather'),
-      tvKey('0xmother')
-    ]))
-    expect(sort(out.unionKeys)).toEqual(sort([
-      unionParentKey('0xfather'),
-      unionParentKey('0xmother')
-    ]))
-    expect(sort(out.strictKeys)).toEqual(sort([
-      makeNodeId('0xfather', 2),
-      makeNodeId('0xmother', 3)
-    ]))
-    expect(out.strictPrefixes).toEqual([])
-  })
+      motherHash: "0xmother",
+      motherVersionIndex: 3,
+    };
+    const out = getInvalidateKeysAfterPersonVersionAdded(ev);
+    expect(sort(out.totalVersionsKeys)).toEqual(
+      sort([tvKey("0xchild"), tvKey("0xfather"), tvKey("0xmother")]),
+    );
+    expect(sort(out.unionKeys)).toEqual(
+      sort([unionParentKey("0xfather"), unionParentKey("0xmother")]),
+    );
+    expect(sort(out.strictKeys)).toEqual(
+      sort([makeNodeId("0xfather", 2), makeNodeId("0xmother", 3)]),
+    );
+    expect(out.strictPrefixes).toEqual([]);
+  });
 
-  it('uses strict prefixes when parent version is missing/invalid', () => {
+  it("uses strict prefixes when parent version is missing/invalid", () => {
     const ev = {
-      personHash: '0xchild',
+      personHash: "0xchild",
       versionIndex: 1,
-      fatherHash: '0xfather',
+      fatherHash: "0xfather",
       fatherVersionIndex: undefined,
-      motherHash: '0xmother',
-      motherVersionIndex: 0
-    }
-    const out = getInvalidateKeysAfterPersonVersionAdded(ev)
-    expect(sort(out.unionKeys)).toEqual(sort([
-      unionParentKey('0xfather'),
-      unionParentKey('0xmother')
-    ]))
-    expect(out.strictKeys).toEqual([])
-    expect(sort(out.strictPrefixes)).toEqual(sort([
-      '0xfather-v-',
-      '0xmother-v-'
-    ]))
-  })
+      motherHash: "0xmother",
+      motherVersionIndex: 0,
+    };
+    const out = getInvalidateKeysAfterPersonVersionAdded(ev);
+    expect(sort(out.unionKeys)).toEqual(
+      sort([unionParentKey("0xfather"), unionParentKey("0xmother")]),
+    );
+    expect(out.strictKeys).toEqual([]);
+    expect(sort(out.strictPrefixes)).toEqual(sort(["0xfather-v-", "0xmother-v-"]));
+  });
 
-  it('skips zero hashes', () => {
+  it("skips zero hashes", () => {
     const ev = {
-      personHash: '0xchild',
+      personHash: "0xchild",
       versionIndex: 1,
-      fatherHash: '0x',
+      fatherHash: "0x",
       fatherVersionIndex: 1,
-      motherHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      motherVersionIndex: 2
-    }
-    const out = getInvalidateKeysAfterPersonVersionAdded(ev)
-    expect(out.unionKeys).toEqual([])
-    expect(out.strictKeys).toEqual([])
-    expect(out.strictPrefixes).toEqual([])
-    expect(out.totalVersionsKeys).toEqual([tvKey('0xchild')])
-  })
-})
+      motherHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      motherVersionIndex: 2,
+    };
+    const out = getInvalidateKeysAfterPersonVersionAdded(ev);
+    expect(out.unionKeys).toEqual([]);
+    expect(out.strictKeys).toEqual([]);
+    expect(out.strictPrefixes).toEqual([]);
+    expect(out.totalVersionsKeys).toEqual([tvKey("0xchild")]);
+  });
+});

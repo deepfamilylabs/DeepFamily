@@ -1,42 +1,57 @@
-import React from 'react'
-import { useTranslation } from 'react-i18next'
-import { ArrowRight } from 'lucide-react'
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { ArrowRight } from "lucide-react";
 
 const WorkflowSection: React.FC = () => {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   const steps = [
     {
       number: 1,
-      title: t('home.valueSystem.advantages.step1', 'Add Person Version'),
-      description: t('home.valueSystem.advantages.step1Desc', 'Submit parent hash commitments → receive DEEP token rewards'),
-      color: 'from-blue-500 to-blue-600'
+      title: t("home.valueSystem.advantages.step1", "Add Person Version"),
+      description: t(
+        "home.valueSystem.advantages.step1Desc",
+        "Submit parent hash commitments → receive DEEP token rewards",
+      ),
+      color: "from-blue-500 to-blue-600",
     },
     {
       number: 2,
-      title: t('home.valueSystem.advantages.step2', 'Community Endorsement'),
-      description: t('home.valueSystem.advantages.step2Desc', 'Pay DEEP tokens to endorse a version'),
-      color: 'from-purple-500 to-purple-600'
+      title: t("home.valueSystem.advantages.step2", "Community Endorsement"),
+      description: t(
+        "home.valueSystem.advantages.step2Desc",
+        "Pay DEEP tokens to endorse a version",
+      ),
+      color: "from-purple-500 to-purple-600",
     },
     {
       number: 3,
-      title: t('home.valueSystem.advantages.step3', 'Mint Version NFT'),
-      description: t('home.valueSystem.advantages.step3Desc', 'Endorsers can mint NFTs for corresponding versions'),
-      color: 'from-pink-500 to-pink-600'
+      title: t("home.valueSystem.advantages.step3", "Mint Version NFT"),
+      description: t(
+        "home.valueSystem.advantages.step3Desc",
+        "Endorsers can mint NFTs for corresponding versions",
+      ),
+      color: "from-pink-500 to-pink-600",
     },
     {
       number: 4,
-      title: t('home.valueSystem.advantages.step4', 'Write Story Shards'),
-      description: t('home.valueSystem.advantages.step4Desc', 'NFT holders write/append person story fragments'),
-      color: 'from-red-500 to-red-600'
+      title: t("home.valueSystem.advantages.step4", "Write Story Shards"),
+      description: t(
+        "home.valueSystem.advantages.step4Desc",
+        "NFT holders write/append person story fragments",
+      ),
+      color: "from-red-500 to-red-600",
     },
     {
       number: 5,
-      title: t('home.valueSystem.advantages.step5', 'Story Sealing'),
-      description: t('home.valueSystem.advantages.step5Desc', 'Seal stories to form immutable on-chain historical records'),
-      color: 'from-orange-500 to-orange-600'
-    }
-  ]
+      title: t("home.valueSystem.advantages.step5", "Story Sealing"),
+      description: t(
+        "home.valueSystem.advantages.step5Desc",
+        "Seal stories to form immutable on-chain historical records",
+      ),
+      color: "from-orange-500 to-orange-600",
+    },
+  ];
 
   return (
     <section className="py-16 bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20 dark:from-gray-900 dark:via-blue-900/10 dark:to-purple-900/10">
@@ -44,10 +59,13 @@ const WorkflowSection: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            {t('home.valueSystem.advantages.title', 'Workflow Process')}
+            {t("home.valueSystem.advantages.title", "Workflow Process")}
           </h2>
           <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            {t('home.valueSystem.advantages.subtitle', 'Five-step value discovery and consensus formation mechanism')}
+            {t(
+              "home.valueSystem.advantages.subtitle",
+              "Five-step value discovery and consensus formation mechanism",
+            )}
           </p>
         </div>
 
@@ -59,10 +77,12 @@ const WorkflowSection: React.FC = () => {
                 {/* Step Card */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:shadow-xl transition-all duration-300 hover:scale-105 h-full flex flex-col">
                   {/* Step Number */}
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center mb-4 mx-auto shadow-lg`}>
+                  <div
+                    className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center mb-4 mx-auto shadow-lg`}
+                  >
                     <span className="text-2xl font-bold text-white">{step.number}</span>
                   </div>
-                  
+
                   {/* Step Content */}
                   <div className="text-center flex-1 flex flex-col">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -89,16 +109,19 @@ const WorkflowSection: React.FC = () => {
           {/* Conclusion */}
           <div className="bg-gradient-to-r from-blue-50/50 via-purple-50/30 to-pink-50/50 dark:from-blue-900/20 dark:via-purple-900/15 dark:to-pink-900/20 rounded-2xl p-6 text-center">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              {t('home.valueSystem.advantages.conclusion', 'Value-driven collaborative network')}
+              {t("home.valueSystem.advantages.conclusion", "Value-driven collaborative network")}
             </h3>
             <p className="text-gray-600 dark:text-gray-300">
-              {t('home.valueSystem.advantages.conclusionDesc', 'Through economic incentive mechanisms, achieve natural accumulation and value discovery of high-quality genealogy data')}
+              {t(
+                "home.valueSystem.advantages.conclusionDesc",
+                "Through economic incentive mechanisms, achieve natural accumulation and value discovery of high-quality genealogy data",
+              )}
             </p>
           </div>
         </div>
       </div>
     </section>
-  )
-}
+  );
+};
 
-export default WorkflowSection
+export default WorkflowSection;

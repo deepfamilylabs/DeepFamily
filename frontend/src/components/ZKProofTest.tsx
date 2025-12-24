@@ -1,78 +1,79 @@
-import React, { useState } from 'react'
-import type { PersonData } from '../lib/zk'
-import { zkWorkerCall } from '../lib/zkWorkerClient'
+import React, { useState } from "react";
+import type { PersonData } from "../lib/zk";
+import { zkWorkerCall } from "../lib/zkWorkerClient";
 
 const ZKProofTest: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(false)
-  const [result, setResult] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<string>("");
   const [person, setPerson] = useState<PersonData>({
-    fullName: 'Test Person',
-    passphrase: 'secret-person',
+    fullName: "Test Person",
+    passphrase: "secret-person",
     birthYear: 1990,
     birthMonth: 12,
     birthDay: 25,
     isBirthBC: false,
-    gender: 2
-  })
+    gender: 2,
+  });
 
   const handleGenerateProof = async () => {
-    setIsLoading(true)
-    setResult('')
+    setIsLoading(true);
+    setResult("");
 
     try {
-      console.log('🔄 Starting ZK proof generation...')
+      console.log("🔄 Starting ZK proof generation...");
 
       // Test with both parents
       const father: PersonData = {
-        fullName: 'Test Father',
-        passphrase: 'secret-father',
+        fullName: "Test Father",
+        passphrase: "secret-father",
         birthYear: 1960,
         birthMonth: 5,
         birthDay: 15,
         isBirthBC: false,
-        gender: 1
-      }
+        gender: 1,
+      };
 
       const mother: PersonData = {
-        fullName: 'Test Mother',
-        passphrase: 'secret-mother',
+        fullName: "Test Mother",
+        passphrase: "secret-mother",
         birthYear: 1965,
         birthMonth: 8,
         birthDay: 20,
         isBirthBC: false,
-        gender: 2
-      }
+        gender: 2,
+      };
 
       // Generate proof
-      console.log('🔄 About to generate proof with:', {
+      console.log("🔄 About to generate proof with:", {
         person: person.fullName,
         hasFather: true,
         hasMother: true,
-        submitter: '0x1234567890123456789012345678901234567890'
-      })
-      
-      const { proof, publicSignals } = await zkWorkerCall('generatePersonProof', {
+        submitter: "0x1234567890123456789012345678901234567890",
+      });
+
+      const { proof, publicSignals } = await zkWorkerCall("generatePersonProof", {
         person,
         father,
         mother,
-        submitterAddress: '0x1234567890123456789012345678901234567890'
-      })
+        submitterAddress: "0x1234567890123456789012345678901234567890",
+      });
 
-      console.log('✅ Proof generated:', proof)
-      console.log('📊 Public signals:', publicSignals)
+      console.log("✅ Proof generated:", proof);
+      console.log("📊 Public signals:", publicSignals);
 
       // Verify proof
-      const { ok: isValid } = await zkWorkerCall('verifyPersonProof', { proof, publicSignals })
-      console.log('🔍 Proof verification:', isValid)
-      console.log('📝 Proof object structure:', proof)
+      const { ok: isValid } = await zkWorkerCall("verifyPersonProof", { proof, publicSignals });
+      console.log("🔍 Proof verification:", isValid);
+      console.log("📝 Proof object structure:", proof);
 
-      setResult(`
+      setResult(
+        `
 🎉 ZK Proof Generated Successfully!
 
 📊 Public Signals (${publicSignals.length} total):
-${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
+${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
 
-🔍 Proof Verification: ${isValid ? '✅ VALID' : '❌ INVALID'}
+🔍 Proof Verification: ${isValid ? "✅ VALID" : "❌ INVALID"}
 
 📝 Proof Structure:
   ${JSON.stringify(proof, null, 2)}
@@ -87,39 +88,40 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
 - Father limbs: ${publicSignals[2]} + ${publicSignals[3]} = Non-zero (father exists) ✅
 - Mother limbs: ${publicSignals[4]} + ${publicSignals[5]} = Non-zero (mother exists) ✅
 - Contract compatibility: Ready for blockchain submission ✅
-      `.trim())
-
+      `.trim(),
+      );
     } catch (error) {
-      console.error('❌ Error:', error)
-      setResult(`❌ Error: ${error}`)
+      console.error("❌ Error:", error);
+      setResult(`❌ Error: ${error}`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleTestNoParents = async () => {
-    setIsLoading(true)
-    setResult('')
+    setIsLoading(true);
+    setResult("");
 
     try {
-      console.log('🔄 Testing with no parents...')
+      console.log("🔄 Testing with no parents...");
 
-      const { proof, publicSignals } = await zkWorkerCall('generatePersonProof', {
+      const { proof, publicSignals } = await zkWorkerCall("generatePersonProof", {
         person,
         father: null,
         mother: null,
-        submitterAddress: '0x1234567890123456789012345678901234567890'
-      })
+        submitterAddress: "0x1234567890123456789012345678901234567890",
+      });
 
-      const { ok: isValid } = await zkWorkerCall('verifyPersonProof', { proof, publicSignals })
+      const { ok: isValid } = await zkWorkerCall("verifyPersonProof", { proof, publicSignals });
 
-      setResult(`
+      setResult(
+        `
 🎉 No Parents Test Successful!
 
 📊 Public Signals (${publicSignals.length} total):
-${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
+${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
 
-🔍 Proof Verification: ${isValid ? '✅ VALID' : '❌ INVALID'}
+🔍 Proof Verification: ${isValid ? "✅ VALID" : "❌ INVALID"}
 
 🧪 Expected Behavior:
 - Signals [2,3]: Father hash should be (0, 0) ✅
@@ -127,22 +129,22 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
 - In contract: bytes32(0) when both limbs are 0
 
 📝 Analysis:
-- Father limbs: ${publicSignals[2]} + ${publicSignals[3]} = ${publicSignals[2] === '0' && publicSignals[3] === '0' ? 'bytes32(0) ✅' : 'NOT zero ❌'}
-- Mother limbs: ${publicSignals[4]} + ${publicSignals[5]} = ${publicSignals[4] === '0' && publicSignals[5] === '0' ? 'bytes32(0) ✅' : 'NOT zero ❌'}
-      `.trim())
-
+- Father limbs: ${publicSignals[2]} + ${publicSignals[3]} = ${publicSignals[2] === "0" && publicSignals[3] === "0" ? "bytes32(0) ✅" : "NOT zero ❌"}
+- Mother limbs: ${publicSignals[4]} + ${publicSignals[5]} = ${publicSignals[4] === "0" && publicSignals[5] === "0" ? "bytes32(0) ✅" : "NOT zero ❌"}
+      `.trim(),
+      );
     } catch (error) {
-      console.error('❌ Error:', error)
-      setResult(`❌ Error: ${error}`)
+      console.error("❌ Error:", error);
+      setResult(`❌ Error: ${error}`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">ZK Proof Generator Test</h2>
-      
+
       <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h3 className="font-semibold text-blue-800 mb-2">Test Person Data</h3>
         <div className="grid grid-cols-2 gap-4">
@@ -195,7 +197,7 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
           disabled={isLoading}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? '⏳ Generating...' : '🔬 Test with Parents'}
+          {isLoading ? "⏳ Generating..." : "🔬 Test with Parents"}
         </button>
 
         <button
@@ -203,16 +205,14 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
           disabled={isLoading}
           className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? '⏳ Testing...' : '🚫 Test No Parents'}
+          {isLoading ? "⏳ Testing..." : "🚫 Test No Parents"}
         </button>
       </div>
 
       {result && (
         <div className="bg-gray-50 rounded-lg border p-4">
           <h3 className="font-semibold text-gray-800 mb-2">Result:</h3>
-          <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
-            {result}
-          </pre>
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">{result}</pre>
         </div>
       )}
 
@@ -227,7 +227,7 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join('\n')}
         </ul>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ZKProofTest
+export default ZKProofTest;

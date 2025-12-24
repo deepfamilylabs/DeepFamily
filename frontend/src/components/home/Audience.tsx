@@ -1,8 +1,8 @@
-import React, { memo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Users, Search, Code, PenTool } from 'lucide-react';
-import { ANIMATION_CLASSES } from '../../constants/animationStyles';
-import PageContainer from '../PageContainer';
+import React, { memo } from "react";
+import { useTranslation } from "react-i18next";
+import { Users, Search, Code, PenTool } from "lucide-react";
+import { ANIMATION_CLASSES } from "../../constants/animationStyles";
+import PageContainer from "../PageContainer";
 
 const Audience = memo(() => {
   const { t } = useTranslation();
@@ -13,21 +13,25 @@ const Audience = memo(() => {
         <div className={`text-center mb-20 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-blue-100 dark:from-indigo-900/30 dark:to-blue-900/30 border border-indigo-200/50 dark:border-indigo-600/30 mb-8 backdrop-blur-sm">
             <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Target Audience</span>
+            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+              Target Audience
+            </span>
           </div>
-          
+
           <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-slate-900 via-indigo-700 to-blue-700 dark:from-slate-100 dark:via-indigo-300 dark:to-blue-300 bg-clip-text text-transparent">
-              {t('home.audience.title')}
+              {t("home.audience.title")}
             </span>
           </h2>
-          
+
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto leading-relaxed">
-            {t('home.audience.subtitle')}
+            {t("home.audience.subtitle")}
           </p>
         </div>
-        
-        <div className={`grid md:grid-cols-2 gap-8 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-300`}>
+
+        <div
+          className={`grid md:grid-cols-2 gap-8 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-300`}
+        >
           {/* Data Contributors */}
           <div className={`group relative ${ANIMATION_CLASSES.SLIDE_IN_LEFT}`}>
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-3xl blur-lg opacity-25 group-hover:opacity-40 transition duration-500"></div>
@@ -41,27 +45,31 @@ const Audience = memo(() => {
                 </div>
                 <div>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {t('home.audience.contributors.title')}
+                    {t("home.audience.contributors.title")}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 bg-blue-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}></div>
-                    <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Primary Users</span>
+                    <div
+                      className={`w-2 h-2 bg-blue-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}
+                    ></div>
+                    <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                      Primary Users
+                    </span>
                   </div>
                 </div>
               </div>
-              
+
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 text-base lg:text-lg">
-                {t('home.audience.contributors.description')}
+                {t("home.audience.contributors.description")}
               </p>
-              
+
               <ul className="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.contributors.benefit1')}
+                  {t("home.audience.contributors.benefit1")}
                 </li>
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.contributors.benefit2')}
+                  {t("home.audience.contributors.benefit2")}
                 </li>
               </ul>
             </div>
@@ -80,27 +88,31 @@ const Audience = memo(() => {
                 </div>
                 <div>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {t('home.audience.researchers.title')}
+                    {t("home.audience.researchers.title")}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 bg-purple-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}></div>
-                    <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">Active Users</span>
+                    <div
+                      className={`w-2 h-2 bg-purple-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}
+                    ></div>
+                    <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                      Active Users
+                    </span>
                   </div>
                 </div>
               </div>
-              
+
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 text-base lg:text-lg">
-                {t('home.audience.researchers.description')}
+                {t("home.audience.researchers.description")}
               </p>
-              
+
               <ul className="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.researchers.benefit1')}
+                  {t("home.audience.researchers.benefit1")}
                 </li>
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.researchers.benefit2')}
+                  {t("home.audience.researchers.benefit2")}
                 </li>
               </ul>
             </div>
@@ -119,27 +131,31 @@ const Audience = memo(() => {
                 </div>
                 <div>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {t('home.audience.developers.title')}
+                    {t("home.audience.developers.title")}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 bg-emerald-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}></div>
-                    <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Builders</span>
+                    <div
+                      className={`w-2 h-2 bg-emerald-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}
+                    ></div>
+                    <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                      Builders
+                    </span>
                   </div>
                 </div>
               </div>
-              
+
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 text-base lg:text-lg">
-                {t('home.audience.developers.description')}
+                {t("home.audience.developers.description")}
               </p>
-              
+
               <ul className="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-emerald-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.developers.benefit1')}
+                  {t("home.audience.developers.benefit1")}
                 </li>
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-emerald-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.developers.benefit2')}
+                  {t("home.audience.developers.benefit2")}
                 </li>
               </ul>
             </div>
@@ -158,27 +174,31 @@ const Audience = memo(() => {
                 </div>
                 <div>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {t('home.audience.creators.title')}
+                    {t("home.audience.creators.title")}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 bg-orange-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}></div>
-                    <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">Storytellers</span>
+                    <div
+                      className={`w-2 h-2 bg-orange-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}
+                    ></div>
+                    <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+                      Storytellers
+                    </span>
                   </div>
                 </div>
               </div>
-              
+
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 text-base lg:text-lg">
-                {t('home.audience.creators.description')}
+                {t("home.audience.creators.description")}
               </p>
-              
+
               <ul className="text-gray-600 dark:text-gray-300 space-y-2 text-sm">
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.creators.benefit1')}
+                  {t("home.audience.creators.benefit1")}
                 </li>
                 <li className="flex items-start">
                   <span className="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                  {t('home.audience.creators.benefit2')}
+                  {t("home.audience.creators.benefit2")}
                 </li>
               </ul>
             </div>
@@ -189,6 +209,6 @@ const Audience = memo(() => {
   );
 });
 
-Audience.displayName = 'Audience';
+Audience.displayName = "Audience";
 
 export default Audience;

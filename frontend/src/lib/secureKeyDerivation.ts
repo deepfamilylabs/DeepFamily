@@ -6,11 +6,15 @@
  * compatibility while providing an additional security layer for key derivation scenarios.
  */
 
-import { scrypt } from 'scrypt-js';
-import { ethers } from 'ethers';
-import { computeIdentityHash, type IdentityHashInput } from './identityHash';
-import { validatePassphraseStrength as validatePassphraseStrengthUtil, normalizePassphraseForHash, normalizeNameForHash } from './passphraseStrength';
-import type { PassphraseStrength } from './passphraseStrength';
+import { scrypt } from "scrypt-js";
+import { ethers } from "ethers";
+import { computeIdentityHash, type IdentityHashInput } from "./identityHash";
+import {
+  validatePassphraseStrength as validatePassphraseStrengthUtil,
+  normalizePassphraseForHash,
+  normalizeNameForHash,
+} from "./passphraseStrength";
+import type { PassphraseStrength } from "./passphraseStrength";
 
 const textEncoder = new TextEncoder();
 
@@ -20,21 +24,21 @@ const textEncoder = new TextEncoder();
 export const KDF_PRESETS = {
   // Fast mode (development/testing) - ~150ms
   FAST: {
-    N: 16384,   // 2^14
+    N: 16384, // 2^14
     r: 8,
     p: 1,
     dkLen: 32,
   },
   // Balanced mode (recommended) - ~1-2 seconds
   BALANCED: {
-    N: 131072,  // 2^17
+    N: 131072, // 2^17
     r: 8,
     p: 1,
     dkLen: 32,
   },
   // Strong security mode - ~3-5 seconds
   STRONG: {
-    N: 262144,  // 2^18
+    N: 262144, // 2^18
     r: 8,
     p: 1,
     dkLen: 32,
@@ -47,9 +51,9 @@ export type KDFPreset = keyof typeof KDF_PRESETS;
  * Purpose identifiers (salt prefix)
  */
 export const PURPOSE = {
-  IDENTITY: 'DeepFamily-Identity-v1',
-  PRIVATE_KEY: 'DeepFamily-PrivateKey-v1',
-  ENCRYPTION: 'DeepFamily-Encryption-v1',
+  IDENTITY: "DeepFamily-Identity-v1",
+  PRIVATE_KEY: "DeepFamily-PrivateKey-v1",
+  ENCRYPTION: "DeepFamily-Encryption-v1",
 } as const;
 
 export type KeyPurpose = keyof typeof PURPOSE;
@@ -105,27 +109,27 @@ export interface DerivedKey {
  */
 export async function deriveKeyFromPersonData(
   input: IdentityHashInput,
-  purpose: KeyPurpose = 'PRIVATE_KEY',
-  preset: KDFPreset = 'BALANCED',
-  onProgress?: (progress: number, stage: string) => void
+  purpose: KeyPurpose = "PRIVATE_KEY",
+  preset: KDFPreset = "BALANCED",
+  onProgress?: (progress: number, stage: string) => void,
 ): Promise<DerivedKey> {
   const startTime = Date.now();
 
   // Phase 1: Compute base PersonHash (original logic)
-  onProgress?.(0, 'Computing PersonHash...');
+  onProgress?.(0, "Computing PersonHash...");
   const baseHash = computeIdentityHash(input);
-  onProgress?.(20, 'PersonHash computed');
+  onProgress?.(20, "PersonHash computed");
 
   // Phase 2: Prepare KDF input
-  onProgress?.(25, 'Preparing KDF...');
+  onProgress?.(25, "Preparing KDF...");
   const kdfParams = KDF_PRESETS[preset];
   const purposeSalt = PURPOSE[purpose];
 
   // Construct salt: purpose identifier + personal info + passphrase hash
   // Important: Salt must include passphrase to prevent attacker precomputation
   // Even if personHash is leaked, cannot reproduce salt without correct passphrase
-  const normalizedPassphrase = normalizePassphraseForHash(input.passphrase || '');
-  const normalizedFullName = normalizeNameForHash(input.fullName || '');
+  const normalizedPassphrase = normalizePassphraseForHash(input.passphrase || "");
+  const normalizedFullName = normalizeNameForHash(input.fullName || "");
 
   const passphraseHash = normalizedPassphrase
     ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
@@ -137,7 +141,7 @@ export async function deriveKeyFromPersonData(
     `${input.birthYear}-${input.birthMonth}-${input.birthDay}`,
     input.gender.toString(),
     passphraseHash, // 🔒 Critical: includes passphrase hash
-  ].join(':');
+  ].join(":");
 
   const saltHash = ethers.keccak256(textEncoder.encode(saltComponents));
   const baseHashBytes = ethers.getBytes(baseHash);
@@ -162,13 +166,20 @@ export async function deriveKeyFromPersonData(
       kdfParams.N,
       kdfParams.r,
       kdfParams.p,
-      kdfParams.dkLen
+      kdfParams.dkLen,
     );
 
     clearInterval(progressInterval);
-    onProgress?.(90, 'KDF completed');
+    onProgress?.(90, "KDF completed");
 
-    return await finalizeDerivedKey(derivedBytes, purpose, purposeSalt, kdfParams, startTime, onProgress);
+    return await finalizeDerivedKey(
+      derivedBytes,
+      purpose,
+      purposeSalt,
+      kdfParams,
+      startTime,
+      onProgress,
+    );
   } catch (error) {
     clearInterval(progressInterval);
     throw error;
@@ -180,26 +191,29 @@ async function finalizeDerivedKey(
   derivedBytes: Uint8Array,
   purpose: KeyPurpose,
   purposeSalt: string,
-  kdfParams: typeof KDF_PRESETS[keyof typeof KDF_PRESETS],
+  kdfParams: (typeof KDF_PRESETS)[keyof typeof KDF_PRESETS],
   startTime: number,
-  onProgress?: (progress: number, stage: string) => void
+  onProgress?: (progress: number, stage: string) => void,
 ): Promise<DerivedKey> {
-
   // Phase 4: Generate final key (browser-compatible method)
-  const key = '0x' + Array.from(derivedBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const key =
+    "0x" +
+    Array.from(derivedBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
 
   // If used as private key, compute corresponding address
   let address: string | undefined;
-  if (purpose === 'PRIVATE_KEY') {
+  if (purpose === "PRIVATE_KEY") {
     try {
       const wallet = new ethers.Wallet(key);
       address = wallet.address;
     } catch (e) {
-      console.warn('Failed to derive address:', e);
+      console.warn("Failed to derive address:", e);
     }
   }
 
-  onProgress?.(100, 'Key derivation complete');
+  onProgress?.(100, "Key derivation complete");
 
   const elapsed = Date.now() - startTime;
   console.log(`Key derivation completed in ${elapsed}ms`);
@@ -225,11 +239,13 @@ async function finalizeDerivedKey(
  * @param passphrase - Passphrase
  * @returns { isStrong: boolean, entropy: number, level: string, recommendation: string }
  */
-export function validatePassphraseStrength(passphrase: string): PassphraseStrength & { recommendation: string } {
+export function validatePassphraseStrength(
+  passphrase: string,
+): PassphraseStrength & { recommendation: string } {
   const result = validatePassphraseStrengthUtil(passphrase, true);
   return {
     ...result,
-    recommendation: result.recommendation || '', // Ensure recommendation is always a string
+    recommendation: result.recommendation || "", // Ensure recommendation is always a string
   };
 }
 
@@ -240,8 +256,8 @@ export function validatePassphraseStrength(passphrase: string): PassphraseStreng
  */
 export async function deriveMultiPurposeKeys(
   input: IdentityHashInput,
-  purposes: KeyPurpose[] = ['IDENTITY', 'PRIVATE_KEY', 'ENCRYPTION'],
-  preset: KDFPreset = 'BALANCED'
+  purposes: KeyPurpose[] = ["IDENTITY", "PRIVATE_KEY", "ENCRYPTION"],
+  preset: KDFPreset = "BALANCED",
 ): Promise<Record<KeyPurpose, DerivedKey>> {
   const results: Partial<Record<KeyPurpose, DerivedKey>> = {};
 
@@ -257,9 +273,9 @@ export async function deriveMultiPurposeKeys(
  */
 export function estimateKDFDuration(preset: KDFPreset): string {
   const estimates: Record<KDFPreset, string> = {
-    FAST: '100-300ms',
-    BALANCED: '1-2 seconds',
-    STRONG: '3-5 seconds',
+    FAST: "100-300ms",
+    BALANCED: "1-2 seconds",
+    STRONG: "3-5 seconds",
   };
   return estimates[preset];
 }
@@ -272,16 +288,17 @@ export function checkCryptoSupport(): {
   scrypt: boolean;
   recommendation: string;
 } {
-  const webCrypto = typeof window !== 'undefined' &&
-                    typeof window.crypto !== 'undefined' &&
-                    typeof window.crypto.subtle !== 'undefined';
+  const webCrypto =
+    typeof window !== "undefined" &&
+    typeof window.crypto !== "undefined" &&
+    typeof window.crypto.subtle !== "undefined";
 
   return {
     webCrypto,
     scrypt: true, // We use scrypt-js, always available
     recommendation: webCrypto
-      ? '✅ Browser fully supports cryptographic features'
-      : '⚠️ Browser crypto API limited, some features may be slower',
+      ? "✅ Browser fully supports cryptographic features"
+      : "⚠️ Browser crypto API limited, some features may be slower",
   };
 }
 

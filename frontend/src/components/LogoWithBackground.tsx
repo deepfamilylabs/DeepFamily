@@ -3,21 +3,24 @@
  * Logo with gradient background based on favicon-with-background.svg
  */
 interface LogoWithBackgroundProps {
-  className?: string
-  size?: number
+  className?: string;
+  size?: number;
 }
 
-export default function LogoWithBackground({ className = "w-10 h-10", size }: LogoWithBackgroundProps) {
-  const width = size ?? undefined
-  const height = size ?? undefined
-  
+export default function LogoWithBackground({
+  className = "w-10 h-10",
+  size,
+}: LogoWithBackgroundProps) {
+  const width = size ?? undefined;
+  const height = size ?? undefined;
+
   return (
-    <svg 
+    <svg
       className={className}
       width={width}
       height={height}
-      viewBox="0 0 32 32" 
-      fill="none" 
+      viewBox="0 0 32 32"
+      fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
@@ -26,25 +29,11 @@ export default function LogoWithBackground({ className = "w-10 h-10", size }: Lo
           <stop offset="100%" stopColor="#1e40af" stopOpacity={1} />
         </linearGradient>
       </defs>
-      
-      <rect 
-        x="0" 
-        y="0" 
-        width="32" 
-        height="32" 
-        rx="4" 
-        ry="4" 
-        fill="url(#bgGradient)"
-      />
-      
+
+      <rect x="0" y="0" width="32" height="32" rx="4" ry="4" fill="url(#bgGradient)" />
+
       <g transform="translate(14, 16) scale(0.8) translate(-16, -16)">
-        <g
-          fill="white"
-          stroke="white"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <g fill="white" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
           <path
             d="M 8 6
                L 20 6
@@ -53,15 +42,10 @@ export default function LogoWithBackground({ className = "w-10 h-10", size }: Lo
                L 8 26"
             fill="none"
           />
-          
-          <line
-            x1="8"
-            y1="16"
-            x2="32"
-            y2="16"
-          />
+
+          <line x1="8" y1="16" x2="32" y2="16" />
         </g>
       </g>
     </svg>
-  )
+  );
 }

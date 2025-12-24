@@ -1,11 +1,11 @@
 // Layout constants for consistent UI sizing
-import React from 'react'
+import React from "react";
 
 export const LAYOUT = {
   // FamilyTree view dimensions - responsive heights
   FAMILLY_TREE_HEIGHT_MOBILE: 520,
   FAMILLY_TREE_HEIGHT_DESKTOP: 680,
-  
+
   // TreeLayout view (SVG cards)
   TREE_NODE_WIDTH: 112,
   TREE_NODE_HEIGHT: 160,
@@ -28,26 +28,38 @@ export const LAYOUT = {
 
   // Virtualized list
   ROW_HEIGHT: 40,
-} as const
+} as const;
 
-export type FamilyTreeLayout = { [K in keyof typeof LAYOUT]: number }
-export type FamilyTreeLayoutOverrides = Partial<FamilyTreeLayout>
+export type FamilyTreeLayout = { [K in keyof typeof LAYOUT]: number };
+export type FamilyTreeLayoutOverrides = Partial<FamilyTreeLayout>;
 
 // Utility function to get responsive familyTree height
-export const getFamilyTreeHeight = (layout: Pick<FamilyTreeLayout, 'FAMILLY_TREE_HEIGHT_MOBILE' | 'FAMILLY_TREE_HEIGHT_DESKTOP'> = LAYOUT) => {
-  if (typeof window === 'undefined') return layout.FAMILLY_TREE_HEIGHT_DESKTOP
-  return window.innerWidth < 768 ? layout.FAMILLY_TREE_HEIGHT_MOBILE : layout.FAMILLY_TREE_HEIGHT_DESKTOP
-}
+export const getFamilyTreeHeight = (
+  layout: Pick<
+    FamilyTreeLayout,
+    "FAMILLY_TREE_HEIGHT_MOBILE" | "FAMILLY_TREE_HEIGHT_DESKTOP"
+  > = LAYOUT,
+) => {
+  if (typeof window === "undefined") return layout.FAMILLY_TREE_HEIGHT_DESKTOP;
+  return window.innerWidth < 768
+    ? layout.FAMILLY_TREE_HEIGHT_MOBILE
+    : layout.FAMILLY_TREE_HEIGHT_DESKTOP;
+};
 
 // React hook for responsive familyTree height
-export const useFamilyTreeHeight = (layout: Pick<FamilyTreeLayout, 'FAMILLY_TREE_HEIGHT_MOBILE' | 'FAMILLY_TREE_HEIGHT_DESKTOP'> = LAYOUT) => {
-  const [height, setHeight] = React.useState(() => getFamilyTreeHeight(layout))
-  
+export const useFamilyTreeHeight = (
+  layout: Pick<
+    FamilyTreeLayout,
+    "FAMILLY_TREE_HEIGHT_MOBILE" | "FAMILLY_TREE_HEIGHT_DESKTOP"
+  > = LAYOUT,
+) => {
+  const [height, setHeight] = React.useState(() => getFamilyTreeHeight(layout));
+
   React.useEffect(() => {
-    const updateHeight = () => setHeight(getFamilyTreeHeight(layout))
-    window.addEventListener('resize', updateHeight)
-    return () => window.removeEventListener('resize', updateHeight)
-  }, [layout])
-  
-  return height
-}
+    const updateHeight = () => setHeight(getFamilyTreeHeight(layout));
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, [layout]);
+
+  return height;
+};

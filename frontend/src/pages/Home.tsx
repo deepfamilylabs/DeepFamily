@@ -1,27 +1,27 @@
-import { memo, useMemo, lazy, Suspense } from 'react'
-import { NavLink } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { DynamicIcon } from '../components/home/DynamicIcon'
-import { 
-  HERO_STYLES as HERO_STYLE_CONSTANTS, 
-  FLOATING_SHAPES as FLOATING_SHAPE_CONSTANTS, 
-  TAG_STRIP_STYLES, 
-  CTA_BUTTON_STYLES, 
+import { memo, useMemo, lazy, Suspense } from "react";
+import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { DynamicIcon } from "../components/home/DynamicIcon";
+import {
+  HERO_STYLES as HERO_STYLE_CONSTANTS,
+  FLOATING_SHAPES as FLOATING_SHAPE_CONSTANTS,
+  TAG_STRIP_STYLES,
+  CTA_BUTTON_STYLES,
   HERO_CONTENT_STYLES,
   TAG_DATA,
-  type ButtonConfig
-} from '../constants/homeStyles'
-import { ANIMATION_CLASSES } from '../constants/animationStyles'
+  type ButtonConfig,
+} from "../constants/homeStyles";
+import { ANIMATION_CLASSES } from "../constants/animationStyles";
 
 // Lazy loaded components
-const ValuePropositions = lazy(() => import('../components/home/ValuePropositions'))
-const TwoLayerValueSystem = lazy(() => import('../components/home/TwoLayerValueSystem'))
-const WorkflowSection = lazy(() => import('../components/WorkflowSection'))
-const CoreFeatures = lazy(() => import('../components/home/CoreFeatures'))
-const Tokenomics = lazy(() => import('../components/home/Tokenomics'))
-const Audience = lazy(() => import('../components/home/Audience'))
-const CallToAction = lazy(() => import('../components/home/CallToAction'))
-const LoadingFallback = lazy(() => import('../components/home/LoadingFallback'))
+const ValuePropositions = lazy(() => import("../components/home/ValuePropositions"));
+const TwoLayerValueSystem = lazy(() => import("../components/home/TwoLayerValueSystem"));
+const WorkflowSection = lazy(() => import("../components/WorkflowSection"));
+const CoreFeatures = lazy(() => import("../components/home/CoreFeatures"));
+const Tokenomics = lazy(() => import("../components/home/Tokenomics"));
+const Audience = lazy(() => import("../components/home/Audience"));
+const CallToAction = lazy(() => import("../components/home/CallToAction"));
+const LoadingFallback = lazy(() => import("../components/home/LoadingFallback"));
 
 // Floating shapes component
 const FloatingShapes = memo(() => (
@@ -30,81 +30,85 @@ const FloatingShapes = memo(() => (
       <div key={index} className={shape.className} />
     ))}
   </div>
-))
+));
 
 // Tag strip component
 const TagStrip = memo(() => {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
   const delayClasses = useMemo(
     () => [
-      '[animation-delay:0ms]',
-      '[animation-delay:200ms]',
-      '[animation-delay:400ms]',
-      '[animation-delay:600ms]',
-      '[animation-delay:800ms]',
-      '[animation-delay:1000ms]',
-      '[animation-delay:1200ms]',
-      '[animation-delay:1400ms]',
+      "[animation-delay:0ms]",
+      "[animation-delay:200ms]",
+      "[animation-delay:400ms]",
+      "[animation-delay:600ms]",
+      "[animation-delay:800ms]",
+      "[animation-delay:1000ms]",
+      "[animation-delay:1200ms]",
+      "[animation-delay:1400ms]",
     ],
-    []
-  )
+    [],
+  );
 
   return (
     <div className={TAG_STRIP_STYLES.container}>
       <div className={TAG_STRIP_STYLES.wrapper}>
         {TAG_DATA.map((tag, index) => (
           <div key={tag.key} className={`${TAG_STRIP_STYLES.tagBase} border ${tag.borderClass}`}>
-            <div className={`${TAG_STRIP_STYLES.dotBase} ${tag.dotClass} ${delayClasses[index] ?? ''}`} />
-            <span className={TAG_STRIP_STYLES.text}>
-              {t(`home.tagStrip.${tag.key}`)}
-            </span>
+            <div
+              className={`${TAG_STRIP_STYLES.dotBase} ${tag.dotClass} ${delayClasses[index] ?? ""}`}
+            />
+            <span className={TAG_STRIP_STYLES.text}>{t(`home.tagStrip.${tag.key}`)}</span>
           </div>
         ))}
       </div>
     </div>
-  )
-})
+  );
+});
 
 // CTA buttons component
 const CTAButtons = memo(() => {
-  const { t } = useTranslation()
-  
-  const buttons = useMemo((): ButtonConfig[] => [
-    {
-      to: "/actions",
-      icon: "Users",
-      text: t('home.blockchainActions'),
-      className: CTA_BUTTON_STYLES.primaryButton,
-      hasOverlay: true
-    },
-    {
-      to: "/familyTree",
-      icon: "Network",
-      text: t('home.exploreFamilyTree'),
-      className: `${CTA_BUTTON_STYLES.secondaryButton} ${CTA_BUTTON_STYLES.blueSecondary}`,
-      hasOverlay: false
-    }
-  ], [t])
+  const { t } = useTranslation();
+
+  const buttons = useMemo(
+    (): ButtonConfig[] => [
+      {
+        to: "/actions",
+        icon: "Users",
+        text: t("home.blockchainActions"),
+        className: CTA_BUTTON_STYLES.primaryButton,
+        hasOverlay: true,
+      },
+      {
+        to: "/familyTree",
+        icon: "Network",
+        text: t("home.exploreFamilyTree"),
+        className: `${CTA_BUTTON_STYLES.secondaryButton} ${CTA_BUTTON_STYLES.blueSecondary}`,
+        hasOverlay: false,
+      },
+    ],
+    [t],
+  );
 
   return (
     <div className={CTA_BUTTON_STYLES.container}>
       {buttons.map((button) => (
         <NavLink key={button.to} to={button.to} className={button.className}>
-          {button.hasOverlay && (
-            <div className={CTA_BUTTON_STYLES.overlay} />
-          )}
+          {button.hasOverlay && <div className={CTA_BUTTON_STYLES.overlay} />}
           <div className={CTA_BUTTON_STYLES.content}>
-            <DynamicIcon name={button.icon} className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 flex-shrink-0" />
+            <DynamicIcon
+              name={button.icon}
+              className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 flex-shrink-0"
+            />
             <span className={CTA_BUTTON_STYLES.text}>{button.text}</span>
           </div>
         </NavLink>
       ))}
     </div>
-  )
-})
+  );
+});
 
 export default function Home() {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   return (
     <>
@@ -120,32 +124,28 @@ export default function Home() {
 
         <div className="relative text-center w-full">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Enhanced Main Title with animations */}
-          <div className={ANIMATION_CLASSES.FADE_IN_UP}>
-            <div className={HERO_CONTENT_STYLES.badge}>
-              <DynamicIcon name="Sparkles" className={HERO_CONTENT_STYLES.badgeIcon} />
-              <span className={HERO_CONTENT_STYLES.badgeText}>Digital Legacy</span>
+            {/* Enhanced Main Title with animations */}
+            <div className={ANIMATION_CLASSES.FADE_IN_UP}>
+              <div className={HERO_CONTENT_STYLES.badge}>
+                <DynamicIcon name="Sparkles" className={HERO_CONTENT_STYLES.badgeIcon} />
+                <span className={HERO_CONTENT_STYLES.badgeText}>Digital Legacy</span>
+              </div>
+
+              <h1 className={HERO_CONTENT_STYLES.title}>
+                <span className={HERO_CONTENT_STYLES.titleGradient}>{t("home.title")}</span>
+              </h1>
             </div>
-            
-            <h1 className={HERO_CONTENT_STYLES.title}>
-              <span className={HERO_CONTENT_STYLES.titleGradient}>
-                {t('home.title')}
-              </span>
-            </h1>
-          </div>
-          
-          {/* Enhanced Subtitle */}
-          <div className={`${ANIMATION_CLASSES.FADE_IN_UP} ${ANIMATION_CLASSES.DELAY_200}`}>
-            <p className={HERO_CONTENT_STYLES.subtitle}>
-              {t('home.subtitle')}
-            </p>
-          </div>
-          
-          {/* Enhanced CTA Buttons */}
-          <CTAButtons />
-          
-          {/* Enhanced Tag Strip */}
-          <TagStrip />
+
+            {/* Enhanced Subtitle */}
+            <div className={`${ANIMATION_CLASSES.FADE_IN_UP} ${ANIMATION_CLASSES.DELAY_200}`}>
+              <p className={HERO_CONTENT_STYLES.subtitle}>{t("home.subtitle")}</p>
+            </div>
+
+            {/* Enhanced CTA Buttons */}
+            <CTAButtons />
+
+            {/* Enhanced Tag Strip */}
+            <TagStrip />
           </div>
         </div>
       </section>
@@ -182,11 +182,10 @@ export default function Home() {
         <Audience />
       </Suspense>
 
-        {/* Call to Action */}
-        <Suspense fallback={<LoadingFallback />}>
-          <CallToAction />
-        </Suspense>
+      {/* Call to Action */}
+      <Suspense fallback={<LoadingFallback />}>
+        <CallToAction />
+      </Suspense>
     </>
-  )
+  );
 }
-
