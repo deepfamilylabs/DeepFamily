@@ -1,35 +1,35 @@
-import React from 'react'
-import type { ZoomTransformState } from '../hooks/useZoom'
-import type { MiniMapNode, UseMiniMapOptions } from '../hooks/useMiniMap'
-import useMiniMap from '../hooks/useMiniMap'
-import { MiniMap, ZoomControls } from './ZoomControls'
+import React from "react";
+import type { ZoomTransformState } from "../hooks/useZoom";
+import type { MiniMapNode, UseMiniMapOptions } from "../hooks/useMiniMap";
+import useMiniMap from "../hooks/useMiniMap";
+import { MiniMap, ZoomControls } from "./ZoomControls";
 
 type GraphViewportProps = {
-  containerRef: React.RefObject<HTMLDivElement>
-  height: number
+  containerRef: React.RefObject<HTMLDivElement>;
+  height: number;
 
-  containerClassName: string
-  svgClassName: string
-  viewBox: string
-  svgRef: React.RefObject<SVGSVGElement>
+  containerClassName: string;
+  svgClassName: string;
+  viewBox: string;
+  svgRef: React.RefObject<SVGSVGElement>;
 
-  transform: ZoomTransformState
-  zoomIn: () => void
-  zoomOut: () => void
-  setZoom: (k: number) => void
-  kToNorm: (k: number) => number
-  normToK: (n: number) => number
-  centerOn: (gx: number, gy: number, containerWidth: number, containerHeight: number) => void
+  transform: ZoomTransformState;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  setZoom: (k: number) => void;
+  kToNorm: (k: number) => number;
+  normToK: (n: number) => number;
+  centerOn: (gx: number, gy: number, containerWidth: number, containerHeight: number) => void;
 
-  miniMapNodes: MiniMapNode[]
-  miniMapOptions?: UseMiniMapOptions
-  miniMapUpdateRef?: React.MutableRefObject<(() => void) | undefined>
-  zoomControlsClassName?: string
-  zoomControlsTrackHeight?: number
-  miniMapWrapperClassName?: string
+  miniMapNodes: MiniMapNode[];
+  miniMapOptions?: UseMiniMapOptions;
+  miniMapUpdateRef?: React.MutableRefObject<(() => void) | undefined>;
+  zoomControlsClassName?: string;
+  zoomControlsTrackHeight?: number;
+  miniMapWrapperClassName?: string;
 
-  children: React.ReactNode
-}
+  children: React.ReactNode;
+};
 
 export default function GraphViewport({
   containerRef,
@@ -48,10 +48,10 @@ export default function GraphViewport({
   miniMapNodes,
   miniMapOptions,
   miniMapUpdateRef,
-  zoomControlsClassName = 'absolute bottom-[124px] left-3 z-10 md:bottom-[158px]',
+  zoomControlsClassName = "absolute bottom-[124px] left-3 z-10 md:bottom-[158px]",
   zoomControlsTrackHeight = 140,
-  miniMapWrapperClassName = 'absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left',
-  children
+  miniMapWrapperClassName = "absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left",
+  children,
 }: GraphViewportProps) {
   const { miniSvgRef, viewportRef, dims, update } = useMiniMap(
     { width: 120, height: 90, ...(miniMapOptions || {}) },
@@ -60,13 +60,13 @@ export default function GraphViewport({
       transform,
       container: containerRef.current,
       onCenter: (gx, gy) => {
-        const box = containerRef.current?.getBoundingClientRect()
-        if (!box) return
-        centerOn(gx, gy, box.width, box.height)
-      }
-    }
-  )
-  if (miniMapUpdateRef) miniMapUpdateRef.current = update
+        const box = containerRef.current?.getBoundingClientRect();
+        if (!box) return;
+        centerOn(gx, gy, box.width, box.height);
+      },
+    },
+  );
+  if (miniMapUpdateRef) miniMapUpdateRef.current = update;
 
   return (
     <div ref={containerRef} className={containerClassName} style={{ height }}>
@@ -87,5 +87,5 @@ export default function GraphViewport({
         {children}
       </svg>
     </div>
-  )
+  );
 }

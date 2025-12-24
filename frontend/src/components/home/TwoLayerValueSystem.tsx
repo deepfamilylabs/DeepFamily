@@ -1,8 +1,8 @@
-import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Shield, Zap, CheckCircle, Eye, Database, Globe, ArrowRight } from 'lucide-react';
-import { ANIMATION_CLASSES } from '../../constants/animationStyles';
-import PageContainer from '../PageContainer';
+import { memo } from "react";
+import { useTranslation } from "react-i18next";
+import { Shield, Zap, CheckCircle, Eye, Database, Globe, ArrowRight } from "lucide-react";
+import { ANIMATION_CLASSES } from "../../constants/animationStyles";
+import PageContainer from "../PageContainer";
 
 const TwoLayerValueSystem = memo(() => {
   const { t } = useTranslation();
@@ -23,17 +23,19 @@ const TwoLayerValueSystem = memo(() => {
         <div className={`text-center mb-20 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-slate-100 to-blue-100 dark:from-slate-800 dark:to-blue-900/30 border border-slate-200 dark:border-slate-700 mb-6 backdrop-blur-sm">
             <Database className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Two-Layer Value System</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Two-Layer Value System
+            </span>
           </div>
 
           <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-slate-900 via-blue-700 to-indigo-700 dark:from-slate-100 dark:via-blue-300 dark:to-indigo-300 bg-clip-text text-transparent">
-              {t('home.valueSystem.title')}
+              {t("home.valueSystem.title")}
             </span>
           </h2>
 
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto leading-relaxed">
-            {t('home.valueSystem.subtitle')}
+            {t("home.valueSystem.subtitle")}
           </p>
         </div>
 
@@ -51,31 +53,41 @@ const TwoLayerValueSystem = memo(() => {
                 </div>
                 <div>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {t('home.valueSystem.layer1.title')}
+                    {t("home.valueSystem.layer1.title")}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 bg-blue-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}></div>
-                    <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Layer 1 - Hash Storage</span>
+                    <div
+                      className={`w-2 h-2 bg-blue-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}
+                    ></div>
+                    <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                      Layer 1 - Hash Storage
+                    </span>
                   </div>
                 </div>
               </div>
 
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 text-base lg:text-lg">
-                {t('home.valueSystem.layer1.description')}
+                {t("home.valueSystem.layer1.description")}
               </p>
 
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">{t('home.valueSystem.layer1.feature1')}</span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">
+                    {t("home.valueSystem.layer1.feature1")}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">{t('home.valueSystem.layer1.feature2')}</span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">
+                    {t("home.valueSystem.layer1.feature2")}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">{t('home.valueSystem.layer1.feature3')}</span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">
+                    {t("home.valueSystem.layer1.feature3")}
+                  </span>
                 </div>
               </div>
             </div>
@@ -94,31 +106,41 @@ const TwoLayerValueSystem = memo(() => {
                 </div>
                 <div>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                    {t('home.valueSystem.layer2.title')}
+                    {t("home.valueSystem.layer2.title")}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 bg-purple-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}></div>
-                    <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">Layer 2 - Public Assets</span>
+                    <div
+                      className={`w-2 h-2 bg-purple-500 rounded-full ${ANIMATION_CLASSES.PULSE_SOFT}`}
+                    ></div>
+                    <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                      Layer 2 - Public Assets
+                    </span>
                   </div>
                 </div>
               </div>
 
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-6 text-base lg:text-lg">
-                {t('home.valueSystem.layer2.description')}
+                {t("home.valueSystem.layer2.description")}
               </p>
 
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">{t('home.valueSystem.layer2.feature1')}</span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">
+                    {t("home.valueSystem.layer2.feature1")}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">{t('home.valueSystem.layer2.feature2')}</span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">
+                    {t("home.valueSystem.layer2.feature2")}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">{t('home.valueSystem.layer2.feature3')}</span>
+                  <span className="text-gray-700 dark:text-gray-300 text-sm lg:text-base">
+                    {t("home.valueSystem.layer2.feature3")}
+                  </span>
                 </div>
               </div>
             </div>
@@ -129,10 +151,10 @@ const TwoLayerValueSystem = memo(() => {
         <div className={`mt-24 ${ANIMATION_CLASSES.FADE_IN_UP} ${ANIMATION_CLASSES.DELAY_500}`}>
           <div className="text-center mb-16">
             <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-              {t('home.valueSystem.flow.title')}
+              {t("home.valueSystem.flow.title")}
             </h3>
             <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              {t('home.valueSystem.flow.description')}
+              {t("home.valueSystem.flow.description")}
             </p>
           </div>
 
@@ -160,10 +182,10 @@ const TwoLayerValueSystem = memo(() => {
                       </div>
                     </div>
                     <h4 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                      {t('home.valueSystem.flow.step1')}
+                      {t("home.valueSystem.flow.step1")}
                     </h4>
                     <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {t('home.valueSystem.flow.step1Desc')}
+                      {t("home.valueSystem.flow.step1Desc")}
                     </p>
                   </div>
                 </div>
@@ -181,10 +203,10 @@ const TwoLayerValueSystem = memo(() => {
                       </div>
                     </div>
                     <h4 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                      {t('home.valueSystem.flow.step2')}
+                      {t("home.valueSystem.flow.step2")}
                     </h4>
                     <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {t('home.valueSystem.flow.step2Desc')}
+                      {t("home.valueSystem.flow.step2Desc")}
                     </p>
                   </div>
                 </div>
@@ -197,10 +219,10 @@ const TwoLayerValueSystem = memo(() => {
         <div className={`mt-28 ${ANIMATION_CLASSES.FADE_IN_UP} ${ANIMATION_CLASSES.DELAY_600}`}>
           <div className="text-center mb-16">
             <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-              {t('home.valueSystem.dualModels.title')}
+              {t("home.valueSystem.dualModels.title")}
             </h3>
             <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              {t('home.valueSystem.dualModels.description')}
+              {t("home.valueSystem.dualModels.description")}
             </p>
           </div>
 
@@ -218,23 +240,23 @@ const TwoLayerValueSystem = memo(() => {
                   </div>
                   <div className="flex-1">
                     <h4 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                      {t('home.valueSystem.dualModels.public.title')}
+                      {t("home.valueSystem.dualModels.public.title")}
                     </h4>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-sm font-medium">
                       <Zap className="w-4 h-4" />
-                      {t('home.valueSystem.dualModels.public.benefit')}
+                      {t("home.valueSystem.dualModels.public.benefit")}
                     </div>
                   </div>
                 </div>
 
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base lg:text-lg mb-6">
-                  {t('home.valueSystem.dualModels.public.description')}
+                  {t("home.valueSystem.dualModels.public.description")}
                 </p>
 
                 <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-200 dark:border-emerald-700/30">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                   <span className="text-emerald-700 dark:text-emerald-300 font-medium text-sm">
-                    {t('home.valueSystem.dualModels.public.mode')}
+                    {t("home.valueSystem.dualModels.public.mode")}
                   </span>
                 </div>
               </div>
@@ -253,23 +275,23 @@ const TwoLayerValueSystem = memo(() => {
                   </div>
                   <div className="flex-1">
                     <h4 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                      {t('home.valueSystem.dualModels.private.title')}
+                      {t("home.valueSystem.dualModels.private.title")}
                     </h4>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
                       <Shield className="w-4 h-4" />
-                      {t('home.valueSystem.dualModels.private.benefit')}
+                      {t("home.valueSystem.dualModels.private.benefit")}
                     </div>
                   </div>
                 </div>
 
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base lg:text-lg mb-6">
-                  {t('home.valueSystem.dualModels.private.description')}
+                  {t("home.valueSystem.dualModels.private.description")}
                 </p>
 
                 <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-700/30">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                   <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">
-                    {t('home.valueSystem.dualModels.private.mode')}
+                    {t("home.valueSystem.dualModels.private.mode")}
                   </span>
                 </div>
               </div>
@@ -281,6 +303,6 @@ const TwoLayerValueSystem = memo(() => {
   );
 });
 
-TwoLayerValueSystem.displayName = 'TwoLayerValueSystem';
+TwoLayerValueSystem.displayName = "TwoLayerValueSystem";
 
 export default TwoLayerValueSystem;

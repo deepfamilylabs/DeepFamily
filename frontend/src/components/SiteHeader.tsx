@@ -1,10 +1,10 @@
-import { NavLink, useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { Home, Search, Network, Book, Zap } from 'lucide-react'
-import HeaderControls from './HeaderControls'
-import Logo from './Logo'
-import PageContainer from './PageContainer'
-import { getBadgeConfig } from '../config/brandBadge'
+import { NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Home, Search, Network, Book, Zap } from "lucide-react";
+import HeaderControls from "./HeaderControls";
+import Logo from "./Logo";
+import PageContainer from "./PageContainer";
+import { getBadgeConfig } from "../config/brandBadge";
 
 /**
  * SiteHeader: Unified top navigation/header bar used across all pages.
@@ -12,29 +12,32 @@ import { getBadgeConfig } from '../config/brandBadge'
  * - On all other pages shows solid surface style
  */
 export default function SiteHeader() {
-  const { t } = useTranslation()
-  const location = useLocation()
-  const isHomePage = location.pathname === '/'
-  const badgeConfig = getBadgeConfig()
+  const { t } = useTranslation();
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
+  const badgeConfig = getBadgeConfig();
 
   const navClasses = ({ isActive }: { isActive: boolean }) => {
-    const baseClasses = 'inline-flex items-center gap-1.5 px-2 py-1.5 lg:px-3.5 lg:py-2 rounded-xl text-xs font-semibold transition-all duration-200 relative group whitespace-nowrap'
+    const baseClasses =
+      "inline-flex items-center gap-1.5 px-2 py-1.5 lg:px-3.5 lg:py-2 rounded-xl text-xs font-semibold transition-all duration-200 relative group whitespace-nowrap";
     if (isHomePage) {
       return `${baseClasses} ${
         isActive
-          ? 'text-white bg-white/25 shadow-lg dark:bg-white/15 backdrop-blur-sm border border-white/20 dark:border-white/10'
-          : 'text-white/85 hover:text-white hover:bg-white/15 hover:shadow-md dark:text-gray-100/85 dark:hover:bg-white/10 hover:scale-105 backdrop-blur-sm'
-      }`
+          ? "text-white bg-white/25 shadow-lg dark:bg-white/15 backdrop-blur-sm border border-white/20 dark:border-white/10"
+          : "text-white/85 hover:text-white hover:bg-white/15 hover:shadow-md dark:text-gray-100/85 dark:hover:bg-white/10 hover:scale-105 backdrop-blur-sm"
+      }`;
     }
     return `${baseClasses} ${
       isActive
-        ? 'text-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 dark:text-blue-300 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm border border-blue-200/50 dark:border-blue-700/30'
-        : 'text-gray-700 hover:text-gray-900 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30 hover:scale-105 hover:shadow-sm'
-    }`
-  }
+        ? "text-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 dark:text-blue-300 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm border border-blue-200/50 dark:border-blue-700/30"
+        : "text-gray-700 hover:text-gray-900 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30 hover:scale-105 hover:shadow-sm"
+    }`;
+  };
 
   return (
-    <header className={`sticky top-0 z-[100] relative ${isHomePage ? 'bg-gradient-to-br from-blue-400/35 via-indigo-500/40 via-purple-500/35 to-violet-600/30 dark:from-blue-500/70 dark:via-indigo-600/75 dark:via-purple-600/70 dark:to-violet-700/65 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/20 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)]' : 'bg-white/85 dark:bg-gray-950/95 backdrop-blur-2xl border-b border-gray-200/70 dark:border-gray-800/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20'}`}>
+    <header
+      className={`sticky top-0 z-[100] relative ${isHomePage ? "bg-gradient-to-br from-blue-400/35 via-indigo-500/40 via-purple-500/35 to-violet-600/30 dark:from-blue-500/70 dark:via-indigo-600/75 dark:via-purple-600/70 dark:to-violet-700/65 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/20 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)]" : "bg-white/85 dark:bg-gray-950/95 backdrop-blur-2xl border-b border-gray-200/70 dark:border-gray-800/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20"}`}
+    >
       {/* Decorative background elements for home page */}
       {isHomePage && (
         <>
@@ -53,12 +56,23 @@ export default function SiteHeader() {
         </>
       )}
       <PageContainer className="relative h-16 flex items-center justify-between">
-        <NavLink to="/" className={`flex items-center gap-1.5 transition-colors ${isHomePage ? 'text-white hover:text-blue-100 dark:text-gray-100' : 'text-gray-800 dark:text-gray-100'}`}>
-          <Logo className={`w-7 h-7 flex-shrink-0 ${isHomePage ? 'text-white dark:text-gray-100' : 'text-blue-500 dark:text-indigo-400'} hover:-rotate-90 transition-transform duration-300`} />
-          <span className={`text-[1.6rem] font-display mt-1 leading-none font-medium ${isHomePage ? 'text-white dark:text-gray-100' : 'text-gray-900 dark:text-gray-100'}`}>Deepfamily</span>
+        <NavLink
+          to="/"
+          className={`flex items-center gap-1.5 transition-colors ${isHomePage ? "text-white hover:text-blue-100 dark:text-gray-100" : "text-gray-800 dark:text-gray-100"}`}
+        >
+          <Logo
+            className={`w-7 h-7 flex-shrink-0 ${isHomePage ? "text-white dark:text-gray-100" : "text-blue-500 dark:text-indigo-400"} hover:-rotate-90 transition-transform duration-300`}
+          />
+          <span
+            className={`text-[1.6rem] font-display mt-1 leading-none font-medium ${isHomePage ? "text-white dark:text-gray-100" : "text-gray-900 dark:text-gray-100"}`}
+          >
+            Deepfamily
+          </span>
           {badgeConfig && (
             <span className="relative hidden sm:inline-block ml-0.5 h-6 align-bottom pointer-events-none">
-              <span className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}>
+              <span
+                className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}
+              >
                 {badgeConfig.text}
               </span>
             </span>
@@ -66,28 +80,28 @@ export default function SiteHeader() {
         </NavLink>
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-shrink-0 min-w-0">
           <NavLink to="/" className={navClasses} end>
-            <Home className="w-3.5 h-3.5" /> 
-            <span className="hidden lg:inline">{t('navigation.home')}</span>
+            <Home className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">{t("navigation.home")}</span>
           </NavLink>
           <NavLink to="/familyTree" className={navClasses}>
-            <Network className="w-3.5 h-3.5" /> 
-            <span className="hidden lg:inline">{t('navigation.familyTree')}</span>
+            <Network className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">{t("navigation.familyTree")}</span>
           </NavLink>
           <NavLink to="/people" className={navClasses}>
-            <Book className="w-3.5 h-3.5" /> 
-            <span className="hidden lg:inline">{t('navigation.people')}</span>
+            <Book className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">{t("navigation.people")}</span>
           </NavLink>
           <NavLink to="/search" className={navClasses}>
             <Search className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">{t('navigation.search')}</span>
+            <span className="hidden lg:inline">{t("navigation.search")}</span>
           </NavLink>
           <NavLink to="/actions" className={navClasses}>
             <Zap className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">{t('navigation.actions', 'Actions')}</span>
+            <span className="hidden lg:inline">{t("navigation.actions", "Actions")}</span>
           </NavLink>
         </nav>
-        <HeaderControls variant={isHomePage ? 'home' : 'normal'} />
+        <HeaderControls variant={isHomePage ? "home" : "normal"} />
       </PageContainer>
     </header>
-  )
+  );
 }

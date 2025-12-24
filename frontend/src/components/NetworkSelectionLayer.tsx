@@ -1,12 +1,8 @@
-import NetworkSelectionModal from './modals/NetworkSelectionModal'
-import { useWallet } from '../context/WalletContext'
+import NetworkSelectionModal from "./modals/NetworkSelectionModal";
+import { useWallet } from "../context/WalletContext";
 
 export default function NetworkSelectionLayer() {
-  const {
-    showNetworkSelection,
-    setShowNetworkSelection,
-    switchOrAddChain
-  } = useWallet()
+  const { showNetworkSelection, setShowNetworkSelection, switchOrAddChain } = useWallet();
 
   return (
     <NetworkSelectionModal
@@ -14,5 +10,5 @@ export default function NetworkSelectionLayer() {
       onSelect={switchOrAddChain}
       onClose={() => setShowNetworkSelection(false)}
     />
-  )
+  );
 }

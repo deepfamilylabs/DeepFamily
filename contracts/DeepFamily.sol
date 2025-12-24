@@ -1173,9 +1173,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    * @param tokenId NFT TokenID
    * @return metadata Story metadata
    */
-  function getStoryMetadata(
-    uint256 tokenId
-  ) external view returns (StoryMetadata memory metadata) {
+  function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata memory metadata) {
     _requireOwned(tokenId);
     metadata = storyMetadata[tokenId];
   }

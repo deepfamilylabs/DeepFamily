@@ -1,22 +1,22 @@
-import { useRef } from 'react'
+import { useRef } from "react";
 
 export function useLongPress(callback: () => void, ms: number = 500) {
-  const timer = useRef<number | null>(null)
+  const timer = useRef<number | null>(null);
 
   const start = () => {
-    clear()
+    clear();
     timer.current = window.setTimeout(() => {
-      callback()
-      clear()
-    }, ms)
-  }
+      callback();
+      clear();
+    }, ms);
+  };
 
   const clear = () => {
     if (timer.current) {
-      window.clearTimeout(timer.current)
-      timer.current = null
+      window.clearTimeout(timer.current);
+      timer.current = null;
     }
-  }
+  };
 
   return {
     onMouseDown: start,
@@ -24,7 +24,5 @@ export function useLongPress(callback: () => void, ms: number = 500) {
     onMouseLeave: clear,
     onTouchStart: start,
     onTouchEnd: clear,
-  }
+  };
 }
-
-

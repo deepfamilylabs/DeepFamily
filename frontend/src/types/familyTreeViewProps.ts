@@ -1,2 +1,1 @@
-export type FamilyTreeViewProps = Record<string, never>
-
+export type FamilyTreeViewProps = Record<string, never>;

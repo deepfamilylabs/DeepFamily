@@ -1,61 +1,61 @@
-import { memo, lazy, Suspense, useMemo } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { LOADING_ANIMATIONS } from '../../constants/animationStyles'
+import { memo, lazy, Suspense, useMemo } from "react";
+import type { LucideIcon } from "lucide-react";
+import { LOADING_ANIMATIONS } from "../../constants/animationStyles";
 
 // Type definition for dynamically imported icons
-type IconName = 
-  | 'Shield' 
-  | 'Coins' 
-  | 'Network' 
-  | 'TrendingUp' 
-  | 'Users' 
-  | 'Globe' 
-  | 'Zap'
-  | 'ArrowRight'
-  | 'Sparkles'
-  | 'Lock'
-  | 'Award'
-  | 'Book'
-  | 'Search'
-  | 'Code'
-  | 'PenTool'
+type IconName =
+  | "Shield"
+  | "Coins"
+  | "Network"
+  | "TrendingUp"
+  | "Users"
+  | "Globe"
+  | "Zap"
+  | "ArrowRight"
+  | "Sparkles"
+  | "Lock"
+  | "Award"
+  | "Book"
+  | "Search"
+  | "Code"
+  | "PenTool";
 
 interface DynamicIconProps {
-  name: IconName
-  className?: string
-  size?: number
+  name: IconName;
+  className?: string;
+  size?: number;
 }
 
 // Icon mapping using dynamic imports
 const iconMap: Record<IconName, () => Promise<{ default: LucideIcon }>> = {
-  Shield: () => import('lucide-react').then(mod => ({ default: mod.Shield })),
-  Coins: () => import('lucide-react').then(mod => ({ default: mod.Coins })),
-  Network: () => import('lucide-react').then(mod => ({ default: mod.Network })),
-  TrendingUp: () => import('lucide-react').then(mod => ({ default: mod.TrendingUp })),
-  Users: () => import('lucide-react').then(mod => ({ default: mod.Users })),
-  Globe: () => import('lucide-react').then(mod => ({ default: mod.Globe })),
-  Zap: () => import('lucide-react').then(mod => ({ default: mod.Zap })),
-  ArrowRight: () => import('lucide-react').then(mod => ({ default: mod.ArrowRight })),
-  Sparkles: () => import('lucide-react').then(mod => ({ default: mod.Sparkles })),
-  Lock: () => import('lucide-react').then(mod => ({ default: mod.Lock })),
-  Award: () => import('lucide-react').then(mod => ({ default: mod.Award })),
-  Book: () => import('lucide-react').then(mod => ({ default: mod.Book })),
-  Search: () => import('lucide-react').then(mod => ({ default: mod.Search })),
-  Code: () => import('lucide-react').then(mod => ({ default: mod.Code })),
-  PenTool: () => import('lucide-react').then(mod => ({ default: mod.PenTool }))
-}
+  Shield: () => import("lucide-react").then((mod) => ({ default: mod.Shield })),
+  Coins: () => import("lucide-react").then((mod) => ({ default: mod.Coins })),
+  Network: () => import("lucide-react").then((mod) => ({ default: mod.Network })),
+  TrendingUp: () => import("lucide-react").then((mod) => ({ default: mod.TrendingUp })),
+  Users: () => import("lucide-react").then((mod) => ({ default: mod.Users })),
+  Globe: () => import("lucide-react").then((mod) => ({ default: mod.Globe })),
+  Zap: () => import("lucide-react").then((mod) => ({ default: mod.Zap })),
+  ArrowRight: () => import("lucide-react").then((mod) => ({ default: mod.ArrowRight })),
+  Sparkles: () => import("lucide-react").then((mod) => ({ default: mod.Sparkles })),
+  Lock: () => import("lucide-react").then((mod) => ({ default: mod.Lock })),
+  Award: () => import("lucide-react").then((mod) => ({ default: mod.Award })),
+  Book: () => import("lucide-react").then((mod) => ({ default: mod.Book })),
+  Search: () => import("lucide-react").then((mod) => ({ default: mod.Search })),
+  Code: () => import("lucide-react").then((mod) => ({ default: mod.Code })),
+  PenTool: () => import("lucide-react").then((mod) => ({ default: mod.PenTool })),
+};
 
 // Create lazy loaded icon component
 const createLazyIcon = (iconName: IconName) => {
   return lazy(async () => {
-    const { default: IconComponent } = await iconMap[iconName]()
+    const { default: IconComponent } = await iconMap[iconName]();
     return {
       default: memo<{ className?: string; size?: number }>(({ className, size = 24 }) => (
         <IconComponent className={className} size={size} />
-      ))
-    }
-  })
-}
+      )),
+    };
+  });
+};
 
 // Icon loading placeholder
 const IconFallback = memo<{ className?: string; size?: number }>(({ className, size = 24 }) => (
@@ -69,17 +69,17 @@ const IconFallback = memo<{ className?: string; size?: number }>(({ className, s
   >
     <rect x="2" y="2" width="20" height="20" rx="4" className="fill-gray-200 dark:fill-gray-700" />
   </svg>
-))
+));
 
 // Main dynamic icon component
 export const DynamicIcon = memo<DynamicIconProps>(({ name, className, size = 24 }) => {
-  const LazyIcon = useMemo(() => createLazyIcon(name), [name])
-  
+  const LazyIcon = useMemo(() => createLazyIcon(name), [name]);
+
   return (
     <Suspense fallback={<IconFallback className={className} size={size} />}>
       <LazyIcon className={className} size={size} />
     </Suspense>
-  )
-})
+  );
+});
 
-DynamicIcon.displayName = 'DynamicIcon'
+DynamicIcon.displayName = "DynamicIcon";

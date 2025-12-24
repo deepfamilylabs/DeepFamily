@@ -3,26 +3,26 @@
  * Custom tree-based logo for the DeepFamily application
  */
 interface LogoProps {
-  className?: string
-  size?: number
+  className?: string;
+  size?: number;
 }
 
 export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
-  const width = size ?? undefined
-  const height = size ?? undefined
-  
+  const width = size ?? undefined;
+  const height = size ?? undefined;
+
   return (
-    <svg 
+    <svg
       className={className}
       width={width}
       height={height}
-      viewBox="4 2 32 28" 
-      fill="none" 
+      viewBox="4 2 32 28"
+      fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g 
-        fill="currentColor" 
-        stroke="currentColor" 
+      <g
+        fill="currentColor"
+        stroke="currentColor"
         strokeWidth="3.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -35,14 +35,9 @@ export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
              L 8 26"
           fill="none"
         />
-        
-        <line
-          x1="8"
-          y1="16"
-          x2="32"
-          y2="16"
-        />
+
+        <line x1="8" y1="16" x2="32" y2="16" />
       </g>
     </svg>
-  )
+  );
 }

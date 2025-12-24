@@ -1,11 +1,11 @@
-import { memo } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Zap, Shield, GitBranch, Coins, Trophy, FileText, TreePine } from 'lucide-react'
-import { ANIMATION_CLASSES } from '../../constants/animationStyles'
-import PageContainer from '../PageContainer'
+import { memo } from "react";
+import { useTranslation } from "react-i18next";
+import { Zap, Shield, GitBranch, Coins, Trophy, FileText, TreePine } from "lucide-react";
+import { ANIMATION_CLASSES } from "../../constants/animationStyles";
+import PageContainer from "../PageContainer";
 
 const CoreFeatures = memo(() => {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   return (
     <section className="py-28 bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-slate-900 dark:via-slate-850/50 dark:to-slate-900">
@@ -13,21 +13,25 @@ const CoreFeatures = memo(() => {
         <div className={`text-center mb-20 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-200/50 dark:border-indigo-600/30 mb-8 backdrop-blur-sm">
             <Zap className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Core Features</span>
+            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+              Core Features
+            </span>
           </div>
-          
+
           <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-6 tracking-tight">
             <span className="bg-gradient-to-r from-slate-900 via-indigo-700 to-purple-700 dark:from-slate-100 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
-              {t('home.features.title')}
+              {t("home.features.title")}
             </span>
           </h2>
-          
+
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto leading-relaxed">
-            {t('home.features.subtitle')}
+            {t("home.features.subtitle")}
           </p>
         </div>
-        
-        <div className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-300`}>
+
+        <div
+          className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-300`}
+        >
           {/* Enhanced Feature Cards */}
           {/* 1. Private Submission Process */}
           <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} h-full`}>
@@ -39,17 +43,21 @@ const CoreFeatures = memo(() => {
                   <Shield className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.zkVersion.title')}</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+                {t("home.features.zkVersion.title")}
+              </h3>
               <div className="flex-1">
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                  {t('home.features.zkVersion.description')}
+                  {t("home.features.zkVersion.description")}
                 </p>
               </div>
             </div>
           </div>
 
           {/* 2. Collaborative and Private Modes */}
-          <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-100 h-full`}>
+          <div
+            className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-100 h-full`}
+          >
             <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-red-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-rose-100/50 dark:border-rose-400/20 hover:shadow-rose-500/10 dark:hover:shadow-rose-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
               <div className="relative mb-8">
@@ -58,17 +66,21 @@ const CoreFeatures = memo(() => {
                   <TreePine className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.versionNotarization.title')}</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+                {t("home.features.versionNotarization.title")}
+              </h3>
               <div className="flex-1">
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                  {t('home.features.versionNotarization.description')}
+                  {t("home.features.versionNotarization.description")}
                 </p>
               </div>
             </div>
           </div>
 
           {/* 3. Multi-Version Governance System */}
-          <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-200 h-full`}>
+          <div
+            className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-200 h-full`}
+          >
             <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-purple-100/50 dark:border-purple-400/20 hover:shadow-purple-500/10 dark:hover:shadow-purple-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
               <div className="relative mb-8">
@@ -77,17 +89,21 @@ const CoreFeatures = memo(() => {
                   <GitBranch className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.versionManagement.title')}</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+                {t("home.features.versionManagement.title")}
+              </h3>
               <div className="flex-1">
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                  {t('home.features.versionManagement.description')}
+                  {t("home.features.versionManagement.description")}
                 </p>
               </div>
             </div>
           </div>
 
           {/* 4. Endorsement Economy Cycle */}
-          <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-300 h-full`}>
+          <div
+            className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-300 h-full`}
+          >
             <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-emerald-100/50 dark:border-emerald-400/20 hover:shadow-emerald-500/10 dark:hover:shadow-emerald-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
               <div className="relative mb-8">
@@ -96,17 +112,21 @@ const CoreFeatures = memo(() => {
                   <Coins className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.endorsementEconomy.title')}</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+                {t("home.features.endorsementEconomy.title")}
+              </h3>
               <div className="flex-1">
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                  {t('home.features.endorsementEconomy.description')}
+                  {t("home.features.endorsementEconomy.description")}
                 </p>
               </div>
             </div>
           </div>
 
           {/* 5. NFT People Encyclopedia */}
-          <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-400 h-full`}>
+          <div
+            className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-400 h-full`}
+          >
             <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-indigo-100/50 dark:border-indigo-400/20 hover:shadow-indigo-500/10 dark:hover:shadow-indigo-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
               <div className="relative mb-8">
@@ -115,17 +135,21 @@ const CoreFeatures = memo(() => {
                   <Trophy className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.personNFT.title')}</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+                {t("home.features.personNFT.title")}
+              </h3>
               <div className="flex-1">
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                  {t('home.features.personNFT.description')}
+                  {t("home.features.personNFT.description")}
                 </p>
               </div>
             </div>
           </div>
 
           {/* 6. Story Sharding and Sealing */}
-          <div className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-500 h-full`}>
+          <div
+            className={`group relative ${ANIMATION_CLASSES.SCALE_IN} animation-delay-500 h-full`}
+          >
             <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
             <div className="relative bg-white dark:bg-slate-800/95 rounded-3xl p-10 shadow-xl border border-orange-100/50 dark:border-orange-400/20 hover:shadow-orange-500/10 dark:hover:shadow-orange-400/20 transition-all duration-500 hover:-translate-y-3 backdrop-blur-sm h-full flex flex-col min-h-[420px]">
               <div className="relative mb-8">
@@ -134,10 +158,12 @@ const CoreFeatures = memo(() => {
                   <FileText className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">{t('home.features.storySharding.title')}</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 leading-tight">
+                {t("home.features.storySharding.title")}
+              </h3>
               <div className="flex-1">
                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">
-                  {t('home.features.storySharding.description')}
+                  {t("home.features.storySharding.description")}
                 </p>
               </div>
             </div>
@@ -145,9 +171,9 @@ const CoreFeatures = memo(() => {
         </div>
       </PageContainer>
     </section>
-  )
-})
+  );
+});
 
-CoreFeatures.displayName = 'CoreFeatures'
+CoreFeatures.displayName = "CoreFeatures";
 
-export default CoreFeatures
+export default CoreFeatures;
