@@ -6,7 +6,7 @@ import { ethers } from 'ethers'
 import { NodeData, birthDateString, deathDateString, genderText as genderTextFn, isMinted, formatUnixSeconds } from '../types/graph'
 import { useNavigate } from 'react-router-dom'
 import { useTreeData } from '../context/TreeDataContext'
-import EndorseCompactModal from './modals/EndorseCompactModal'
+import { useEndorseModal } from '../context/EndorseModalContext'
 
 export default function NodeDetailModal({
   open,
@@ -55,9 +55,9 @@ export default function NodeDetailModal({
   const [dragOffset, setDragOffset] = React.useState(0)
   const startYRef = React.useRef<number | null>(null)
   const navigate = useNavigate()
-  const { getOwnerOf, bumpEndorsementCount } = useTreeData()
+  const { getOwnerOf } = useTreeData()
+  const { openEndorse } = useEndorseModal()
   const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner)
-  const [showEndorseModal, setShowEndorseModal] = React.useState(false)
   const [endorsementCount, setEndorsementCount] = React.useState<number>(nodeData?.endorsementCount ?? 0)
   const handleClose = React.useCallback(() => {
     closedBySelfRef.current = true
@@ -229,7 +229,12 @@ export default function NodeDetailModal({
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setShowEndorseModal(true)
+                          openEndorse({
+                            personHash: nodeData.personHash,
+                            versionIndex: Number(nodeData.versionIndex),
+                            fullName: nodeData.fullName,
+                            endorsementCount
+                          })
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
@@ -307,20 +312,7 @@ export default function NodeDetailModal({
               </button>
             </div>
           </div>
-          <EndorseCompactModal
-            isOpen={showEndorseModal}
-            onClose={() => setShowEndorseModal(false)}
-            personHash={nodeData?.personHash || fallback.hash}
-            versionIndex={Number(nodeData?.versionIndex || fallback.versionIndex || 1)}
-            versionData={{
-              fullName: nodeData?.fullName,
-              endorsementCount: endorsementCount
-            }}
-            onSuccess={() => {
-              setEndorsementCount(c => c + 1)
-              bumpEndorsementCount(nodeData?.personHash || fallback.hash, Number(nodeData?.versionIndex || fallback.versionIndex || 1), 1)
-            }}
-          />
+          
         {centerHint && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
             <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">{centerHint}</div>

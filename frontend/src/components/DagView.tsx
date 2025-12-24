@@ -1,16 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react'
-import { makeNodeId, nodeLabel, isMinted, shortHash } from '../types/graph'
-import { birthDateString } from '../types/graph'
-import { useNodeDetail } from '../context/NodeDetailContext'
 import useZoom from '../hooks/useZoom'
-import useMiniMap from '../hooks/useMiniMap'
-import { ZoomControls, MiniMap } from './ZoomControls'
 import NodeCard from './NodeCard'
-import { useTreeData } from '../context/TreeDataContext'
 import { useFamilyTreeHeight } from '../constants/layout'
-import { useVizOptions } from '../context/VizOptionsContext'
-import EndorseCompactModal from './modals/EndorseCompactModal'
-import { buildViewGraphData } from '../utils/treeData'
+import GraphViewport from './GraphViewport'
+import { useFamilyTreeViewModel } from '../hooks/useFamilyTreeViewModel'
+import { computeDagLayout } from '../layout/dagLayout'
 
 export interface DagViewHandle { centerOnNode: (id: string) => void }
 
@@ -21,56 +15,22 @@ function DagViewInner({
   nodeWidth?: number
   nodeHeight?: number
 }, ref: React.Ref<DagViewHandle>) {
-  const { openNode, selected: ctxSelected } = useNodeDetail()
-  const ctxSelectedId = ctxSelected ? makeNodeId(ctxSelected.personHash, ctxSelected.versionIndex) : null
+  const vm = useFamilyTreeViewModel()
+  const { selectedId: ctxSelectedId } = vm
+  const { openNodeById, openEndorseById } = vm.actions
   const { svgRef, innerRef, transform, zoomIn, zoomOut, setZoom, kToNorm, normToK, centerOn } = useZoom()
-  const { rootId, nodesData, edgesUnion, edgesStrict, endorsementsReady, bumpEndorsementCount } = useTreeData()
-  const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions()
-  const [endorseModal, setEndorseModal] = useState<{
-    open: boolean
-    personHash: string
-    versionIndex: number
-    fullName?: string
-    endorsementCount?: number
-  }>({ open: false, personHash: '', versionIndex: 1 })
-
-  type FlattenNode = { id: string; label: string; hash: string; versionIndex: number; depth: number }
-  type Edge = { from: string; to: string }
+  const { graph, deduplicateChildren } = vm
+  const selectedHash = useMemo(() => {
+    if (!ctxSelectedId) return ''
+    return vm.nodeUiById[ctxSelectedId]?.personHash || ''
+  }, [ctxSelectedId, vm.nodeUiById])
 
   const { nodes, edges, positions, width, height } = useMemo(() => {
-    const graph = buildViewGraphData({
-      rootId,
-      childrenMode,
-      strictIncludeUnversionedChildren,
-      deduplicateChildren,
-      endorsementsReady,
-      nodesData,
-      edgesUnion,
-      edgesStrict
-    })
-    const nodes: FlattenNode[] = graph.nodes.map(n => ({
-      id: n.id,
-      label: nodeLabel({ personHash: n.personHash, versionIndex: n.versionIndex }),
-      hash: n.personHash,
-      versionIndex: n.versionIndex,
-      depth: n.depth
-    }))
+    const nodes = graph.nodes
     const edges = graph.edges
-    const levels: Map<number, FlattenNode[]> = new Map()
-    let maxDepthSeen = 0
-    nodes.forEach(n => { const arr = levels.get(n.depth) || []; arr.push(n); levels.set(n.depth, arr); if (n.depth > maxDepthSeen) maxDepthSeen = n.depth })
-    const margin = { left: 24, top: 24, right: 24, bottom: 24 }
-    const gapX = nodeWidth + 220
-    const gapY = nodeHeight + 22  // Increased vertical spacing from 12 to 40
-    const width = margin.left + margin.right + (maxDepthSeen + 1) * gapX
-    const maxPerLevel = Math.max(...Array.from(levels.values()).map(a => a.length)) || 1
-    const height = margin.top + margin.bottom + maxPerLevel * gapY
-    const positions: Record<string, { x: number; y: number }> = {}
-    Array.from(levels.entries()).forEach(([depth, arr]) => {
-      arr.forEach((n, idx) => { const x = margin.left + depth * gapX; const y = margin.top + idx * gapY; positions[n.id] = { x, y } })
-    })
+    const { positions, width, height } = computeDagLayout(graph, nodeWidth, nodeHeight)
     return { nodes, edges, positions, width, height }
-  }, [childrenMode, deduplicateChildren, edgesStrict, edgesUnion, endorsementsReady, nodeHeight, nodeWidth, nodesData, rootId, strictIncludeUnversionedChildren])
+  }, [graph, nodeHeight, nodeWidth])
 
   const textRefs = useRef<Record<string, SVGTextElement | null>>({})
   const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({})
@@ -113,17 +73,13 @@ function DagViewInner({
         const scr = toContainer(p.x + w / 2, p.y)
         setHover(prev => {
           if (prev && prev.id === ctxSelectedId && prev.x === scr.left && prev.y === scr.top) return prev
-          return { id: ctxSelectedId, x: scr.left, y: scr.top, hash: ctxSelected?.personHash || '' }
+          return { id: ctxSelectedId, x: scr.left, y: scr.top, hash: selectedHash }
         })
       }
     } else if (!hover) setHover(null)
-  }, [ctxSelectedId, positions, measuredWidths, nodeWidth, transform, ctxSelected, hover])
+  }, [ctxSelectedId, positions, measuredWidths, nodeWidth, transform, selectedHash, hover])
 
   const miniNodes = useMemo(() => nodes.map(n => ({ id: n.id, x: positions[n.id].x, y: positions[n.id].y, w: measuredWidths[n.id] || nodeWidth, h: nodeHeight })), [nodes, positions, measuredWidths, nodeWidth, nodeHeight])
-  const { miniSvgRef, viewportRef, dims } = useMiniMap({ width: 120, height: 90 }, { nodes: miniNodes, transform, container: containerRef.current, onCenter: (gx, gy) => {
-    const box = containerRef.current?.getBoundingClientRect(); if (!box) return
-    centerOn(gx, gy, box.width, box.height)
-  } })
 
   useImperativeHandle(ref, () => ({
     centerOnNode: (id: string) => {
@@ -137,16 +93,23 @@ function DagViewInner({
   }), [positions, measuredWidths, nodeWidth, nodeHeight, centerOn])
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 pt-16 pb-4 px-4 md:px-6 overscroll-contain"
-      style={{ height: responsiveHeight }}
-    >
-      <ZoomControls className="absolute bottom-[124px] left-3 z-10 md:bottom-[158px]" trackHeight={140} k={transform.k} kToNorm={kToNorm} normToK={normToK} onSetZoom={setZoom} onZoomIn={zoomIn} onZoomOut={zoomOut} />
-      <div className="absolute bottom-3 left-3 z-10 scale-75 md:scale-100 origin-bottom-left">
-        <MiniMap width={dims.w} height={dims.h} miniSvgRef={miniSvgRef} viewportRef={viewportRef} />
-      </div>
-      <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, responsiveHeight)}`} className="block min-w-full min-h-full select-none touch-none">
+    <>
+      <GraphViewport
+        containerRef={containerRef}
+        height={responsiveHeight}
+        containerClassName="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 pt-16 pb-4 px-4 md:px-6 overscroll-contain"
+        svgClassName="block min-w-full min-h-full select-none touch-none"
+        viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, responsiveHeight)}`}
+        svgRef={svgRef}
+        transform={transform}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
+        setZoom={setZoom}
+        kToNorm={kToNorm}
+        normToK={normToK}
+        centerOn={centerOn}
+        miniMapNodes={miniNodes}
+      >
         <defs>
           <marker id="ftv-arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
             <path d="M0,0 L0,6 L9,3 z" className="fill-blue-400 dark:fill-blue-500" />
@@ -168,69 +131,45 @@ function DagViewInner({
           {nodes.map(n => {
             const p = positions[n.id]
             const w = measuredWidths[n.id] || nodeWidth
-            const nd = nodesData[n.id]
-            const mintedFlag = isMinted(nd)
-            const endorse = nd?.endorsementCount
-            const hashShort = shortHash(n.hash)
+            const ui = vm.nodeUiById[n.id]
             const isSelected = ctxSelectedId === n.id
             // Pass totalVersions only in deduplicate mode; NodeCard will handle display logic (show badge only if > 1)
-            const totalVersions = deduplicateChildren ? nd?.totalVersions : undefined
+            const totalVersions = deduplicateChildren ? ui.totalVersions : undefined
             return (
               <g key={n.id}
                  transform={`translate(${p.x}, ${p.y})`}
-                 onMouseEnter={() => { if (!ctxSelectedId) setHover({ id: n.id, x: 0, y: 0, hash: n.hash }) }}
+                 onMouseEnter={() => { if (!ctxSelectedId) setHover({ id: n.id, x: 0, y: 0, hash: ui.personHash }) }}
                  onMouseLeave={() => { if (!(ctxSelectedId && ctxSelectedId === n.id)) setHover(null) }}
-                 onClick={() => openNode({ personHash: n.hash, versionIndex: n.versionIndex})}
+                 onClick={() => openNodeById(n.id)}
                  className="cursor-pointer">
-                <title>{n.hash}</title>
+                <title>{ui.personHash}</title>
                 {/* Hidden text for width measurement, consistent with TreeLayoutView */}
                 <text ref={el => { textRefs.current[n.id] = el }} opacity={0} className="font-mono pointer-events-none select-none">
-                  <tspan x={8} y={14}>{(mintedFlag && nd?.fullName) ? nd.fullName : hashShort}</tspan>
+                  <tspan x={8} y={14}>{ui.titleText}</tspan>
                 </text>
                 <NodeCard
                   w={w}
                   h={nodeHeight}
-                  minted={mintedFlag}
+                  minted={ui.minted}
                   selected={isSelected}
                   hover={Boolean(hover && hover.id === n.id)}
-                  versionText={`v${n.versionIndex}`}
-                  titleText={(mintedFlag && nd?.fullName) ? nd.fullName : hashShort}
-                  tagText={nd?.tag}
-                  gender={nd?.gender}
-                  birthPlace={nd?.birthPlace}
-                  birthDateText={mintedFlag ? birthDateString(nd) : undefined}
-                  shortHashText={hashShort}
-                  endorsementCount={endorse}
+                  versionText={ui.versionText}
+                  titleText={ui.titleText}
+                  tagText={ui.tagText}
+                  gender={ui.gender}
+                  birthPlace={ui.birthPlace}
+                  birthDateText={ui.birthDateText}
+                  shortHashText={ui.shortHashText}
+                  endorsementCount={ui.endorsementCount}
                   totalVersions={totalVersions}
-                  onEndorseClick={() => {
-                    setEndorseModal({
-                      open: true,
-                      personHash: n.hash,
-                      versionIndex: n.versionIndex,
-                      fullName: nd?.fullName,
-                      endorsementCount: endorse
-                    })
-                  }}
+                  onEndorseClick={() => openEndorseById(n.id)}
                 />
               </g>
             )
           })}
-        </g>
-      </svg>
-      <EndorseCompactModal
-        isOpen={endorseModal.open}
-        onClose={() => setEndorseModal(m => ({ ...m, open: false }))}
-        personHash={endorseModal.personHash}
-        versionIndex={endorseModal.versionIndex}
-        versionData={{
-          fullName: endorseModal.fullName,
-          endorsementCount: endorseModal.endorsementCount
-        }}
-        onSuccess={() => {
-          bumpEndorsementCount(endorseModal.personHash, endorseModal.versionIndex, 1)
-        }}
-      />
-    </div>
+	        </g>
+      </GraphViewport>
+    </>
   )
 }
 
