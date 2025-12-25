@@ -94,7 +94,7 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
         <div className="flex items-center justify-center mb-6 relative">
           {/* Glow effect behind avatar */}
           <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-          
+
           <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-xl shadow-orange-500/20 group-hover:scale-105 transition-transform duration-500 ring-4 ring-white dark:ring-gray-900">
             <User className="w-10 h-10 text-white" strokeWidth={2} />
           </div>
@@ -150,7 +150,7 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
           {(formatDate.birth || person.birthPlace) && (
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
               <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
-                 <Baby className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
+                <Baby className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
@@ -166,7 +166,7 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
           {(formatDate.death || person.deathPlace) && (
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
               <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
-                 <Flower2 className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
+                <Flower2 className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
@@ -182,7 +182,9 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
           {/* Story Preview */}
           {storyPreview && (
             <div className="mt-4 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800/50 italic text-gray-600 dark:text-gray-400 text-sm leading-relaxed relative">
-              <span className="absolute top-2 left-2 text-2xl text-gray-200 dark:text-gray-700 font-serif leading-none">"</span>
+              <span className="absolute top-2 left-2 text-2xl text-gray-200 dark:text-gray-700 font-serif leading-none">
+                "
+              </span>
               <span className="relative z-10">{storyPreview}</span>
             </div>
           )}
@@ -191,22 +193,24 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
         {/* Footer */}
         <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <div className="flex flex-col gap-1">
-             {person.timestamp && (
-                <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-                  <Clock className="w-3 h-3" />
-                  {formatUnixDate(person.timestamp)}
-                </span>
-              )}
-              {person.storyMetadata && (
-                <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-                  <FileText className="w-3 h-3" />
-                  {t("people.chunks", "{{count}} chunks", { count: person.storyMetadata.totalChunks })}
-                </span>
-              )}
+            {person.timestamp && (
+              <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                <Clock className="w-3 h-3" />
+                {formatUnixDate(person.timestamp)}
+              </span>
+            )}
+            {person.storyMetadata && (
+              <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                <FileText className="w-3 h-3" />
+                {t("people.chunks", "{{count}} chunks", {
+                  count: person.storyMetadata.totalChunks,
+                })}
+              </span>
+            )}
           </div>
-          
+
           <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white transition-colors duration-300 shadow-lg shadow-gray-200 dark:shadow-none">
-             <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5" />
           </div>
         </div>
       </div>

@@ -933,7 +933,9 @@ export default function FamilyTreeConfigForm({
                         <button
                           type="button"
                           onClick={() =>
-                            setActiveTooltip(activeTooltip === "childrenMode" ? null : "childrenMode")
+                            setActiveTooltip(
+                              activeTooltip === "childrenMode" ? null : "childrenMode",
+                            )
                           }
                           className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
                         >

@@ -25,14 +25,15 @@ export default function Layout() {
   const isFullWidthPage = isHomePage || isPeoplePage || isTreePage;
 
   // Dynamic background based on page type
-  const bgClass = isPeoplePage || isTreePage
-    ? "bg-white dark:bg-black" // PeoplePage and TreePage handle their own background
-    : "bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900";
+  const bgClass =
+    isPeoplePage || isTreePage
+      ? "bg-white dark:bg-black" // PeoplePage and TreePage handle their own background
+      : "bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900";
 
   // Desktop padding logic:
   // Base strip width: w-16 (4rem) -> pl-16
   // Expanded width: w-16 + w-80 (20rem) = 24rem -> pl-96
-  const desktopPadding = activeSection ? 'md:pl-96' : 'md:pl-16';
+  const desktopPadding = activeSection ? "md:pl-96" : "md:pl-16";
 
   return (
     <div className={`${bgClass} min-h-screen transition-colors duration-300`}>
