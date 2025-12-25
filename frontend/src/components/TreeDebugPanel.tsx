@@ -83,7 +83,9 @@ export default function TreeDebugPanel() {
         className="w-full flex items-center justify-between gap-2 text-left text-slate-700 dark:text-slate-200 group"
         aria-expanded={!collapsed}
       >
-        <span className="font-semibold group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">Tree Debug</span>
+        <span className="font-semibold group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+          Tree Debug
+        </span>
         <ChevronDown className={`h-3 w-3 transition-transform ${collapsed ? "" : "rotate-180"}`} />
       </button>
       {collapsed ? null : (

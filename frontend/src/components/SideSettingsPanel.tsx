@@ -29,17 +29,17 @@ export default function SideSettingsPanel(props: SideSettingsPanelProps) {
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (!panelRef.current) return;
-    
+
     const rect = panelRef.current.getBoundingClientRect();
     panelWidthRef.current = rect.width;
-    
+
     // Calculate current translate X based on state or computed style
     // If expanded, 0. If collapsed, -(width - STRIP_WIDTH)
     const currentTranslate = expanded ? 0 : -(rect.width - STRIP_WIDTH);
-    
+
     dragStartX.current = e.touches[0].clientX;
     dragStartTranslateX.current = currentTranslate;
-    
+
     isDraggingRef.current = false;
     isScrollingRef.current = false;
   };
@@ -56,18 +56,18 @@ export default function SideSettingsPanel(props: SideSettingsPanelProps) {
       // We assume if we are on the strip (which is the handle), we likely want to drag
       // But let's stick to a simple threshold check for now
       if (Math.abs(deltaX) > 5) {
-         isDraggingRef.current = true;
-         setIsDragging(true);
+        isDraggingRef.current = true;
+        setIsDragging(true);
       }
     }
 
     if (isDraggingRef.current) {
       let newTranslate = dragStartTranslateX.current + deltaX;
-      
+
       // Clamp
       const minTranslate = -(panelWidthRef.current - STRIP_WIDTH);
       const maxTranslate = 0;
-      
+
       if (newTranslate < minTranslate) newTranslate = minTranslate;
       if (newTranslate > maxTranslate) newTranslate = maxTranslate;
 
@@ -81,7 +81,7 @@ export default function SideSettingsPanel(props: SideSettingsPanelProps) {
       if (dragX !== null) {
         const minTranslate = -(panelWidthRef.current - STRIP_WIDTH);
         const threshold = minTranslate / 2; // Midpoint
-        
+
         // If we are closer to 0 (expanded) than minTranslate (collapsed)
         if (dragX > threshold) {
           setExpanded(true);
@@ -102,9 +102,12 @@ export default function SideSettingsPanel(props: SideSettingsPanelProps) {
         isDragging ? "transition-none" : "transition-transform duration-300 ease-in-out"
       }`}
       style={{
-        transform: dragX !== null 
-          ? `translateX(${dragX}px)` 
-          : (expanded ? 'translateX(0)' : `translateX(calc(-100% + ${STRIP_WIDTH}px))`)
+        transform:
+          dragX !== null
+            ? `translateX(${dragX}px)`
+            : expanded
+              ? "translateX(0)"
+              : `translateX(calc(-100% + ${STRIP_WIDTH}px))`,
       }}
       onMouseEnter={() => !isDragging && setExpanded(true)}
       onMouseLeave={() => !isDragging && setExpanded(false)}

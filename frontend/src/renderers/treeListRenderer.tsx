@@ -56,10 +56,10 @@ export default function TreeListRenderer(props: {
 
   return (
     <div className="w-full h-full transition-all duration-300 overflow-hidden">
-      <div className="p-4 h-full overflow-x-auto">
+      <div className="p-4 pt-12 md:pt-4 h-full overflow-x-auto">
         <VirtualList
           ref={listRef as any}
-          height={typeof height === 'number' ? height - 32 : 600} // Fallback if string, but ideally we use AutoSizer
+          height={typeof height === "number" ? height - 32 : 600} // Fallback if string, but ideally we use AutoSizer
           itemCount={rows.length}
           itemSize={rowHeight}
           width={"100%"}
