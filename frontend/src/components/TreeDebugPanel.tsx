@@ -76,15 +76,15 @@ export default function TreeDebugPanel() {
   const [collapsed, setCollapsed] = useState(true);
 
   return (
-    <div className="text-xs rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white/60 dark:bg-slate-900/70 p-3 space-y-2">
+    <div className="text-xs rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm px-3 py-1.5 space-y-2">
       <button
         type="button"
         onClick={() => setCollapsed((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 text-left text-slate-700 dark:text-slate-200"
+        className="w-full flex items-center justify-between gap-2 text-left text-slate-700 dark:text-slate-200 group"
         aria-expanded={!collapsed}
       >
-        <span className="font-semibold">Tree Debug</span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-180"}`} />
+        <span className="font-semibold group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">Tree Debug</span>
+        <ChevronDown className={`h-3 w-3 transition-transform ${collapsed ? "" : "rotate-180"}`} />
       </button>
       {collapsed ? null : (
         <>

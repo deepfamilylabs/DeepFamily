@@ -1,14 +1,6 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  TrendingUp,
-  Shield,
-  Key,
-  GitBranch,
-  Users,
-  Gem,
-  FileText,
-} from "lucide-react";
+import { TrendingUp, Shield, Key, GitBranch, Users, Gem, FileText } from "lucide-react";
 import { ANIMATION_CLASSES } from "../../constants/animationStyles";
 import PageContainer from "../PageContainer";
 
@@ -57,9 +49,7 @@ const ValuePropositions = memo(() => {
           </div>
 
           {/* Salted Passphrase Unlinkability */}
-          <div
-            className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-100 h-full`}
-          >
+          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-100 h-full`}>
             <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-purple-500/10 hover:border-purple-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
               <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
                 <Key className="w-7 h-7 text-purple-600" />
@@ -74,9 +64,7 @@ const ValuePropositions = memo(() => {
           </div>
 
           {/* Dual Tree Models */}
-          <div
-            className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-200 h-full`}
-          >
+          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-200 h-full`}>
             <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-emerald-500/10 hover:border-emerald-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
               <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
                 <GitBranch className="w-7 h-7 text-emerald-600" />
@@ -91,9 +79,7 @@ const ValuePropositions = memo(() => {
           </div>
 
           {/* Community Endorsement */}
-          <div
-            className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-300 h-full`}
-          >
+          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-300 h-full`}>
             <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
               <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
                 <Users className="w-7 h-7 text-indigo-600" />
@@ -108,9 +94,7 @@ const ValuePropositions = memo(() => {
           </div>
 
           {/* Incentive Mechanism */}
-          <div
-            className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-400 h-full`}
-          >
+          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-400 h-full`}>
             <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-orange-500/10 hover:border-orange-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
               <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
                 <Gem className="w-7 h-7 text-orange-600" />
@@ -125,9 +109,7 @@ const ValuePropositions = memo(() => {
           </div>
 
           {/* Story Protocol */}
-          <div
-            className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-500 h-full`}
-          >
+          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-500 h-full`}>
             <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-rose-500/10 hover:border-rose-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
               <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
                 <FileText className="w-7 h-7 text-rose-600" />

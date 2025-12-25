@@ -121,19 +121,17 @@ const WorkflowSection: React.FC = memo(() => {
                   Step {step.number}
                 </div>
 
-                <div className={`w-16 h-16 rounded-2xl ${step.bg} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                  className={`w-16 h-16 rounded-2xl ${step.bg} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}
+                >
                   <step.icon className={`w-8 h-8 ${step.color}`} />
                 </div>
-                
+
                 <h3 className="text-lg font-bold text-slate-900 mb-3 leading-tight">
                   {step.title}
                 </h3>
-                
-                <p className="text-slate-500 text-sm leading-relaxed">
-                  {step.description}
-                </p>
 
-
+                <p className="text-slate-500 text-sm leading-relaxed">{step.description}</p>
               </div>
             ))}
           </div>

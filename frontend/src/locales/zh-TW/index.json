@@ -1346,5 +1346,17 @@
       "CALL_EXCEPTION": "合約校驗未通過，請檢查輸入資料。"
     },
     "unknown": "提交失敗，請稍後重試或核對輸入。"
+  },
+  "footer": {
+    "tagline": "您的去中心化數位族譜平台。保存歷史，驗證真相，構建傳承。",
+    "resources": "資源",
+    "documentation": "文件",
+    "blog": "部落格",
+    "support": "支援",
+    "status": "狀態",
+    "about": "關於",
+    "privacy": "隱私政策",
+    "terms": "服務條款",
+    "rights": "© 2026 DeepFamily. MIT License."
   }
 }

@@ -123,42 +123,49 @@ export default function ActionsPage() {
     return (
       <PageContainer className="py-12">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="mb-8">
-            <Wallet className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-500" />
+          <div className="mb-8 relative inline-block">
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-red-500 blur-xl opacity-20 rounded-full"></div>
+            <div className="relative bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg">
+              <Wallet className="w-12 h-12 text-orange-500" />
+            </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 tracking-tight">
             {t("actions.walletRequired", "Wallet Connection Required")}
           </h1>
 
-          <p className="text-lg text-gray-600 dark:text-gray-300 mb-8">
+          <p className="text-lg text-gray-500 dark:text-gray-400 mb-10 max-w-lg mx-auto leading-relaxed">
             {t(
               "actions.walletRequiredDesc",
               "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
             )}
           </p>
 
-          <div className="space-y-6">
-            <WalletConnectButton className="mx-auto" alwaysShowLabel />
+          <div className="space-y-8">
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <WalletConnectButton className="mx-auto" alwaysShowLabel />
+            </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div className="text-left">
-                  <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+            <div className="bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-8 shadow-xl shadow-gray-200/50 dark:shadow-none backdrop-blur-sm">
+              <div className="flex items-start gap-5">
+                <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+                  <AlertCircle className="w-6 h-6 text-orange-500" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
                     {t("actions.whatYouCanDo", "What you can do after connecting:")}
                   </h3>
-                  <ul className="text-sm text-blue-700 dark:text-blue-200 space-y-2">
-                    <li className="flex items-center gap-2">
-                      <Plus className="w-4 h-4" />
+                  <ul className="space-y-3">
+                    <li className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
                       {t("actions.feature1", "Add new person versions with privacy protection")}
                     </li>
-                    <li className="flex items-center gap-2">
-                      <Star className="w-4 h-4" />
+                    <li className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
                       {t("actions.feature2", "Endorse quality data and earn rewards")}
                     </li>
-                    <li className="flex items-center gap-2">
-                      <Image className="w-4 h-4" />
+                    <li className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
                       {t("actions.feature3", "Mint NFTs from endorsed data")}
                     </li>
                   </ul>
@@ -172,14 +179,14 @@ export default function ActionsPage() {
   }
 
   return (
-    <PageContainer className="py-8">
+    <PageContainer className="py-12">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="mb-12 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 tracking-tight">
             {t("actions.title", "Blockchain Actions")}
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
+          <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
             {t(
               "actions.subtitle",
               "Interact with the DeepFamily protocol using your connected wallet",
@@ -187,11 +194,9 @@ export default function ActionsPage() {
           </p>
         </div>
 
-        {/* Wallet Status removed to avoid duplication with top header */}
-
         {/* Tab Navigation */}
-        <div className="mb-8">
-          <nav className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+        <div className="mb-10 flex justify-center">
+          <nav className="inline-flex p-1.5 bg-gray-100 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700/50 backdrop-blur-sm">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -202,13 +207,13 @@ export default function ActionsPage() {
                     setActiveTab(tab.id);
                     setSearchParams({ tab: tab.id });
                   }}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
                     isActive
-                      ? `text-${tab.color}-700 dark:text-${tab.color}-300 bg-white dark:bg-gray-700 shadow-sm`
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                      ? "bg-white dark:bg-gray-800 text-orange-500 shadow-md shadow-gray-200/50 dark:shadow-none ring-1 ring-black/5 dark:ring-white/10"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className={`w-4 h-4 ${isActive ? "stroke-[2.5px]" : ""}`} />
                   <span className="whitespace-nowrap">{tab.name}</span>
                 </button>
               );
@@ -217,33 +222,34 @@ export default function ActionsPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-500">
           {tabs.map((tab) => {
             if (activeTab !== tab.id) return null;
 
             const Icon = tab.icon;
 
             return (
-              <div key={tab.id} className="p-8">
-                <div className="text-center mb-8">
-                  <div
-                    className={`inline-flex items-center justify-center w-16 h-16 rounded-full bg-${tab.color}-100 dark:bg-${tab.color}-900/30 mb-4`}
-                  >
-                    <Icon className={`w-8 h-8 text-${tab.color}-600 dark:text-${tab.color}-400`} />
+              <div
+                key={tab.id}
+                className="p-12 animate-in fade-in slide-in-from-bottom-4 duration-500"
+              >
+                <div className="text-center mb-10">
+                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/10 mb-6 shadow-inner">
+                    <Icon className="w-10 h-10 text-orange-500" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
                     {tab.subtitle}
                   </h2>
-                  <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+                  <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
                     {tab.description}
                   </p>
                 </div>
 
-                <div className="max-w-md mx-auto">
+                <div className="max-w-xs mx-auto">
                   {tab.id === "add-version" && (
                     <button
                       onClick={() => setAddVersionModal({ isOpen: true })}
-                      className={`w-full px-6 py-3 bg-${tab.color}-600 text-white rounded-lg hover:bg-${tab.color}-700 font-medium transition-colors`}
+                      className="w-full px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
                     >
                       {t("actions.startAddVersion", "Start Adding Version")}
                     </button>
@@ -259,7 +265,7 @@ export default function ActionsPage() {
                             versionIndex: undefined,
                           })
                         }
-                        className={`w-full px-6 py-3 bg-${tab.color}-600 text-white rounded-lg hover:bg-${tab.color}-700 font-medium transition-colors`}
+                        className="w-full px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
                       >
                         {t("actions.openMintNFT", "Open NFT Minting")}
                       </button>
@@ -276,7 +282,7 @@ export default function ActionsPage() {
                             versionIndex: undefined,
                           })
                         }
-                        className={`w-full px-6 py-3 bg-${tab.color}-600 text-white rounded-lg hover:bg-${tab.color}-700 font-medium transition-colors`}
+                        className="w-full px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
                       >
                         {t("actions.openEndorse", "Open Endorsement")}
                       </button>

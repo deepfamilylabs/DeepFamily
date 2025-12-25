@@ -7,12 +7,7 @@ import Logo from "./Logo";
 
 // Custom X (Twitter) Icon
 const XIcon = ({ className }: { className?: string }) => (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className={className}
-    fill="currentColor"
-  >
+  <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
@@ -55,12 +50,18 @@ const SiteFooter = memo(() => {
             <p className="text-neutral-400 text-sm max-w-md leading-relaxed">
               {t("footer.tagline")}
             </p>
-            
+
             {/* Links */}
             <div className="flex flex-wrap gap-6 mt-2">
-                <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">{t("footer.documentation")}</a>
-                <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">{t("footer.privacy")}</a>
-                <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">{t("footer.terms")}</a>
+              <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">
+                {t("footer.documentation")}
+              </a>
+              <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">
+                {t("footer.privacy")}
+              </a>
+              <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">
+                {t("footer.terms")}
+              </a>
             </div>
           </div>
 
@@ -68,23 +69,23 @@ const SiteFooter = memo(() => {
           <div className="flex flex-col items-start lg:items-end gap-6 w-full lg:w-auto">
             {/* Social Icons */}
             <div className="flex items-center gap-4">
-              <a 
-                href="https://x.com/DeepFamilyLabs" 
-                target="_blank" 
+              <a
+                href="https://x.com/DeepFamilyLabs"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-neutral-400 hover:bg-white/10 hover:text-white transition-all"
               >
                 <XIcon className="w-4 h-4" />
               </a>
-              <a 
-                href="https://github.com/DeepFamilyLabs" 
-                target="_blank" 
+              <a
+                href="https://github.com/DeepFamilyLabs"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-neutral-400 hover:bg-white/10 hover:text-white transition-all"
               >
                 <Github className="w-4 h-4" />
               </a>
-              <a 
+              <a
                 href="mailto:DeepFamilyLabs@gmail.com"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-neutral-400 hover:bg-white/10 hover:text-white transition-all"
               >
@@ -103,9 +104,11 @@ const SiteFooter = memo(() => {
                     <Globe className="w-4 h-4" />
                     <span>{currentLanguage.nativeName}</span>
                   </div>
-                  <ChevronUp className={`w-3 h-3 transition-transform duration-200 ${isLangOpen ? "rotate-180" : ""}`} />
+                  <ChevronUp
+                    className={`w-3 h-3 transition-transform duration-200 ${isLangOpen ? "rotate-180" : ""}`}
+                  />
                 </button>
-                
+
                 {isLangOpen && (
                   <div className="absolute bottom-full right-0 mb-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
                     {languages.map((lang) => (
@@ -129,9 +132,7 @@ const SiteFooter = memo(() => {
               </div>
 
               {/* Copyright */}
-              <p className="text-neutral-500 text-sm whitespace-nowrap">
-                {t("footer.rights")}
-              </p>
+              <p className="text-neutral-500 text-sm whitespace-nowrap">{t("footer.rights")}</p>
             </div>
           </div>
         </div>

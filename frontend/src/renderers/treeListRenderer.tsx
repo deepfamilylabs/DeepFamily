@@ -10,7 +10,7 @@ import type { NodeUi } from "../utils/familyTreeNodeUi";
 import TreeListRowRenderer from "./treeListRowRenderer";
 
 export default function TreeListRenderer(props: {
-  height: number;
+  height: number | string;
   rowHeight: number;
   rows: TreeRow[];
   expanded: Set<NodeId>;
@@ -55,14 +55,15 @@ export default function TreeListRenderer(props: {
   );
 
   return (
-    <div className="w-full transition-all duration-300 overflow-hidden" style={{ height }}>
-      <div className="p-4 pt-16 h-full overflow-x-auto">
+    <div className="w-full h-full transition-all duration-300 overflow-hidden">
+      <div className="p-4 h-full overflow-x-auto">
         <VirtualList
           ref={listRef as any}
-          height={height - 32}
+          height={typeof height === 'number' ? height - 32 : 600} // Fallback if string, but ideally we use AutoSizer
           itemCount={rows.length}
           itemSize={rowHeight}
-          width={"auto"}
+          width={"100%"}
+          className="w-full"
         >
           {Row}
         </VirtualList>

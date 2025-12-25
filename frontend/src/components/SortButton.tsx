@@ -33,13 +33,13 @@ export default function SortButton({
     <button
       onClick={handleClick}
       className={`
-        group relative inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg
+        group relative inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full
         text-sm font-medium whitespace-nowrap
         transition-all duration-200 ease-out
         ${
           isActive
-            ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 scale-105"
-            : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200"
+            ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 scale-105"
+            : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
         }
       `}
       aria-label={`${label} - ${sortOrder === "asc" ? "Ascending" : "Descending"}`}

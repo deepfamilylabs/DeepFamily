@@ -11,17 +11,17 @@ const order: ViewMode[] = ["tree", "dag", "force", "virtual"];
 
 export default function ViewModeSwitch({ value, onChange, labels, disabled }: ViewModeSwitchProps) {
   return (
-    <div className="relative inline-flex h-9 select-none rounded-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-gray-200 dark:border-slate-700 text-xs font-medium overflow-hidden shadow-md p-1 gap-1 max-w-full">
+    <div className="relative inline-flex h-10 select-none rounded-full bg-slate-100 dark:bg-slate-800 p-1 gap-1 max-w-full border border-slate-200 dark:border-slate-700">
       {order.map((m) => (
         <button
           key={m}
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1.5 px-2.5 md:px-2.5 px-2 rounded-md h-full transition-all duration-150 focus:outline-none text-[11px] font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${
+          className={`relative z-10 inline-flex items-center justify-center gap-1.5 px-4 rounded-full h-full transition-all duration-200 focus:outline-none text-xs font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${
             value === m
-              ? "text-white scale-[0.98] bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 shadow-sm"
-              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-slate-700/50"
+              ? "bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-sm ring-1 ring-black/5 dark:ring-white/5"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
           }`}
           title={labels[m]}
         >

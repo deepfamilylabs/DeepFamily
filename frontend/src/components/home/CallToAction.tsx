@@ -12,10 +12,10 @@ const CallToAction = memo(() => {
   return (
     <section className="relative py-32 w-screen ml-[calc(-50vw+50%)] overflow-hidden bg-white">
       {/* Soft, Airy Gradients */}
-      
+
       {/* Left Glow - Soft Blue/Cyan */}
       <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[800px] h-[800px] bg-blue-100/80 rounded-full blur-[120px] pointer-events-none -translate-x-1/4 mix-blend-multiply" />
-      
+
       {/* Right Glow - Soft Pink/Orange */}
       <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[800px] h-[800px] bg-orange-100/80 rounded-full blur-[120px] pointer-events-none translate-x-1/4 mix-blend-multiply" />
 
@@ -46,8 +46,6 @@ const CallToAction = memo(() => {
               {t("home.cta.exploreButton")}
             </NavLink>
           </div>
-
-
         </div>
       </PageContainer>
     </section>

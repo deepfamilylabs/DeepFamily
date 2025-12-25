@@ -1,7 +1,7 @@
 import { useState, useMemo, useLayoutEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Search, Users, User, Hash, X, Plus } from "lucide-react";
+import { Search, Users, User, Hash, X, Plus, BookOpen } from "lucide-react";
 import { NodeData, isMinted } from "../types/graph";
 import { useTreeData } from "../context/TreeDataContext";
 import PersonStoryCard from "../components/PersonStoryCard";
@@ -246,105 +246,84 @@ export default function PeoplePage() {
   // No longer full-page loading overlay; changed to light hint in top-right, page always interactive
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-black text-gray-900 dark:text-gray-100 selection:bg-orange-500/30">
       {/* Hero Header */}
-      <section className="relative overflow-hidden bg-white dark:bg-gray-900">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.08),transparent_50%),radial-gradient(circle_at_70%_60%,rgba(168,85,247,0.08),transparent_50%)] dark:bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.15),transparent_50%),radial-gradient(circle_at_70%_60%,rgba(168,85,247,0.15),transparent_50%)]"></div>
-
-        {/* Subtle Grid */}
-        <div className="absolute inset-0 [background-image:linear-gradient(rgba(156,163,175,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(156,163,175,0.03)_1px,transparent_1px)] [background-size:48px_48px]" />
-
-        <PageContainer className="relative py-16 md:py-20">
+      <section className="relative pt-24 pb-12 md:pt-32 md:pb-20 overflow-hidden">
+        {/* Ambient Background */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-[radial-gradient(ellipse_at_top,rgba(251,146,60,0.15),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(251,146,60,0.1),transparent_70%)] pointer-events-none" />
+        
+        <PageContainer className="relative z-10">
           {/* Title */}
-          <div className="text-center mb-10">
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-4">
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+          <div className="text-center mb-16 md:mb-24">
+            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter mb-6">
+              <span className="bg-clip-text text-transparent bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
                 {t("people.title", "Family Encyclopedia")}
               </span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-xl md:text-2xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
               {t("people.subtitle", "Explore family member profiles preserved on the blockchain")}
             </p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-4xl mx-auto">
+          {/* Stats Cards - Minimalist */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {/* Total People */}
-            <div className="group relative bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-2xl p-6 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12"></div>
-
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-semibold text-blue-100 uppercase tracking-wider">
-                    {t("people.totalPeople", "People")}
-                  </div>
-                  <Users className="w-5 h-5 text-blue-200" />
-                </div>
-                <div className="text-5xl font-black text-white tabular-nums">{data.totalCount}</div>
+            <div className="group relative p-8 rounded-[2rem] bg-white dark:bg-gray-900 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden hover:-translate-y-1 transition-all duration-500">
+              <div className="absolute -right-6 -top-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-500 transform group-hover:scale-110 group-hover:rotate-12 origin-center">
+                 <Users className="w-40 h-40 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="relative z-10">
+                 <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors">
+                       <Users className="w-5 h-5" />
+                    </div>
+                    <div className="text-xs font-bold text-blue-900/50 dark:text-blue-100/50 uppercase tracking-widest">
+                      {t("people.totalPeople", "People")}
+                    </div>
+                 </div>
+                 <div className="text-6xl font-black tracking-tighter bg-gradient-to-br from-blue-600 to-indigo-600 bg-clip-text text-transparent tabular-nums">
+                    {data.totalCount}
+                 </div>
               </div>
             </div>
 
             {/* Stories */}
-            <div className="group relative bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 rounded-2xl p-6 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12"></div>
-
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-semibold text-purple-100 uppercase tracking-wider">
-                    {t("people.withEncyclopedia", "Encyclopedia")}
-                  </div>
-                  <svg
-                    className="w-5 h-5 text-purple-200"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-                    />
-                  </svg>
-                </div>
-                <div className="text-5xl font-black text-white tabular-nums">
-                  {
-                    data.people.filter((p) => p.storyMetadata && p.storyMetadata.totalChunks > 0)
-                      .length
-                  }
-                </div>
+            <div className="group relative p-8 rounded-[2rem] bg-white dark:bg-gray-900 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden hover:-translate-y-1 transition-all duration-500">
+              <div className="absolute -right-6 -top-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-500 transform group-hover:scale-110 group-hover:rotate-12 origin-center">
+                 <BookOpen className="w-40 h-40 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="relative z-10">
+                 <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 transition-colors">
+                       <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div className="text-xs font-bold text-purple-900/50 dark:text-purple-100/50 uppercase tracking-widest">
+                      {t("people.withEncyclopedia", "Encyclopedia")}
+                    </div>
+                 </div>
+                 <div className="text-6xl font-black tracking-tighter bg-gradient-to-br from-purple-600 to-pink-600 bg-clip-text text-transparent tabular-nums">
+                    {data.people.filter((p) => p.storyMetadata && p.storyMetadata.totalChunks > 0).length}
+                 </div>
               </div>
             </div>
 
             {/* NFTs */}
-            <div className="group relative bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 rounded-2xl p-6 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-12 -mb-12"></div>
-
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-semibold text-indigo-100 uppercase tracking-wider">
-                    {t("people.withNFTs", "NFTs")}
-                  </div>
-                  <svg
-                    className="w-5 h-5 text-indigo-200"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"
-                    />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
-                  </svg>
-                </div>
-                <div className="text-5xl font-black text-white tabular-nums">{data.totalNFTs}</div>
+            <div className="group relative p-8 rounded-[2rem] bg-white dark:bg-gray-900 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden hover:-translate-y-1 transition-all duration-500">
+              <div className="absolute -right-6 -top-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-500 transform group-hover:scale-110 group-hover:rotate-12 origin-center">
+                 <svg className="w-40 h-40 text-orange-600 dark:text-orange-400" fill="currentColor" viewBox="0 0 24 24"><path d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" /></svg>
+              </div>
+              <div className="relative z-10">
+                 <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2.5 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 group-hover:bg-orange-100 dark:group-hover:bg-orange-900/30 transition-colors">
+                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
+                    </div>
+                    <div className="text-xs font-bold text-orange-900/50 dark:text-orange-100/50 uppercase tracking-widest">
+                      {t("people.withNFTs", "NFTs")}
+                    </div>
+                 </div>
+                 <div className="text-6xl font-black tracking-tighter bg-gradient-to-br from-orange-500 to-red-600 bg-clip-text text-transparent tabular-nums">
+                    {data.totalNFTs}
+                 </div>
               </div>
             </div>
           </div>
@@ -352,238 +331,204 @@ export default function PeoplePage() {
       </section>
 
       {/* Search and Filter Controls */}
-      <PageContainer className="mt-8 mb-8" noPadding>
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg shadow-gray-100/50 dark:shadow-none overflow-hidden">
+      <PageContainer className="mb-12" noPadding>
+        <div className="mx-4 md:mx-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-xl rounded-3xl border border-gray-200 dark:border-gray-800 shadow-xl shadow-gray-200/20 dark:shadow-black/20 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-gray-200/30 dark:hover:shadow-black/30">
           {/* Search Bar */}
-          <div className="p-6">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-800">
             <div className="relative group">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-orange-500 transition-colors duration-300" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={t(
-                  "people.searchPlaceholder",
-                  "Search by name, location, or story content...",
-                )}
-                className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 focus:bg-white dark:focus:bg-gray-800 transition-all"
+                placeholder={t("people.searchPlaceholder", "Search by name, location, or story content...")}
+                className="w-full pl-11 pr-4 py-2.5 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 focus:bg-white dark:focus:bg-gray-800 transition-all duration-300"
               />
             </div>
           </div>
 
           {/* Advanced Filters */}
-          <div className="px-6 py-5 bg-gradient-to-b from-gray-50/80 to-gray-50/40 dark:from-gray-900/50 dark:to-gray-900/20 border-t border-gray-200/50 dark:border-gray-700/50">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-                {t("people.filterRules", "Filter Rules")}
-              </div>
-              {/* Clear Filters - moved to top right */}
-              {(selectedAddresses.length > 0 || selectedTags.length > 0 || searchTerm) && (
-                <button
-                  onClick={() => {
-                    setSelectedAddresses([]);
-                    setSelectedTags([]);
-                    setAddressInput("");
-                    setTagInput("");
-                    setSearchTerm("");
-                    setFilterType("all");
-                    setSortOrder("desc");
-                  }}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:underline transition-colors"
-                >
-                  {t("people.clearFilters", "Clear all filters")}
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Creator Address Filter */}
-              <div className="space-y-2.5">
-                <div className="relative group flex gap-2">
-                  <div className="relative flex-1">
-                    <User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                    <input
-                      type="text"
-                      value={addressInput}
-                      onChange={(e) => setAddressInput(e.target.value)}
-                      onKeyDown={handleAddressKeyDown}
-                      placeholder={t("people.filterByAddress", "Add creator address...")}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-all"
-                    />
+          <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left: Filters */}
+            <div className="lg:col-span-7 space-y-6">
+               <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                    {t("people.filterRules", "Filter Rules")}
                   </div>
-                  <button
-                    onClick={addAddress}
-                    disabled={!addressInput.trim()}
-                    className="w-10 h-10 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center justify-center flex-shrink-0 hover:scale-105 disabled:hover:scale-100 active:scale-95"
-                  >
-                    <Plus className="w-5 h-5" strokeWidth={2.5} />
-                  </button>
-                </div>
-                {selectedAddresses.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
-                    {selectedAddresses.map((address) => (
-                      <div
-                        key={address}
-                        className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded-full text-sm shadow-sm hover:shadow-md transition-shadow"
-                      >
-                        <span className="font-mono text-xs truncate max-w-24">{address}</span>
-                        <button
-                          onClick={() => removeAddress(address)}
-                          className="p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors flex-shrink-0"
-                          aria-label={`Remove ${address}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                  {(selectedAddresses.length > 0 || selectedTags.length > 0 || searchTerm) && (
+                    <button
+                      onClick={() => {
+                        setSelectedAddresses([]);
+                        setSelectedTags([]);
+                        setAddressInput("");
+                        setTagInput("");
+                        setSearchTerm("");
+                        setFilterType("all");
+                        setSortOrder("desc");
+                      }}
+                      className="text-xs font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
+                    >
+                      {t("people.clearFilters", "Clear all filters")}
+                    </button>
+                  )}
+               </div>
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Address Filter */}
+                  <div className="space-y-3">
+                    <div className="relative flex gap-2">
+                      <div className="relative flex-1 group">
+                        <User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                        <input
+                          type="text"
+                          value={addressInput}
+                          onChange={(e) => setAddressInput(e.target.value)}
+                          onKeyDown={handleAddressKeyDown}
+                          placeholder={t("people.filterByAddress", "Add creator address...")}
+                          className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition-all"
+                        />
                       </div>
-                    ))}
+                      <button
+                        onClick={addAddress}
+                        disabled={!addressInput.trim()}
+                        className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-orange-600 dark:hover:bg-orange-400 disabled:opacity-50 disabled:hover:bg-gray-900 dark:disabled:hover:bg-white transition-all flex items-center justify-center flex-shrink-0 active:scale-95"
+                      >
+                        <Plus className="w-5 h-5" strokeWidth={2.5} />
+                      </button>
+                    </div>
+                    {selectedAddresses.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedAddresses.map((address) => (
+                          <div key={address} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium border border-orange-100 dark:border-orange-900/30">
+                            <span className="truncate max-w-[100px]">{address}</span>
+                            <button onClick={() => removeAddress(address)} className="p-0.5 hover:bg-orange-200 dark:hover:bg-orange-800/40 rounded-full transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Tag Filter */}
-              <div className="space-y-2.5">
-                <div className="relative group flex gap-2">
-                  <div className="relative flex-1">
-                    <Hash className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={handleTagKeyDown}
-                      placeholder={t("people.filterByTag", "Add tag...")}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 transition-all"
-                    />
-                  </div>
-                  <button
-                    onClick={addTag}
-                    disabled={!tagInput.trim()}
-                    className="w-10 h-10 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center justify-center flex-shrink-0 hover:scale-105 disabled:hover:scale-100 active:scale-95"
-                  >
-                    <Plus className="w-5 h-5" strokeWidth={2.5} />
-                  </button>
-                </div>
-                {selectedTags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-2 bg-purple-50/50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-900/30">
-                    {selectedTags.map((tag) => (
-                      <div
-                        key={tag}
-                        className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 rounded-full text-sm shadow-sm hover:shadow-md transition-shadow"
-                      >
-                        <span className="truncate max-w-24">{tag}</span>
-                        <button
-                          onClick={() => removeTag(tag)}
-                          className="p-0.5 rounded-full hover:bg-purple-200 dark:hover:bg-purple-800/60 transition-colors flex-shrink-0"
-                          aria-label={`Remove ${tag}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                  {/* Tag Filter */}
+                  <div className="space-y-3">
+                    <div className="relative flex gap-2">
+                      <div className="relative flex-1 group">
+                        <Hash className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={handleTagKeyDown}
+                          placeholder={t("people.filterByTag", "Add tag...")}
+                          className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition-all"
+                        />
                       </div>
-                    ))}
+                      <button
+                        onClick={addTag}
+                        disabled={!tagInput.trim()}
+                        className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-orange-600 dark:hover:bg-orange-400 disabled:opacity-50 disabled:hover:bg-gray-900 dark:disabled:hover:bg-white transition-all flex items-center justify-center flex-shrink-0 active:scale-95"
+                      >
+                        <Plus className="w-5 h-5" strokeWidth={2.5} />
+                      </button>
+                    </div>
+                    {selectedTags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedTags.map((tag) => (
+                          <div key={tag} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs font-medium border border-gray-200 dark:border-gray-700">
+                            <span className="truncate max-w-[100px]">{tag}</span>
+                            <button onClick={() => removeTag(tag)} className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+               </div>
+            </div>
+
+            {/* Right: Sort */}
+            <div className="lg:col-span-5 space-y-6 lg:border-l lg:border-gray-100 lg:dark:border-gray-800 lg:pl-8">
+               <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    {t("people.sortRules", "Sort Rules")}
+                  </div>
+               </div>
+               <div className="flex flex-wrap gap-2">
+                  <SortButton
+                    label={t("people.filterAll", "Token ID")}
+                    isActive={filterType === "all"}
+                    sortOrder={sortOrder}
+                    onClick={() => setFilterType("all")}
+                    onSortOrderChange={setSortOrder}
+                    showSortArrows={true}
+                  />
+                  <SortButton
+                    label={t("people.filterByCreateTime", "Creation Time")}
+                    isActive={filterType === "by_create_time"}
+                    sortOrder={sortOrder}
+                    onClick={() => setFilterType("by_create_time")}
+                    onSortOrderChange={setSortOrder}
+                    showSortArrows={true}
+                  />
+                  <SortButton
+                    label={t("people.filterByName", "Name")}
+                    isActive={filterType === "by_name"}
+                    sortOrder={sortOrder}
+                    onClick={() => setFilterType("by_name")}
+                    onSortOrderChange={setSortOrder}
+                    showSortArrows={true}
+                  />
+                  <SortButton
+                    label={t("people.filterByEndorsement", "Endorsements")}
+                    isActive={filterType === "by_endorsement"}
+                    sortOrder={sortOrder}
+                    onClick={() => setFilterType("by_endorsement")}
+                    onSortOrderChange={setSortOrder}
+                    showSortArrows={true}
+                  />
+                  <SortButton
+                    label={t("people.filterByBirthYear", "Birth Year")}
+                    isActive={filterType === "by_birth_year"}
+                    sortOrder={sortOrder}
+                    onClick={() => setFilterType("by_birth_year")}
+                    onSortOrderChange={setSortOrder}
+                    showSortArrows={true}
+                  />
+               </div>
             </div>
           </div>
 
-          {/* Sort Controls */}
-          <div className="px-6 py-5 border-t border-gray-200/50 dark:border-gray-700/50 bg-white dark:bg-gray-800">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-4 bg-gradient-to-b from-indigo-500 to-blue-500 rounded-full"></div>
-              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                {t("people.sortRules", "Sort Rules")}
-              </div>
-            </div>
-            <div className="inline-flex flex-wrap items-center gap-2 bg-gray-50 dark:bg-gray-900/50 rounded-xl p-2 border border-gray-200/80 dark:border-gray-700/80">
-              <SortButton
-                label={t("people.filterAll", "Token ID")}
-                isActive={filterType === "all"}
-                sortOrder={sortOrder}
-                onClick={() => setFilterType("all")}
-                onSortOrderChange={setSortOrder}
-                showSortArrows={true}
-              />
-              <SortButton
-                label={t("people.filterByCreateTime", "Creation Time")}
-                isActive={filterType === "by_create_time"}
-                sortOrder={sortOrder}
-                onClick={() => setFilterType("by_create_time")}
-                onSortOrderChange={setSortOrder}
-                showSortArrows={true}
-              />
-              <SortButton
-                label={t("people.filterByName", "Name")}
-                isActive={filterType === "by_name"}
-                sortOrder={sortOrder}
-                onClick={() => setFilterType("by_name")}
-                onSortOrderChange={setSortOrder}
-                showSortArrows={true}
-              />
-              <SortButton
-                label={t("people.filterByEndorsement", "Endorsements")}
-                isActive={filterType === "by_endorsement"}
-                sortOrder={sortOrder}
-                onClick={() => setFilterType("by_endorsement")}
-                onSortOrderChange={setSortOrder}
-                showSortArrows={true}
-              />
-              <SortButton
-                label={t("people.filterByBirthYear", "Birth Year")}
-                isActive={filterType === "by_birth_year"}
-                sortOrder={sortOrder}
-                onClick={() => setFilterType("by_birth_year")}
-                onSortOrderChange={setSortOrder}
-                showSortArrows={true}
-              />
-            </div>
-          </div>
-
-          {/* Results count */}
-          <div className="px-6 py-4 bg-gradient-to-r from-blue-50/30 via-purple-50/20 to-indigo-50/30 dark:from-blue-950/10 dark:via-purple-950/5 dark:to-indigo-950/10 border-t border-gray-200/50 dark:border-gray-700/50">
-            <div
-              className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2.5"
-              aria-live="polite"
-            >
-              {data.loading && (
-                <>
-                  <div className="relative">
-                    <div className="w-4 h-4 border-2 border-blue-200 dark:border-blue-800 rounded-full"></div>
-                    <div className="w-4 h-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin absolute inset-0"></div>
-                  </div>
-                  <span className="font-medium">{t("people.syncing", "Syncing...")}</span>
-                  <span className="text-gray-300 dark:text-gray-600">·</span>
-                </>
-              )}
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
-                {selectedAddresses.length > 0 || selectedTags.length > 0
-                  ? t("people.filteredResults", "{{count}} filtered results", {
-                      count: filteredPeople.length,
-                    })
-                  : t("people.allResults", "{{count}} total results", {
-                      count: filteredPeople.length,
-                    })}
-              </span>
-            </div>
+          {/* Results Bar */}
+          <div className="px-6 py-3 bg-gray-50/50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+             <div className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                {data.loading && (
+                  <div className="w-4 h-4 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+                )}
+                <span>
+                  {selectedAddresses.length > 0 || selectedTags.length > 0
+                    ? t("people.filteredResults", "{{count}} filtered results", { count: filteredPeople.length })
+                    : t("people.allResults", "{{count}} total results", { count: filteredPeople.length })}
+                </span>
+             </div>
           </div>
         </div>
       </PageContainer>
 
       {/* Main Content */}
-      <PageContainer className="pb-12" noPadding>
+      <PageContainer className="pb-24" noPadding>
         {filteredPeople.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="relative inline-block mb-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full blur-2xl opacity-50"></div>
-              <div className="relative bg-white dark:bg-gray-800 rounded-2xl p-8 border-2 border-dashed border-gray-300 dark:border-gray-600">
-                <Users
-                  className="w-20 h-20 text-gray-400 dark:text-gray-500 mx-auto"
-                  strokeWidth={1.5}
-                />
-              </div>
+          <div className="text-center py-32">
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gray-50 dark:bg-gray-900 mb-6">
+              <Users className="w-10 h-10 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
             </div>
-            <p className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
               {t("people.noResults", "No stories found")}
-            </p>
-            <p className="text-base text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8">
               {t("people.noResultsDesc", "Try adjusting your search terms or filters")}
             </p>
             {(selectedAddresses.length > 0 || selectedTags.length > 0 || searchTerm) && (
@@ -597,7 +542,7 @@ export default function PeoplePage() {
                   setFilterType("all");
                   setSortOrder("desc");
                 }}
-                className="mt-6 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30"
+                className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full font-medium hover:bg-orange-600 dark:hover:bg-orange-400 transition-colors"
               >
                 {t("people.resetFilters", "Reset filters")}
               </button>

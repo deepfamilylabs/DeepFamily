@@ -3,12 +3,12 @@ import { useDebounce } from "../hooks/useDebounce";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../context/ConfigContext";
 import { formatHashMiddle, shortAddress } from "../types/graph";
-import { Clipboard } from "lucide-react";
+import { Clipboard, HelpCircle } from "lucide-react";
 import { useTreeData } from "../context/TreeDataContext";
 import { useToast } from "./ToastProvider";
 import { NETWORK_PRESETS } from "../config/networks";
 
-interface Props {
+export interface FamilyTreeConfigFormProps {
   editing: boolean;
   setEditing: (v: boolean) => void;
   // Status bar props
@@ -27,6 +27,9 @@ interface Props {
   setDeduplicateChildren: (value: boolean) => void;
   progress?: { created: number; visited: number; depth: number };
   locale?: string;
+  alwaysShowExtras?: boolean;
+  hideToggle?: boolean;
+  hideHeader?: boolean;
 }
 
 const LOCALE_NEED_ZH_ROOT = new Set(["ja", "ko", "zh-cn", "zh-tw"]);
@@ -60,7 +63,10 @@ export default function FamilyTreeConfigForm({
   setDeduplicateChildren,
   progress,
   locale,
-}: Props) {
+  alwaysShowExtras,
+  hideToggle,
+  hideHeader,
+}: FamilyTreeConfigFormProps) {
   const { t, i18n } = useTranslation();
   const isDev = import.meta.env.DEV;
   const showDeduplicateToggle = useMemo(
@@ -89,6 +95,7 @@ export default function FamilyTreeConfigForm({
   const [localContractAddress, setLocalContractAddress] = useState(contractAddress);
   const [localRootHash, setLocalRootHash] = useState(rootHash);
   const [localVersion, setLocalVersion] = useState(rootVersionIndex);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     rpc?: string;
     chainId?: string;
@@ -168,7 +175,7 @@ export default function FamilyTreeConfigForm({
         name: t?.(n.nameKey, n.defaultName) || n.defaultName,
         rpcUrl: n.rpcUrl,
       })),
-      // Recompute when locale changes
+    // Recompute when locale changes
     [t, i18n.language],
   );
 
@@ -394,52 +401,74 @@ export default function FamilyTreeConfigForm({
   };
 
   return (
-    <div className="text-sm text-slate-600 dark:text-slate-300 p-6">
+    <div className="text-sm text-slate-600 dark:text-slate-300 p-4">
       {/* Mobile-responsive header layout */}
       <div className="mb-6">
         {/* Header with title and edit buttons - always on same row */}
         <div className="flex items-start justify-between gap-4 mb-4">
           {/* Left side: Title */}
-          <div className="min-w-0 flex-1">
-            <span className="text-lg font-bold text-transparent bg-gradient-to-r from-slate-800 via-blue-600 to-purple-600 dark:from-slate-200 dark:via-blue-400 dark:to-purple-400 bg-clip-text">
-              {t("familyTree.ui.contractModeConfig")}
-            </span>
-          </div>
+          {!hideHeader && (
+            <div className="min-w-0 flex-1">
+              <span className="text-lg font-bold text-transparent bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text">
+                {t("familyTree.ui.contractModeConfig")}
+              </span>
+            </div>
+          )}
 
           {/* Right side: Edit/Save/Cancel Buttons - always in top right */}
-          <div className="flex-shrink-0">
-            {editing ? (
-              <div className="flex gap-2">
+          {!hideToggle && (
+            <div className="flex-shrink-0">
+              {editing ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={resetToDefaults}
+                    className="px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg transition-all duration-200 font-semibold"
+                    title={t("familyTree.config.resetToDefaults")}
+                  >
+                    {t("familyTree.config.reset")}
+                  </button>
+                  <button
+                    onClick={applyConfigChanges}
+                    disabled={!hasDiff}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 font-semibold ${hasDiff ? "bg-gradient-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white shadow-md hover:shadow-lg" : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"}`}
+                  >
+                    {t("familyTree.ui.save")}
+                  </button>
+                  <button
+                    onClick={cancel}
+                    className="px-3 py-1.5 text-xs rounded-full bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
+                  >
+                    {t("familyTree.ui.cancel")}
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={resetToDefaults}
-                  className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-md hover:shadow-lg transition-all duration-200 font-semibold"
-                  title={t("familyTree.config.resetToDefaults")}
+                  onClick={() => setEditing(true)}
+                  className="px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white hover:from-orange-500 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
                 >
-                  {t("familyTree.config.reset")}
+                  {t("familyTree.ui.edit")}
                 </button>
-                <button
-                  onClick={applyConfigChanges}
-                  disabled={!hasDiff}
-                  className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-semibold ${hasDiff ? "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-md hover:shadow-lg" : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"}`}
-                >
-                  {t("familyTree.ui.save")}
-                </button>
-                <button
-                  onClick={cancel}
-                  className="px-3 py-1.5 text-xs rounded-lg bg-slate-600 dark:bg-slate-500 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
-                >
-                  {t("familyTree.ui.cancel")}
-                </button>
-              </div>
-            ) : (
+              )}
+            </div>
+          )}
+          {hideToggle && editing && (
+            <div className="flex gap-2">
               <button
-                onClick={() => setEditing(true)}
-                className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
+                onClick={resetToDefaults}
+                className="px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg transition-all duration-200 font-semibold"
+                title={t("familyTree.config.resetToDefaults")}
               >
-                {t("familyTree.ui.edit")}
+                {t("familyTree.config.reset")}
               </button>
-            )}
-          </div>
+              <button
+                onClick={applyConfigChanges}
+                disabled={!hasDiff}
+                className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 font-semibold ${hasDiff ? "bg-gradient-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white shadow-md hover:shadow-lg" : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"}`}
+              >
+                {t("familyTree.ui.save")}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Status Badge and Action Buttons Row - only show in non-editing mode */}
@@ -453,13 +482,13 @@ export default function FamilyTreeConfigForm({
               {onRefresh && (
                 <button
                   onClick={onRefresh}
-                  className="inline-flex items-center justify-center h-6 px-2 gap-1 rounded-md border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700/80 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs whitespace-nowrap"
+                  className="inline-flex items-center justify-center h-7 px-3 gap-1.5 rounded-full border border-slate-300/60 dark:border-slate-600/60 bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-orange-50 dark:hover:bg-slate-700/80 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm group flex-shrink-0 text-xs whitespace-nowrap font-medium"
                   disabled={loading}
                   title={statusT ? statusT("familyTree.actions.refresh") : "Refresh"}
                   aria-label={statusT ? statusT("familyTree.actions.refresh") : "Refresh"}
                 >
                   <svg
-                    className={`w-3 h-3 ${loading ? "animate-spin" : "group-hover:rotate-180"} transition-transform duration-300 flex-shrink-0`}
+                    className={`w-3.5 h-3.5 ${loading ? "animate-spin" : "group-hover:rotate-180"} transition-transform duration-300 flex-shrink-0`}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -481,10 +510,10 @@ export default function FamilyTreeConfigForm({
                 onClick={() => {
                   clearAllCaches();
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-300 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all duration-200 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-100 hover:border-rose-300 hover:text-rose-800 dark:hover:bg-rose-800/40 dark:hover:border-rose-600 dark:hover:text-rose-200 hover:shadow-md active:bg-rose-200 dark:active:bg-rose-700/50 shadow-sm flex-shrink-0 whitespace-nowrap"
               >
                 <svg
-                  className="w-3 h-3 flex-shrink-0"
+                  className="w-3.5 h-3.5 flex-shrink-0"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -508,17 +537,17 @@ export default function FamilyTreeConfigForm({
       {editing ? (
         <div className="space-y-4">
           {/* RPC and Contract in same row */}
-          <div className="flex flex-col lg:flex-row lg:gap-4 gap-4">
+          <div className="flex flex-col gap-4">
             <div className="flex-1">
               <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">
                 {t("familyTree.config.rpc")}:
               </label>
               <div className="space-y-2">
-                <div className="flex flex-col md:flex-row gap-2">
+                <div className="flex flex-col gap-2">
                   <select
                     value={selectedNetwork === "custom" ? "custom" : String(selectedNetwork)}
                     onChange={(e) => handleNetworkChange(e.target.value)}
-                    className="w-full md:w-56 min-w-[190px] px-3 pr-5 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 transition-all duration-200 backdrop-blur-sm shadow-sm border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500"
+                    className="w-full px-3 pr-5 py-2 text-sm rounded-2xl border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 transition-all duration-200 backdrop-blur-sm shadow-sm border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"
                   >
                     {presetNetworks.map((n) => (
                       <option key={n.chainId} value={n.chainId}>
@@ -542,7 +571,7 @@ export default function FamilyTreeConfigForm({
                     type="text"
                     value={localRpcUrl}
                     readOnly
-                    className={`flex-1 px-3 py-2 text-sm font-mono rounded-md border bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500" : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500"}`}
+                    className={`flex-1 px-3 py-2 text-sm font-mono rounded-2xl border bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.rpc ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500" : "border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"}`}
                   />
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400">
@@ -550,14 +579,14 @@ export default function FamilyTreeConfigForm({
                   {localChainId || t("common.na", "N/A")}
                 </div>
                 {selectedNetwork === "custom" && (
-                  <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/50 p-3 space-y-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/50 p-3 space-y-2">
+                    <div className="grid grid-cols-1 gap-2">
                       <input
                         type="text"
                         placeholder={t("familyTree.config.customNetworkName", "Network name")}
                         value={customName}
                         onChange={(e) => setCustomName(e.target.value)}
-                        className="px-3 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60"
+                        className="px-3 py-2 text-sm rounded-xl border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60"
                       />
                       <input
                         type="number"
@@ -566,14 +595,14 @@ export default function FamilyTreeConfigForm({
                         onChange={(e) =>
                           setCustomChainId(e.target.value === "" ? "" : Number(e.target.value))
                         }
-                        className="px-3 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60"
+                        className="px-3 py-2 text-sm rounded-xl border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60"
                       />
                       <input
                         type="text"
                         placeholder="https://"
                         value={customRpc}
                         onChange={(e) => setCustomRpc(e.target.value)}
-                        className="px-3 py-2 text-sm rounded-md border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 sm:col-span-1"
+                        className="px-3 py-2 text-sm rounded-xl border bg-white/90 dark:bg-slate-900/70 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60"
                       />
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -596,7 +625,7 @@ export default function FamilyTreeConfigForm({
                       <button
                         type="button"
                         onClick={addCustomNetwork}
-                        className="px-3 py-1.5 text-xs rounded-md bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+                        className="px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
                       >
                         {t("familyTree.config.addCustomNetwork", "Save custom")}
                       </button>
@@ -623,7 +652,7 @@ export default function FamilyTreeConfigForm({
                 type="text"
                 value={localContractAddress}
                 onChange={(e) => setLocalContractAddress(e.target.value)}
-                className={`w-full px-3 py-2 text-sm font-mono rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.contract ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500" : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500"}`}
+                className={`w-full px-3 py-2 text-sm font-mono rounded-2xl border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.contract ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500" : "border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"}`}
               />
               {errors.contract && (
                 <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">
@@ -633,7 +662,7 @@ export default function FamilyTreeConfigForm({
             </div>
           </div>
           {/* Root Hash and Version in same row */}
-          <div className="flex flex-col lg:flex-row lg:gap-4 gap-4">
+          <div className="flex flex-col gap-4">
             <div className="flex-1">
               <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">
                 {t("familyTree.config.root")}:
@@ -642,7 +671,7 @@ export default function FamilyTreeConfigForm({
                 type="text"
                 value={localRootHash}
                 onChange={(e) => setLocalRootHash(e.target.value)}
-                className={`w-full px-3 py-2 text-sm font-mono rounded-md border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500" : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/60 hover:border-blue-400 dark:hover:border-blue-500"}`}
+                className={`w-full px-3 py-2 text-sm font-mono rounded-2xl border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${errors.root ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500" : "border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"}`}
               />
               {errors.root && (
                 <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">
@@ -650,13 +679,13 @@ export default function FamilyTreeConfigForm({
                 </div>
               )}
             </div>
-            <div className="lg:min-w-32">
+            <div>
               <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">
                 {t("familyTree.ui.versionNumber")}:
               </label>
-              <div className="inline-flex items-center rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm h-[38px]">
+              <div className="inline-flex items-center rounded-2xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm h-[38px] overflow-hidden">
                 <button
-                  className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-l-md transition-colors duration-150 text-sm font-medium"
+                  className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 text-sm font-medium"
                   onClick={() => setLocalVersion((v) => Math.max(1, (v || 1) - 1))}
                   aria-label="Decrease version"
                 >
@@ -670,7 +699,7 @@ export default function FamilyTreeConfigForm({
                   className="w-24 h-full text-sm text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
                 />
                 <button
-                  className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-r-md transition-colors duration-150 text-sm font-medium"
+                  className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 text-sm font-medium"
                   onClick={() => setLocalVersion((v) => (v || 1) + 1)}
                   aria-label="Increase version"
                 >
@@ -722,19 +751,19 @@ export default function FamilyTreeConfigForm({
       ) : (
         <div className="space-y-2 text-slate-700 dark:text-slate-300">
           {/* RPC and Contract - responsive layout */}
-          <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
-            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-1 lg:min-w-0">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 min-w-0">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {t("familyTree.config.rpc")}:
               </span>
               <span
-                className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all text-right lg:text-left"
+                className="font-mono text-xs text-blue-600 dark:text-blue-400 break-all text-right"
                 title={rpcUrl}
               >
                 {rpcUrl}
               </span>
             </div>
-            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {t("familyTree.config.contract")}:
               </span>
@@ -766,12 +795,12 @@ export default function FamilyTreeConfigForm({
       {!editing && (
         <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
           {/* Root and Version - responsive layout */}
-          <div className="flex flex-col lg:flex-row lg:gap-6 gap-2">
-            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-1 lg:min-w-0">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 min-w-0">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {t("familyTree.config.root")}:
               </span>
-              <div className="flex-1 lg:flex-initial min-w-0 flex justify-end lg:justify-start">
+              <div className="flex-1 min-w-0 flex justify-end">
                 <div className="inline-flex items-center gap-1 max-w-full">
                   <span
                     className="block overflow-hidden font-mono text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap sm:whitespace-normal sm:break-all"
@@ -793,7 +822,7 @@ export default function FamilyTreeConfigForm({
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between lg:justify-start gap-2 lg:flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 {t("familyTree.ui.versionNumber")}:
               </span>
@@ -830,7 +859,7 @@ export default function FamilyTreeConfigForm({
       )}
 
       {/* Divider and bottom controls - only show in non-editing mode */}
-      {!editing && (
+      {(!editing || alwaysShowExtras) && (
         <>
           <div className="border-t border-slate-200/60 dark:border-slate-700/60 mt-4"></div>
 
@@ -839,67 +868,52 @@ export default function FamilyTreeConfigForm({
             {/* First row: Traversal mode and Stats */}
             <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 text-xs">
               {/* Left: Traversal */}
-              <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-                <span className="hidden sm:block text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                  {statusT ? statusT("familyTree.ui.traversal") : "Traversal"}:
-                </span>
-                <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-                  <div className="relative group">
-                    <button
-                      type="button"
-                      aria-label={statusT ? statusT("familyTree.ui.traversalDFS") : "DFS"}
-                      onClick={() => setTraversal("dfs")}
-                      className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${traversal === "dfs" ? "bg-blue-600 text-white" : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
-                    >
-                      DFS
-                    </button>
-                    <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                      {statusT ? statusT("familyTree.ui.traversalDFS") : "Depth First Search"}
-                    </div>
-                  </div>
-                  <div className="relative group border-l border-slate-300 dark:border-slate-600">
+              <div className="flex items-center justify-between w-full gap-2 relative">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    {statusT ? statusT("familyTree.ui.traversal") : "Traversal"}:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveTooltip(activeTooltip === "traversal" ? null : "traversal")
+                    }
+                    className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
+                  >
+                    <HelpCircle size={14} />
+                  </button>
+                </div>
+                <div className="inline-flex rounded-2xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
+                  <button
+                    type="button"
+                    aria-label={statusT ? statusT("familyTree.ui.traversalDFS") : "DFS"}
+                    onClick={() => setTraversal("dfs")}
+                    className={`px-3 py-1.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium ${traversal === "dfs" ? "bg-gradient-to-r from-orange-400 to-red-500 text-white shadow-md" : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+                  >
+                    DFS
+                  </button>
+                  <div className="relative border-l border-slate-300 dark:border-slate-600">
                     <button
                       type="button"
                       aria-label={statusT ? statusT("familyTree.ui.traversalBFS") : "BFS"}
                       onClick={() => setTraversal("bfs")}
-                      className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-lg ${traversal === "bfs" ? "bg-blue-600 text-white" : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+                      className={`px-3 py-1.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium ${traversal === "bfs" ? "bg-gradient-to-r from-orange-400 to-red-500 text-white shadow-md" : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
                     >
                       BFS
                     </button>
-                    <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                      {statusT ? statusT("familyTree.ui.traversalBFS") : "Breadth First Search"}
-                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Right: Stats */}
-              <div className="flex items-center gap-1 sm:gap-2">
-                {(() => {
-                  const createdDisplay = progress ? progress.created : loading ? "…" : 0;
-                  const depthDisplay = progress ? progress.depth : loading ? "…" : 0;
-                  return (
-                    <span className="text-xs px-3 sm:px-4 py-0.5 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-600/30 select-none inline-flex items-center gap-3 sm:gap-5 backdrop-blur-sm shadow-sm flex-shrink-0">
-                      <span className="inline-flex flex-col items-start gap-0">
-                        <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">
-                          {statusT ? statusT("familyTree.ui.nodesLabelFull") : "Nodes"}
-                        </span>
-                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold">
-                          {createdDisplay}
-                        </span>
-                      </span>
-                      <span className="h-5 w-px bg-blue-300 dark:bg-blue-600" aria-hidden="true" />
-                      <span className="inline-flex flex-col items-start gap-0">
-                        <span className="text-[10px] leading-tight font-medium text-slate-600 dark:text-slate-400">
-                          {statusT ? statusT("familyTree.ui.depthLabelFull") : "Depth"}
-                        </span>
-                        <span className="text-[10px] leading-tight font-mono tabular-nums text-blue-800 dark:text-blue-100 font-bold">
-                          {depthDisplay}
-                        </span>
-                      </span>
-                    </span>
-                  );
-                })()}
+                {activeTooltip === "traversal" && (
+                  <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
+                    {traversal === "dfs"
+                      ? statusT
+                        ? statusT("familyTree.ui.traversalDFS")
+                        : "Depth First Search"
+                      : statusT
+                        ? statusT("familyTree.ui.traversalBFS")
+                        : "Breadth First Search"}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -908,21 +922,32 @@ export default function FamilyTreeConfigForm({
                 <div className="border-t border-slate-200/60 dark:border-slate-700/60"></div>
                 <div className="space-y-2">
                   {showChildrenModeToggle ? (
-                    <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {statusT
-                          ? statusT("familyTree.ui.childrenMode", "Children Mode")
-                          : "Children Mode"}
-                        :
-                      </span>
-                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                    <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          {statusT
+                            ? statusT("familyTree.ui.childrenMode", "Children Mode")
+                            : "Children Mode"}
+                          :
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveTooltip(activeTooltip === "childrenMode" ? null : "childrenMode")
+                          }
+                          className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
+                        >
+                          <HelpCircle size={14} />
+                        </button>
+                      </div>
+                      <div className="inline-flex rounded-2xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
                         <button
                           type="button"
                           aria-label="Union children mode"
                           onClick={() => setChildrenMode("union")}
-                          className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-l-lg ${
+                          className={`px-3 py-1.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium ${
                             childrenMode === "union"
-                              ? "bg-blue-600 text-white"
+                              ? "bg-gradient-to-r from-orange-400 to-red-500 text-white shadow-md"
                               : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                           }`}
                         >
@@ -933,9 +958,9 @@ export default function FamilyTreeConfigForm({
                             type="button"
                             aria-label="Strict children mode"
                             onClick={() => setChildrenMode("strict")}
-                            className={`px-3 py-1.5 text-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 font-medium rounded-r-lg ${
+                            className={`px-3 py-1.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium ${
                               childrenMode === "strict"
-                                ? "bg-blue-600 text-white"
+                                ? "bg-gradient-to-r from-orange-400 to-red-500 text-white shadow-md"
                                 : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                             }`}
                           >
@@ -943,40 +968,53 @@ export default function FamilyTreeConfigForm({
                           </button>
                         </div>
                       </div>
-                      <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                        {childrenMode === "strict"
-                          ? statusT
-                            ? statusT(
-                                "familyTree.ui.childrenModeTooltip.strict",
-                                "Strict: only children attached to this parent version",
-                              )
-                            : "Strict: only children attached to this parent version"
-                          : statusT
-                            ? statusT(
-                                "familyTree.ui.childrenModeTooltip.union",
-                                "Union: merge children across all parent versions",
-                              )
-                            : "Union: merge children across all parent versions"}
-                      </div>
+                      {activeTooltip === "childrenMode" && (
+                        <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
+                          {childrenMode === "strict"
+                            ? statusT
+                              ? statusT(
+                                  "familyTree.ui.childrenModeTooltip.strict",
+                                  "Strict: only children attached to this parent version",
+                                )
+                              : "Strict: only children attached to this parent version"
+                            : statusT
+                              ? statusT(
+                                  "familyTree.ui.childrenModeTooltip.union",
+                                  "Union: merge children across all parent versions",
+                                )
+                              : "Union: merge children across all parent versions"}
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
                   {showChildrenModeToggle && childrenMode === "strict" ? (
-                    <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {statusT
-                          ? statusT("familyTree.ui.strictIncludeV0", "Include v0")
-                          : "Include v0"}
-                        :
-                      </span>
+                    <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          {statusT
+                            ? statusT("familyTree.ui.strictIncludeV0", "Include v0")
+                            : "Include v0"}
+                          :
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveTooltip(activeTooltip === "includeV0" ? null : "includeV0")
+                          }
+                          className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
+                        >
+                          <HelpCircle size={14} />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
                           setStrictIncludeUnversionedChildren(!strictIncludeUnversionedChildren)
                         }
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 ${
                           strictIncludeUnversionedChildren
-                            ? "bg-blue-600 dark:bg-blue-500"
+                            ? "bg-gradient-to-r from-orange-400 to-red-500"
                             : "bg-slate-300 dark:bg-slate-600"
                         }`}
                         aria-label={
@@ -993,38 +1031,51 @@ export default function FamilyTreeConfigForm({
                           }`}
                         />
                       </button>
-                      <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                        {strictIncludeUnversionedChildren
-                          ? statusT
-                            ? statusT(
-                                "familyTree.ui.strictIncludeV0Tooltip.on",
-                                "Strict + v0: include unversioned children (parentVersionIndex=0)",
-                              )
-                            : "Strict + v0: include unversioned children (parentVersionIndex=0)"
-                          : statusT
-                            ? statusT(
-                                "familyTree.ui.strictIncludeV0Tooltip.off",
-                                "Strict only: exactly parentVersionIndex you selected",
-                              )
-                            : "Strict only: exactly parentVersionIndex you selected"}
-                      </div>
+                      {activeTooltip === "includeV0" && (
+                        <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
+                          {strictIncludeUnversionedChildren
+                            ? statusT
+                              ? statusT(
+                                  "familyTree.ui.strictIncludeV0Tooltip.on",
+                                  "Strict + v0: include unversioned children (parentVersionIndex=0)",
+                                )
+                              : "Strict + v0: include unversioned children (parentVersionIndex=0)"
+                            : statusT
+                              ? statusT(
+                                  "familyTree.ui.strictIncludeV0Tooltip.off",
+                                  "Strict only: exactly parentVersionIndex you selected",
+                                )
+                              : "Strict only: exactly parentVersionIndex you selected"}
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
                   {showDeduplicateToggle ? (
-                    <div className="flex items-center justify-between lg:justify-start gap-2 flex-shrink-0 group relative">
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {statusT
-                          ? statusT("familyTree.ui.deduplicateChildren")
-                          : "Deduplicate Children"}
-                        :
-                      </span>
+                    <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          {statusT
+                            ? statusT("familyTree.ui.deduplicateChildren")
+                            : "Deduplicate Children"}
+                          :
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveTooltip(activeTooltip === "deduplicate" ? null : "deduplicate")
+                          }
+                          className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
+                        >
+                          <HelpCircle size={14} />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() => setDeduplicateChildren(!deduplicateChildren)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 ${
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 ${
                           deduplicateChildren
-                            ? "bg-blue-600 dark:bg-blue-500"
+                            ? "bg-gradient-to-r from-orange-400 to-red-500"
                             : "bg-slate-300 dark:bg-slate-600"
                         }`}
                         aria-label={
@@ -1039,15 +1090,17 @@ export default function FamilyTreeConfigForm({
                           }`}
                         />
                       </button>
-                      <div className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[9999]">
-                        {deduplicateChildren
-                          ? statusT
-                            ? statusT("familyTree.ui.deduplicateChildrenTooltip.enabled")
-                            : "Highest endorsed version only"
-                          : statusT
-                            ? statusT("familyTree.ui.deduplicateChildrenTooltip.disabled")
-                            : "Show all versions"}
-                      </div>
+                      {activeTooltip === "deduplicate" && (
+                        <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
+                          {deduplicateChildren
+                            ? statusT
+                              ? statusT("familyTree.ui.deduplicateChildrenTooltip.enabled")
+                              : "Highest endorsed version only"
+                            : statusT
+                              ? statusT("familyTree.ui.deduplicateChildrenTooltip.disabled")
+                              : "Show all versions"}
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </div>
