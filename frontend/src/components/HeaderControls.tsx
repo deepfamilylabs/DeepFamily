@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Moon, Sun, Menu, Globe, Lock } from "lucide-react";
-import LanguageSwitch from "./LanguageSwitch";
+import { Moon, Sun, Menu, Lock, ChevronDown, Check, Globe } from "lucide-react";
 import WalletConnectButton from "./WalletConnectButton";
 import { languages } from "../config/languages";
 
@@ -12,6 +11,8 @@ interface HeaderControlsProps {
 
 export default function HeaderControls({ variant = "home" }: HeaderControlsProps) {
   const { t, i18n } = useTranslation();
+  
+  // Theme state logic
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     typeof window !== "undefined" && window.localStorage.getItem("df-theme") === "dark"
       ? "dark"
@@ -20,6 +21,7 @@ export default function HeaderControls({ variant = "home" }: HeaderControlsProps
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
+  // Apply theme
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark");
@@ -27,13 +29,13 @@ export default function HeaderControls({ variant = "home" }: HeaderControlsProps
     window.localStorage.setItem("df-theme", theme);
   }, [theme]);
 
+  // Click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
         setIsSettingsOpen(false);
       }
     };
-
     if (isSettingsOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -43,186 +45,126 @@ export default function HeaderControls({ variant = "home" }: HeaderControlsProps
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
   const handleLanguageChange = (langCode: string) => {
+    i18n.changeLanguage(langCode);
     setIsSettingsOpen(false);
-    i18n
-      .changeLanguage(langCode)
-      .then(() => {
-        console.log("Language changed successfully to:", i18n.language);
-      })
-      .catch((error) => {
-        console.error("Error changing language:", error);
-      });
   };
 
   const isHomePage = variant === "home";
 
-  const moreButtonClass = `flex items-center gap-1 px-2 py-2 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm ${
+  // Button styles
+  const toolsButtonClass = `flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 active:scale-95 ${
+    isSettingsOpen 
+      ? "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white" 
+      : isHomePage
+        ? "text-slate-600 hover:text-slate-900 hover:bg-white/50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 hover:shadow-lg hover:shadow-orange-500/10" 
+        : "text-slate-600 hover:text-slate-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 hover:shadow-lg hover:shadow-orange-500/10"
+  }`;
+  
+  // Mobile hamburger style
+  const mobileMenuBtnClass = `flex items-center justify-center w-10 h-10 rounded-full border text-xs font-medium transition-all duration-300 active:scale-95 ${
     isHomePage
-      ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15"
-      : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600"
+      ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 backdrop-blur-md"
+      : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
   }`;
 
   return (
-    <div className="flex items-center gap-2 lg:gap-3 min-w-0">
-      {/* Wallet connect button - always show */}
+    <div className="flex items-center gap-2 lg:gap-4 min-w-0">
       <WalletConnectButton showBalance={false} variant={variant} />
 
-      {/* Desktop controls: language + theme */}
-      <div className="hidden md:flex items-center gap-2 lg:gap-3">
-        <LanguageSwitch variant={variant} />
-        <button
-          onClick={toggleTheme}
-          aria-label={
-            theme === "dark"
-              ? (t("theme.switchToLight", "Switch to Light") as string)
-              : (t("theme.switchToDark", "Switch to Dark") as string)
-          }
-          className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap ${
-            isHomePage
-              ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15"
-              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600"
-          }`}
-        >
-          {theme === "dark" ? (
-            <Moon size={16} className={`${isHomePage ? "text-blue-200" : "text-indigo-500"}`} />
-          ) : (
-            <Sun size={16} className={`${isHomePage ? "text-yellow-200" : "text-amber-500"}`} />
-          )}
-          <span className="hidden lg:inline">
-            {theme === "dark" ? t("theme.dark", "Dark") : t("theme.light", "Light")}
-          </span>
-        </button>
-      </div>
-
-      {/* More button for all screens (holds decrypt; mobile also theme/lang) */}
+      {/* Tools Dropdown */}
       <div className="relative" ref={settingsRef}>
+        {/* Desktop Trigger */}
         <button
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-          className={`hidden md:flex ${moreButtonClass}`}
+          className={`hidden md:flex ${toolsButtonClass}`}
         >
-          <Menu className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-          className={`md:hidden ${moreButtonClass}`}
-        >
-          <Menu className="w-4 h-4" />
+          <span>{t("navigation.tools", "Tools")}</span>
+          <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isSettingsOpen ? "rotate-180" : ""}`} />
         </button>
 
-        {/* More options dropdown menu */}
+        {/* Mobile Trigger */}
+        <button
+          onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+          className={`md:hidden ${mobileMenuBtnClass}`}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Dropdown Content */}
         <div
-          className={`absolute right-0 z-[9999] mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-xl transition-all duration-200 ${
+          className={`absolute right-0 z-[9999] mt-4 w-72 origin-top-right rounded-3xl shadow-2xl shadow-orange-500/10 backdrop-blur-2xl transition-all duration-300 ring-1 ring-black/5 focus:outline-none p-2 ${
             isSettingsOpen
               ? "opacity-100 visible transform translate-y-0 scale-100"
-              : "opacity-0 invisible transform -translate-y-2 scale-95"
+              : "opacity-0 invisible transform -translate-y-4 scale-95"
           } ${
-            isHomePage
-              ? "bg-white/95 dark:bg-gray-800/95 border border-white/30 dark:border-gray-700/50"
-              : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600"
+             "bg-white/90 dark:bg-black/90 border border-white/20 dark:border-white/10"
           }`}
         >
-          <div className="py-1">
-            {/* Decrypt entry */}
+            {/* Decrypt */}
             <NavLink
               to="/decrypt"
               onClick={() => setIsSettingsOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 w-full px-4 py-3 text-xs font-medium rounded-lg transition ${
+                `flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 group mb-1 ${
                   isActive
-                    ? "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30"
-                    : isHomePage
-                      ? "text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700/70"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    ? "bg-gradient-to-r from-orange-400 to-red-500 text-white shadow-lg shadow-orange-500/30"
+                    : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10"
                 }`
               }
             >
-              <Lock
-                size={18}
-                className={`${isHomePage ? "text-blue-500 dark:text-blue-400" : "text-indigo-500 dark:text-indigo-400"}`}
-              />
-              <span>{t("decryptMetadata.title", "Decrypt Metadata")}</span>
+              {({ isActive }) => (
+                <>
+                  <Lock size={18} className={isActive ? "text-white" : "text-gray-400 group-hover:text-orange-500 transition-colors"} />
+                  <span>{t("decryptMetadata.title", "Decrypt Metadata")}</span>
+                </>
+              )}
             </NavLink>
 
-            {/* Mobile-only extra items when space is tight */}
-            <div className="md:hidden">
-              <div
-                className={`mx-4 my-2 h-px ${
-                  isHomePage ? "bg-gray-200/50 dark:bg-gray-600/50" : "bg-gray-200 dark:bg-gray-600"
-                }`}
-              ></div>
+            <div className="mx-2 my-1 h-px bg-gray-100 dark:bg-white/5" />
 
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 group"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-full transition-colors ${theme === 'dark' ? 'bg-white/10 text-orange-400' : 'bg-gray-100 text-orange-500'}`}>
+                    {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
+                </div>
+                <span>{t("settings.theme", "Theme")}</span>
+              </div>
+              
+              {/* Custom Switch */}
+              <div className={`w-11 h-6 rounded-full p-1 transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${theme === 'dark' ? 'translate-x-5' : 'translate-x-0'}`} />
+              </div>
+            </button>
+
+            <div className="mx-2 my-1 h-px bg-gray-100 dark:bg-white/5" />
+
+            {/* Language Section */}
+            <div className="px-4 py-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              {t("settings.language", "Language")}
+            </div>
+            <div className="grid gap-1">
+            {languages.map((lang) => (
               <button
-                onClick={toggleTheme}
-                className={`flex items-center justify-between w-full px-4 py-3 text-xs transition-all duration-200 rounded-lg mx-1 ${
-                  isHomePage
-                    ? "text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-gray-700/70"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                key={lang.code}
+                onClick={() => handleLanguageChange(lang.code)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all duration-200 group ${
+                  i18n.language === lang.code
+                    ? "bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  {theme === "dark" ? (
-                    <Moon
-                      size={18}
-                      className={`${isHomePage ? "text-blue-500 dark:text-blue-400" : "text-indigo-500 dark:text-indigo-400"}`}
-                    />
-                  ) : (
-                    <Sun
-                      size={18}
-                      className={`${isHomePage ? "text-yellow-500 dark:text-yellow-400" : "text-amber-500 dark:text-amber-400"}`}
-                    />
-                  )}
-                  <span className="font-medium">{t("settings.theme", "Theme")}</span>
+                  <Globe size={16} className={`transition-colors ${i18n.language === lang.code ? "text-orange-500" : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"}`} />
+                  <span>{lang.nativeName}</span>
                 </div>
-                <span className="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                  {theme === "dark" ? t("theme.dark", "Dark") : t("theme.light", "Light")}
-                </span>
+                {i18n.language === lang.code && <Check size={16} className="text-orange-500" />}
               </button>
-
-              <div
-                className={`mx-4 my-2 h-px ${
-                  isHomePage ? "bg-gray-200/50 dark:bg-gray-600/50" : "bg-gray-200 dark:bg-gray-600"
-                }`}
-              ></div>
-
-              <div className="px-2">
-                <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  {t("settings.language", "Language")}
-                </div>
-
-                <div className="space-y-1">
-                  {languages.map((language) => (
-                    <button
-                      key={language.code}
-                      onClick={() => handleLanguageChange(language.code)}
-                      className={`flex items-center justify-between w-full px-3 py-2.5 text-xs transition-all duration-200 rounded-lg ${
-                        i18n.language === language.code
-                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
-                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Globe
-                          size={16}
-                          className={`${
-                            i18n.language === language.code
-                              ? "text-blue-500 dark:text-blue-400"
-                              : "text-gray-400 dark:text-gray-500"
-                          }`}
-                        />
-                        <div className="flex flex-col items-start">
-                          <span className="font-medium">{language.nativeName}</span>
-                          <span className="text-xs opacity-70">{language.name}</span>
-                        </div>
-                      </div>
-                      {i18n.language === language.code && (
-                        <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full"></div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            ))}
             </div>
-          </div>
         </div>
       </div>
     </div>

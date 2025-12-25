@@ -7,78 +7,70 @@ export default function BottomNav() {
 
   const navItemClasses = ({ isActive }: { isActive: boolean }) => {
     const baseClasses =
-      "flex-1 flex flex-col items-center justify-center py-2 px-1 text-xs font-medium transition-all duration-200 relative group min-h-[64px]";
+      "flex-1 flex flex-col items-center justify-center py-2 px-1 text-xs font-medium transition-colors duration-200 relative group min-h-[64px]";
     return `${baseClasses} ${
       isActive
-        ? "text-blue-700 dark:text-blue-300"
-        : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+        ? "text-orange-600 dark:text-orange-400"
+        : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
     }`;
   };
 
+  // Helper for icon container styles
+  const getIconContainerClass = (isActive: boolean) => 
+    `flex items-center justify-center w-10 h-10 rounded-2xl transition-colors duration-200 ${
+      isActive
+        ? "bg-orange-50 dark:bg-orange-500/10 text-orange-500 dark:text-orange-400"
+        : "bg-transparent hover:bg-gray-50 dark:hover:bg-white/5"
+    }`;
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/80 dark:border-gray-700/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20 z-[9999] transform-gpu pb-[env(safe-area-inset-bottom)]">
-      <div className="flex h-16 w-full px-2 gap-0 justify-between items-stretch">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/10 shadow-2xl shadow-orange-500/5 z-[9999] transform-gpu pb-[env(safe-area-inset-bottom)]">
+      <div className="flex h-16 w-full px-4 gap-2 justify-between items-stretch max-w-lg mx-auto">
         <NavLink to="/" className={navItemClasses} end>
           {({ isActive }) => (
             <>
-              <div
-                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                  isActive
-                    ? "bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm"
-                    : "hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30"
-                }`}
-              >
-                <Home className="w-4 h-4" />
+              <div className={getIconContainerClass(isActive)}>
+                <Home className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className="mt-1 text-[10px] leading-tight">{t("navigation.home")}</span>
+              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+                {t("navigation.home")}
+              </span>
             </>
           )}
         </NavLink>
         <NavLink to="/familyTree" className={navItemClasses}>
           {({ isActive }) => (
             <>
-              <div
-                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                  isActive
-                    ? "bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm"
-                    : "hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30"
-                }`}
-              >
-                <Network className="w-4 h-4" />
+              <div className={getIconContainerClass(isActive)}>
+                <Network className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className="mt-1 text-[10px] leading-tight">{t("navigation.familyTree")}</span>
+              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+                {t("navigation.familyTree")}
+              </span>
             </>
           )}
         </NavLink>
         <NavLink to="/people" className={navItemClasses}>
           {({ isActive }) => (
             <>
-              <div
-                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                  isActive
-                    ? "bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm"
-                    : "hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30"
-                }`}
-              >
-                <Book className="w-4 h-4" />
+              <div className={getIconContainerClass(isActive)}>
+                <Book className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className="mt-1 text-[10px] leading-tight">{t("navigation.people")}</span>
+              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+                {t("navigation.people")}
+              </span>
             </>
           )}
         </NavLink>
         <NavLink to="/search" className={navItemClasses}>
           {({ isActive }) => (
             <>
-              <div
-                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
-                  isActive
-                    ? "bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm"
-                    : "hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30"
-                }`}
-              >
-                <Search className="w-4 h-4" />
+              <div className={getIconContainerClass(isActive)}>
+                <Search className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className="mt-1 text-[10px] leading-tight">{t("navigation.search")}</span>
+              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+                {t("navigation.search")}
+              </span>
             </>
           )}
         </NavLink>

@@ -18,7 +18,8 @@ type IconName =
   | "Book"
   | "Search"
   | "Code"
-  | "PenTool";
+  | "PenTool"
+  | "ChevronDown";
 
 interface DynamicIconProps {
   name: IconName;
@@ -43,6 +44,7 @@ const iconMap: Record<IconName, () => Promise<{ default: LucideIcon }>> = {
   Search: () => import("lucide-react").then((mod) => ({ default: mod.Search })),
   Code: () => import("lucide-react").then((mod) => ({ default: mod.Code })),
   PenTool: () => import("lucide-react").then((mod) => ({ default: mod.PenTool })),
+  ChevronDown: () => import("lucide-react").then((mod) => ({ default: mod.ChevronDown })),
 };
 
 // Create lazy loaded icon component

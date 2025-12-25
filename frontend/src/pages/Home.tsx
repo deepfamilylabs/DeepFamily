@@ -8,6 +8,7 @@ import {
   TAG_STRIP_STYLES,
   CTA_BUTTON_STYLES,
   HERO_CONTENT_STYLES,
+  SCROLL_INDICATOR_STYLES,
   TAG_DATA,
   type ButtonConfig,
 } from "../constants/homeStyles";
@@ -32,38 +33,23 @@ const FloatingShapes = memo(() => (
   </div>
 ));
 
-// Tag strip component
-const TagStrip = memo(() => {
-  const { t } = useTranslation();
-  const delayClasses = useMemo(
-    () => [
-      "[animation-delay:0ms]",
-      "[animation-delay:200ms]",
-      "[animation-delay:400ms]",
-      "[animation-delay:600ms]",
-      "[animation-delay:800ms]",
-      "[animation-delay:1000ms]",
-      "[animation-delay:1200ms]",
-      "[animation-delay:1400ms]",
-    ],
-    [],
-  );
+// Scroll indicator component
+const ScrollIndicator = memo(() => {
+  const handleScroll = () => {
+    window.scrollTo({
+      top: window.innerHeight,
+      behavior: "smooth",
+    });
+  };
 
   return (
-    <div className={TAG_STRIP_STYLES.container}>
-      <div className={TAG_STRIP_STYLES.wrapper}>
-        {TAG_DATA.map((tag, index) => (
-          <div key={tag.key} className={`${TAG_STRIP_STYLES.tagBase} border ${tag.borderClass}`}>
-            <div
-              className={`${TAG_STRIP_STYLES.dotBase} ${tag.dotClass} ${delayClasses[index] ?? ""}`}
-            />
-            <span className={TAG_STRIP_STYLES.text}>{t(`home.tagStrip.${tag.key}`)}</span>
-          </div>
-        ))}
-      </div>
+    <div className={SCROLL_INDICATOR_STYLES.container} onClick={handleScroll}>
+      <DynamicIcon name="ChevronDown" className={SCROLL_INDICATOR_STYLES.icon} />
     </div>
   );
 });
+
+
 
 // CTA buttons component
 const CTAButtons = memo(() => {
@@ -95,10 +81,6 @@ const CTAButtons = memo(() => {
         <NavLink key={button.to} to={button.to} className={button.className}>
           {button.hasOverlay && <div className={CTA_BUTTON_STYLES.overlay} />}
           <div className={CTA_BUTTON_STYLES.content}>
-            <DynamicIcon
-              name={button.icon}
-              className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 flex-shrink-0"
-            />
             <span className={CTA_BUTTON_STYLES.text}>{button.text}</span>
           </div>
         </NavLink>
@@ -143,11 +125,11 @@ export default function Home() {
 
             {/* Enhanced CTA Buttons */}
             <CTAButtons />
-
-            {/* Enhanced Tag Strip */}
-            <TagStrip />
           </div>
         </div>
+
+        {/* Scroll Indicator */}
+        <ScrollIndicator />
       </section>
 
       {/* Content Container */}
@@ -163,7 +145,7 @@ export default function Home() {
       </Suspense>
 
       {/* Workflow Section */}
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<LoadingFallback variant="banner" />}>
         <WorkflowSection />
       </Suspense>
 
@@ -183,7 +165,7 @@ export default function Home() {
       </Suspense>
 
       {/* Call to Action */}
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<LoadingFallback variant="banner" />}>
         <CallToAction />
       </Suspense>
     </>

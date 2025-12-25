@@ -27,7 +27,8 @@
     "search": "Search",
     "people": "People",
     "actions": "Actions",
-    "keyGen": "KeyGen"
+    "keyGen": "KeyGen",
+    "tools": "Tools"
   },
   "home": {
     "title": "Decentralized Digital Family Tree",
@@ -1344,5 +1345,20 @@
       "CALL_EXCEPTION": "Contract validation failed. Please check input data."
     },
     "unknown": "Submission failed. Please retry later or verify your inputs."
+  }
+,
+  "footer": {
+    "tagline": "Your decentralized digital genealogy platform. Preserve history, verify truth, and build legacy.",
+    "resources": "Resources",
+    "documentation": "Documentation",
+    "blog": "Blog",
+    "support": "Support",
+    "status": "Status",
+    "company": "Company",
+    "about": "About",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "rights": "© 2025 DeepFamily. MIT License."
   }
 }

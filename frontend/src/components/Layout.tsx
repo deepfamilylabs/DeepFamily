@@ -12,6 +12,7 @@ import BottomNav from "./BottomNav";
 import PageContainer from "./PageContainer";
 import SiteHeader from "./SiteHeader";
 import FloatingActionButton from "./FloatingActionButton";
+import SiteFooter from "./SiteFooter";
 
 export default function Layout() {
   const location = useLocation();
@@ -29,6 +30,7 @@ export default function Layout() {
           </PageContainer>
         )}
       </main>
+      {isHomePage && <SiteFooter />}
       <div className="md:hidden">
         <BottomNav />
       </div>

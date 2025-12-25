@@ -21,7 +21,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Zain display font for headings (xaicreator.com exact style) */
+/* Zain display font for headings */
 /* With multilingual fallback support */
 h1,
 h2,
@@ -47,7 +47,7 @@ h6,
   line-height: 100%;
 }
 
-/* h1 - Large hero titles (xaicreator style) */
+/* h1 - Large hero titles */
 h1 {
   font-weight: 700;
   letter-spacing: -0.04em; /* Responsive equivalent of -3.96px for large text */
