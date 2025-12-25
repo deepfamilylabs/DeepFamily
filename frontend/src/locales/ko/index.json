@@ -1346,5 +1346,17 @@
       "CALL_EXCEPTION": "컨트랙트 검증에 실패했습니다. 입력 데이터를 확인하세요."
     },
     "unknown": "제출에 실패했습니다. 잠시 후 다시 시도하거나 입력을 확인하세요."
+  },
+  "footer": {
+    "tagline": "분산형 디지털 가계도 플랫폼. 역사를 보존하고, 진실을 검증하며, 유산을 구축합니다.",
+    "resources": "리소스",
+    "documentation": "문서",
+    "blog": "블로그",
+    "support": "지원",
+    "status": "상태",
+    "about": "소개",
+    "privacy": "개인정보 보호정책",
+    "terms": "서비스 약관",
+    "rights": "© 2026 DeepFamily. MIT License."
   }
 }

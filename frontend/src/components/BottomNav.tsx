@@ -16,7 +16,7 @@ export default function BottomNav() {
   };
 
   // Helper for icon container styles
-  const getIconContainerClass = (isActive: boolean) => 
+  const getIconContainerClass = (isActive: boolean) =>
     `flex items-center justify-center w-10 h-10 rounded-2xl transition-colors duration-200 ${
       isActive
         ? "bg-orange-50 dark:bg-orange-500/10 text-orange-500 dark:text-orange-400"
@@ -32,7 +32,9 @@ export default function BottomNav() {
               <div className={getIconContainerClass(isActive)}>
                 <Home className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+              <span
+                className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
+              >
                 {t("navigation.home")}
               </span>
             </>
@@ -44,7 +46,9 @@ export default function BottomNav() {
               <div className={getIconContainerClass(isActive)}>
                 <Network className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+              <span
+                className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
+              >
                 {t("navigation.familyTree")}
               </span>
             </>
@@ -56,7 +60,9 @@ export default function BottomNav() {
               <div className={getIconContainerClass(isActive)}>
                 <Book className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+              <span
+                className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
+              >
                 {t("navigation.people")}
               </span>
             </>
@@ -68,7 +74,9 @@ export default function BottomNav() {
               <div className={getIconContainerClass(isActive)}>
                 <Search className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
               </div>
-              <span className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}>
+              <span
+                className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
+              >
                 {t("navigation.search")}
               </span>
             </>

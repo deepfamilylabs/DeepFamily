@@ -125,8 +125,8 @@ const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
     <>
       <GraphViewport
         containerRef={containerRef}
-        height={responsiveHeight}
-        containerClassName="relative w-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 pt-16 pb-4 px-4 md:px-6 overscroll-contain"
+        height="100%"
+        containerClassName="relative w-full h-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 overscroll-contain"
         svgClassName="block min-w-full min-h-full select-none touch-none"
         viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, responsiveHeight)}`}
         svgRef={svgRef}

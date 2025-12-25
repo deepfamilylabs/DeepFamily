@@ -18,6 +18,7 @@ interface ViewContainerProps {
   skeletonLines?: number;
   onViewModeChange?: (mode: "dag" | "tree" | "force" | "virtual") => void;
   viewModeLabels?: { tree: string; dag: string; force: string; virtual: string };
+  hideSwitch?: boolean;
 }
 
 export default function ViewContainer({
@@ -27,6 +28,7 @@ export default function ViewContainer({
   loading,
   onViewModeChange,
   viewModeLabels,
+  hideSwitch,
 }: ViewContainerProps) {
   // useVizOptions internally inside views / contexts
   const content = (
@@ -43,7 +45,7 @@ export default function ViewContainer({
           <TreeListView />
         )
       ) : (
-        <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 pt-16 flex items-center justify-center">
+        <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 flex items-center justify-center">
           {loading ? (
             <LoadingSkeleton />
           ) : contractMessage ? (
@@ -56,9 +58,9 @@ export default function ViewContainer({
     </Suspense>
   );
   return (
-    <div className="w-full transition-colors relative">
+    <div className="w-full h-full transition-colors relative">
       {/* Floating View Mode Switch - positioned above zoom controls */}
-      {onViewModeChange && viewModeLabels && (
+      {!hideSwitch && onViewModeChange && viewModeLabels && (
         <div className="absolute top-4 right-3 z-10">
           <ViewModeSwitch value={viewMode} onChange={onViewModeChange} labels={viewModeLabels} />
         </div>

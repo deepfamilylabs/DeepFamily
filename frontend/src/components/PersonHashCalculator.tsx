@@ -70,7 +70,7 @@ const ThemedSelect: React.FC<{
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -91,7 +91,7 @@ const ThemedSelect: React.FC<{
                 }}
                 className={`px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
                   o.value === value
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
                     : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}
               >
@@ -402,7 +402,7 @@ export const PersonHashCalculator = forwardRef<
                 {t("search.hashCalculator.name")} <span className="text-red-500">*</span>
               </label>
               <input
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                 placeholder={t("search.hashCalculator.nameInputPlaceholder")}
                 {...register("fullName")}
               />
@@ -455,7 +455,7 @@ export const PersonHashCalculator = forwardRef<
                   min="0"
                   max={isBirthBC ? 9999 : new Date().getFullYear()}
                   placeholder={isBirthBC ? "<10000" : "<=" + new Date().getFullYear()}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                   {...register("birthYear", {
                     setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                   })}
@@ -473,7 +473,7 @@ export const PersonHashCalculator = forwardRef<
                 min="0"
                 max="12"
                 placeholder={t("search.hashCalculator.birthMonth")}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                 {...register("birthMonth", {
                   setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                 })}
@@ -490,7 +490,7 @@ export const PersonHashCalculator = forwardRef<
                 min="0"
                 max="31"
                 placeholder={t("search.hashCalculator.birthDay")}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                 {...register("birthDay", { setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)) })}
               />
               <FieldError message={errors.birthDay?.message} />
@@ -505,7 +505,7 @@ export const PersonHashCalculator = forwardRef<
                 <button
                   type="button"
                   onClick={() => setShowPassphraseHelp(!showPassphraseHelp)}
-                  className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                  className="text-gray-400 dark:text-gray-500 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
                   aria-label={t(
                     "search.hashCalculator.passphraseHelp.buttonAriaLabel",
                     "Identity passphrase help",
@@ -608,7 +608,7 @@ export const PersonHashCalculator = forwardRef<
             <div className="relative">
               <input
                 type={showPassphrase ? "text" : "password"}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                 placeholder={t(
                   "search.hashCalculator.passphrasePlaceholder",
                   "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
@@ -810,7 +810,7 @@ export const PersonHashCalculator = forwardRef<
           className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden ${className}`}
         >
           {showTitle && (
-            <div className="bg-teal-50 dark:bg-gray-800/60 px-4 py-2 border-b border-gray-200 dark:border-gray-700/60">
+            <div className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 border-b border-gray-200 dark:border-gray-700/60">
               <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                 {t("search.hashCalculator.title")}
               </h3>
@@ -826,7 +826,7 @@ export const PersonHashCalculator = forwardRef<
         className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden ${className}`}
       >
         <div
-          className="bg-teal-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
+          className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
           onClick={handleToggle}
         >
           {showTitle && (

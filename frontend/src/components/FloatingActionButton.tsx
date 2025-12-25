@@ -77,7 +77,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
             const Icon = action.icon;
             // Staggered delay for entrance
             const delayStyle = isOpen ? { transitionDelay: `${index * 50}ms` } : {};
-            
+
             return (
               <button
                 key={action.id}
@@ -92,7 +92,9 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
                 `}
               >
                 <Icon className="w-5 h-5" strokeWidth={2.5} />
-                <span className="text-[15px] font-bold tracking-wide whitespace-nowrap">{action.label}</span>
+                <span className="text-[15px] font-bold tracking-wide whitespace-nowrap">
+                  {action.label}
+                </span>
               </button>
             );
           })}
@@ -110,16 +112,16 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
           `}
         >
           <div className="relative w-6 h-6 md:w-7 md:h-7">
-            <Plus 
+            <Plus
               className={`absolute inset-0 w-full h-full transition-all duration-300 ease-out ${
                 isOpen ? "opacity-0 rotate-90 scale-50" : "opacity-100 rotate-0 scale-100"
-              }`} 
+              }`}
               strokeWidth={2.5}
             />
-            <X 
+            <X
               className={`absolute inset-0 w-full h-full transition-all duration-300 ease-out ${
                 isOpen ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-50"
-              }`} 
+              }`}
               strokeWidth={2.5}
             />
           </div>

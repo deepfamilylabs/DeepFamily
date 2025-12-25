@@ -26,10 +26,7 @@ const Audience = memo(() => {
       icon: Search,
       title: t("home.audience.researchers.title"),
       description: t("home.audience.researchers.description"),
-      benefits: [
-        t("home.audience.researchers.benefit1"),
-        t("home.audience.researchers.benefit2"),
-      ],
+      benefits: [t("home.audience.researchers.benefit1"), t("home.audience.researchers.benefit2")],
       color: "text-purple-600",
       bg: "bg-purple-50",
       border: "border-purple-100",
@@ -40,10 +37,7 @@ const Audience = memo(() => {
       icon: Code,
       title: t("home.audience.developers.title"),
       description: t("home.audience.developers.description"),
-      benefits: [
-        t("home.audience.developers.benefit1"),
-        t("home.audience.developers.benefit2"),
-      ],
+      benefits: [t("home.audience.developers.benefit1"), t("home.audience.developers.benefit2")],
       color: "text-emerald-600",
       bg: "bg-emerald-50",
       border: "border-emerald-100",
@@ -54,10 +48,7 @@ const Audience = memo(() => {
       icon: PenTool,
       title: t("home.audience.creators.title"),
       description: t("home.audience.creators.description"),
-      benefits: [
-        t("home.audience.creators.benefit1"),
-        t("home.audience.creators.benefit2"),
-      ],
+      benefits: [t("home.audience.creators.benefit1"), t("home.audience.creators.benefit2")],
       color: "text-orange-600",
       bg: "bg-orange-50",
       border: "border-orange-100",
@@ -89,28 +80,30 @@ const Audience = memo(() => {
         </div>
 
         {/* Audience Grid */}
-        <div className={`grid md:grid-cols-2 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-200`}>
+        <div
+          className={`grid md:grid-cols-2 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-200`}
+        >
           {audiences.map((item, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`group bg-white rounded-3xl p-10 shadow-sm border ${item.border} hover:shadow-xl ${item.hoverShadow} ${item.hoverBorder} hover:-translate-y-1 transition-all duration-300`}
             >
               <div className="flex items-start gap-8">
-                <div className={`w-16 h-16 rounded-2xl ${item.bg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+                <div
+                  className={`w-16 h-16 rounded-2xl ${item.bg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}
+                >
                   <item.icon className={`w-8 h-8 ${item.color}`} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                    {item.title}
-                  </h3>
-                  <p className="text-slate-500 leading-relaxed mb-8 text-lg">
-                    {item.description}
-                  </p>
-                  
+                  <h3 className="text-2xl font-bold text-slate-900 mb-4">{item.title}</h3>
+                  <p className="text-slate-500 leading-relaxed mb-8 text-lg">{item.description}</p>
+
                   <div className="space-y-3">
                     {item.benefits.map((benefit, i) => (
                       <div key={i} className="flex items-center gap-3 group/item">
-                        <CheckCircle className={`w-5 h-5 ${item.color} opacity-60 group-hover/item:opacity-100 transition-opacity`} />
+                        <CheckCircle
+                          className={`w-5 h-5 ${item.color} opacity-60 group-hover/item:opacity-100 transition-opacity`}
+                        />
                         <span className="text-slate-600 font-medium group-hover/item:text-slate-900 transition-colors">
                           {benefit}
                         </span>

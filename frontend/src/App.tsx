@@ -16,6 +16,7 @@ import { ToastProvider } from "./components/ToastProvider";
 import { VizOptionsProvider } from "./context/VizOptionsContext";
 import { TreeDataProvider } from "./context/TreeDataContext";
 import { WalletProvider } from "./context/WalletContext";
+import { SidebarProvider } from "./context/SidebarContext";
 import WalletSelectionLayer from "./components/WalletSelectionLayer";
 import NetworkSelectionLayer from "./components/NetworkSelectionLayer";
 
@@ -83,16 +84,18 @@ export default function App() {
     <ConfigProvider>
       <ToastProvider>
         <WalletProvider>
-          <WalletSelectionLayer />
-          <NetworkSelectionLayer />
-          <VizOptionsProvider>
-            <TreeDataProvider>
-              <BrowserRouter>
-                <TitleUpdater />
-                <RouterContent />
-              </BrowserRouter>
-            </TreeDataProvider>
-          </VizOptionsProvider>
+          <SidebarProvider>
+            <WalletSelectionLayer />
+            <NetworkSelectionLayer />
+            <VizOptionsProvider>
+              <TreeDataProvider>
+                <BrowserRouter>
+                  <TitleUpdater />
+                  <RouterContent />
+                </BrowserRouter>
+              </TreeDataProvider>
+            </VizOptionsProvider>
+          </SidebarProvider>
         </WalletProvider>
       </ToastProvider>
     </ConfigProvider>

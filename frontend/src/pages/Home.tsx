@@ -49,8 +49,6 @@ const ScrollIndicator = memo(() => {
   );
 });
 
-
-
 // CTA buttons component
 const CTAButtons = memo(() => {
   const { t } = useTranslation();

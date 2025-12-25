@@ -32,8 +32,7 @@ export const FLOATING_SHAPES = [
 // Tag strip styles - Clean & Minimal
 export const TAG_STRIP_STYLES = {
   container: "animate-fade-in-up animation-delay-500 mt-16 mb-12",
-  wrapper:
-    "flex flex-wrap items-center justify-center gap-3 max-w-4xl mx-auto px-4",
+  wrapper: "flex flex-wrap items-center justify-center gap-3 max-w-4xl mx-auto px-4",
   tagBase:
     "flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-sm transition-all hover:scale-105 hover:shadow-md cursor-default",
   dotBase: "w-1.5 h-1.5 rounded-full animate-pulse",

@@ -93,18 +93,20 @@ const CoreFeatures = memo(() => {
         </div>
 
         {/* Features Grid */}
-        <div className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-200`}>
+        <div
+          className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-200`}
+        >
           {features.map((feature, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`group bg-white rounded-3xl p-10 shadow-sm border ${feature.border} hover:shadow-xl ${feature.hoverShadow} ${feature.hoverBorder} hover:-translate-y-1 transition-all duration-300 flex flex-col`}
             >
-              <div className={`w-14 h-14 rounded-2xl ${feature.bg} flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300`}>
+              <div
+                className={`w-14 h-14 rounded-2xl ${feature.bg} flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300`}
+              >
                 <feature.icon className={`w-7 h-7 ${feature.color}`} />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {feature.title}
-              </h3>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">{feature.title}</h3>
               <p className="text-slate-500 leading-relaxed text-base flex-1">
                 {feature.description}
               </p>

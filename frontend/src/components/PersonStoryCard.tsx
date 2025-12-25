@@ -11,6 +11,8 @@ import {
   Hash,
   ChevronRight,
   Eye,
+  Baby,
+  Flower2,
 } from "lucide-react";
 import {
   NodeData,
@@ -81,44 +83,48 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
   return (
     <div
       onMouseEnter={handleMouseEnter}
-      className="group bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-2xl border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 hover:border-blue-300 dark:hover:border-blue-600 relative overflow-hidden h-full flex flex-col"
+      onClick={onClick}
+      className="group relative flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden"
     >
-      {/* Animated gradient overlay on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-purple-500/0 to-indigo-500/0 group-hover:from-blue-500/5 group-hover:via-purple-500/5 group-hover:to-indigo-500/5 dark:group-hover:from-blue-400/10 dark:group-hover:via-purple-400/10 dark:group-hover:to-indigo-400/10 transition-all duration-300 pointer-events-none rounded-xl"></div>
+      {/* Top accent light - subtle gradient line */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-orange-400/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-      <div className="relative flex-1 flex flex-col p-5">
+      <div className="relative flex-1 flex flex-col p-6 z-10">
         {/* Avatar Header */}
-        <div className="flex items-center justify-center mb-4 relative">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-500 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-lg group-hover:shadow-xl">
+        <div className="flex items-center justify-center mb-6 relative">
+          {/* Glow effect behind avatar */}
+          <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          
+          <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-xl shadow-orange-500/20 group-hover:scale-105 transition-transform duration-500 ring-4 ring-white dark:ring-gray-900">
             <User className="w-10 h-10 text-white" strokeWidth={2} />
           </div>
           {hasDetailedStory && (
             <button
               type="button"
               onClick={handleStoryBadgeClick}
-              className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-blue-500 dark:bg-blue-400 hover:bg-blue-600 dark:hover:bg-blue-500 flex items-center justify-center shadow-lg hover:shadow-xl ring-2 ring-white dark:ring-gray-800 hover:scale-125 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400/70 dark:focus:ring-blue-500/60 cursor-pointer"
+              className="absolute top-0 right-0 w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-orange-500 border border-gray-100 dark:border-gray-700 flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-300 z-10"
               title={storyLabel}
               aria-label={storyLabel}
             >
-              <BookOpen className="w-4 h-4 text-white" strokeWidth={2.5} />
+              <BookOpen className="w-5 h-5" strokeWidth={2.5} />
             </button>
           )}
         </div>
 
         {/* Name and Badges */}
-        <div className="text-center mb-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 min-h-[3.5rem]">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-orange-500 transition-colors duration-300 line-clamp-2 min-h-[3.5rem]">
             {person.fullName || `Person #${shortHash(person.personHash)}`}
           </h3>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {genderText && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-300">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
                 <User className="w-3 h-3" />
                 {genderText}
               </span>
             )}
             {isMinted(person) && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-xs font-mono font-medium text-indigo-700 dark:text-indigo-300">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 dark:bg-gray-800 text-xs font-mono font-medium text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
                 <Hash className="w-3 h-3" />
                 {person.tokenId}
               </span>
@@ -129,10 +135,10 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
                   e.stopPropagation();
                   setShowEndorseModal(true);
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-xs font-medium text-emerald-700 dark:text-emerald-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-xs font-medium text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
                 title={t("people.clickToEndorse", "Click to endorse this version")}
               >
-                <Star className="w-3 h-3 fill-emerald-500 text-emerald-500" />
+                <Star className="w-3 h-3 fill-orange-500 text-orange-500" />
                 {endorsementCount}
               </button>
             )}
@@ -140,73 +146,68 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
         </div>
 
         {/* Life Events */}
-        <div className="space-y-2 mb-4 flex-1">
+        <div className="space-y-2 mb-6 flex-1">
           {(formatDate.birth || person.birthPlace) && (
-            <div className="px-3 py-2 rounded-lg bg-green-50/50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30">
-              <div className="flex items-center gap-2 mb-1">
-                <Calendar className="w-3.5 h-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                <div className="text-[10px] font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
+              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
+                 <Baby className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                   {t("people.born", "Born")}
                 </div>
-              </div>
-              <div className="text-xs font-mono text-gray-700 dark:text-gray-300 line-clamp-1">
-                {[formatDate.birth, person.birthPlace].filter(Boolean).join(" · ")}
+                <div className="text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
+                  {[formatDate.birth, person.birthPlace].filter(Boolean).join(" · ")}
+                </div>
               </div>
             </div>
           )}
 
           {(formatDate.death || person.deathPlace) && (
-            <div className="px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-1">
-                <Calendar className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
+              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
+                 <Flower2 className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                   {t("people.died", "Died")}
                 </div>
-              </div>
-              <div className="text-xs font-mono text-gray-700 dark:text-gray-300 line-clamp-1">
-                {[formatDate.death, person.deathPlace].filter(Boolean).join(" · ")}
+                <div className="text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
+                  {[formatDate.death, person.deathPlace].filter(Boolean).join(" · ")}
+                </div>
               </div>
             </div>
           )}
 
           {/* Story Preview */}
           {storyPreview && (
-            <div className="p-3 rounded-lg bg-gradient-to-br from-blue-50/50 to-purple-50/30 dark:from-blue-900/10 dark:to-purple-900/10 border border-blue-100/50 dark:border-blue-800/30">
-              <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
-                {storyPreview}
-              </p>
+            <div className="mt-4 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800/50 italic text-gray-600 dark:text-gray-400 text-sm leading-relaxed relative">
+              <span className="absolute top-2 left-2 text-2xl text-gray-200 dark:text-gray-700 font-serif leading-none">"</span>
+              <span className="relative z-10">{storyPreview}</span>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-              {person.timestamp && (
-                <span className="flex items-center gap-1">
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <div className="flex flex-col gap-1">
+             {person.timestamp && (
+                <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
                   <Clock className="w-3 h-3" />
                   {formatUnixDate(person.timestamp)}
                 </span>
               )}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onClick();
-              }}
-              className="flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:gap-1.5 transition-all duration-200 px-2 py-1 -mx-2 -my-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </button>
+              {person.storyMetadata && (
+                <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                  <FileText className="w-3 h-3" />
+                  {t("people.chunks", "{{count}} chunks", { count: person.storyMetadata.totalChunks })}
+                </span>
+              )}
           </div>
-          {person.storyMetadata && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-              <FileText className="w-3 h-3" />
-              {t("people.chunks", "{{count}} chunks", { count: person.storyMetadata.totalChunks })}
-            </div>
-          )}
+          
+          <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white transition-colors duration-300 shadow-lg shadow-gray-200 dark:shadow-none">
+             <ChevronRight className="w-5 h-5" />
+          </div>
         </div>
       </div>
       <EndorseCompactModal

@@ -6,7 +6,7 @@ import { MiniMap, ZoomControls } from "./ZoomControls";
 
 type GraphViewportProps = {
   containerRef: React.RefObject<HTMLDivElement>;
-  height: number;
+  height: number | string;
 
   containerClassName: string;
   svgClassName: string;

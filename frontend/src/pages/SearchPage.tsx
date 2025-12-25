@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { ethers } from "ethers";
-import { ChevronDown, Clipboard } from "lucide-react";
+import { ChevronDown, Clipboard, Search, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useToast } from "../components/ToastProvider";
 import DeepFamily from "../abi/DeepFamily.json";
@@ -28,11 +28,85 @@ const getByteLength = (str: string): number => {
 const FieldError: React.FC<{ message?: string }> = ({ message }) => {
   if (!message) return null;
   return (
-    <div className="text-xs text-red-600 dark:text-red-400 leading-snug whitespace-normal break-words w-full mt-0.5">
+    <div className="text-xs text-red-500 font-medium leading-snug whitespace-normal break-words w-full mt-1 ml-1">
       {message}
     </div>
   );
 };
+
+const SectionCard = ({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) => (
+  <div
+    className={`group relative overflow-hidden rounded-3xl bg-white dark:bg-black border border-gray-100 dark:border-gray-800 transition-all duration-500 ${isOpen ? "shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50" : "shadow-sm hover:shadow-md"}`}
+  >
+    <div
+      className="p-6 flex items-center justify-between cursor-pointer select-none"
+      onClick={onToggle}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          className={`w-1.5 h-6 rounded-full bg-gradient-to-b from-orange-400 to-red-500 transition-all duration-500 ${isOpen ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0"}`}
+        />
+        <h3
+          className={`text-lg font-bold transition-all duration-300 ${isOpen ? "bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400" : "text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200"}`}
+        >
+          {title}
+        </h3>
+      </div>
+      <button
+        type="button"
+        className={`flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-gray-500 transition-all duration-300 group-hover:scale-110 ${isOpen ? "rotate-180 bg-white dark:bg-black shadow-lg text-orange-500" : ""}`}
+      >
+        <ChevronDown size={20} />
+      </button>
+    </div>
+    <div
+      className={`transition-all duration-500 ease-in-out overflow-hidden ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
+    >
+      <div className="p-6 pt-0">{children}</div>
+    </div>
+  </div>
+);
+
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  ({ className = "", ...props }, ref) => (
+    <input
+      ref={ref}
+      className={`w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300 ${className}`}
+      {...props}
+    />
+  ),
+);
+Input.displayName = "Input";
+
+const ButtonPrimary = ({
+  className = "",
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  <button
+    className={`px-6 py-2.5 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
+    {...props}
+  />
+);
+
+const ButtonSecondary = ({
+  className = "",
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  <button
+    className={`px-6 py-2.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
+    {...props}
+  />
+);
 
 const sanitizeNumberInput = (value: unknown) => {
   if (value === "" || value === null || value === undefined) return undefined;
@@ -65,16 +139,19 @@ const ThemedSelect: React.FC<{
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        className="w-full h-[50px] px-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-left text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 hover:bg-white dark:hover:bg-black transition-all duration-300 flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="truncate">{current}</span>
-        <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
+        <ChevronDown
+          size={16}
+          className={`text-gray-500 dark:text-gray-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
-          <ul role="listbox" className="max-h-60 overflow-auto">
+        <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <ul role="listbox" className="max-h-60 overflow-auto p-1">
             {options.map((o) => (
               <li
                 key={o.value}
@@ -84,10 +161,10 @@ const ThemedSelect: React.FC<{
                   onChange(o.value);
                   setOpen(false);
                 }}
-                className={`px-3 py-2 text-sm cursor-pointer select-none transition-colors ${
+                className={`px-3 py-2.5 rounded-lg text-sm cursor-pointer select-none transition-colors ${
                   o.value === value
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    ? "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 font-medium"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
                 {o.label}
@@ -693,923 +770,768 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="space-y-4 text-gray-900 dark:text-gray-100 pb-4 md:pb-0">
+    <div className="space-y-6 text-gray-900 dark:text-gray-100 pb-8 md:pb-0 max-w-7xl mx-auto">
       {/* Hash Calculator Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div
-          className="bg-teal-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
-          onClick={() => toggle("hash")}
-        >
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {t("search.hashCalculator.title")}
-          </h3>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle("hash");
-            }}
-            aria-expanded={openSections.hash}
-          >
-            {openSections.hash ? "−" : "+"}
-          </button>
+      <SectionCard
+        title={t("search.hashCalculator.title")}
+        isOpen={openSections.hash}
+        onToggle={() => toggle("hash")}
+      >
+        <div className="space-y-4">
+          <div className="w-full">
+            <PersonHashCalculator
+              showTitle={false}
+              collapsible={false}
+              className="border-0 shadow-none bg-transparent p-0"
+            />
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {t("search.hashCalculator.description")}
+          </p>
         </div>
-        {openSections.hash && (
-          <div className="p-2 space-y-2">
-            <div className="text-xs text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800/40">
-              {t("search.hashCalculator.tip")}
+      </SectionCard>
+      {/* Versions Section */}
+      <SectionCard
+        title={t("search.versionsQuery.title")}
+        isOpen={openSections.versions}
+        onToggle={() => toggle("versions")}
+      >
+        <div className="space-y-6">
+          <form
+            onSubmit={hs5((d) => onQueryPersonVersions(d, 0))}
+            className="flex flex-col md:flex-row gap-4 items-start"
+          >
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.versionsQuery.personHash")}
+              </label>
+              <Input placeholder={t("search.versionsQuery.placeholder")} {...reg5("personHash")} />
+              <FieldError message={e5.personHash?.message as any} />
             </div>
-            <div className="w-full">
-              <PersonHashCalculator
-                showTitle={false}
-                collapsible={false}
-                className="border-0 shadow-none bg-transparent"
+            <div className="w-full md:w-32">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.nameQuery.pageSize")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
+                {...reg5("pageSize", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e5.pageSize?.message, pageSizeValidationMessage)}
               />
             </div>
+            <div className="flex gap-3 pt-7 w-full md:w-auto">
+              <ButtonPrimary type="submit" disabled={versionsLoading}>
+                {versionsLoading ? (
+                  <RefreshCw className="animate-spin" size={18} />
+                ) : (
+                  <Search size={18} />
+                )}
+                {t("search.query")}
+              </ButtonPrimary>
+              <ButtonSecondary type="button" onClick={onResetVersionsQuery}>
+                {t("search.reset")}
+              </ButtonSecondary>
+            </div>
+          </form>
 
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              {t("search.hashCalculator.description")}
-            </p>
-          </div>
-        )}
-      </div>
-      {/* Versions Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div
-          className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
-          onClick={() => toggle("versions")}
-        >
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {t("search.versionsQuery.title")}
-          </h3>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle("versions");
-            }}
-            aria-expanded={openSections.versions}
-          >
-            {openSections.versions ? "−" : "+"}
-          </button>
-        </div>
-        {openSections.versions && (
-          <div className="p-2 space-y-2">
-            <form
-              onSubmit={hs5((d) => onQueryPersonVersions(d, 0))}
-              className="flex flex-wrap gap-1.5 sm:gap-2 items-start"
-            >
-              <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
-                <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">
-                  {t("search.versionsQuery.personHash")}
-                </label>
-                <input
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                  placeholder={t("search.versionsQuery.placeholder")}
-                  {...reg5("personHash")}
-                />
-                <FieldError message={e5.personHash?.message as any} />
+          {versionsQueried && (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {t("search.totalResults")}: {versionsTotal}
               </div>
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-20 sm:w-24">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.nameQuery.pageSize")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
-                    {...reg5("pageSize", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e5.pageSize?.message, pageSizeValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
-                <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">
-                  {t("search.nameQuery.pageSize")}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={versionsLoading}
-                  >
-                    {t("search.query")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onResetVersionsQuery}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    {t("search.reset")}
-                  </button>
-                </div>
-              </div>
-            </form>
-            {versionsQueried && (
-              <>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {t("search.totalResults")}: {versionsTotal}
-                </div>
-                <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
-                  {versionsData.length === 0 ? (
-                    <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
-                      {versionsLoading ? t("search.loading") : t("search.noData")}
-                    </div>
-                  ) : (
-                    versionsData.map((version, i) => (
-                      <div
-                        key={i}
-                        className="p-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
-                      >
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm mb-2">
-                          <div className="shrink-0">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.versionIndex")}:
-                            </span>{" "}
-                            {Number(version.versionIndex)}
-                          </div>
-                          <div className="flex items-center gap-1 min-w-0 max-w-full">
-                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.creator")}:
-                            </span>
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                {versionsData.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    {versionsLoading ? t("search.loading") : t("search.noData")}
+                  </div>
+                ) : (
+                  versionsData.map((version, i) => (
+                    <div
+                      key={i}
+                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mb-3">
+                        <div className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium text-xs">
+                          v{Number(version.versionIndex)}
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <span>{t("search.versionsQuery.creator")}:</span>
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
                             <HashInline
                               value={String(version.addedBy || "")}
-                              className="font-mono text-xs text-gray-800 dark:text-gray-300"
+                              className="font-mono text-xs text-gray-900 dark:text-gray-200"
                             />
                             <button
-                              aria-label={t("search.copy")}
                               onClick={() => onCopy(String(version.addedBy || ""))}
-                              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                             >
-                              <Clipboard size={14} />
+                              <Clipboard size={12} />
                             </button>
                           </div>
-                          <div className="min-w-0">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.addTime")}:
-                            </span>{" "}
-                            <span className="font-mono text-xs text-gray-800 dark:text-gray-300">
-                              {version.timestamp
-                                ? formatUnixSeconds(version.timestamp)
-                                : t("search.versionsQuery.unknown")}
-                            </span>
-                          </div>
                         </div>
-                        <div className="text-sm space-y-1">
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
+                        <div className="text-gray-500 dark:text-gray-500 text-xs">
+                          {version.timestamp
+                            ? formatUnixSeconds(version.timestamp)
+                            : t("search.versionsQuery.unknown")}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 dark:bg-gray-900/30 rounded-xl p-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-gray-400">
                               {t("search.versionsQuery.versionTag")}:
-                            </span>{" "}
-                            {version.tag || t("search.versionsQuery.none")}{" "}
-                            {version.metadataCID && (
-                              <>
-                                <span className="text-gray-600 dark:text-gray-400 ml-4">
-                                  {t("search.versionsQuery.metadataCID")}:
-                                </span>{" "}
-                                <span className="font-mono text-xs break-all text-gray-800 dark:text-gray-300">
-                                  {version.metadataCID}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 overflow-hidden">
-                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.fatherHash")}:
                             </span>
-                            <HashInline
-                              value={version.fatherHash}
-                              className="font-mono text-xs text-gray-800 dark:text-gray-300"
-                            />
-                            <button
-                              aria-label={t("search.copy")}
-                              onClick={() => onCopy(String(version.fatherHash || ""))}
-                              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                            >
-                              <Clipboard size={14} />
-                            </button>
-                          </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.fatherVersion")}:
-                            </span>{" "}
-                            {Number(version.fatherVersionIndex)}
-                          </div>
-                          <div className="flex items-center gap-1 overflow-hidden">
-                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.motherHash")}:
-                            </span>
-                            <HashInline
-                              value={version.motherHash}
-                              className="font-mono text-xs text-gray-800 dark:text-gray-300"
-                            />
-                            <button
-                              aria-label={t("search.copy")}
-                              onClick={() => onCopy(String(version.motherHash || ""))}
-                              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                            >
-                              <Clipboard size={14} />
-                            </button>
-                          </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.versionsQuery.motherVersion")}:
-                            </span>{" "}
-                            {Number(version.motherVersionIndex)}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onVersionsPrev}
-                disabled={versionsLoading || versionsOffset === 0}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.prev")}
-              </button>
-              <button
-                onClick={onVersionsNext}
-                disabled={versionsLoading || !versionsHasMore}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.next")}
-              </button>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                {t("search.offset")}: {versionsOffset}
-              </div>
-            </div>
-            {versionsError && (
-              <div className="text-sm text-red-600 dark:text-red-400">{versionsError}</div>
-            )}
-          </div>
-        )}
-      </div>
-      {/* Endorsement Stats Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div
-          className="bg-green-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
-          onClick={() => toggle("endorsement")}
-        >
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {t("search.endorsementQuery.title")}
-          </h3>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle("endorsement");
-            }}
-            aria-expanded={openSections.endorsement}
-          >
-            {openSections.endorsement ? "−" : "+"}
-          </button>
-        </div>
-        {openSections.endorsement && (
-          <div className="p-2 space-y-2">
-            <form
-              onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))}
-              className="flex flex-wrap gap-1.5 sm:gap-2 items-start"
-            >
-              <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
-                <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">
-                  {t("search.endorsementQuery.personHash")}
-                </label>
-                <input
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                  placeholder={t("search.endorsementQuery.placeholder")}
-                  {...reg3("personHash")}
-                />
-                <FieldError message={e3.personHash?.message as any} />
-              </div>
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-20 sm:w-24">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.nameQuery.pageSize")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
-                    {...reg3("pageSize", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e3.pageSize?.message, pageSizeValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
-                <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">
-                  {t("search.nameQuery.pageSize")}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={endorsementLoading}
-                  >
-                    {t("search.query")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onResetEndorsementQuery}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    {t("search.reset")}
-                  </button>
-                </div>
-              </div>
-            </form>
-            {endorsementQueried && (
-              <>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {t("search.totalResults")}: {endorsementTotal}
-                </div>
-                <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
-                  {endorsementData.versionIndices.length === 0 ? (
-                    <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
-                      {endorsementLoading ? t("search.loading") : t("search.noData")}
-                    </div>
-                  ) : (
-                    endorsementData.versionIndices.map((versionIndex, i) => (
-                      <div key={i} className="p-2">
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                              {t("search.endorsementQuery.version")}:
-                            </span>{" "}
-                            {versionIndex}
-                          </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                              {t("search.endorsementQuery.endorsementCount")}:
-                            </span>{" "}
-                            {endorsementData.endorsementCounts[i]}
-                          </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                              {t("search.endorsementQuery.tokenId")}:
-                            </span>{" "}
-                            {endorsementData.tokenIds[i]}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onEndorsementPrev}
-                disabled={endorsementLoading || endorsementOffset === 0}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.prev")}
-              </button>
-              <button
-                onClick={onEndorsementNext}
-                disabled={endorsementLoading || !endorsementHasMore}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.next")}
-              </button>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                {t("search.offset")}: {endorsementOffset}
-              </div>
-            </div>
-            {endorsementError && (
-              <div className="text-sm text-red-600 dark:text-red-400">{endorsementError}</div>
-            )}
-          </div>
-        )}
-      </div>
-      {/* Children Query Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div
-          className="bg-rose-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
-          onClick={() => toggle("children")}
-        >
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {t("search.childrenQuery.title")}
-          </h3>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle("children");
-            }}
-            aria-expanded={openSections.children}
-          >
-            {openSections.children ? "−" : "+"}
-          </button>
-        </div>
-        {openSections.children && (
-          <div className="p-2 space-y-2">
-            <form
-              onSubmit={hs7((d) => onQueryChildren(d, 0))}
-              className="flex flex-wrap gap-1.5 sm:gap-2 items-start"
-            >
-              <div className="basis-full sm:basis-[560px] md:basis-[560px] grow-0 shrink-0">
-                <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">
-                  {t("search.childrenQuery.parentHash")}
-                </label>
-                <input
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                  placeholder={t("search.childrenQuery.parentHashPlaceholder")}
-                  {...reg7("parentHash")}
-                />
-                <FieldError message={e7.parentHash?.message as any} />
-              </div>
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-28 sm:w-32">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.childrenQuery.parentVersion")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.versionIndexPlaceholder", { defaultValue: "≥0" })}
-                    title={t("search.versionIndexPlaceholder", { defaultValue: "≥0" })}
-                    {...reg7("parentVersionIndex", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(
-                      e7.parentVersionIndex?.message,
-                      versionIndexValidationMessage,
-                    )}
-                  />
-                </div>
-              </div>
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-20 sm:w-24">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.nameQuery.pageSize")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
-                    {...reg7("pageSize", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e7.pageSize?.message, pageSizeValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
-                <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">
-                  {t("search.nameQuery.pageSize")}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={childrenLoading}
-                  >
-                    {t("search.query")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onResetChildrenQuery}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    {t("search.reset")}
-                  </button>
-                </div>
-              </div>
-            </form>
-            {childrenQueried && (
-              <>
-                {childrenQueried && (
-                  <>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      {t("search.childrenQuery.totalChildren")}: {childrenTotal}
-                    </div>
-                    <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
-                      {childrenData.childHashes.length === 0 ? (
-                        <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
-                          {childrenLoading ? t("search.loading") : t("search.noData")}
-                        </div>
-                      ) : (
-                        childrenData.childHashes.map((childHash, i) => (
-                          <div key={i} className="p-2">
-                            <div className="text-sm space-y-1">
-                              <div className="flex items-center gap-1 overflow-hidden">
-                                <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                                  {t("search.childrenQuery.childHash")}:
-                                </span>{" "}
-                                <HashInline
-                                  value={childHash}
-                                  className="font-mono text-xs text-gray-800 dark:text-gray-300"
-                                />
-                                <button
-                                  aria-label={t("search.copy")}
-                                  onClick={() => onCopy(childHash)}
-                                  className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                                >
-                                  <Clipboard size={14} />
-                                </button>
-                              </div>
-                              <div>
-                                <span className="text-gray-600 dark:text-gray-400">
-                                  {t("search.childrenQuery.childVersion")}:
-                                </span>{" "}
-                                {childrenData.childVersions[i]}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onChildrenPrev}
-                disabled={childrenLoading || childrenOffset === 0}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.prev")}
-              </button>
-              <button
-                onClick={onChildrenNext}
-                disabled={childrenLoading || !childrenHasMore}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.next")}
-              </button>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                {t("search.offset")}: {childrenOffset}
-              </div>
-            </div>
-            {childrenError && (
-              <div className="text-sm text-red-600 dark:text-red-400">{childrenError}</div>
-            )}
-          </div>
-        )}
-      </div>
-      {/* Story Chunks Query Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div
-          className="bg-indigo-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
-          onClick={() => toggle("storyChunks")}
-        >
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {t("search.storyChunksQuery.title")}
-          </h3>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle("storyChunks");
-            }}
-            aria-expanded={openSections.storyChunks}
-          >
-            {openSections.storyChunks ? "−" : "+"}
-          </button>
-        </div>
-        {openSections.storyChunks && (
-          <div className="p-2 space-y-2">
-            <form
-              onSubmit={hs6((d) => onQueryStoryChunks(d, 0))}
-              className="flex flex-wrap gap-1.5 sm:gap-2 items-start"
-            >
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-44 sm:w-52">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.storyChunksQuery.tokenId")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.storyChunksQuery.placeholder")}
-                    title={t("search.storyChunksQuery.placeholder")}
-                    {...reg6("tokenId", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e6.tokenId?.message, tokenIdValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-20 sm:w-24">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.nameQuery.pageSize")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
-                    {...reg6("pageSize", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e6.pageSize?.message, pageSizeValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
-                <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">
-                  {t("search.nameQuery.pageSize")}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={storyChunksLoading}
-                  >
-                    {t("search.query")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onResetStoryChunksQuery}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    {t("search.reset")}
-                  </button>
-                </div>
-              </div>
-            </form>
-            {storyChunksQueried && (
-              <>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {t("search.storyChunksQuery.totalChunks")}: {storyChunksTotal}
-                </div>
-                <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
-                  {storyChunksData.length === 0 ? (
-                    <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
-                      {storyChunksLoading ? t("search.loading") : t("search.noData")}
-                    </div>
-                  ) : (
-                    storyChunksData.map((chunk, i) => (
-                      <div key={i} className="p-2">
-                        {/* Index then timestamp on the same line */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-2">
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.storyChunksQuery.chunkIndex")}:
-                            </span>{" "}
-                            {Number(chunk.chunkIndex)}
-                          </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.storyChunksQuery.timestamp")}:
-                            </span>{" "}
-                            <span className="font-mono text-sm text-gray-800 dark:text-gray-300">
-                              {chunk.timestamp
-                                ? formatUnixSeconds(chunk.timestamp)
-                                : t("search.versionsQuery.unknown")}
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {version.tag || t("search.versionsQuery.none")}
                             </span>
                           </div>
-                        </div>
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1 overflow-hidden">
-                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                              {t("search.storyChunksQuery.chunkHash")}:
-                            </span>
-                            <HashInline
-                              value={chunk.chunkHash}
-                              className="font-mono text-sm text-gray-800 dark:text-gray-300"
-                            />
-                            <button
-                              aria-label={t("search.copy")}
-                              onClick={() => onCopy(String(chunk.chunkHash || ""))}
-                              className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                            >
-                              <Clipboard size={14} />
-                            </button>
-                          </div>
-                          <div className="flex items-center gap-1 overflow-hidden">
-                            <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                              {t("search.storyChunksQuery.editor")}:
-                            </span>
-                            <HashInline
-                              value={String(chunk.editor || "")}
-                              className="font-mono text-sm text-gray-800 dark:text-gray-300"
-                            />
-                            {chunk.editor && (
-                              <button
-                                aria-label={t("search.copy")}
-                                onClick={() => onCopy(String(chunk.editor || ""))}
-                                className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                              >
-                                <Clipboard size={14} />
-                              </button>
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.storyChunksQuery.chunkType")}:
-                            </span>{" "}
-                            {getChunkTypeLabel(Number(chunk.chunkType ?? 0))}
-                          </div>
-                          {chunk.attachmentCID && chunk.attachmentCID.length > 0 && (
-                            <div className="flex items-center gap-1 overflow-hidden">
-                              <span className="shrink-0 text-gray-600 dark:text-gray-400">
-                                {t("search.storyChunksQuery.attachmentCID")}:
+                          {version.metadataCID && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500 dark:text-gray-400">
+                                {t("search.versionsQuery.metadataCID")}:
                               </span>
-                              <span className="font-mono text-sm break-all text-gray-800 dark:text-gray-300">
-                                {chunk.attachmentCID}
+                              <span className="font-mono text-xs text-gray-900 dark:text-gray-100 truncate max-w-[150px]">
+                                {version.metadataCID}
                               </span>
-                              <button
-                                aria-label={t("search.copy")}
-                                onClick={() => onCopy(String(chunk.attachmentCID))}
-                                className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                              >
-                                <Clipboard size={14} />
-                              </button>
                             </div>
                           )}
-                          <div>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              {t("search.storyChunksQuery.contentPreview")}:
+                        </div>
+
+                        <div className="space-y-2 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 pt-2 md:pt-0 md:pl-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {t("search.versionsQuery.fatherHash")}:
                             </span>
+                            <div className="flex items-center gap-1">
+                              <HashInline
+                                value={version.fatherHash}
+                                className="font-mono text-xs"
+                              />
+                              <span className="text-xs text-gray-400">
+                                (v{Number(version.fatherVersionIndex)})
+                              </span>
+                            </div>
                           </div>
-                          <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded text-sm leading-snug max-h-20 overflow-y-auto">
-                            {chunk.content || t("search.noData")}
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {t("search.versionsQuery.motherHash")}:
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <HashInline
+                                value={version.motherHash}
+                                className="font-mono text-xs"
+                              />
+                              <span className="text-xs text-gray-400">
+                                (v{Number(version.motherVersionIndex)})
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onStoryChunksPrev}
-                disabled={storyChunksLoading || storyChunksOffset === 0}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.prev")}
-              </button>
-              <button
-                onClick={onStoryChunksNext}
-                disabled={storyChunksLoading || !storyChunksHasMore}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.next")}
-              </button>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                {t("search.offset")}: {storyChunksOffset}
-              </div>
-            </div>
-            {storyChunksError && (
-              <div className="text-sm text-red-600 dark:text-red-400">{storyChunksError}</div>
-            )}
-          </div>
-        )}
-      </div>
-      {/* URI History Section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-        <div
-          className="bg-purple-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
-          onClick={() => toggle("uri")}
-        >
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {t("search.uriQuery.title")}
-          </h3>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle("uri");
-            }}
-            aria-expanded={openSections.uri}
-          >
-            {openSections.uri ? "−" : "+"}
-          </button>
-        </div>
-        {openSections.uri && (
-          <div className="p-2 space-y-2">
-            <form
-              onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))}
-              className="flex flex-wrap gap-1.5 sm:gap-2 items-start"
-            >
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-44 sm:w-52">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.uriQuery.tokenId")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.uriQuery.placeholder")}
-                    title={t("search.uriQuery.placeholder")}
-                    {...reg4("tokenId", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e4.tokenId?.message, tokenIdValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="basis-auto">
-                <div className="flex flex-col gap-1 w-20 sm:w-24">
-                  <label className="text-xs text-gray-700 dark:text-gray-300">
-                    {t("search.nameQuery.pageSize")}
-                  </label>
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
-                    placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
-                    {...reg4("pageSize", { setValueAs: sanitizeNumberInput })}
-                  />
-                  <FieldError
-                    message={formatNumericError(e4.pageSize?.message, pageSizeValidationMessage)}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-0 sm:gap-1 sm:justify-end basis-full sm:basis-auto">
-                <span className="text-xs text-gray-700 dark:text-gray-300 invisible hidden sm:inline">
-                  {t("search.nameQuery.pageSize")}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={uriLoading}
-                  >
-                    {t("search.query")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onResetUriQuery}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    {t("search.reset")}
-                  </button>
-                </div>
-              </div>
-            </form>
-            {uriQueried && (
-              <>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {t("search.totalResults")}: {uriTotal}
-                </div>
-                <div className="rounded border border-gray-200 dark:border-gray-700/60 divide-y dark:divide-gray-700/60">
-                  {uriData.length === 0 ? (
-                    <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
-                      {uriLoading ? t("search.loading") : t("search.noData")}
                     </div>
-                  ) : (
-                    uriData.map((uri, i) => (
-                      <div key={i} className="p-2 flex items-center gap-2 overflow-hidden">
-                        <span
-                          className="min-w-0 flex-1 font-mono text-sm truncate text-gray-800 dark:text-gray-200"
-                          title={uri}
-                        >
-                          {uri}
-                        </span>
-                        <button
-                          aria-label={t("search.copy")}
-                          onClick={() => onCopy(uri)}
-                          className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors -mt-[2px]"
-                        >
-                          <Clipboard size={14} />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onUriPrev}
-                disabled={uriLoading || uriOffset === 0}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.prev")}
-              </button>
-              <button
-                onClick={onUriNext}
-                disabled={uriLoading || !uriHasMore}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {t("search.next")}
-              </button>
-              <div className="text-xs text-gray-500 dark:text-gray-500">
-                {t("search.offset")}: {uriOffset}
+                  ))
+                )}
               </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("search.offset")}: {versionsOffset}
+                </div>
+                <div className="flex gap-2">
+                  <ButtonSecondary
+                    onClick={onVersionsPrev}
+                    disabled={versionsLoading || versionsOffset === 0}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    <ArrowLeft size={14} />
+                    {t("search.prev")}
+                  </ButtonSecondary>
+                  <ButtonSecondary
+                    onClick={onVersionsNext}
+                    disabled={versionsLoading || !versionsHasMore}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    {t("search.next")}
+                    <ArrowRight size={14} />
+                  </ButtonSecondary>
+                </div>
+              </div>
+              {versionsError && (
+                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800/30">
+                  {versionsError}
+                </div>
+              )}
             </div>
-            {uriError && <div className="text-sm text-red-600 dark:text-red-400">{uriError}</div>}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </SectionCard>
+      {/* Endorsement Stats Section */}
+      <SectionCard
+        title={t("search.endorsementQuery.title")}
+        isOpen={openSections.endorsement}
+        onToggle={() => toggle("endorsement")}
+      >
+        <div className="space-y-6">
+          <form
+            onSubmit={hs3((d) => onQueryEndorsementStats(d, 0))}
+            className="flex flex-col md:flex-row gap-4 items-start"
+          >
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.endorsementQuery.personHash")}
+              </label>
+              <Input
+                placeholder={t("search.endorsementQuery.placeholder")}
+                {...reg3("personHash")}
+              />
+              <FieldError message={e3.personHash?.message as any} />
+            </div>
+            <div className="w-full md:w-32">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.nameQuery.pageSize")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
+                {...reg3("pageSize", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e3.pageSize?.message, pageSizeValidationMessage)}
+              />
+            </div>
+            <div className="flex gap-3 pt-7 w-full md:w-auto">
+              <ButtonPrimary type="submit" disabled={endorsementLoading}>
+                {endorsementLoading ? (
+                  <RefreshCw className="animate-spin" size={18} />
+                ) : (
+                  <Search size={18} />
+                )}
+                {t("search.query")}
+              </ButtonPrimary>
+              <ButtonSecondary type="button" onClick={onResetEndorsementQuery}>
+                {t("search.reset")}
+              </ButtonSecondary>
+            </div>
+          </form>
+
+          {endorsementQueried && (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {t("search.totalResults")}: {endorsementTotal}
+              </div>
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                {endorsementData.versionIndices.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    {endorsementLoading ? t("search.loading") : t("search.noData")}
+                  </div>
+                ) : (
+                  endorsementData.versionIndices.map((versionIndex, i) => (
+                    <div
+                      key={i}
+                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("search.endorsementQuery.version")}:
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
+                            v{versionIndex}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("search.endorsementQuery.endorsementCount")}:
+                          </span>
+                          <span className="font-bold text-orange-500">
+                            {endorsementData.endorsementCounts[i]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("search.endorsementQuery.tokenId")}:
+                          </span>
+                          <span className="font-mono text-gray-900 dark:text-gray-100">
+                            #{endorsementData.tokenIds[i]}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("search.offset")}: {endorsementOffset}
+                </div>
+                <div className="flex gap-2">
+                  <ButtonSecondary
+                    onClick={onEndorsementPrev}
+                    disabled={endorsementLoading || endorsementOffset === 0}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    <ArrowLeft size={14} />
+                    {t("search.prev")}
+                  </ButtonSecondary>
+                  <ButtonSecondary
+                    onClick={onEndorsementNext}
+                    disabled={endorsementLoading || !endorsementHasMore}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    {t("search.next")}
+                    <ArrowRight size={14} />
+                  </ButtonSecondary>
+                </div>
+              </div>
+              {endorsementError && (
+                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800/30">
+                  {endorsementError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </SectionCard>
+      {/* Children Query Section */}
+      <SectionCard
+        title={t("search.childrenQuery.title")}
+        isOpen={openSections.children}
+        onToggle={() => toggle("children")}
+      >
+        <div className="space-y-6">
+          <form
+            onSubmit={hs7((d) => onQueryChildren(d, 0))}
+            className="flex flex-col md:flex-row gap-4 items-start"
+          >
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.childrenQuery.parentHash")}
+              </label>
+              <Input
+                placeholder={t("search.childrenQuery.parentHashPlaceholder")}
+                {...reg7("parentHash")}
+              />
+              <FieldError message={e7.parentHash?.message as any} />
+            </div>
+            <div className="w-full md:w-32">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.childrenQuery.parentVersion")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.versionIndexPlaceholder", { defaultValue: "≥0" })}
+                title={t("search.versionIndexPlaceholder", { defaultValue: "≥0" })}
+                {...reg7("parentVersionIndex", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(
+                  e7.parentVersionIndex?.message,
+                  versionIndexValidationMessage,
+                )}
+              />
+            </div>
+            <div className="w-full md:w-32">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.nameQuery.pageSize")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
+                {...reg7("pageSize", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e7.pageSize?.message, pageSizeValidationMessage)}
+              />
+            </div>
+            <div className="flex gap-3 pt-7 w-full md:w-auto">
+              <ButtonPrimary type="submit" disabled={childrenLoading}>
+                {childrenLoading ? (
+                  <RefreshCw className="animate-spin" size={18} />
+                ) : (
+                  <Search size={18} />
+                )}
+                {t("search.query")}
+              </ButtonPrimary>
+              <ButtonSecondary type="button" onClick={onResetChildrenQuery}>
+                {t("search.reset")}
+              </ButtonSecondary>
+            </div>
+          </form>
+
+          {childrenQueried && (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {t("search.childrenQuery.totalChildren")}: {childrenTotal}
+              </div>
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                {childrenData.childHashes.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    {childrenLoading ? t("search.loading") : t("search.noData")}
+                  </div>
+                ) : (
+                  childrenData.childHashes.map((childHash, i) => (
+                    <div
+                      key={i}
+                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("search.childrenQuery.childHash")}:
+                          </span>
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
+                            <HashInline
+                              value={childHash}
+                              className="font-mono text-xs text-gray-900 dark:text-gray-200"
+                            />
+                            <button
+                              onClick={() => onCopy(childHash)}
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            >
+                              <Clipboard size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("search.childrenQuery.childVersion")}:
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
+                            v{childrenData.childVersions[i]}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("search.offset")}: {childrenOffset}
+                </div>
+                <div className="flex gap-2">
+                  <ButtonSecondary
+                    onClick={onChildrenPrev}
+                    disabled={childrenLoading || childrenOffset === 0}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    <ArrowLeft size={14} />
+                    {t("search.prev")}
+                  </ButtonSecondary>
+                  <ButtonSecondary
+                    onClick={onChildrenNext}
+                    disabled={childrenLoading || !childrenHasMore}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    {t("search.next")}
+                    <ArrowRight size={14} />
+                  </ButtonSecondary>
+                </div>
+              </div>
+              {childrenError && (
+                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800/30">
+                  {childrenError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </SectionCard>
+      {/* Story Chunks Query Section */}
+      <SectionCard
+        title={t("search.storyChunksQuery.title")}
+        isOpen={openSections.storyChunks}
+        onToggle={() => toggle("storyChunks")}
+      >
+        <div className="space-y-6">
+          <form
+            onSubmit={hs6((d) => onQueryStoryChunks(d, 0))}
+            className="flex flex-col md:flex-row gap-4 items-start"
+          >
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.storyChunksQuery.tokenId")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.storyChunksQuery.placeholder")}
+                title={t("search.storyChunksQuery.placeholder")}
+                {...reg6("tokenId", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e6.tokenId?.message, tokenIdValidationMessage)}
+              />
+            </div>
+            <div className="w-full md:w-32">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.nameQuery.pageSize")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
+                {...reg6("pageSize", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e6.pageSize?.message, pageSizeValidationMessage)}
+              />
+            </div>
+            <div className="flex gap-3 pt-7 w-full md:w-auto">
+              <ButtonPrimary type="submit" disabled={storyChunksLoading}>
+                {storyChunksLoading ? (
+                  <RefreshCw className="animate-spin" size={18} />
+                ) : (
+                  <Search size={18} />
+                )}
+                {t("search.query")}
+              </ButtonPrimary>
+              <ButtonSecondary type="button" onClick={onResetStoryChunksQuery}>
+                {t("search.reset")}
+              </ButtonSecondary>
+            </div>
+          </form>
+
+          {storyChunksQueried && (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {t("search.storyChunksQuery.totalChunks")}: {storyChunksTotal}
+              </div>
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                {storyChunksData.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    {storyChunksLoading ? t("search.loading") : t("search.noData")}
+                  </div>
+                ) : (
+                  storyChunksData.map((chunk, i) => (
+                    <div
+                      key={i}
+                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mb-3">
+                        <div className="px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium text-xs">
+                          #{Number(chunk.chunkIndex)}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-500 text-xs">
+                          {chunk.timestamp
+                            ? formatUnixSeconds(chunk.timestamp)
+                            : t("search.versionsQuery.unknown")}
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 ml-auto">
+                          <span className="text-xs">{t("search.storyChunksQuery.chunkType")}:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {getChunkTypeLabel(Number(chunk.chunkType ?? 0))}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl text-sm text-gray-700 dark:text-gray-300 leading-relaxed max-h-32 overflow-y-auto">
+                          {chunk.content || (
+                            <span className="text-gray-400 italic">{t("search.noData")}</span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <span>{t("search.storyChunksQuery.chunkHash")}:</span>
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                              <HashInline value={chunk.chunkHash} className="font-mono" />
+                              <button onClick={() => onCopy(String(chunk.chunkHash || ""))}>
+                                <Clipboard size={10} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {chunk.editor && (
+                            <div className="flex items-center gap-1">
+                              <span>{t("search.storyChunksQuery.editor")}:</span>
+                              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                                <HashInline value={String(chunk.editor)} className="font-mono" />
+                                <button onClick={() => onCopy(String(chunk.editor))}>
+                                  <Clipboard size={10} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {chunk.attachmentCID && chunk.attachmentCID.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span>{t("search.storyChunksQuery.attachmentCID")}:</span>
+                              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                                <span className="font-mono truncate max-w-[100px]">
+                                  {chunk.attachmentCID}
+                                </span>
+                                <button onClick={() => onCopy(String(chunk.attachmentCID))}>
+                                  <Clipboard size={10} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("search.offset")}: {storyChunksOffset}
+                </div>
+                <div className="flex gap-2">
+                  <ButtonSecondary
+                    onClick={onStoryChunksPrev}
+                    disabled={storyChunksLoading || storyChunksOffset === 0}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    <ArrowLeft size={14} />
+                    {t("search.prev")}
+                  </ButtonSecondary>
+                  <ButtonSecondary
+                    onClick={onStoryChunksNext}
+                    disabled={storyChunksLoading || !storyChunksHasMore}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    {t("search.next")}
+                    <ArrowRight size={14} />
+                  </ButtonSecondary>
+                </div>
+              </div>
+              {storyChunksError && (
+                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800/30">
+                  {storyChunksError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </SectionCard>
+      {/* URI History Section */}
+      <SectionCard
+        title={t("search.uriQuery.title")}
+        isOpen={openSections.uri}
+        onToggle={() => toggle("uri")}
+      >
+        <div className="space-y-6">
+          <form
+            onSubmit={hs4((d) => onQueryTokenURIHistory(d, 0))}
+            className="flex flex-col md:flex-row gap-4 items-start"
+          >
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.uriQuery.tokenId")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.uriQuery.placeholder")}
+                title={t("search.uriQuery.placeholder")}
+                {...reg4("tokenId", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e4.tokenId?.message, tokenIdValidationMessage)}
+              />
+            </div>
+            <div className="w-full md:w-32">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {t("search.nameQuery.pageSize")}
+              </label>
+              <Input
+                type="number"
+                placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
+                {...reg4("pageSize", { setValueAs: sanitizeNumberInput })}
+              />
+              <FieldError
+                message={formatNumericError(e4.pageSize?.message, pageSizeValidationMessage)}
+              />
+            </div>
+            <div className="flex gap-3 pt-7 w-full md:w-auto">
+              <ButtonPrimary type="submit" disabled={uriLoading}>
+                {uriLoading ? (
+                  <RefreshCw className="animate-spin" size={18} />
+                ) : (
+                  <Search size={18} />
+                )}
+                {t("search.query")}
+              </ButtonPrimary>
+              <ButtonSecondary type="button" onClick={onResetUriQuery}>
+                {t("search.reset")}
+              </ButtonSecondary>
+            </div>
+          </form>
+
+          {uriQueried && (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {t("search.totalResults")}: {uriTotal}
+              </div>
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+                {uriData.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    {uriLoading ? t("search.loading") : t("search.noData")}
+                  </div>
+                ) : (
+                  uriData.map((uri, i) => (
+                    <div
+                      key={i}
+                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors flex items-center gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
+                          <span
+                            className="font-mono text-sm text-gray-700 dark:text-gray-300 truncate flex-1"
+                            title={uri}
+                          >
+                            {uri}
+                          </span>
+                          <button
+                            onClick={() => onCopy(uri)}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                          >
+                            <Clipboard size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("search.offset")}: {uriOffset}
+                </div>
+                <div className="flex gap-2">
+                  <ButtonSecondary
+                    onClick={onUriPrev}
+                    disabled={uriLoading || uriOffset === 0}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    <ArrowLeft size={14} />
+                    {t("search.prev")}
+                  </ButtonSecondary>
+                  <ButtonSecondary
+                    onClick={onUriNext}
+                    disabled={uriLoading || !uriHasMore}
+                    className="!px-4 !py-1.5 text-sm"
+                  >
+                    {t("search.next")}
+                    <ArrowRight size={14} />
+                  </ButtonSecondary>
+                </div>
+              </div>
+              {uriError && (
+                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800/30">
+                  {uriError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 }

@@ -83,7 +83,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg touch-manipulation select-none"
+        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-lg touch-manipulation select-none"
       >
         +
       </button>
@@ -115,11 +115,11 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
       >
         <div className="absolute left-1/2 -translate-x-1/2 top-1.5 bottom-1.5 w-1.5 rounded-full bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-slate-600 dark:via-slate-500 dark:to-slate-600 shadow-inner backdrop-blur-sm">
           <div
-            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing"
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-orange-400 to-red-500 shadow-lg shadow-orange-500/30 ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing"
             style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
           />
           <div
-            className="absolute left-1/2 -translate-x-1/2 bottom-0 w-1.5 rounded-full bg-gradient-to-t from-blue-400/80 to-indigo-400/60 dark:from-blue-500/70 dark:to-indigo-500/50"
+            className="absolute left-1/2 -translate-x-1/2 bottom-0 w-1.5 rounded-full bg-gradient-to-t from-orange-400/80 to-red-500/60 dark:from-orange-500/70 dark:to-red-500/50"
             style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
           />
         </div>
@@ -132,7 +132,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-blue-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:focus-visible:ring-blue-400/60 backdrop-blur-sm hover:shadow-xl font-semibold text-lg touch-manipulation select-none"
+        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-lg touch-manipulation select-none"
       >
         -
       </button>
@@ -161,7 +161,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 }) => {
   return (
     <div
-      className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-200/60 dark:border-slate-600/60 p-1.5 select-none transition-all duration-200 hover:shadow-xl ${className}`}
+      className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-2xl shadow-lg border border-slate-200/60 dark:border-slate-600/60 p-1.5 select-none transition-all duration-200 hover:shadow-2xl hover:shadow-orange-500/10 ${className}`}
     >
       <svg
         ref={miniSvgRef}
@@ -175,8 +175,8 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           y={0}
           width={width}
           height={height}
-          rx={6}
-          ry={6}
+          rx={8}
+          ry={8}
           fill="#f8fafc"
           className="dark:fill-slate-800"
         />
@@ -188,11 +188,11 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           width={20}
           height={20}
           fill="none"
-          stroke="#3b82f6"
+          stroke="#f97316"
           strokeWidth={2}
-          rx={2}
-          ry={2}
-          className="dark:stroke-blue-400"
+          rx={4}
+          ry={4}
+          className="dark:stroke-orange-400"
         />
         {children}
       </svg>
