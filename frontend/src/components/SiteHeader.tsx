@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Home, Search, Network, Book, Zap } from "lucide-react";
@@ -8,100 +9,92 @@ import { getBadgeConfig } from "../config/brandBadge";
 
 /**
  * SiteHeader: Unified top navigation/header bar used across all pages.
- * - On home page (path === '/') shows gradient decorative style
- * - On all other pages shows solid surface style
+ * Optimized for Visual Polish, UX, and Performance.
+ * Theme: Light/Airy
  */
-export default function SiteHeader() {
+const SiteHeader = memo(() => {
   const { t } = useTranslation();
   const location = useLocation();
   const isHomePage = location.pathname === "/";
   const badgeConfig = getBadgeConfig();
 
-  const navClasses = ({ isActive }: { isActive: boolean }) => {
-    const baseClasses =
-      "inline-flex items-center gap-1.5 px-2 py-1.5 lg:px-3.5 lg:py-2 rounded-xl text-xs font-semibold transition-all duration-200 relative group whitespace-nowrap";
-    if (isHomePage) {
-      return `${baseClasses} ${
-        isActive
-          ? "text-white bg-white/25 shadow-lg dark:bg-white/15 backdrop-blur-sm border border-white/20 dark:border-white/10"
-          : "text-white/85 hover:text-white hover:bg-white/15 hover:shadow-md dark:text-gray-100/85 dark:hover:bg-white/10 hover:scale-105 backdrop-blur-sm"
-      }`;
-    }
-    return `${baseClasses} ${
+  // Base classes for nav links
+  const baseNavClasses = "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 relative group whitespace-nowrap";
+
+  const getNavClasses = ({ isActive }: { isActive: boolean }) => {
+    // Unified Light Theme Style
+    return `${baseNavClasses} ${
       isActive
-        ? "text-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 dark:text-blue-300 dark:from-blue-900/50 dark:to-cyan-900/30 shadow-sm border border-blue-200/50 dark:border-blue-700/30"
-        : "text-gray-700 hover:text-gray-900 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:from-gray-800/60 dark:hover:to-blue-900/30 hover:scale-105 hover:shadow-sm"
+        ? "bg-slate-900 text-white shadow-md dark:bg-white dark:text-black"
+        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10"
     }`;
   };
 
   return (
     <header
-      className={`sticky top-0 z-[100] relative ${isHomePage ? "bg-gradient-to-br from-blue-400/35 via-indigo-500/40 via-purple-500/35 to-violet-600/30 dark:from-blue-500/70 dark:via-indigo-600/75 dark:via-purple-600/70 dark:to-violet-700/65 backdrop-blur-3xl border-b border-white/20 dark:border-white/10 shadow-2xl shadow-blue-500/20 dark:shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)]" : "bg-white/85 dark:bg-gray-950/95 backdrop-blur-2xl border-b border-gray-200/70 dark:border-gray-800/80 shadow-lg shadow-gray-500/5 dark:shadow-gray-900/20"}`}
+      className={`sticky top-0 z-[100] w-full transition-all duration-300 ${
+        isHomePage
+          ? "bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-white/20 dark:border-white/10"
+          : "bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-gray-800"
+      }`}
     >
-      {/* Decorative background elements for home page */}
-      {isHomePage && (
-        <>
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute -top-3 left-1/4 w-20 h-20 bg-gradient-to-br from-blue-400/25 via-cyan-400/20 to-teal-400/15 dark:from-blue-400/40 dark:via-cyan-400/35 dark:to-teal-400/30 rounded-full blur-xl animate-pulse-soft"></div>
-            <div className="absolute -top-6 right-1/3 w-24 h-24 bg-gradient-to-br from-purple-400/20 via-violet-400/15 to-pink-400/12 dark:from-purple-400/35 dark:via-violet-400/30 dark:to-pink-400/25 rounded-full blur-2xl animate-float"></div>
-            <div className="absolute -bottom-3 left-2/3 w-16 h-16 bg-gradient-to-br from-indigo-400/30 via-blue-400/25 to-cyan-400/20 dark:from-indigo-400/45 dark:via-blue-400/40 dark:to-cyan-400/35 rounded-full blur-lg animate-bounce-gentle"></div>
-            <div className="absolute top-0 left-1/6 w-8 h-8 bg-gradient-to-br from-emerald-400/20 to-green-400/15 dark:from-emerald-400/30 dark:to-green-400/25 rounded-full blur-md animate-float delay-1000"></div>
-            <div className="absolute -bottom-1 right-1/4 w-10 h-10 bg-gradient-to-br from-rose-400/15 to-orange-400/12 dark:from-rose-400/25 dark:to-orange-400/20 rounded-full blur-lg animate-pulse-soft delay-1000"></div>
-            <div className="absolute top-2 right-1/6 w-6 h-6 bg-gradient-to-br from-yellow-400/25 to-amber-400/20 dark:from-yellow-400/35 dark:to-amber-400/30 rounded-full blur-sm animate-bounce-gentle delay-1000"></div>
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/3 to-white/8 dark:via-black/5 dark:to-black/15 pointer-events-none"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/8 via-indigo-500/5 via-purple-500/8 to-violet-500/6 dark:from-blue-500/15 dark:via-indigo-500/12 dark:via-purple-500/15 dark:to-violet-500/12 pointer-events-none"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/3 via-transparent via-transparent to-pink-400/3 dark:from-cyan-400/8 dark:to-pink-400/8 pointer-events-none"></div>
-          <div className="absolute inset-0 bg-mesh-pattern dark:bg-mesh-pattern-dark opacity-10 dark:opacity-20 pointer-events-none"></div>
-        </>
-      )}
-      <PageContainer className="relative h-16 flex items-center justify-between">
+      <PageContainer className="h-16 flex items-center justify-between">
+        {/* Logo Section */}
         <NavLink
           to="/"
-          className={`flex items-center gap-1.5 transition-colors ${isHomePage ? "text-white hover:text-blue-100 dark:text-gray-100" : "text-gray-800 dark:text-gray-100"}`}
+          className="flex items-center gap-1.5 group focus:outline-none"
         >
           <Logo
-            className={`w-7 h-7 flex-shrink-0 ${isHomePage ? "text-white dark:text-gray-100" : "text-blue-500 dark:text-indigo-400"} hover:-rotate-90 transition-transform duration-300`}
+            className="w-7 h-7 flex-shrink-0 text-orange-500 hover:-rotate-90 transition-transform duration-300"
           />
-          <span
-            className={`text-[1.6rem] font-display mt-1 leading-none font-medium ${isHomePage ? "text-white dark:text-gray-100" : "text-gray-900 dark:text-gray-100"}`}
-          >
-            Deepfamily
-          </span>
-          {badgeConfig && (
-            <span className="relative hidden sm:inline-block ml-0.5 h-6 align-bottom pointer-events-none">
-              <span
-                className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}
-              >
-                {badgeConfig.text}
-              </span>
+          <div className="flex flex-col">
+            <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
+              Deepfamily
             </span>
-          )}
+            {badgeConfig && (
+              <span className="relative hidden sm:inline-block ml-0.5 h-6 align-bottom pointer-events-none">
+                <span
+                  className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}
+                >
+                  {badgeConfig.text}
+                </span>
+              </span>
+            )}
+          </div>
         </NavLink>
-        <nav className="hidden md:flex items-center gap-1 lg:gap-2 flex-shrink-0 min-w-0">
-          <NavLink to="/" className={navClasses} end>
-            <Home className="w-3.5 h-3.5" />
+
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-1">
+          <NavLink to="/" className={getNavClasses} end>
+            <Home className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.home")}</span>
           </NavLink>
-          <NavLink to="/familyTree" className={navClasses}>
-            <Network className="w-3.5 h-3.5" />
+          <NavLink to="/familyTree" className={getNavClasses}>
+            <Network className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.familyTree")}</span>
           </NavLink>
-          <NavLink to="/people" className={navClasses}>
-            <Book className="w-3.5 h-3.5" />
+          <NavLink to="/people" className={getNavClasses}>
+            <Book className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.people")}</span>
           </NavLink>
-          <NavLink to="/search" className={navClasses}>
-            <Search className="w-3.5 h-3.5" />
+          <NavLink to="/search" className={getNavClasses}>
+            <Search className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.search")}</span>
           </NavLink>
-          <NavLink to="/actions" className={navClasses}>
-            <Zap className="w-3.5 h-3.5" />
+          <NavLink to="/actions" className={getNavClasses}>
+            <Zap className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.actions", "Actions")}</span>
           </NavLink>
         </nav>
-        <HeaderControls variant={isHomePage ? "home" : "normal"} />
+
+        {/* Right Side Controls */}
+        <div className="flex items-center gap-2">
+          <HeaderControls variant="normal" />
+        </div>
       </PageContainer>
     </header>
   );
-}
+});
+
+SiteHeader.displayName = "SiteHeader";
+export default SiteHeader;

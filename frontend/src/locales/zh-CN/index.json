@@ -27,7 +27,8 @@
     "search": "搜索",
     "people": "人物",
     "actions": "操作",
-    "keyGen": "密钥"
+    "keyGen": "密钥",
+    "tools": "工具"
   },
   "home": {
     "title": "去中心化数字族谱",
@@ -1345,5 +1346,20 @@
       "CALL_EXCEPTION": "合约校验未通过，请检查输入数据。"
     },
     "unknown": "提交失败，请稍后重试或核对输入。"
+  }
+,
+  "footer": {
+    "tagline": "您的去中心化数字族谱平台。保存历史，验证真相，构建传承。",
+    "resources": "资源",
+    "documentation": "文档",
+    "blog": "博客",
+    "support": "支持",
+    "status": "状态",
+    "company": "公司",
+    "about": "关于",
+    "contact": "联系",
+    "privacy": "隐私政策",
+    "terms": "服务条款",
+    "rights": "© 2025 DeepFamily. MIT License."
   }
 }

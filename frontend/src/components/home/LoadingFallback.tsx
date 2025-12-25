@@ -1,8 +1,27 @@
 import { LOADING_ANIMATIONS } from "../../constants/animationStyles";
 
-const LoadingFallback = () => {
+interface LoadingFallbackProps {
+  variant?: "grid" | "banner";
+}
+
+const LoadingFallback = ({ variant = "grid" }: LoadingFallbackProps) => {
+  const containerClasses =
+    "py-28 bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-slate-900 dark:via-slate-850/50 dark:to-slate-900";
+
+  if (variant === "banner") {
+    return (
+      <div className={containerClasses}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div
+            className={`w-full h-80 bg-slate-100 dark:bg-slate-800 rounded-3xl ${LOADING_ANIMATIONS.PULSE}`}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="py-28 bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-slate-900 dark:via-slate-850/50 dark:to-slate-900">
+    <div className={containerClasses}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-20">
           <div
