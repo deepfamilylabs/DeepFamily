@@ -18,6 +18,31 @@ The DeepFamily frontend is a React/Vite SPA that:
 **Routing**
 - Pages live under `frontend/src/pages/` and are routed via React Router.
 
+### Rendering Pipeline (FamilyTree)
+
+The FamilyTree UI is designed as a **Rendering Pipeline** (a.k.a. **Pipes & Filters**). Each view renders by passing data through a fixed sequence of stages:
+
+**ViewModel → Layout → Viewport → Renderer**
+
+- The **pipeline order is fixed by the framework** (Template Method): views orchestrate the stages, but should not reshuffle responsibilities.
+- **Layout** and **Renderer** are **pluggable strategies** (Strategy Pattern): different views swap only geometry (layout) and visuals (renderer) while sharing the same ViewModel and Viewport.
+
+**Design rules**
+- Views should not “re-assemble” node UI fields or re-derive graph structure; they consume ViewModel outputs.
+- **ViewModel** is the single source of truth for `graph`, `nodeUiById`, selection state, and user actions (e.g. open/copy/endorse).
+- **Layout** is responsible only for geometry (positions / simulation coordinates), not DOM, modals, or filtering.
+- **Viewport** handles zoom/pan/minimap and is shared across graph-based views.
+- **Renderer** draws nodes/edges and wires view-specific interactions, consuming ViewModel data + Layout output.
+
+**Where to look in code**
+- ViewModel: `frontend/src/hooks/useFamilyTreeViewModel.ts`
+- Layout engines: `frontend/src/layout/`
+- Viewport: `frontend/src/components/GraphViewport.tsx`
+- Renderers: `frontend/src/renderers/`
+
+**Extending the system**
+To add a new view, implement a new Layout and/or Renderer strategy and plug it into the pipeline; avoid duplicating ViewModel logic or mixing cross-cutting concerns into view components.
+
 **State & data access**
 - Providers live under `frontend/src/context/` (wallet/config/tree data).
 - Reusable chain/data logic lives under `frontend/src/hooks/`.
@@ -112,9 +137,12 @@ frontend/src/
 ├── pages/               # Routes
 ├── context/             # App providers
 ├── hooks/               # Data + contract hooks
+├── layout/              # Layout engines (tree/dag/force)
+├── renderers/           # View renderers (SVG/D3/list)
 ├── lib/                 # Shared logic (worker-safe where possible)
 ├── workers/             # Web worker entrypoints (crypto/ZK)
 ├── abi/                 # Contract ABIs
+├── constants/           # UI/layout constants
 ├── types/               # TypeScript types
 ├── utils/               # Misc utilities
 └── locales/             # i18n resources

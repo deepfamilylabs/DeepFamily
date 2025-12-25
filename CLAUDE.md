@@ -132,23 +132,57 @@ DeepFamily/
 ├── frontend/               # React dApp
 │   ├── src/
 │   │   ├── components/            # React components
-│   │   │   ├── FamilyTree.tsx           # Main family tree container
+│   │   │   ├── DagView.tsx              # DAG-based family tree view
+│   │   │   ├── ForceGraphView.tsx       # Force-directed graph view
+│   │   │   ├── TreeLayoutView.tsx       # Hierarchical tree layout view
+│   │   │   ├── TreeListView.tsx         # List-based tree view
+│   │   │   ├── GraphViewport.tsx        # Shared viewport container for graph views
+│   │   │   ├── ViewContainer.tsx        # View container wrapper
+│   │   │   ├── ViewModeSwitch.tsx       # View mode toggle component
+│   │   │   ├── ZoomControls.tsx         # Zoom control panel
 │   │   │   ├── FamilyTreeConfigForm.tsx # Tree configuration form
-│   │   │   ├── FlexibleDAGView.tsx      # Flexible layout family tree
-│   │   │   ├── ForceDAGView.tsx         # Force-directed graph tree
-│   │   │   ├── MerkleTreeView.tsx       # Merkle tree visualization
 │   │   │   ├── NodeDetailModal.tsx      # Person details modal
 │   │   │   ├── NodeCard.tsx             # Tree node display card
+│   │   │   ├── HashBadge.tsx            # Hash display badge component
 │   │   │   ├── PersonHashCalculator.tsx # ZK hash calculator
 │   │   │   ├── PersonStoryCard.tsx      # Story display component
 │   │   │   ├── StoryChunksModal.tsx     # Story chunks editor
 │   │   │   ├── SecureKeyDerivation.tsx  # Passphrase derivation UI
 │   │   │   ├── SiteHeader.tsx           # Application header
+│   │   │   ├── Layout.tsx               # Main app layout wrapper
+│   │   │   ├── PageContainer.tsx        # Page container component
+│   │   │   ├── BottomNav.tsx            # Mobile bottom navigation
+│   │   │   ├── FloatingActionButton.tsx # Floating action button
 │   │   │   ├── WalletConnectButton.tsx  # Web3 wallet connection
+│   │   │   ├── NetworkSelectionLayer.tsx# Network selection overlay
+│   │   │   ├── WalletSelectionLayer.tsx # Wallet selection overlay
 │   │   │   ├── LanguageSwitch.tsx       # i18n language selector
 │   │   │   ├── HeaderControls.tsx       # Header control panel
+│   │   │   ├── Logo.tsx                 # App logo component
+│   │   │   ├── LogoWithBackground.tsx   # Logo with background
+│   │   │   ├── LoadingSkeleton.tsx      # Loading placeholder
+│   │   │   ├── ConfirmDialog.tsx        # Confirmation dialog
+│   │   │   ├── ToastProvider.tsx        # Toast notification provider
+│   │   │   ├── SortButton.tsx           # Sort control button
+│   │   │   ├── TreeDebugPanel.tsx       # Debug panel for tree data
+│   │   │   ├── WorkflowSection.tsx      # Workflow section component
 │   │   │   ├── ZKProofTest.tsx          # ZK proof testing component
+│   │   │   ├── home/                    # Home page components
+│   │   │   │   ├── Audience.tsx               # Target audience section
+│   │   │   │   ├── CallToAction.tsx           # CTA section
+│   │   │   │   ├── CoreFeatures.tsx           # Core features section
+│   │   │   │   ├── DynamicIcon.tsx            # Dynamic icon component
+│   │   │   │   ├── LoadingFallback.tsx        # Loading fallback
+│   │   │   │   ├── Tokenomics.tsx             # Token economics section
+│   │   │   │   ├── TwoLayerValueSystem.tsx    # Value system section
+│   │   │   │   └── ValuePropositions.tsx      # Value propositions
 │   │   │   └── modals/                  # Modal components
+│   │   │       ├── AddVersionModal.tsx        # Add version modal
+│   │   │       ├── EndorseModal.tsx           # Endorsement modal
+│   │   │       ├── EndorseCompactModal.tsx    # Compact endorsement modal
+│   │   │       ├── MintNFTModal.tsx           # NFT minting modal
+│   │   │       ├── NetworkSelectionModal.tsx  # Network selection modal
+│   │   │       └── WalletSelectionModal.tsx   # Wallet selection modal
 │   │   ├── pages/                 # Application routes
 │   │   │   ├── Home.tsx                 # Landing page
 │   │   │   ├── TreePage.tsx             # Family tree view page
@@ -157,25 +191,83 @@ DeepFamily/
 │   │   │   ├── PersonPage.tsx           # Person detail page
 │   │   │   ├── ActionsPage.tsx          # Action center page
 │   │   │   ├── StoryEditorPage.tsx      # Story editing page
-│   │   │   └── KeyDerivationPage.tsx    # Key derivation utility
+│   │   │   ├── KeyDerivationPage.tsx    # Key derivation utility
+│   │   │   └── DecryptMetadataPage.tsx  # Metadata decryption page
 │   │   ├── context/               # React Context state management
+│   │   │   ├── ConfigContext.tsx        # App configuration context
+│   │   │   ├── WalletContext.tsx        # Wallet connection context
+│   │   │   ├── TreeDataContext.tsx      # Tree data state context
+│   │   │   ├── NodeDetailContext.tsx    # Node detail state context
+│   │   │   ├── EndorseModalContext.tsx  # Endorsement modal context
+│   │   │   ├── FamilyTreeViewConfigContext.tsx # Tree view config
+│   │   │   └── VizOptionsContext.tsx    # Visualization options
 │   │   ├── hooks/                 # Custom React hooks
 │   │   │   ├── useContract.ts           # Contract interaction hook
+│   │   │   ├── useFamilyTreeViewModel.ts # Tree view model hook
 │   │   │   ├── useZoom.ts               # Zoom control hook
 │   │   │   ├── useMiniMap.ts            # Minimap functionality
 │   │   │   ├── useDebounce.ts           # Debounce utility hook
 │   │   │   └── useErrorMonitor.ts       # Error monitoring hook
-│   │   ├── lib/                   # Utility libraries
+│   │   ├── lib/                   # Core utility libraries
 │   │   │   ├── zk.ts                    # ZK proof generation utilities
+│   │   │   ├── zkSnark.ts               # ZK SNARK core utilities
+│   │   │   ├── zkWorkerClient.ts        # ZK Web Worker client
+│   │   │   ├── cryptoWorkerClient.ts    # Crypto Web Worker client
 │   │   │   ├── story.ts                 # Story sharding utilities
 │   │   │   ├── cid.ts                   # IPFS CID handling
 │   │   │   ├── errors.ts                # Error handling utilities
+│   │   │   ├── hooks.ts                 # Shared hook utilities
+│   │   │   ├── identityHash.ts          # Identity hash utilities
+│   │   │   ├── metadataCrypto.ts        # Metadata encryption/decryption
 │   │   │   ├── secureKeyDerivation.ts   # Key derivation functions
 │   │   │   └── passphraseStrength.ts    # Passphrase strength checker
+│   │   ├── layout/                # Layout algorithms
+│   │   │   ├── dagLayout.ts             # DAG layout algorithm
+│   │   │   ├── forceLayout.ts           # Force-directed layout
+│   │   │   └── treeLayout.ts            # Tree hierarchy layout
+│   │   ├── renderers/             # View renderers
+│   │   │   ├── dagRenderer.tsx          # DAG view renderer
+│   │   │   ├── forceGraphRenderer.ts    # Force graph renderer
+│   │   │   ├── treeLayoutRenderer.tsx   # Tree layout renderer
+│   │   │   ├── treeListRenderer.tsx     # Tree list renderer
+│   │   │   └── treeListRowRenderer.tsx  # Tree list row renderer
+│   │   ├── workers/               # Web Workers
+│   │   │   ├── zk.worker.ts             # ZK proof generation worker
+│   │   │   └── crypto.worker.ts         # Cryptographic operations worker
+│   │   ├── utils/                 # General utilities
+│   │   │   ├── deepFamilyApi.ts         # Contract API wrapper
+│   │   │   ├── treeData.ts              # Tree data processing
+│   │   │   ├── treeInvalidation.ts      # Tree cache invalidation
+│   │   │   ├── queryCache.ts            # Query caching utilities
+│   │   │   ├── queryKeys.ts             # Query key management
+│   │   │   ├── idbCache.ts              # IndexedDB caching
+│   │   │   ├── familyTreeNodeUi.ts      # Node UI utilities
+│   │   │   ├── familyTreeTheme.ts       # Theme configuration
+│   │   │   ├── provider.ts              # Provider utilities
+│   │   │   └── noPropsForwardRef.tsx    # Forward ref utility
+│   │   ├── types/                 # TypeScript types
+│   │   │   ├── familyTreeTypes.ts       # Family tree types
+│   │   │   ├── familyTreeViewHandle.ts  # View handle types
+│   │   │   ├── familyTreeViewProps.ts   # View props types
+│   │   │   ├── graph.ts                 # Graph data types
+│   │   │   └── treeStore.ts             # Tree store types
+│   │   ├── config/                # Configuration
+│   │   │   ├── networks.ts              # Network configurations
+│   │   │   ├── wallets.ts               # Wallet configurations
+│   │   │   ├── ipfs.ts                  # IPFS configuration
+│   │   │   ├── languages.ts             # Language settings
+│   │   │   ├── familyTreeConfig.ts      # Tree display config
+│   │   │   └── brandBadge.ts            # Brand badge config
+│   │   ├── constants/             # Constants
+│   │   │   ├── layout.ts                # Layout constants
+│   │   │   ├── genderColors.ts          # Gender color scheme
+│   │   │   ├── chunkTypes.ts            # Story chunk types
+│   │   │   ├── animationStyles.ts       # Animation definitions
+│   │   │   └── homeStyles.ts            # Home page styles
 │   │   ├── abi/                   # Contract ABIs (auto-synced)
 │   │   ├── locales/               # i18n translation files
 │   │   ├── i18n/                  # i18n configuration
-│   │   └── utils/                 # General utilities
+│   │   └── shims/                 # Module shims
 │   ├── scripts/
 │   │   ├── sync-abi.mjs               # ABI synchronization script
 │   │   └── update-local-config.mjs    # Local config generator
