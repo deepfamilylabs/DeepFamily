@@ -3,6 +3,12 @@ import forms from '@tailwindcss/forms'
 
 export default {
   darkMode: 'class',
+  safelist: [
+    {
+      pattern: /(text|fill|stroke)-(slate|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|stone|gray)-(50|100|200|300|400|500|600|700|800|900)(\/.*)?/,
+      variants: ['dark'],
+    },
+  ],
   content: [
     "./index.html",
     "./src/**/*.{ts,tsx}",
