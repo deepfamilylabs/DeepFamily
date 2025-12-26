@@ -222,10 +222,10 @@ export default function GlobalSidebar() {
       >
         {/* Mobile Header */}
         <div className="md:hidden p-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
-          <div className="flex items-center gap-3">
-            <Logo className="h-8 w-8 text-orange-500" />
-            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">
-              DeepFamily
+          <div className="flex items-center gap-1.5">
+            <Logo className="w-7 h-7 flex-shrink-0 text-orange-500" />
+            <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
+              Deepfamily
             </span>
           </div>
           <button

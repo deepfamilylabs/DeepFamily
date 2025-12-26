@@ -46,7 +46,7 @@ const SiteHeader = memo(() => {
         <div className="flex items-center">
           <button
             onClick={toggleMobileSidebar}
-            className="md:hidden p-2 -ml-2 mr-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            className="md:hidden p-2 -ml-2 mr-0 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             aria-label="Toggle sidebar"
           >
             <Menu className="w-6 h-6" />
