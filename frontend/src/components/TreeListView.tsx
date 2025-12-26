@@ -12,11 +12,13 @@ import type { TreeRow } from "../utils/treeData";
 import { useFamilyTreeViewModel } from "../hooks/useFamilyTreeViewModel";
 import TreeListRenderer from "../renderers/treeListRenderer";
 import { useFamilyTreeViewConfig } from "../context/FamilyTreeViewConfigContext";
+import { useColorTheme } from "../context/ColorThemeContext";
 import { noPropsForwardRef } from "../utils/noPropsForwardRef";
 import type { FamilyTreeViewHandle } from "../types/familyTreeViewHandle";
 
 const TreeListView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const { layout, height } = useFamilyTreeViewConfig();
+  const { theme } = useColorTheme();
   const rowHeight = layout.ROW_HEIGHT;
   const vm = useFamilyTreeViewModel();
   const { rootId } = vm;
@@ -70,6 +72,7 @@ const TreeListView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
       openNodeById={openNodeById}
       openEndorseById={openEndorseById}
       listRef={listRef}
+      themeName={theme}
     />
   );
 });

@@ -5,11 +5,13 @@ import { useFamilyTreeViewModel } from "../hooks/useFamilyTreeViewModel";
 import { computeTreeLayout, type TreePositionedNode } from "../layout/treeLayout";
 import { TreeLayoutDefs, TreeLayoutEdges, TreeLayoutNodes } from "../renderers/treeLayoutRenderer";
 import { useFamilyTreeViewConfig } from "../context/FamilyTreeViewConfigContext";
+import { useColorTheme } from "../context/ColorThemeContext";
 import { noPropsForwardRef } from "../utils/noPropsForwardRef";
 import type { FamilyTreeViewHandle } from "../types/familyTreeViewHandle";
 
 const TreeLayoutView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const { layout, height: responsiveHeight } = useFamilyTreeViewConfig();
+  const { theme } = useColorTheme();
   const vm = useFamilyTreeViewModel();
   const { graph, rootId, deduplicateChildren } = vm;
   const { selectedId } = vm;
@@ -102,6 +104,7 @@ const TreeLayoutView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
             setHoverId={setHoverId}
             deduplicateChildren={deduplicateChildren}
             actions={{ openNodeById, openEndorseById, copyHash }}
+            themeName={theme}
           />
         </g>
       </GraphViewport>

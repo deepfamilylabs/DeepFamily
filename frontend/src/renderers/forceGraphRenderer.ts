@@ -50,7 +50,7 @@ export type ForceGraphMiniNode = { id: string; x: number; y: number };
 
 export type ForceGraphScene = {
   stop: () => void;
-  updateUi: (nodeUiById: Record<string, NodeUi>, selectedId: string | null) => void;
+  updateUi: (nodeUiById: Record<string, NodeUi>, selectedId: string | null, themeName?: string) => void;
   getMiniMapNodes: () => ForceGraphMiniNode[];
   getNodePosition: (id: string) => { x: number; y: number } | null;
   simulation: d3.Simulation<ForceNode, ForceLink>;
@@ -242,14 +242,14 @@ export function mountForceGraphScene(params: {
     onTick?.();
   });
 
-  const updateUi = (uiById: Record<string, NodeUi>, selId: string | null) => {
+  const updateUi = (uiById: Record<string, NodeUi>, selId: string | null, themeName?: string) => {
     const nodeGroups = root.selectAll<SVGGElement, ForceNode>('g[data-ft-node="1"]');
     nodeGroups.each(function (d: any) {
       const sim = d as ForceNode;
       const id = sim.id as any;
       const ui = uiById[id];
       if (!ui) return;
-      const theme = getFamilyTreeNodeTheme({ minted: Boolean(ui.minted), selected: id === selId });
+      const theme = getFamilyTreeNodeTheme({ minted: Boolean(ui.minted), selected: id === selId, themeName });
       const g = d3.select(this);
 
       g.select<SVGCircleElement>('circle[data-ft="base"]')

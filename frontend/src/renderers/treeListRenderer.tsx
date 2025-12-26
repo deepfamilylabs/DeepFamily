@@ -20,6 +20,7 @@ export default function TreeListRenderer(props: {
   openNodeById: (id: NodeId) => void;
   openEndorseById: (id: NodeId) => void;
   listRef?: React.Ref<VirtualListHandle>;
+  themeName?: string;
 }) {
   const {
     height,
@@ -32,6 +33,7 @@ export default function TreeListRenderer(props: {
     openNodeById,
     openEndorseById,
     listRef,
+    themeName,
   } = props;
 
   const Row = useCallback(
@@ -48,10 +50,11 @@ export default function TreeListRenderer(props: {
           nodeUiById={nodeUiById}
           openNodeById={openNodeById}
           openEndorseById={openEndorseById}
+          themeName={themeName}
         />
       );
     },
-    [expanded, nodeUiById, openEndorseById, openNodeById, rowHeight, rows, selectedKey, toggle],
+    [expanded, nodeUiById, openEndorseById, openNodeById, rowHeight, rows, selectedKey, toggle, themeName],
   );
 
   return (

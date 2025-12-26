@@ -16,11 +16,13 @@ import {
   type ForceGraphScene,
 } from "../renderers/forceGraphRenderer";
 import { useFamilyTreeViewConfig } from "../context/FamilyTreeViewConfigContext";
+import { useColorTheme } from "../context/ColorThemeContext";
 import { noPropsForwardRef } from "../utils/noPropsForwardRef";
 import type { FamilyTreeViewHandle } from "../types/familyTreeViewHandle";
 
 const ForceGraphView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const { layout, height } = useFamilyTreeViewConfig();
+  const { theme } = useColorTheme();
   const vm = useFamilyTreeViewModel();
   const { graph } = vm;
   const graphRef = useRef(graph);
@@ -103,8 +105,8 @@ const ForceGraphView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   }, [height, structureKey]);
 
   useEffect(() => {
-    sceneRef.current?.updateUi(vm.nodeUiById, selectedId);
-  }, [selectedId, vm.nodeUiById]);
+    sceneRef.current?.updateUi(vm.nodeUiById, selectedId, theme);
+  }, [selectedId, vm.nodeUiById, theme]);
 
   const [miniNodes, setMiniNodes] = useState<ForceGraphMiniNode[]>([]);
   const refreshMiniNodes = useCallback(() => {

@@ -5,6 +5,7 @@ import TreeListView from "./TreeListView";
 import { NodeDetailProvider } from "../context/NodeDetailContext";
 import { EndorseModalProvider } from "../context/EndorseModalContext";
 import { FamilyTreeViewConfigProvider } from "../context/FamilyTreeViewConfigContext";
+import ColorPalette from "./ColorPalette";
 
 const ForceGraphView = React.lazy(() => import("./ForceGraphView"));
 const DagView = React.lazy(() => import("./DagView"));
@@ -65,6 +66,11 @@ export default function ViewContainer({
           <ViewModeSwitch value={viewMode} onChange={onViewModeChange} labels={viewModeLabels} />
         </div>
       )}
+
+      {/* Color Palette - positioned top-left */}
+      <div className="absolute top-4 left-4 z-30 hidden md:block">
+        <ColorPalette />
+      </div>
 
       <EndorseModalProvider>
         <NodeDetailProvider>

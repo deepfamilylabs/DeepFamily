@@ -58,6 +58,7 @@ export function TreeLayoutNodes(props: {
     openEndorseById: (id: NodeId) => void;
     copyHash: (personHash: string) => void;
   };
+  themeName?: string;
 }) {
   const {
     nodes,
@@ -69,6 +70,7 @@ export function TreeLayoutNodes(props: {
     setHoverId,
     deduplicateChildren,
     actions,
+    themeName,
   } = props;
   return (
     <g>
@@ -106,6 +108,7 @@ export function TreeLayoutNodes(props: {
               endorsementCount={ui.endorsementCount}
               totalVersions={totalVersions}
               onEndorseClick={handleEndorse}
+              themeName={themeName}
             />
           </g>
         );
