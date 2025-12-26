@@ -575,7 +575,8 @@
     "copy": "コピー",
     "copied": "コピー済み",
     "na": "無",
-    "retry": "再試行"
+    "retry": "再試行",
+    "loadingMore": "さらに読み込む..."
   },
   "wallet": {
     "connect": "ウォレット接続",
