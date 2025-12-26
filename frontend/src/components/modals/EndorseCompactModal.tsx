@@ -339,168 +339,191 @@ export default function EndorseCompactModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/70 dark:border-gray-700/70 shadow-2xl p-6 space-y-6"
+        className="w-full max-w-md bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-8 relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 text-white flex items-center justify-center shadow-lg">
-              <Star className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {t("endorse.quickTitle", "Endorse Version")}
-              </h2>
-            </div>
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+          aria-label={t("common.close", "Close")}
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Header Section */}
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
+            <Star className="w-8 h-8 fill-current" />
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-            aria-label={t("common.close", "Close")}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+              {t("endorse.quickTitle", "Endorse Version")}
+            </h2>
+          </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/60 px-4 py-3 space-y-3">
-          <div className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {t("endorse.targetVersion", "Target Version")}
-          </div>
-          <div className="space-y-2 text-sm text-gray-900 dark:text-gray-100">
-            <div className="font-medium truncate">
-              {displayName || t("endorse.personHash", "Person Hash")}
+        {/* Content Section */}
+        <div className="space-y-4">
+          {/* Target Info */}
+          <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-5 border border-gray-100 dark:border-white/5 transition-colors hover:border-gray-200 dark:hover:border-white/10 space-y-4">
+            <div>
+              <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                {t("endorse.personHash", "Person Hash")}
+              </div>
+              <code className="block font-mono text-xs text-gray-600 dark:text-gray-300 break-all bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-100 dark:border-white/5">
+                {personHash}
+              </code>
             </div>
-            <code className="block text-xs font-mono text-gray-700 dark:text-gray-200 break-all">
-              {personHash}
-            </code>
-            <code className="block text-xs font-mono text-gray-700 dark:text-gray-200 break-all">
-              v{versionIndex}
-            </code>
+
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                  {t("addVersion.versionIndex", "Version Index")}
+                </div>
+                <div className="font-mono text-lg font-semibold text-gray-900 dark:text-white">
+                  {versionIndex}
+                </div>
+              </div>
+              {endorsementCount !== null && (
+                <div className="text-right">
+                  <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                    {t("search.endorsementQuery.endorsementCount", "Endorsements")}
+                  </div>
+                  <div className="font-mono text-lg font-semibold text-gray-900 dark:text-white">
+                    {endorsementCount}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          {endorsementCount !== null && (
-            <div className="text-xs text-emerald-600 dark:text-emerald-400">
-              {t("endorse.currentCount", "Current endorsements")}: {endorsementCount}
+
+          {/* Token Info */}
+          {(endorsementFee || userBalance) && (
+            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-5 border border-gray-100 dark:border-white/5">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <Coins className="w-4 h-4 text-orange-500" />
+                <span>DEEP {t("endorse.tokenInfo", "Token Info")}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {endorsementFee && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {t("endorse.fee", "Fee")}
+                    </div>
+                    <div className="font-mono font-medium text-gray-900 dark:text-white">
+                      {endorsementFee} DEEP
+                    </div>
+                  </div>
+                )}
+                {userBalance && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {t("endorse.yourBalance", "Your Balance")}
+                    </div>
+                    <div
+                      className={`font-mono font-medium ${
+                        canAfford ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {userBalance} DEEP
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!canAfford && (
+                <div className="mt-3 flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {t("endorse.needMoreTokens", "You need more DEEP tokens to endorse this version")}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Token Balance & Fee Info */}
-        {(endorsementFee || userBalance) && (
-          <div className="rounded-xl border border-purple-200 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-900/20 px-4 py-3 space-y-2">
-            <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
-              <Coins className="w-4 h-4" />
-              <span className="font-medium">DEEP {t("endorse.tokenInfo", "Token Info")}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {endorsementFee && (
-                <div className="flex flex-col">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {t("endorse.fee", "Fee")}
-                  </span>
-                  <span className="font-mono text-purple-700 dark:text-purple-300">
-                    {endorsementFee} DEEP
-                  </span>
-                </div>
-              )}
-              {userBalance && (
-                <div className="flex flex-col">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {t("endorse.yourBalance", "Your Balance")}
-                  </span>
-                  <span
-                    className={`font-mono ${canAfford ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
-                  >
-                    {userBalance} DEEP
-                  </span>
-                </div>
-              )}
-            </div>
-            {!canAfford && (
-              <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 mt-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>
-                  {t("endorse.needMoreTokens", "You need more DEEP tokens to endorse this version")}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Status panel - only show when not insufficient balance (that's shown above) */}
-        {!(state === "error" && isInsufficientBalance) && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
-            {(state === "checking" || state === "approving" || state === "working") && (
-              <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <div className="flex-1">
-                  <span className="text-sm">{getStatusMessage()}</span>
-                  {state === "approving" && (
-                    <div className="flex items-center gap-1.5 mt-1 text-xs text-blue-500 dark:text-blue-300">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>{t("endorse.confirmInWallet", "Please confirm in your wallet")}</span>
+        {/* Status & Actions */}
+        <div className="pt-2">
+          {!(state === "error" && isInsufficientBalance) && (
+            <div className="text-center">
+              {(state === "checking" || state === "approving" || state === "working") && (
+                <div className="flex flex-col items-center gap-3 animate-pulse">
+                  <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                  <div className="space-y-1">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {getStatusMessage()}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
-            {(state === "success" || state === "already-endorsed") && (
-              <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
-                <Check className="w-5 h-5" />
-                <div>
-                  <div className="text-sm font-medium">
-                    {state === "already-endorsed"
-                      ? t("endorse.alreadyEndorsed", "You already endorsed this version")
-                      : t("endorse.success", "Endorsed successfully")}
+                    {state === "approving" && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>{t("endorse.confirmInWallet", "Please confirm in your wallet")}</span>
+                      </div>
+                    )}
                   </div>
-                  {state === "success" && txHash && (
-                    <code className="block text-xs font-mono text-gray-700 dark:text-gray-200 break-all">
-                      {txHash}
-                    </code>
-                  )}
                 </div>
-              </div>
-            )}
-            {state === "error" && !isInsufficientBalance && (
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <div className="flex-1 text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">
+              )}
+
+              {(state === "success" || state === "already-endorsed") && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <Check className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white text-lg">
+                      {state === "already-endorsed"
+                        ? t("endorse.alreadyEndorsed", "You already endorsed this version")
+                        : t("endorse.success", "Endorsed successfully")}
+                    </div>
+                    {state === "success" && txHash && (
+                      <code className="block mt-2 text-xs font-mono text-gray-500 break-all">
+                        {txHash}
+                      </code>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {state === "error" && !isInsufficientBalance && (
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center gap-2 text-red-600 dark:text-red-400">
+                    <AlertCircle className="w-8 h-8" />
+                    <div className="text-sm text-center max-w-[280px] mx-auto">
                       {errorMessage ||
                         t("endorse.transactionFailed", "Transaction failed. Please try again.")}
-                    </span>
+                    </div>
                   </div>
+                  {hasValidTarget && (
+                    <button
+                      onClick={() => {
+                        setHasTriggered(false);
+                        setState("idle");
+                        setErrorMessage(null);
+                        setIsInsufficientBalance(false);
+                        setTimeout(() => setHasTriggered(false), 0);
+                      }}
+                      disabled={isProcessing}
+                      className="w-full py-3 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {t("common.retry", "Retry")}
+                    </button>
+                  )}
                 </div>
-                {hasValidTarget && (
-                  <button
-                    onClick={() => {
-                      setHasTriggered(false);
-                      setState("idle");
-                      setErrorMessage(null);
-                      setIsInsufficientBalance(false);
-                      // Trigger will happen via useEffect
-                      setTimeout(() => setHasTriggered(false), 0);
-                    }}
-                    className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 transition"
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {t("common.retry", "Retry")}
-                  </button>
-                )}
-              </div>
-            )}
-            {state === "idle" && (
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {t("endorse.quickWaiting", "Preparing endorsement...")}
-              </div>
-            )}
-          </div>
-        )}
+              )}
+
+              {state === "idle" && (
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {t("endorse.quickWaiting", "Preparing endorsement...")}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>,
     document.body,
