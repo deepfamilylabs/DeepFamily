@@ -576,7 +576,8 @@
     "copy": "复制",
     "copied": "已复制",
     "na": "无",
-    "retry": "重试"
+    "retry": "重试",
+    "loadingMore": "加载更多..."
   },
   "wallet": {
     "connect": "连接钱包",

@@ -424,7 +424,7 @@
     "offset": "Offset"
   },
   "familyTree": {
-    "title": "FamilyTree",
+    "title": "Visualization",
     "viewModes": {
       "tree": "Tree Layout",
       "dag": "DAG",
@@ -576,7 +576,8 @@
     "copy": "Copy",
     "copied": "Copied",
     "na": "N/A",
-    "retry": "Retry"
+    "retry": "Retry",
+    "loadingMore": "Loading more..."
   },
   "wallet": {
     "connect": "Connect Wallet",
