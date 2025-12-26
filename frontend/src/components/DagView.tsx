@@ -13,11 +13,13 @@ import { useFamilyTreeViewModel } from "../hooks/useFamilyTreeViewModel";
 import { computeDagLayout } from "../layout/dagLayout";
 import { DagDefs, DagEdges, DagNodes } from "../renderers/dagRenderer";
 import { useFamilyTreeViewConfig } from "../context/FamilyTreeViewConfigContext";
+import { useColorTheme } from "../context/ColorThemeContext";
 import { noPropsForwardRef } from "../utils/noPropsForwardRef";
 import type { FamilyTreeViewHandle } from "../types/familyTreeViewHandle";
 
 const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const vm = useFamilyTreeViewModel();
+  const { theme } = useColorTheme();
   const { layout, height: responsiveHeight } = useFamilyTreeViewConfig();
   const nodeWidth = layout.DAG_NODE_WIDTH;
   const nodeHeight = layout.DAG_NODE_HEIGHT;
@@ -161,6 +163,7 @@ const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
             deduplicateChildren={deduplicateChildren}
             actions={{ openNodeById, openEndorseById }}
             textRefs={textRefs}
+            themeName={theme}
           />
         </g>
       </GraphViewport>

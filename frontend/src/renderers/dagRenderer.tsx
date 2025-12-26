@@ -71,6 +71,7 @@ export function DagNodes(props: {
     openEndorseById: (id: NodeId) => void;
   };
   textRefs: React.MutableRefObject<Record<string, SVGTextElement | null>>;
+  themeName?: string;
 }) {
   const {
     nodes,
@@ -85,6 +86,7 @@ export function DagNodes(props: {
     deduplicateChildren,
     actions,
     textRefs,
+    themeName,
   } = props;
   return (
     <>
@@ -135,6 +137,7 @@ export function DagNodes(props: {
               endorsementCount={ui.endorsementCount}
               totalVersions={totalVersions}
               onEndorseClick={() => actions.openEndorseById(n.id)}
+              themeName={themeName}
             />
           </g>
         );

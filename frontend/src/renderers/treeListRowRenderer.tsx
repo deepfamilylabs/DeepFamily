@@ -2,6 +2,7 @@ import React from "react";
 import type { ListChildComponentProps } from "react-window";
 import type { NodeId } from "../types/graph";
 import { getGenderColor } from "../constants/genderColors";
+import { getFamilyTreeNodeTheme } from "../utils/familyTreeTheme";
 import type { TreeRow } from "../utils/treeData";
 import type { NodeUi } from "../utils/familyTreeNodeUi";
 
@@ -15,6 +16,7 @@ export default function TreeListRowRenderer(
     nodeUiById: Record<NodeId, NodeUi>;
     openNodeById: (id: NodeId) => void;
     openEndorseById: (id: NodeId) => void;
+    themeName?: string;
   },
 ) {
   const {
@@ -28,6 +30,7 @@ export default function TreeListRowRenderer(
     nodeUiById,
     openNodeById,
     openEndorseById,
+    themeName,
   } = props;
   const row = rows[index];
   const { nodeId, depth, isLast, hasChildren } = row;
@@ -37,6 +40,8 @@ export default function TreeListRowRenderer(
   const mintedFlag = ui.minted;
   const gender = ui.gender as number | undefined;
   const isSel = selectedKey === nodeId;
+
+  const theme = getFamilyTreeNodeTheme({ minted: mintedFlag, selected: isSel, themeName });
 
   const ancestorGuides: boolean[] = [];
   if (depth > 0) {
@@ -106,8 +111,8 @@ export default function TreeListRowRenderer(
         </div>
 
         <div className="flex items-center gap-2 flex-wrap min-w-max">
-          <span className="text-slate-600 dark:text-slate-300">{ui.shortHashText}</span>
-          <span className="text-sky-600 dark:text-sky-400">{ui.versionTextWithTotal}</span>
+          <span className={theme.shortHashText.html}>{ui.shortHashText}</span>
+          <span className={theme.versionText.html}>{ui.versionTextWithTotal}</span>
           {endorse !== undefined && (
             <button
               type="button"
@@ -131,11 +136,11 @@ export default function TreeListRowRenderer(
               >
                 <path
                   d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15l-5.2 2.8 1-5.9-4.3-4.2 5.9-.9L10 1.5z"
-                  className={mintedFlag ? "fill-emerald-500" : "fill-slate-500"}
+                  className={theme.endorseStarClass}
                 />
               </svg>
               <span
-                className={`font-mono text-[12px] ${mintedFlag ? "text-emerald-700 dark:text-emerald-300" : "text-slate-700 dark:text-slate-300"}`}
+                className={`font-mono text-[12px] ${theme.endorseCountText.html}`}
               >
                 {endorse}
               </span>
@@ -143,7 +148,7 @@ export default function TreeListRowRenderer(
           )}
           {mintedFlag && (
             <>
-              <span className="text-[10px] px-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/40">
+              <span className={`text-[10px] px-1 rounded ${theme.tagBadgeBgClass.replace("fill-", "bg-")} ${theme.tagBadgeText.html} border border-emerald-300 dark:border-emerald-700/40`}>
                 NFT
               </span>
               <span
@@ -161,7 +166,7 @@ export default function TreeListRowRenderer(
           )}
           {ui.tagText && (
             <span
-              className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/40 px-1 rounded"
+              className={`text-xs ${theme.tagBadgeText.html} ${theme.tagBadgeBgClass.replace("fill-", "bg-")} border border-blue-200 dark:border-blue-700/40 px-1 rounded`}
               title={ui.tagText}
             >
               {ui.tagText}
