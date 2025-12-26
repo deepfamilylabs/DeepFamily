@@ -1,4 +1,4 @@
-import { useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
+import { memo, useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useTreeData } from "../context/TreeDataContext";
 import {
@@ -28,10 +28,10 @@ import EndorseCompactModal from "./modals/EndorseCompactModal";
 
 interface PersonStoryCardProps {
   person: NodeData;
-  onClick: () => void;
+  onOpen: (person: NodeData) => void;
 }
 
-export default function PersonStoryCard({ person, onClick }: PersonStoryCardProps) {
+function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
   const { t } = useTranslation();
   const { preloadStoryData, bumpEndorsementCount } = useTreeData();
   const [showEndorseModal, setShowEndorseModal] = useState(false);
@@ -83,7 +83,7 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
   return (
     <div
       onMouseEnter={handleMouseEnter}
-      onClick={onClick}
+      onClick={() => onOpen(person)}
       className="group relative flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden"
     >
       {/* Top accent light - subtle gradient line */}
@@ -214,20 +214,24 @@ export default function PersonStoryCard({ person, onClick }: PersonStoryCardProp
           </div>
         </div>
       </div>
-      <EndorseCompactModal
-        isOpen={showEndorseModal}
-        onClose={() => setShowEndorseModal(false)}
-        personHash={person.personHash}
-        versionIndex={Number(person.versionIndex || 1)}
-        versionData={{
-          fullName: person.fullName,
-          endorsementCount,
-        }}
-        onSuccess={() => {
-          setEndorsementCount((c) => c + 1);
-          bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1);
-        }}
-      />
+      {showEndorseModal ? (
+        <EndorseCompactModal
+          isOpen={true}
+          onClose={() => setShowEndorseModal(false)}
+          personHash={person.personHash}
+          versionIndex={Number(person.versionIndex || 1)}
+          versionData={{
+            fullName: person.fullName,
+            endorsementCount,
+          }}
+          onSuccess={() => {
+            setEndorsementCount((c) => c + 1);
+            bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
+
+export default memo(PersonStoryCard);

@@ -18,6 +18,7 @@ export interface NodeCardProps {
   endorsementCount?: number;
   totalVersions?: number; // Total number of versions for this person
   onEndorseClick?: () => void;
+  themeName?: string;
 }
 
 const PADDING_X = 12;
@@ -65,12 +66,13 @@ export default function NodeCard(props: NodeCardProps) {
     endorsementCount,
     totalVersions,
     onEndorseClick,
+    themeName,
   } = props;
 
   // Only show badge when totalVersions is explicitly passed (deduplicate mode) and > 1
   const hasMultipleVersions = typeof totalVersions === "number" && totalVersions > 1;
 
-  const theme = getFamilyTreeNodeTheme({ minted, selected });
+  const theme = getFamilyTreeNodeTheme({ minted, selected, themeName });
   const baseRect = theme.baseShapeClass;
   const hoverStroke = !selected && hover ? "stroke-blue-500 dark:stroke-blue-400" : "";
   const cardShadow = hover ? "shadow-lg" : "shadow-md";
@@ -194,17 +196,7 @@ export default function NodeCard(props: NodeCardProps) {
         </>
       )}
 
-      {/* Divider line (if title exists, moves up with height compression, at most below body upper boundary) */}
-      {hasTitle && dividerSafeY > TITLE_START_Y + 2 && (
-        <line
-          x1={PADDING_X}
-          x2={w - PADDING_X}
-          y1={dividerSafeY}
-          y2={dividerSafeY}
-          className="stroke-slate-200 dark:stroke-slate-700"
-          strokeWidth={1}
-        />
-      )}
+      {/* Divider line removed for a cleaner look */}
 
       {/* Additional NFT information */}
       {minted && (birthPlace || birthDateText) && (
@@ -218,7 +210,7 @@ export default function NodeCard(props: NodeCardProps) {
               pointerEvents="none"
             >
               <div
-                className={`font-sans text-[12px] leading-[16px] ${minted ? "text-emerald-700 dark:text-emerald-300" : "text-slate-700 dark:text-slate-300"} overflow-hidden text-ellipsis whitespace-nowrap`}
+                className={`font-sans text-[12px] leading-[16px] ${theme.infoText.html} overflow-hidden text-ellipsis whitespace-nowrap`}
               >
                 {birthPlace}
               </div>
@@ -229,7 +221,7 @@ export default function NodeCard(props: NodeCardProps) {
               <tspan
                 x={PADDING_X}
                 y={bodyY2}
-                className={`text-[12px] ${minted ? "fill-emerald-600 dark:fill-emerald-400" : "fill-slate-600 dark:fill-slate-400"}`}
+                className={`text-[12px] ${theme.infoText.svg}`}
               >
                 {birthDateText}
               </tspan>
