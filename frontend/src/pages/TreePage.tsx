@@ -1,28 +1,36 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ViewContainer from "../components/ViewContainer";
 import { useTreeData } from "../context/TreeDataContext";
-import { useVizOptions } from "../context/VizOptionsContext";
 import { useConfig } from "../context/ConfigContext";
 import TreeDebugPanel from "../components/TreeDebugPanel";
 import ViewModeSwitch from "../components/ViewModeSwitch";
-import { Activity, Layers } from "lucide-react";
+import { Activity, Layers, GitMerge } from "lucide-react";
+import { ColorThemeProvider } from "../context/ColorThemeContext";
 
+/**
+ * TreePage is intentionally a thin UI shell. The actual "data -> UI" pipeline is:
+ *
+ * Data (L3) — `frontend/src/context/TreeDataContext.tsx`:
+ * - JSON-RPC / on-chain reads (ethers) for nodes + edges + details.
+ *
+ * Caching (L1/L2):
+ * - L1 in-memory `QueryCache` (`frontend/src/utils/queryCache.ts`): TTL + inflight de-dupe.
+ * - L2 optional IndexedDB (`frontend/src/utils/idbCache.ts`): persisted `nodesData` + edge stores,
+ *   hydrated async and then revalidated.
+ *
+ * Projection (view-model) — `frontend/src/hooks/useFamilyTreeViewModel.ts` + `frontend/src/utils/treeData.ts`:
+ * - Builds a *projected graph* via `buildViewGraphData()` (childrenMode + strictIncludeUnversionedChildren +
+ *   optional sibling dedup by endorsements).
+ *
+ * Rendering (UI) — `frontend/src/components/ViewContainer.tsx`:
+ * - Swaps view implementations (Tree/DAG/Force/Virtual), all consuming the same projected graph.
+ */
 function toBool(val: any) {
   return val === "1" || val === "true" || val === true || val === "yes";
 }
 
-export default function TreePage() {
-  const {
-    traversal,
-    setTraversal,
-    deduplicateChildren,
-    setDeduplicateChildren,
-    childrenMode,
-    setChildrenMode,
-    strictIncludeUnversionedChildren,
-    setStrictIncludeUnversionedChildren,
-  } = useVizOptions();
+function usePersistedViewMode() {
   const [viewMode, setViewMode] = useState<"dag" | "tree" | "force" | "virtual">(() => {
     const preferFlat = toBool((import.meta as any).env.VITE_USE_FLAT_TREE);
     if (typeof window !== "undefined") {
@@ -33,7 +41,17 @@ export default function TreePage() {
     return preferFlat ? "virtual" : "tree";
   });
 
-  const { t, i18n } = useTranslation();
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("df:viewMode", viewMode);
+  }, [viewMode]);
+
+  return { viewMode, setViewMode };
+}
+
+export default function TreePage() {
+  const { viewMode, setViewMode } = usePersistedViewMode();
+
+  const { t } = useTranslation();
   const {
     rootId,
     rootExists,
@@ -43,7 +61,8 @@ export default function TreePage() {
     refresh,
     clearAllCaches,
   } = useTreeData();
-  const { contractAddress, rootHash, rootVersionIndex, defaults, update } = useConfig();
+  const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, defaults, update } =
+    useConfig();
   const forceEnvConfigSync = useMemo(
     () => toBool((import.meta as any).env.VITE_FORCE_ENV_CONFIG_SYNC),
     [],
@@ -52,25 +71,56 @@ export default function TreePage() {
 
   useEffect(() => {
     if (!forceEnvConfigSync) return;
+    const envRpcUrl = (defaults.rpcUrl || "").trim();
     const envContract = (defaults.contractAddress || "").trim();
     const envRootHash = (defaults.rootHash || "").trim();
-    const envRootVersion = defaults.rootVersionIndex;
-    if (!envContract) return;
+    const envRootVersion = Number(defaults.rootVersionIndex);
+    const envChainId = Number(defaults.chainId);
 
-    const matchesContract =
-      envContract.toLowerCase() === (contractAddress || "").trim().toLowerCase();
-    if (matchesContract) return;
+    // Nothing to enforce.
+    if (!envRpcUrl && !envContract) return;
 
+    const nextUpdate: any = {};
+    const normalize = (v: string) => v.trim();
+    const normalizeAddr = (v: string) => normalize(v).toLowerCase();
+    const normalizeHash = (v: string) => normalize(v).toLowerCase();
+    const isValidRootHash = (v: string) => /^0x[a-fA-F0-9]{64}$/.test(v);
+
+    if (envRpcUrl && normalize(envRpcUrl) !== normalize(rpcUrl || "")) nextUpdate.rpcUrl = envRpcUrl;
+    if (Number.isFinite(envChainId) && envChainId > 0 && envChainId !== Number(chainId || 0)) {
+      nextUpdate.chainId = envChainId;
+    }
+    if (envContract && normalizeAddr(envContract) !== normalizeAddr(contractAddress || "")) {
+      nextUpdate.contractAddress = envContract;
+    }
+    const hasEnvRoot = isValidRootHash(envRootHash);
+    if (hasEnvRoot && normalizeHash(envRootHash) !== normalizeHash(rootHash || "")) {
+      nextUpdate.rootHash = envRootHash;
+    }
+    if (
+      hasEnvRoot &&
+      Number.isFinite(envRootVersion) &&
+      envRootVersion >= 1 &&
+      envRootVersion !== Number(rootVersionIndex || 0)
+    ) {
+      nextUpdate.rootVersionIndex = envRootVersion;
+    }
+
+    if (!Object.keys(nextUpdate).length) return;
+
+    // Important: clear old namespace caches BEFORE updating config.
     clearAllCaches();
-    const nextUpdate: any = { contractAddress: envContract, rootVersionIndex: envRootVersion };
-    if (envRootHash) nextUpdate.rootHash = envRootHash;
     update(nextUpdate);
     refresh();
   }, [
     forceEnvConfigSync,
+    defaults.rpcUrl,
     defaults.contractAddress,
     defaults.rootHash,
     defaults.rootVersionIndex,
+    defaults.chainId,
+    rpcUrl,
+    chainId,
     contractAddress,
     rootHash,
     rootVersionIndex,
@@ -79,14 +129,9 @@ export default function TreePage() {
     refresh,
   ]);
 
-  const triggerRefresh = useCallback(() => refresh(), [refresh]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") localStorage.setItem("df:viewMode", viewMode);
-  }, [viewMode]);
-
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-white dark:bg-black">
+    <ColorThemeProvider>
+      <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-white dark:bg-black">
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Top Toolbar */}
@@ -101,10 +146,11 @@ export default function TreePage() {
             <div className="hidden md:flex items-center gap-3 text-xs font-medium">
               <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" />
-                <span>Nodes: {progress?.created || 0}</span>
+                <span>{t("familyTree.ui.nodesLabelFull")}: {progress?.created || 0}</span>
               </span>
-              <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                Depth: {progress?.depth || 0}
+              <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                <GitMerge className="w-3.5 h-3.5" />
+                <span>{t("familyTree.ui.depthLabelFull")}: {progress?.depth || 0}</span>
               </span>
               {/* Refresh Button */}
               <button
@@ -173,8 +219,9 @@ export default function TreePage() {
               <Activity className="w-3 h-3" />
               <span>{progress?.created || 0}</span>
             </span>
-            <span className="px-2 py-1 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 shadow-sm backdrop-blur-sm">
-              D:{progress?.depth || 0}
+            <span className="px-2 py-1 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 flex items-center gap-1 shadow-sm backdrop-blur-sm">
+              <GitMerge className="w-3 h-3" />
+              <span>{progress?.depth || 0}</span>
             </span>
             <button
               onClick={refresh}
@@ -240,5 +287,6 @@ export default function TreePage() {
         </div>
       ) : null}
     </div>
+    </ColorThemeProvider>
   );
 }

@@ -1,9 +1,10 @@
-import { useState, useMemo, useLayoutEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, Users, User, Hash, X, Plus, BookOpen } from "lucide-react";
 import { NodeData, isMinted } from "../types/graph";
 import { useTreeData } from "../context/TreeDataContext";
+import { useFamilyTreeProjection } from "../hooks/useFamilyTreeProjection";
 import PersonStoryCard from "../components/PersonStoryCard";
 import StoryChunksModal from "../components/StoryChunksModal";
 import PageContainer from "../components/PageContainer";
@@ -14,7 +15,9 @@ type SortOrder = "asc" | "desc";
 
 export default function PeoplePage() {
   const { t } = useTranslation();
-  const { nodesData, loading, getNodeByTokenId, reachableNodeIds } = useTreeData();
+  const { nodesData, loading } = useTreeData();
+  const [projectionEnabled, setProjectionEnabled] = useState(false);
+  const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();
   const navigate = useNavigate();
   // Track whether modal was opened by clicking inside this page
@@ -28,6 +31,16 @@ export default function PeoplePage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [addressInput, setAddressInput] = useState("");
   const [tagInput, setTagInput] = useState("");
+  const [personQueryError, setPersonQueryError] = useState<string | null>(null);
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Avoid blocking the navigation paint: enable heavy projection work one frame later.
+  useEffect(() => {
+    const handle = window.requestAnimationFrame(() => setProjectionEnabled(true));
+    return () => window.cancelAnimationFrame(handle);
+  }, []);
 
   // Handle adding addresses
   const handleAddressKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -69,84 +82,103 @@ export default function PeoplePage() {
     setSelectedTags((prev) => prev.filter((t) => t !== tag));
   };
 
-  // Get person data from TreeDataContext, only show people from root subtree with NFTs
+  // Get person data from the SAME tree projection as TreePage.
+  // This ensures the People page strictly follows the projected tree (childrenMode/dedup/etc).
   const people = useMemo(() => {
-    const subtreePeopleWithNFTs = reachableNodeIds
-      .map((id) => nodesData[id])
-      .filter((person) => person && isMinted(person));
+    return graph.nodes
+      .map((n) => nodesData[n.id])
+      .filter((person): person is NodeData => !!person && isMinted(person));
+  }, [graph.nodes, nodesData]);
 
-    // Group by personHash to get unique people (since one person can have multiple NFT versions)
-    const uniquePeopleMap = new Map<string, NodeData>();
+  const projectedLookup = useMemo(() => {
+    const byId = new Map<string, NodeData>();
+    const byTokenId = new Map<string, NodeData>();
+    const byHash = new Map<string, NodeData>();
+    for (const p of people) {
+      byId.set(String(p.id), p);
+      if (p.tokenId) byTokenId.set(String(p.tokenId), p);
+      if (p.personHash) byHash.set(String(p.personHash).toLowerCase(), p);
+    }
+    return { byId, byTokenId, byHash };
+  }, [people]);
 
-    subtreePeopleWithNFTs.forEach((person) => {
-      const personHash = person.personHash;
-      // If we haven't seen this personHash before, or if this version has more story chunks, use this version
-      const existing = uniquePeopleMap.get(personHash);
-      if (
-        !existing ||
-        (person.storyMetadata?.totalChunks || 0) > (existing.storyMetadata?.totalChunks || 0)
-      ) {
-        uniquePeopleMap.set(personHash, person);
-      }
-    });
-
-    return Array.from(uniquePeopleMap.values());
-  }, [nodesData, reachableNodeIds]);
+  const clearPersonQuery = useCallback(() => {
+    const sp = new URLSearchParams(location.search);
+    sp.delete("person");
+    navigate({ pathname: location.pathname, search: sp.toString() }, { replace: true });
+    setPersonQueryError(null);
+  }, [location.pathname, location.search, navigate]);
 
   const data = useMemo(() => {
-    // Calculate total NFT count from subtree only
-    const totalNFTs = reachableNodeIds.reduce(
-      (acc, id) => (isMinted(nodesData[id]) ? acc + 1 : acc),
-      0,
-    );
+    // Calculate total NFT count from the projected tree only (matches TreePage projection).
+    const totalNFTs = graph.nodes.reduce((acc, n) => {
+      const nd = nodesData[n.id];
+      return isMinted(nd) ? acc + 1 : acc;
+    }, 0);
+
+    // Unique people count (by personHash) within the projected tree's minted set.
+    const uniquePeople = new Set<string>();
+    for (const n of graph.nodes) {
+      const nd = nodesData[n.id];
+      if (!isMinted(nd)) continue;
+      uniquePeople.add(String(nd.personHash || "").toLowerCase());
+    }
 
     return {
       people,
-      totalCount: people.length, // Unique people count (by personHash)
-      totalNFTs, // Total NFT count (can be more than people count)
+      totalCount: uniquePeople.size,
+      totalNFTs, // Total NFT count in the projected tree
       loading,
     };
-  }, [people, loading, nodesData, reachableNodeIds]);
+  }, [people, loading, nodesData, graph.nodes]);
 
   // Sync selectedPerson with URL query param (?person=tokenId|personHash|id)
-  useLayoutEffect(() => {
+  useEffect(() => {
     const sp = new URLSearchParams(location.search);
     const q = sp.get("person");
     if (!q) {
-      if (selectedPerson) setSelectedPerson(null);
+      setSelectedPerson(null);
+      setPersonQueryError(null);
       return;
     }
-    // Prefer exact tokenId match from full nodesData (covers non-representative versions)
-    const byToken = Object.values(nodesData).find((x) => x.tokenId && String(x.tokenId) === q);
-    const p =
-      byToken ||
-      people.find(
-        (x) => (x.tokenId && String(x.tokenId) === q) || x.personHash === q || String(x.id) === q,
-      );
-    // Always sync to the latest data object for the same person
-    if (p) {
-      setSelectedPerson(p);
-    } else {
-      // Cold start for tokenId deep link: fetch minimal details
-      const isHexHash = /^0x[a-fA-F0-9]{64}$/.test(q);
-      if (!isHexHash) {
-        (async () => {
-          const fetched = await getNodeByTokenId(q);
-          if (fetched) setSelectedPerson(fetched);
-        })();
-      }
+    if (!projectionEnabled) return;
+    const normalized = q.trim();
+
+    // Strict mode (B): only allow opening a person that exists in the CURRENT projected tree.
+    // This keeps PeoplePage selection semantics consistent with TreePage (childrenMode/dedup/root).
+    const isHexHash = /^0x[a-fA-F0-9]{64}$/.test(normalized);
+    const resolved =
+      projectedLookup.byId.get(normalized) ||
+      (isHexHash ? projectedLookup.byHash.get(normalized.toLowerCase()) : null) ||
+      projectedLookup.byTokenId.get(normalized) ||
+      null;
+
+    if (resolved) {
+      setPersonQueryError(null);
+      setSelectedPerson(resolved);
+      return;
     }
-  }, [location.search, people, nodesData]);
+
+    // If tree data is still building, defer "not found" until the projection stabilizes.
+    setSelectedPerson(null);
+    if (loading) return;
+    setPersonQueryError(normalized);
+  }, [location.search, projectedLookup, loading, projectionEnabled]);
+
+  // Reset pagination when filters or projected set changes.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [PAGE_SIZE, filterType, sortOrder, searchTerm, selectedAddresses, selectedTags, people.length]);
 
   // Open person: push state with ?person=...
-  const openPerson = (person: NodeData) => {
+  const openPerson = useCallback((person: NodeData) => {
     openedViaClickRef.current = true;
     const sp = new URLSearchParams(location.search);
     sp.set("person", String(person.tokenId || person.personHash || person.id));
     navigate({ pathname: location.pathname, search: sp.toString() });
     // Optimistic local state for immediate render
     setSelectedPerson(person);
-  };
+  }, [location.pathname, location.search, navigate]);
 
   // Close person: back if opened via click, else replace to clear query
   const closePerson = () => {
@@ -243,6 +275,33 @@ export default function PeoplePage() {
     return filtered;
   }, [data.people, searchTerm, filterType, sortOrder, selectedAddresses, selectedTags]);
 
+  const visiblePeople = useMemo(
+    () => filteredPeople.slice(0, Math.max(0, visibleCount)),
+    [filteredPeople, visibleCount],
+  );
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => Math.min(c + PAGE_SIZE, filteredPeople.length));
+  }, [PAGE_SIZE, filteredPeople.length]);
+
+  // Infinite scroll: when reaching the bottom sentinel, append the next page.
+  useEffect(() => {
+    if (!projectionEnabled || data.loading) return;
+    if (visibleCount >= filteredPeople.length) return;
+    if (typeof window === "undefined" || typeof window.IntersectionObserver !== "function") return;
+    const target = loadMoreSentinelRef.current;
+    if (!target) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMore();
+      },
+      { root: null, rootMargin: "600px", threshold: 0 },
+    );
+    obs.observe(target);
+    return () => obs.disconnect();
+  }, [projectionEnabled, data.loading, visibleCount, filteredPeople.length, loadMore]);
+
   // No longer full-page loading overlay; changed to light hint in top-right, page always interactive
 
   return (
@@ -264,6 +323,57 @@ export default function PeoplePage() {
               {t("people.subtitle", "Explore family member profiles preserved on the blockchain")}
             </p>
           </div>
+
+          {personQueryError ? (
+            <div className="max-w-3xl mx-auto mb-10 px-4">
+              <div className="rounded-2xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/20 px-5 py-4 text-sm text-amber-900 dark:text-amber-100">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="font-semibold">
+                      {t(
+                        "people.personNotInTree.title",
+                        "This person isn’t in the current tree projection",
+                      )}
+                    </div>
+                    <div className="mt-1 text-amber-800/90 dark:text-amber-200/90 break-all">
+                      {t("people.personNotInTree.query", "Query")}: {personQueryError}
+                    </div>
+                    <div className="mt-2 text-amber-800/80 dark:text-amber-200/80">
+                      {t(
+                        "people.personNotInTree.hint",
+                        "Adjust the global tree configuration (root/contract/network) to include it, or open the Tree page.",
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate("/familyTree")}
+                        className="px-3 py-1.5 rounded-full bg-amber-900/90 text-amber-50 hover:bg-amber-900 transition-colors text-xs font-semibold"
+                      >
+                        {t("people.personNotInTree.openTree", "Open Tree")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearPersonQuery}
+                        className="px-3 py-1.5 rounded-full bg-white/90 dark:bg-slate-900/40 border border-amber-300/60 dark:border-amber-800/40 text-amber-900 dark:text-amber-100 hover:bg-white dark:hover:bg-slate-900/60 transition-colors text-xs font-semibold"
+                      >
+                        {t("common.dismiss", "Dismiss")}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearPersonQuery}
+                    className="p-2 rounded-full hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                    aria-label={t("common.close", "Close")}
+                    title={t("common.close", "Close")}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Stats Cards - Minimalist */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-5xl mx-auto">
@@ -561,7 +671,16 @@ export default function PeoplePage() {
 
       {/* Main Content */}
       <PageContainer className="pb-24" noPadding>
-        {filteredPeople.length === 0 ? (
+        {!projectionEnabled || data.loading ? (
+          <div className="grid gap-6 px-4 sm:px-6 lg:px-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-[520px] rounded-[2rem] border border-gray-200/80 dark:border-gray-800 bg-white/70 dark:bg-gray-900/40 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : filteredPeople.length === 0 ? (
           <div className="text-center py-32">
             <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gray-50 dark:bg-gray-900 mb-6">
               <Users className="w-10 h-10 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
@@ -590,11 +709,26 @@ export default function PeoplePage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-6 px-4 sm:px-6 lg:px-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {filteredPeople.map((person) => (
-              <PersonStoryCard key={person.id} person={person} onClick={() => openPerson(person)} />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-6 px-4 sm:px-6 lg:px-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {visiblePeople.map((person) => (
+                <PersonStoryCard
+                  key={person.id}
+                  person={person}
+                  onOpen={openPerson}
+                />
+              ))}
+            </div>
+            {visibleCount < filteredPeople.length ? (
+              <div className="mt-10 px-4 sm:px-6 lg:px-8">
+                <div ref={loadMoreSentinelRef} className="h-1 w-full" />
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="w-4 h-4 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+                  <span>{t("common.loadingMore", "Loading more...")}</span>
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </PageContainer>
 
