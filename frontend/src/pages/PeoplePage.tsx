@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, Users, User, Hash, X, Plus, BookOpen } from "lucide-react";
 import { NodeData, isMinted } from "../types/graph";
+import { useActivePath } from "../context/ActivePathContext";
 import { useTreeData } from "../context/TreeDataContext";
 import { useFamilyTreeProjection } from "../hooks/useFamilyTreeProjection";
 import PersonStoryCard from "../components/PersonStoryCard";
@@ -20,6 +21,7 @@ export default function PeoplePage() {
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();
   const navigate = useNavigate();
+  const { setActivePath } = useActivePath();
   // Track whether modal was opened by clicking inside this page
   const openedViaClickRef = useRef(false);
 
@@ -347,7 +349,10 @@ export default function PeoplePage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => navigate("/familyTree")}
+                        onClick={() => {
+                          setActivePath("/familyTree");
+                          navigate("/familyTree");
+                        }}
                         className="px-3 py-1.5 rounded-full bg-amber-900/90 text-amber-50 hover:bg-amber-900 transition-colors text-xs font-semibold"
                       >
                         {t("people.personNotInTree.openTree", "Open Tree")}

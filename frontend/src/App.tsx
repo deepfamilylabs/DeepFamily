@@ -17,6 +17,7 @@ import { VizOptionsProvider } from "./context/VizOptionsContext";
 import { TreeDataProvider } from "./context/TreeDataContext";
 import { WalletProvider } from "./context/WalletContext";
 import { SidebarProvider } from "./context/SidebarContext";
+import { ActivePathProvider } from "./context/ActivePathContext";
 import WalletSelectionLayer from "./components/WalletSelectionLayer";
 import NetworkSelectionLayer from "./components/NetworkSelectionLayer";
 
@@ -90,8 +91,10 @@ export default function App() {
             <VizOptionsProvider>
               <TreeDataProvider>
                 <BrowserRouter>
-                  <TitleUpdater />
-                  <RouterContent />
+                  <ActivePathProvider>
+                    <TitleUpdater />
+                    <RouterContent />
+                  </ActivePathProvider>
                 </BrowserRouter>
               </TreeDataProvider>
             </VizOptionsProvider>
