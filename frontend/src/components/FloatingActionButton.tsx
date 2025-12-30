@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, Image, Star, UserPlus, X } from "lucide-react";
+import { useActivePath } from "../context/ActivePathContext";
 
 interface FloatingActionButtonProps {
   className?: string;
@@ -11,6 +12,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { setActivePath } = useActivePath();
   const [isOpen, setIsOpen] = useState(false);
 
   // Hide FAB on Actions page since FAB represents that page
@@ -47,6 +49,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
 
   const handleActionClick = (tab: string) => {
     setIsOpen(false);
+    setActivePath("/actions");
     navigate(`/actions?tab=${tab}`);
   };
 

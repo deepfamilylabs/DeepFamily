@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { DynamicIcon } from "../components/home/DynamicIcon";
 import LoadingFallback from "../components/home/LoadingFallback";
+import { useActivePath } from "../context/ActivePathContext";
 import {
   HERO_STYLES as HERO_STYLE_CONSTANTS,
   FLOATING_SHAPES as FLOATING_SHAPE_CONSTANTS,
@@ -50,6 +51,7 @@ const ScrollIndicator = memo(() => {
 // CTA buttons component
 const CTAButtons = memo(() => {
   const { t } = useTranslation();
+  const { setActivePath } = useActivePath();
 
   const buttons = useMemo(
     (): ButtonConfig[] => [
@@ -74,7 +76,12 @@ const CTAButtons = memo(() => {
   return (
     <div className={CTA_BUTTON_STYLES.container}>
       {buttons.map((button) => (
-        <NavLink key={button.to} to={button.to} className={button.className}>
+        <NavLink
+          key={button.to}
+          to={button.to}
+          className={button.className}
+          onClick={() => setActivePath(button.to)}
+        >
           {button.hasOverlay && <div className={CTA_BUTTON_STYLES.overlay} />}
           <div className={CTA_BUTTON_STYLES.content}>
             <span className={CTA_BUTTON_STYLES.text}>{button.text}</span>

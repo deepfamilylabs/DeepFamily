@@ -7,6 +7,7 @@ import Logo from "./Logo";
 import PageContainer from "./PageContainer";
 import { getBadgeConfig } from "../config/brandBadge";
 import { useSidebar } from "../context/SidebarContext";
+import { useActivePath } from "../context/ActivePathContext";
 
 /**
  * SiteHeader: Unified top navigation/header bar used across all pages.
@@ -19,12 +20,24 @@ const SiteHeader = memo(() => {
   const isHomePage = location.pathname === "/";
   const badgeConfig = getBadgeConfig();
   const { toggleMobileSidebar } = useSidebar();
+  const { activePath, setActivePath } = useActivePath();
+
+  const handleNavClick = (path: string) => {
+    setActivePath(path);
+  };
+
+  const isPathActive = (path: string, end: boolean = false) => {
+    if (end) {
+      return activePath === path;
+    }
+    return activePath.startsWith(path);
+  };
 
   // Base classes for nav links
   const baseNavClasses =
     "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 relative group whitespace-nowrap";
 
-  const getNavClasses = ({ isActive }: { isActive: boolean }) => {
+  const getNavClasses = (isActive: boolean) => {
     // Unified Light Theme Style
     return `${baseNavClasses} ${
       isActive
@@ -51,7 +64,11 @@ const SiteHeader = memo(() => {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <NavLink to="/" className="flex items-center gap-1.5 group focus:outline-none">
+          <NavLink
+            to="/"
+            className="flex items-center gap-1.5 group focus:outline-none"
+            onClick={() => handleNavClick("/")}
+          >
             <Logo className="w-7 h-7 flex-shrink-0 text-orange-500 hover:-rotate-90 transition-transform duration-300" />
             <div className="flex flex-col">
               <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
@@ -72,23 +89,44 @@ const SiteHeader = memo(() => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          <NavLink to="/" className={getNavClasses} end>
+          <NavLink
+            to="/"
+            className={() => getNavClasses(isPathActive("/", true))}
+            onClick={() => handleNavClick("/")}
+            end
+          >
             <Home className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.home")}</span>
           </NavLink>
-          <NavLink to="/familyTree" className={getNavClasses}>
+          <NavLink
+            to="/familyTree"
+            className={() => getNavClasses(isPathActive("/familyTree"))}
+            onClick={() => handleNavClick("/familyTree")}
+          >
             <Network className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.familyTree")}</span>
           </NavLink>
-          <NavLink to="/people" className={getNavClasses}>
+          <NavLink
+            to="/people"
+            className={() => getNavClasses(isPathActive("/people"))}
+            onClick={() => handleNavClick("/people")}
+          >
             <Book className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.people")}</span>
           </NavLink>
-          <NavLink to="/search" className={getNavClasses}>
+          <NavLink
+            to="/search"
+            className={() => getNavClasses(isPathActive("/search"))}
+            onClick={() => handleNavClick("/search")}
+          >
             <Search className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.search")}</span>
           </NavLink>
-          <NavLink to="/actions" className={getNavClasses}>
+          <NavLink
+            to="/actions"
+            className={() => getNavClasses(isPathActive("/actions"))}
+            onClick={() => handleNavClick("/actions")}
+          >
             <Zap className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.actions", "Actions")}</span>
           </NavLink>
