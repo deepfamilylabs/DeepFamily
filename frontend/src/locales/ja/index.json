@@ -16,7 +16,7 @@
     "anecdotes": "逸話",
     "controversies": "論争",
     "legacy": "歴史的影響",
-    "gallery": "ギャラリー",
+    "gallery": "メディア資料",
     "references": "参考文献",
     "notes": "補足",
     "unknown": "不明"
@@ -720,7 +720,7 @@
       "controversiesDesc": "論争、批判、スキャンダル",
       "closing": "結び",
       "legacyDesc": "歴史的影響、影響力、記念活動",
-      "galleryDesc": "写真、画像、マルチメディア",
+      "galleryDesc": "写真、動画、音声、マルチメディア資料",
       "referencesDesc": "出典、引用、参考文献",
       "notesDesc": "追加の備考、修正、明確化",
       "usageNotes": "使用上の注意",

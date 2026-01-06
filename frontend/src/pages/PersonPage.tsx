@@ -618,7 +618,7 @@ export default function PersonPage() {
                         onClick={() => scrollToSection("basicInfo")}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
                           isActive
-                            ? "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400"
+                            ? "bg-orange-50 dark:bg-orange-900/20 border-l-2 border-orange-500 dark:border-orange-400"
                             : "hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent"
                         }`}
                       >
@@ -626,12 +626,12 @@ export default function PersonPage() {
                           size={14}
                           className={
                             isActive
-                              ? "text-blue-600 dark:text-blue-400"
+                              ? "text-orange-600 dark:text-orange-400"
                               : "text-gray-500 dark:text-gray-400"
                           }
                         />
                         <span
-                          className={`flex-1 truncate ${isActive ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
+                          className={`flex-1 truncate ${isActive ? "text-orange-600 dark:text-orange-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
                         >
                           {t("person.basicInfo", "基本信息")}
                         </span>
@@ -649,7 +649,7 @@ export default function PersonPage() {
                         onClick={() => scrollToSection("profileTop")}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
                           isGroupActive
-                            ? "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400"
+                            ? "bg-orange-50 dark:bg-orange-900/20 border-l-2 border-orange-500 dark:border-orange-400"
                             : "hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent"
                         }`}
                       >
@@ -657,17 +657,17 @@ export default function PersonPage() {
                           size={14}
                           className={
                             isGroupActive
-                              ? "text-blue-600 dark:text-blue-400"
+                              ? "text-orange-600 dark:text-orange-400"
                               : "text-gray-500 dark:text-gray-400"
                           }
                         />
                         <span
-                          className={`flex-1 truncate ${isGroupActive ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
+                          className={`flex-1 truncate ${isGroupActive ? "text-orange-600 dark:text-orange-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
                         >
                           {t("person.profileData", "Profile Data")}
                         </span>
                         <span
-                          className={`text-xs ${isGroupActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
+                          className={`text-xs ${isGroupActive ? "text-orange-600 dark:text-orange-400" : "text-gray-400 dark:text-gray-500"}`}
                         >
                           {totalCount}
                         </span>
@@ -691,21 +691,21 @@ export default function PersonPage() {
                         onClick={() => scrollToSection(type)}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors pl-7 ${
                           isActive
-                            ? "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-600 dark:border-blue-400"
+                            ? "bg-orange-50 dark:bg-orange-900/20 border-l-2 border-orange-500 dark:border-orange-400"
                             : "hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent"
                         }`}
                       >
                         <ChunkIcon
                           size={14}
-                          className={isActive ? "text-blue-600 dark:text-blue-400" : colorClass}
+                          className={isActive ? "text-orange-600 dark:text-orange-400" : colorClass}
                         />
                         <span
-                          className={`flex-1 truncate ${isActive ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
+                          className={`flex-1 truncate ${isActive ? "text-orange-600 dark:text-orange-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
                         >
                           {typeLabel}
                         </span>
                         <span
-                          className={`text-xs ${isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
+                          className={`text-xs ${isActive ? "text-orange-600 dark:text-orange-400" : "text-gray-400 dark:text-gray-500"}`}
                         >
                           {chunks.length}
                         </span>
@@ -748,7 +748,7 @@ export default function PersonPage() {
                             });
                             navigate(`/familyTree?root=${data.personHash}&v=${data.versionIndex}`);
                           }}
-                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors"
+                          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg transition-colors"
                           title={t("person.viewFamilyTree", "View Family Tree") as string}
                         >
                           <GitBranch size={16} />

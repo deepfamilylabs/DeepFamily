@@ -659,45 +659,46 @@ export default function StoryEditorPage() {
 
   return (
     <>
-      <main data-story-editor-page className="mx-auto w-full max-w-7xl">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
-          <section className="xl:col-span-3 flex flex-col">
-            <header className="rounded-t-lg border border-b-0 border-gray-200 bg-white px-4 py-4 sm:px-6 dark:border-gray-800 dark:bg-gray-900">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2 className="flex items-center gap-2 truncate text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <div data-story-editor-page className="w-full py-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+          <section className="xl:col-span-2 flex flex-col gap-6">
+            <header className="flex items-end justify-between gap-4 pb-2">
+              <div className="min-w-0 space-y-1">
+                <h2 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
                     {titleText}
-                    {isSealed && <Lock className="text-gray-500 dark:text-gray-400" size={16} />}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  {meta?.isSealed && (
-                    <div className="text-xs px-2 py-0.5 rounded font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                      {t("person.sealed", "Sealed")}
-                    </div>
-                  )}
-                  {!isSealed && meta && meta.totalChunks > 0 && (
-                    <button
-                      onClick={handleSeal}
-                      disabled={submitting}
-                      className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                      type="button"
-                    >
-                      <Lock size={12} />
-                      {t("storyChunkEditor.seal", "Seal Story")}
-                    </button>
-                  )}
-                </div>
+                  </span>
+                  {isSealed && <Lock className="text-orange-500" size={24} />}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {meta?.isSealed && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900/30">
+                    <Lock size={10} />
+                    {t("person.sealed", "Sealed")}
+                  </div>
+                )}
+                {!isSealed && meta && meta.totalChunks > 0 && (
+                  <button
+                    onClick={handleSeal}
+                    disabled={submitting}
+                    className="group flex items-center gap-2 rounded-full bg-gray-900 px-5 py-2 text-sm font-medium text-white shadow-lg shadow-gray-200/50 transition-all hover:scale-105 hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:shadow-none"
+                    type="button"
+                  >
+                    <Lock size={14} className="transition-transform group-hover:rotate-12" />
+                    {t("storyChunkEditor.seal", "Seal Story")}
+                  </button>
+                )}
               </div>
             </header>
 
             <div
               ref={scrollContainerRef}
-              className="flex flex-col gap-4 rounded-b-lg border border-gray-200 bg-white p-4 sm:p-6 dark:border-gray-800 dark:bg-gray-900"
+              className="flex flex-col gap-6"
             >
               {showError && (
-                <section className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:border-red-700/50 dark:bg-red-900/30 dark:text-red-400">
-                  <p className="mb-1 font-semibold text-red-800 dark:text-red-300">
+                <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+                  <p className="mb-1 font-bold text-red-800 dark:text-red-300">
                     {t("common.error", "Error")}
                   </p>
                   <p>{errorMessage}</p>
@@ -707,27 +708,27 @@ export default function StoryEditorPage() {
               {showEditorForm && (
                 <section
                   ref={formRef}
-                  className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-800"
+                  className="relative flex flex-col gap-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-8"
                 >
-                  <header className="flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-700">
-                    <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-                      <>
-                        <Plus size={16} className="text-gray-600 dark:text-gray-400" />
-                        {t("storyChunkEditor.addChunk", "Add New Chunk")}
-                      </>
+                  <header className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+                    <h3 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100/50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                         <Plus size={18} />
+                      </span>
+                      {t("storyChunkEditor.addChunk", "Add New Chunk")}
                     </h3>
                     <button
                       onClick={handleCancelEdit}
                       disabled={submitting}
-                      className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                      className="rounded-full p-2 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600 hover:rotate-90 disabled:opacity-50 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                       aria-label={t("common.close", "Close") as string}
                       type="button"
                     >
-                      <X size={18} />
+                      <X size={20} />
                     </button>
                   </header>
 
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <textarea
                       ref={textareaRef}
                       value={formData.content}
@@ -744,20 +745,20 @@ export default function StoryEditorPage() {
                         "storyChunkEditor.contentPlaceholderBytes",
                         "Enter chunk content (max 2048 bytes, approximately 2048 English characters or ~680 Chinese characters)",
                       )}
-                      className="h-[500px] w-full resize-none rounded border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-900 transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+                      className="h-[500px] w-full resize-none rounded-2xl border-0 bg-gray-50 p-6 text-base leading-relaxed text-gray-900 transition-all placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-orange-500/20 active:ring-orange-500/20 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:bg-gray-800"
                       disabled={submitting}
                     />
 
-                    <div className="grid gap-3 sm:grid-cols-[1fr_3fr]">
+                    <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
                       <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <label className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                             {t("storyChunkEditor.chunkTypeLabel", "Chunk Type")}
                           </label>
                           <button
                             type="button"
                             onClick={() => setShowChunkTypeHelp(true)}
-                            className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                            className="text-gray-400 hover:text-orange-600 dark:text-gray-500 dark:hover:text-orange-400 transition-colors"
                             aria-label="Help"
                           >
                             <HelpCircle size={14} />
@@ -770,7 +771,7 @@ export default function StoryEditorPage() {
                               !submitting && setShowChunkTypeDropdown(!showChunkTypeDropdown)
                             }
                             disabled={submitting}
-                            className="w-full flex items-center justify-between gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-gray-500"
+                            className="w-full flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
                           >
                             {(() => {
                               const selected = chunkTypeOptions.find(
@@ -788,13 +789,13 @@ export default function StoryEditorPage() {
                             })()}
                             <ChevronDown
                               size={16}
-                              className={`flex-shrink-0 transition-transform ${showChunkTypeDropdown ? "rotate-180" : ""}`}
+                              className={`flex-shrink-0 text-gray-400 transition-transform ${showChunkTypeDropdown ? "rotate-180" : ""}`}
                             />
                           </button>
 
                           {showChunkTypeDropdown && (
-                            <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-900">
-                              <div className="max-h-60 overflow-y-auto py-1">
+                            <div className="absolute z-50 mt-2 w-full rounded-xl border border-gray-100 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                              <div className="max-h-60 overflow-y-auto py-2">
                                 {chunkTypeOptions.map((option) => {
                                   const Icon = option.icon;
                                   const isSelected = option.value === formData.chunkType;
@@ -809,18 +810,18 @@ export default function StoryEditorPage() {
                                         }));
                                         setShowChunkTypeDropdown(false);
                                       }}
-                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
                                         isSelected
-                                          ? "bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
-                                          : "text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+                                          ? "bg-orange-50 text-orange-900 dark:bg-orange-900/20 dark:text-orange-100"
+                                          : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
                                       }`}
                                     >
                                       <Icon size={16} className={option.color} />
-                                      <span className="flex-1 truncate">{option.label}</span>
+                                      <span className="flex-1 truncate font-medium">{option.label}</span>
                                       {isSelected && (
                                         <Check
                                           size={16}
-                                          className="flex-shrink-0 text-blue-600 dark:text-blue-400"
+                                          className="flex-shrink-0 text-orange-600 dark:text-orange-400"
                                         />
                                       )}
                                     </button>
@@ -832,7 +833,7 @@ export default function StoryEditorPage() {
                         </div>
                       </div>
                       <div className="flex flex-col sm:min-w-0">
-                        <label className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <label className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
                           {t("storyChunkEditor.attachmentLabel", "Attachment CID (optional)")}
                         </label>
                         <input
@@ -847,13 +848,13 @@ export default function StoryEditorPage() {
                             "storyChunkEditor.attachmentPlaceholder",
                             "CID (e.g. bafy...) or leave empty",
                           )}
-                          className="mt-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
                           disabled={submitting}
                         />
                       </div>
                     </div>
 
-                    <div className="flex flex-col justify-between gap-3 text-sm sm:flex-row sm:items-center">
+                    <div className="flex flex-col justify-between gap-3 text-sm sm:flex-row sm:items-center pt-2">
                       <div
                         className={`font-medium ${getByteWarningColor(getByteLength(formData.content))}`}
                       >
@@ -873,10 +874,10 @@ export default function StoryEditorPage() {
 
                       {formData.expectedHash && (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                             {t("storyChunkEditor.hashLabel", "Hash")}:
                           </span>
-                          <code className="rounded border border-gray-200 bg-gray-50 px-2 py-1 font-mono text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                          <code className="rounded-lg bg-gray-100 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                             {formatHash(formData.expectedHash)}
                           </code>
                           <button
@@ -892,7 +893,7 @@ export default function StoryEditorPage() {
                     </div>
                   </div>
 
-                  <footer className="flex flex-col gap-2 pt-2 sm:flex-row">
+                  <footer className="flex flex-col gap-3 pt-2 sm:flex-row">
                     <button
                       onClick={handleSubmit}
                       disabled={
@@ -900,7 +901,7 @@ export default function StoryEditorPage() {
                         !formData.content.trim() ||
                         getByteLength(formData.content) > MAX_CHUNK_BYTES
                       }
-                      className="flex items-center justify-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-400 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:scale-[1.02] hover:shadow-orange-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
                       type="button"
                     >
                       <Save size={16} />
@@ -911,7 +912,7 @@ export default function StoryEditorPage() {
                     <button
                       onClick={handleCancelEdit}
                       disabled={submitting}
-                      className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                      className="rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                       type="button"
                     >
                       {t("storyChunkEditor.cancel", "Cancel")}
@@ -939,18 +940,18 @@ export default function StoryEditorPage() {
               )}
             </div>
           </section>
-          <aside className="xl:col-span-1 flex flex-col gap-4">
+          <aside className="xl:col-span-1 flex flex-col gap-6">
             {sortedChunks.length > 0 ? (
-              <section className="flex flex-col flex-shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <header className="flex items-center justify-between border-b border-gray-200 px-4 pt-5 pb-3 dark:border-gray-800">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              <section className="flex flex-col flex-shrink-0 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+                <header className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     {t("storyChunkEditor.chunks", "Existing Chunks")}
                   </h3>
-                  <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                  <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
                     {sortedChunks.length}
                   </span>
                 </header>
-                <ul className="max-h-[500px] overflow-y-auto pb-2">
+                <ul className="max-h-[600px] overflow-y-auto p-4 space-y-3">
                   {sortedChunks.map((chunk) => {
                     const isExpanded = expandedChunks.has(chunk.chunkIndex);
                     const preview =
@@ -960,19 +961,25 @@ export default function StoryEditorPage() {
                     return (
                       <li
                         key={chunk.chunkIndex}
-                        className="border-b border-gray-200 dark:border-gray-800 last:border-b-0"
                       >
-                        <div className="w-full text-left flex items-start gap-1.5 p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <div
+                          className={`w-full text-left flex items-start gap-3 rounded-2xl border p-4 transition-all cursor-pointer ${
+                            isExpanded
+                              ? "bg-white border-orange-200 shadow-md shadow-orange-100 dark:bg-gray-800 dark:border-orange-900/50 dark:shadow-none"
+                              : "bg-gray-50/50 border-transparent hover:bg-white hover:border-gray-100 hover:shadow-sm dark:bg-gray-800/30 dark:hover:bg-gray-800 dark:hover:border-gray-700"
+                          }`}
+                          onClick={() => toggleChunkExpansion(chunk.chunkIndex)}
+                        >
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleChunkExpansion(chunk.chunkIndex);
                             }}
-                            className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
                             type="button"
                             aria-label={isExpanded ? "Collapse" : "Expand"}
                           >
-                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                           </button>
                           <div
                             className="flex-1 min-w-0 cursor-pointer"
@@ -1094,15 +1101,15 @@ export default function StoryEditorPage() {
                 </ul>
               </section>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-500">
+              <div className="overflow-hidden rounded-3xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm font-medium text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500">
                 {t("storyChunkEditor.noChunks")}
               </div>
             )}
 
             {meta && (
-              <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <header className="border-b border-gray-200 px-4 pt-5 pb-3 dark:border-gray-800">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+                <header className="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     {t("person.metadata", "Metadata")}
                   </h3>
                 </header>
@@ -1223,7 +1230,7 @@ export default function StoryEditorPage() {
             )}
           </aside>
         </div>
-      </main>
+      </div>
 
       {/* Seal Confirmation Dialog */}
       {showSealConfirm &&
@@ -1232,17 +1239,17 @@ export default function StoryEditorPage() {
             className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
             data-seal-dialog
           >
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md border border-gray-200 dark:border-gray-800">
-              <div className="p-6">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
-                    <Lock size={20} className="text-blue-600 dark:text-blue-400" />
+            <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 overflow-hidden">
+              <div className="p-8">
+                <div className="flex flex-col items-center text-center gap-4 mb-8">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
+                    <Lock size={32} className="text-orange-600 dark:text-orange-500" />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                       {t("storyChunkEditor.sealDialog.title", "Seal Story")}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-xs mx-auto">
                       {t(
                         "storyChunkEditor.sealDialog.description",
                         "Are you sure you want to seal the story? Once sealed, it cannot be modified.",
@@ -1251,18 +1258,18 @@ export default function StoryEditorPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 justify-end">
+                <div className="flex gap-4">
                   <button
                     onClick={() => setShowSealConfirm(false)}
                     disabled={submitting}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md disabled:opacity-50 transition-colors"
+                    className="flex-1 px-4 py-3 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"
                   >
                     {t("storyChunkEditor.sealDialog.cancel", "Cancel")}
                   </button>
                   <button
                     onClick={executeSeal}
                     disabled={submitting}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 transition-colors flex items-center gap-2"
+                    className="flex-1 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-orange-400 to-red-600 hover:shadow-lg shadow-orange-500/20 rounded-full disabled:opacity-50 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
                   >
                     {submitting ? (
                       <>
@@ -1292,29 +1299,29 @@ export default function StoryEditorPage() {
             data-chunk-help-dialog
           >
             <div
-              className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl border border-gray-200 dark:border-gray-800 max-h-[75vh] overflow-hidden flex flex-col"
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-3xl border border-gray-100 dark:border-gray-800 max-h-[75vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
-                    <HelpCircle size={20} className="text-blue-600 dark:text-blue-400" />
+              <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                    <HelpCircle size={24} className="text-blue-600 dark:text-blue-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                     {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
                   </h3>
                 </div>
                 <button
                   onClick={() => setShowChunkTypeHelp(false)}
-                  className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 hover:rotate-90"
                   aria-label="Close"
                   type="button"
                 >
-                  <X size={20} />
+                  <X size={24} />
                 </button>
               </div>
 
-              <div className="overflow-y-auto p-6 space-y-6">
+              <div className="overflow-y-auto p-8 space-y-8">
                 {/* Introduction */}
                 <div className="prose dark:prose-invert max-w-none">
                   <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -1609,7 +1616,7 @@ export default function StoryEditorPage() {
                         key: "legacy",
                         desc: "Historical impact, influence, commemorations",
                       },
-                      { value: 16, key: "gallery", desc: "Photos, images, multimedia" },
+                      { value: 16, key: "gallery", desc: "Photos, videos, audio, documents, and multimedia" },
                       { value: 17, key: "references", desc: "Sources, citations, bibliography" },
                       {
                         value: 18,

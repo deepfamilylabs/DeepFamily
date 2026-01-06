@@ -16,7 +16,7 @@
     "anecdotes": "일화",
     "controversies": "논란",
     "legacy": "역사적 영향",
-    "gallery": "갤러리",
+    "gallery": "미디어 자료",
     "references": "참고문헌",
     "notes": "보충 사항",
     "unknown": "알 수 없음"
@@ -720,7 +720,7 @@
       "controversiesDesc": "논쟁, 비판, 스캔들",
       "closing": "결론",
       "legacyDesc": "역사적 영향, 영향력, 기념 활동",
-      "galleryDesc": "사진, 이미지, 멀티미디어",
+      "galleryDesc": "사진, 동영상, 오디오, 멀티미디어 자료",
       "referencesDesc": "출처, 인용, 참고 문헌",
       "notesDesc": "추가 비고, 수정, 설명",
       "usageNotes": "사용 안내",
