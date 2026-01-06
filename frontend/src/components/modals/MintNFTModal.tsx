@@ -11,6 +11,11 @@ import {
   ChevronDown,
   Check,
   ChevronRight,
+  Shield,
+  Lock,
+  Calendar,
+  FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 import { useContract } from "../../hooks/useContract";
 import { useWallet } from "../../context/WalletContext";
@@ -45,20 +50,22 @@ const ThemedSelect: React.FC<{
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const selectedOption = options.find((o) => o.value === value);
+  const current = options.find((o) => o.value === value)?.label ?? "";
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full h-10 px-3 py-2 text-left bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 text-sm text-gray-800 dark:text-gray-100 outline-none transition flex items-center justify-between"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        <span>{selectedOption?.label || "Select..."}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="truncate">{current}</span>
+        <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
       </button>
       {open && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg">
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
           <ul role="listbox" className="max-h-60 overflow-auto">
             {options.map((o) => (
               <li
@@ -69,9 +76,9 @@ const ThemedSelect: React.FC<{
                   onChange(o.value);
                   setOpen(false);
                 }}
-                className={`px-3 py-2 text-sm cursor-pointer select-none transition-colors ${
+                className={`px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
                   o.value === value
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
                     : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}
               >
@@ -767,14 +774,14 @@ export default function MintNFTModal({
   }: {
     label: string;
     value: string;
-    colorClass: "purple";
+    colorClass: "orange";
     isPlainText?: boolean;
   }) => {
     const colorConfig = {
-      purple: {
-        labelColor: "text-purple-800 dark:text-purple-200",
-        valueBg: "bg-purple-100 dark:bg-purple-800",
-        valueColor: "text-purple-900 dark:text-purple-100",
+      orange: {
+        labelColor: "text-orange-800 dark:text-orange-200",
+        valueBg: "bg-orange-100 dark:bg-orange-800",
+        valueColor: "text-orange-900 dark:text-orange-100",
       },
     };
 
@@ -806,7 +813,7 @@ export default function MintNFTModal({
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
-          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
+          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
           onClick={(e) => e.stopPropagation()}
           style={{
             transform: dragging ? `translateY(${dragOffset}px)` : undefined,
@@ -815,7 +822,7 @@ export default function MintNFTModal({
         >
           {/* Header */}
           <div
-            className="sticky top-0 bg-gradient-to-br from-purple-500/10 via-blue-500/8 to-indigo-500/10 dark:from-purple-600/20 dark:via-blue-600/15 dark:to-indigo-600/20 p-3 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
+            className="sticky top-0 bg-white/80 dark:bg-gray-950/80 p-6 border-b border-gray-100 dark:border-gray-800 z-20 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
             onPointerDown={(e) => {
               (e.currentTarget as any).setPointerCapture?.(e.pointerId);
               startYRef.current = e.clientY;
@@ -855,25 +862,23 @@ export default function MintNFTModal({
             }}
           >
             {/* Drag handle (mobile only) */}
-            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
+            <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-800" />
 
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 flex items-center gap-4 min-w-0">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                  <Image className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20 flex-shrink-0">
+                  <Image className="w-6 h-6 text-white" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-0.5">
                     {t("mintNFT.title", "Mint NFT")}
                   </h2>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    <span className="whitespace-normal">
-                      {t(
-                        "mintNFT.headerOnChainHint",
-                        "Minting is public: plain text is permanently on-chain and undeletable",
-                      )}
-                    </span>
-                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                    {t(
+                      "mintNFT.headerOnChainHint",
+                      "Minting is public: plain text is permanently on-chain",
+                    )}
+                  </p>
                 </div>
               </div>
               <button
@@ -884,10 +889,10 @@ export default function MintNFTModal({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors flex-shrink-0"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0 group"
                 aria-label={t("common.close", "Close")}
               >
-                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <X className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
               </button>
             </div>
           </div>
@@ -899,17 +904,17 @@ export default function MintNFTModal({
               onSubmit={handleSubmit(onSubmit)}
               className="min-h-full flex flex-col"
             >
-              <div className="flex-1 p-4 sm:p-6 space-y-6">
+              <div className="flex-1 p-6 space-y-6">
                 {/* Person Hash and Version Input (always shown as editable) */}
                 <div className="space-y-4">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     {t("mintNFT.targetVersion", "Target Version")}
                   </h3>
 
-                  <div className="p-4 bg-amber-50/50 dark:bg-amber-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
-                    <div className="space-y-4 sm:space-y-0 sm:flex sm:items-start sm:gap-4">
-                      <div className="sm:flex-1">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20">
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr,140px] gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
                           {t("mintNFT.personHash", "Person Hash")}{" "}
                           <span className="text-red-500">*</span>
                         </label>
@@ -917,17 +922,17 @@ export default function MintNFTModal({
                           type="text"
                           value={personHash}
                           onChange={(e) => setPersonHash(e.target.value)}
-                          className={`w-full h-10 rounded-md border bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 outline-none transition font-mono ${
+                          className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none transition-all font-mono ${
                             hashInputInvalid
-                              ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30 dark:border-red-400 dark:focus:border-red-400 dark:focus:ring-red-400/30"
-                              : "border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
+                              ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                              : "border-gray-200 dark:border-gray-700 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
                           }`}
                           placeholder={t("search.versionsQuery.placeholder")}
                         />
                       </div>
 
-                      <div className="w-32">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
                           {t("mintNFT.versionIndex", "Version Index")}{" "}
                           <span className="text-red-500">*</span>
                         </label>
@@ -936,7 +941,7 @@ export default function MintNFTModal({
                           min="1"
                           value={versionIndex}
                           onChange={(e) => setVersionIndex(parseInt(e.target.value) || 1)}
-                          className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                          className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
                           placeholder="1"
                         />
                       </div>
@@ -944,7 +949,7 @@ export default function MintNFTModal({
 
                     {/* Inline status chips (endorsed / can mint) */}
                     {hashInputInvalid && (
-                      <div className="mt-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                      <div className="mt-3 p-3 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-2">
                         <AlertCircle className="w-4 h-4" />
                         {t(
                           "mintNFT.invalidPersonHashFormat",
@@ -954,15 +959,16 @@ export default function MintNFTModal({
                     )}
 
                     {!hashInputInvalid && hasValidTarget && (
-                      <div className="mt-3">
+                      <div className="mt-4 pt-4 border-t border-orange-100 dark:border-orange-900/20">
                         {isCheckingStatus ? (
-                          <div className="text-sm text-blue-600 dark:text-blue-400">
+                          <div className="text-sm font-medium text-orange-600 dark:text-orange-400 flex items-center gap-2">
+                            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                             {t("mintNFT.checkingStatus", "Checking status...")}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-4 text-sm">
+                          <div className="flex flex-wrap items-center gap-3 text-sm font-bold">
                             <div
-                              className={`flex items-center gap-2 ${isEndorsed ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400"}`}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isEndorsed ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"}`}
                             >
                               <div
                                 className={`w-2 h-2 rounded-full ${isEndorsed ? "bg-green-500" : "bg-orange-500"}`}
@@ -972,7 +978,7 @@ export default function MintNFTModal({
                                 : t("mintNFT.notEndorsed", "Not Endorsed")}
                             </div>
                             <div
-                              className={`flex items-center gap-2 ${isAlreadyMinted ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isAlreadyMinted ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"}`}
                             >
                               <div
                                 className={`w-2 h-2 rounded-full ${isAlreadyMinted ? "bg-red-500" : "bg-green-500"}`}
@@ -990,14 +996,14 @@ export default function MintNFTModal({
                     {!isCheckingStatus &&
                       hasMissingParents &&
                       (hasMissingParents.father || hasMissingParents.mother) && (
-                        <div className="mt-4">
+                        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/30 rounded-xl border border-amber-100 dark:border-amber-900/30">
                           <div className="flex items-start gap-3">
                             <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
-                              <h4 className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-1">
+                              <h4 className="text-sm font-bold text-amber-900 dark:text-amber-100 mb-1">
                                 {t("mintNFT.missingParentsTitle", "Incomplete Parent Information")}
                               </h4>
-                              <p className="text-sm text-amber-700 dark:text-amber-200">
+                              <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed opacity-90">
                                 {hasMissingParents.father && hasMissingParents.mother
                                   ? t(
                                       "mintNFT.missingBothParents",
@@ -1023,10 +1029,10 @@ export default function MintNFTModal({
                 {/* Show form content only if NFT hasn't been minted */}
                 {!isAlreadyMinted && (
                   <>
-                    <div className="space-y-2">
-                      <div className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-300/40 dark:bg-amber-900/20 dark:text-amber-50">
-                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                        <p className="text-xs leading-relaxed">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex gap-3 rounded-2xl border border-amber-100 bg-amber-50/50 p-4 text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-100">
+                        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500" />
+                        <p className="text-xs font-medium leading-relaxed opacity-90">
                           {t(
                             "mintNFT.legalTruthfulNotice",
                             "Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.",
@@ -1034,9 +1040,9 @@ export default function MintNFTModal({
                         </p>
                       </div>
 
-                      <div className="flex gap-2 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-red-900 dark:border-red-300/40 dark:bg-red-900/20 dark:text-red-50">
-                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                        <p className="text-xs leading-relaxed">
+                      <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-4 text-red-900 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-100">
+                        <AlertTriangle className="w-5 h-5 shrink-0 text-red-500" />
+                        <p className="text-xs font-medium leading-relaxed opacity-90">
                           {t(
                             "mintNFT.ageRequirement",
                             "The person minted into an NFT must be 18 years or older. Do not submit minors' identities.",
@@ -1047,17 +1053,15 @@ export default function MintNFTModal({
 
                     {/* Basic Information - Using PersonHashCalculator */}
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                          {t("mintNFT.basicInfo", "Basic Information")}
-                        </h3>
-                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        {t("mintNFT.basicInfo", "Basic Information")}
+                      </h3>
 
                       {/* Verification Notice */}
-                      <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-700/50">
+                      <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
                         <div className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                          <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed font-medium">
                             {t(
                               "mintNFT.basicInfoMustMatch",
                               "The basic information you enter must exactly match the target version data. The contract will verify this on-chain before minting.",
@@ -1070,7 +1074,7 @@ export default function MintNFTModal({
                         ref={personCalcRef}
                         showTitle={false}
                         collapsible={false}
-                        className="border-0 shadow-none"
+                        className="bg-transparent border-0 shadow-none !p-0"
                         initialValues={
                           personInfo
                             ? {
@@ -1101,18 +1105,16 @@ export default function MintNFTModal({
                     </div>
 
                     {/* Supplemental Information (from PersonSupplementInfo) */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                          {t("mintNFT.supplementalInfo", "Supplemental Information")}
-                        </h3>
-                      </div>
+                    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                        {t("mintNFT.supplementalInfo", "Supplemental Information")}
+                      </h3>
 
                       {/* Immutability Warning */}
-                      <div className="p-3 bg-amber-50/50 dark:bg-amber-900/20 rounded-lg border border-amber-200/50 dark:border-amber-700/50">
+                      <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/30">
                         <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                          <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                          <Lock className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                          <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed font-medium">
                             {t(
                               "mintNFT.supplementalInfoImmutable",
                               "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
@@ -1121,26 +1123,26 @@ export default function MintNFTModal({
                         </div>
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="space-y-5">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
                               {t("mintNFT.birthPlace", "Birth Place")}
                             </label>
                             <input
                               {...register("birthPlace")}
-                              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
                               placeholder={t("mintNFT.birthPlacePlaceholder", "Enter birth place")}
                             />
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
                               {t("mintNFT.deathPlace", "Death Place")}
                             </label>
                             <input
                               {...register("deathPlace")}
-                              className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
                               placeholder={t(
                                 "mintNFT.deathPlacePlaceholder",
                                 "Enter death place (if applicable)",
@@ -1151,13 +1153,13 @@ export default function MintNFTModal({
 
                         {/* Death Date Information - Using PersonHashCalculator style */}
                         <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                             {t("mintNFT.deathDate", "Death Date (if applicable)")}
                           </h4>
-
+                          
                           <div className="flex flex-nowrap items-start gap-1">
                             <div className="flex items-start gap-1">
-                              <div className="w-20">
+                              <div className="w-20 relative">
                                 <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                                   {t("search.hashCalculator.isBirthBC")}
                                 </label>
@@ -1182,7 +1184,7 @@ export default function MintNFTModal({
                                   placeholder={
                                     watch("isDeathBC") ? "<10000" : "<=" + new Date().getFullYear()
                                   }
-                                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                                   {...register("deathYear", {
                                     setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                                   })}
@@ -1199,7 +1201,7 @@ export default function MintNFTModal({
                                 min="0"
                                 max="12"
                                 placeholder={t("search.hashCalculator.birthMonth")}
-                                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                                 {...register("deathMonth", {
                                   setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                                 })}
@@ -1215,7 +1217,7 @@ export default function MintNFTModal({
                                 min="0"
                                 max="31"
                                 placeholder={t("search.hashCalculator.birthDay")}
-                                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
                                 {...register("deathDay", {
                                   setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                                 })}
@@ -1225,20 +1227,20 @@ export default function MintNFTModal({
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
                             {t("mintNFT.story", "Life Story Summary")}
                           </label>
                           <textarea
                             {...register("story")}
                             rows={4}
-                            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition resize-none"
+                            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all resize-none"
                             placeholder={t(
                               "mintNFT.storyPlaceholder",
                               "Enter a brief life story summary...",
                             )}
                           />
                           {errors.story && (
-                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            <p className="mt-1 text-xs text-red-500 font-bold">
                               {errors.story.message}
                             </p>
                           )}
@@ -1247,21 +1249,21 @@ export default function MintNFTModal({
                     </div>
 
                     {/* NFT Metadata */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
                           {t("mintNFT.tokenURI", "Token URI")}
                         </label>
                         <input
                           {...register("tokenURI")}
-                          className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                          className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
                           placeholder="https://... or ipfs://..."
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                           {t("mintNFT.tokenURIHint", "Optional: URL or IPFS hash for NFT metadata")}
                         </p>
                         {errors.tokenURI && (
-                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          <p className="mt-1 text-xs text-red-500 font-bold">
                             {errors.tokenURI.message}
                           </p>
                         )}
@@ -1272,14 +1274,14 @@ export default function MintNFTModal({
 
                 {/* Message when NFT is already minted */}
                 {isAlreadyMinted && !successResult && (
-                  <div className="p-6 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <div className="p-8 rounded-3xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 text-center flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/40 dark:to-red-900/20 flex items-center justify-center mb-4 shadow-sm">
                       <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                       {t("mintNFT.nftAlreadyMinted", "NFT Already Minted")}
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-300">
+                    <p className="text-gray-500 dark:text-gray-400 max-w-sm">
                       {t(
                         "mintNFT.nftAlreadyMintedDesc",
                         "This version has already been minted as an NFT. Each version can only be minted once.",
@@ -1290,11 +1292,13 @@ export default function MintNFTModal({
 
                 {/* Informed Consent - before success/error results, consistent with AddVersionModal */}
                 {!successResult && !isAlreadyMinted && (
-                  <div className="mt-4 p-4 sm:p-5 rounded-lg border border-red-200/80 bg-red-50 dark:border-red-300/40 dark:bg-red-900/15">
+                  <div className="p-5 rounded-2xl border border-red-200/50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 backdrop-blur-sm !mt-8">
                     <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300 mt-0.5 shrink-0" />
-                      <div className="space-y-3 w-full">
-                        <p className="text-sm font-semibold text-red-900 dark:text-red-50">
+                      <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                        <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="space-y-3 w-full pt-1">
+                        <p className="text-sm font-bold text-gray-900 dark:text-red-100">
                           {t("mintNFT.consentTitle", "Informed consent (required)")}
                         </p>
                         <div className="space-y-2">
@@ -1323,23 +1327,29 @@ export default function MintNFTModal({
                               },
                             ] as const
                           ).map((item) => (
-                            <label key={item.key} className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                checked={consents[item.key]}
-                                onChange={() => toggleConsent(item.key)}
-                                className="h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-500"
-                              />
-                              <span className="text-xs text-red-900 dark:text-red-50 leading-snug">
+                            <label key={item.key} className="flex items-start gap-3 cursor-pointer group select-none">
+                              <div className="relative flex items-center justify-center shrink-0 w-4 h-4 mt-[2px]">
+                                <input
+                                  type="checkbox"
+                                  checked={consents[item.key]}
+                                  onChange={() => toggleConsent(item.key)}
+                                  className="peer h-4 w-4 rounded-[4px] border-[1.5px] border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-600 focus:ring-0 focus:border-red-500 checked:bg-red-600 checked:border-red-600 transition-all cursor-pointer appearance-none"
+                                />
+                                <Check className="w-3 h-3 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform scale-75 opacity-0 peer-checked:opacity-100 peer-checked:scale-75 transition-all duration-200 pointer-events-none stroke-[4]" />
+                              </div>
+                              <span className="text-xs text-gray-800 dark:text-red-50 leading-relaxed font-medium group-hover:text-red-700 dark:group-hover:text-white transition-colors">
                                 {item.label}
                               </span>
                             </label>
                           ))}
                         </div>
                         {consentError && (
-                          <p className="text-xs text-red-700 dark:text-red-200 font-medium">
-                            {consentError}
-                          </p>
+                          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fadeIn">
+                            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                            <p className="text-xs text-red-700 dark:text-red-300 font-bold">
+                              {consentError}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1348,16 +1358,19 @@ export default function MintNFTModal({
 
                 {/* Progress Indicator */}
                 {isSubmitting && !successResult && !errorResult && (
-                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
-                    <div className="flex items-center gap-3">
-                      <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                  <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20 animate-fadeIn">
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-10 h-10 flex-shrink-0">
+                        <div className="absolute inset-0 rounded-full border-4 border-orange-200 dark:border-orange-800 opacity-30"></div>
+                        <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-1">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
                           {proofGenerationStep
                             ? t("mintNFT.processing", "Processing...")
                             : t("mintNFT.minting", "Minting NFT...")}
                         </p>
-                        <p className="text-xs text-purple-700 dark:text-purple-300">
+                        <p className="text-xs font-medium text-orange-700 dark:text-orange-300">
                           {proofGenerationStep ||
                             t(
                               "mintNFT.mintingDesc",
@@ -1367,7 +1380,7 @@ export default function MintNFTModal({
                       </div>
                     </div>
                     {proofGenerationStep?.includes("30-60 seconds") && (
-                      <div className="mt-3 text-xs text-purple-700 dark:text-purple-300">
+                      <div className="mt-4 pt-4 border-t border-orange-200/50 dark:border-orange-800/50 text-xs font-medium text-orange-600 dark:text-orange-400">
                         {t(
                           "mintNFT.proofGenerationNote",
                           "ZK proof generation requires heavy cryptography. Please keep this tab active until completion.",
@@ -1379,17 +1392,17 @@ export default function MintNFTModal({
 
                 {/* Success Message */}
                 {successResult && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 animate-fadeIn">
                     {/* Success Header */}
-                    <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-50 to-fuchsia-50 dark:from-purple-900/20 dark:to-fuchsia-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
-                      <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                    <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700">
+                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                         <Check className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="text-base font-semibold text-purple-900 dark:text-purple-100">
+                        <h3 className="text-base font-bold text-green-900 dark:text-green-100">
                           {t("mintNFT.successTitle", "NFT Minted Successfully")}
                         </h3>
-                        <p className="text-sm text-purple-700 dark:text-purple-300">
+                        <p className="text-sm text-green-700 dark:text-green-300">
                           {t("mintNFT.successDesc", "Your NFT has been created on the blockchain")}
                         </p>
                       </div>
@@ -1398,20 +1411,20 @@ export default function MintNFTModal({
                     {/* Event Information - collapsible */}
                     {successResult.events.PersonNFTMinted && (
                       <details
-                        className="group bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700 overflow-hidden"
+                        className="group bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700 overflow-hidden"
                         open
                       >
-                        <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
+                        <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
                           <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                            <span className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                            <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
+                            <span className="text-sm font-bold text-orange-900 dark:text-orange-100">
                               {t("mintNFT.nftDetails", "NFT Details")}
                             </span>
-                            <span className="ml-2 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-800 px-2 py-0.5 rounded-full">
+                            <span className="ml-2 text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-800 px-2 py-0.5 rounded-full uppercase tracking-wide">
                               #{successResult.tokenId}
                             </span>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-purple-600 group-open:rotate-90 transition-transform" />
+                          <ChevronRight className="w-4 h-4 text-orange-600 group-open:rotate-90 transition-transform" />
                         </summary>
                         <div className="px-3 pb-3 space-y-3">
                           {/* Basic Info */}
@@ -1419,54 +1432,54 @@ export default function MintNFTModal({
                             <DataRow
                               label={t("mintNFT.personHash", "Person Hash")}
                               value={successResult.personHash}
-                              colorClass="purple"
+                              colorClass="orange"
                             />
                             <DataRow
                               label={t("mintNFT.tokenId", "Token ID")}
                               value={`#${successResult.tokenId}`}
-                              colorClass="purple"
+                              colorClass="orange"
                             />
                             <DataRow
                               label={t("mintNFT.versionIndex", "Version Index")}
                               value={successResult.versionIndex.toString()}
-                              colorClass="purple"
+                              colorClass="orange"
                             />
                             {successResult.tokenURI && (
                               <DataRow
                                 label={t("mintNFT.tokenURI", "Token URI")}
                                 value={successResult.tokenURI}
-                                colorClass="purple"
+                                colorClass="orange"
                               />
                             )}
                             <DataRow
                               label={t("mintNFT.owner", "Owner")}
                               value={successResult.events.PersonNFTMinted.owner}
-                              colorClass="purple"
+                              colorClass="orange"
                             />
                           </div>
 
                           {/* Transaction Info Section */}
-                          <div className="pt-2 border-t border-purple-200/50 dark:border-purple-700/50">
-                            <p className="text-xs font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                          <div className="pt-2 border-t border-orange-200/50 dark:border-orange-700/50">
+                            <p className="text-xs font-bold text-orange-800 dark:text-orange-200 mb-2 uppercase tracking-wide">
                               {t("mintNFT.transactionInfo", "Transaction Info")}
                             </p>
                             <div className="space-y-2">
                               <DataRow
                                 label={t("mintNFT.transactionHash", "Transaction Hash")}
                                 value={successResult.transactionHash}
-                                colorClass="purple"
+                                colorClass="orange"
                               />
                               <DataRow
                                 label={t("mintNFT.blockNumber", "Block Number")}
                                 value={successResult.blockNumber.toString()}
-                                colorClass="purple"
+                                colorClass="orange"
                               />
                               <DataRow
                                 label={t("mintNFT.timestamp", "Timestamp")}
                                 value={new Date(
                                   Number(successResult.events.PersonNFTMinted.timestamp) * 1000,
                                 ).toLocaleString()}
-                                colorClass="purple"
+                                colorClass="orange"
                                 isPlainText
                               />
                             </div>
@@ -1479,38 +1492,38 @@ export default function MintNFTModal({
 
                 {/* Error Message */}
                 {errorResult && (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-700 animate-fadeIn">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
                         <AlertTriangle className="w-5 h-5 text-white" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-base font-semibold text-red-900 dark:text-red-100 mb-2">
+                        <p className="text-base font-bold text-red-900 dark:text-red-100 mb-2">
                           {t("mintNFT.mintFailed", "NFT Minting Failed")}
                         </p>
                         <div className="space-y-2">
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                            <span className="text-xs font-bold text-red-800 dark:text-red-200 uppercase tracking-wide">
                               {t("mintNFT.errorType", "Error Type")}
                             </span>
-                            <code className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded font-mono text-xs">
+                            <code className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1.5 rounded-lg font-mono text-xs">
                               {errorResult.type}
                             </code>
                           </div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                            <span className="text-xs font-bold text-red-800 dark:text-red-200 uppercase tracking-wide">
                               {t("mintNFT.errorMessage", "Message")}
                             </span>
-                            <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
+                            <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1.5 rounded-lg text-xs font-medium">
                               {errorResult.message}
                             </p>
                           </div>
                           {errorResult.details !== errorResult.message && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                              <span className="text-xs font-bold text-red-800 dark:text-red-200 uppercase tracking-wide">
                                 {t("mintNFT.errorDetails", "Details")}
                               </span>
-                              <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
+                              <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1.5 rounded-lg text-xs font-medium">
                                 {errorResult.details}
                               </p>
                             </div>
@@ -1523,21 +1536,21 @@ export default function MintNFTModal({
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+              <div className="flex flex-col-reverse sm:flex-row gap-4 p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 {successResult ? (
                   // Success state: Show Continue Minting and Close buttons
                   <>
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                      className="flex-1 px-6 py-4 rounded-full border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all font-bold text-sm"
                     >
                       {t("common.close", "Close")}
                     </button>
                     <button
                       type="button"
                       onClick={handleContinueMinting}
-                      className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                      className="flex-1 px-6 py-4 bg-gradient-to-r from-orange-400 to-red-600 hover:from-orange-500 hover:to-red-700 text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 rounded-full transition-all hover:scale-[1.02] active:scale-95 font-bold text-sm"
                     >
                       {t("mintNFT.continueMinting", "Continue Minting")}
                     </button>
@@ -1548,7 +1561,7 @@ export default function MintNFTModal({
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                      className="flex-1 px-6 py-4 rounded-full border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all font-bold text-sm"
                     >
                       {t("common.cancel", "Cancel")}
                     </button>
@@ -1561,7 +1574,7 @@ export default function MintNFTModal({
                             type="button"
                             onClick={() => setShowEndorseConfirm(true)}
                             disabled={isCheckingStatus}
-                            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                            className="flex-[1.5] px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-[1.02] active:scale-95 text-sm font-bold"
                           >
                             {t("mintNFT.goEndorse", "Go Endorse")}
                           </button>
@@ -1575,11 +1588,19 @@ export default function MintNFTModal({
                               !hasPersonInfo ||
                               !hasTargetInputs
                             }
-                            className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                            className="flex-[1.5] px-6 py-4 bg-gradient-to-r from-orange-400 to-red-600 hover:from-orange-500 hover:to-red-700 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 rounded-full disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all hover:scale-[1.02] active:scale-95 text-sm font-bold flex items-center justify-center gap-2"
                           >
-                            {isSubmitting
-                              ? t("mintNFT.minting", "Minting...")
-                              : t("mintNFT.mint", "Mint NFT")}
+                            {isSubmitting ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>{t("mintNFT.minting", "Minting...")}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>{t("mintNFT.mint", "Mint NFT")}</span>
+                                <ChevronRight className="w-4 h-4 opacity-80" />
+                              </>
+                            )}
                           </button>
                         )}
                       </>
@@ -1593,17 +1614,20 @@ export default function MintNFTModal({
         {/* Confirm to jump to endorse */}
         {showEndorseConfirm && (
           <div
-            className="absolute inset-0 z-30 flex items-center justify-center p-4"
+            className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn"
             onClick={() => setShowEndorseConfirm(false)}
           >
             <div
-              className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl p-5"
+              className="w-full max-w-sm rounded-3xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-2xl p-6"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
                 {t("mintNFT.endorsementRequiredTitle", "Endorsement Required")}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
                 {t(
                   "mintNFT.endorsementRequiredDesc",
                   "You must endorse this version before minting. Would you like to go endorse now?",
@@ -1613,14 +1637,14 @@ export default function MintNFTModal({
                 <button
                   type="button"
                   onClick={() => setShowEndorseConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+                  className="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all font-bold text-sm"
                 >
                   {t("common.cancel", "Cancel")}
                 </button>
                 <button
                   type="button"
                   onClick={handleGoEndorse}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95 text-sm font-bold"
                 >
                   {t("mintNFT.goEndorse", "Go Endorse")}
                 </button>

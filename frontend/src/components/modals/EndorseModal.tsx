@@ -797,7 +797,7 @@ export default function EndorseModal({
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
-          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
+          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
           onClick={(e) => e.stopPropagation()}
           style={{
             transform: dragging ? `translateY(${dragOffset}px)` : undefined,
@@ -806,7 +806,7 @@ export default function EndorseModal({
         >
           {/* Header */}
           <div
-            className="sticky top-0 bg-gradient-to-br from-green-500/10 via-blue-500/8 to-indigo-500/10 dark:from-green-600/20 dark:via-blue-600/15 dark:to-indigo-600/20 p-4 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
+            className="sticky top-0 bg-white/80 dark:bg-gray-950/80 p-6 border-b border-gray-100 dark:border-gray-800 z-20 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
             onPointerDown={(e) => {
               (e.currentTarget as any).setPointerCapture?.(e.pointerId);
               startYRef.current = e.clientY;
@@ -846,22 +846,20 @@ export default function EndorseModal({
             }}
           >
             {/* Drag handle (mobile only) */}
-            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
+            <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-800" />
 
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                  <Star className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20 flex-shrink-0">
+                  <Star className="w-6 h-6 text-white" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-0.5">
                     {t("endorse.title", "Endorse Version")}
                   </h2>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    <span className="whitespace-nowrap">
-                      {t("endorse.description", "Support quality data by endorsing versions")}
-                    </span>
-                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                    {t("endorse.description", "Support quality data by endorsing versions")}
+                  </p>
                 </div>
               </div>
               <button
@@ -872,27 +870,27 @@ export default function EndorseModal({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors flex-shrink-0"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0 group"
                 aria-label={t("common.close", "Close")}
               >
-                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <X className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
               </button>
             </div>
           </div>
 
           {/* Form Content */}
           <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0 touch-pan-y">
-            <div className="flex-1 p-4 sm:p-6 space-y-6">
+            <div className="flex-1 p-6 space-y-8">
               {/* Person Hash and Version Input (always shown as editable) */}
               <div className="space-y-4">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-50">
                   {t("endorse.targetVersion", "Target Version")}
                 </h3>
 
-                <div className="p-4 bg-amber-50/50 dark:bg-amber-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
-                  <div className="space-y-4 sm:space-y-0 sm:flex sm:items-start sm:gap-4">
-                    <div className="sm:flex-1">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 space-y-2">
+                      <label className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                         {t("endorse.personHash", "Person Hash")}{" "}
                         <span className="text-red-500">*</span>
                       </label>
@@ -900,16 +898,16 @@ export default function EndorseModal({
                         type="text"
                         value={personHash}
                         onChange={(e) => setPersonHash(e.target.value)}
-                        className={`w-full h-10 rounded-md border bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 outline-none transition font-mono ${
+                        className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 font-mono transition-all outline-none ${
                           hashInputInvalid
-                            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/30 dark:border-red-400 dark:focus:border-red-400 dark:focus:ring-red-400/30"
-                            : "border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
+                            ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:border-red-500"
+                            : "border-gray-200 dark:border-gray-700 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
                         }`}
                         placeholder={t("search.versionsQuery.placeholder")}
                       />
                       {hashInputInvalid && (
-                        <div className="mt-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
+                        <div className="flex items-center gap-2 text-xs font-medium text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/30">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                           {t(
                             "endorse.invalidPersonHashFormat",
                             "Person hash must be 0x-prefixed 32-byte hex (64 hex chars).",
@@ -917,40 +915,40 @@ export default function EndorseModal({
                         </div>
                       )}
                       {!hashInputInvalid && hasValidTarget && (
-                        <div className="mt-3 space-y-1 text-sm">
+                        <div className="pt-2 animate-fadeIn">
                           {isTargetValidOnChain && (
                             <div className="flex flex-wrap items-center gap-3">
                               {displayName && (
-                                <div className="font-medium text-gray-900 dark:text-gray-100">
+                                <div className="font-bold text-gray-900 dark:text-gray-100 px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-sm">
                                   {displayName}
                                 </div>
                               )}
-                              <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                <span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  {t("endorse.currentEndorsements", "Current Endorsements")}
+                              <div className="flex items-center gap-2 px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                                <span className="text-xs font-bold uppercase tracking-wider text-orange-700 dark:text-orange-300">
+                                  {t("endorse.currentEndorsements", "Endorsements")}
                                 </span>
-                                <span className="text-sm font-mono text-purple-800 dark:text-purple-200">
+                                <span className="text-sm font-bold font-mono text-orange-800 dark:text-orange-200">
                                   {currentEndorsementCount}
                                 </span>
                               </div>
                             </div>
                           )}
                           {!isTargetValidOnChain && (
-                            <div className="text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
-                              <AlertCircle className="w-4 h-4 mt-0.5" />
-                              <div>
-                                <span className="font-medium">
+                            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-bold text-amber-900 dark:text-amber-100">
                                   {t(
                                     "endorse.invalidTarget",
                                     "Invalid person hash or version index",
                                   )}
-                                </span>
-                                <div>
+                                </p>
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
                                   {t(
                                     "endorse.invalidTargetDesc",
                                     "Please verify the hash and index refer to an existing version",
                                   )}
-                                </div>
+                                </p>
                               </div>
                             </div>
                           )}
@@ -958,8 +956,8 @@ export default function EndorseModal({
                       )}
                     </div>
 
-                    <div className="w-32">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <div className="w-full sm:w-32 space-y-2">
+                      <label className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                         {t("endorse.versionIndex", "Version Index")}{" "}
                         <span className="text-red-500">*</span>
                       </label>
@@ -968,7 +966,7 @@ export default function EndorseModal({
                         min="1"
                         value={versionIndex}
                         onChange={(e) => setVersionIndex(parseInt(e.target.value) || 1)}
-                        className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                        className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
                         placeholder="1"
                       />
                     </div>
@@ -978,22 +976,27 @@ export default function EndorseModal({
               </div>
 
               {/* DEEP Token Fee & Distribution Info */}
-              <div className="bg-gradient-to-br from-purple-50 to-amber-50 dark:from-purple-900/20 dark:to-amber-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-                <div className="text-xs text-purple-700 dark:text-purple-300 space-y-2">
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="font-medium text-purple-800 dark:text-purple-200">
+              <div className="bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                        <Coins className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      </div>
                       {t("endorse.deepTokenFee", "Endorsement fee")}
                     </span>
-                    <span className="font-mono text-purple-800 dark:text-purple-100">
-                      {deepTokenFee} DEEP
+                    <span className="font-bold font-mono text-xl text-orange-600 dark:text-orange-400">
+                      {deepTokenFee} <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">DEEP</span>
                     </span>
                   </div>
 
                   {/* User Balance */}
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span>{t("endorse.yourBalance", "Your balance")}:</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">
+                      {t("endorse.yourBalance", "Your balance")}:
+                    </span>
                     <span
-                      className={`font-mono ${canAffordEndorsement ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                      className={`font-mono font-bold ${canAffordEndorsement ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                     >
                       {userDeepBalance} DEEP
                     </span>
@@ -1001,9 +1004,9 @@ export default function EndorseModal({
 
                   {/* Inline insufficient balance warning */}
                   {!canAffordEndorsement && !hasEndorsed && (
-                    <div className="flex items-start gap-2 text-red-700 dark:text-red-300">
-                      <AlertCircle className="w-4 h-4 mt-0.5 text-red-600 dark:text-red-400" />
-                      <p className="text-sm">
+                    <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/30">
+                      <AlertCircle className="w-4 h-4 mt-0.5 text-red-600 dark:text-red-400 shrink-0" />
+                      <p className="text-xs font-bold text-red-700 dark:text-red-300">
                         {t(
                           "endorse.needMoreTokens",
                           "You need more DEEP tokens to endorse this version",
@@ -1013,15 +1016,18 @@ export default function EndorseModal({
                   )}
 
                   {/* Distribution Rule */}
-                  <div className="pt-2 mt-2 border-t border-purple-200/50 dark:border-purple-700/50">
-                    <div className="flex items-start gap-2">
-                      <span className="font-medium shrink-0">
-                        {t("endorse.feeDistribution", "Fee Distribution")}:
-                      </span>
-                      <span>
+                  <div className="pt-3 mt-1 border-t border-orange-100 dark:border-orange-900/10">
+                    <div className="flex flex-col gap-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                          <div className="w-1 h-3 rounded-full bg-gradient-to-b from-orange-400 to-red-600"></div>
+                          {t("endorse.feeDistribution", "Fee Distribution")}
+                        </span>
+                      </div>
+                      <span className="text-gray-600 dark:text-gray-400 leading-relaxed pl-2.5">
                         {isNFTMinted ? (
                           <>
-                            <strong>{t("endorse.nftMinted", "NFT Minted")}:</strong>{" "}
+                            <strong className="text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">{t("endorse.nftMinted", "NFT Minted")}</strong>
                             {t(
                               "endorse.feeToNFTHolder",
                               "{{recipientPercent}}% to NFT holder, {{protocolPercent}}% protocol fee",
@@ -1033,7 +1039,7 @@ export default function EndorseModal({
                           </>
                         ) : (
                           <>
-                            <strong>{t("endorse.noNFT", "No NFT Yet")}:</strong>{" "}
+                            <strong className="text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">{t("endorse.noNFT", "No NFT Yet")}</strong>
                             {t(
                               "endorse.feeToCreator",
                               "{{recipientPercent}}% to version creator, {{protocolPercent}}% protocol fee",
@@ -1050,37 +1056,44 @@ export default function EndorseModal({
                 </div>
               </div>
 
-              {/* Post-endorsement balance info */}
               {/* Endorsement Benefits */}
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
+              <div className="bg-gradient-to-br from-orange-50/50 to-red-50/50 dark:from-orange-900/5 dark:to-red-900/5 rounded-2xl border border-orange-100/50 dark:border-orange-900/20 p-5 mt-4">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-orange-500 dark:text-orange-400 fill-orange-500/20" />
                   {t("endorse.benefits", "Benefits of Endorsing")}
                 </h3>
-                <ul className="text-xs text-green-700 dark:text-green-200 space-y-1 list-disc list-inside">
-                  <li>{t("endorse.benefitQuality", "Help verify and improve data quality")}</li>
-                  <li>
-                    {t(
-                      "endorse.benefitPriority",
-                      "Endorsed versions get higher priority in searches",
-                    )}
-                  </li>
-                  <li>{t("endorse.benefitNFT", "Required step before minting NFTs")}</li>
-                  <li>{t("endorse.benefitEconomy", "Support version creators and NFT holders")}</li>
+                <ul className="space-y-2.5">
+                  {[
+                    t("endorse.benefitQuality", "Help verify and improve data quality"),
+                    t("endorse.benefitPriority", "Endorsed versions get higher priority in searches"),
+                    t("endorse.benefitNFT", "Required step before minting NFTs"),
+                    t("endorse.benefitEconomy", "Support version creators and NFT holders"),
+                  ].map((benefit, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <div className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 mt-0.5">
+                        <Check className="w-2.5 h-2.5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <span className="leading-relaxed">{benefit}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
               {/* Progress Indicator with Wallet Guidance */}
               {(isSubmitting || isApproving) && !successResult && !errorResult && (
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20 animate-fadeIn">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-10 h-10 flex-shrink-0">
+                      <div className="absolute inset-0 rounded-full border-4 border-orange-200 dark:border-orange-800 opacity-30"></div>
+                      <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-orange-100 mb-1">
                         {isApproving
                           ? t("endorse.approving", "Approving DEEP tokens...")
                           : t("endorse.endorsing", "Endorsing version...")}
                       </p>
-                      <p className="text-xs text-green-700 dark:text-green-300">
+                      <p className="text-xs font-medium text-orange-700 dark:text-orange-300">
                         {isApproving
                           ? t(
                               "endorse.approvingDesc",
@@ -1098,17 +1111,17 @@ export default function EndorseModal({
 
               {/* Success Message */}
               {successResult && (
-                <div className="space-y-4">
+                <div className="space-y-4 animate-fadeIn">
                   {/* Success Header */}
-                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                    <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-6 h-6 text-white" />
+                  <div className="flex items-center gap-4 p-5 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-100 dark:border-green-800">
+                    <div className="w-12 h-12 rounded-full bg-green-500 shadow-lg shadow-green-500/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-6 h-6 text-white stroke-[3]" />
                     </div>
                     <div>
-                      <h3 className="text-base font-semibold text-green-900 dark:text-green-100">
+                      <h3 className="text-lg font-bold text-green-900 dark:text-green-100">
                         {t("endorse.successTitle", "Endorsement Successful")}
                       </h3>
-                      <p className="text-sm text-green-700 dark:text-green-300">
+                      <p className="text-sm font-medium text-green-700 dark:text-green-300">
                         {t("endorse.successDesc", "Version has been successfully endorsed")}
                       </p>
                     </div>
@@ -1117,16 +1130,16 @@ export default function EndorseModal({
                   {/* Complete Event Information */}
                   {successResult.events.PersonVersionEndorsed && (
                     <details
-                      className="group bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 overflow-hidden"
+                      className="group bg-green-50/50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-800 overflow-hidden"
                       open
                     >
-                      <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                          <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                      <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-green-100/50 dark:hover:bg-green-900/20 transition-colors select-none">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full shadow-sm shadow-green-500/50"></div>
+                          <span className="text-sm font-bold text-green-900 dark:text-green-100">
                             {t("endorse.endorsementDetails", "Endorsement Details")}
                           </span>
-                          <span className="ml-2 text-xs font-semibold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-800 px-2 py-0.5 rounded-full">
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-800/50 px-2 py-0.5 rounded-full border border-green-200 dark:border-green-700/50">
                             {(
                               Number(successResult.events.PersonVersionEndorsed.endorsementFee) /
                               Math.pow(10, deepTokenDecimals)
@@ -1134,11 +1147,11 @@ export default function EndorseModal({
                             {deepTokenSymbol}
                           </span>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-green-600 group-open:rotate-90 transition-transform" />
+                        <ChevronRight className="w-5 h-5 text-green-500 group-open:rotate-90 transition-transform" />
                       </summary>
-                      <div className="px-3 pb-3 space-y-3">
+                      <div className="px-4 pb-4 space-y-4">
                         {/* Basic Info */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 p-3 bg-white/50 dark:bg-gray-900/50 rounded-xl border border-green-100/50 dark:border-green-800/30">
                           <DataRow
                             label={t("endorse.personHash", "Person Hash")}
                             value={successResult.personHash}
@@ -1158,7 +1171,7 @@ export default function EndorseModal({
 
                         {/* Fee Distribution Section */}
                         <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
-                          <p className="text-xs font-semibold text-green-800 dark:text-green-200 mb-2">
+                          <p className="text-xs font-bold text-green-800 dark:text-green-200 mb-3 uppercase tracking-wider opacity-80">
                             {t("endorse.feeDistribution", "Fee Distribution")}
                           </p>
                           <div className="space-y-2">
@@ -1205,7 +1218,7 @@ export default function EndorseModal({
 
                         {/* Transaction Info Section */}
                         <div className="pt-2 border-t border-green-200/50 dark:border-green-700/50">
-                          <p className="text-xs font-semibold text-green-800 dark:text-green-200 mb-2">
+                          <p className="text-xs font-bold text-green-800 dark:text-green-200 mb-3 uppercase tracking-wider opacity-80">
                             {t("endorse.transactionInfo", "Transaction Info")}
                           </p>
                           <div className="space-y-2">
@@ -1237,38 +1250,38 @@ export default function EndorseModal({
 
               {/* Error Message */}
               {errorResult && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-                      <AlertTriangle className="w-5 h-5 text-white" />
+                <div className="p-5 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-800 animate-fadeIn">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center flex-shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-red-900 dark:text-red-100 mb-2">
+                      <p className="text-base font-bold text-red-900 dark:text-red-100 mb-3">
                         {t("endorse.endorseFailed", "Endorsement Failed")}
                       </p>
-                      <div className="space-y-2">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-xs font-bold uppercase tracking-wider text-red-800 dark:text-red-200 opacity-80">
                             {t("endorse.errorType", "Error Type")}
                           </span>
-                          <code className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded font-mono text-xs">
+                          <code className="block bg-white dark:bg-black/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100 px-3 py-2 rounded-xl font-mono text-xs break-all">
                             {errorResult.type}
                           </code>
                         </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-xs font-bold uppercase tracking-wider text-red-800 dark:text-red-200 opacity-80">
                             {t("endorse.errorMessage", "Message")}
                           </span>
-                          <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
+                          <p className="bg-white dark:bg-black/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100 px-3 py-2 rounded-xl text-xs leading-relaxed">
                             {errorResult.message}
                           </p>
                         </div>
                         {errorResult.details !== errorResult.message && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium text-red-800 dark:text-red-200">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-bold uppercase tracking-wider text-red-800 dark:text-red-200 opacity-80">
                               {t("endorse.errorDetails", "Details")}
                             </span>
-                            <p className="bg-red-100 dark:bg-red-800 text-red-900 dark:text-red-100 px-2 py-1 rounded text-xs">
+                            <p className="bg-white dark:bg-black/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100 px-3 py-2 rounded-xl text-xs leading-relaxed">
                               {errorResult.details}
                             </p>
                           </div>
@@ -1277,13 +1290,13 @@ export default function EndorseModal({
 
                       {/* Retry button for wallet timeout */}
                       {errorResult.type === "WALLET_TIMEOUT" && (
-                        <div className="mt-3">
+                        <div className="mt-4">
                           <button
                             onClick={() => {
                               setErrorResult(null);
                               handleEndorse(true);
                             }}
-                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition-colors"
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-all shadow-md shadow-red-500/20 active:scale-95"
                           >
                             {t("endorse.retryTransaction", "Retry Transaction")}
                           </button>
@@ -1296,10 +1309,10 @@ export default function EndorseModal({
 
               {/* Legacy Success Message (for backwards compatibility) */}
               {hasEndorsed && !successResult && (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                <div className="bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-800 rounded-2xl p-4">
+                  <div className="flex items-center gap-3">
+                    <Star className="w-5 h-5 text-green-600 dark:text-green-400 fill-current" />
+                    <span className="text-sm font-bold text-green-900 dark:text-green-100">
                       {t("endorse.successMessage", "You have successfully endorsed this version!")}
                     </span>
                   </div>
@@ -1308,23 +1321,23 @@ export default function EndorseModal({
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex gap-3 p-4 sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+            <div className="flex gap-4 p-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 pb-[calc(4rem+env(safe-area-inset-bottom))] sticky bottom-0 z-20">
               {successResult ? (
                 // Success state: Show Close, Continue Endorsing and Go to Mint NFT buttons
-                <>
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                    className="flex-1 px-5 py-3.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-bold text-sm shadow-sm hover:shadow-md active:scale-95"
                   >
                     {t("common.close", "Close")}
                   </button>
                   <button
                     type="button"
                     onClick={handleContinueEndorsing}
-                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    className="flex-1 px-5 py-3.5 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-xl hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all font-bold text-sm shadow-sm hover:shadow-md active:scale-95 flex items-center justify-center gap-2.5"
                   >
-                    <Star className="w-4 h-4" />
+                    <Star className="w-4 h-4 fill-current/20" />
                     {t("endorse.continueEndorsing", "Continue Endorsing")}
                   </button>
                   <button
@@ -1335,19 +1348,19 @@ export default function EndorseModal({
                         onMintNFT(successResult.personHash, successResult.versionIndex);
                       }
                     }}
-                    className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    className="flex-1 px-5 py-3.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all font-bold text-sm flex items-center justify-center gap-2.5"
                   >
-                    <Image className="w-4 h-4" />
+                    <Image className="w-4 h-4 fill-current/20" />
                     {t("endorse.goToMintNFT", "Go to Mint NFT")}
                   </button>
-                </>
+                </div>
               ) : (
                 // Normal state: Show Cancel and Endorse buttons
-                <>
+                <div className="flex gap-3 w-full">
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                    className="flex-1 px-5 py-3.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-bold text-sm shadow-sm hover:shadow-md active:scale-95"
                   >
                     {t("common.cancel", "Cancel")}
                   </button>
@@ -1362,7 +1375,7 @@ export default function EndorseModal({
                       !isTargetValidOnChain ||
                       !isPersonHashFormatValid
                     }
-                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    className="flex-[2] px-6 py-3.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none transition-all font-bold text-sm flex items-center justify-center gap-2"
                   >
                     {isApproving ? (
                       <div className="flex items-center justify-center gap-2">
@@ -1375,15 +1388,18 @@ export default function EndorseModal({
                         {t("endorse.endorsing", "Endorsing...")}
                       </div>
                     ) : hasEndorsed ? (
-                      t("endorse.endorsed", "Endorsed!")
+                      <div className="flex items-center justify-center gap-2">
+                         <Check className="w-4 h-4" />
+                         {t("endorse.endorsed", "Endorsed!")}
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center gap-2">
-                        <Star className="w-4 h-4" />
+                        <Star className="w-4 h-4 fill-current/20" />
                         {t("endorse.endorse", "Endorse")}
                       </div>
                     )}
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>
