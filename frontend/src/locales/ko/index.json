@@ -1263,6 +1263,9 @@
       }
     }
   },
+  "logo": {
+    "converter": "로고 변환기"
+  },
   "decryptMetadata": {
     "title": "메타데이터 복호화",
     "source": "암호화된 데이터 가져오기",

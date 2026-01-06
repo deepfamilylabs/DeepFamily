@@ -1263,6 +1263,9 @@
       }
     }
   },
+  "logo": {
+    "converter": "Logo 转换器"
+  },
   "decryptMetadata": {
     "title": "解密元数据",
     "source": "获取加密数据",

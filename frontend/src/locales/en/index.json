@@ -1262,6 +1262,9 @@
       }
     }
   },
+  "logo": {
+    "converter": "Logo Converter"
+  },
   "decryptMetadata": {
     "title": "Decrypt Metadata",
     "source": "Fetch Encrypted Data",
