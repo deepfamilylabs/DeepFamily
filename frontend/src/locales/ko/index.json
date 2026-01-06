@@ -859,6 +859,7 @@
     "died": "사망",
     "storyInfo": "전기 정보",
     "chunksCount": "{{count}}개 샤드, {{length}}바이트",
+    "chunksAndSize": "{{count}}개 샤드 · {{size}}바이트",
     "addedBy": "추가자",
     "tag": "태그",
     "personHash": "인물 해시",

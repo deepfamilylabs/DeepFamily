@@ -800,7 +800,7 @@ export default function MintNFTModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden touch-pan-y"
+      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
       onClick={isDesktop ? undefined : handleClose}
     >
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
@@ -1593,7 +1593,7 @@ export default function MintNFTModal({
         {/* Confirm to jump to endorse */}
         {showEndorseConfirm && (
           <div
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+            className="absolute inset-0 z-30 flex items-center justify-center p-4"
             onClick={() => setShowEndorseConfirm(false)}
           >
             <div

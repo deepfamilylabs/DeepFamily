@@ -517,7 +517,7 @@ export const PersonHashCalculator = forwardRef<
                   <>
                     {/* Backdrop */}
                     <div
-                      className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40"
+                      className="fixed inset-0 z-40"
                       onClick={() => setShowPassphraseHelp(false)}
                     />
                     {/* Modal */}

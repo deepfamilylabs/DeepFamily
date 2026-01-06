@@ -860,6 +860,7 @@
     "died": "Died",
     "storyInfo": "Biography Info",
     "chunksCount": "{{count}} profile chunks, {{length}} bytes",
+    "chunksAndSize": "{{count}} chunks · {{size}} bytes",
     "addedBy": "Added By",
     "tag": "Tag",
     "personHash": "Person Hash",

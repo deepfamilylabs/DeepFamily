@@ -222,7 +222,7 @@ export default function NodeDetailModal({
 
   const modal = createPortal(
     <div
-      className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden touch-pan-y"
+      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
       onClick={handleClose}
     >
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 pb-[env(safe-area-inset-bottom)] sm:p-4">

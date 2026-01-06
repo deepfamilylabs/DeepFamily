@@ -861,6 +861,7 @@
     "died": "逝世",
     "storyInfo": "传记信息",
     "chunksCount": "{{count}} 个资料分片，{{length}} 字节",
+    "chunksAndSize": "{{count}} 个分片 · {{size}} 字节",
     "addedBy": "添加者",
     "tag": "标签",
     "personHash": "人物哈希",

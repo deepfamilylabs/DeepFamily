@@ -791,7 +791,7 @@ export default function EndorseModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-sm overflow-x-hidden touch-pan-y"
+      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
       onClick={isDesktop ? undefined : handleClose}
     >
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
