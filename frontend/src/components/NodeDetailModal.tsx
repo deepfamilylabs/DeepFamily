@@ -162,61 +162,42 @@ export default function NodeDetailModal({
     copy?: string;
     color?: "purple" | "emerald" | "blue" | "amber" | "pink" | "slate";
   }> = ({ label, value, copy, color = "slate" }) => {
-    const colorClasses = {
+    // xAI Style: "High End" = Clean White/Black + Colored Accent Indicator + Glow
+    const containerClasses = {
       purple:
-        "bg-purple-50/30 dark:bg-purple-900/5 border-purple-100/40 dark:border-purple-800/15 hover:border-purple-200/60 dark:hover:border-purple-700/25",
+        "border-l-purple-500/80 hover:shadow-[0_8px_30px_-4px_rgba(168,85,247,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(168,85,247,0.25)]",
       emerald:
-        "bg-emerald-50/30 dark:bg-emerald-900/5 border-emerald-100/40 dark:border-emerald-800/15 hover:border-emerald-200/60 dark:hover:border-emerald-700/25",
-      blue: "bg-blue-50/30 dark:bg-blue-900/5 border-blue-100/40 dark:border-blue-800/15 hover:border-blue-200/60 dark:hover:border-blue-700/25",
+        "border-l-emerald-500/80 hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.25)]",
+      blue: "border-l-blue-500/80 hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.25)]",
       amber:
-        "bg-amber-50/30 dark:bg-amber-900/5 border-amber-100/40 dark:border-amber-800/15 hover:border-amber-200/60 dark:hover:border-amber-700/25",
-      pink: "bg-pink-50/30 dark:bg-pink-900/5 border-pink-100/40 dark:border-pink-800/15 hover:border-pink-200/60 dark:hover:border-pink-700/25",
+        "border-l-amber-500/80 hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.25)]",
+      pink: "border-l-pink-500/80 hover:shadow-[0_8px_30px_-4px_rgba(236,72,153,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(236,72,153,0.25)]",
       slate:
-        "bg-indigo-50/30 dark:bg-indigo-900/5 border-indigo-100/40 dark:border-indigo-800/15 hover:border-indigo-200/60 dark:hover:border-indigo-700/25",
+        "border-l-gray-400 hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.25)]",
     };
-    const labelColorClasses = {
-      purple: "text-gray-700 dark:text-gray-300",
-      emerald: "text-gray-700 dark:text-gray-300",
-      blue: "text-gray-700 dark:text-gray-300",
-      amber: "text-gray-700 dark:text-gray-300",
-      pink: "text-gray-700 dark:text-gray-300",
-      slate: "text-gray-700 dark:text-gray-300",
-    };
-    const valueColorClasses = {
-      purple: "text-gray-900 dark:text-gray-100",
-      emerald: "text-gray-900 dark:text-gray-100",
-      blue: "text-gray-900 dark:text-gray-100",
-      amber: "text-gray-900 dark:text-gray-100",
-      pink: "text-gray-900 dark:text-gray-100",
-      slate: "text-gray-900 dark:text-gray-100",
-    };
-    const buttonColorClasses = {
-      purple: "hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400",
-      emerald: "hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400",
-      blue: "hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400",
-      amber: "hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400",
-      pink: "hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400",
-      slate: "hover:bg-gray-100/60 dark:hover:bg-gray-700/30 text-gray-500 dark:text-gray-400",
-    };
+
+    // Keep labels neutral and clean
+    const labelClasses = "text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5";
+    
+    const valueClasses = "text-sm font-medium text-gray-900 dark:text-gray-100 leading-relaxed";
+
     return (
       <div
-        className={`flex items-center gap-3 p-3.5 rounded-xl border transition-colors ${colorClasses[color]}`}
+        className={`group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] ${containerClasses[color]}`}
       >
         <div className="min-w-0 flex-1">
-          <div className={`text-sm font-semibold mb-1.5 ${labelColorClasses[color]}`}>{label}</div>
-          <div className="flex items-center gap-2">
-            <div
-              className={`text-sm font-mono min-w-0 flex-1 break-all ${valueColorClasses[color]}`}
-            >
+          <div className={labelClasses}>{label}</div>
+          <div className="flex items-center gap-3">
+            <div className={`font-mono min-w-0 flex-1 break-all leading-relaxed ${valueClasses}`}>
               {value}
             </div>
             {copy ? (
               <button
                 aria-label={t("search.copy")}
                 onClick={() => onCopy(copy)}
-                className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${buttonColorClasses[color]}`}
+                className="opacity-0 group-hover:opacity-100 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
               >
-                <Clipboard size={15} strokeWidth={2.5} />
+                <Clipboard size={14} strokeWidth={2.5} />
               </button>
             ) : null}
           </div>
@@ -246,7 +227,7 @@ export default function NodeDetailModal({
     >
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 pb-[env(safe-area-inset-bottom)] sm:p-4">
         <div
-          className={`relative flex flex-col w-full max-w-[720px] ${hasNFT ? "h-[92vh]" : "h-auto max-h-[92vh] mb-2"} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
+          className={`relative flex flex-col w-full max-w-[720px] ${hasNFT ? "h-[92vh]" : "h-auto max-h-[92vh] mb-2"} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform ring-1 ring-black/5 dark:ring-white/10`}
           style={{
             transform: dragging ? `translateY(${dragOffset}px)` : undefined,
             transitionDuration: dragging ? "0ms" : undefined,
@@ -254,7 +235,7 @@ export default function NodeDetailModal({
           onClick={(e) => e.stopPropagation()}
         >
           <div
-            className="sticky top-0 bg-gradient-to-br from-blue-100/80 via-purple-100/60 to-blue-50/40 dark:from-gray-800 dark:via-gray-800/95 dark:to-gray-900 px-5 py-4 pt-7 sm:pt-5 sm:px-6 border-b border-gray-200 dark:border-gray-700 z-10 relative touch-none cursor-grab active:cursor-grabbing backdrop-blur-sm supports-[backdrop-filter]:bg-white/90 dark:supports-[backdrop-filter]:bg-gray-900/80"
+            className="sticky top-0 bg-white/80 dark:bg-gray-950/80 px-5 py-4 pt-7 sm:pt-6 sm:px-8 border-b border-gray-100 dark:border-gray-800 z-10 relative touch-none cursor-grab active:cursor-grabbing backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/60"
             onPointerDown={(e) => {
               (e.currentTarget as any).setPointerCapture?.(e.pointerId);
               startYRef.current = e.clientY;
@@ -294,18 +275,18 @@ export default function NodeDetailModal({
             }}
           >
             {/* Drag handle */}
-            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3 min-w-0 flex-1">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
-                  <User className="w-7 h-7 sm:w-8 sm:h-8 text-white" strokeWidth={2.5} />
+            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1 w-10 rounded-full bg-gray-200 dark:bg-gray-700" />
+            <div className="flex items-start justify-between gap-4 sm:gap-6">
+              <div className="flex items-start gap-4 min-w-0 flex-1">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20 flex-shrink-0 ring-4 ring-white dark:ring-gray-900">
+                  <User className="w-6 h-6 sm:w-7 sm:h-7 text-white" strokeWidth={2.5} />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[16px] sm:text-[17px] font-bold text-gray-900 dark:text-gray-50 truncate pr-2 tracking-tight leading-tight">
+                <div className="min-w-0 flex-1 pt-1">
+                  <div className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white truncate pr-2 tracking-tight leading-tight">
                     {t("familyTree.personVersionDetail.title")}
                   </div>
                   {/* Endorsement and People Encyclopedia badges under title */}
-                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <div className="flex items-center gap-2.5 mt-3 flex-wrap">
                     {nodeData?.personHash && nodeData?.versionIndex !== undefined && (
                       <button
                         onClick={(e) => {
@@ -319,14 +300,14 @@ export default function NodeDetailModal({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
-                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 py-1 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                        className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                         title={t("people.clickToEndorse", "Click to endorse this version")}
                       >
                         <Star
-                          className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500 dark:text-emerald-400 dark:fill-emerald-400"
-                          strokeWidth={0}
+                          className="w-4 h-4 text-gray-400 group-hover:text-white"
+                          strokeWidth={2}
                         />
-                        <span className="text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                           {endorsementCount}
                         </span>
                       </button>
@@ -347,14 +328,14 @@ export default function NodeDetailModal({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
-                        className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-950/60 border border-purple-200/60 dark:border-purple-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                        className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                         title={t(
                           "familyTree.nodeDetail.mintNFTTooltip",
                           "Mint this person as an NFT",
                         )}
                       >
-                        <Image className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
-                        <span className="hidden sm:inline text-[13px] font-semibold text-purple-700 dark:text-purple-300">
+                        <Image className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
+                        <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                           {t("actions.mintNFT", "Mint NFT")}
                         </span>
                       </button>
@@ -372,11 +353,11 @@ export default function NodeDetailModal({
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                          className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                           title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
                         >
-                          <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          <span className="hidden sm:inline text-[13px] font-semibold text-blue-700 dark:text-blue-400">
+                          <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
+                          <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                             {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
                           </span>
                         </button>
@@ -392,11 +373,11 @@ export default function NodeDetailModal({
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="inline-flex h-7 min-w-[36px] items-center gap-1 px-2 sm:px-2.5 py-1 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60 border border-green-200/60 dark:border-green-800/50 rounded-full transition-all duration-200 cursor-pointer justify-center sm:justify-start"
+                          className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                           title={t("familyTree.nodeDetail.editStory", "Edit Story")}
                         >
-                          <Edit2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                          <span className="hidden sm:inline text-[13px] font-semibold text-green-700 dark:text-green-400">
+                          <Edit2 className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
+                          <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                             {t("familyTree.nodeDetail.edit", "Edit")}
                           </span>
                         </button>
@@ -407,7 +388,7 @@ export default function NodeDetailModal({
               </div>
               <button
                 aria-label="close"
-                className="p-1.5 -mt-0.5 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-200 flex-shrink-0"
+                className="p-2 rounded-full bg-gray-100/50 dark:bg-gray-800/50 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-200 flex-shrink-0 hover:scale-105 active:scale-95"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleClose();
@@ -415,7 +396,7 @@ export default function NodeDetailModal({
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
               >
-                <X size={22} strokeWidth={2} />
+                <X size={20} strokeWidth={2.5} />
               </button>
             </div>
           </div>
@@ -501,8 +482,8 @@ export default function NodeDetailModal({
               <Row
                 label={t("familyTree.nodeDetail.cid")}
                 value={
-                  <div className="flex items-center gap-2">
-                    <span className="block break-all">{nodeData?.metadataCID || "-"}</span>
+                  <div className="flex items-center justify-between gap-3 w-full">
+                    <span className="block break-all min-w-0">{nodeData?.metadataCID || "-"}</span>
                     {nodeData?.metadataCID && (
                       <button
                         type="button"
@@ -512,7 +493,7 @@ export default function NodeDetailModal({
                           if (!cid) return;
                           navigate(`/decrypt?cid=${encodeURIComponent(cid)}`);
                         }}
-                        className="px-2 py-1 text-[12px] rounded-md border border-blue-200 dark:border-blue-600 text-blue-700 dark:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
+                        className="flex-shrink-0 whitespace-nowrap px-4 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 text-gray-500 hover:text-white dark:hover:text-white hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
                       >
                         {t("familyTree.nodeDetail.decrypt", "Decrypt and View")}
                       </button>
@@ -573,12 +554,12 @@ export default function NodeDetailModal({
                     color="slate"
                   />
                   {nodeData?.story && nodeData.story.trim() !== "" && (
-                    <div className="flex items-start gap-3 p-3.5 bg-blue-50/30 dark:bg-blue-900/5 rounded-xl border border-blue-100/40 dark:border-blue-800/15 hover:border-blue-200/60 dark:hover:border-blue-700/25 transition-colors">
+                    <div className="group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] border-l-blue-500/80 hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.25)] transition-all duration-300">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                           {t("familyTree.nodeDetail.story")}
                         </div>
-                        <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto">
+                        <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto font-medium">
                           {nodeData.story}
                         </div>
                       </div>

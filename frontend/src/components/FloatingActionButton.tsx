@@ -87,35 +87,30 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
         >
           {actions.map((action, index) => {
             const Icon = action.icon;
-            // Staggered delay for entrance only
-            const delayStyle = isOpen ? { transitionDelay: `${index * 50}ms` } : {};
-
+            
             return (
               <div
                 key={action.id}
-                style={delayStyle}
                 className={`
-                  transform transition-all duration-300 ease-out
-                  ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}
+                  transform
+                  ${isOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8 pointer-events-none"}
                 `}
               >
                 <button
                   onClick={() => handleActionClick(action.tab)}
                   className={`
-                    group flex items-center gap-3 pl-2 pr-5 py-2 rounded-full
-                    bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl
-                    border border-gray-100 dark:border-white/10
+                    group flex items-center gap-3 pl-4 pr-6 py-2.5 rounded-full
+                    bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800
                     shadow-sm hover:shadow-md
-                    transition-all duration-200 ease-out
-                    active:scale-95
+                    active:scale-95 focus:outline-none
                     w-full
-                    ${action.bgHover} ${action.borderHover} ${action.shadowHover}
+                    hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)]
                   `}
                 >
-                  <div className={`p-2 rounded-full transition-colors duration-300 flex-shrink-0 ${action.iconBg} ${action.colorClass}`}>
-                    <Icon className="w-4 h-4" strokeWidth={2.5} />
+                  <div className="flex-shrink-0 text-gray-400 group-hover:text-white">
+                    <Icon className="w-5 h-5" strokeWidth={2.5} />
                   </div>
-                  <span className="text-[14px] font-medium text-gray-700 dark:text-gray-200 group-hover:text-orange-500 dark:group-hover:text-orange-400 whitespace-nowrap transition-colors duration-200">
+                  <span className="text-[14px] font-bold tracking-wide text-gray-600 dark:text-gray-300 group-hover:text-white whitespace-nowrap">
                     {action.label}
                   </span>
                 </button>
