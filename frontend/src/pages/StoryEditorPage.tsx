@@ -1287,7 +1287,7 @@ export default function StoryEditorPage() {
       {showChunkTypeHelp &&
         createPortal(
           <div
-            className="fixed inset-0 z-[1002] flex items-center justify-center p-4 bg-black/50"
+            className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
             onClick={() => setShowChunkTypeHelp(false)}
             data-chunk-help-dialog
           >

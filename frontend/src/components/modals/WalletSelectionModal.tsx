@@ -47,7 +47,7 @@ export default function WalletSelectionModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300"
+      className="fixed inset-0 z-[1300] flex items-center justify-center p-4 transition-all duration-300"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="w-full max-w-md bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-8 relative overflow-hidden">

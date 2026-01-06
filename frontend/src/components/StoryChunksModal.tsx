@@ -87,7 +87,6 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<"chunks" | "full">("chunks");
   const [centerHint, setCenterHint] = useState<string | null>(null);
-  const [entered, setEntered] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const startYRef = useRef<number | null>(null);
@@ -451,26 +450,15 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  // Enter animation for mobile bottom sheet
-  useEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => setEntered(true));
-    } else {
-      setEntered(false);
-    }
-  }, [isOpen]);
-
   return createPortal(
     <div
-      className="fixed inset-0 z-[1200] bg-black/40 backdrop-blur-md overflow-x-hidden touch-pan-y"
+      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
       onClick={onClose}
     >
       {/* Modal Container */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-0 sm:p-4 pb-[env(safe-area-inset-bottom)]">
         <div
-          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-[85vh] bg-white dark:bg-[#0a0a0a] rounded-t-[32px] sm:rounded-[32px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-transform duration-500 cubic-bezier(0.19, 1, 0.22, 1) ${
-            entered ? "translate-y-0 scale-100" : "translate-y-full sm:translate-y-8 sm:scale-95"
-          }`}
+          className="relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-[85vh] bg-white dark:bg-[#0a0a0a] rounded-t-[32px] sm:rounded-[32px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-gray-800 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           style={{
             transform: dragging ? `translateY(${dragOffset}px)` : undefined,

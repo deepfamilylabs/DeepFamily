@@ -56,10 +56,7 @@ export default function ConfirmDialog({
   })();
   return createPortal(
     <div className="fixed inset-0 z-[1200] flex items-center justify-center">
-      <div
-        className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
-        onClick={onCancel}
-      />
+      <div className="fixed inset-0" onClick={onCancel} />
       <div className="relative bg-white dark:bg-gray-900 dark:border dark:border-gray-700 rounded-lg shadow-xl w-[420px] max-w-[95vw] p-6 transition-colors">
         <button
           aria-label="close"

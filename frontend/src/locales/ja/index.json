@@ -859,6 +859,7 @@
     "died": "死去",
     "storyInfo": "伝記情報",
     "chunksCount": "{{count}} 個のデータシャード、{{length}} バイト",
+    "chunksAndSize": "{{count}} 個のデータシャード · {{size}} バイト",
     "addedBy": "追加者",
     "tag": "タグ",
     "personHash": "人物ハッシュ",

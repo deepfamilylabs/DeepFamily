@@ -859,6 +859,7 @@
     "died": "逝世",
     "storyInfo": "傳記資訊",
     "chunksCount": "{{count}} 個資料分片，{{length}} 位元組",
+    "chunksAndSize": "{{count}} 個分片 · {{size}} 位元組",
     "addedBy": "添加者",
     "tag": "標籤",
     "personHash": "人物雜湊",
