@@ -10,22 +10,23 @@ export const HERO_STYLES = {
   gradientOverlay: "hidden", // Removed heavy overlay to keep it clean
 } as const;
 
-// Floating shape styles - Soft, Large, Colorful Blurs
+// Floating shape styles - Using radial-gradient for optimal performance
+// Gradients are GPU-friendly and produce similar soft glow effects as blur
 export const FLOATING_SHAPES = [
   {
-    // Left: Soft Blue/Cyan
+    // Left: Soft Blue/Cyan glow
     className:
-      "absolute top-1/2 left-0 w-[800px] h-[800px] bg-blue-100/80 rounded-full blur-[120px] -translate-x-1/4 -translate-y-1/2 mix-blend-multiply animate-float pointer-events-none",
+      "absolute top-1/2 left-0 w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(219,234,254,0.8)_0%,rgba(219,234,254,0.4)_30%,transparent_70%)] -translate-x-1/4 -translate-y-1/2 animate-float pointer-events-none will-change-transform",
   },
   {
-    // Right: Soft Pink/Orange
+    // Right: Soft Orange/Pink glow
     className:
-      "absolute top-1/2 right-0 w-[800px] h-[800px] bg-orange-100/80 rounded-full blur-[120px] translate-x-1/4 -translate-y-1/2 mix-blend-multiply animate-float animation-delay-2000 pointer-events-none",
+      "absolute top-1/2 right-0 w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(255,237,213,0.8)_0%,rgba(255,237,213,0.4)_30%,transparent_70%)] translate-x-1/4 -translate-y-1/2 animate-float animation-delay-2000 pointer-events-none will-change-transform",
   },
   {
-    // Center/Bottom: Very subtle purple for depth
+    // Center/Bottom: Subtle purple glow for depth
     className:
-      "absolute bottom-0 left-1/2 w-[600px] h-[400px] bg-purple-100/50 rounded-full blur-[100px] -translate-x-1/2 translate-y-1/4 mix-blend-multiply animate-pulse-soft pointer-events-none",
+      "absolute bottom-0 left-1/2 w-[600px] h-[400px] bg-[radial-gradient(ellipse,rgba(233,213,255,0.5)_0%,rgba(233,213,255,0.2)_40%,transparent_70%)] -translate-x-1/2 translate-y-1/4 animate-pulse-soft pointer-events-none will-change-transform",
   },
 ] as const;
 

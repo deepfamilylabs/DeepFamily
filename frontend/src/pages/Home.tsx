@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { memo, useEffect, useMemo, useRef, useState, lazy, Suspense, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { DynamicIcon } from "../components/home/DynamicIcon";
+import { Sparkles, ChevronDown } from "lucide-react";
 import LoadingFallback from "../components/home/LoadingFallback";
 import { useActivePath } from "../context/ActivePathContext";
 import {
@@ -23,7 +23,7 @@ const Tokenomics = lazy(() => import("../components/home/Tokenomics"));
 const Audience = lazy(() => import("../components/home/Audience"));
 const CallToAction = lazy(() => import("../components/home/CallToAction"));
 
-// Floating shapes component
+// Floating shapes component - uses CSS gradients for optimal performance
 const FloatingShapes = memo(() => (
   <div className="absolute inset-0 w-full h-full pointer-events-none">
     {FLOATING_SHAPE_CONSTANTS.map((shape, index) => (
@@ -32,18 +32,18 @@ const FloatingShapes = memo(() => (
   </div>
 ));
 
-// Scroll indicator component
+// Scroll indicator component - using direct import for performance
 const ScrollIndicator = memo(() => {
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     window.scrollTo({
       top: window.innerHeight,
       behavior: "smooth",
     });
-  };
+  }, []);
 
   return (
     <div className={SCROLL_INDICATOR_STYLES.container} onClick={handleScroll}>
-      <DynamicIcon name="ChevronDown" className={SCROLL_INDICATOR_STYLES.icon} />
+      <ChevronDown className={SCROLL_INDICATOR_STYLES.icon} />
     </div>
   );
 });
@@ -163,6 +163,7 @@ export default function Home() {
   const [pageCount, setPageCount] = useState(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastLoadAtRef = useRef<number>(0);
+  const hasScrolledRef = useRef(false);
 
   const sectionsPerPage = 1;
   const maxPages = Math.max(1, Math.ceil(HOME_SECTIONS.length / sectionsPerPage));
@@ -177,8 +178,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Optimized scroll handler - only set state once
     const onScroll = () => {
-      if (window.scrollY > 0) setHasUserScrolled(true);
+      if (!hasScrolledRef.current && window.scrollY > 0) {
+        hasScrolledRef.current = true;
+        setHasUserScrolled(true);
+      }
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -214,7 +219,7 @@ export default function Home() {
       <section className={HERO_STYLE_CONSTANTS.section}>
         <div className={HERO_STYLE_CONSTANTS.backgroundOverlay} />
 
-        {/* Floating background shapes with animations (deferred to improve first paint) */}
+        {/* Floating background shapes - uses CSS gradients for performance */}
         {showFloatingShapes && <FloatingShapes />}
 
         {/* Gradient overlay for depth */}
@@ -225,7 +230,7 @@ export default function Home() {
             {/* Enhanced Main Title with animations */}
             <div className={ANIMATION_CLASSES.FADE_IN_UP}>
               <div className={HERO_CONTENT_STYLES.badge}>
-                <DynamicIcon name="Sparkles" className={HERO_CONTENT_STYLES.badgeIcon} />
+                <Sparkles className={HERO_CONTENT_STYLES.badgeIcon} />
                 <span className={HERO_CONTENT_STYLES.badgeText}>Digital Legacy</span>
               </div>
 
