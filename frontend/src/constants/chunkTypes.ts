@@ -261,7 +261,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
   {
     value: 16,
     key: "gallery",
-    label: "Gallery",
+    label: "Media",
     icon: Image,
     colorClass: "text-fuchsia-600 dark:text-fuchsia-400",
     borderColorClass: "border-fuchsia-600 dark:border-fuchsia-400",

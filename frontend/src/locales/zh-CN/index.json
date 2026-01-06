@@ -16,7 +16,7 @@
     "anecdotes": "轶事趣闻",
     "controversies": "争议事件",
     "legacy": "历史影响",
-    "gallery": "图片图册",
+    "gallery": "媒体资料",
     "references": "参考资料",
     "notes": "补充备注",
     "unknown": "未知"
@@ -721,7 +721,7 @@
       "controversiesDesc": "争议、批评、丑闻",
       "closing": "结尾",
       "legacyDesc": "历史影响、影响力、纪念活动",
-      "galleryDesc": "照片、图片、多媒体",
+      "galleryDesc": "照片、视频、音频、文档等多媒体资料",
       "referencesDesc": "来源、引用、参考文献",
       "notesDesc": "附加说明、更正、澄清",
       "usageNotes": "使用说明",

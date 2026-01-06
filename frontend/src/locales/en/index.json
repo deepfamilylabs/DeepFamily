@@ -16,7 +16,7 @@
     "anecdotes": "Anecdotes",
     "controversies": "Controversies",
     "legacy": "Legacy",
-    "gallery": "Gallery",
+    "gallery": "Media",
     "references": "References",
     "notes": "Notes",
     "unknown": "Unknown"
@@ -721,7 +721,7 @@
       "controversiesDesc": "Disputes, criticisms, scandals",
       "closing": "Closing",
       "legacyDesc": "Historical impact, influence, commemorations",
-      "galleryDesc": "Photos, images, multimedia",
+      "galleryDesc": "Photos, videos, audio, documents, and multimedia",
       "referencesDesc": "Sources, citations, bibliography",
       "notesDesc": "Additional remarks, corrections, clarifications",
       "usageNotes": "Usage Notes",
