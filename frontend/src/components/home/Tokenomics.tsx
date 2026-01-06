@@ -1,8 +1,31 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Coins, TrendingUp, Award, Target, Wallet, PieChart } from "lucide-react";
+import { Coins, TrendingUp, Award, Target, Wallet, PieChart, BadgeCheck } from "lucide-react";
 import { ANIMATION_CLASSES } from "../../constants/animationStyles";
 import PageContainer from "../PageContainer";
+
+const BorderLine = ({ side, className = "" }: { side: 'left' | 'right'; className?: string }) => (
+  <div 
+    className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
+      ${side === 'left' ? 'left-0' : 'right-0'}
+      ${className}
+      group-hover:bg-slate-300
+    `}
+  >
+    {/* Top Cap */}
+    <div 
+      className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+        ${side === 'left' ? 'left-0' : 'right-0'}
+      `} 
+    />
+    {/* Bottom Cap */}
+    <div 
+      className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+        ${side === 'left' ? 'left-0' : 'right-0'}
+      `} 
+    />
+  </div>
+);
 
 const Tokenomics = memo(() => {
   const { t } = useTranslation();
@@ -10,106 +33,116 @@ const Tokenomics = memo(() => {
   const items = [
     {
       icon: Coins,
-      title: t("home.tokenomics.deepToken.title"),
-      description: t("home.tokenomics.deepToken.description"),
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-      border: "border-purple-100",
-      hoverBorder: "group-hover:border-purple-200",
-      hoverShadow: "group-hover:shadow-purple-500/10",
+      key: "deepToken",
     },
     {
       icon: Wallet,
-      title: t("home.tokenomics.supply.title"),
-      description: t("home.tokenomics.supply.description"),
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      border: "border-blue-100",
-      hoverBorder: "group-hover:border-blue-200",
-      hoverShadow: "group-hover:shadow-blue-500/10",
+      key: "supply",
     },
     {
       icon: Award,
-      title: t("home.tokenomics.mining.title"),
-      description: t("home.tokenomics.mining.description"),
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-      border: "border-emerald-100",
-      hoverBorder: "group-hover:border-emerald-200",
-      hoverShadow: "group-hover:shadow-emerald-500/10",
+      key: "mining",
     },
     {
-      icon: Coins,
-      title: t("home.tokenomics.endorsement.title"),
-      description: t("home.tokenomics.endorsement.description"),
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
-      border: "border-indigo-100",
-      hoverBorder: "group-hover:border-indigo-200",
-      hoverShadow: "group-hover:shadow-indigo-500/10",
+      icon: BadgeCheck,
+      key: "endorsement",
     },
     {
       icon: TrendingUp,
-      title: t("home.tokenomics.distribution.title"),
-      description: t("home.tokenomics.distribution.description"),
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-      border: "border-orange-100",
-      hoverBorder: "group-hover:border-orange-200",
-      hoverShadow: "group-hover:shadow-orange-500/10",
+      key: "distribution",
     },
     {
       icon: Target,
-      title: t("home.tokenomics.goal.title"),
-      description: t("home.tokenomics.goal.description"),
-      color: "text-rose-600",
-      bg: "bg-rose-50",
-      border: "border-rose-100",
-      hoverBorder: "group-hover:border-rose-200",
-      hoverShadow: "group-hover:shadow-rose-500/10",
+      key: "goal",
     },
   ];
 
   return (
-    <section className="py-32 bg-white relative overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
-
-      <PageContainer className="relative z-10">
-        {/* Header */}
-        <div className={`text-center mb-20 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-50 border border-purple-100 mb-8 shadow-sm">
-            <PieChart className="w-3.5 h-3.5 text-purple-600" />
-            <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">
+    <section className="py-24 lg:py-32 bg-white relative overflow-hidden">
+      <PageContainer>
+        {/* Section Header */}
+        <div className={`text-center mb-12 lg:mb-20 max-w-3xl mx-auto ${ANIMATION_CLASSES.FADE_IN_UP}`}>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-50 mb-6 border border-purple-100">
+             <PieChart className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-bold text-purple-600 tracking-wide uppercase">
               {t("home.tokenomics.pill", "Tokenomics")}
             </span>
           </div>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-8 tracking-tight leading-tight">
+          
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 tracking-tight leading-[1.1]">
             {t("home.tokenomics.title")}
           </h2>
-          <p className="text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed font-normal">
+
+          <p className="text-xl text-slate-500 leading-relaxed">
             {t("home.tokenomics.subtitle")}
           </p>
         </div>
 
-        {/* Grid */}
-        <div
-          className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-200`}
-        >
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className={`group bg-white rounded-3xl p-10 shadow-sm border ${item.border} hover:shadow-xl ${item.hoverShadow} ${item.hoverBorder} hover:-translate-y-1 transition-all duration-300 flex flex-col`}
-            >
+        {/* Grid - xAI Style - 2 Row 3 Cols */}
+        <div className={`grid md:grid-cols-2 lg:grid-cols-3 ${ANIMATION_CLASSES.FADE_IN}`}>
+          {items.map((item, index) => {
+            // Determine border visibility based on grid position
+            // Left border is always visible (default)
+            // Right border is visible if it's the last item in the row
+            const isLastInRowMd = (index + 1) % 2 === 0;
+            const isLastInRowLg = (index + 1) % 3 === 0;
+
+            // Construct border classes for responsiveness
+            // We want bg-slate-200 to be showing if it's last in row for that breakpoint
+            // Otherwise bg-transparent
+            
+            // For right border:
+            // Mobile (hidden by md:block in component)
+            // MD: show if isLastInRowMd
+            // LG: show if isLastInRowLg
+            
+            // Tailwind class construction:
+            const rightBorderClass = `
+              bg-transparent 
+              md:${isLastInRowMd ? 'bg-slate-200' : 'bg-transparent'} 
+              lg:${isLastInRowLg ? 'bg-slate-200' : 'bg-transparent'}
+            `;
+
+            return (
               <div
-                className={`w-14 h-14 rounded-2xl ${item.bg} flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300`}
+                key={index}
+                className="group relative h-full"
               >
-                <item.icon className={`w-7 h-7 ${item.color}`} />
+                {/* Interactive Area Layer (Background & Lines) */}
+                <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
+                   {/* Hover Background - Gradient matching Theme */}
+                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
+                   
+                   {/* Left Border Line */}
+                   <BorderLine side="left" className="bg-slate-200" />
+                   
+                   {/* Right Border Line (Logic applied) */}
+                   <BorderLine side="right" className={rightBorderClass} />
+                   
+                   {/* Mobile Line (Simple left border for <md) */}
+                   <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+                </div>
+
+                {/* Content Layer */}
+                <div className="relative z-10 p-10 lg:p-12 h-full flex flex-col">
+                  {/* Icon */}
+                  <div className="mb-6 lg:mb-8">
+                    <item.icon className="w-10 h-10 lg:w-12 lg:h-12 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 stroke-[1.5]" />
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-2xl font-bold text-slate-900 mb-4">
+                    {t(`home.tokenomics.${item.key}.title`)}
+                  </h3>
+
+                  {/* Description */}
+                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed">
+                    {t(`home.tokenomics.${item.key}.description`)}
+                  </p>
+                </div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">{item.title}</h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">{item.description}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </PageContainer>
     </section>

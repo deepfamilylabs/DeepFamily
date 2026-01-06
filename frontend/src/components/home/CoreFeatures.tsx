@@ -4,114 +4,136 @@ import { Zap, Shield, GitBranch, Coins, Trophy, FileText, TreePine } from "lucid
 import { ANIMATION_CLASSES } from "../../constants/animationStyles";
 import PageContainer from "../PageContainer";
 
+const BorderLine = ({ side, className = "" }: { side: 'left' | 'right'; className?: string }) => (
+  <div 
+    className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
+      ${side === 'left' ? 'left-0' : 'right-0'}
+      ${className}
+      group-hover:bg-slate-300
+    `}
+  >
+    {/* Top Cap */}
+    <div 
+      className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+        ${side === 'left' ? 'left-0' : 'right-0'}
+      `} 
+    />
+    {/* Bottom Cap */}
+    <div 
+      className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+        ${side === 'left' ? 'left-0' : 'right-0'}
+      `} 
+    />
+  </div>
+);
+
 const CoreFeatures = memo(() => {
   const { t } = useTranslation();
 
   const features = [
     {
       icon: Shield,
-      title: t("home.features.zkVersion.title"),
-      description: t("home.features.zkVersion.description"),
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      border: "border-blue-100",
-      hoverBorder: "group-hover:border-blue-200",
-      hoverShadow: "group-hover:shadow-blue-500/10",
+      key: "zkVersion",
     },
     {
       icon: TreePine,
-      title: t("home.features.versionNotarization.title"),
-      description: t("home.features.versionNotarization.description"),
-      color: "text-rose-600",
-      bg: "bg-rose-50",
-      border: "border-rose-100",
-      hoverBorder: "group-hover:border-rose-200",
-      hoverShadow: "group-hover:shadow-rose-500/10",
+      key: "versionNotarization",
     },
     {
       icon: GitBranch,
-      title: t("home.features.versionManagement.title"),
-      description: t("home.features.versionManagement.description"),
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-      border: "border-purple-100",
-      hoverBorder: "group-hover:border-purple-200",
-      hoverShadow: "group-hover:shadow-purple-500/10",
+      key: "versionManagement",
     },
     {
       icon: Coins,
-      title: t("home.features.endorsementEconomy.title"),
-      description: t("home.features.endorsementEconomy.description"),
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-      border: "border-emerald-100",
-      hoverBorder: "group-hover:border-emerald-200",
-      hoverShadow: "group-hover:shadow-emerald-500/10",
+      key: "endorsementEconomy",
     },
     {
       icon: Trophy,
-      title: t("home.features.personNFT.title"),
-      description: t("home.features.personNFT.description"),
-      color: "text-indigo-600",
-      bg: "bg-indigo-50",
-      border: "border-indigo-100",
-      hoverBorder: "group-hover:border-indigo-200",
-      hoverShadow: "group-hover:shadow-indigo-500/10",
+      key: "personNFT",
     },
     {
       icon: FileText,
-      title: t("home.features.storySharding.title"),
-      description: t("home.features.storySharding.description"),
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-      border: "border-orange-100",
-      hoverBorder: "group-hover:border-orange-200",
-      hoverShadow: "group-hover:shadow-orange-500/10",
+      key: "storySharding",
     },
   ];
 
   return (
-    <section className="py-32 bg-white relative overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
-
-      <PageContainer className="relative z-10">
-        {/* Header */}
-        <div className={`text-center mb-20 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-100 mb-8 shadow-sm">
+    <section className="py-24 lg:py-32 bg-white relative overflow-hidden">
+      <PageContainer>
+        {/* Section Header */}
+        <div className={`text-center mb-12 lg:mb-20 max-w-3xl mx-auto ${ANIMATION_CLASSES.FADE_IN_UP}`}>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 mb-6 border border-amber-100">
             <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+            <span className="text-sm font-bold text-amber-500 tracking-wide uppercase">
               Core Features
             </span>
           </div>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-8 tracking-tight leading-tight">
+          
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 tracking-tight leading-[1.1]">
             {t("home.features.title")}
           </h2>
-          <p className="text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed font-normal">
+
+          <p className="text-xl text-slate-500 leading-relaxed">
             {t("home.features.subtitle")}
           </p>
         </div>
 
-        {/* Features Grid */}
-        <div
-          className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-200`}
-        >
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className={`group bg-white rounded-3xl p-10 shadow-sm border ${feature.border} hover:shadow-xl ${feature.hoverShadow} ${feature.hoverBorder} hover:-translate-y-1 transition-all duration-300 flex flex-col`}
-            >
+        {/* Grid - xAI Style - 2 Row 3 Cols */}
+        <div className={`grid md:grid-cols-2 lg:grid-cols-3 ${ANIMATION_CLASSES.FADE_IN}`}>
+          {features.map((feature, index) => {
+            // Determine border visibility based on grid position
+            // Left border is always visible (default)
+            // Right border is visible if it's the last item in the row
+            const isLastInRowMd = (index + 1) % 2 === 0;
+            const isLastInRowLg = (index + 1) % 3 === 0;
+
+            // Construct border classes for responsiveness
+            const rightBorderClass = `
+              bg-transparent 
+              md:${isLastInRowMd ? 'bg-slate-200' : 'bg-transparent'} 
+              lg:${isLastInRowLg ? 'bg-slate-200' : 'bg-transparent'}
+            `;
+
+            return (
               <div
-                className={`w-14 h-14 rounded-2xl ${feature.bg} flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300`}
+                key={index}
+                className="group relative h-full"
               >
-                <feature.icon className={`w-7 h-7 ${feature.color}`} />
+                {/* Interactive Area Layer (Background & Lines) */}
+                <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
+                   {/* Hover Background - Gradient matching Theme */}
+                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
+                   
+                   {/* Left Border Line */}
+                   <BorderLine side="left" className="bg-slate-200" />
+                   
+                   {/* Right Border Line (Logic applied) */}
+                   <BorderLine side="right" className={rightBorderClass} />
+                   
+                   {/* Mobile Line (Simple left border for <md) */}
+                   <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+                </div>
+
+                {/* Content Layer */}
+                <div className="relative z-10 p-10 lg:p-12 h-full flex flex-col">
+                  {/* Icon */}
+                  <div className="mb-6 lg:mb-8">
+                    <feature.icon className="w-10 h-10 lg:w-12 lg:h-12 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 stroke-[1.5]" />
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-2xl font-bold text-slate-900 mb-4">
+                    {t(`home.features.${feature.key}.title`)}
+                  </h3>
+
+                  {/* Description */}
+                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed">
+                    {t(`home.features.${feature.key}.description`)}
+                  </p>
+                </div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">{feature.title}</h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </PageContainer>
     </section>

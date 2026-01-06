@@ -4,124 +4,136 @@ import { TrendingUp, Shield, Key, GitBranch, Users, Gem, FileText } from "lucide
 import { ANIMATION_CLASSES } from "../../constants/animationStyles";
 import PageContainer from "../PageContainer";
 
+const BorderLine = ({ side, className = "" }: { side: 'left' | 'right'; className?: string }) => (
+  <div 
+    className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
+      ${side === 'left' ? 'left-0' : 'right-0'}
+      ${className}
+      group-hover:bg-slate-300
+    `}
+  >
+    {/* Top Cap */}
+    <div 
+      className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+        ${side === 'left' ? 'left-0' : 'right-0'}
+      `} 
+    />
+    {/* Bottom Cap */}
+    <div 
+      className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+        ${side === 'left' ? 'left-0' : 'right-0'}
+      `} 
+    />
+  </div>
+);
+
 const ValuePropositions = memo(() => {
   const { t } = useTranslation();
 
-  return (
-    <section className="py-32 bg-white relative overflow-hidden">
-      {/* Subtle background pattern (Matching Hero) */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+  const features = [
+    {
+      key: "zkPrivacy",
+      icon: Shield,
+    },
+    {
+      key: "saltedUnlinkability",
+      icon: Key,
+    },
+    {
+      key: "dualTreeModels",
+      icon: GitBranch,
+    },
+    {
+      key: "communityEndorsement",
+      icon: Users,
+    },
+    {
+      key: "nftValueCreation",
+      icon: Gem,
+    },
+    {
+      key: "storyShardingSealing",
+      icon: FileText,
+    },
+  ];
 
+  return (
+    <section className="py-24 lg:py-32 bg-white relative overflow-hidden">
       <PageContainer>
-        <div className={`text-center mb-20 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 mb-8 shadow-sm">
-            <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+        {/* Section Header */}
+        <div className={`text-center mb-12 lg:mb-20 max-w-3xl mx-auto ${ANIMATION_CLASSES.FADE_IN_UP}`}>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-50 mb-6 border border-slate-200">
+            <TrendingUp className="w-3.5 h-3.5 text-orange-600" />
+            <span className="text-sm font-bold text-slate-600 tracking-wide uppercase">
               Value Propositions
             </span>
           </div>
-
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-8 tracking-tight leading-tight">
+          
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 tracking-tight leading-[1.1]">
             {t("home.valueProps.title")}
           </h2>
 
-          <p className="text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed font-normal">
+          <p className="text-xl text-slate-500 leading-relaxed">
             {t("home.valueProps.subtitle")}
           </p>
         </div>
 
-        <div
-          className={`grid md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10 ${ANIMATION_CLASSES.FADE_IN_UP} animation-delay-300`}
-        >
-          {/* Zero-Knowledge Privacy */}
-          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} h-full`}>
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-500/10 hover:border-blue-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Shield className="w-7 h-7 text-blue-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {t("home.valueProps.zkPrivacy.title")}
-              </h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {t("home.valueProps.zkPrivacy.description")}
-              </p>
-            </div>
-          </div>
+        {/* Grid - xAI Style - 2 Row 3 Cols */}
+        <div className={`grid md:grid-cols-2 lg:grid-cols-3 ${ANIMATION_CLASSES.FADE_IN}`}>
+          {features.map((feature, index) => {
+            // Determine border visibility based on grid position
+            // Left border is always visible (default)
+            // Right border is visible if it's the last item in the row
+            const isLastInRowMd = (index + 1) % 2 === 0;
+            const isLastInRowLg = (index + 1) % 3 === 0;
 
-          {/* Salted Passphrase Unlinkability */}
-          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-100 h-full`}>
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-purple-500/10 hover:border-purple-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-              <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Key className="w-7 h-7 text-purple-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {t("home.valueProps.saltedUnlinkability.title")}
-              </h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {t("home.valueProps.saltedUnlinkability.description")}
-              </p>
-            </div>
-          </div>
+            // Construct border classes for responsiveness
+            const rightBorderClass = `
+              bg-transparent 
+              md:${isLastInRowMd ? 'bg-slate-200' : 'bg-transparent'} 
+              lg:${isLastInRowLg ? 'bg-slate-200' : 'bg-transparent'}
+            `;
 
-          {/* Dual Tree Models */}
-          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-200 h-full`}>
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-emerald-500/10 hover:border-emerald-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <GitBranch className="w-7 h-7 text-emerald-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {t("home.valueProps.dualTreeModels.title")}
-              </h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {t("home.valueProps.dualTreeModels.description")}
-              </p>
-            </div>
-          </div>
+            return (
+              <div
+                key={feature.key}
+                className="group relative h-full"
+              >
+                {/* Interactive Area Layer (Background & Lines) */}
+                <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
+                  {/* Hover Background - Gradient matching Theme */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
+                   
+                   {/* Left Border Line */}
+                   <BorderLine side="left" className="bg-slate-200" />
+                   
+                   {/* Right Border Line (Logic applied) */}
+                   <BorderLine side="right" className={rightBorderClass} />
+                   
+                   {/* Mobile Line (Simple left border for <md) */}
+                   <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+                </div>
 
-          {/* Community Endorsement */}
-          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-300 h-full`}>
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Users className="w-7 h-7 text-indigo-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {t("home.valueProps.communityEndorsement.title")}
-              </h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {t("home.valueProps.communityEndorsement.description")}
-              </p>
-            </div>
-          </div>
+                {/* Content Layer */}
+                <div className="relative z-10 p-10 lg:p-12 h-full flex flex-col">
+                  {/* Icon */}
+                  <div className="mb-6 lg:mb-8">
+                    <feature.icon className="w-10 h-10 lg:w-12 lg:h-12 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 stroke-[1.5]" />
+                  </div>
 
-          {/* Incentive Mechanism */}
-          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-400 h-full`}>
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-orange-500/10 hover:border-orange-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-              <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <Gem className="w-7 h-7 text-orange-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {t("home.valueProps.nftValueCreation.title")}
-              </h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {t("home.valueProps.nftValueCreation.description")}
-              </p>
-            </div>
-          </div>
+                  {/* Title */}
+                  <h3 className="text-2xl font-bold text-slate-900 mb-4">
+                    {t(`home.valueProps.${feature.key}.title`)}
+                  </h3>
 
-          {/* Story Protocol */}
-          <div className={`group ${ANIMATION_CLASSES.SCALE_IN} animation-delay-500 h-full`}>
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-rose-500/10 hover:border-rose-200 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-              <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
-                <FileText className="w-7 h-7 text-rose-600" />
+                  {/* Description */}
+                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed">
+                    {t(`home.valueProps.${feature.key}.description`)}
+                  </p>
+                </div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">
-                {t("home.valueProps.storyShardingSealing.title")}
-              </h3>
-              <p className="text-slate-500 leading-relaxed text-base flex-1">
-                {t("home.valueProps.storyShardingSealing.description")}
-              </p>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </PageContainer>
     </section>

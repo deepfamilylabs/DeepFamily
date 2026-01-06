@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, lazy, Suspense, useCallback } from "react";
+import { memo, useEffect, useMemo, useState, lazy, Suspense, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sparkles, ChevronDown } from "lucide-react";
@@ -159,59 +159,13 @@ const HOME_SECTIONS: HomeSection[] = [
 export default function Home() {
   const { t } = useTranslation();
   const [showFloatingShapes, setShowFloatingShapes] = useState(false);
-  const [hasUserScrolled, setHasUserScrolled] = useState(false);
-  const [pageCount, setPageCount] = useState(0);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const lastLoadAtRef = useRef<number>(0);
-  const hasScrolledRef = useRef(false);
-
-  const sectionsPerPage = 1;
-  const maxPages = Math.max(1, Math.ceil(HOME_SECTIONS.length / sectionsPerPage));
-  const visibleCount = Math.min(HOME_SECTIONS.length, pageCount * sectionsPerPage);
 
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => {
       setShowFloatingShapes(true);
-      setPageCount(1);
     });
     return () => window.cancelAnimationFrame(rafId);
   }, []);
-
-  useEffect(() => {
-    // Optimized scroll handler - only set state once
-    const onScroll = () => {
-      if (!hasScrolledRef.current && window.scrollY > 0) {
-        hasScrolledRef.current = true;
-        setHasUserScrolled(true);
-      }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    const target = loadMoreRef.current;
-    if (!target) return;
-    if (!hasUserScrolled) return;
-    if (!("IntersectionObserver" in window)) return;
-    if (pageCount >= maxPages) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry?.isIntersecting) return;
-        const now = performance.now();
-        if (now - lastLoadAtRef.current < 500) return;
-        lastLoadAtRef.current = now;
-        setPageCount((count) => Math.min(maxPages, count + 1));
-      },
-      { rootMargin: "800px 0px" },
-    );
-
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [hasUserScrolled, maxPages, pageCount]);
 
   return (
     <>
@@ -253,27 +207,10 @@ export default function Home() {
         <ScrollIndicator />
       </section>
 
-      {/* Content (progressive mount on scroll) */}
-      {HOME_SECTIONS.slice(0, visibleCount).map((section) => (
+      {/* Content */}
+      {HOME_SECTIONS.map((section) => (
         <section key={section.key}>{section.render()}</section>
       ))}
-
-      {visibleCount < HOME_SECTIONS.length && (
-        <div className="py-16 bg-white dark:bg-slate-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div ref={loadMoreRef} className="h-1 w-full" />
-            {!hasUserScrolled ? (
-              <div className="text-center text-slate-500 dark:text-slate-400 text-sm">
-                Scroll to load more
-              </div>
-            ) : (
-              <div className="text-center text-slate-500 dark:text-slate-400 text-sm animate-pulse">
-                {t("common.loadingMore")}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }

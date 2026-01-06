@@ -1,6 +1,7 @@
 // Animation and transition constants for consistent styling
 export const ANIMATION_CLASSES = {
   // Entrance animations
+  FADE_IN: "animate-fade-in",
   FADE_IN_UP: "animate-fade-in-up",
   SLIDE_IN_RIGHT: "animate-slide-in-right",
   SLIDE_IN_LEFT: "animate-slide-in-left",
