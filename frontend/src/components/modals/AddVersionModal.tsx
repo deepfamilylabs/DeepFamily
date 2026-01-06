@@ -16,6 +16,7 @@ import {
   Star,
   Eye,
   EyeOff,
+  Lock,
 } from "lucide-react";
 import { ethers } from "ethers";
 import { useWallet } from "../../context/WalletContext";
@@ -769,7 +770,7 @@ export default function AddVersionModal({
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
-          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
+          className={`relative flex flex-col w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform`}
           onClick={(e) => e.stopPropagation()}
           style={{
             transform: dragging ? `translateY(${dragOffset}px)` : undefined,
@@ -778,7 +779,7 @@ export default function AddVersionModal({
         >
           {/* Header */}
           <div
-            className="sticky top-0 bg-gradient-to-br from-blue-500/10 via-purple-500/8 to-indigo-500/10 dark:from-blue-600/20 dark:via-purple-600/15 dark:to-indigo-600/20 p-3 pt-7 sm:pt-6 sm:p-6 border-b border-gray-200/50 dark:border-gray-700/50 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
+            className="sticky top-0 bg-white/80 dark:bg-gray-950/80 p-6 border-b border-gray-100 dark:border-gray-800 z-20 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-950/60 relative touch-none cursor-grab active:cursor-grabbing select-none"
             onPointerDown={(e) => {
               (e.currentTarget as any).setPointerCapture?.(e.pointerId);
               startYRef.current = e.clientY;
@@ -818,25 +819,20 @@ export default function AddVersionModal({
             }}
           >
             {/* Drag handle (mobile only) */}
-            <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-12 rounded-full bg-gray-300/90 dark:bg-gray-700/90" />
+            <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-800" />
 
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 flex items-center gap-4 min-w-0">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                  <UserPlus className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20 flex-shrink-0">
+                  <UserPlus className="w-6 h-6 text-white" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-0.5">
                     {t("addVersion.title", "Add Version")}
                   </h2>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    <span className="whitespace-normal">
-                      {t(
-                        "addVersion.personInfoHint",
-                        "Plain text won't go on-chain, used only for ZK proof",
-                      )}
-                    </span>
-                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                    {t("addVersion.personInfoHint", "Secure zero-knowledge proof generation")}
+                  </p>
                 </div>
               </div>
               <button
@@ -847,10 +843,10 @@ export default function AddVersionModal({
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors flex-shrink-0"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0 group"
                 aria-label={t("common.close", "Close")}
               >
-                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <X className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
               </button>
             </div>
           </div>
@@ -862,20 +858,20 @@ export default function AddVersionModal({
               onSubmit={handleSubmit(onSubmit)}
               className="min-h-full flex flex-col"
             >
-              <div className="flex-1 p-4 sm:p-6 space-y-6">
-                <div className="space-y-2">
-                  <div className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-300/40 dark:bg-amber-900/20 dark:text-amber-50">
-                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p className="text-xs leading-relaxed">
+              <div className="flex-1 p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex gap-3 rounded-2xl border border-amber-100 bg-amber-50/50 p-4 text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-100">
+                    <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500" />
+                    <p className="text-xs font-medium leading-relaxed opacity-90">
                       {t(
                         "mintNFT.legalTruthfulNotice",
                         "Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.",
                       )}
                     </p>
                   </div>
-                  <div className="flex gap-2 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-red-900 dark:border-red-300/40 dark:bg-red-900/20 dark:text-red-50">
-                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p className="text-xs leading-relaxed">
+                  <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50/50 p-4 text-red-900 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-100">
+                    <AlertTriangle className="w-5 h-5 shrink-0 text-red-500" />
+                    <p className="text-xs font-medium leading-relaxed opacity-90">
                       {t(
                         "addVersion.ageRequirement",
                         "The person being added must be 18 years or older. Do not submit minors' identities.",
@@ -886,21 +882,18 @@ export default function AddVersionModal({
 
                 {/* Person Being Added - Using PersonHashCalculator */}
                 <div className="space-y-4">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-50">
                     {t("addVersion.personInfo", "Person Information")}
                   </h3>
 
-                  {/* Privacy Notice */}
-                  <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
-                        {t(
-                          "addVersion.personInfoPrivacy",
-                          "Person information is only used locally to generate zero-knowledge proofs. Plain text will not be stored on-chain, only the hash value is permanently recorded.",
-                        )}
-                      </p>
-                    </div>
+                  <div className="flex items-start gap-3 p-3 bg-green-50/50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/30">
+                    <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
+                      {t(
+                        "addVersion.personInfoPrivacy",
+                        "Person information is only used locally to generate zero-knowledge proofs. Plain text will not be stored on-chain, only the hash value is permanently recorded.",
+                      )}
+                    </p>
                   </div>
 
                   <PersonHashCalculator
@@ -927,246 +920,291 @@ export default function AddVersionModal({
                   <button
                     type="button"
                     onClick={() => setFatherExpanded(!fatherExpanded)}
-                    className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group ${
+                      fatherExpanded
+                        ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+                        : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm"
+                    }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-green-600" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {t("addVersion.fatherInfo", "Father Information")}
-                      </h3>
-                      <StatusIndicator status={fatherStatus} />
-                      {fatherStatus !== "empty" && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded">
-                          {fatherStatus === "partial"
-                            ? t("addVersion.partial", "Partial")
-                            : t("addVersion.complete", "Complete")}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${fatherStatus === 'complete' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                            {t("addVersion.fatherInfo", "Father Information")}
+                          </h3>
+                        </div>
+                        {fatherStatus !== "empty" && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            fatherStatus === "complete" 
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" 
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          }`}>
+                            {fatherStatus === "partial"
+                              ? t("addVersion.partial", "Partial")
+                              : t("addVersion.complete", "Complete")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {fatherExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                     )}
                   </button>
 
                   <div
-                    className={`py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3 ${fatherExpanded ? "" : "hidden"}`}
+                    className={`p-1 space-y-4 transition-all duration-300 ease-in-out ${fatherExpanded ? "opacity-100 max-h-[2000px]" : "opacity-0 max-h-0 overflow-hidden"}`}
                   >
-                    {/* Parent Info Notice */}
-                    <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                        <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
-                          {t(
-                            "addVersion.parentInfoNotice",
-                            "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
-                          )}
-                        </p>
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
+                      {/* Parent Info Notice */}
+                      <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
+                        <div className="flex items-start gap-2">
+                          <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed opacity-90">
+                            {t(
+                              "addVersion.parentInfoNotice",
+                              "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <PersonHashCalculator
-                      ref={fatherCalcRef}
-                      key={`father-${formResetKey}`}
-                      showTitle={false}
-                      collapsible={false}
-                      className="border-0 shadow-none"
-                      initialValues={{
-                        fullName: "",
-                        gender: 1, // Default to male
-                        birthYear: 0,
-                        birthMonth: 0,
-                        birthDay: 0,
-                        isBirthBC: false,
-                      }}
-                      onPublicFormChange={(formData) => {
-                        setFatherInfo({
-                          fullName: formData.fullName,
-                          gender: formData.gender,
-                          birthYear: formData.birthYear,
-                          birthMonth: formData.birthMonth,
-                          birthDay: formData.birthDay,
-                          isBirthBC: formData.isBirthBC,
-                        });
-                      }}
-                    />
-
-                    <div className="w-40">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
-                        {t("addVersion.versionIndex", "Version Index")} (
-                        {t("addVersion.versionIndexHint")})
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        {...register("fatherVersionIndex", {
-                          setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
-                        })}
-                        className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                        placeholder="0"
+                      <PersonHashCalculator
+                        ref={fatherCalcRef}
+                        key={`father-${formResetKey}`}
+                        showTitle={false}
+                        collapsible={false}
+                        className="border-0 shadow-none bg-transparent"
+                        initialValues={{
+                          fullName: "",
+                          gender: 1, // Default to male
+                          birthYear: 0,
+                          birthMonth: 0,
+                          birthDay: 0,
+                          isBirthBC: false,
+                        }}
+                        onPublicFormChange={(formData) => {
+                          setFatherInfo({
+                            fullName: formData.fullName,
+                            gender: formData.gender,
+                            birthYear: formData.birthYear,
+                            birthMonth: formData.birthMonth,
+                            birthDay: formData.birthDay,
+                            isBirthBC: formData.isBirthBC,
+                          });
+                        }}
                       />
+
+                      <div className="w-full sm:w-auto">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          {t("addVersion.versionIndex", "Version Index")}
+                          <span className="ml-2 text-xs text-gray-400 font-normal">
+                            ({t("addVersion.versionIndexHint")})
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          {...register("fatherVersionIndex", {
+                            setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
+                          })}
+                          className="w-full sm:w-32 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Mother Information - Using PersonHashCalculator */}
-                <div className="space-y-2">
+                <div className="space-y-2 !mt-2">
                   <button
                     type="button"
                     onClick={() => setMotherExpanded(!motherExpanded)}
-                    className="w-full flex items-center justify-between py-4 px-3 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group ${
+                      motherExpanded
+                        ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+                        : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm"
+                    }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-pink-600" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {t("addVersion.motherInfo", "Mother Information")}
-                      </h3>
-                      <StatusIndicator status={motherStatus} />
-                      {motherStatus !== "empty" && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded">
-                          {motherStatus === "partial"
-                            ? t("addVersion.partial", "Partial")
-                            : t("addVersion.complete", "Complete")}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${motherStatus === 'complete' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400'}`}>
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                            {t("addVersion.motherInfo", "Mother Information")}
+                          </h3>
+                        </div>
+                        {motherStatus !== "empty" && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            motherStatus === "complete"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          }`}>
+                            {motherStatus === "partial"
+                              ? t("addVersion.partial", "Partial")
+                              : t("addVersion.complete", "Complete")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {motherExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
                     )}
                   </button>
 
                   <div
-                    className={`py-4 px-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 space-y-3 ${motherExpanded ? "" : "hidden"}`}
+                    className={`p-1 space-y-4 transition-all duration-300 ease-in-out ${motherExpanded ? "opacity-100 max-h-[2000px]" : "opacity-0 max-h-0 overflow-hidden"}`}
                   >
-                    {/* Parent Info Notice */}
-                    <div className="p-3 bg-green-50/50 dark:bg-green-900/20 rounded-lg border border-green-200/50 dark:border-green-700/50">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                        <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
-                          {t(
-                            "addVersion.parentInfoNotice",
-                            "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
-                          )}
-                        </p>
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
+                      {/* Parent Info Notice */}
+                      <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
+                        <div className="flex items-start gap-2">
+                          <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed opacity-90">
+                            {t(
+                              "addVersion.parentInfoNotice",
+                              "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <PersonHashCalculator
-                      ref={motherCalcRef}
-                      key={`mother-${formResetKey}`}
-                      showTitle={false}
-                      collapsible={false}
-                      className="border-0 shadow-none"
-                      initialValues={{
-                        fullName: "",
-                        gender: 2, // Default to female
-                        birthYear: 0,
-                        birthMonth: 0,
-                        birthDay: 0,
-                        isBirthBC: false,
-                      }}
-                      onPublicFormChange={(formData) => {
-                        setMotherInfo({
-                          fullName: formData.fullName,
-                          gender: formData.gender,
-                          birthYear: formData.birthYear,
-                          birthMonth: formData.birthMonth,
-                          birthDay: formData.birthDay,
-                          isBirthBC: formData.isBirthBC,
-                        });
-                      }}
-                    />
-
-                    <div className="w-40">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
-                        {t("addVersion.versionIndex", "Version Index")} (
-                        {t("addVersion.versionIndexHint")})
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        {...register("motherVersionIndex", {
-                          setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
-                        })}
-                        className="w-20 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                        placeholder="0"
+                      <PersonHashCalculator
+                        ref={motherCalcRef}
+                        key={`mother-${formResetKey}`}
+                        showTitle={false}
+                        collapsible={false}
+                        className="border-0 shadow-none bg-transparent"
+                        initialValues={{
+                          fullName: "",
+                          gender: 2, // Default to female
+                          birthYear: 0,
+                          birthMonth: 0,
+                          birthDay: 0,
+                          isBirthBC: false,
+                        }}
+                        onPublicFormChange={(formData) => {
+                          setMotherInfo({
+                            fullName: formData.fullName,
+                            gender: formData.gender,
+                            birthYear: formData.birthYear,
+                            birthMonth: formData.birthMonth,
+                            birthDay: formData.birthDay,
+                            isBirthBC: formData.isBirthBC,
+                          });
+                        }}
                       />
+
+                      <div className="w-full sm:w-auto">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          {t("addVersion.versionIndex", "Version Index")}
+                          <span className="ml-2 text-xs text-gray-400 font-normal">
+                            ({t("addVersion.versionIndexHint")})
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          {...register("motherVersionIndex", {
+                            setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
+                          })}
+                          className="w-full sm:w-32 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Metadata */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800 !mt-2">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">
                       {t("addVersion.tag", "Tag")}
                     </label>
                     <input
                       {...register("tag")}
-                      className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
-                      placeholder={t("addVersion.tagPlaceholder", "Optional tag")}
+                      className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                      placeholder={t("addVersion.tagPlaceholder", "Optional tag (e.g. 'Standard Version')")}
                     />
                   </div>
-                  <div className="rounded-lg border border-blue-100 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/20 p-3 space-y-2">
+                  
+                  <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <label className="font-medium text-gray-900 dark:text-gray-100">
-                          {t(
-                            "addVersion.encryptionPassword",
-                            "Metadata Encryption Password (AES-GCM, local encryption)",
-                          )}
-                        </label>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                          <Lock className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+                            {t("addVersion.encryptionPassword", "Metadata Encryption")}
+                            <span className="text-red-500 ml-1">*</span>
+                          </label>
+                        </div>
                       </div>
-                      <label className="flex items-center gap-2 text-[11px] text-gray-700 dark:text-gray-200">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-blue-400 text-blue-600 focus:ring-blue-500"
-                          checked={usePersonPassphraseForEncryption}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setUsePersonPassphraseForEncryption(checked);
-                            if (checked) {
-                              if (encryptionPasswordRef.current)
-                                encryptionPasswordRef.current.value = "";
-                              if (confirmEncryptionPasswordRef.current)
-                                confirmEncryptionPasswordRef.current.value = "";
-                            }
-                            if (checked && encryptionError) setEncryptionError(null);
-                          }}
-                        />
-                        <span>
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={usePersonPassphraseForEncryption}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setUsePersonPassphraseForEncryption(checked);
+                              if (checked) {
+                                if (encryptionPasswordRef.current)
+                                  encryptionPasswordRef.current.value = "";
+                                if (confirmEncryptionPasswordRef.current)
+                                  confirmEncryptionPasswordRef.current.value = "";
+                              }
+                              if (checked && encryptionError) setEncryptionError(null);
+                            }}
+                          />
+                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </div>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
                           {t(
                             "addVersion.usePassphraseForEncryption",
-                            "Use identity passphrase for metadata encryption",
+                            "Use identity passphrase"
                           )}
                         </span>
                       </label>
                     </div>
+                    
                     {showManualEncryptionInputs ? (
-                      <>
+                      <div className="space-y-3 pt-2 animate-fadeIn">
                         {usePersonPassphraseForEncryption && !personHasPassphrase && (
-                          <p className="text-xs text-amber-800 dark:text-amber-200">
-                            {t(
-                              "addVersion.passphraseMissingForEncryption",
-                              "Identity passphrase is empty. Please enter an encryption password below or set a passphrase above.",
-                            )}
-                          </p>
+                          <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>
+                              {t(
+                                "addVersion.passphraseMissingForEncryption",
+                                "Identity passphrase is empty. Please enter an encryption password or set a passphrase above.",
+                              )}
+                            </span>
+                          </div>
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <div className="relative">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="relative group">
                             <input
                               type={showEncryptionPassword ? "text" : "password"}
                               ref={encryptionPasswordRef}
                               onChange={() => {
                                 if (encryptionError) setEncryptionError(null);
                               }}
-                              className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                              className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
                               placeholder={t(
                                 "addVersion.encryptionPasswordPlaceholder",
-                                "At least 8 characters",
+                                "Password (min 8 chars)",
                               )}
                               inputMode="text"
                               autoCapitalize="none"
@@ -1177,24 +1215,19 @@ export default function AddVersionModal({
                             <button
                               type="button"
                               onClick={() => setShowEncryptionPassword((v) => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
-                              aria-label={
-                                showEncryptionPassword
-                                  ? "Hide encryption password"
-                                  : "Show encryption password"
-                              }
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
                             >
                               {showEncryptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                           </div>
-                          <div className="relative">
+                          <div className="relative group">
                             <input
                               type={showConfirmEncryptionPassword ? "text" : "password"}
                               ref={confirmEncryptionPasswordRef}
                               onChange={() => {
                                 if (encryptionError) setEncryptionError(null);
                               }}
-                              className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 outline-none transition"
+                              className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
                               placeholder={t(
                                 "addVersion.encryptionPasswordConfirm",
                                 "Confirm password",
@@ -1208,12 +1241,7 @@ export default function AddVersionModal({
                             <button
                               type="button"
                               onClick={() => setShowConfirmEncryptionPassword((v) => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
-                              aria-label={
-                                showConfirmEncryptionPassword
-                                  ? "Hide encryption password confirmation"
-                                  : "Show encryption password confirmation"
-                              }
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
                             >
                               {showConfirmEncryptionPassword ? (
                                 <EyeOff size={16} />
@@ -1224,55 +1252,57 @@ export default function AddVersionModal({
                           </div>
                         </div>
                         {encryptionError && (
-                          <p className="text-xs text-red-600 dark:text-red-300">
+                          <p className="text-xs text-red-500 dark:text-red-400 font-medium flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
                             {encryptionError}
                           </p>
                         )}
-                        <p className="text-[11px] text-amber-800 dark:text-amber-200 leading-snug">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug pl-1">
                           {t(
                             "addVersion.encryptionNotice",
                             "Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.",
                           )}
                         </p>
-                      </>
+                      </div>
                     ) : (
-                      <div className="space-y-1 text-[11px] text-gray-700 dark:text-gray-200">
-                        <p className="text-amber-800 dark:text-amber-200">
+                      <div className="pl-1 pt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                           {t(
                             "addVersion.encryptionNotice",
                             "Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.",
                           )}
                         </p>
                         {encryptionError && (
-                          <p className="text-xs text-red-600 dark:text-red-300">
+                          <p className="text-xs text-red-500 dark:text-red-400 font-medium mt-1">
                             {encryptionError}
                           </p>
                         )}
                       </div>
                     )}
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {t("addVersion.metadataCID", "Metadata CID")}
-                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                        ({t("addVersion.autoGenerated", "Auto-generated")})
-                      </span>
+                    <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+                       {t("addVersion.metadataCID", "Metadata CID")}
+                       <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                         {t("addVersion.autoGenerated", "Auto-generated")}
+                       </span>
                     </label>
                     <div className="flex gap-2">
                       <input
                         {...register("metadataCID")}
                         readOnly
-                        className="flex-1 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 text-sm text-gray-600 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-400 outline-none cursor-not-allowed"
+                        className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 text-sm text-gray-500 dark:text-gray-400 font-mono text-xs placeholder-gray-400 outline-none cursor-not-allowed select-all"
                         placeholder={t(
                           "addVersion.metadataCIDPlaceholder",
-                          "Will be auto-generated from metadata",
+                          "Generated from encrypted metadata...",
                         )}
                       />
                       <button
                         type="button"
                         onClick={handleDownloadMetadata}
                         disabled={isSubmitting}
-                        className="px-3 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                        className="px-4 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-sm"
                         title={t("addVersion.downloadMetadata", "Download metadata JSON")}
                       >
                         <Download className="w-4 h-4" />
@@ -1286,14 +1316,19 @@ export default function AddVersionModal({
 
                 {/* Informed Consent for Add Version */}
                 {!successResult && (
-                  <div className="p-4 sm:p-5 rounded-lg border border-red-200/80 bg-red-50 dark:border-red-300/40 dark:bg-red-900/15">
+                  <div className="p-5 rounded-2xl border border-red-200/50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 backdrop-blur-sm !mt-4">
                     <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300 mt-0.5 shrink-0" />
-                      <div className="space-y-3 w-full">
-                        <p className="text-sm font-semibold text-red-900 dark:text-red-50">
-                          {t("addVersion.consentTitle", "Informed consent (required)")}
-                        </p>
-                        <div className="space-y-2">
+                      <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                        <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="space-y-3 w-full pt-1">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-sm font-bold text-gray-900 dark:text-red-100">
+                             {t("addVersion.consentTitle", "Informed consent (required)")}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-1.5 pt-1">
                           {(
                             [
                               {
@@ -1319,23 +1354,29 @@ export default function AddVersionModal({
                               },
                             ] as const
                           ).map((item) => (
-                            <label key={item.key} className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                checked={consents[item.key]}
-                                onChange={() => toggleConsent(item.key)}
-                                className="h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-500"
-                              />
-                              <span className="text-xs text-red-900 dark:text-red-50 leading-snug">
+                            <label key={item.key} className="flex items-start gap-2.5 cursor-pointer group select-none">
+                              <div className="relative flex items-center justify-center shrink-0 w-4 h-4 mt-[1px]">
+                                <input
+                                  type="checkbox"
+                                  checked={consents[item.key]}
+                                  onChange={() => toggleConsent(item.key)}
+                                  className="peer h-4 w-4 rounded-[4px] border-[1.5px] border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-600 focus:ring-0 focus:border-red-500 checked:bg-red-600 checked:border-red-600 transition-all cursor-pointer appearance-none"
+                                />
+                                <Check className="w-3 h-3 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform scale-75 opacity-0 peer-checked:opacity-100 peer-checked:scale-75 transition-all duration-200 pointer-events-none stroke-[4]" />
+                              </div>
+                              <span className="text-xs text-gray-800 dark:text-red-50 leading-relaxed font-medium group-hover:text-red-700 dark:group-hover:text-white transition-colors">
                                 {item.label}
                               </span>
                             </label>
                           ))}
                         </div>
                         {consentError && (
-                          <p className="text-xs text-red-700 dark:text-red-200 font-medium">
-                            {consentError}
-                          </p>
+                          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fadeIn">
+                            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                            <p className="text-xs text-red-700 dark:text-red-300 font-bold">
+                              {consentError}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1344,20 +1385,23 @@ export default function AddVersionModal({
 
                 {/* Progress Indicator */}
                 {isSubmitting && proofGenerationStep && !successResult && !errorResult && (
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
-                    <div className="flex items-center gap-3">
-                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                  <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20 animate-fadeIn">
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-10 h-10 flex-shrink-0">
+                        <div className="absolute inset-0 rounded-full border-4 border-orange-200 dark:border-orange-800 opacity-30"></div>
+                        <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
                           {t("addVersion.processing", "Processing...")}
                         </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                        <p className="text-xs font-medium text-orange-700 dark:text-orange-300">
                           {proofGenerationStep}
                         </p>
                       </div>
                     </div>
                     {proofGenerationStep.includes("30-60 seconds") && (
-                      <div className="mt-3 text-xs text-blue-600 dark:text-blue-400">
+                      <div className="mt-4 pt-4 border-t border-orange-200/50 dark:border-orange-800/50 text-xs font-medium text-orange-600 dark:text-orange-400">
                         {t(
                           "addVersion.proofGenerationNote",
                           "ZK proof generation requires complex cryptographic calculations. Please wait...",
@@ -1635,22 +1679,23 @@ export default function AddVersionModal({
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex gap-3 p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] sm:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col-reverse sm:flex-row gap-4 p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 {successResult ? (
                   // Success state: Show Close, Continue Adding and Go to Endorse buttons
                   <>
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                      className="flex-1 px-5 py-3.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-bold text-sm shadow-sm hover:shadow-md active:scale-95"
                     >
                       {t("common.close", "Close")}
                     </button>
                     <button
                       type="button"
                       onClick={handleContinueAdding}
-                      className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                      className="flex-1 px-5 py-3.5 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-xl hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all font-bold text-sm shadow-sm hover:shadow-md active:scale-95 flex items-center justify-center gap-2.5"
                     >
+                      <UserPlus className="w-4 h-4 text-orange-600 dark:text-orange-400 opacity-60" />
                       {t("addVersion.continueAdding", "Continue Adding")}
                     </button>
                     <button
@@ -1670,10 +1715,10 @@ export default function AddVersionModal({
                           onEndorse(String(endorsedHash), Number(endorsedIndex));
                         }
                       }}
-                      className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                      className="flex-1 px-5 py-3.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all font-bold text-sm flex items-center justify-center gap-2.5"
                     >
-                      <Star className="w-4 h-4" />
-                      {t("addVersion.goToEndorse", "Go to Endorse")}
+                      <Star className="w-4 h-4 fill-white/20" />
+                      {t("addVersion.goToEndorse", "Endorse Now")}
                     </button>
                   </>
                 ) : (
@@ -1682,7 +1727,7 @@ export default function AddVersionModal({
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                      className="flex-1 px-6 py-4 rounded-full border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all font-bold text-sm"
                     >
                       {t("common.cancel", "Cancel")}
                     </button>
@@ -1693,11 +1738,19 @@ export default function AddVersionModal({
                         !normalizeNameForHash(personInfo?.fullName || "").length ||
                         !allConsentsChecked
                       }
-                      className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                      className="flex-[1.5] px-6 py-4 bg-gradient-to-r from-orange-400 to-red-600 hover:from-orange-500 hover:to-red-700 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 rounded-full disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all hover:scale-[1.02] active:scale-95 text-sm font-bold flex items-center justify-center gap-2"
                     >
-                      {isSubmitting
-                        ? t("addVersion.processing", "Processing...")
-                        : t("addVersion.submit", "Add Version")}
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>{t("addVersion.processing", "Processing...")}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{t("addVersion.submit", "Add Version")}</span>
+                          <ChevronRight className="w-4 h-4 opacity-80" />
+                        </>
+                      )}
                     </button>
                   </>
                 )}
