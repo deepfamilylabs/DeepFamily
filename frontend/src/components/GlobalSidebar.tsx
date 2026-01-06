@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Settings, Globe, Palette, Lock, ChevronRight, X, Layers, Moon, Sun } from "lucide-react";
+import { Settings, Globe, Palette, Lock, ChevronRight, X, Layers, Moon, Sun, Image } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import FamilyTreeConfigForm from "./FamilyTreeConfigForm";
 import { useVizOptions } from "../context/VizOptionsContext";
@@ -137,6 +137,12 @@ export default function GlobalSidebar() {
         icon: Lock,
         label: t("decryptMetadata.title", "Decrypt Metadata"),
         path: "/decrypt",
+      },
+      {
+        id: "logo-converter",
+        icon: Image,
+        label: t("logo.converter", "Logo Converter"),
+        onClick: () => window.open("/logo-converter.html", "_blank"),
       },
     ],
     [

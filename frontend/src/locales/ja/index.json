@@ -1263,6 +1263,9 @@
       }
     }
   },
+  "logo": {
+    "converter": "ロゴ変換"
+  },
   "decryptMetadata": {
     "title": "メタデータ復号",
     "source": "暗号化データを取得",
