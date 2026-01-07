@@ -28,6 +28,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       colorClass: "text-blue-500 dark:text-blue-400",
       bgHover: "hover:bg-blue-50 dark:hover:bg-blue-900/20",
       borderHover: "hover:border-blue-200 dark:hover:border-blue-800",
+      borderClass: "border-orange-500 dark:border-orange-400",
       iconBg: "bg-blue-100 dark:bg-blue-900/30",
       shadowHover: "hover:shadow-[0_8px_20px_-8px_rgba(59,130,246,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(59,130,246,0.4)]",
       tab: "add-version",
@@ -39,6 +40,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       colorClass: "text-emerald-500 dark:text-emerald-400",
       bgHover: "hover:bg-emerald-50 dark:hover:bg-emerald-900/20",
       borderHover: "hover:border-emerald-200 dark:hover:border-emerald-800",
+      borderClass: "border-orange-500 dark:border-orange-400",
       iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
       shadowHover: "hover:shadow-[0_8px_20px_-8px_rgba(16,185,129,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(16,185,129,0.4)]",
       tab: "endorse",
@@ -50,6 +52,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       colorClass: "text-purple-500 dark:text-purple-400",
       bgHover: "hover:bg-purple-50 dark:hover:bg-purple-900/20",
       borderHover: "hover:border-purple-200 dark:hover:border-purple-800",
+      borderClass: "border-orange-500 dark:border-orange-400",
       iconBg: "bg-purple-100 dark:bg-purple-900/30",
       shadowHover: "hover:shadow-[0_8px_20px_-8px_rgba(168,85,247,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(168,85,247,0.4)]",
       tab: "mint-nft",
@@ -59,7 +62,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
   const handleActionClick = (tab: string) => {
     setIsOpen(false);
     setActivePath("/actions");
-    navigate(`/actions?tab=${tab}`);
+    navigate(`/actions?tab=${tab}&open=1`);
   };
 
   const toggleMenu = () => {
@@ -100,14 +103,14 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
                   onClick={() => handleActionClick(action.tab)}
                   className={`
                     group flex items-center gap-3 pl-4 pr-6 py-2.5 rounded-full
-                    bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-800
+                    bg-white dark:bg-zinc-900 border ${action.borderClass}
                     shadow-sm hover:shadow-md
                     active:scale-95 focus:outline-none
                     w-full
                     hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)]
                   `}
                 >
-                  <div className="flex-shrink-0 text-gray-400 group-hover:text-white">
+                  <div className="flex-shrink-0 text-orange-500 dark:text-orange-400 group-hover:text-white">
                     <Icon className="w-5 h-5" strokeWidth={2.5} />
                   </div>
                   <span className="text-[14px] font-bold tracking-wide text-gray-600 dark:text-gray-300 group-hover:text-white whitespace-nowrap">

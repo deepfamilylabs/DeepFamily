@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Image, Star, Wallet, AlertCircle } from "lucide-react";
@@ -16,14 +16,41 @@ export default function ActionsPage() {
   const { address } = useWallet();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<ActionTab>("add-version");
+  const hasAutoOpenedRef = useRef(false);
+  const tabParam = useMemo(() => {
+    const param = searchParams.get("tab") as ActionTab;
+    return param && ["add-version", "mint-nft", "endorse"].includes(param) ? param : null;
+  }, [searchParams]);
+
+  const shouldAutoOpen = useMemo(() => {
+    const openParam = searchParams.get("open") || searchParams.get("autoOpen") || "";
+    return openParam === "1" || openParam.toLowerCase() === "true";
+  }, [searchParams]);
 
   // Handle URL tab parameter
   useEffect(() => {
-    const tabParam = searchParams.get("tab") as ActionTab;
-    if (tabParam && ["add-version", "mint-nft", "endorse"].includes(tabParam)) {
+    if (tabParam) {
       setActiveTab(tabParam);
     }
-  }, [searchParams]);
+  }, [tabParam]);
+
+  // Auto-open modal when arriving with explicit open flag
+  useEffect(() => {
+    if (!address || !shouldAutoOpen || hasAutoOpenedRef.current) return;
+    if (!tabParam) return;
+
+    if (tabParam === "add-version") {
+      setAddVersionModal({ isOpen: true });
+    }
+    if (tabParam === "mint-nft") {
+      setMintNFTModal({ isOpen: true, personHash: undefined, versionIndex: undefined });
+    }
+    if (tabParam === "endorse") {
+      setEndorseModal({ isOpen: true, personHash: undefined, versionIndex: undefined });
+    }
+
+    hasAutoOpenedRef.current = true;
+  }, [address, shouldAutoOpen, tabParam]);
 
   // Auto-open Endorse modal if URL carries target hash/index
   useEffect(() => {
