@@ -32,6 +32,7 @@
   "home": {
     "title": "分散型デジタル家系図",
     "subtitle": "ゼロ知識プライバシー・非連結性・マルチバージョン合意・コミュニティエンドースメント・NFT人物百科",
+    "getStarted": "はじめる",
     "exploreFamilyTree": "家系図を見る",
     "addPerson": "人物追加",
     "search": "検索",

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState, lazy, Suspense, useCallback } from "react";
+import { memo, useEffect, useState, lazy, Suspense, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sparkles, ChevronDown } from "lucide-react";
@@ -10,7 +10,6 @@ import {
   CTA_BUTTON_STYLES,
   HERO_CONTENT_STYLES,
   SCROLL_INDICATOR_STYLES,
-  type ButtonConfig,
 } from "../constants/homeStyles";
 import { ANIMATION_CLASSES } from "../constants/animationStyles";
 
@@ -53,41 +52,18 @@ const CTAButtons = memo(() => {
   const { t } = useTranslation();
   const { setActivePath } = useActivePath();
 
-  const buttons = useMemo(
-    (): ButtonConfig[] => [
-      {
-        to: "/actions",
-        icon: "Users",
-        text: t("home.blockchainActions"),
-        className: CTA_BUTTON_STYLES.primaryButton,
-        hasOverlay: true,
-      },
-      {
-        to: "/familyTree",
-        icon: "Network",
-        text: t("home.exploreFamilyTree"),
-        className: `${CTA_BUTTON_STYLES.secondaryButton} ${CTA_BUTTON_STYLES.blueSecondary}`,
-        hasOverlay: false,
-      },
-    ],
-    [t],
-  );
-
   return (
     <div className={CTA_BUTTON_STYLES.container}>
-      {buttons.map((button) => (
-        <NavLink
-          key={button.to}
-          to={button.to}
-          className={button.className}
-          onClick={() => setActivePath(button.to)}
-        >
-          {button.hasOverlay && <div className={CTA_BUTTON_STYLES.overlay} />}
-          <div className={CTA_BUTTON_STYLES.content}>
-            <span className={CTA_BUTTON_STYLES.text}>{button.text}</span>
-          </div>
-        </NavLink>
-      ))}
+      <NavLink
+        to="/familyTree"
+        onClick={() => setActivePath("/familyTree")}
+        className="relative inline-flex h-14 overflow-hidden rounded-full p-[2px] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-50 hover:scale-105 transition-transform duration-300"
+      >
+        <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#ffffff_0%,#ff9e64_50%,#ffffff_100%)]" />
+        <span className="relative z-10 inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-gradient-to-r from-orange-400 to-red-500 px-10 py-1 text-base font-bold text-white transition-opacity hover:opacity-90">
+          {t("home.getStarted")}
+        </span>
+      </NavLink>
     </div>
   );
 });

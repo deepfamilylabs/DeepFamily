@@ -32,7 +32,8 @@
   },
   "home": {
     "title": "Decentralized Digital Family Tree",
-    "subtitle": "Zero-knowledge privacy · Unlinkability · Multi-version governance · Community endorsement · NFT biographies",
+    "subtitle": "ZK privacy · Unlinkability · Multi-version · Community endorsement · NFT bios",
+    "getStarted": "Get started",
     "exploreFamilyTree": "Explore Family Tree",
     "addPerson": "Add Person",
     "search": "Search",

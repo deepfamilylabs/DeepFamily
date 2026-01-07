@@ -33,31 +33,31 @@ export default function SortButton({
     <button
       onClick={handleClick}
       className={`
-        group relative inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full
-        text-sm font-medium whitespace-nowrap
-        transition-all duration-200 ease-out
+        group relative inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full
+        text-sm font-medium whitespace-nowrap select-none
+        transition-all duration-200 ease-out border
         ${
           isActive
-            ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 scale-105"
-            : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
+            ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20"
+            : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
         }
       `}
       aria-label={`${label} - ${sortOrder === "asc" ? "Ascending" : "Descending"}`}
     >
       <span>{label}</span>
       {isActive && showSortArrows && (
-        <div className="flex flex-col -space-y-2 items-center ml-0.5">
+        <div className="flex flex-col -space-y-1 items-center ml-0.5">
           <ChevronUp
             className={`w-3.5 h-3.5 transition-all duration-200 ${
-              sortOrder === "asc" ? "text-white drop-shadow-sm" : "text-white/30"
+              sortOrder === "asc" ? "text-white drop-shadow-sm" : "text-white/40"
             }`}
             strokeWidth={2.5}
           />
           <ChevronDown
             className={`w-3.5 h-3.5 transition-all duration-200 ${
-              sortOrder === "desc" ? "text-white drop-shadow-sm" : "text-white/30"
+              sortOrder === "desc" ? "text-white drop-shadow-sm" : "text-white/40"
             }`}
-            strokeWidth={2.5}
+             strokeWidth={2.5}
           />
         </div>
       )}

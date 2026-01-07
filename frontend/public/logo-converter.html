@@ -4,77 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeepFamily Logo Exporter</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #f3f4f6;
-            color: #1f2937;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            text-align: center;
-            max-width: 500px;
-            width: 90%;
-        }
-        h1 { margin-top: 0; font-size: 1.5rem; color: #111827; }
-        .preview-area {
-            margin: 2rem 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #f9fafb; /* Light gray to show transparency */
-            background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            padding: 20px;
-        }
-        canvas {
-            max-width: 100%;
-            height: auto;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        .controls {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        button {
-            background: linear-gradient(to right, #fb923c, #ef4444);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 9999px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s;
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
-        }
-        button:hover { opacity: 0.9; }
-        button:active { transform: scale(0.98); }
-        .size-select, .control-input {
-            padding: 0.5rem;
-            border-radius: 0.5rem;
-            border: 1px solid #d1d5db;
-        }
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-    </style>
+    <link rel="stylesheet" href="/logo-converter.css">
 </head>
 <body>
     <div class="container">
@@ -84,7 +14,7 @@
         <div class="controls" style="flex-direction: column; align-items: center;">
             <div class="control-group">
                 <label>Size:</label>
-                <select id="sizeSelect" class="size-select" onchange="render()">
+                <select id="sizeSelect" class="size-select">
                     <option value="64">64 x 64 (Favicon)</option>
                     <option value="128" selected>128 x 128 (Default)</option>
                     <option value="512">512 x 512 (High Res)</option>
@@ -94,7 +24,7 @@
             
             <div class="control-group">
                 <label>Background:</label>
-                <select id="bgShape" class="control-input" onchange="render()">
+                <select id="bgShape" class="control-input">
                     <option value="none">None (Transparent)</option>
                     <option value="circle">Circle</option>
                     <option value="square">Rounded Square</option>
@@ -103,30 +33,30 @@
 
             <div class="control-group" id="swapGroup" style="display:none;">
                 <label style="cursor:pointer; display:flex; align-items:center;">
-                    <input type="checkbox" id="swapColors" onchange="render()" style="margin-right: 0.5rem;"> 
+                    <input type="checkbox" id="swapColors" style="margin-right: 0.5rem;">
                     Swap Colors (Brand BG)
                 </label>
             </div>
 
             <div class="control-group" id="bgColorGroup" style="display:none;">
                 <label id="colorLabel">Color:</label>
-                <input type="color" id="bgColor" class="control-input" value="#ffffff" oninput="render()" onchange="render()">
+                <input type="color" id="bgColor" class="control-input" value="#ffffff">
             </div>
 
             <div class="control-group" id="scaleGroup" style="display:none;">
                 <label>Scale:</label>
-                <input type="range" id="logoScale" min="50" max="100" value="75" class="control-input" oninput="render()" onchange="render()">
+                <input type="range" id="logoScale" min="50" max="100" value="75" class="control-input">
                 <span id="scaleValue" style="min-width: 3ch;">75%</span>
             </div>
 
             <div class="control-group" id="panGroupX" style="display:none;">
                 <label>Pan X:</label>
-                <input type="range" id="panX" min="-20" max="20" value="0" class="control-input" oninput="render()" onchange="render()">
+                <input type="range" id="panX" min="-20" max="20" value="0" class="control-input">
             </div>
             
             <div class="control-group" id="panGroupY" style="display:none;">
                 <label>Pan Y:</label>
-                <input type="range" id="panY" min="-20" max="20" value="0" class="control-input" oninput="render()" onchange="render()">
+                <input type="range" id="panY" min="-20" max="20" value="0" class="control-input">
             </div>
         </div>
 
@@ -135,7 +65,7 @@
         </div>
 
         <div class="controls">
-            <button onclick="downloadPNG()">Download PNG</button>
+            <button id="downloadButton">Download PNG</button>
         </div>
     </div>
 
@@ -155,108 +85,6 @@
         </svg>          
     </div>
 
-    <script>
-        function render() {
-            const size = parseInt(document.getElementById('sizeSelect').value);
-            const bgShape = document.getElementById('bgShape').value;
-            const bgColor = document.getElementById('bgColor').value;
-            const logoScale = parseInt(document.getElementById('logoScale').value);
-            const panX = parseInt(document.getElementById('panX').value);
-            const panY = parseInt(document.getElementById('panY').value);
-            const swapColors = document.getElementById('swapColors').checked;
-            
-            // Update UI text
-            document.getElementById('scaleValue').innerText = logoScale + '%';
-
-            // Show/Hide Controls
-            const hasBackground = bgShape !== 'none';
-            document.getElementById('bgColorGroup').style.display = hasBackground ? 'flex' : 'none';
-            document.getElementById('swapGroup').style.display = hasBackground ? 'flex' : 'none';
-            document.getElementById('scaleGroup').style.display = hasBackground ? 'flex' : 'none';
-            document.getElementById('panGroupX').style.display = hasBackground ? 'flex' : 'none';
-            document.getElementById('panGroupY').style.display = hasBackground ? 'flex' : 'none';
-            
-            // Update Label based on Swap State
-            document.getElementById('colorLabel').innerText = swapColors ? "Logo Color:" : "BG Color:";
-
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-            const svgElement = document.getElementById('source-svg');
-            
-            // Set canvas size
-            canvas.width = size;
-            canvas.height = size;
-            
-            // Draw Background
-            ctx.clearRect(0, 0, size, size);
-            
-            if (hasBackground) {
-                if (swapColors) {
-                    // Use Brand Gradient for Background
-                    const grad = ctx.createLinearGradient(0, 0, size, size);
-                    grad.addColorStop(0, "#fb923c");
-                    grad.addColorStop(1, "#ef4444");
-                    ctx.fillStyle = grad;
-                } else {
-                    // Use User Selected Color
-                    ctx.fillStyle = bgColor;
-                }
-
-                ctx.beginPath();
-                if (bgShape === 'circle') {
-                    ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
-                } else if (bgShape === 'square') {
-                    // Rounded Square (using 20% of size as radius)
-                    const radius = size * 0.2;
-                    ctx.roundRect(0, 0, size, size, radius);
-                }
-                ctx.fill();
-            }
-
-            // Serialize SVG
-            let svgData = new XMLSerializer().serializeToString(svgElement);
-            
-            // Handle Logo Color Swapping
-            if (hasBackground && swapColors) {
-                // Replace gradient stroke with solid user color
-                svgData = svgData.replace(/fill="none" stroke="url\(#brand-gradient\)"/g, `fill="none" stroke="${bgColor}"`);
-                // Fallback replace just in case attributes order differs
-                svgData = svgData.replace(/stroke="url\(#brand-gradient\)"/g, `stroke="${bgColor}"`);
-            }
-
-            const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            
-            const img = new Image();
-            img.onload = function() {
-                let drawSize = size;
-                
-                if (hasBackground) {
-                    // User defined scale (50% - 100%)
-                    drawSize = size * (logoScale / 100);
-                }
-                
-                // Center the logo + Apply Pan (Pan is percentage of total size)
-                const baseOffset = (size - drawSize) / 2;
-                const offsetX = baseOffset + (size * (panX / 100));
-                const offsetY = baseOffset + (size * (panY / 100));
-
-                ctx.drawImage(img, offsetX, offsetY, drawSize, drawSize); 
-                URL.revokeObjectURL(url);
-            };
-            img.src = url;
-        }
-
-        function downloadPNG() {
-            const canvas = document.getElementById('canvas');
-            const link = document.createElement('a');
-            link.download = `deepfamily-logo-${canvas.width}x${canvas.height}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }
-
-        // Initial render
-        window.onload = render;
-    </script>
+    <script src="/logo-converter.js" defer></script>
 </body>
 </html>
