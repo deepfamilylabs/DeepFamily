@@ -70,17 +70,15 @@ const SiteHeader = memo(() => {
             onClick={() => handleNavClick("/")}
           >
             <Logo className="w-7 h-7 flex-shrink-0 text-orange-500 hover:-rotate-90 transition-transform duration-300" />
-            <div className="flex flex-col">
+            <div className="inline-flex items-baseline gap-1">
               <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
                 Deepfamily
               </span>
               {badgeConfig && (
-                <span className="relative hidden sm:inline-block ml-0.5 h-6 align-bottom pointer-events-none">
-                  <span
-                    className={`absolute bottom-0 text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider`}
-                  >
-                    {badgeConfig.text}
-                  </span>
+                <span
+                  className={`hidden sm:inline-flex text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider pointer-events-none`}
+                >
+                  {badgeConfig.text}
                 </span>
               )}
             </div>

@@ -27,7 +27,7 @@ export default function PeoplePage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedPerson, setSelectedPerson] = useState<NodeData | null>(null);
   const [selectedAddresses, setSelectedAddresses] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -197,7 +197,7 @@ export default function PeoplePage() {
 
   // Search and filter logic
   const filteredPeople = useMemo(() => {
-    let filtered = data.people;
+    let filtered = [...data.people];
 
     // Search filter
     if (searchTerm.trim()) {
@@ -505,7 +505,7 @@ export default function PeoplePage() {
                       setTagInput("");
                       setSearchTerm("");
                       setFilterType("all");
-                      setSortOrder("desc");
+                      setSortOrder("asc");
                     }}
                     className="text-xs font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
                   >
@@ -705,7 +705,7 @@ export default function PeoplePage() {
                   setTagInput("");
                   setSearchTerm("");
                   setFilterType("all");
-                  setSortOrder("desc");
+                  setSortOrder("asc");
                 }}
                 className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full font-medium hover:bg-orange-600 dark:hover:bg-orange-400 transition-colors"
               >
