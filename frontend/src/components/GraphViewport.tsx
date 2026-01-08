@@ -48,8 +48,8 @@ export default function GraphViewport({
   miniMapNodes,
   miniMapOptions,
   miniMapUpdateRef,
-  zoomControlsClassName = "absolute bottom-48 left-3 z-10 md:bottom-[158px]",
-  zoomControlsTrackHeight = 140,
+  zoomControlsClassName = "absolute bottom-44 left-3 z-10 md:bottom-[158px]",
+  zoomControlsTrackHeight = 120,
   miniMapWrapperClassName = "absolute bottom-20 left-3 z-10 scale-75 md:scale-100 origin-bottom-left md:bottom-3",
   children,
 }: GraphViewportProps) {
