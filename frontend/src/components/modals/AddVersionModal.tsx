@@ -927,7 +927,9 @@ export default function AddVersionModal({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${fatherStatus === 'complete' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${fatherStatus === "complete" ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"}`}
+                      >
                         <Users className="w-4 h-4" />
                       </div>
                       <div className="flex flex-col items-start gap-1">
@@ -937,11 +939,13 @@ export default function AddVersionModal({
                           </h3>
                         </div>
                         {fatherStatus !== "empty" && (
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                            fatherStatus === "complete" 
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" 
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                          }`}>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              fatherStatus === "complete"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                            }`}
+                          >
                             {fatherStatus === "partial"
                               ? t("addVersion.partial", "Partial")
                               : t("addVersion.complete", "Complete")}
@@ -1032,7 +1036,9 @@ export default function AddVersionModal({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${motherStatus === 'complete' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400'}`}>
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center ${motherStatus === "complete" ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400"}`}
+                      >
                         <Users className="w-4 h-4" />
                       </div>
                       <div className="flex flex-col items-start gap-1">
@@ -1042,11 +1048,13 @@ export default function AddVersionModal({
                           </h3>
                         </div>
                         {motherStatus !== "empty" && (
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                            motherStatus === "complete"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                          }`}>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              motherStatus === "complete"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                            }`}
+                          >
                             {motherStatus === "partial"
                               ? t("addVersion.partial", "Partial")
                               : t("addVersion.complete", "Complete")}
@@ -1134,10 +1142,13 @@ export default function AddVersionModal({
                     <input
                       {...register("tag")}
                       className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
-                      placeholder={t("addVersion.tagPlaceholder", "Optional tag (e.g. 'Standard Version')")}
+                      placeholder={t(
+                        "addVersion.tagPlaceholder",
+                        "Optional tag (e.g. 'Standard Version')",
+                      )}
                     />
                   </div>
-                  
+
                   <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
@@ -1172,14 +1183,11 @@ export default function AddVersionModal({
                           <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                         </div>
                         <span className="text-xs font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
-                          {t(
-                            "addVersion.usePassphraseForEncryption",
-                            "Use identity passphrase"
-                          )}
+                          {t("addVersion.usePassphraseForEncryption", "Use identity passphrase")}
                         </span>
                       </label>
                     </div>
-                    
+
                     {showManualEncryptionInputs ? (
                       <div className="space-y-3 pt-2 animate-fadeIn">
                         {usePersonPassphraseForEncryption && !personHasPassphrase && (
@@ -1283,10 +1291,10 @@ export default function AddVersionModal({
 
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
-                       {t("addVersion.metadataCID", "Metadata CID")}
-                       <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                         {t("addVersion.autoGenerated", "Auto-generated")}
-                       </span>
+                      {t("addVersion.metadataCID", "Metadata CID")}
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                        {t("addVersion.autoGenerated", "Auto-generated")}
+                      </span>
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -1324,10 +1332,10 @@ export default function AddVersionModal({
                       <div className="space-y-3 w-full pt-1">
                         <div className="flex flex-col gap-0.5">
                           <p className="text-sm font-bold text-gray-900 dark:text-red-100">
-                             {t("addVersion.consentTitle", "Informed consent (required)")}
+                            {t("addVersion.consentTitle", "Informed consent (required)")}
                           </p>
                         </div>
-                        
+
                         <div className="space-y-1.5 pt-1">
                           {(
                             [
@@ -1354,7 +1362,10 @@ export default function AddVersionModal({
                               },
                             ] as const
                           ).map((item) => (
-                            <label key={item.key} className="flex items-start gap-2.5 cursor-pointer group select-none">
+                            <label
+                              key={item.key}
+                              className="flex items-start gap-2.5 cursor-pointer group select-none"
+                            >
                               <div className="relative flex items-center justify-center shrink-0 w-4 h-4 mt-[1px]">
                                 <input
                                   type="checkbox"

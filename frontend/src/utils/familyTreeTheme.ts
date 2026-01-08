@@ -33,7 +33,7 @@ type ThemeColors = {
 const createTheme = (color: string): ThemeColors => {
   // Colors that are naturally light need darker text shades for contrast
   const isLightColor = ["yellow", "lime", "amber", "cyan", "green"].includes(color);
-  
+
   // Define shades based on contrast needs
   // Title: Darkest
   const titleShade = isLightColor ? 900 : 700;
@@ -50,12 +50,12 @@ const createTheme = (color: string): ThemeColors => {
   return {
     base: `fill-${color}-50 dark:fill-${color}-900/20`,
     stroke: `stroke-${color}-300 dark:stroke-${color}-400`,
-    
+
     // All text uses the theme color, just different shades
     title: `text-${color}-${titleShade} dark:text-${color}-${titleDarkShade}`,
     body: `text-${color}-${bodyShade} dark:text-${color}-${bodyDarkShade}`,
     meta: `text-${color}-${metaShade} dark:text-${color}-${metaDarkShade}`,
-    
+
     badgeBg: `fill-${color}-100 dark:fill-${color}-800/60`,
     badgeText: `text-${color}-${titleShade} dark:text-${color}-${titleDarkShade}`,
     star: `fill-${color}-500`,
@@ -123,9 +123,7 @@ export function getFamilyTreeNodeTheme(opts: {
       ? { html: "text-amber-600 dark:text-amber-300", svg: "fill-amber-600 dark:fill-amber-300" }
       : { html: "text-slate-600 dark:text-slate-400", svg: "fill-slate-600 dark:fill-slate-400" };
 
-  const tagBadgeBgClass = minted
-    ? theme.badgeBg
-    : "fill-slate-100 dark:fill-slate-800/60";
+  const tagBadgeBgClass = minted ? theme.badgeBg : "fill-slate-100 dark:fill-slate-800/60";
 
   const tagBadgeText: FamilyTreeThemeText = minted
     ? {
@@ -154,7 +152,8 @@ export function getFamilyTreeNodeTheme(opts: {
     infoText,
     tagBadgeBgClass,
     tagBadgeText,
-    endorseBadgeBgClass,    endorseStarClass,
+    endorseBadgeBgClass,
+    endorseStarClass,
     endorseCountText,
   };
 }

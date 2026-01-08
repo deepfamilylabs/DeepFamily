@@ -177,8 +177,9 @@ export default function NodeDetailModal({
     };
 
     // Keep labels neutral and clean
-    const labelClasses = "text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5";
-    
+    const labelClasses =
+      "text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5";
+
     const valueClasses = "text-sm font-medium text-gray-900 dark:text-gray-100 leading-relaxed";
 
     return (
@@ -221,10 +222,7 @@ export default function NodeDetailModal({
   };
 
   const modal = createPortal(
-    <div
-      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y" onClick={handleClose}>
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 pb-[env(safe-area-inset-bottom)] sm:p-4">
         <div
           className={`relative flex flex-col w-full max-w-[720px] ${hasNFT ? "h-[92vh]" : "h-auto max-h-[92vh] mb-2"} sm:h-auto sm:max-h-[85vh] bg-white dark:bg-gray-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full sm:translate-y-0"} will-change-transform ring-1 ring-black/5 dark:ring-white/10`}
@@ -334,7 +332,10 @@ export default function NodeDetailModal({
                           "Mint this person as an NFT",
                         )}
                       >
-                        <Image className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
+                        <Image
+                          className="w-4 h-4 text-gray-400 group-hover:text-white"
+                          strokeWidth={2}
+                        />
                         <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                           {t("actions.mintNFT", "Mint NFT")}
                         </span>
@@ -356,7 +357,10 @@ export default function NodeDetailModal({
                           className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                           title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
                         >
-                          <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
+                          <BookOpen
+                            className="w-4 h-4 text-gray-400 group-hover:text-white"
+                            strokeWidth={2}
+                          />
                           <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                             {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
                           </span>
@@ -376,7 +380,10 @@ export default function NodeDetailModal({
                           className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                           title={t("familyTree.nodeDetail.editStory", "Edit Story")}
                         >
-                          <Edit2 className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
+                          <Edit2
+                            className="w-4 h-4 text-gray-400 group-hover:text-white"
+                            strokeWidth={2}
+                          />
                           <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
                             {t("familyTree.nodeDetail.edit", "Edit")}
                           </span>

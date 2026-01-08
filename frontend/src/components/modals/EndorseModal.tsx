@@ -986,7 +986,8 @@ export default function EndorseModal({
                       {t("endorse.deepTokenFee", "Endorsement fee")}
                     </span>
                     <span className="font-bold font-mono text-xl text-orange-600 dark:text-orange-400">
-                      {deepTokenFee} <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">DEEP</span>
+                      {deepTokenFee}{" "}
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">DEEP</span>
                     </span>
                   </div>
 
@@ -1027,7 +1028,9 @@ export default function EndorseModal({
                       <span className="text-gray-600 dark:text-gray-400 leading-relaxed pl-2.5">
                         {isNFTMinted ? (
                           <>
-                            <strong className="text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">{t("endorse.nftMinted", "NFT Minted")}</strong>
+                            <strong className="text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">
+                              {t("endorse.nftMinted", "NFT Minted")}
+                            </strong>
                             {t(
                               "endorse.feeToNFTHolder",
                               "{{recipientPercent}}% to NFT holder, {{protocolPercent}}% protocol fee",
@@ -1039,7 +1042,9 @@ export default function EndorseModal({
                           </>
                         ) : (
                           <>
-                            <strong className="text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">{t("endorse.noNFT", "No NFT Yet")}</strong>
+                            <strong className="text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">
+                              {t("endorse.noNFT", "No NFT Yet")}
+                            </strong>
                             {t(
                               "endorse.feeToCreator",
                               "{{recipientPercent}}% to version creator, {{protocolPercent}}% protocol fee",
@@ -1065,11 +1070,17 @@ export default function EndorseModal({
                 <ul className="space-y-2.5">
                   {[
                     t("endorse.benefitQuality", "Help verify and improve data quality"),
-                    t("endorse.benefitPriority", "Endorsed versions get higher priority in searches"),
+                    t(
+                      "endorse.benefitPriority",
+                      "Endorsed versions get higher priority in searches",
+                    ),
                     t("endorse.benefitNFT", "Required step before minting NFTs"),
                     t("endorse.benefitEconomy", "Support version creators and NFT holders"),
                   ].map((benefit, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+                    <li
+                      key={i}
+                      className="flex items-start gap-2.5 text-xs font-medium text-gray-600 dark:text-gray-300"
+                    >
                       <div className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 mt-0.5">
                         <Check className="w-2.5 h-2.5 text-orange-600 dark:text-orange-400" />
                       </div>
@@ -1389,8 +1400,8 @@ export default function EndorseModal({
                       </div>
                     ) : hasEndorsed ? (
                       <div className="flex items-center justify-center gap-2">
-                         <Check className="w-4 h-4" />
-                         {t("endorse.endorsed", "Endorsed!")}
+                        <Check className="w-4 h-4" />
+                        {t("endorse.endorsed", "Endorsed!")}
                       </div>
                     ) : (
                       <div className="flex items-center justify-center gap-2">

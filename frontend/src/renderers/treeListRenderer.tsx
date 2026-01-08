@@ -54,7 +54,17 @@ export default function TreeListRenderer(props: {
         />
       );
     },
-    [expanded, nodeUiById, openEndorseById, openNodeById, rowHeight, rows, selectedKey, toggle, themeName],
+    [
+      expanded,
+      nodeUiById,
+      openEndorseById,
+      openNodeById,
+      rowHeight,
+      rows,
+      selectedKey,
+      toggle,
+      themeName,
+    ],
   );
 
   return (

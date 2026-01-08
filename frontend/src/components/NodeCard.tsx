@@ -218,11 +218,7 @@ export default function NodeCard(props: NodeCardProps) {
           )}
           {birthDateText && (
             <text className="font-sans">
-              <tspan
-                x={PADDING_X}
-                y={bodyY2}
-                className={`text-[12px] ${theme.infoText.svg}`}
-              >
+              <tspan x={PADDING_X} y={bodyY2} className={`text-[12px] ${theme.infoText.svg}`}>
                 {birthDateText}
               </tspan>
             </text>

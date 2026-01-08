@@ -36,20 +36,17 @@ export default function ColorPalette() {
         title="Change Color Theme"
       >
         <Palette className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-        <div 
-          className="w-3 h-3 rounded-full" 
-          style={{ backgroundColor: THEMES.find(t => t.id === theme)?.color }}
+        <div
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: THEMES.find((t) => t.id === theme)?.color }}
         />
       </button>
 
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 grid grid-cols-5 gap-2 w-64">
-            {THEMES.filter(t => t.id !== 'default').map((t) => (
+            {THEMES.filter((t) => t.id !== "default").map((t) => (
               <button
                 key={t.id}
                 onClick={() => {

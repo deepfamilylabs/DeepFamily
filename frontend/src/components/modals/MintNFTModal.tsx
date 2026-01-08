@@ -1156,7 +1156,7 @@ export default function MintNFTModal({
                           <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                             {t("mintNFT.deathDate", "Death Date (if applicable)")}
                           </h4>
-                          
+
                           <div className="flex flex-nowrap items-start gap-1">
                             <div className="flex items-start gap-1">
                               <div className="w-20 relative">
@@ -1327,7 +1327,10 @@ export default function MintNFTModal({
                               },
                             ] as const
                           ).map((item) => (
-                            <label key={item.key} className="flex items-start gap-3 cursor-pointer group select-none">
+                            <label
+                              key={item.key}
+                              className="flex items-start gap-3 cursor-pointer group select-none"
+                            >
                               <div className="relative flex items-center justify-center shrink-0 w-4 h-4 mt-[2px]">
                                 <input
                                   type="checkbox"

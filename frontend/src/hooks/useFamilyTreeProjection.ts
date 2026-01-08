@@ -23,7 +23,10 @@ export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
     useTreeData();
   const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions();
 
-  const emptyGraph = useMemo<TreeGraphData>(() => ({ nodes: [], edges: [], childrenByParent: {} }), []);
+  const emptyGraph = useMemo<TreeGraphData>(
+    () => ({ nodes: [], edges: [], childrenByParent: {} }),
+    [],
+  );
 
   const graph = useMemo(() => {
     if (!enabled) return emptyGraph;
