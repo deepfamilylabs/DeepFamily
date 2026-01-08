@@ -11,14 +11,14 @@ const order: ViewMode[] = ["tree", "dag", "force", "virtual"];
 
 export default function ViewModeSwitch({ value, onChange, labels, disabled }: ViewModeSwitchProps) {
   return (
-    <div className="relative inline-flex h-10 select-none rounded-full bg-slate-100 dark:bg-slate-800 p-1 gap-1 max-w-full border border-slate-200 dark:border-slate-700">
+    <div className="relative inline-flex h-9 md:h-10 select-none rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 md:p-1 gap-0.5 md:gap-1 max-w-full border border-slate-200 dark:border-slate-700">
       {order.map((m) => (
         <button
           key={m}
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1.5 px-4 rounded-full h-full transition-all duration-200 focus:outline-none text-xs font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${
+          className={`relative z-10 inline-flex items-center justify-center gap-1 md:gap-1.5 px-2.5 md:px-4 rounded-full h-full transition-colors duration-200 focus:outline-none text-xs font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap ${
             value === m
               ? "bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-sm ring-1 ring-black/5 dark:ring-white/5"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
@@ -27,7 +27,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
         >
           {m === "tree" && (
             <svg
-              className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0"
+              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 flex-shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -42,7 +42,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           )}
           {m === "dag" && (
             <svg
-              className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0"
+              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 flex-shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -64,7 +64,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           )}
           {m === "force" && (
             <svg
-              className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0"
+              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 flex-shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -85,7 +85,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           )}
           {m === "virtual" && (
             <svg
-              className="w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0"
+              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 flex-shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

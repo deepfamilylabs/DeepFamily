@@ -72,6 +72,11 @@ export default function ViewContainer({
         <ColorPalette />
       </div>
 
+      {/* Color Palette (mobile) - positioned top-left */}
+      <div className="absolute top-3 left-3 z-30 md:hidden">
+        <ColorPalette />
+      </div>
+
       <EndorseModalProvider>
         <NodeDetailProvider>
           <FamilyTreeViewConfigProvider>
