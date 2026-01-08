@@ -211,6 +211,7 @@ export default function GlobalSidebar() {
   // When activeSection is not null, expand to w-96.
 
   const isExpanded = isHovered;
+  const isCollapsed = !isMobileOpen && !isExpanded;
 
   return (
     <>
@@ -254,75 +255,108 @@ export default function GlobalSidebar() {
         </div>
 
         {/* Menu Items List */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar flex flex-col">
-          {menuItems.map((item) => (
-            <div
-              key={item.id}
-              className="border-b border-gray-50 dark:border-slate-800/50 md:border-none"
-            >
-              <button
-                onClick={() => handleItemClick(item)}
-                className={`
-                            w-full flex items-center p-4 transition-colors relative
+        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar sidebar-scroll flex flex-col">
+          {menuItems.map((item) => {
+            return (
+              <div
+                key={item.id}
+                className="border-b border-gray-50 dark:border-slate-800/50 md:border-none"
+              >
+                {item.isSwitch ? (
+                  <button
+                    onClick={() => handleItemClick(item)}
+                    className={`
+                            w-full flex items-center justify-start p-4 pl-12 transition-colors relative overflow-hidden text-left
                             ${
                               activeSection === item.id
                                 ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/10"
                                 : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                             }
-                            ${!isMobileOpen && !isExpanded ? "justify-center" : "justify-between"}
                         `}
-                title={!isExpanded ? item.label : undefined}
-              >
-                <div
-                  className={`flex items-center transition-all duration-200 ${!isMobileOpen && !isExpanded ? "justify-center w-full gap-0" : "gap-3"}`}
-                >
-                  <item.icon className="w-6 h-6 flex-shrink-0" />
-                  <span
-                    className={`font-medium whitespace-nowrap overflow-hidden transition-all duration-200 ${
-                      isMobileOpen || isExpanded
-                        ? "opacity-100 translate-x-0 max-w-[200px]"
-                        : "opacity-0 -translate-x-4 max-w-0"
-                    }`}
+                    title={isCollapsed ? item.label : undefined}
                   >
-                    {item.label}
-                  </span>
-                </div>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center">
+                      <item.icon className="w-6 h-6" />
+                    </span>
+                    <span
+                      className={`flex-1 min-w-0 ml-3 font-medium whitespace-nowrap overflow-hidden transition-[opacity,transform,max-width] duration-200 text-left ${
+                        !isCollapsed
+                          ? "opacity-100 translate-x-0 max-w-[200px]"
+                          : "opacity-0 -translate-x-3 max-w-0"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
 
-                {/* Right Indicators (Chevron/Switch) */}
-                {(isMobileOpen || isExpanded) && (
-                  <div className="flex-shrink-0 ml-2">
-                    {item.isSwitch ? (
-                      <div
-                        className={`w-10 h-6 rounded-full p-1 transition-colors ${item.value ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-600"}`}
+                    <span
+                      className={`absolute right-4 top-1/2 -translate-y-1/2 transition-opacity duration-200 ${
+                        isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+                      }`}
+                    >
+                      <span
+                        className={`inline-flex w-10 h-6 items-center rounded-full p-1 transition-colors ${item.value ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-600"}`}
                       >
-                        <div
-                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${item.value ? "translate-x-4" : ""}`}
+                        <span
+                          className={`block w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${item.value ? "translate-x-4" : ""}`}
                         />
-                      </div>
-                    ) : (
-                      !!item.content && (
+                      </span>
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleItemClick(item)}
+                    className={`
+                            w-full flex items-center justify-start p-4 pl-12 transition-colors relative overflow-hidden text-left
+                            ${
+                              activeSection === item.id
+                                ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/10"
+                                : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            }
+                        `}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center">
+                      <item.icon className="w-6 h-6" />
+                    </span>
+                    <span
+                      className={`flex-1 min-w-0 ml-3 font-medium whitespace-nowrap overflow-hidden transition-[opacity,transform,max-width] duration-200 text-left ${
+                        !isCollapsed
+                          ? "opacity-100 translate-x-0 max-w-[200px]"
+                          : "opacity-0 -translate-x-3 max-w-0"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+
+                    {/* Right Indicators (Chevron) */}
+                    {item.content && (
+                      <span
+                        className={`absolute right-4 top-1/2 -translate-y-1/2 transition-opacity duration-200 ${
+                          isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+                        }`}
+                      >
                         <ChevronRight
                           className={`w-4 h-4 transition-transform ${activeSection === item.id ? "rotate-90" : ""}`}
                         />
-                      )
+                      </span>
                     )}
-                  </div>
+                  </button>
                 )}
-              </button>
 
-              {/* Accordion Content */}
-              {(isMobileOpen || isExpanded) && !item.path && !item.isSwitch && (
-                <div
-                  className={`
+                {/* Accordion Content */}
+                {(isMobileOpen || isExpanded) && !item.path && !item.isSwitch && (
+                  <div
+                    className={`
                           overflow-hidden transition-all duration-300 bg-slate-50/50 dark:bg-black/20
                           ${activeSection === item.id ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}
                       `}
-                >
-                  {item.content}
-                </div>
-              )}
-            </div>
-          ))}
+                  >
+                    {item.content}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
