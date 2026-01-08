@@ -139,16 +139,16 @@ export default function TreeListRowRenderer(
                   className={theme.endorseStarClass}
                 />
               </svg>
-              <span
-                className={`font-mono text-[12px] ${theme.endorseCountText.html}`}
-              >
+              <span className={`font-mono text-[12px] ${theme.endorseCountText.html}`}>
                 {endorse}
               </span>
             </button>
           )}
           {mintedFlag && (
             <>
-              <span className={`text-[10px] px-1 rounded ${theme.tagBadgeBgClass.replace("fill-", "bg-")} ${theme.tagBadgeText.html} border border-emerald-300 dark:border-emerald-700/40`}>
+              <span
+                className={`text-[10px] px-1 rounded ${theme.tagBadgeBgClass.replace("fill-", "bg-")} ${theme.tagBadgeText.html} border border-emerald-300 dark:border-emerald-700/40`}
+              >
                 NFT
               </span>
               <span

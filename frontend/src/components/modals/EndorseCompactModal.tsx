@@ -427,7 +427,9 @@ export default function EndorseCompactModal({
                     </div>
                     <div
                       className={`font-mono font-medium ${
-                        canAfford ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                        canAfford
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-red-600 dark:text-red-400"
                       }`}
                     >
                       {userBalance} DEEP
@@ -439,7 +441,10 @@ export default function EndorseCompactModal({
                 <div className="mt-3 flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    {t("endorse.needMoreTokens", "You need more DEEP tokens to endorse this version")}
+                    {t(
+                      "endorse.needMoreTokens",
+                      "You need more DEEP tokens to endorse this version",
+                    )}
                   </span>
                 </div>
               )}

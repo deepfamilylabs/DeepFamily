@@ -692,10 +692,7 @@ export default function StoryEditorPage() {
               </div>
             </header>
 
-            <div
-              ref={scrollContainerRef}
-              className="flex flex-col gap-6"
-            >
+            <div ref={scrollContainerRef} className="flex flex-col gap-6">
               {showError && (
                 <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
                   <p className="mb-1 font-bold text-red-800 dark:text-red-300">
@@ -713,7 +710,7 @@ export default function StoryEditorPage() {
                   <header className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
                     <h3 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
                       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100/50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                         <Plus size={18} />
+                        <Plus size={18} />
                       </span>
                       {t("storyChunkEditor.addChunk", "Add New Chunk")}
                     </h3>
@@ -817,7 +814,9 @@ export default function StoryEditorPage() {
                                       }`}
                                     >
                                       <Icon size={16} className={option.color} />
-                                      <span className="flex-1 truncate font-medium">{option.label}</span>
+                                      <span className="flex-1 truncate font-medium">
+                                        {option.label}
+                                      </span>
                                       {isSelected && (
                                         <Check
                                           size={16}
@@ -959,9 +958,7 @@ export default function StoryEditorPage() {
                         ? `${chunk.content.slice(0, 60)}...`
                         : chunk.content;
                     return (
-                      <li
-                        key={chunk.chunkIndex}
-                      >
+                      <li key={chunk.chunkIndex}>
                         <div
                           className={`w-full text-left flex items-start gap-3 rounded-2xl border p-4 transition-all cursor-pointer ${
                             isExpanded
@@ -1616,7 +1613,11 @@ export default function StoryEditorPage() {
                         key: "legacy",
                         desc: "Historical impact, influence, commemorations",
                       },
-                      { value: 16, key: "gallery", desc: "Photos, videos, audio, documents, and multimedia" },
+                      {
+                        value: 16,
+                        key: "gallery",
+                        desc: "Photos, videos, audio, documents, and multimedia",
+                      },
                       { value: 17, key: "references", desc: "Sources, citations, bibliography" },
                       {
                         value: 18,

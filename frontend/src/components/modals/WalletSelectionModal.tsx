@@ -159,11 +159,17 @@ export default function WalletSelectionModal({
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border border-gray-100 dark:border-white/5"
                   >
                     <div className="w-10 h-10 rounded-lg bg-white p-1.5 shadow-sm flex items-center justify-center">
-                      <img src={wallet.icon} alt={wallet.name} className="w-full h-full object-contain" />
+                      <img
+                        src={wallet.icon}
+                        alt={wallet.name}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                     <div className="flex-1 text-left">
                       <div className="font-medium text-gray-900 dark:text-white">{wallet.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Click to install</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Click to install
+                      </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                   </a>

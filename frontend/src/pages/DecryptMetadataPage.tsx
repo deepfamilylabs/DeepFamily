@@ -195,10 +195,7 @@ export default function DecryptMetadataPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400 ml-1">
-                  {t(
-                    "decryptMetadata.baseUrl",
-                    "Base URL",
-                  )}
+                  {t("decryptMetadata.baseUrl", "Base URL")}
                 </label>
                 <div className="relative group">
                   <div className="flex items-center h-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 focus-within:border-orange-500 focus-within:ring-4 focus-within:ring-orange-500/10 transition-all duration-300">
@@ -249,7 +246,9 @@ export default function DecryptMetadataPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 ml-1">CID</label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 ml-1">
+                  CID
+                </label>
                 <input
                   value={cid}
                   onChange={(e) => setCid(e.target.value)}
@@ -291,10 +290,7 @@ export default function DecryptMetadataPage() {
             <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800/50">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5 ml-1">
                 <Lock className="w-3.5 h-3.5 text-orange-500" />
-                {t(
-                  "decryptMetadata.password",
-                  "Decryption Password",
-                )}
+                {t("decryptMetadata.password", "Decryption Password")}
               </label>
               <div className="relative group">
                 <input
@@ -432,4 +428,3 @@ export default function DecryptMetadataPage() {
     </div>
   );
 }
-

@@ -1,24 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-export type ColorTheme = 
-  | "default" 
-  | "slate" 
-  | "red" 
-  | "orange" 
-  | "amber" 
-  | "yellow" 
-  | "lime" 
-  | "green" 
-  | "emerald" 
-  | "teal" 
-  | "cyan" 
-  | "sky" 
-  | "blue" 
-  | "indigo" 
-  | "violet" 
-  | "purple" 
-  | "fuchsia" 
-  | "pink" 
+export type ColorTheme =
+  | "default"
+  | "slate"
+  | "red"
+  | "orange"
+  | "amber"
+  | "yellow"
+  | "lime"
+  | "green"
+  | "emerald"
+  | "teal"
+  | "cyan"
+  | "sky"
+  | "blue"
+  | "indigo"
+  | "violet"
+  | "purple"
+  | "fuchsia"
+  | "pink"
   | "rose";
 
 interface ColorThemeContextType {
@@ -47,9 +47,7 @@ export function ColorThemeProvider({ children }: { children: React.ReactNode }) 
   }, [theme]);
 
   return (
-    <ColorThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ColorThemeContext.Provider>
+    <ColorThemeContext.Provider value={{ theme, setTheme }}>{children}</ColorThemeContext.Provider>
   );
 }
 

@@ -1,6 +1,17 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Settings, Globe, Palette, Lock, ChevronRight, X, Layers, Moon, Sun, Image } from "lucide-react";
+import {
+  Settings,
+  Globe,
+  Palette,
+  Lock,
+  ChevronRight,
+  X,
+  Layers,
+  Moon,
+  Sun,
+  Image,
+} from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import FamilyTreeConfigForm from "./FamilyTreeConfigForm";
 import { useVizOptions } from "../context/VizOptionsContext";
@@ -289,7 +300,7 @@ export default function GlobalSidebar() {
                         />
                       </div>
                     ) : (
-                      !item.path && (
+                      !!item.content && (
                         <ChevronRight
                           className={`w-4 h-4 transition-transform ${activeSection === item.id ? "rotate-90" : ""}`}
                         />

@@ -569,9 +569,12 @@ export default function FamilyTreeConfigForm({
                         {(() => {
                           if (selectedNetwork === "custom")
                             return t("familyTree.config.customNetwork", "Custom network");
-                          const found = presetNetworks.find((n) => n.chainId === selectedNetwork) ||
-                                        customNetworks.find((n) => n.chainId === selectedNetwork);
-                          return found ? found.name : t("familyTree.config.unknownNetwork", "Unknown");
+                          const found =
+                            presetNetworks.find((n) => n.chainId === selectedNetwork) ||
+                            customNetworks.find((n) => n.chainId === selectedNetwork);
+                          return found
+                            ? found.name
+                            : t("familyTree.config.unknownNetwork", "Unknown");
                         })()}
                       </span>
                       <ChevronDown

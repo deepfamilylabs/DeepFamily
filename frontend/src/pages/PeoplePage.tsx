@@ -170,17 +170,28 @@ export default function PeoplePage() {
   // Reset pagination when filters or projected set changes.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [PAGE_SIZE, filterType, sortOrder, searchTerm, selectedAddresses, selectedTags, people.length]);
+  }, [
+    PAGE_SIZE,
+    filterType,
+    sortOrder,
+    searchTerm,
+    selectedAddresses,
+    selectedTags,
+    people.length,
+  ]);
 
   // Open person: push state with ?person=...
-  const openPerson = useCallback((person: NodeData) => {
-    openedViaClickRef.current = true;
-    const sp = new URLSearchParams(location.search);
-    sp.set("person", String(person.tokenId || person.personHash || person.id));
-    navigate({ pathname: location.pathname, search: sp.toString() });
-    // Optimistic local state for immediate render
-    setSelectedPerson(person);
-  }, [location.pathname, location.search, navigate]);
+  const openPerson = useCallback(
+    (person: NodeData) => {
+      openedViaClickRef.current = true;
+      const sp = new URLSearchParams(location.search);
+      sp.set("person", String(person.tokenId || person.personHash || person.id));
+      navigate({ pathname: location.pathname, search: sp.toString() });
+      // Optimistic local state for immediate render
+      setSelectedPerson(person);
+    },
+    [location.pathname, location.search, navigate],
+  );
 
   // Close person: back if opened via click, else replace to clear query
   const closePerson = () => {
@@ -717,11 +728,7 @@ export default function PeoplePage() {
           <>
             <div className="grid gap-6 px-4 sm:px-6 lg:px-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
               {visiblePeople.map((person) => (
-                <PersonStoryCard
-                  key={person.id}
-                  person={person}
-                  onOpen={openPerson}
-                />
+                <PersonStoryCard key={person.id} person={person} onOpen={openPerson} />
               ))}
             </div>
             {visibleCount < filteredPeople.length ? (

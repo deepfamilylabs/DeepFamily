@@ -4,25 +4,25 @@ import { Shield, Eye, CheckCircle, Zap } from "lucide-react";
 import { ANIMATION_CLASSES } from "../../constants/animationStyles";
 import PageContainer from "../PageContainer";
 
-const BorderLine = ({ side, className = "" }: { side: 'left' | 'right'; className?: string }) => (
-  <div 
+const BorderLine = ({ side, className = "" }: { side: "left" | "right"; className?: string }) => (
+  <div
     className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
-      ${side === 'left' ? 'left-0' : 'right-0'}
+      ${side === "left" ? "left-0" : "right-0"}
       ${className}
       group-hover:bg-slate-300
     `}
   >
     {/* Top Cap */}
-    <div 
+    <div
       className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
-        ${side === 'left' ? 'left-0' : 'right-0'}
-      `} 
+        ${side === "left" ? "left-0" : "right-0"}
+      `}
     />
     {/* Bottom Cap */}
-    <div 
+    <div
       className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
-        ${side === 'left' ? 'left-0' : 'right-0'}
-      `} 
+        ${side === "left" ? "left-0" : "right-0"}
+      `}
     />
   </div>
 );
@@ -45,21 +45,21 @@ const TwoLayerValueSystem = memo(() => {
     <section className="py-24 lg:py-32 bg-white relative overflow-hidden">
       <PageContainer>
         {/* Section Header */}
-        <div className={`text-center mb-12 lg:mb-20 max-w-3xl mx-auto ${ANIMATION_CLASSES.FADE_IN_UP}`}>
+        <div
+          className={`text-center mb-12 lg:mb-20 max-w-3xl mx-auto ${ANIMATION_CLASSES.FADE_IN_UP}`}
+        >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 mb-6 border border-orange-100">
-             <Zap className="w-3.5 h-3.5 text-orange-600" />
+            <Zap className="w-3.5 h-3.5 text-orange-600" />
             <span className="text-sm font-bold text-orange-600 tracking-wide uppercase">
               Core Architecture
             </span>
           </div>
-          
+
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 tracking-tight leading-[1.1]">
             {t("home.valueSystem.title")}
           </h2>
 
-          <p className="text-xl text-slate-500 leading-relaxed">
-            {t("home.valueSystem.subtitle")}
-          </p>
+          <p className="text-xl text-slate-500 leading-relaxed">{t("home.valueSystem.subtitle")}</p>
         </div>
 
         {/* Grid - xAI Style - 2 Columns */}
@@ -68,23 +68,23 @@ const TwoLayerValueSystem = memo(() => {
             const isLastInRow = (index + 1) % 2 === 0;
 
             return (
-              <div
-                key={layer.key}
-                className="group relative h-full"
-              >
+              <div key={layer.key} className="group relative h-full">
                 {/* Interactive Area Layer (Background & Lines) */}
                 <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
                   {/* Hover Background - Gradient matching Theme */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
-                   
-                   {/* Left Border Line */}
-                   <BorderLine side="left" className="bg-slate-200" />
-                   
-                   {/* Right Border Line (Only for last item in row by default) */}
-                   <BorderLine side="right" className={isLastInRow ? 'bg-slate-200' : 'bg-transparent'} />
-                   
-                   {/* Mobile Line (Simple left border for <md) */}
-                   <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+
+                  {/* Left Border Line */}
+                  <BorderLine side="left" className="bg-slate-200" />
+
+                  {/* Right Border Line (Only for last item in row by default) */}
+                  <BorderLine
+                    side="right"
+                    className={isLastInRow ? "bg-slate-200" : "bg-transparent"}
+                  />
+
+                  {/* Mobile Line (Simple left border for <md) */}
+                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
                 </div>
 
                 {/* Content Layer */}
@@ -100,7 +100,7 @@ const TwoLayerValueSystem = memo(() => {
                       {index + 1}
                     </span>
                     <h3 className="text-2xl lg:text-3xl font-bold text-slate-900">
-                       {t(`home.valueSystem.${layer.key}.title`)}
+                      {t(`home.valueSystem.${layer.key}.title`)}
                     </h3>
                   </div>
 

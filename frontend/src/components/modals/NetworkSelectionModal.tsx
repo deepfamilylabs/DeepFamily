@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X, RefreshCw, Check, ChevronRight, Zap, FlaskConical, HardDrive, Globe } from "lucide-react";
+import {
+  X,
+  RefreshCw,
+  Check,
+  ChevronRight,
+  Zap,
+  FlaskConical,
+  HardDrive,
+  Globe,
+} from "lucide-react";
 
 interface NetworkOption {
   chainId: number;
@@ -174,11 +183,11 @@ export default function NetworkSelectionModal({
                     </span>
                   </div>
                   {/* Minimal Tag */}
-                   <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {t(network.tagKey, network.defaultTag)}
-                      </span>
-                   </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {t(network.tagKey, network.defaultTag)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Action Indicator */}
@@ -186,7 +195,7 @@ export default function NetworkSelectionModal({
                   {isLoading ? (
                     <RefreshCw className="w-5 h-5 text-orange-500 animate-spin" />
                   ) : isActive ? (
-                     <Check className="w-5 h-5 text-emerald-500" />
+                    <Check className="w-5 h-5 text-emerald-500" />
                   ) : (
                     <ChevronRight className="w-5 h-5 text-gray-300 dark:text-gray-600 group-hover:text-orange-500" />
                   )}

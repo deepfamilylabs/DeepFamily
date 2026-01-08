@@ -30,4 +30,3 @@ export function useActivePath() {
   if (!value) throw new Error("useActivePath must be used within ActivePathProvider");
   return value;
 }
-

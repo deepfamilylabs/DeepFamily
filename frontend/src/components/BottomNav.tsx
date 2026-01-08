@@ -22,18 +22,14 @@ export default function BottomNav() {
     const baseClasses =
       "flex-1 flex flex-col items-center justify-center py-2 px-1 text-xs font-medium transition-colors duration-200 relative group min-h-[64px]";
     return `${baseClasses} ${
-      isActive
-        ? "text-orange-600 dark:text-orange-400"
-        : "text-gray-500 dark:text-gray-400"
+      isActive ? "text-orange-600 dark:text-orange-400" : "text-gray-500 dark:text-gray-400"
     }`;
   };
 
   // Helper for icon container styles
   const getIconContainerClass = (isActive: boolean) =>
     `flex items-center justify-center w-10 h-10 rounded-2xl transition-colors duration-200 ${
-      isActive
-        ? "bg-transparent text-orange-500 dark:text-orange-400"
-        : "bg-transparent"
+      isActive ? "bg-transparent text-orange-500 dark:text-orange-400" : "bg-transparent"
     }`;
 
   return (

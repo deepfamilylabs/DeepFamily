@@ -30,7 +30,8 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       borderHover: "hover:border-blue-200 dark:hover:border-blue-800",
       borderClass: "border-orange-500 dark:border-orange-400",
       iconBg: "bg-blue-100 dark:bg-blue-900/30",
-      shadowHover: "hover:shadow-[0_8px_20px_-8px_rgba(59,130,246,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(59,130,246,0.4)]",
+      shadowHover:
+        "hover:shadow-[0_8px_20px_-8px_rgba(59,130,246,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(59,130,246,0.4)]",
       tab: "add-version",
     },
     {
@@ -42,7 +43,8 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       borderHover: "hover:border-emerald-200 dark:hover:border-emerald-800",
       borderClass: "border-orange-500 dark:border-orange-400",
       iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
-      shadowHover: "hover:shadow-[0_8px_20px_-8px_rgba(16,185,129,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(16,185,129,0.4)]",
+      shadowHover:
+        "hover:shadow-[0_8px_20px_-8px_rgba(16,185,129,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(16,185,129,0.4)]",
       tab: "endorse",
     },
     {
@@ -54,7 +56,8 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       borderHover: "hover:border-purple-200 dark:hover:border-purple-800",
       borderClass: "border-orange-500 dark:border-orange-400",
       iconBg: "bg-purple-100 dark:bg-purple-900/30",
-      shadowHover: "hover:shadow-[0_8px_20px_-8px_rgba(168,85,247,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(168,85,247,0.4)]",
+      shadowHover:
+        "hover:shadow-[0_8px_20px_-8px_rgba(168,85,247,0.5)] dark:hover:shadow-[0_8px_20px_-8px_rgba(168,85,247,0.4)]",
       tab: "mint-nft",
     },
   ];
@@ -73,10 +76,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
     <>
       {/* Transparent backdrop for closing menu when clicking outside */}
       {isOpen && (
-        <div
-          className="fixed inset-0 z-[9999] bg-transparent"
-          onClick={() => setIsOpen(false)}
-        />
+        <div className="fixed inset-0 z-[9999] bg-transparent" onClick={() => setIsOpen(false)} />
       )}
 
       <div className={`fixed right-6 md:right-10 z-[10000] bottom-24 md:bottom-10 ${className}`}>
@@ -90,7 +90,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
         >
           {actions.map((action, index) => {
             const Icon = action.icon;
-            
+
             return (
               <div
                 key={action.id}

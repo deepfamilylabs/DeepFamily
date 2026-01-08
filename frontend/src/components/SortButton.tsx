@@ -57,7 +57,7 @@ export default function SortButton({
             className={`w-3.5 h-3.5 transition-all duration-200 ${
               sortOrder === "desc" ? "text-white drop-shadow-sm" : "text-white/40"
             }`}
-             strokeWidth={2.5}
+            strokeWidth={2.5}
           />
         </div>
       )}

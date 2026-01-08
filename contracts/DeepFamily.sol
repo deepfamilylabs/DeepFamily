@@ -675,15 +675,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (bytes(tag).length > MAX_LONG_TEXT_LENGTH) revert InvalidTagLength();
     if (bytes(metadataCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
     bytes32 versionHash = keccak256(
-      abi.encode(
-        personHash,
-        fatherHash,
-        motherHash,
-        fatherVersionIndex,
-        motherVersionIndex,
-        tag,
-        metadataCID
-      )
+      abi.encode(personHash, fatherHash, motherHash, fatherVersionIndex, motherVersionIndex, tag)
     );
     if (versionExists[personHash][versionHash]) revert DuplicateVersion();
     versionExists[personHash][versionHash] = true;
