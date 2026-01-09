@@ -566,6 +566,8 @@
     }
   },
   "common": {
+    "open": "자세히 보기",
+    "dismiss": "닫기",
     "back": "뒤로",
     "confirm": "시각화로 이동",
     "cancel": "취소",
@@ -849,7 +851,13 @@
     "chunks": "{{count}}개 샤드",
     "viewDetails": "보기",
     "clickToEndorse": "이 버전을 승인하려면 클릭하세요",
-    "resetFilters": "필터 초기화"
+    "resetFilters": "필터 초기화",
+    "personNotInTree": {
+      "title": "이 사람은 현재 가계도 투영에 없습니다",
+      "query": "쿼리",
+      "hint": "글로벌 가계도 설정(루트/계약/네트워크)을 조정하여 포함하거나, 가계도 페이지를여십시오.",
+      "openTree": "가계도 열기"
+    }
   },
   "storyChunksModal": {
     "fetchError": "전기 데이터 로드 실패",

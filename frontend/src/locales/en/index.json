@@ -567,6 +567,8 @@
     }
   },
   "common": {
+    "open": "Open details",
+    "dismiss": "Dismiss",
     "back": "Back",
     "confirm": "Go to FamilyTree",
     "cancel": "Cancel",
@@ -850,7 +852,13 @@
     "chunks": "{{count}} chunks",
     "viewDetails": "View",
     "clickToEndorse": "Click to endorse this version",
-    "resetFilters": "Reset filters"
+    "resetFilters": "Reset filters",
+    "personNotInTree": {
+      "title": "This person isn’t in the current tree projection",
+      "query": "Query",
+      "hint": "Adjust the global tree configuration (root/contract/network) to include it, or open the Tree page.",
+      "openTree": "Open Tree"
+    }
   },
   "storyChunksModal": {
     "fetchError": "Failed to load story data",

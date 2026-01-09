@@ -83,8 +83,7 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
   return (
     <div
       onMouseEnter={handleMouseEnter}
-      onClick={() => onOpen(person)}
-      className="group relative flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 cursor-pointer overflow-hidden"
+      className="group relative flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 overflow-hidden"
     >
       {/* Top accent light - subtle gradient line */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-orange-400/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -102,7 +101,7 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
             <button
               type="button"
               onClick={handleStoryBadgeClick}
-              className="absolute top-0 right-0 w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-orange-500 border border-gray-100 dark:border-gray-700 flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-300 z-10"
+              className="absolute top-0 right-0 w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-orange-500 border border-gray-100 dark:border-gray-700 flex items-center justify-center shadow-lg hover:scale-110 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 transition-all duration-300 z-10"
               title={storyLabel}
               aria-label={storyLabel}
             >
@@ -135,10 +134,10 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
                   e.stopPropagation();
                   setShowEndorseModal(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-xs font-medium text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                className="group/endorse inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-xs font-medium text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-900/30 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 dark:hover:text-white transition-all duration-300"
                 title={t("people.clickToEndorse", "Click to endorse this version")}
               >
-                <Star className="w-3 h-3 fill-orange-500 text-orange-500" />
+                <Star className="w-3 h-3 fill-orange-500 text-orange-500 group-hover/endorse:text-white group-hover/endorse:fill-white transition-colors" />
                 {endorsementCount}
               </button>
             )}
@@ -209,9 +208,13 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
             )}
           </div>
 
-          <div className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white transition-colors duration-300 shadow-lg shadow-gray-200 dark:shadow-none">
+          <button
+            onClick={() => onOpen(person)}
+            className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white hover:!bg-orange-600 hover:scale-110 transition-all duration-300 shadow-lg shadow-gray-200 dark:shadow-none"
+            aria-label={t("common.open", "Open details")}
+          >
             <ChevronRight className="w-5 h-5" />
-          </div>
+          </button>
         </div>
       </div>
       {showEndorseModal ? (

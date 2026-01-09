@@ -298,7 +298,7 @@ export default function NodeDetailModal({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
-                        className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+                        className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                         title={t("people.clickToEndorse", "Click to endorse this version")}
                       >
                         <Star
@@ -326,7 +326,7 @@ export default function NodeDetailModal({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
-                        className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+                        className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                         title={t(
                           "familyTree.nodeDetail.mintNFTTooltip",
                           "Mint this person as an NFT",
@@ -354,7 +354,7 @@ export default function NodeDetailModal({
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+                          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                           title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
                         >
                           <BookOpen
@@ -377,7 +377,7 @@ export default function NodeDetailModal({
                           }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+                          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
                           title={t("familyTree.nodeDetail.editStory", "Edit Story")}
                         >
                           <Edit2
