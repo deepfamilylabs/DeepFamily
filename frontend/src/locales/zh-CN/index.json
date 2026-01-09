@@ -567,6 +567,8 @@
     }
   },
   "common": {
+    "open": "查看详情",
+    "dismiss": "忽略",
     "back": "返回",
     "confirm": "前往可视化",
     "cancel": "取消",
@@ -851,7 +853,13 @@
     "chunks": "{{count}} 个分片",
     "viewDetails": "查看",
     "clickToEndorse": "点击为此版本背书",
-    "resetFilters": "重置筛选"
+    "resetFilters": "重置筛选",
+    "personNotInTree": {
+      "title": "此人不在当前的系谱投影中",
+      "query": "查询",
+      "hint": "请调整全局系谱配置（根节点/合约/网络）以包含此人，或打开系谱页面。",
+      "openTree": "打开系谱"
+    }
   },
   "storyChunksModal": {
     "fetchError": "加载传记数据失败",

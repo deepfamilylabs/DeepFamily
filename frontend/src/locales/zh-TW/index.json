@@ -566,6 +566,8 @@
     }
   },
   "common": {
+    "open": "查看詳情",
+    "dismiss": "忽略",
     "back": "返回",
     "confirm": "前往視覺化",
     "cancel": "取消",
@@ -849,7 +851,13 @@
     "chunks": "{{count}} 個分片",
     "viewDetails": "查看",
     "clickToEndorse": "點擊為此版本背書",
-    "resetFilters": "重置篩選"
+    "resetFilters": "重置篩選",
+    "personNotInTree": {
+      "title": "此人不在當前的系譜投影中",
+      "query": "查詢",
+      "hint": "請調整全局系譜配置（根節點/合約/網絡）以包含此人，或打開系譜頁面。",
+      "openTree": "打開系譜"
+    }
   },
   "storyChunksModal": {
     "fetchError": "載入傳記資料失敗",

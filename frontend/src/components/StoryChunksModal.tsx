@@ -540,7 +540,7 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 mt-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-3">
                     {/* Tags */}
                     {genderText && (
                       <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -555,49 +555,53 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
                         </span>
                       </>
                     )}
-                    {endorsementCount > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowEndorseModal(true);
-                        }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
-                      >
-                        <Star
-                          className="w-4 h-4 text-gray-400 group-hover:text-white"
-                          strokeWidth={2}
-                        />
-                        <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-                          {endorsementCount}
-                        </span>
-                      </button>
-                    )}
+                    {(endorsementCount > 0 || isMinted(person)) && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {endorsementCount > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowEndorseModal(true);
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none flex-shrink-0 whitespace-nowrap"
+                          >
+                            <Star
+                              className="w-4 h-4 text-gray-400 group-hover:text-white"
+                              strokeWidth={2}
+                            />
+                            <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
+                              {endorsementCount}
+                            </span>
+                          </button>
+                        )}
 
-                    {isMinted(person) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(
-                            `/person/${person.tokenId || person.id}`,
-                            "_blank",
-                            "noopener,noreferrer",
-                          );
-                        }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        className="group relative inline-flex h-9 items-center gap-2 px-4 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
-                        title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
-                      >
-                        <BookOpen
-                          className="w-4 h-4 text-gray-400 group-hover:text-white"
-                          strokeWidth={2}
-                        />
-                        <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-                          {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
-                        </span>
-                      </button>
+                        {isMinted(person) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(
+                                `/person/${person.tokenId || person.id}`,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none flex-shrink-0 whitespace-nowrap"
+                            title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
+                          >
+                            <BookOpen
+                              className="w-4 h-4 text-gray-400 group-hover:text-white"
+                              strokeWidth={2}
+                            />
+                            <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
+                              {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

@@ -566,6 +566,8 @@
     }
   },
   "common": {
+    "open": "詳細を開く",
+    "dismiss": "閉じる",
     "back": "戻る",
     "confirm": "可視化に移動",
     "cancel": "キャンセル",
@@ -849,7 +851,13 @@
     "chunks": "{{count}} 個のシャード",
     "viewDetails": "詳細を見る",
     "clickToEndorse": "クリックしてこのバージョンをエンドース",
-    "resetFilters": "フィルタをリセット"
+    "resetFilters": "フィルタをリセット",
+    "personNotInTree": {
+      "title": "この人物は現在の家系図射影に含まれていません",
+      "query": "クエリ",
+      "hint": "グローバル家系図設定（ルート/コントラクト/ネットワーク）を調整して含めるか、家系図ページを開いてください。",
+      "openTree": "家系図を開く"
+    }
   },
   "storyChunksModal": {
     "fetchError": "伝記データ読み込み失敗",
