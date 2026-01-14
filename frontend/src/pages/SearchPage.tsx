@@ -70,7 +70,7 @@ const SectionCard = ({
       </button>
     </div>
     <div
-      className={`transition-all duration-500 ease-in-out overflow-hidden ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
+      className={`transition-all duration-500 ease-in-out overflow-hidden ${isOpen ? "max-h-[50000px] opacity-100" : "max-h-0 opacity-0"}`}
     >
       <div className="p-6 pt-0">{children}</div>
     </div>
@@ -853,19 +853,26 @@ export default function SearchPage() {
                       className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
                     >
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mb-3">
-                        <div className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium text-xs">
-                          v{Number(version.versionIndex)}
+                        <div className="flex items-center gap-2">
+                          <div className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium text-xs">
+                            v{Number(version.versionIndex)}
+                          </div>
+                          {version.tag && (
+                            <div className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700">
+                              {version.tag}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                          <span>{t("search.versionsQuery.creator")}:</span>
-                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 max-w-full flex-1 min-w-0">
+                          <span className="whitespace-nowrap flex-shrink-0">{t("search.versionsQuery.creator")}:</span>
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0">
                             <HashInline
                               value={String(version.addedBy || "")}
-                              className="font-mono text-xs text-gray-900 dark:text-gray-200"
+                              className="font-mono text-xs text-gray-900 dark:text-gray-200 flex-1 min-w-0"
                             />
                             <button
                               onClick={() => onCopy(String(version.addedBy || ""))}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
                             >
                               <Clipboard size={12} />
                             </button>
@@ -878,56 +885,72 @@ export default function SearchPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 dark:bg-gray-900/30 rounded-xl p-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-500 dark:text-gray-400">
-                              {t("search.versionsQuery.versionTag")}:
+                      <div className="flex flex-col gap-1 text-sm pl-0 md:pl-0">
+                        {version.metadataCID && (
+                          <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
+                            <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right text-xs">
+                              {t("search.versionsQuery.metadataCID")}
                             </span>
-                            <span className="font-medium text-gray-900 dark:text-gray-100">
-                              {version.tag || t("search.versionsQuery.none")}
-                            </span>
-                          </div>
-                          {version.metadataCID && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-500 dark:text-gray-400">
-                                {t("search.versionsQuery.metadataCID")}:
-                              </span>
-                              <span className="font-mono text-xs text-gray-900 dark:text-gray-100 truncate max-w-[150px]">
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
+                              <span
+                                className="font-mono text-xs text-gray-900 dark:text-gray-100 truncate min-w-0"
+                                title={version.metadataCID}
+                              >
                                 {version.metadataCID}
                               </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 pt-2 md:pt-0 md:pl-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-500 dark:text-gray-400">
-                              {t("search.versionsQuery.fatherHash")}:
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <HashInline
-                                value={version.fatherHash}
-                                className="font-mono text-xs"
-                              />
-                              <span className="text-xs text-gray-400">
-                                (v{Number(version.fatherVersionIndex)})
-                              </span>
+                              <button
+                                onClick={() => onCopy(version.metadataCID || "")}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
+                              >
+                                <Clipboard size={12} />
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-500 dark:text-gray-400">
-                              {t("search.versionsQuery.motherHash")}:
+                        )}
+
+                        <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right text-xs">
+                            {t("search.versionsQuery.fatherHash")}
+                          </span>
+                          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
+                              <HashInline
+                                value={version.fatherHash}
+                                className="font-mono text-xs text-gray-900 dark:text-gray-200 min-w-0"
+                              />
+                              <button
+                                onClick={() => onCopy(version.fatherHash)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
+                              >
+                                <Clipboard size={12} />
+                              </button>
+                            </div>
+                            <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                              (v{Number(version.fatherVersionIndex)})
                             </span>
-                            <div className="flex items-center gap-1">
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right text-xs">
+                            {t("search.versionsQuery.motherHash")}
+                          </span>
+                          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
                               <HashInline
                                 value={version.motherHash}
-                                className="font-mono text-xs"
+                                className="font-mono text-xs text-gray-900 dark:text-gray-200 min-w-0"
                               />
-                              <span className="text-xs text-gray-400">
-                                (v{Number(version.motherVersionIndex)})
-                              </span>
+                              <button
+                                onClick={() => onCopy(version.motherHash)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
+                              >
+                                <Clipboard size={12} />
+                              </button>
                             </div>
+                            <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                              (v{Number(version.motherVersionIndex)})
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1178,31 +1201,33 @@ export default function SearchPage() {
                       key={i}
                       className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
                     >
-                      <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-500 dark:text-gray-400">
+                      <div className="flex flex-col gap-2 text-sm">
+                        <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right">
                             {t("search.childrenQuery.childHash")}:
                           </span>
-                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
                             <HashInline
                               value={childHash}
-                              className="font-mono text-xs text-gray-900 dark:text-gray-200"
+                              className="font-mono text-xs text-gray-900 dark:text-gray-200 flex-1 min-w-0"
                             />
                             <button
                               onClick={() => onCopy(childHash)}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
                             >
                               <Clipboard size={12} />
                             </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-500 dark:text-gray-400">
+                        <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right">
                             {t("search.childrenQuery.childVersion")}:
                           </span>
-                          <span className="font-medium text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
-                            v{childrenData.childVersions[i]}
-                          </span>
+                          <div className="w-fit">
+                            <span className="font-medium text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
+                              v{childrenData.childVersions[i]}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1335,23 +1360,23 @@ export default function SearchPage() {
                           )}
                         </div>
 
-                        <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center gap-1">
-                            <span>{t("search.storyChunksQuery.chunkHash")}:</span>
-                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                              <HashInline value={chunk.chunkHash} className="font-mono" />
-                              <button onClick={() => onCopy(String(chunk.chunkHash || ""))}>
+                        <div className="flex flex-col gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
+                            <span className="whitespace-nowrap flex-shrink-0 text-right">{t("search.storyChunksQuery.chunkHash")}:</span>
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded min-w-0 w-fit max-w-full">
+                              <HashInline value={chunk.chunkHash} className="font-mono flex-1 min-w-0" />
+                              <button onClick={() => onCopy(String(chunk.chunkHash || ""))} className="flex-shrink-0">
                                 <Clipboard size={10} />
                               </button>
                             </div>
                           </div>
 
                           {chunk.editor && (
-                            <div className="flex items-center gap-1">
-                              <span>{t("search.storyChunksQuery.editor")}:</span>
-                              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                                <HashInline value={String(chunk.editor)} className="font-mono" />
-                                <button onClick={() => onCopy(String(chunk.editor))}>
+                            <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
+                              <span className="whitespace-nowrap flex-shrink-0 text-right">{t("search.storyChunksQuery.editor")}:</span>
+                              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded min-w-0 w-fit max-w-full">
+                                <HashInline value={String(chunk.editor)} className="font-mono flex-1 min-w-0" />
+                                <button onClick={() => onCopy(String(chunk.editor))} className="flex-shrink-0">
                                   <Clipboard size={10} />
                                 </button>
                               </div>
@@ -1359,13 +1384,13 @@ export default function SearchPage() {
                           )}
 
                           {chunk.attachmentCID && chunk.attachmentCID.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              <span>{t("search.storyChunksQuery.attachmentCID")}:</span>
-                              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                                <span className="font-mono truncate max-w-[100px]">
+                            <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
+                              <span className="whitespace-nowrap flex-shrink-0 text-right">{t("search.storyChunksQuery.attachmentCID")}:</span>
+                              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded min-w-0 w-fit max-w-full">
+                                <span className="font-mono truncate flex-1 min-w-0" title={chunk.attachmentCID}>
                                   {chunk.attachmentCID}
                                 </span>
-                                <button onClick={() => onCopy(String(chunk.attachmentCID))}>
+                                <button onClick={() => onCopy(String(chunk.attachmentCID))} className="flex-shrink-0">
                                   <Clipboard size={10} />
                                 </button>
                               </div>
