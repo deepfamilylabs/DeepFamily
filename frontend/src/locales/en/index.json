@@ -26,28 +26,12 @@
     "familyTree": "Tree",
     "search": "Search",
     "people": "People",
-    "actions": "Actions",
-    "keyGen": "KeyGen",
-    "tools": "Tools"
+    "actions": "Actions"
   },
   "home": {
     "title": "Decentralized Digital Family Tree",
     "subtitle": "ZK privacy · Unlinkability · Multi-version · Community endorsement · NFT bios",
     "getStarted": "Get started",
-    "exploreFamilyTree": "Explore Family Tree",
-    "addPerson": "Add Person",
-    "search": "Search",
-    "blockchainActions": "Add Person",
-    "tagStrip": {
-      "protocol": "Private",
-      "incentive": "Endorse",
-      "nft": "NFT Bio",
-      "zk": "Sealed"
-    },
-    "coreValue": {
-      "title": "Core Mission",
-      "description": "Building a permanently trusted global digital genealogy infrastructure"
-    },
     "valueProps": {
       "title": "Core Value Propositions",
       "subtitle": "A trusted multi-dimensional genealogy layer turning open exploration into confirmed value.",
@@ -65,73 +49,47 @@
       },
       "communityEndorsement": {
         "title": "Community Endorsement",
-        "description": "Endorsing with DEEP utility points carries real cost, so endorsers vote with fees to surface trustworthy versions and dilute noise"
+        "description": "Endorsing carries real cost, so endorsers stake their credibility to surface trustworthy versions and dilute noise"
       },
       "nftValueCreation": {
-        "title": "NFT Value Creation",
-        "description": "Backed versions mint into NFT biographies where holders route future endorsement fees and story traffic, recognizing quality contributions"
+        "title": "NFT Biographies",
+        "description": "Endorsed versions can be minted as NFT biographies with full biographical data, recognizing quality contributions"
       },
       "storyShardingSealing": {
-        "title": "Story Sharding & Sealing",
-        "description": "Story shards append details with hash checks; sealing makes them permanently immutable so archives stay rich and trustworthy"
+        "title": "Biographical Storage & Sealing",
+        "description": "Append biographical details with hash verification; sealing makes them permanently immutable so archives stay rich and trustworthy"
       }
     },
     "valueSystem": {
-      "title": "Two-Layer Value System",
-      "subtitle": "Progressive privacy path: hash submission → community endorsement → NFT disclosure",
+      "title": "Two-Layer Architecture",
+      "subtitle": "Build the relationship network privately, then validate and publish through community consensus",
       "layer1": {
-        "title": "Hash Privacy Layer",
-        "description": "Only salted hash commitments are submitted at this layer—no plaintext ever touches the chain. Zero-knowledge proofs keep the entire submission process private.",
+        "title": "Family Relationship Network",
+        "description": "Build a global family tree graph through parent-child hash connections. Zero-knowledge proofs keep the entire submission process private.",
         "feature1": "Store salted hash commitments only, no plaintext on-chain",
         "feature2": "Salted passphrases block identity inference and pollution",
         "feature3": "Shared passphrases enable private collaboration; strong solo passphrases fully isolate trees"
       },
       "layer2": {
-        "title": "NFT Biography Layer",
-        "description": "Endorsed versions can be minted into NFT biographies, and minting immediately discloses the full narrative on-chain. Story sharding keeps detailed histories verifiable over time.",
-        "feature1": "Minting publishes the complete NFT biography",
-        "feature2": "Endorsements drive community consensus and incentives",
-        "feature3": "Story shards extend biographies with on-chain verification"
-      },
-      "flow": {
-        "title": "Privacy to Value Flow",
-        "description": "From private hash storage to community-validated NFT assets",
-        "step1": "Private Submission",
-        "step1Desc": "Add family members with zero-knowledge proofs",
-        "step2": "Public Disclosure",
-        "step2Desc": "Mint NFTs revealing full biographical information"
-      },
-      "dualModels": {
-        "title": "Dual Family Tree Models",
-        "description": "Salted passphrase system enables both collaborative public trees and pollution-resistant private trees",
-        "public": {
-          "title": "Public Collaborative Trees",
-          "description": "Shared passphrases enable multiple users to collaboratively build comprehensive family trees together.",
-          "benefit": "Community Collaboration",
-          "mode": "Shared Passphrase Mode"
-        },
-        "private": {
-          "title": "Private Protected Trees",
-          "description": "Unique passphrases create completely protected trees immune to pollution attacks and relationship corruption.",
-          "benefit": "Anti-Pollution Protection",
-          "mode": "Unique Passphrase Mode"
-        }
+        "title": "Value & Public Records",
+        "description": "Endorsed versions can be minted as NFT biographies. Community consensus surfaces the most trusted data while biographical storage keeps histories verifiable.",
+        "feature1": "Minting publishes NFT biographies on-chain",
+        "feature2": "Community endorsements validate data quality",
+        "feature3": "Biographical details extend records with on-chain verification"
       },
       "advantages": {
         "title": "Workflow",
         "subtitle": "Five-step value discovery and consensus formation mechanism",
         "step1": "Add Person Version",
-        "step1Desc": "Submit parent hash commitments → receive DEEP utility distribution",
+        "step1Desc": "Submit parent hash commitments to build the family network",
         "step2": "User Endorsement",
-        "step2Desc": "Pay DEEP utility points to endorse a version",
+        "step2Desc": "Endorse trusted versions to signal data quality",
         "step3": "Mint Version NFT",
         "step3Desc": "Endorsers can mint NFTs for corresponding versions",
-        "step4": "Write Story Shards",
-        "step4Desc": "NFT holders write/append person story fragments",
+        "step4": "Write Biographical Details",
+        "step4Desc": "Record holders write and append biographical content",
         "step5": "Story Sealing",
-        "step5Desc": "Seal stories to form immutable on-chain historical records",
-        "conclusion": "Value-Driven Collaborative Network",
-        "conclusionDesc": "Through utility-gated actions and contribution-based distributions, enabling organic accumulation and discovery of high-quality genealogy data"
+        "step5Desc": "Seal stories to form immutable on-chain historical records"
       },
       "privacyLayer": {
         "title": "Privacy Protection Layer",
@@ -141,11 +99,11 @@
         "feature3": "Structural correctness verification"
       },
       "valueLayer": {
-        "title": "Value Confirmation Layer",
-        "description": "Confirming data quality and routing functional fees through utility-based consensus mechanisms",
+        "title": "Community Validation Layer",
+        "description": "Confirming data quality through community consensus and endorsement mechanisms",
         "feature1": "Endorsement consensus mechanism",
-        "feature2": "NFT value binding",
-        "feature3": "Fee routing"
+        "feature2": "NFT biographical records",
+        "feature3": "Quality-driven governance"
       }
     },
     "features": {
@@ -160,16 +118,16 @@
         "description": "Person versions store parent pointers and timestamps; on-chain deduplication plus endorsement ordering keeps history traceable."
       },
       "endorsementEconomy": {
-        "title": "Endorsement Utility Loop",
-        "description": "Every endorsement costs DEEP and splits between holder, contributor, and protocol—functional fee routing that ties trust to on-chain actions."
+        "title": "Endorsement System",
+        "description": "Every endorsement carries real cost, tying trust to on-chain actions and surfacing the most credible versions through community consensus."
       },
       "personNFT": {
         "title": "NFT Biographies",
-        "description": "Endorsed versions mint into NFT biographies that disclose core info; holders can extend stories and capture ongoing fee streams."
+        "description": "Endorsed versions mint into NFT biographies that disclose core biographical info; holders can extend them with detailed narratives."
       },
       "storySharding": {
-        "title": "Story Sharding & Sealing",
-        "description": "Append life stories in 100×1KB shards with hash checks, then seal them for immutable, trustworthy on-chain archives."
+        "title": "Biographical Storage & Sealing",
+        "description": "Append life stories in verified on-chain segments, then seal them for immutable, trustworthy archives."
       },
       "versionNotarization": {
         "title": "Collaboration & Private Modes",
@@ -177,31 +135,31 @@
       }
     },
     "tokenomics": {
-      "pill": "Utility & Incentives",
-      "title": "Utility & Incentives",
-      "subtitle": "DEEP utility points gate actions and allocate to complete, verified data—no investment promises",
+      "pill": "Protocol Incentives",
+      "title": "Protocol Incentives",
+      "subtitle": "Contributions are rewarded, endorsements carry cost, and quality data is prioritized",
       "deepToken": {
-        "title": "DEEP Utility Points",
-        "description": "Progressive halving utility issuance used solely for protocol actions; rewards follow contributions while maintaining supply discipline."
+        "title": "Contribution Rewards",
+        "description": "The protocol rewards contributors who build complete family connections, encouraging structured and verified genealogy data."
       },
       "supply": {
-        "title": "Supply Cap",
-        "description": "Utility supply capped at 100B with no pre-mine or fundraising; minting only via protocol interactions."
+        "title": "Controlled Issuance",
+        "description": "Rewards are issued solely through protocol interactions with no pre-allocation, ensuring fair distribution to active contributors."
       },
       "mining": {
-        "title": "Issuance Trigger",
-        "description": "Utility rewards mint only when parent hash commitments are submitted, incentivizing structured completion without exposing plaintext."
+        "title": "Reward Trigger",
+        "description": "Rewards are issued only when complete parent relationships are submitted, incentivizing structured family data without exposing plaintext."
       },
       "endorsement": {
-        "title": "Endorsement Fees",
-        "description": "Fees mirror the current utility issuance level; the protocol can retain a small share to curb self-endorsement and fund operations."
+        "title": "Endorsement Cost",
+        "description": "Endorsements carry real cost to prevent spam, ensuring that community validation signals are meaningful and trustworthy."
       },
       "distribution": {
-        "title": "Fee Distribution",
-        "description": "Fees route between submitters and NFT holders based on stage; they are functional transfers, not investment returns."
+        "title": "Contributor Recognition",
+        "description": "Endorsement fees flow to data contributors and record holders, recognizing those who provide quality genealogy information."
       },
       "goal": {
-        "title": "Protocol Goals",
+        "title": "Quality-Driven Design",
         "description": "Align real costs with data quality to reward accurate relationships while suppressing spam and noise."
       }
     },
@@ -211,8 +169,8 @@
       "contributors": {
         "title": "Data Contributors",
         "description": "Input, enrich, and verify genealogy data to build a trusted network",
-        "benefit1": "Receive DEEP utility distributions",
-        "benefit2": "Share in ongoing endorsement fees"
+        "benefit1": "Earn protocol rewards for contributions",
+        "benefit2": "Benefit from community endorsements"
       },
       "researchers": {
         "title": "Family Researchers",
@@ -230,46 +188,17 @@
         "title": "Narrative Creators",
         "description": "Write and seal family stories, turning memories into verifiable archives",
         "benefit1": "Preserve work permanently on-chain",
-        "benefit2": "Protect authorship via story sharding"
-      }
-    },
-    "contracts": {
-      "title": "Smart Contract Architecture",
-      "subtitle": "A complete family tree smart contract system covering person management, endorsement systems, NFT minting, and governance mechanisms",
-      "familyTree": {
-        "feature1": "Person Management System",
-        "feature2": "Endorsement Staking Mechanism",
-        "feature3": "NFT Minting Functionality"
-      },
-      "token": {
-        "feature1": "ERC20 Token Contract",
-        "feature2": "10 Halving Phases",
-        "feature3": "Total Supply 100 Billion"
-      },
-      "votes": {
-        "feature1": "NFT Voting Weight",
-        "feature2": "Endorsement Challenge Proposals",
-        "feature3": "Fee Adjustment Proposals"
+        "benefit2": "Protect authorship with permanent on-chain sealing"
       }
     },
     "cta": {
       "title": "Start Building Your Digital Family Tree",
       "subtitle": "Build your digital family tree using smart contracts and search in constructing a decentralized family history recording system",
       "startButton": "Start Building",
-      "exploreButton": "Explore Family Tree",
-      "experience": "Experience Now",
-      "search": "Search Family",
-      "configure": "Configure Connection",
-      "opensource": "Open Source on GitHub",
-      "free": "Free & Open Source",
-      "license": "MIT License",
-      "privacy": "Privacy Protection",
-      "security": "Security Guarantee",
-      "github": "Open Source"
+      "exploreButton": "Explore Family Tree"
     }
   },
   "search": {
-    "title": "Search",
     "query": "Query",
     "reset": "Reset",
     "copy": "Copy",
@@ -284,10 +213,7 @@
     "pageSizePlaceholder": "≤100",
     "versionIndexPlaceholder": "≥0",
     "nameQuery": {
-      "title": "Query by Full Name",
-      "fullName": "Full Name",
-      "pageSize": "Page Size",
-      "placeholder": "e.g., John Smith"
+      "pageSize": "Page Size"
     },
     "endorsementQuery": {
       "title": "Endorsement Statistics Query",
@@ -306,30 +232,20 @@
       "title": "Person Versions Query",
       "personHash": "Person Hash",
       "placeholder": "0x1234...abcd (64-character hexadecimal)",
-      "versionIndex": "Version Index",
       "creator": "Creator",
-      "addTime": "Add Time",
       "fatherHash": "Father Hash",
       "motherHash": "Mother Hash",
-      "fatherVersion": "Father Version",
-      "motherVersion": "Mother Version",
-      "versionTag": "Version Tag",
       "metadataCID": "Metadata CID",
-      "unknown": "Unknown",
-      "none": "None"
+      "unknown": "Unknown"
     },
     "storyChunksQuery": {
       "title": "Story Chunks Query",
       "tokenId": "Token ID",
       "placeholder": "Enter NFT Token ID",
-      "chunkIndex": "Chunk Index",
       "chunkHash": "Chunk Hash",
-      "content": "Content",
-      "timestamp": "Timestamp",
       "editor": "Editor",
       "chunkType": "Chunk Type",
       "attachmentCID": "Attachment CID",
-      "contentPreview": "Content Preview",
       "totalChunks": "Total Chunks"
     },
     "childrenQuery": {
@@ -337,17 +253,14 @@
       "parentHash": "Parent Hash",
       "parentVersion": "Version Index",
       "parentHashPlaceholder": "0x1234...abcd (64-character hexadecimal)",
-      "parentVersionPlaceholder": "≥0",
       "childHash": "Child Hash",
       "childVersion": "Child Version",
       "totalChildren": "Total Children"
     },
     "hashCalculator": {
       "title": "Calculate Identity Hash Locally",
-      "tip": "💡 Tip: Use the tool below to calculate your identity hash, then copy it to use in the queries below",
       "name": "Full Name",
       "isBirthBC": "Era",
-      "birthYear": "Birth Year",
       "birthMonth": "1-12",
       "birthDay": "1-31",
       "gender": "Gender",
@@ -391,25 +304,14 @@
       "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
       "passphraseCharCount": "Characters after trim: {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
-      "toggleNo": "No",
-      "toggleYes": "Yes",
-      "birthPlace": "Birth Place (Optional)",
-      "birthPlacePlaceholder": "e.g., US-CA-Los Angeles",
-      "compute": "Calculate",
-      "result": "Result",
-      "hashLabel": "Hash:",
       "description": "Note: Calculation logic is completely consistent with the contract getPersonHash (identity hash).",
       "bcOptions": {
         "ad": "AD",
         "bc": "BC"
       },
-      "calculatedHash": "Identity Hash",
-      "contractHash": "Contract Hash",
-      "hashesMatch": "Hashes match",
-      "hashesNoMatch": "Hashes don't match"
+      "calculatedHash": "Identity Hash"
     },
     "validation": {
-      "nameRequired": "Please enter name",
       "nameTooLong": "Name cannot exceed 256 bytes (approximately 256 English characters)",
       "hashRequired": "Please enter identity hash",
       "hashInvalid": "Please enter a valid 64-character hexadecimal hash",
@@ -432,21 +334,18 @@
       "force": "Force Directed",
       "virtual": "Tree List"
     },
-    "versionSelector": {
-      "label": "Version Selection",
-      "apply": "Apply"
-    },
+    "versionSelector": {},
     "config": {
       "rpc": "RPC",
-      "network": "Network",
-      "selectNetwork": "Select network",
       "customNetwork": "Custom network",
       "customNetworks": "Custom",
       "customNetworkName": "Network name",
       "chainId": "Chain ID",
       "addCustomNetwork": "Save custom",
       "addCustomNetworkHint": "Fill in and save to reuse later",
+      "customNetworkCspHint": "In preview/production, the RPC origin must be allowlisted by CSP (connect-src). If it fails to connect, add the origin via DEEP_CSP_CONNECT_SRC when running preview/build.",
       "customNetworkAdded": "Custom network added",
+      "unknownNetwork": "Unknown",
       "contract": "Contract",
       "root": "Root Hash",
       "clearAndRefresh": "Clear",
@@ -455,14 +354,11 @@
       "resetToDefaults": "Reset to environment defaults"
     },
     "ui": {
-      "displaySettings": "Data Options",
       "versionNumber": "Version Index",
       "contractModeConfig": "Config",
       "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
       "traversalBFS": "BFS - Breadth-First (level order)",
       "traversal": "Traversal Mode",
-      "traversalDesc": "DFS depth-first (faster deep nodes) / BFS breadth-first (level-wise)",
-      "progressSummary": "Nodes {{created}} / depth {{depth}}",
       "nodesLabelFull": "Nodes",
       "depthLabelFull": "Depth",
       "edit": "Edit",
@@ -485,15 +381,11 @@
       }
     },
     "status": {
-      "loading": "Loading...",
       "contractModeRootNotFound": "Root node version not found. Please check the hash and version number.",
       "rootNotFound": "Root node not found. Please check the Root configuration or wait for indexing",
-      "contractOk": "Contract data loaded",
       "badge": {
         "checking": "Checking",
-        "ok": "OK",
-        "root_missing": "Root Missing",
-        "error": "Error"
+        "ok": "OK"
       },
       "networkError": "Network request failed",
       "rateLimited": "RPC rate limit exceeded. Please try again later."
@@ -504,10 +396,8 @@
       "clearAll": "Clear all"
     },
     "nodeDetail": {
-      "title": "Node Detail",
       "hash": "Hash",
       "version": "Version",
-      "endorsementCount": "Endorsements",
       "father": "Father Hash",
       "fatherVersion": "Father Version",
       "mother": "Mother Hash",
@@ -523,15 +413,6 @@
       "birth": "Birth",
       "death": "Death",
       "story": "Introduction",
-      "profile": "Profile",
-      "storyChunks": "Chunks Count",
-      "storyLength": "Total Length",
-      "sealed": "Sealed",
-      "lastUpdate": "Last Update",
-      "showFullStory": "Show Full Story",
-      "hideFullStory": "Hide Full Story",
-      "showChunks": "Show Chunks",
-      "hideChunks": "Hide Chunks",
       "encyclopedia": "Encyclopedia",
       "editStory": "Edit Story",
       "edit": "Edit",
@@ -539,18 +420,13 @@
       "mintNFTTooltip": "Mint this person as an NFT",
       "uri": "URI",
       "loading": "Loading NFT info…",
-      "loadErrorPrefix": "NFT load failed",
-      "bcPrefix": "BC",
       "decrypt": "Decrypt and View",
       "genders": {
         "male": "Male",
         "female": "Female",
         "other": "Other"
       },
-      "errors": {
-        "nftLoadFailed": "NFT load failed",
-        "loadFailed": "Load failed"
-      }
+      "errors": {}
     },
     "personVersionDetail": {
       "title": "Person Version Details"
@@ -559,7 +435,6 @@
       "rpc": "Please enter a valid RPC URL",
       "contract": "Please enter a valid contract address (0x + 40 hex chars)",
       "root": "Please enter a valid root hash (0x + 64 hex chars)",
-      "version": "Please enter a valid version index",
       "chainIdInvalid": "Please enter a valid chain ID",
       "customNetwork": "Please enter network name, valid chain ID, and RPC URL",
       "chainIdConflict": "Chain ID already exists in built-in networks",
@@ -569,8 +444,6 @@
   "common": {
     "open": "Open details",
     "dismiss": "Dismiss",
-    "back": "Back",
-    "confirm": "Go to FamilyTree",
     "cancel": "Cancel",
     "goBack": "Go Back",
     "close": "Close",
@@ -578,6 +451,7 @@
     "hashCopied": "Hash copied",
     "copy": "Copy",
     "copied": "Copied",
+    "copyFailed": "Failed to copy",
     "na": "N/A",
     "retry": "Retry",
     "loadingMore": "Loading more..."
@@ -590,9 +464,7 @@
     "wrongNetwork": "Wrong Network",
     "clickToSwitch": "Click to switch network",
     "switchNetwork": "Switch Network",
-    "currentNetwork": "Current network",
     "selectNetworkDesc": "Please select a supported network:",
-    "networkId": "ID: {{chainId}}",
     "mainnet": "Mainnet",
     "testnet": "Testnet",
     "localhost": "Local Dev",
@@ -616,18 +488,10 @@
     "chainAdded": "Network added successfully",
     "chainAddFailed": "Failed to add network",
     "chainNotSupported": "This network is not supported",
-    "noMetaMask": "Please install MetaMask",
     "noWallet": "Please install a wallet extension",
     "selectWallet": "Select Wallet",
     "noWalletsFound": "No wallets found",
-    "detected": "Detected",
-    "secureConnection": "Secure connection",
-    "installWallet": "Install Wallet",
-    "installWalletTitle": "Install a Wallet",
     "installWalletDesc": "To use this application, please install one of the following wallets:",
-    "metamaskDesc": "Popular Ethereum wallet",
-    "fluentDesc": "Conflux eSpace & Ethereum",
-    "refreshAfterInstall": "After installing, please refresh this page",
     "connected": "Wallet connected successfully",
     "rejected": "Connection rejected by user",
     "pending": "Connection request already pending",
@@ -637,19 +501,9 @@
     "chainNotAdded": "Chain not added to wallet",
     "chainSwitchFailed": "Failed to switch chain",
     "notConnected": "Please connect your wallet",
-    "keepVisible": "Keep wallet popup visible:",
-    "dontClickOutside": "Don't click outside the wallet popup",
-    "checkTaskbar": "Check taskbar if popup disappears",
-    "useAltTab": "Use Alt+Tab to find hidden wallet window",
-    "waitForConfirm": "Wait for transaction confirmation before closing",
     "securityNote": "Your keys stay in your wallet. We never have access."
   },
-  "theme": {
-    "switchToLight": "Switch to Light",
-    "switchToDark": "Switch to Dark",
-    "light": "Light",
-    "dark": "Dark"
-  },
+  "theme": {},
   "settings": {
     "theme": "Theme",
     "language": "Language"
@@ -658,25 +512,18 @@
     "title": "Story Editor"
   },
   "storyChunkEditor": {
-    "title": "Profile Data Editor",
     "titleWithName": "{{name}} Profile Data",
     "titleFallback": "Profile Data",
-    "stats": "Chunks: {{count}}, Total Length: {{length}}",
     "totalLength": "Total Length",
-    "sealed": "Sealed",
     "seal": "Seal",
     "hashLabel": "Hash",
-    "editChunk": "Edit Chunk",
     "addChunk": "Add New Chunk",
-    "contentPlaceholder": "Enter chunk content (max 2048 bytes)",
     "saving": "Saving...",
     "save": "Save",
     "cancel": "Cancel",
-    "addNewChunk": "Add New Chunk",
     "chunks": "Existing Profile Chunks",
     "loading": "Loading...",
     "contentRequired": "Content cannot be empty",
-    "contentTooLong": "Content cannot exceed 2048 bytes",
     "noChunks": "No profile chunks yet.",
     "noChunksSealed": "This profile is sealed with no chunks.",
     "chunkTypeLabel": "Chunk Type",
@@ -685,15 +532,10 @@
     "attachmentTooLong": "Attachment CID cannot exceed 256 characters",
     "invalidChunkType": "Invalid chunk type",
     "operationFailed": "Operation failed",
-    "sealConfirm": "Are you sure you want to seal the biography? Once sealed, it cannot be modified.",
     "sealFailed": "Seal failed",
-    "leaveConfirmTitle": "Leave Editor",
-    "leaveConfirm": "Unsaved changes will be lost. Do you want to leave the editor?",
-    "leaveConfirmButton": "Leave",
     "sealDialog": {
       "title": "Seal Biography",
       "description": "Are you sure you want to seal the biography? Once sealed, it can no longer be modified.",
-      "dontAskAgain": "Don't ask again",
       "cancel": "Cancel",
       "confirm": "Confirm Seal"
     },
@@ -736,51 +578,26 @@
     },
     "contentTooLongBytes": "Content must not exceed 2048 bytes",
     "contentPlaceholderBytes": "Enter chunk content (max 2048 bytes ≈ 2048 ASCII or ~680 CJK chars)",
-    "offlineNoData": "Offline mode: story not cached locally",
     "success": {
       "chunkAdded": "Chunk #{{index}} added successfully ({{bytes}} bytes)",
       "chunkAddedGeneric": "Story chunk added successfully",
-      "chunkUpdated": "Chunk #{{index}} updated successfully",
-      "chunkUpdatedGeneric": "Story chunk updated successfully",
       "storySealed": "Story sealed successfully ({{total}} chunks)",
       "storySealedGeneric": "Story sealed successfully"
     },
     "errors": {
-      "mustBeNFTHolder": "You must own this NFT to edit its story",
-      "unauthorized": "Not authorized to perform this action",
-      "onlyOwner": "Only the owner can perform this action",
-      "storySealed": "Story is sealed and cannot be modified",
-      "chunkIndexExists": "Chunk at this index already exists",
-      "invalidChunkIndex": "Invalid chunk index",
-      "contentTooLong": "Content exceeds maximum length",
-      "expectedHashMismatch": "Expected hash does not match",
-      "chunkHashMismatch": "Chunk content does not match expected hash",
-      "chunkIndexOutOfRange": "Chunk index is out of valid range",
-      "customError": "Contract error: {{error}}",
-      "transactionReverted": "Transaction failed: execution reverted",
       "userRejected": "Transaction was rejected by user",
       "walletTimeout": "Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.",
       "walletPending": "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
-      "insufficientFunds": "Insufficient funds for gas",
-      "unknown": "An unknown error occurred"
+      "noWallet": "No wallet connected. Please connect your wallet first."
     }
   },
   "person": {
     "encyclopedia": "Encyclopedia",
     "pageTitle": "{{name}} Encyclopedia",
-    "title": "Biography Wiki",
-    "loading": "Loading profile data...",
-    "notFound": "Profile data not found",
-    "chunks": "Chunks",
-    "length": "Length",
     "sealed": "Sealed",
-    "edit": "Edit Profile",
-    "fullStory": "Biography",
     "profileData": "Profile Data",
-    "noStory": "No biographical content",
     "noProfileData": "No profile data",
     "chunkList": "Profile Chunks",
-    "characters": "characters",
     "noChunks": "No profile chunks",
     "metadata": "Metadata",
     "totalChunks": "Total Chunks",
@@ -798,16 +615,10 @@
     "viewSections": "Sections Mode",
     "viewParagraph": "Paragraph Mode",
     "viewRaw": "Raw Mode",
-    "integrityOk": "Integrity Verified",
     "integrityWarn": "Integrity Possibly Inconsistent",
     "integrityLenDiff": "Length mismatch local={{local}} bytes",
     "integrityLocalHashMismatch": "Local hash mismatch",
-    "integrityChainHashMismatch": "On-chain hash mismatch",
     "integrityMissing": "Missing indices: {{indices}}",
-    "integrityFrontendOk": "Integrity Verified",
-    "integrityChainFail": "On-chain verification failed",
-    "verify": "Contract Verify",
-    "verified": "Verified",
     "personHashLabel": "Person Hash",
     "versionLabel": "Version Index",
     "viewFamilyTree": "View Family Tree",
@@ -817,9 +628,6 @@
     "tokenId": "Token ID"
   },
   "people": {
-    "syncing": "Syncing...",
-    "loading": "Loading people...",
-    "badge": "People Encyclopedia",
     "title": "Family People Encyclopedia",
     "subtitle": "Explore family member profiles preserved on the blockchain",
     "totalPeople": "People",
@@ -833,24 +641,17 @@
     "allResults": "Total {{count}} results",
     "sortRules": "Sort Rules",
     "filterRules": "Filter Rules",
-    "viewMode": "View Mode",
     "filterAll": "Token ID",
     "filterByCreateTime": "Creation Time",
     "filterByName": "Name",
     "filterByEndorsement": "Endorsements",
     "filterByBirthYear": "Birth Year",
-    "gridView": "Grid View",
-    "listView": "List View",
-    "resultsCount": "Found {{count}} results",
     "noResults": "No people found",
     "noResultsDesc": "Try adjusting your search criteria or filters",
-    "hasStory": "Bio",
     "viewEncyclopedia": "View Encyclopedia",
-    "hasNFT": "NFT",
     "born": "Born",
     "died": "Died",
     "chunks": "{{count}} chunks",
-    "viewDetails": "View",
     "clickToEndorse": "Click to endorse this version",
     "resetFilters": "Reset filters",
     "personNotInTree": {
@@ -864,13 +665,9 @@
     "fetchError": "Failed to load story data",
     "lifeEvents": "Life Events",
     "blockchainIdentity": "Blockchain Identity",
-    "viewDetail": "View Details",
     "born": "Born",
     "died": "Died",
-    "storyInfo": "Biography Info",
-    "chunksCount": "{{count}} profile chunks, {{length}} bytes",
     "chunksAndSize": "{{count}} chunks · {{size}} bytes",
-    "addedBy": "Added By",
     "tag": "Tag",
     "personHash": "Person Hash",
     "detailedStory": "Detailed Profile",
@@ -880,7 +677,6 @@
     "integrityVerified": "Story integrity verified",
     "integrityWarning": "Story integrity issues detected",
     "loading": "Loading story chunks...",
-    "chunkTitle": "Chunk #{{index}}",
     "characters": "characters",
     "noStoryData": "No profile data available",
     "basicStory": "Introduction",
@@ -892,7 +688,6 @@
     "subtitle": "Interact with the DeepFamily protocol using your connected wallet",
     "walletRequired": "Wallet Connection Required",
     "walletRequiredDesc": "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
-    "walletConnected": "Wallet Connected",
     "whatYouCanDo": "What you can do after connecting:",
     "feature1": "Add new person versions (receive DEEP utility points)",
     "feature2": "Endorse quality data and route utility fees",
@@ -907,21 +702,15 @@
     "endorsement": "Endorsement",
     "endorseDesc": "Support quality data by endorsing versions with DEEP utility points",
     "startAddVersion": "Start Adding Version",
-    "mintNFTHint": "First search for a person and version to mint as NFT",
     "openMintNFT": "Open NFT Minting",
-    "endorseHint": "Search for person versions to endorse",
     "openEndorse": "Open Endorsement"
   },
   "addVersion": {
     "title": "Add Version",
-    "addNewVersion": "Add New Version",
-    "addPerson": "Add Person",
-    "description": "Add person with zero-knowledge proof",
     "versionIndexHint": "0=Unknown",
     "fatherInfo": "Father Information",
     "motherInfo": "Mother Information",
     "versionIndex": "Version Index",
-    "metadata": "Metadata",
     "tag": "Tag",
     "tagPlaceholder": "Optional tag",
     "metadataCID": "Metadata CID",
@@ -934,13 +723,8 @@
     "generatingProof": "Generating zero-knowledge proof...",
     "verifyingProof": "Verifying proof...",
     "submittingToBlockchain": "Submitting to blockchain...",
-    "addedSuccessfully": "Person added successfully!",
     "successTitle": "Version Added Successfully",
     "successDesc": "The person version has been added to the blockchain",
-    "personHash": "Person Hash",
-    "transactionHash": "Transaction Hash",
-    "blockNumber": "Block Number",
-    "eventsTriggered": "Events Triggered",
     "zkProofVerified": "ZK Proof Verified",
     "zkProofVerifiedDesc": "Zero-knowledge proof was successfully verified on-chain",
     "versionAdded": "Person Version Added",
@@ -959,7 +743,6 @@
     "rewardAmount": "Utility Amount",
     "noTokenReward": "No Utility Distribution",
     "tokenRewardCondition": "Utility points distribute when parent hash commitments are submitted",
-    "tokenRewardTip": "Submit parent hash commitments to receive DEEP utility distributions",
     "failed": "Transaction Failed",
     "errorType": "Error Type",
     "errorMessage": "Message",
@@ -967,10 +750,7 @@
     "continueAdding": "Continue Adding",
     "goToEndorse": "Go to Endorse",
     "submit": "Add Version",
-    "cancel": "Cancel",
-    "close": "Close",
     "personInfoRequired": "Please fill in person information",
-    "contractNotConfigured": "Contract not configured",
     "partial": "Partial",
     "complete": "Complete",
     "ageRequirement": "The person being added must be 18 years or older. Do not submit minors' identities.",
@@ -987,23 +767,19 @@
     "encryptionPasswordRequired": "Please enter encryption password",
     "encryptionPasswordWeak": "Password must be at least 8 characters",
     "encryptionPasswordMismatch": "Passwords do not match",
-    "encryptionUnavailable": "Encryption is not available in this environment, please try a different browser",
     "encryptionFailed": "Failed to encrypt or export metadata, please try again",
     "encryptionPassword": "Metadata Encryption Password (AES-GCM, local encryption)",
-    "encryptionHint": "Only encrypted CID stored on-chain",
     "usePassphraseForEncryption": "Use identity passphrase for metadata encryption",
     "passphraseMissingForEncryption": "Identity passphrase is empty. Please enter an encryption password below or set a passphrase above.",
-    "encryptionPasswordAuto": "Metadata CID will reuse the identity passphrase. Turn off the toggle to set a separate password.",
     "encryptionPasswordPlaceholder": "At least 8 characters",
     "encryptionPasswordConfirm": "Confirm password",
     "encryptionNotice": "Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.",
-    "generatingMetadataCID": "Generating metadata CID..."
+    "generatingMetadataCID": "Generating metadata CID...",
+    "proofVerificationFailed": "Generated proof verification failed"
   },
   "mintNFT": {
     "title": "Mint NFT",
-    "description": "Create a unique NFT for this person",
     "headerOnChainHint": "Minting is public: plain text is permanently on-chain and undeletable",
-    "personInfo": "Person Information",
     "personHash": "Person Hash",
     "versionIndex": "Version Index",
     "checkingStatus": "Checking status...",
@@ -1012,13 +788,10 @@
     "alreadyMinted": "Already Minted",
     "canMint": "Can Mint",
     "targetVersion": "Target Version",
-    "specifyVersion": "Specify Version to Mint",
-    "specifyVersionDesc": "Enter the person hash and version index of the version you want to mint as NFT.",
     "targetRequired": "Please provide a valid person hash and version index.",
     "invalidPersonHashFormat": "Person hash must be 0x-prefixed 32-byte hex (64 hex chars).",
     "basicInfo": "Basic Information",
     "basicInfoMustMatch": "The basic information you enter must exactly match the target version data. The contract will verify this on-chain before minting.",
-    "publicOnChain": "Public, permanent, undeletable",
     "legalTruthfulNotice": "Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.",
     "ageRequirement": "The person minted into an NFT must be 18 years or older. Do not submit minors' identities.",
     "consentTitle": "Informed consent (required)",
@@ -1036,7 +809,6 @@
     "deathYear": "Death Year",
     "story": "Introduction",
     "storyPlaceholder": "Enter a brief introduction...",
-    "metadata": "NFT Metadata",
     "tokenURI": "Token URI",
     "tokenURIHint": "Optional: URL or IPFS hash for NFT metadata",
     "nftAlreadyMinted": "NFT Already Minted",
@@ -1047,9 +819,10 @@
     "endorsementRequiredTitle": "Endorsement Required",
     "endorsementRequiredDesc": "You must endorse this version before minting. Would you like to go endorse now?",
     "personInfoRequired": "Please fill in person information",
+    "fullNameRequired": "Full name is required to generate proof",
     "personHashRequired": "Unable to compute person hash",
+    "walletRequired": "Wallet connection required to mint",
     "mintFailed": "Failed to mint NFT",
-    "mintedSuccessfully": "NFT minted successfully!",
     "successTitle": "NFT Minted Successfully",
     "successDesc": "Your NFT has been created on the blockchain",
     "nftDetails": "NFT Details",
@@ -1063,15 +836,13 @@
     "preparingProof": "Preparing proof inputs...",
     "generatingProof": "Generating zero-knowledge proof...",
     "verifyingProof": "Verifying zero-knowledge proof...",
+    "proofVerificationFailed": "Generated proof verification failed",
     "proofVerified": "Zero-knowledge proof verified. Submitting transaction...",
     "proofGenerationNote": "ZK proof generation requires heavy cryptography. Please keep this tab active until completion.",
-    "nftMintedEvent": "PersonNFTMinted Event",
-    "nftMintedEventDesc": "NFT was successfully minted and recorded on-chain",
     "continueMinting": "Continue Minting",
     "errorType": "Error Type",
     "errorMessage": "Message",
     "errorDetails": "Details",
-    "eventDetails": "Event Details",
     "transactionInfo": "Transaction Info",
     "validation": {
       "birthPlaceTooLong": "Birth place is too long",
@@ -1081,17 +852,7 @@
       "invalidTokenURI": "Invalid URL or IPFS URI",
       "yearExceedsCurrent": "AD year cannot exceed current year"
     },
-    "errors": {
-      "versionAlreadyMinted": "This version has already been minted as NFT",
-      "mustEndorseFirst": "You must endorse this version before minting",
-      "basicInfoMismatch": "Person information does not match the version data",
-      "invalidTokenURI": "Invalid token URI format",
-      "invalidStory": "Story content is too long",
-      "invalidBirthPlace": "Birth place is too long",
-      "invalidDeathPlace": "Death place is too long",
-      "insufficientFunds": "Insufficient funds for transaction",
-      "userRejected": "Transaction was rejected by user"
-    },
+    "errors": {},
     "missingParentsTitle": "Incomplete Parent Information",
     "missingBothParents": "Both parent hashes are empty for this version. Publish a new ZK version with parent hashes (version index can be 0 to defer choosing a parent version).",
     "missingFather": "The father hash is empty for this version. Publish a new ZK version with the father hash; index 0 lets the UI pick the highest-endorsed father version.",
@@ -1101,17 +862,12 @@
     "title": "Endorse Version",
     "description": "Support quality data by endorsing versions",
     "targetVersion": "Target Version",
-    "specifyVersion": "Specify Version to Endorse",
-    "specifyVersionDesc": "Enter the person hash and version index of the version you want to endorse.",
     "personHash": "Person Hash",
     "versionIndex": "Version Index",
-    "versionInfo": "Version Information",
     "invalidPersonHashFormat": "Person hash must be 0x-prefixed 32-byte hex (64 hex chars).",
-    "fullName": "Full Name",
     "currentEndorsements": "Current Endorsements",
     "deepTokenFee": "Endorsement fee",
     "yourBalance": "Your balance",
-    "feeRecipient": "Fee Recipient",
     "feeDistribution": "Fee Distribution",
     "nftMinted": "NFT Minted",
     "feeToNFTHolder": "{{recipientPercent}}% to NFT holder, {{protocolPercent}}% protocol fee",
@@ -1119,8 +875,6 @@
     "feeToCreator": "{{recipientPercent}}% to version creator, {{protocolPercent}}% protocol fee",
     "insufficientBalance": "Insufficient DEEP Utility Balance",
     "needMoreTokens": "You need more DEEP utility points to endorse this version",
-    "endorsementComplete": "Endorsement Complete",
-    "needMoreForNext": "You need more DEEP utility points for additional endorsements",
     "benefits": "Benefits of Endorsing",
     "benefitQuality": "Help verify and improve data quality",
     "benefitPriority": "Endorsed versions get higher priority in searches",
@@ -1133,23 +887,16 @@
     "endorse": "Endorse",
     "invalidTarget": "Invalid person hash or version index",
     "invalidTargetDesc": "Please verify the hash and index refer to an existing version",
-    "needApprove": "Allowance too low, please approve DEEP utility points again",
     "personHashRequired": "Please provide valid person hash and version index",
     "insufficientDeepTokens": "Insufficient DEEP utility points for endorsement",
-    "endorsedSuccessfully": "Version endorsed successfully!",
     "successTitle": "Endorsement Successful",
     "successDesc": "Version has been successfully endorsed",
     "endorsementDetails": "Endorsement Details",
-    "feePaid": "Fee Paid",
     "transactionHash": "Transaction Hash",
     "blockNumber": "Block Number",
     "transactionInfo": "Transaction Info",
-    "eventDetails": "Event Details",
-    "versionEndorsedEvent": "Version endorsed successfully",
-    "versionEndorsedEventDesc": "Endorsement was successfully recorded on-chain",
     "endorser": "Endorser",
     "totalFee": "Total Fee",
-    "feeAmount": "Fee Amount",
     "recipient": "Recipient",
     "recipientShare": "Recipient Share",
     "protocolRecipient": "Protocol Recipient",
@@ -1161,7 +908,6 @@
     "errorDetails": "Details",
     "continueEndorsing": "Continue Endorsing",
     "goToMintNFT": "Go to Mint NFT",
-    "canContinueEndorsing": "You can now continue to endorse other versions or close this dialog.",
     "transactionFailed": "Transaction failed. Please check the error message and try again.",
     "transactionFailedDetails": "The transaction was submitted but failed to complete successfully.",
     "approvingDesc": "Please confirm the DEEP utility approval in your wallet",
@@ -1169,19 +915,10 @@
     "errors": {
       "invalidTarget": "Invalid person hash or version index",
       "needApprove": "Allowance too low, please approve DEEP utility points again",
-      "insufficientDeepTokens": "Insufficient DEEP utility points for endorsement",
-      "feeTransferFailed": "Failed to transfer endorsement fee",
-      "insufficientFunds": "Insufficient funds for transaction",
-      "userRejected": "Transaction was rejected by user",
-      "walletTimeout": "Wallet confirmation timed out. The wallet popup may have been closed or hidden.",
-      "walletTimeoutDetails": "Please try again and make sure to confirm the transaction in your wallet popup window.",
-      "alreadyEndorsed": "You already endorsed this version"
+      "userRejected": "Transaction was rejected by user"
     },
-    "approveUnlimited": "Approve unlimited DEEP utility allowance to avoid future approvals",
-    "approveUnlimitedHint": "Recommended: Each endorsement consumes allowance; unlimited approval avoids repeated authorizations",
     "retryTransaction": "Retry Transaction",
     "quickTitle": "Endorse Version",
-    "currentCount": "Current endorsements",
     "processing": "Submitting endorsement...",
     "success": "Endorsed successfully",
     "alreadyEndorsed": "You already endorsed this version",
@@ -1189,19 +926,13 @@
     "checkingAllowance": "Checking token allowance...",
     "confirmInWallet": "Please confirm in your wallet",
     "fee": "Fee",
-    "tokenInfo": "Token Info",
-    "balanceDetails": "Balance",
-    "required": "Required"
+    "tokenInfo": "Token Info"
   },
   "transaction": {
     "pending": "Transaction pending confirmation...",
     "pendingDetails": "Transaction has been submitted or waiting for wallet confirmation. You can continue using the app, we'll update after confirmation.",
     "submitted": "Transaction submitted...",
-    "success": "Transaction successful",
-    "failed": "Transaction failed",
-    "rejected": "Transaction rejected by user",
-    "insufficientFunds": "Insufficient funds",
-    "walletTimeout": "Wallet confirmation timed out. Please try again and make sure to confirm in the wallet popup."
+    "success": "Transaction successful"
   },
   "contract": {
     "endorseSuccess": "endorse success",
@@ -1209,7 +940,8 @@
     "addVersionSuccess": "Person version added successfully",
     "addVersionFailed": "Failed to add person version",
     "mintSuccess": "NFT minted successfully",
-    "mintFailed": "Failed to mint NFT"
+    "mintFailed": "Failed to mint NFT",
+    "queryFailed": "Failed to query data"
   },
   "keyDerivation": {
     "title": "🔐 Secure Key Derivation",
@@ -1225,7 +957,6 @@
       "nameRequired": "Name cannot be empty",
       "success": "✅ Private key derived successfully",
       "failed": "❌ Private key derivation failed",
-      "passphraseStrength": "Passphrase Strength:",
       "kdfStrength": "KDF Strength (affects security and computation time)",
       "presets": {
         "testing": "Testing",
@@ -1252,7 +983,6 @@
       "weakPassphraseContinue": "Do you still want to continue? (Not recommended)",
       "proceedAnyway": "Proceed Anyway",
       "improvePassphrase": "Improve Passphrase",
-      "bitsSummary": "{{raw}} bits raw / score {{adjusted}}",
       "recommendations": {
         "empty": "⚠️ Empty passphrase: insufficient security. Strongly recommend a 15+ character strong passphrase",
         "weak": "❌ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
@@ -1262,12 +992,7 @@
         "excellent": "🛡️ Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Excellent security"
       },
       "progress": {
-        "computingPersonHash": "Computing PersonHash...",
-        "personHashComputed": "PersonHash computed",
         "preparingKDF": "Preparing KDF...",
-        "runningScrypt": "Running scrypt KDF (N={{n}})...",
-        "computingKDF": "Computing KDF... ({{progress}}%)",
-        "kdfCompleted": "KDF completed",
         "keyDerivationComplete": "Key derivation complete"
       }
     }
@@ -1278,7 +1003,6 @@
   "decryptMetadata": {
     "title": "Decrypt Metadata",
     "source": "Fetch Encrypted Data",
-    "sourceDesc": "Enter base URL + CID, or upload encrypted file directly",
     "baseUrl": "Base URL",
     "cidPlaceholder": "Paste CID",
     "fetch": "Fetch Encrypted Data",
@@ -1288,7 +1012,6 @@
     "hidePassword": "Hide password",
     "showPassword": "Show password",
     "payload": "Encrypted Content",
-    "payloadPlaceholder": "Download from above or paste encrypted data text directly",
     "decrypt": "Decrypt and View",
     "result": "Decryption Result",
     "resultPlaceholder": "Decrypted plaintext metadata will be displayed here",
@@ -1298,6 +1021,8 @@
     "passwordRequired": "Please enter decryption password",
     "payloadRequired": "Please fetch or paste encrypted content first",
     "cryptoUnavailable": "Web Crypto is not available in this environment",
+    "gatewayBlockedByCsp": "The gateway request was blocked by Content Security Policy (CSP).",
+    "gatewayCspHint": "Add this gateway origin to DEEP_CSP_CONNECT_SRC when running preview/build, then retry.",
     "hashMismatch": "Plaintext hash verification failed, password or file may be incorrect",
     "decryptFailed": "Decryption failed, please check password or file",
     "payloadMeta": {
@@ -1362,12 +1087,7 @@
   },
   "footer": {
     "tagline": "Your decentralized digital genealogy platform. Preserve history, verify truth, and build legacy.",
-    "resources": "Resources",
     "documentation": "Documentation",
-    "blog": "Blog",
-    "support": "Support",
-    "status": "Status",
-    "about": "About",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
     "rights": "© 2026 DeepFamily. MIT License."

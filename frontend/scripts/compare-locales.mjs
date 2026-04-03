@@ -7,6 +7,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// This script serves two related use cases:
+// 1. Compare locale JSON files against each other (missing / extra / ordering).
+// 2. Compare locale keys against frontend source usage (`--usage`).
+
 // Recursively get all key paths
 function getAllKeys(obj, prefix = '') {
   const keys = new Set();
@@ -21,6 +25,24 @@ function getAllKeys(obj, prefix = '') {
     }
   }
   
+  return keys;
+}
+
+// Recursively get leaf key paths only
+function getLeafKeys(obj, prefix = '') {
+  const keys = new Set();
+
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const nestedKeys = getLeafKeys(value, fullKey);
+      nestedKeys.forEach(k => keys.add(k));
+    } else {
+      keys.add(fullKey);
+    }
+  }
+
   return keys;
 }
 
@@ -81,6 +103,255 @@ function loadJsonFile(filePath) {
   } catch (error) {
     console.error(`❌ Unable to read file ${filePath}:`, error.message);
     return null;
+  }
+}
+
+function walkFiles(dirPath, allowedExtensions) {
+  const files = [];
+
+  if (!fs.existsSync(dirPath)) {
+    return files;
+  }
+
+  for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+    const fullPath = path.join(dirPath, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...walkFiles(fullPath, allowedExtensions));
+      continue;
+    }
+
+    if (allowedExtensions.has(path.extname(entry.name))) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+// We treat dotted paths as translation-like keys, e.g. `common.copy` or `mintNFT.title`.
+function looksLikeTranslationKey(value) {
+  return /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/.test(value);
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildTemplateKeyRegex(templateContent) {
+  if (!templateContent.includes('${')) {
+    return null;
+  }
+
+  const parts = templateContent.split(/\$\{[^}]+\}/g);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const pattern = `^${parts.map(escapeRegex).join('[^.]+')}$`;
+  return new RegExp(pattern);
+}
+
+// Collect dotted-string candidates from source so config-held translation keys are not missed.
+function extractQuotedTranslationCandidates(content) {
+  const candidates = new Set();
+  const regexes = [
+    /"((?:\\.|[^"\\\n])*)"/g,
+    /'((?:\\.|[^'\\\n])*)'/g,
+    /`((?:\\.|[^`\\\n$])*)`/g,
+  ];
+
+  for (const regex of regexes) {
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      const value = match[1];
+      if (looksLikeTranslationKey(value)) {
+        candidates.add(value);
+      }
+    }
+  }
+
+  return candidates;
+}
+
+// Extract direct translation calls so missing locale entries are treated as hard findings.
+function extractTCallTranslationCandidates(content) {
+  const candidates = new Set();
+  const regexes = [
+    /(?:\bi18n\.)?\bt\(\s*"((?:\\.|[^"\\\n])*)"/g,
+    /(?:\bi18n\.)?\bt\(\s*'((?:\\.|[^'\\\n])*)'/g,
+    /(?:\bi18n\.)?\bt\(\s*`((?:\\.|[^`\\\n$])*)`/g,
+  ];
+
+  for (const regex of regexes) {
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      const value = match[1];
+      if (looksLikeTranslationKey(value)) {
+        candidates.add(value);
+      }
+    }
+  }
+
+  return candidates;
+}
+
+// Convert template literals such as `chunkTypes.${key}` into regexes for locale matching.
+function extractDynamicTemplatePatterns(content) {
+  const patterns = [];
+  const templateRegex = /`([^`\n]*\$\{[^`\n]+\}[^`\n]*)`/g;
+
+  let match;
+  while ((match = templateRegex.exec(content)) !== null) {
+    const template = match[1];
+    const regex = buildTemplateKeyRegex(template);
+    if (regex) {
+      patterns.push({ template, regex });
+    }
+  }
+
+  return patterns;
+}
+
+function summarizeByTopLevel(keys) {
+  const counts = new Map();
+
+  for (const key of keys) {
+    const namespace = key.split('.')[0];
+    counts.set(namespace, (counts.get(namespace) || 0) + 1);
+  }
+
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+// Scan frontend source files and classify locale keys into:
+// - used keys
+// - code references missing from locale
+// - unused candidates
+//
+// The "unused" bucket is intentionally conservative: it is a cleanup hint,
+// not a proof that a key is safe to delete in every runtime path.
+function analyzeLocaleUsage(localeFilePath, sourceDir) {
+  const localeJson = loadJsonFile(localeFilePath);
+  if (!localeJson) {
+    return null;
+  }
+
+  const allLocaleKeys = getAllKeys(localeJson);
+  const leafLocaleKeys = getLeafKeys(localeJson);
+  const localeNamespaces = new Set([...allLocaleKeys].map(key => key.split('.')[0]));
+  const sourceFiles = walkFiles(sourceDir, new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs']));
+
+  const staticUsedLeafKeys = new Set();
+  const codeKeysMissingFromLocale = new Set();
+  const dynamicCoveredLeafKeys = new Set();
+  const dynamicPatternMatches = [];
+
+  for (const filePath of sourceFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    // Direct t(...) / i18n.t(...) references are the strongest signal and can be missing from locale.
+    for (const candidate of extractTCallTranslationCandidates(content)) {
+      if (allLocaleKeys.has(candidate)) {
+        if (leafLocaleKeys.has(candidate)) {
+          staticUsedLeafKeys.add(candidate);
+        }
+      } else {
+        codeKeysMissingFromLocale.add(candidate);
+      }
+    }
+
+    // Also inspect quoted config strings, but only inside known locale namespaces to limit false positives.
+    for (const candidate of extractQuotedTranslationCandidates(content)) {
+      const namespace = candidate.split('.')[0];
+      if (!localeNamespaces.has(namespace)) {
+        continue;
+      }
+
+      if (allLocaleKeys.has(candidate)) {
+        if (leafLocaleKeys.has(candidate)) {
+          staticUsedLeafKeys.add(candidate);
+        }
+      } else {
+        codeKeysMissingFromLocale.add(candidate);
+      }
+    }
+
+    // Template-literal matches are treated as dynamic coverage, not explicit single-key references.
+    for (const { template, regex } of extractDynamicTemplatePatterns(content)) {
+      const matches = [...leafLocaleKeys].filter(key => regex.test(key));
+      if (matches.length === 0) {
+        continue;
+      }
+
+      matches.forEach(key => dynamicCoveredLeafKeys.add(key));
+      dynamicPatternMatches.push({
+        filePath,
+        template,
+        matchCount: matches.length,
+      });
+    }
+  }
+
+  // Unused keys remain candidates because dynamic/runtime-only references can still exist outside these patterns.
+  const usedLeafKeys = new Set([...staticUsedLeafKeys, ...dynamicCoveredLeafKeys]);
+  const unusedLeafKeys = [...leafLocaleKeys].filter(key => !usedLeafKeys.has(key)).sort();
+
+  return {
+    localeFilePath,
+    totalLeafKeys: leafLocaleKeys.size,
+    totalAllKeys: allLocaleKeys.size,
+    sourceFileCount: sourceFiles.length,
+    staticUsedLeafKeys: [...staticUsedLeafKeys].sort(),
+    dynamicCoveredLeafKeys: [...dynamicCoveredLeafKeys].sort(),
+    usedLeafKeys: [...usedLeafKeys].sort(),
+    unusedLeafKeys,
+    codeKeysMissingFromLocale: [...codeKeysMissingFromLocale].sort(),
+    unusedSummary: summarizeByTopLevel(unusedLeafKeys),
+    dynamicPatternMatches: dynamicPatternMatches.sort((a, b) => b.matchCount - a.matchCount),
+  };
+}
+
+// Keep the CLI output human-readable so the script is useful both locally and in CI logs.
+function printUsageReport(localeName, report, verbose = false) {
+  console.log(`🧭 Locale usage report: ${localeName}\n`);
+  console.log(`Locale file: ${report.localeFilePath}`);
+  console.log(`Source files scanned: ${report.sourceFileCount}`);
+  console.log(`Leaf keys in locale: ${report.totalLeafKeys}`);
+  console.log(`Used leaf keys: ${report.usedLeafKeys.length}`);
+  console.log(`  - Static/literal coverage: ${report.staticUsedLeafKeys.length}`);
+  console.log(`  - Dynamic template coverage: ${report.dynamicCoveredLeafKeys.length}`);
+  console.log(`Unused candidate leaf keys: ${report.unusedLeafKeys.length}`);
+  console.log(`Code references missing from locale: ${report.codeKeysMissingFromLocale.length}`);
+
+  if (report.codeKeysMissingFromLocale.length > 0) {
+    console.log(`\n❌ Keys referenced in code but missing from ${localeName}:`);
+    report.codeKeysMissingFromLocale.forEach(key => console.log(`   - ${key}`));
+  }
+
+  if (report.unusedLeafKeys.length > 0) {
+    console.log(`\n⚠️  Unused candidate leaf keys in ${localeName}:`);
+    const previewLimit = verbose ? report.unusedLeafKeys.length : 80;
+    report.unusedLeafKeys.slice(0, previewLimit).forEach(key => console.log(`   - ${key}`));
+    if (!verbose && report.unusedLeafKeys.length > previewLimit) {
+      console.log(`   ... and ${report.unusedLeafKeys.length - previewLimit} more`);
+    }
+
+    if (report.unusedSummary.length > 0) {
+      console.log('\n📦 Unused candidate summary by namespace:');
+      report.unusedSummary.forEach(([namespace, count]) => {
+        console.log(`   - ${namespace}: ${count}`);
+      });
+    }
+  } else {
+    console.log(`\n✅ No unused leaf key candidates found in ${localeName}.`);
+  }
+
+  if (verbose && report.dynamicPatternMatches.length > 0) {
+    console.log('\n🔄 Dynamic template patterns that matched locale keys:');
+    report.dynamicPatternMatches.forEach(({ filePath, template, matchCount }) => {
+      console.log(`   - ${path.relative(process.cwd(), filePath)} :: \`${template}\` (${matchCount} matches)`);
+    });
   }
 }
 
@@ -265,7 +536,10 @@ function compareKeys(file1Path, file2Path) {
   };
 }
 
-// Compare all language files with base file
+// Compare every locale directory against one base locale.
+// Optional follow-up actions:
+// - `--sync`: copy missing keys from base into target
+// - `--align`: reorder target keys to match base structure
 function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = false) {
   const basePath = path.join(localesDir, baseFile, 'index.json');
 
@@ -402,10 +676,13 @@ function compareTwoFiles(file1, file2, localesDir) {
   }
 }
 
-// Main function
+// CLI entrypoint:
+// - default / compare mode operates on locale JSON files
+// - usage mode scans frontend source and compares it against one locale
 function main() {
   const args = process.argv.slice(2);
   const localesDir = path.join(__dirname, '../src/locales');
+  const sourceDir = path.join(__dirname, '../src');
   
   if (!fs.existsSync(localesDir)) {
     console.error(`❌ Locales directory does not exist: ${localesDir}`);
@@ -441,6 +718,38 @@ function main() {
     args.splice(alignIndex, 1); // Remove --align parameter
   }
 
+  const usageIndex = args.indexOf('--usage');
+  const checkUsage = usageIndex !== -1;
+  if (checkUsage) {
+    args.splice(usageIndex, 1);
+  }
+
+  const verboseUsageIndex = args.indexOf('--verbose-usage');
+  const verboseUsage = verboseUsageIndex !== -1;
+  if (verboseUsage) {
+    args.splice(verboseUsageIndex, 1);
+  }
+
+  // Usage mode is intentionally separate from locale-vs-locale comparison:
+  // it answers "does the code reference keys that this locale does not define?"
+  if (checkUsage || verboseUsage) {
+    const localeName = args[0] || 'en';
+    const localeFilePath = path.join(localesDir, localeName, 'index.json');
+
+    if (!fs.existsSync(localeFilePath)) {
+      console.error(`❌ Locale file does not exist: ${localeFilePath}`);
+      process.exit(1);
+    }
+
+    const report = analyzeLocaleUsage(localeFilePath, sourceDir);
+    if (!report) {
+      process.exit(1);
+    }
+
+    printUsageReport(localeName, report, verboseUsage);
+    return;
+  }
+
   if (args.length === 0) {
     // Default: compare all files with en as base
     compareAllWithBase('en', localesDir, autoSync, alignKeys);
@@ -456,6 +765,9 @@ function main() {
     console.log('  node compare-locales.mjs --sync             # Compare with en and auto-sync missing keys');
     console.log('  node compare-locales.mjs --align            # Align key order with en structure');
     console.log('  node compare-locales.mjs --sync --align     # Sync missing keys and align structure');
+    console.log('  node compare-locales.mjs --usage            # Check en locale keys against frontend code usage');
+    console.log('  node compare-locales.mjs zh-CN --usage      # Check zh-CN locale keys against frontend code usage');
+    console.log('  node compare-locales.mjs --verbose-usage    # Usage check with dynamic pattern details');
     console.log('  node compare-locales.mjs zh-CN              # Compare all files with zh-CN as base');
     console.log('  node compare-locales.mjs zh-CN --sync       # Compare with zh-CN and auto-sync');
     console.log('  node compare-locales.mjs ja ko              # Compare ja and ko files');

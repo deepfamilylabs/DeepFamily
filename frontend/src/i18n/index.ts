@@ -3,17 +3,11 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
 import zhCN from "../locales/zh-CN/index.json";
-import zhTW from "../locales/zh-TW/index.json";
 import en from "../locales/en/index.json";
-import ja from "../locales/ja/index.json";
-import ko from "../locales/ko/index.json";
 
 const resources = {
   en: { translation: en },
-  ja: { translation: ja },
-  ko: { translation: ko },
   "zh-CN": { translation: zhCN },
-  "zh-TW": { translation: zhTW },
 } satisfies Record<string, { translation: Record<string, unknown> }>;
 
 type CanonicalLocale = keyof typeof resources;

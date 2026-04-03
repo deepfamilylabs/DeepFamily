@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "csp:scan": "node ./scripts/csp-scan.mjs",
     "config:local": "node ./scripts/update-local-config.mjs",
-    "sync:abi": "node ./scripts/sync-abi.mjs"
+    "sync:abi": "node ./scripts/sync-abi.mjs",
+    "locales:compare": "node ./scripts/compare-locales.mjs",
+    "locales:usage": "node ./scripts/compare-locales.mjs --usage",
+    "locales:usage:verbose": "node ./scripts/compare-locales.mjs --verbose-usage",
+    "locales:check": "npm run locales:compare && npm run locales:usage"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
