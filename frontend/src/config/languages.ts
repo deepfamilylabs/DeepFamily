@@ -7,9 +7,6 @@ export interface Language {
 const languageData: Language[] = [
   { code: "en", name: "English", nativeName: "English" },
   { code: "zh-CN", name: "Chinese (Simplified)", nativeName: "简体中文" },
-  { code: "zh-TW", name: "Chinese (Traditional)", nativeName: "繁體中文" },
-  { code: "ja", name: "Japanese", nativeName: "日本語" },
-  { code: "ko", name: "Korean", nativeName: "한국어" },
 ];
 
 // Detect if a language uses CJK characters (Chinese, Japanese, Korean)

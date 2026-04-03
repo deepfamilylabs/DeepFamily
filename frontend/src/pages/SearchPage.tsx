@@ -454,7 +454,7 @@ export default function SearchPage() {
     (type: number) => {
       const numericType = Number.isFinite(type) ? Number(type) : 0;
       const match = chunkTypeOptions.find((opt) => opt.value === numericType);
-      return match ? match.label : t("storyChunkEditor.chunkTypes.unknown", "Unknown");
+      return match ? match.label : t("chunkTypes.unknown", "Unknown");
     },
     [chunkTypeOptions, t],
   );

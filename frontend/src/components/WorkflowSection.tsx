@@ -14,7 +14,7 @@ const WorkflowSection: React.FC = memo(() => {
       title: t("home.valueSystem.advantages.step1", "Add Person Version"),
       description: t(
         "home.valueSystem.advantages.step1Desc",
-        "Submit parent hash commitments → receive DEEP token rewards",
+        "Submit parent hash commitments to build the family network",
       ),
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -28,7 +28,7 @@ const WorkflowSection: React.FC = memo(() => {
       title: t("home.valueSystem.advantages.step2", "Community Endorsement"),
       description: t(
         "home.valueSystem.advantages.step2Desc",
-        "Pay DEEP tokens to endorse a version",
+        "Endorse trusted versions to signal data quality",
       ),
       color: "text-purple-600",
       bg: "bg-purple-50",
@@ -53,10 +53,10 @@ const WorkflowSection: React.FC = memo(() => {
     {
       number: 4,
       icon: PenTool,
-      title: t("home.valueSystem.advantages.step4", "Write Story Shards"),
+      title: t("home.valueSystem.advantages.step4", "Write Biographical Details"),
       description: t(
         "home.valueSystem.advantages.step4Desc",
-        "NFT holders write/append person story fragments",
+        "Record holders write and append biographical content",
       ),
       color: "text-rose-600",
       bg: "bg-rose-50",

@@ -32,7 +32,7 @@ export interface FamilyTreeConfigFormProps {
   hideHeader?: boolean;
 }
 
-const LOCALE_NEED_ZH_ROOT = new Set(["ja", "ko", "zh-cn", "zh-tw"]);
+const LOCALE_NEED_ZH_ROOT = new Set(["zh-cn"]);
 const CUSTOM_NETWORKS_KEY = "ft:customNetworks";
 
 type NetworkOption = {

@@ -124,14 +124,14 @@ export default function StoryChunksModal({ person, isOpen, onClose }: StoryChunk
   const getChunkTypeLabel = useCallback(
     (type: number | string | null | undefined) => {
       if (type === null || type === undefined || type === "") {
-        return chunkTypeOptions[0]?.label || t("storyChunkEditor.chunkTypes.unknown", "Unknown");
+        return chunkTypeOptions[0]?.label || t("chunkTypes.unknown", "Unknown");
       }
       const numericType = Number(type);
       if (Number.isFinite(numericType)) {
         const match = chunkTypeOptions.find((opt) => opt.value === numericType);
         if (match) return match.label;
       }
-      return t("storyChunkEditor.chunkTypes.unknown", "Unknown");
+      return t("chunkTypes.unknown", "Unknown");
     },
     [chunkTypeOptions, t],
   );

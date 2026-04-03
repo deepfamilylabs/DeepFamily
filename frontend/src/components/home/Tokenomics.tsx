@@ -67,7 +67,7 @@ const Tokenomics = memo(() => {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-50 mb-6 border border-purple-100">
             <PieChart className="w-4 h-4 text-purple-600" />
             <span className="text-sm font-bold text-purple-600 tracking-wide uppercase">
-              {t("home.tokenomics.pill", "Tokenomics")}
+              {t("home.tokenomics.pill", "Protocol Incentives")}
             </span>
           </div>
 

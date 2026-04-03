@@ -461,11 +461,8 @@ html {
   overflow-wrap: break-word;
 }
 
-/* Chinese and CJK text wrapping support */
-[lang="zh-CN"],
-[lang="zh-TW"],
-[lang="ja"],
-[lang="ko"] {
+/* Chinese text wrapping support */
+[lang="zh-CN"] {
   word-break: break-all;
   line-break: auto;
 }

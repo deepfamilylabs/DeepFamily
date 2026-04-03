@@ -147,7 +147,7 @@ export default function StoryEditorPage() {
     (type: number | string | null | undefined) => {
       const numericType = convertChunkTypeToNumber(type);
       const match = chunkTypeOptions.find((opt) => opt.value === numericType);
-      return match ? match.label : t("storyChunkEditor.chunkTypes.unknown", "Unknown");
+      return match ? match.label : t("chunkTypes.unknown", "Unknown");
     },
     [chunkTypeOptions, convertChunkTypeToNumber, t],
   );
