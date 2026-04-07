@@ -62,6 +62,10 @@ export const deployIntegratedSystem = async (
   const poseidonT4 = await PoseidonT4.deploy()
   await poseidonT4.waitForDeployment()
 
+  const PoseidonT5 = await ethers.getContractFactory('PoseidonT5', deployer)
+  const poseidonT5 = await PoseidonT5.deploy()
+  await poseidonT5.waitForDeployment()
+
   const PersonHashVerifier = await ethers.getContractFactory('PersonHashVerifier', deployer)
   const personHashVerifier = await PersonHashVerifier.deploy()
   await personHashVerifier.waitForDeployment()
@@ -72,12 +76,16 @@ export const deployIntegratedSystem = async (
 
   const tokenAddress = await token.getAddress()
   const poseidonT4Address = await poseidonT4.getAddress()
+  const poseidonT5Address = await poseidonT5.getAddress()
   const personHashVerifierAddress = await personHashVerifier.getAddress()
   const namePoseidonVerifierAddress = await namePoseidonVerifier.getAddress()
 
   const DeepFamily = await ethers.getContractFactory('DeepFamily', {
     signer: deployer,
-    libraries: { PoseidonT4: poseidonT4Address },
+    libraries: {
+      PoseidonT4: poseidonT4Address,
+      PoseidonT5: poseidonT5Address,
+    },
   })
   const deepFamily = await DeepFamily.deploy(tokenAddress, personHashVerifierAddress, namePoseidonVerifierAddress)
   await deepFamily.waitForDeployment()
@@ -100,11 +108,13 @@ export const deployIntegratedSystem = async (
     const tokenArtifact = await artifacts.readArtifact('DeepFamilyToken')
     const deepArtifact = await artifacts.readArtifact('DeepFamily')
     const poseidonArtifact = await artifacts.readArtifact('PoseidonT4')
+    const poseidonT5Artifact = await artifacts.readArtifact('PoseidonT5')
     const verifierArtifact = await artifacts.readArtifact('PersonHashVerifier')
     const nameVerifierArtifact = await artifacts.readArtifact('NamePoseidonVerifier')
 
     await writeDeployment(connection, 'DeepFamilyToken', tokenAddress, tokenArtifact.abi)
     await writeDeployment(connection, 'PoseidonT4', poseidonT4Address, poseidonArtifact.abi)
+    await writeDeployment(connection, 'PoseidonT5', poseidonT5Address, poseidonT5Artifact.abi)
     await writeDeployment(connection, 'PersonHashVerifier', personHashVerifierAddress, verifierArtifact.abi)
     await writeDeployment(connection, 'NamePoseidonVerifier', namePoseidonVerifierAddress, nameVerifierArtifact.abi)
     await writeDeployment(connection, 'DeepFamily', deepFamilyAddress, deepArtifact.abi)
@@ -114,6 +124,7 @@ export const deployIntegratedSystem = async (
     deployerAddress,
     token,
     poseidonT4,
+    poseidonT5,
     personHashVerifier,
     namePoseidonVerifier,
     deepFamily,

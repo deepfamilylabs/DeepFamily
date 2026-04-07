@@ -1,4 +1,10 @@
 import type { HashForm } from "../components/PersonHashCalculator";
+import type { EncryptedMetadataPayloadV2 } from "./metadataCrypto";
+import type {
+  DerivedSecretBundleV2,
+  FileEncryptionKdfConfig,
+  IdentityKdfConfig,
+} from "./secretDerivation";
 import type { DerivedKey, KeyPurpose, KDFPreset } from "./secureKeyDerivation";
 
 type CryptoWorkerCallMap = {
@@ -15,6 +21,31 @@ type CryptoWorkerCallMap = {
   deriveKey: {
     params: { input: HashForm; purpose?: KeyPurpose; preset?: KDFPreset };
     result: DerivedKey;
+  };
+  deriveIdentitySecretV2: {
+    params: { passphrase: string; saltHex?: string; config?: IdentityKdfConfig };
+    result: DerivedSecretBundleV2;
+  };
+  encryptMetadataBundleV2: {
+    params: {
+      plaintextJson: string;
+      password: string;
+      aad?: string;
+      schema?: string;
+      version?: string;
+      fileKdfConfig?: FileEncryptionKdfConfig;
+    };
+    result: {
+      encryptedJson: string;
+      cid: string;
+      plainHash: string;
+      passwordFingerprint: string;
+      payload: EncryptedMetadataPayloadV2;
+    };
+  };
+  decryptMetadataBundleV2: {
+    params: { payloadOrJson: string; password: string };
+    result: { plaintext: string; data: any; hash: string; payload: EncryptedMetadataPayloadV2 };
   };
 };
 

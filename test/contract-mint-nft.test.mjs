@@ -4,16 +4,85 @@ import hre from 'hardhat'
 import namePoseidon from '../lib/namePoseidon.js'
 import namePoseidonProof from '../lib/namePoseidonProof.js'
 import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+import { poseidon4 } from 'poseidon-lite'
 
 const { buildBasicInfo } = namePoseidon
 const { generateNamePoseidonProof } = namePoseidonProof
 
+const PROOF_PURPOSE_PERSON_V2 = 2
+const PROOF_PURPOSE_NAME_DISCLOSURE_V2 = 3
 const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000);
 
 // Tests for mint-nft task & underlying contract invariants
 
 describe('Mint NFT Tests', function () {
   this.timeout(60_000);
+
+  async function setupPersonV2Verifier(deepFamily, shouldVerify = true) {
+    const stubFactory = await hre.ethers.getContractFactory('contracts/test/StubPersonCommitmentVerifierV2.sol:StubPersonCommitmentVerifierV2')
+    const verifier = await stubFactory.deploy(shouldVerify)
+    await verifier.waitForDeployment()
+    await deepFamily.setVerifier(1, PROOF_PURPOSE_PERSON_V2, await verifier.getAddress())
+    return verifier
+  }
+
+  async function setupNameDisclosureV2Verifier(deepFamily, shouldVerify = true) {
+    const stubFactory = await hre.ethers.getContractFactory('contracts/test/StubNameDisclosureVerifierV2.sol:StubNameDisclosureVerifierV2')
+    const verifier = await stubFactory.deploy(shouldVerify)
+    await verifier.waitForDeployment()
+    await deepFamily.setVerifier(1, PROOF_PURPOSE_NAME_DISCLOSURE_V2, await verifier.getAddress())
+    return verifier
+  }
+
+  async function prepareMintV2Base() {
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const [signer] = await hre.ethers.getSigners();
+    const FULLNAME = 'Mint Subject V2';
+    const identityCommitment = 123456789n;
+    const personHash = hre.ethers.keccak256(
+      hre.ethers.solidityPacked(['bytes32'], [hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32)])
+    );
+
+    await setupPersonV2Verifier(deepFamily, true);
+    await setupNameDisclosureV2Verifier(deepFamily, true);
+
+    const addProof = {
+      proofSystemId: 1,
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      a: [0, 0],
+      b: [[0, 0], [0, 0]],
+      c: [0, 0],
+    };
+
+    const addPublicSignals = {
+      identityCommitment,
+      fatherIdentityCommitment: 0,
+      motherIdentityCommitment: 0,
+      submitter: BigInt(await signer.getAddress()),
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      hashAlgoId: 1,
+    };
+
+    const emptyParent = { personHash: hre.ethers.ZeroHash, versionIndex: 0 };
+    const meta = { schemaVersion: 2, cryptoSuiteVersion: 2, hashAlgoId: 1 };
+
+    await deepFamily.connect(signer).addPersonZKV2(
+      addProof,
+      addPublicSignals,
+      emptyParent,
+      emptyParent,
+      meta,
+      'v2',
+      'ipfs://QmMintV2Base',
+      {},
+    );
+
+    await deepFamily.endorseVersion(personHash, 1);
+
+    return { deepFamily, signer, FULLNAME, personHash, identityCommitment };
+  }
 
   async function prepare(endorsed = true) {
     const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
@@ -262,6 +331,189 @@ describe('Mint NFT Tests', function () {
     ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch');
   });
 
+  it('mintPersonNFTV2 rejects mismatched disclosure fullName and supplement fullName', async () => {
+    const { deepFamily, signer, FULLNAME, personHash, identityCommitment } = await prepareMintV2Base();
+
+    const proof = {
+      proofSystemId: 1,
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      a: [0, 0],
+      b: [[0, 0], [0, 0]],
+      c: [0, 0],
+    };
+
+    const disclosureBinding = hre.ethers.zeroPadValue('0x1234', 32);
+    const publicSignals = {
+      identityCommitment,
+      disclosureBinding: BigInt(disclosureBinding),
+      minter: BigInt(await signer.getAddress()),
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      hashAlgoId: 1,
+    };
+
+    const coreInfo = {
+      basicInfo: {
+        fullNameCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+        isBirthBC: false,
+        birthYear: 1999,
+        birthMonth: 0,
+        birthDay: 0,
+        gender: 1,
+      },
+      supplementInfo: {
+        fullName: 'Different Name',
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story',
+      },
+    };
+
+    const disclosure = {
+      fullName: FULLNAME,
+      disclosureNonce: hre.ethers.zeroPadValue('0x11', 32),
+      disclosureBinding,
+    };
+
+    await expect(
+      deepFamily.connect(signer).mintPersonNFTV2(proof, publicSignals, personHash, 1, 'ipfs://mint-v2', coreInfo, disclosure)
+    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
+  });
+
+  it('mintPersonNFTV2 rejects mismatched disclosure binding', async () => {
+    const { deepFamily, signer, FULLNAME, personHash, identityCommitment } = await prepareMintV2Base();
+
+    const proof = {
+      proofSystemId: 1,
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      a: [0, 0],
+      b: [[0, 0], [0, 0]],
+      c: [0, 0],
+    };
+
+    const publicSignals = {
+      identityCommitment,
+      disclosureBinding: 0x1234n,
+      minter: BigInt(await signer.getAddress()),
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      hashAlgoId: 1,
+    };
+
+    const coreInfo = {
+      basicInfo: {
+        fullNameCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+        isBirthBC: false,
+        birthYear: 1999,
+        birthMonth: 0,
+        birthDay: 0,
+        gender: 1,
+      },
+      supplementInfo: {
+        fullName: FULLNAME,
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story',
+      },
+    };
+
+    const disclosure = {
+      fullName: FULLNAME,
+      disclosureNonce: hre.ethers.zeroPadValue('0x22', 32),
+      disclosureBinding: hre.ethers.zeroPadValue('0x9999', 32),
+    };
+
+    await expect(
+      deepFamily.connect(signer).mintPersonNFTV2(proof, publicSignals, personHash, 1, 'ipfs://mint-v2', coreInfo, disclosure)
+    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
+  });
+
+  it('mintPersonNFTV2 mints successfully with consistent v2 inputs', async () => {
+    const { deepFamily, signer, FULLNAME, personHash, identityCommitment } = await prepareMintV2Base();
+
+    const proof = {
+      proofSystemId: 1,
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      a: [0, 0],
+      b: [[0, 0], [0, 0]],
+      c: [0, 0],
+    };
+
+    const domainBytes = hre.ethers.toUtf8Bytes('deepfamily:name-prehash:v2');
+    const nameBytes = hre.ethers.toUtf8Bytes(FULLNAME);
+    const namePrehash = hre.ethers.keccak256(hre.ethers.concat([domainBytes, nameBytes]));
+    const snarkField = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
+    const nameField = BigInt(namePrehash) % snarkField;
+    const disclosureNonce = hre.ethers.zeroPadValue('0x33', 32);
+    const disclosureNonceField = BigInt(disclosureNonce) % snarkField;
+    const suiteCommitment = poseidon4([1000n, 2n, 2n, 1n]);
+    const disclosureBindingValue = poseidon4([1003n, nameField, disclosureNonceField, suiteCommitment]);
+    const disclosureBinding = hre.ethers.zeroPadValue(hre.ethers.toBeHex(disclosureBindingValue), 32);
+
+    const publicSignals = {
+      identityCommitment,
+      disclosureBinding: disclosureBindingValue,
+      minter: BigInt(await signer.getAddress()),
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      hashAlgoId: 1,
+    };
+
+    const coreInfo = {
+      basicInfo: {
+        fullNameCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+        isBirthBC: false,
+        birthYear: 1999,
+        birthMonth: 0,
+        birthDay: 0,
+        gender: 1,
+      },
+      supplementInfo: {
+        fullName: FULLNAME,
+        birthPlace: 'City',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: 'Story',
+      },
+    };
+
+    const disclosure = {
+      fullName: FULLNAME,
+      disclosureNonce,
+      disclosureBinding,
+    };
+
+    await deepFamily.connect(signer).mintPersonNFTV2(
+      proof,
+      publicSignals,
+      personHash,
+      1,
+      'ipfs://mint-v2-success',
+      coreInfo,
+      disclosure,
+      {},
+    );
+
+    const tokenCounter = await deepFamily.tokenCounter();
+    expect(tokenCounter).to.equal(1n);
+    expect(await deepFamily.tokenIdToPerson(1n)).to.equal(personHash);
+    expect(await deepFamily.versionToTokenId(personHash, 1n)).to.equal(1n);
+  });
+
   describe('Age gate', () => {
     function supplement(fullName) {
       return {
@@ -312,7 +564,7 @@ describe('Mint NFT Tests', function () {
           personHash,
           1,
           'ipfs://age-under',
-          { basicInfo, supplementInfo: supplement(fullName) }
+          { basicInfo, supplementInfo: supplement(fullName) },
         )
       ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult');
     });
@@ -335,7 +587,7 @@ describe('Mint NFT Tests', function () {
           personHash,
           1,
           'ipfs://age-day',
-          { basicInfo, supplementInfo: supplement(fullName) }
+          { basicInfo, supplementInfo: supplement(fullName) },
         )
       ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult');
     });
@@ -358,6 +610,7 @@ describe('Mint NFT Tests', function () {
         1,
         'ipfs://age-unknown-day',
         { basicInfo, supplementInfo: supplement(fullName) },
+        {},
       );
     });
 
@@ -379,6 +632,7 @@ describe('Mint NFT Tests', function () {
         1,
         'ipfs://age-unknown-year',
         { basicInfo, supplementInfo: supplement(fullName) },
+        {},
       );
     });
   });

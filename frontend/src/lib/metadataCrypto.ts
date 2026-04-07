@@ -1,4 +1,13 @@
 import { sha256 } from "@noble/hashes/sha2";
+import {
+  DEFAULT_FILE_KDF_CONFIG,
+  type Argon2idParams,
+  type FileEncryptionKdfConfig,
+  bytesToBase64,
+  base64ToBytes,
+  deriveFileEncryptionKeyBytes,
+  generateRandomSalt,
+} from "./secretDerivation";
 import { normalizePassphraseForHash } from "./passphraseStrength";
 
 export const METADATA_AAD = "deepfamily/person-version@1.0";
@@ -24,6 +33,36 @@ export type EncryptedMetadataPayload = {
   ciphertext: string;
   tag: string;
 };
+
+export type EncryptedMetadataPayloadV2 = {
+  version: string;
+  schema: string;
+  cipher: "AES-256-GCM";
+  aad: string;
+  kdf: {
+    alg: "Argon2id";
+    kdfVersion: number;
+    memoryKiB: number;
+    iterations: number;
+    parallelism: number;
+    outputBytes: number;
+    salt: string;
+  };
+  iv: string;
+  ciphertext: string;
+  tag: string;
+};
+
+export type MetadataRecoveryV2 = {
+  identityKdf: {
+    algorithm: "Argon2id";
+    kdfVersion: number;
+    params: Argon2idParams;
+    saltHex: string;
+  };
+};
+
+export type AnyEncryptedMetadataPayload = EncryptedMetadataPayload | EncryptedMetadataPayloadV2;
 
 export const toBase64 = (data: Uint8Array) => {
   let binary = "";
@@ -125,6 +164,66 @@ export const encryptMetadataJson = async (
   return { payload, plainHash };
 };
 
+export const encryptMetadataJsonV2 = async (
+  plaintext: string,
+  password: string,
+  opts?: {
+    aad?: string;
+    schema?: string;
+    version?: string;
+    fileKdfConfig?: FileEncryptionKdfConfig;
+  },
+): Promise<{ payload: EncryptedMetadataPayloadV2; plainHash: string }> => {
+  const cryptoObj = getWebCrypto();
+  const normalizedPassword = normalizePassphraseForHash(password || "");
+  const aad = opts?.aad ?? METADATA_AAD;
+  const config = opts?.fileKdfConfig ?? DEFAULT_FILE_KDF_CONFIG;
+  const salt = generateRandomSalt(16);
+  const iv = new Uint8Array(new ArrayBuffer(12));
+  cryptoObj.getRandomValues(iv);
+
+  const keyBytes = await deriveFileEncryptionKeyBytes({
+    password: normalizedPassword,
+    salt,
+    config,
+  });
+
+  const key = await cryptoObj.subtle.importKey("raw", keyBytes, { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+  ]);
+
+  const ciphertextBuffer = await cryptoObj.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: encoder.encode(aad) },
+    key,
+    encoder.encode(plaintext),
+  );
+
+  const ciphertext = new Uint8Array(ciphertextBuffer);
+  const tag = ciphertext.slice(ciphertext.length - 16);
+  const plainHash = sha256Hex(plaintext);
+
+  const payload: EncryptedMetadataPayloadV2 = {
+    version: opts?.version ?? "df-meta-v2",
+    schema: opts?.schema ?? "deepfamily/person-version@2.0",
+    cipher: "AES-256-GCM",
+    aad,
+    kdf: {
+      alg: "Argon2id",
+      kdfVersion: config.kdfVersion,
+      memoryKiB: config.params.memoryKiB,
+      iterations: config.params.iterations,
+      parallelism: config.params.parallelism,
+      outputBytes: config.params.outputBytes,
+      salt: bytesToBase64(salt),
+    },
+    iv: toBase64(iv),
+    ciphertext: toBase64(ciphertext),
+    tag: toBase64(tag),
+  };
+
+  return { payload, plainHash };
+};
+
 const estimateBase64Bytes = (b64: string): number => {
   if (!b64) return 0;
   const trimmed = b64.trim();
@@ -162,8 +261,88 @@ const coerceIterations = (iter: unknown): number => {
   return intIter;
 };
 
+export const decryptMetadataPayloadV2 = async (
+  payloadOrJson: string | EncryptedMetadataPayloadV2,
+  password: string,
+): Promise<{
+  plaintext: string;
+  data: any;
+  hash: string;
+  payload: EncryptedMetadataPayloadV2;
+}> => {
+  const cryptoObj = getWebCrypto();
+  const normalizedPassword = normalizePassphraseForHash(password || "");
+  if (typeof payloadOrJson === "string" && payloadOrJson.length > MAX_ENCRYPTED_PAYLOAD_CHARS) {
+    throw new Error("Invalid encrypted payload: payload is too large");
+  }
+
+  const payload: EncryptedMetadataPayloadV2 =
+    typeof payloadOrJson === "string" ? JSON.parse(payloadOrJson) : payloadOrJson;
+
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Invalid encrypted payload: not an object");
+  }
+  if (payload?.kdf?.alg !== "Argon2id") {
+    throw new Error("Invalid encrypted payload: unsupported kdf algorithm");
+  }
+
+  const salt = safeFromBase64(payload?.kdf?.salt || "", {
+    maxBytes: MAX_SALT_BYTES,
+    label: "kdf.salt",
+  });
+  const iv = safeFromBase64(payload?.iv || "", { maxBytes: MAX_IV_BYTES, label: "iv" });
+  if (salt.length !== 16) throw new Error("Invalid encrypted payload: salt length mismatch");
+  if (iv.length !== 12) throw new Error("Invalid encrypted payload: iv length mismatch");
+
+  const aad = payload?.aad ?? payload?.schema ?? METADATA_AAD;
+  if (typeof aad !== "string" || !aad) throw new Error("Invalid encrypted payload: missing aad");
+
+  const config: FileEncryptionKdfConfig = {
+    kdfVersion: payload.kdf.kdfVersion,
+    algorithm: "Argon2id",
+    params: {
+      memoryKiB: payload.kdf.memoryKiB,
+      iterations: payload.kdf.iterations,
+      parallelism: payload.kdf.parallelism,
+      outputBytes: payload.kdf.outputBytes,
+    },
+  };
+
+  const keyBytes = await deriveFileEncryptionKeyBytes({
+    password: normalizedPassword,
+    salt,
+    config,
+  });
+  const key = await cryptoObj.subtle.importKey("raw", keyBytes, { name: "AES-GCM", length: 256 }, false, [
+    "decrypt",
+  ]);
+
+  const cipherBytes = safeFromBase64(payload?.ciphertext || "", {
+    maxBytes: MAX_CIPHERTEXT_BYTES,
+    label: "ciphertext",
+  });
+  const tagBytes = safeFromBase64(payload?.tag || "", { maxBytes: 32, label: "tag" });
+  if (tagBytes.length !== 16) throw new Error("Invalid encrypted payload: tag length mismatch");
+  const tailTag = cipherBytes.slice(cipherBytes.length - 16);
+  for (let i = 0; i < 16; i += 1) {
+    if (tailTag[i] !== tagBytes[i]) throw new Error("Invalid encrypted payload: tag mismatch");
+  }
+
+  const plainBuffer = await cryptoObj.subtle.decrypt(
+    { name: "AES-GCM", iv, additionalData: encoder.encode(aad) },
+    key,
+    cipherBytes,
+  );
+
+  const plaintext = decoder.decode(plainBuffer);
+  const hashHex = sha256Hex(plaintext);
+  const hashWithPrefix = `sha256:${hashHex}`;
+  const data = JSON.parse(plaintext);
+  return { plaintext, data, hash: hashWithPrefix, payload };
+};
+
 export const decryptMetadataPayload = async (
-  payloadOrJson: string | EncryptedMetadataPayload,
+  payloadOrJson: string | AnyEncryptedMetadataPayload,
   password: string,
   opts?: {
     aad?: string;
@@ -182,8 +361,12 @@ export const decryptMetadataPayload = async (
     throw new Error("Invalid encrypted payload: payload is too large");
   }
 
-  const payload: EncryptedMetadataPayload =
+  const payload: AnyEncryptedMetadataPayload =
     typeof payloadOrJson === "string" ? JSON.parse(payloadOrJson) : payloadOrJson;
+
+  if ((payload as EncryptedMetadataPayloadV2)?.kdf?.alg === "Argon2id") {
+    return await decryptMetadataPayloadV2(payload as EncryptedMetadataPayloadV2, password);
+  }
 
   if (!payload || typeof payload !== "object") {
     throw new Error("Invalid encrypted payload: not an object");
@@ -257,7 +440,7 @@ export const decryptMetadataPayload = async (
   return { plaintext, data, hash: hashWithPrefix, payload };
 };
 
-export const parseEncryptedPayload = (json: string): EncryptedMetadataPayload | null => {
+export const parseEncryptedPayload = (json: string): AnyEncryptedMetadataPayload | null => {
   try {
     return JSON.parse(json);
   } catch {
