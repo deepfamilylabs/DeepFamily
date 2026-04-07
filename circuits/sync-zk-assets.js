@@ -23,6 +23,12 @@ const filesToCopy = [
   "person_hash_zk_final.zkey",
   "person_hash_zk.vkey.json",
   "person_hash_zk.wasm",
+  "name_disclosure_v2_final.zkey",
+  "name_disclosure_v2.vkey.json",
+  "name_disclosure_v2.wasm",
+  "person_commitment_v2_final.zkey",
+  "person_commitment_v2.vkey.json",
+  "person_commitment_v2.wasm",
 ];
 
 async function ensureDirectoryExists(directory) {

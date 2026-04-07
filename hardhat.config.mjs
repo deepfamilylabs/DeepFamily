@@ -34,7 +34,7 @@ export default {
   ],
   solidity: {
     version: "0.8.20",
-    npmFilesToBuild: ["poseidon-solidity/PoseidonT4.sol"],
+    npmFilesToBuild: ["poseidon-solidity/PoseidonT4.sol", "poseidon-solidity/PoseidonT5.sol"],
     settings: {
       optimizer: {
         enabled: true,

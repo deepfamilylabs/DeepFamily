@@ -2,8 +2,11 @@ import { computeIdentityHash } from "../lib/identityHash";
 import type { IdentityHashInput } from "../lib/identityHash";
 import {
   decryptMetadataPayload,
+  decryptMetadataPayloadV2,
   encryptMetadataJson,
+  encryptMetadataJsonV2,
   passwordFingerprint,
+  type EncryptedMetadataPayloadV2,
 } from "../lib/metadataCrypto";
 import { generateMetadataCID } from "../lib/cid";
 import {
@@ -11,6 +14,13 @@ import {
   type KeyPurpose,
   type KDFPreset,
 } from "../lib/secureKeyDerivation";
+import {
+  deriveIdentitySecretV2,
+  hexToBytes,
+  type DerivedSecretBundleV2,
+  type FileEncryptionKdfConfig,
+  type IdentityKdfConfig,
+} from "../lib/secretDerivation";
 
 type CryptoWorkerMethods = {
   computeIdentityHash: {
@@ -38,6 +48,31 @@ type CryptoWorkerMethods = {
       kdfParams: { N: number; r: number; p: number };
       purpose: string;
     };
+  };
+  deriveIdentitySecretV2: {
+    params: { passphrase: string; saltHex?: string; config?: IdentityKdfConfig };
+    result: DerivedSecretBundleV2;
+  };
+  encryptMetadataBundleV2: {
+    params: {
+      plaintextJson: string;
+      password: string;
+      aad?: string;
+      schema?: string;
+      version?: string;
+      fileKdfConfig?: FileEncryptionKdfConfig;
+    };
+    result: {
+      encryptedJson: string;
+      cid: string;
+      plainHash: string;
+      passwordFingerprint: string;
+      payload: EncryptedMetadataPayloadV2;
+    };
+  };
+  decryptMetadataBundleV2: {
+    params: { payloadOrJson: string; password: string };
+    result: { plaintext: string; data: any; hash: string; payload: EncryptedMetadataPayloadV2 };
   };
 };
 
@@ -94,6 +129,34 @@ const handlers: {
   },
   deriveKey: async ({ input, purpose, preset }) => {
     return await deriveKeyFromPersonData(input, purpose ?? "PRIVATE_KEY", preset ?? "BALANCED");
+  },
+  deriveIdentitySecretV2: async ({ passphrase, saltHex, config }) => {
+    return await deriveIdentitySecretV2({
+      passphrase,
+      salt: saltHex ? hexToBytes(saltHex) : undefined,
+      config,
+    });
+  },
+  encryptMetadataBundleV2: async ({ plaintextJson, password, aad, schema, version, fileKdfConfig }) => {
+    const { payload, plainHash } = await encryptMetadataJsonV2(plaintextJson, password, {
+      aad,
+      schema,
+      version,
+      fileKdfConfig,
+    });
+    const encryptedJson = JSON.stringify(payload);
+    const cid = await generateMetadataCID(encryptedJson);
+    return {
+      encryptedJson,
+      cid,
+      plainHash,
+      passwordFingerprint: passwordFingerprint(password),
+      payload,
+    };
+  },
+  decryptMetadataBundleV2: async ({ payloadOrJson, password }) => {
+    const { plaintext, data, hash, payload } = await decryptMetadataPayloadV2(payloadOrJson, password);
+    return { plaintext, data, hash, payload };
   },
 };
 

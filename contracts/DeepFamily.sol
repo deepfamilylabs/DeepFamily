@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "poseidon-solidity/PoseidonT4.sol";
+import "poseidon-solidity/PoseidonT5.sol";
 
 /**
  * @dev DeepFamily Token Contract Interface
@@ -41,6 +42,30 @@ interface INamePoseidonVerifier {
 }
 
 /**
+ * @dev Groth16 verifier interface for v2 person commitment proofs.
+ */
+interface IPersonCommitmentVerifierV2 {
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[7] calldata publicSignals
+  ) external view returns (bool);
+}
+
+/**
+ * @dev Groth16 verifier interface for v2 name disclosure proofs.
+ */
+interface INameDisclosureVerifierV2 {
+  function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[6] calldata publicSignals
+  ) external view returns (bool);
+}
+
+/**
  * @title DeepFamily — Zero-Knowledge Decentralized Family Tree Protocol
  * @notice Verifiable global family lineages through ZK proofs, multi-version management, community endorsement, and NFT assets
  * @dev Architecture:
@@ -73,6 +98,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error InvalidZKProof();
   error VerifierNotSet();
   error NameVerifierNotSet();
+  error VerifierRouteNotSet();
+  error InvalidHashAlgoId();
 
   // Business logic errors
   error DuplicateVersion();
@@ -104,9 +131,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   /**
    * @dev Basic identity information structure
+   * @notice Compatibility note:
+   * - v1: `fullNameCommitment` stores the Poseidon digest derived from keccak(fullName) and salt
+   * - v2: `fullNameCommitment` stores the bytes32 representation of `IdentityCommitmentV2`
+   * Consumers MUST interpret this field together with schema/suite metadata and MUST NOT assume
+   * that `fullNameCommitment` always has v1 semantics.
    */
   struct PersonBasicInfo {
-    bytes32 fullNameCommitment; // Poseidon digest derived from keccak(fullName) and salt
+    bytes32 fullNameCommitment;
     bool isBirthBC; // Whether birth is BC (Before Christ)
     uint16 birthYear; // Birth year(0=unknown)
     uint8 birthMonth; // Birth month (1-12, 0=unknown)
@@ -150,6 +182,58 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   struct PersonCoreInfo {
     PersonBasicInfo basicInfo; // Basic information
     PersonSupplementInfo supplementInfo; // Supplementary information
+  }
+
+  enum ProofPurpose {
+    PersonV1,
+    NameV1,
+    PersonV2,
+    NameDisclosureV2
+  }
+
+  struct ProofEnvelope {
+    uint16 proofSystemId;
+    uint16 schemaVersion;
+    uint16 cryptoSuiteVersion;
+    uint256[2] a;
+    uint256[2][2] b;
+    uint256[2] c;
+  }
+
+  struct ParentRef {
+    bytes32 personHash;
+    uint256 versionIndex;
+  }
+
+  struct VersionMeta {
+    uint16 schemaVersion;
+    uint16 cryptoSuiteVersion;
+    uint16 hashAlgoId;
+  }
+
+  struct PersonProofPublicSignalsV2 {
+    uint256 identityCommitment;
+    uint256 fatherIdentityCommitment;
+    uint256 motherIdentityCommitment;
+    uint256 submitter;
+    uint256 schemaVersion;
+    uint256 cryptoSuiteVersion;
+    uint256 hashAlgoId;
+  }
+
+  struct DisclosureData {
+    string fullName;
+    bytes32 disclosureNonce;
+    bytes32 disclosureBinding;
+  }
+
+  struct NameDisclosurePublicSignalsV2 {
+    uint256 identityCommitment;
+    uint256 disclosureBinding;
+    uint256 minter;
+    uint256 schemaVersion;
+    uint256 cryptoSuiteVersion;
+    uint256 hashAlgoId;
   }
 
   /**
@@ -291,6 +375,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /// @dev ZK verification contract address (immutable)
   address public immutable PERSON_HASH_VERIFIER;
   address public immutable NAME_POSEIDON_VERIFIER;
+  mapping(uint16 => mapping(uint8 => address)) public verifierRegistry;
 
   // ========== Event Definitions ==========
 
@@ -451,6 +536,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
    */
   event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
+  /**
+   * @dev Emitted when a verifier address is updated in the registry
+   */
+  event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
+
   // ========== Function Modifiers ==========
 
   /**
@@ -586,6 +676,166 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return keccak256(abi.encodePacked(value));
   }
 
+  function _getVerifier(uint16 proofSystemId, ProofPurpose purpose) internal view returns (address) {
+    address verifier = verifierRegistry[proofSystemId][uint8(purpose)];
+    if (verifier == address(0)) revert VerifierRouteNotSet();
+    return verifier;
+  }
+
+  function _wrapIdentityCommitmentAsPersonHashV2(
+    uint256 identityCommitment
+  ) internal pure returns (bytes32) {
+    return _wrapPoseidonHash(bytes32(identityCommitment));
+  }
+
+  function _computeNamePrehashV2(string memory fullName) internal pure returns (bytes32) {
+    // v2 expects fullName to already match the off-chain canonicalized proof input.
+    if (bytes(fullName).length == 0) revert InvalidFullName();
+    return keccak256(abi.encodePacked("deepfamily:name-prehash:v2", bytes(fullName)));
+  }
+
+  function _computeNameFieldV2(string memory fullName) internal pure returns (uint256) {
+    uint256 fieldModulus =
+      21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    return uint256(_computeNamePrehashV2(fullName)) % fieldModulus;
+  }
+
+  function _computeSuiteCommitmentV2(
+    uint256 schemaVersion,
+    uint256 cryptoSuiteVersion,
+    uint256 hashAlgoId
+  ) internal pure returns (uint256) {
+    uint256[4] memory inputs;
+    inputs[0] = 1000; // domain_suite_v2
+    inputs[1] = schemaVersion;
+    inputs[2] = cryptoSuiteVersion;
+    inputs[3] = hashAlgoId;
+    return PoseidonT5.hash(inputs);
+  }
+
+  function _computeDisclosureBindingV2(
+    string memory fullName,
+    bytes32 disclosureNonce,
+    uint256 schemaVersion,
+    uint256 cryptoSuiteVersion,
+    uint256 hashAlgoId
+  ) internal pure returns (bytes32) {
+    uint256 fieldModulus =
+      21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256[4] memory inputs;
+    inputs[0] = 1003; // domain_disclosure_v2
+    inputs[1] = _computeNameFieldV2(fullName);
+    inputs[2] = uint256(disclosureNonce) % fieldModulus;
+    inputs[3] = _computeSuiteCommitmentV2(schemaVersion, cryptoSuiteVersion, hashAlgoId);
+
+    uint256 disclosurePoseidon = PoseidonT5.hash(inputs);
+    return bytes32(disclosurePoseidon);
+  }
+
+  function _validateMintPersonNFTV2Input(
+    bytes32 personHash,
+    uint256 versionIndex,
+    string calldata _tokenURI,
+    PersonCoreInfo calldata coreInfo
+  ) internal view {
+    if (versionToTokenId[personHash][versionIndex] != 0) revert VersionAlreadyMinted();
+    if (endorsedVersionIndex[personHash][msg.sender] != versionIndex) {
+      revert MustEndorseVersionFirst();
+    }
+
+    if (bytes(_tokenURI).length > MAX_LONG_TEXT_LENGTH) revert InvalidTokenURI();
+    if (bytes(coreInfo.supplementInfo.fullName).length == 0) revert InvalidFullName();
+    if (bytes(coreInfo.supplementInfo.fullName).length > MAX_LONG_TEXT_LENGTH) {
+      revert InvalidFullName();
+    }
+    if (bytes(coreInfo.supplementInfo.story).length > MAX_LONG_TEXT_LENGTH) revert InvalidStory();
+    if (bytes(coreInfo.supplementInfo.birthPlace).length > MAX_LONG_TEXT_LENGTH) {
+      revert InvalidBirthPlace();
+    }
+    if (bytes(coreInfo.supplementInfo.deathPlace).length > MAX_LONG_TEXT_LENGTH) {
+      revert InvalidDeathPlace();
+    }
+    if (coreInfo.supplementInfo.deathMonth > 12) revert InvalidDeathMonth();
+    if (coreInfo.supplementInfo.deathDay > 31) revert InvalidDeathDay();
+  }
+
+  function _verifyMintPersonNFTV2Proof(
+    ProofEnvelope calldata proof,
+    NameDisclosurePublicSignalsV2 calldata publicSignals
+  ) internal view {
+    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.NameDisclosureV2);
+    uint256[6] memory ps = [
+      publicSignals.identityCommitment,
+      publicSignals.disclosureBinding,
+      publicSignals.minter,
+      publicSignals.schemaVersion,
+      publicSignals.cryptoSuiteVersion,
+      publicSignals.hashAlgoId
+    ];
+
+    if (!INameDisclosureVerifierV2(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
+      revert InvalidZKProof();
+    }
+  }
+
+  /**
+   * @dev Validate v2 mint proof-to-calldata binding consistency.
+   * @notice String comparison is byte-exact; callers MUST submit identically
+   * canonicalized names in both `disclosure.fullName` and `coreInfo.supplementInfo.fullName`.
+   * The contract does NOT perform Unicode normalization.
+   */
+  function _validateMintPersonNFTV2Bindings(
+    NameDisclosurePublicSignalsV2 calldata publicSignals,
+    bytes32 personHash,
+    PersonCoreInfo calldata coreInfo,
+    DisclosureData calldata disclosure
+  ) internal pure {
+    bytes32 computedPersonHash = _wrapIdentityCommitmentAsPersonHashV2(
+      publicSignals.identityCommitment
+    );
+    if (computedPersonHash != personHash) revert BasicInfoMismatch();
+
+    if (bytes32(publicSignals.identityCommitment) != coreInfo.basicInfo.fullNameCommitment) {
+      revert BasicInfoMismatch();
+    }
+
+    if (
+      keccak256(abi.encodePacked(disclosure.fullName)) !=
+      keccak256(abi.encodePacked(coreInfo.supplementInfo.fullName))
+    ) {
+      revert BasicInfoMismatch();
+    }
+
+    bytes32 computedDisclosureBinding = _computeDisclosureBindingV2(
+      disclosure.fullName,
+      disclosure.disclosureNonce,
+      publicSignals.schemaVersion,
+      publicSignals.cryptoSuiteVersion,
+      publicSignals.hashAlgoId
+    );
+    if (computedDisclosureBinding != disclosure.disclosureBinding) revert BasicInfoMismatch();
+    if (bytes32(publicSignals.disclosureBinding) != disclosure.disclosureBinding) {
+      revert BasicInfoMismatch();
+    }
+  }
+
+  function _mintPersonNFTV2Internal(
+    bytes32 personHash,
+    uint256 versionIndex,
+    string calldata _tokenURI,
+    PersonCoreInfo calldata coreInfo
+  ) internal returns (uint256 newTokenId) {
+    newTokenId = ++tokenCounter;
+
+    tokenIdToPerson[newTokenId] = personHash;
+    tokenIdToVersionIndex[newTokenId] = versionIndex;
+    versionToTokenId[personHash][versionIndex] = newTokenId;
+    nftCoreInfo[newTokenId] = coreInfo;
+    _setTokenURI(newTokenId, _tokenURI);
+
+    _safeMint(msg.sender, newTokenId);
+  }
+
   /**
    * @dev Internal function to set token URI
    * @param tokenId Token ID
@@ -613,13 +863,33 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     DEEP_FAMILY_TOKEN_CONTRACT = _deepFamilyTokenContract;
     PERSON_HASH_VERIFIER = _personHashVerifier;
     NAME_POSEIDON_VERIFIER = _namePoseidonVerifier;
+
+    verifierRegistry[0][uint8(ProofPurpose.PersonV1)] = _personHashVerifier;
+    verifierRegistry[0][uint8(ProofPurpose.NameV1)] = _namePoseidonVerifier;
   }
 
   // ========== Public Functions ==========
 
   /**
-   * @notice Calculate unique person hash value
-   * @dev Matches circuit Poseidon output and applies keccak256 for final domain-separated hash
+   * @notice Register or update a proof verifier address for a given proof system and purpose.
+   * @dev Emits {VerifierUpdated}. Does NOT affect the immutable v1 verifier addresses.
+   */
+  function setVerifier(
+    uint16 proofSystemId,
+    ProofPurpose purpose,
+    address verifier
+  ) external onlyOwner {
+    if (verifier == address(0)) revert VerifierNotSet();
+    verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
+    emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
+  }
+
+  /**
+   * @notice Calculate unique person hash value for the legacy v1 path
+   * @dev v1-only semantics:
+   * - Interprets `basicInfo.fullNameCommitment` as the v1 name/salt Poseidon digest
+   * - Recomputes the final person hash from that v1 structure
+   * - MUST NOT be used for v2 validation, where `fullNameCommitment` carries `IdentityCommitmentV2`
    */
   function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
     if (basicInfo.fullNameCommitment == bytes32(0)) revert InvalidFullName();
@@ -769,6 +1039,71 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       motherHash_,
       fatherVersionIndex,
       motherVersionIndex,
+      tag,
+      metadataCID
+    );
+  }
+
+  function addPersonZKV2(
+    ProofEnvelope calldata proof,
+    PersonProofPublicSignalsV2 calldata publicSignals,
+    ParentRef calldata father,
+    ParentRef calldata mother,
+    VersionMeta calldata meta,
+    string calldata tag,
+    string calldata metadataCID
+  ) external nonReentrant {
+    if (publicSignals.submitter != uint256(uint160(msg.sender))) revert CallerMismatch();
+    if (publicSignals.hashAlgoId == 0) revert InvalidHashAlgoId();
+    if (publicSignals.schemaVersion != proof.schemaVersion) revert BasicInfoMismatch();
+    if (publicSignals.cryptoSuiteVersion != proof.cryptoSuiteVersion) revert BasicInfoMismatch();
+    if (uint16(publicSignals.schemaVersion) != meta.schemaVersion) revert BasicInfoMismatch();
+    if (uint16(publicSignals.cryptoSuiteVersion) != meta.cryptoSuiteVersion) revert BasicInfoMismatch();
+    if (uint16(publicSignals.hashAlgoId) != meta.hashAlgoId) revert BasicInfoMismatch();
+
+    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.PersonV2);
+    uint256[7] memory ps = [
+      publicSignals.identityCommitment,
+      publicSignals.fatherIdentityCommitment,
+      publicSignals.motherIdentityCommitment,
+      publicSignals.submitter,
+      publicSignals.schemaVersion,
+      publicSignals.cryptoSuiteVersion,
+      publicSignals.hashAlgoId
+    ];
+
+    if (!IPersonCommitmentVerifierV2(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
+      revert InvalidZKProof();
+    }
+
+    bytes32 personHash_ = _wrapIdentityCommitmentAsPersonHashV2(publicSignals.identityCommitment);
+    bytes32 fatherHash_ = publicSignals.fatherIdentityCommitment == 0
+      ? bytes32(0)
+      : _wrapIdentityCommitmentAsPersonHashV2(publicSignals.fatherIdentityCommitment);
+    bytes32 motherHash_ = publicSignals.motherIdentityCommitment == 0
+      ? bytes32(0)
+      : _wrapIdentityCommitmentAsPersonHashV2(publicSignals.motherIdentityCommitment);
+
+    if (publicSignals.fatherIdentityCommitment == 0) {
+      if (father.personHash != bytes32(0) || father.versionIndex != 0) revert InvalidParentHash();
+    } else {
+      if (father.personHash != fatherHash_) revert InvalidParentHash();
+    }
+
+    if (publicSignals.motherIdentityCommitment == 0) {
+      if (mother.personHash != bytes32(0) || mother.versionIndex != 0) revert InvalidParentHash();
+    } else {
+      if (mother.personHash != motherHash_) revert InvalidParentHash();
+    }
+
+    emit PersonHashZKVerified(personHash_, msg.sender);
+
+    _addPersonInternal(
+      personHash_,
+      fatherHash_,
+      motherHash_,
+      father.versionIndex,
+      mother.versionIndex,
       tag,
       metadataCID
     );
@@ -962,6 +1297,37 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     _setTokenURI(newTokenId, _tokenURI);
 
     _safeMint(msg.sender, newTokenId);
+
+    emit PersonNFTMinted(
+      personHash,
+      newTokenId,
+      msg.sender,
+      versionIndex,
+      _tokenURI,
+      block.timestamp
+    );
+  }
+
+  function mintPersonNFTV2(
+    ProofEnvelope calldata proof,
+    NameDisclosurePublicSignalsV2 calldata publicSignals,
+    bytes32 personHash,
+    uint256 versionIndex,
+    string calldata _tokenURI,
+    PersonCoreInfo calldata coreInfo,
+    DisclosureData calldata disclosure
+  ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
+    if (publicSignals.minter != uint256(uint160(msg.sender))) revert CallerMismatch();
+    if (publicSignals.hashAlgoId == 0) revert InvalidHashAlgoId();
+    if (publicSignals.schemaVersion != proof.schemaVersion) revert BasicInfoMismatch();
+    if (publicSignals.cryptoSuiteVersion != proof.cryptoSuiteVersion) revert BasicInfoMismatch();
+
+    _validateMintPersonNFTV2Input(personHash, versionIndex, _tokenURI, coreInfo);
+    _verifyMintPersonNFTV2Proof(proof, publicSignals);
+    _validateMintPersonNFTV2Bindings(publicSignals, personHash, coreInfo, disclosure);
+    _enforceAdult(coreInfo.basicInfo);
+
+    uint256 newTokenId = _mintPersonNFTV2Internal(personHash, versionIndex, _tokenURI, coreInfo);
 
     emit PersonNFTMinted(
       personHash,

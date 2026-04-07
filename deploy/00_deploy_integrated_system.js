@@ -17,7 +17,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     redeployIfChanged: true,
   });
 
-  // 2) Deploy PoseidonT4 library first
+  // 2) Deploy Poseidon libraries first
   const poseidonT4Deployment = await deploy("PoseidonT4", {
     from: deployer,
     args: [],
@@ -26,7 +26,16 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     redeployIfChanged: true,
   });
 
+  const poseidonT5Deployment = await deploy("PoseidonT5", {
+    from: deployer,
+    args: [],
+    log: true,
+    waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
+  });
+
   log(`PoseidonT4 library deployed at: ${poseidonT4Deployment.address}`);
+  log(`PoseidonT5 library deployed at: ${poseidonT5Deployment.address}`);
 
   // 3) Deploy PersonHashVerifier (ZK proof verifier contract)
   const verifierDeployment = await deploy("PersonHashVerifier", {
@@ -51,12 +60,13 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 
   log(`NamePoseidonVerifier deployed at: ${nameVerifierDeployment.address}`);
 
-  // 5) Deploy DeepFamily with PoseidonT4 library linked
+  // 5) Deploy DeepFamily with Poseidon libraries linked
   const deepFamilyDeployment = await deploy("DeepFamily", {
     from: deployer,
     args: [tokenDeployment.address, verifierDeployment.address, nameVerifierDeployment.address],
     libraries: {
       PoseidonT4: poseidonT4Deployment.address,
+      PoseidonT5: poseidonT5Deployment.address,
     },
     log: true,
     waitConfirmations: network.live ? 2 : 1,
@@ -89,5 +99,6 @@ module.exports.tags = [
   "DeepFamilyToken",
   "PersonHashVerifier",
   "PoseidonT4",
+  "PoseidonT5",
   "Integrated",
 ];

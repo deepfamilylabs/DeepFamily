@@ -5,6 +5,9 @@ import namePoseidon from '../lib/namePoseidon.js'
 import personHashProof from '../lib/personHashProof.js'
 import { deployIntegratedFixture } from './fixtures/integrated.mjs'
 
+const ZERO_HASH = hre.ethers.ZeroHash
+const PROOF_PURPOSE_PERSON_V2 = 2
+
 const { buildBasicInfo } = namePoseidon
 const { generatePersonHashProof } = personHashProof
 
@@ -16,6 +19,14 @@ describe('Person Version (add-person) Tests', function () {
   async function baseSetup() {
     const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     return { deepFamily };
+  }
+
+  async function setupPersonV2Verifier(deepFamily, shouldVerify = true) {
+    const stubFactory = await hre.ethers.getContractFactory('contracts/test/StubPersonCommitmentVerifierV2.sol:StubPersonCommitmentVerifierV2')
+    const verifier = await stubFactory.deploy(shouldVerify)
+    await verifier.waitForDeployment()
+    await deepFamily.setVerifier(1, PROOF_PURPOSE_PERSON_V2, await verifier.getAddress())
+    return verifier
   }
 
   it('adds a basic person and emits event', async () => {
@@ -527,5 +538,71 @@ describe('Person Version (add-person) Tests', function () {
     const personHash = await deepFamily.getPersonHash(basicInfo);
     const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 100);
     expect(totalVersions).to.equal(1n);
+  });
+
+  it('addPersonZKV2 allows zero parents when parent commitments are zero', async () => {
+    const { deepFamily } = await baseSetup();
+    await setupPersonV2Verifier(deepFamily, true);
+    const [signer] = await hre.ethers.getSigners();
+
+    const proof = {
+      proofSystemId: 1,
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      a: [0, 0],
+      b: [[0, 0], [0, 0]],
+      c: [0, 0],
+    };
+
+    const publicSignals = {
+      identityCommitment: 123456n,
+      fatherIdentityCommitment: 0,
+      motherIdentityCommitment: 0,
+      submitter: BigInt(await signer.getAddress()),
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      hashAlgoId: 1,
+    };
+
+    const father = { personHash: ZERO_HASH, versionIndex: 0 };
+    const mother = { personHash: ZERO_HASH, versionIndex: 0 };
+    const meta = { schemaVersion: 2, cryptoSuiteVersion: 2, hashAlgoId: 1 };
+
+    await deepFamily
+      .connect(signer)
+      .addPersonZKV2(proof, publicSignals, father, mother, meta, 'v2', 'ipfs://v2-zero-parents', {});
+  });
+
+  it('addPersonZKV2 rejects non-zero parent ref when corresponding commitment is zero', async () => {
+    const { deepFamily } = await baseSetup();
+    await setupPersonV2Verifier(deepFamily, true);
+    const [signer] = await hre.ethers.getSigners();
+
+    const proof = {
+      proofSystemId: 1,
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      a: [0, 0],
+      b: [[0, 0], [0, 0]],
+      c: [0, 0],
+    };
+
+    const publicSignals = {
+      identityCommitment: 789012n,
+      fatherIdentityCommitment: 0,
+      motherIdentityCommitment: 0,
+      submitter: BigInt(await signer.getAddress()),
+      schemaVersion: 2,
+      cryptoSuiteVersion: 2,
+      hashAlgoId: 1,
+    };
+
+    const father = { personHash: hre.ethers.keccak256(hre.ethers.solidityPacked(['bytes32'], [ZERO_HASH])), versionIndex: 1 };
+    const mother = { personHash: ZERO_HASH, versionIndex: 0 };
+    const meta = { schemaVersion: 2, cryptoSuiteVersion: 2, hashAlgoId: 1 };
+
+    await expect(
+      deepFamily.connect(signer).addPersonZKV2(proof, publicSignals, father, mother, meta, 'v2', 'ipfs://v2-bad-parent', {})
+    ).to.be.revertedWithCustomError(deepFamily, 'InvalidParentHash');
   });
 });
