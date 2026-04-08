@@ -117,7 +117,7 @@ export async function deriveKeyFromPersonData(
 
   // Phase 1: Compute base PersonHash (original logic)
   onProgress?.(0, "Computing PersonHash...");
-  const baseHash = computeIdentityHash(input);
+  const baseHash = await computeIdentityHash(input);
   onProgress?.(20, "PersonHash computed");
 
   // Phase 2: Prepare KDF input

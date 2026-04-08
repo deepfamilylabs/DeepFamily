@@ -1,6 +1,22 @@
 import { ethers } from "ethers";
-import { poseidon3, poseidon5 } from "poseidon-lite";
-import { normalizeNameForHash, normalizePassphraseForHash } from "./passphraseStrength";
+import {
+  computePersonHashFromData,
+  DEFAULT_SCHEMA_VERSION,
+  DEFAULT_CRYPTO_SUITE_VERSION,
+  DEFAULT_HASH_ALGO_ID,
+} from "./zk";
+import { canonicalizeFullName, packBirthGenderField } from "./identityCommitment";
+import { normalizePassphraseForHash } from "./passphraseStrength";
+import {
+  bytesToHex,
+  deriveIdentitySecret,
+  generateRandomSalt,
+  hexToBytes,
+  mapBytesToSnarkField,
+  type DerivedSecretBundle,
+} from "./secretDerivation";
+
+export type IdentitySaltMode = "deterministic" | "random";
 
 export type IdentityHashInput = {
   fullName: string;
@@ -10,46 +26,150 @@ export type IdentityHashInput = {
   birthMonth: number;
   birthDay: number;
   gender: number;
+  identityMode?: IdentitySaltMode;
+  identitySaltHex?: string | null;
 };
 
-const textEncoder = new TextEncoder();
+export type IdentityHashComputation = {
+  identityMode: IdentitySaltMode;
+  canonicalFullName: string;
+  personHash: string;
+  identityCommitment: bigint;
+  nameField: bigint;
+  suiteCommitment: bigint;
+  packedBirthGenderField: bigint;
+  derivedSecretField: bigint;
+  derivedSecretBundle: DerivedSecretBundle | null;
+  identitySaltHex: string | null;
+  schemaVersion: number;
+  cryptoSuiteVersion: number;
+  hashAlgoId: number;
+};
 
-export function computePersonHash(input: IdentityHashInput): string {
-  const { fullName, passphrase, isBirthBC, birthYear, birthMonth, birthDay, gender } = input;
+const IDENTITY_SALT_DOMAIN = "deepfamily:identity-kdf-salt:v1";
+const IDENTITY_SALT_BYTES = 16;
 
-  const normalizedFullName = normalizeNameForHash(fullName);
-  const normalizedPassphrase =
-    typeof passphrase === "string" ? normalizePassphraseForHash(passphrase) : "";
+export function normalizeIdentitySaltHex(value: string): string {
+  const normalized = (value ?? "").trim().replace(/^0x/i, "").toLowerCase();
+  if (!normalized) {
+    throw new Error("Identity recovery salt is required");
+  }
+  if (!/^[0-9a-f]+$/.test(normalized) || normalized.length !== IDENTITY_SALT_BYTES * 2) {
+    throw new Error("Identity recovery salt must be 16-byte hex");
+  }
+  return normalized;
+}
 
-  const packedData =
-    (BigInt(birthYear) << 24n) |
-    (BigInt(birthMonth) << 16n) |
-    (BigInt(birthDay) << 8n) |
-    (BigInt(gender) << 1n) |
-    (isBirthBC ? 1n : 0n);
+export function generateRandomIdentitySaltHex(): string {
+  return bytesToHex(generateRandomSalt(IDENTITY_SALT_BYTES));
+}
 
-  const fullNameHash = ethers.keccak256(textEncoder.encode(normalizedFullName));
-  const saltHash =
-    normalizedPassphrase.length > 0
-      ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
-      : ethers.ZeroHash;
+export function computeIdentitySaltHex(input: Omit<IdentityHashInput, "passphrase"> & {
+  schemaVersion?: number;
+  cryptoSuiteVersion?: number;
+  hashAlgoId?: number;
+}): string {
+  const canonicalFullName = canonicalizeFullName(input.fullName);
+  const packedBirthGenderField = packBirthGenderField({
+    isBirthBC: input.isBirthBC,
+    birthYear: input.birthYear,
+    birthMonth: input.birthMonth,
+    birthDay: input.birthDay,
+    gender: input.gender,
+  });
 
-  const fullNameHashBN = BigInt(fullNameHash);
-  const limb0 = fullNameHashBN >> 128n;
-  const limb1 = fullNameHashBN & ((1n << 128n) - 1n);
+  const encoded = ethers.solidityPacked(
+    ["string", "uint16", "uint16", "uint16", "string", "bytes32"],
+    [
+      IDENTITY_SALT_DOMAIN,
+      input.schemaVersion ?? DEFAULT_SCHEMA_VERSION,
+      input.cryptoSuiteVersion ?? DEFAULT_CRYPTO_SUITE_VERSION,
+      input.hashAlgoId ?? DEFAULT_HASH_ALGO_ID,
+      canonicalFullName,
+      ethers.zeroPadValue(ethers.toBeHex(packedBirthGenderField), 32),
+    ],
+  );
 
-  const saltHashBN = BigInt(saltHash);
-  const saltLimb0 = saltHashBN >> 128n;
-  const saltLimb1 = saltHashBN & ((1n << 128n) - 1n);
+  return bytesToHex(ethers.getBytes(ethers.keccak256(encoded)).slice(0, 16));
+}
 
-  const saltedNamePoseidon = poseidon5([limb0, limb1, saltLimb0, saltLimb1, 0n]);
-  const saltedNameBN = BigInt(saltedNamePoseidon);
-  const saltedLimb0 = saltedNameBN >> 128n;
-  const saltedLimb1 = saltedNameBN & ((1n << 128n) - 1n);
+export async function computeIdentityHashMaterial(
+  input: IdentityHashInput & {
+    schemaVersion?: number;
+    cryptoSuiteVersion?: number;
+    hashAlgoId?: number;
+  },
+): Promise<IdentityHashComputation> {
+  const canonicalFullName = canonicalizeFullName(input.fullName);
+  const schemaVersion = input.schemaVersion ?? DEFAULT_SCHEMA_VERSION;
+  const cryptoSuiteVersion = input.cryptoSuiteVersion ?? DEFAULT_CRYPTO_SUITE_VERSION;
+  const hashAlgoId = input.hashAlgoId ?? DEFAULT_HASH_ALGO_ID;
+  const identityMode = input.identityMode ?? "deterministic";
+  const normalizedPassphrase = normalizePassphraseForHash(input.passphrase || "");
 
-  const poseidonResult = poseidon3([saltedLimb0, saltedLimb1, packedData]);
-  const poseidonHex = "0x" + poseidonResult.toString(16).padStart(64, "0");
-  return ethers.keccak256(poseidonHex);
+  let derivedSecretField = 0n;
+  let derivedSecretBundle: DerivedSecretBundle | null = null;
+  let identitySaltHex: string | null = null;
+
+  if (normalizedPassphrase.length > 0) {
+    if (identityMode === "random") {
+      identitySaltHex = normalizeIdentitySaltHex(input.identitySaltHex || "");
+    } else {
+      identitySaltHex = computeIdentitySaltHex({
+        fullName: canonicalFullName,
+        isBirthBC: input.isBirthBC,
+        birthYear: input.birthYear,
+        birthMonth: input.birthMonth,
+        birthDay: input.birthDay,
+        gender: input.gender,
+        schemaVersion,
+        cryptoSuiteVersion,
+        hashAlgoId,
+      });
+    }
+    derivedSecretBundle = await deriveIdentitySecret({
+      passphrase: normalizedPassphrase,
+      salt: hexToBytes(identitySaltHex),
+    });
+    derivedSecretField = mapBytesToSnarkField(hexToBytes(derivedSecretBundle.derivedSecretHex));
+  }
+
+  const computed = computePersonHashFromData({
+    fullName: canonicalFullName,
+    derivedSecretField,
+    isBirthBC: input.isBirthBC,
+    birthYear: input.birthYear,
+    birthMonth: input.birthMonth,
+    birthDay: input.birthDay,
+    gender: input.gender,
+    schemaVersion,
+    cryptoSuiteVersion,
+    hashAlgoId,
+  });
+
+  return {
+    identityMode,
+    canonicalFullName,
+    personHash: computed.personHash,
+    identityCommitment: computed.identityCommitment,
+    nameField: computed.nameField,
+    suiteCommitment: computed.suiteCommitment,
+    packedBirthGenderField: computed.packedBirthGenderField,
+    derivedSecretField,
+    derivedSecretBundle,
+    identitySaltHex,
+    schemaVersion,
+    cryptoSuiteVersion,
+    hashAlgoId,
+  };
+}
+
+export async function computePersonHash(input: IdentityHashInput): Promise<string> {
+  try {
+    return (await computeIdentityHashMaterial(input)).personHash;
+  } catch {
+    return "";
+  }
 }
 
 export const computeIdentityHash = computePersonHash;

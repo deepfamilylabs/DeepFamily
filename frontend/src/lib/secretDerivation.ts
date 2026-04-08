@@ -19,7 +19,7 @@ export type FileEncryptionKdfConfig = {
   params: Argon2idParams;
 };
 
-export type DerivedSecretBundleV2 = {
+export type DerivedSecretBundle = {
   kdfVersion: number;
   algorithm: "Argon2id";
   saltHex: string;
@@ -135,11 +135,11 @@ export async function deriveArgon2idBytes(input: {
   return hexToBytes(hex);
 }
 
-export async function deriveIdentitySecretV2(input: {
+export async function deriveIdentitySecret(input: {
   passphrase: string;
   salt?: Uint8Array;
   config?: IdentityKdfConfig;
-}): Promise<DerivedSecretBundleV2> {
+}): Promise<DerivedSecretBundle> {
   const config = input.config ?? DEFAULT_IDENTITY_KDF_CONFIG;
   const salt = input.salt ?? generateRandomSalt();
   const derivedSecret = await deriveArgon2idBytes({

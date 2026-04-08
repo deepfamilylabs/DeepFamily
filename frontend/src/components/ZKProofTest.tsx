@@ -1,98 +1,126 @@
 import React, { useState } from "react";
 import type { PersonData } from "../lib/zk";
+import { DEFAULT_SCHEMA_VERSION, DEFAULT_CRYPTO_SUITE_VERSION, DEFAULT_HASH_ALGO_ID } from "../lib/zk";
 import { zkWorkerCall } from "../lib/zkWorkerClient";
+import { computeIdentityHashMaterial } from "../lib/identityHash";
+
+type EditablePerson = {
+  fullName: string;
+  passphrase: string;
+  birthYear: number;
+  birthMonth: number;
+  birthDay: number;
+  isBirthBC: boolean;
+  gender: number;
+  schemaVersion: number;
+  cryptoSuiteVersion: number;
+  hashAlgoId: number;
+};
 
 const ZKProofTest: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<string>("");
-  const [person, setPerson] = useState<PersonData>({
+  const [person, setPerson] = useState<EditablePerson>({
     fullName: "Test Person",
-    passphrase: "secret-person",
+    passphrase: "test-person-passphrase",
     birthYear: 1990,
     birthMonth: 12,
     birthDay: 25,
     isBirthBC: false,
     gender: 2,
+    schemaVersion: DEFAULT_SCHEMA_VERSION,
+    cryptoSuiteVersion: DEFAULT_CRYPTO_SUITE_VERSION,
+    hashAlgoId: DEFAULT_HASH_ALGO_ID,
   });
+
+  const buildPersonData = async (input: EditablePerson): Promise<PersonData> => {
+    const computed = await computeIdentityHashMaterial(input);
+    return {
+      fullName: computed.canonicalFullName,
+      derivedSecretField: computed.derivedSecretField,
+      birthYear: input.birthYear,
+      birthMonth: input.birthMonth,
+      birthDay: input.birthDay,
+      isBirthBC: input.isBirthBC,
+      gender: input.gender,
+      schemaVersion: input.schemaVersion,
+      cryptoSuiteVersion: input.cryptoSuiteVersion,
+      hashAlgoId: input.hashAlgoId,
+    };
+  };
 
   const handleGenerateProof = async () => {
     setIsLoading(true);
     setResult("");
 
     try {
-      console.log("🔄 Starting ZK proof generation...");
-
-      // Test with both parents
-      const father: PersonData = {
+      const personData = await buildPersonData(person);
+      const father = await buildPersonData({
         fullName: "Test Father",
-        passphrase: "secret-father",
+        passphrase: "test-father-passphrase",
         birthYear: 1960,
         birthMonth: 5,
         birthDay: 15,
         isBirthBC: false,
         gender: 1,
-      };
+        schemaVersion: DEFAULT_SCHEMA_VERSION,
+        cryptoSuiteVersion: DEFAULT_CRYPTO_SUITE_VERSION,
+        hashAlgoId: DEFAULT_HASH_ALGO_ID,
+      });
 
-      const mother: PersonData = {
+      const mother = await buildPersonData({
         fullName: "Test Mother",
-        passphrase: "secret-mother",
+        passphrase: "test-mother-passphrase",
         birthYear: 1965,
         birthMonth: 8,
         birthDay: 20,
         isBirthBC: false,
         gender: 2,
-      };
-
-      // Generate proof
-      console.log("🔄 About to generate proof with:", {
-        person: person.fullName,
-        hasFather: true,
-        hasMother: true,
-        submitter: "0x1234567890123456789012345678901234567890",
+        schemaVersion: DEFAULT_SCHEMA_VERSION,
+        cryptoSuiteVersion: DEFAULT_CRYPTO_SUITE_VERSION,
+        hashAlgoId: DEFAULT_HASH_ALGO_ID,
       });
 
-      const { proof, publicSignals } = await zkWorkerCall("generatePersonProof", {
-        person,
+      const { proof, publicSignals } = await zkWorkerCall("generatePersonCommitmentProof", {
+        person: personData,
         father,
         mother,
         submitterAddress: "0x1234567890123456789012345678901234567890",
       });
 
-      console.log("✅ Proof generated:", proof);
-      console.log("📊 Public signals:", publicSignals);
-
-      // Verify proof
-      const { ok: isValid } = await zkWorkerCall("verifyPersonProof", { proof, publicSignals });
-      console.log("🔍 Proof verification:", isValid);
-      console.log("📝 Proof object structure:", proof);
+      const { ok: isValid } = await zkWorkerCall("verifyPersonCommitmentProof", {
+        proof,
+        publicSignals,
+      });
 
       setResult(
         `
-🎉 ZK Proof Generated Successfully!
+ZK Proof Generated Successfully!
 
-📊 Public Signals (${publicSignals.length} total):
+Public Signals (${publicSignals.length} total):
 ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
 
-🔍 Proof Verification: ${isValid ? "✅ VALID" : "❌ INVALID"}
+Proof Verification: ${isValid ? "VALID" : "INVALID"}
 
-📝 Proof Structure:
-  ${JSON.stringify(proof, null, 2)}
+Signals:
+- [0] identityCommitment: ${publicSignals[0]}
+- [1] fatherIdentityCommitment: ${publicSignals[1]}
+- [2] motherIdentityCommitment: ${publicSignals[2]}
+- [3] submitter: ${publicSignals[3]}
+- [4] schemaVersion: ${publicSignals[4]}
+- [5] cryptoSuiteVersion: ${publicSignals[5]}
+- [6] hashAlgoId: ${publicSignals[6]}
 
-🧪 Test Details:
+Test Details:
 - Person: ${person.fullName} (${person.birthYear}/${person.birthMonth}/${person.birthDay})
+- Person passphrase: ${person.passphrase}
 - Father: Test Father (exists)
 - Mother: Test Mother (exists)
-- Expected signals: 7 (person_limb0, person_limb1, father_limb0, father_limb1, mother_limb0, mother_limb1, submitter)
-
-✅ Analysis:
-- Father limbs: ${publicSignals[2]} + ${publicSignals[3]} = Non-zero (father exists) ✅
-- Mother limbs: ${publicSignals[4]} + ${publicSignals[5]} = Non-zero (mother exists) ✅
-- Contract compatibility: Ready for blockchain submission ✅
       `.trim(),
       );
     } catch (error) {
-      console.error("❌ Error:", error);
-      setResult(`❌ Error: ${error}`);
+      console.error("Error:", error);
+      setResult(`Error: ${error}`);
     } finally {
       setIsLoading(false);
     }
@@ -103,39 +131,37 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
     setResult("");
 
     try {
-      console.log("🔄 Testing with no parents...");
-
-      const { proof, publicSignals } = await zkWorkerCall("generatePersonProof", {
-        person,
+      const personData = await buildPersonData(person);
+      const { proof, publicSignals } = await zkWorkerCall("generatePersonCommitmentProof", {
+        person: personData,
         father: null,
         mother: null,
         submitterAddress: "0x1234567890123456789012345678901234567890",
       });
 
-      const { ok: isValid } = await zkWorkerCall("verifyPersonProof", { proof, publicSignals });
+      const { ok: isValid } = await zkWorkerCall("verifyPersonCommitmentProof", {
+        proof,
+        publicSignals,
+      });
 
       setResult(
         `
-🎉 No Parents Test Successful!
+No Parents Test Successful!
 
-📊 Public Signals (${publicSignals.length} total):
+Public Signals (${publicSignals.length} total):
 ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
 
-🔍 Proof Verification: ${isValid ? "✅ VALID" : "❌ INVALID"}
+Proof Verification: ${isValid ? "VALID" : "INVALID"}
 
-🧪 Expected Behavior:
-- Signals [2,3]: Father hash should be (0, 0) ✅
-- Signals [4,5]: Mother hash should be (0, 0) ✅
-- In contract: bytes32(0) when both limbs are 0
-
-📝 Analysis:
-- Father limbs: ${publicSignals[2]} + ${publicSignals[3]} = ${publicSignals[2] === "0" && publicSignals[3] === "0" ? "bytes32(0) ✅" : "NOT zero ❌"}
-- Mother limbs: ${publicSignals[4]} + ${publicSignals[5]} = ${publicSignals[4] === "0" && publicSignals[5] === "0" ? "bytes32(0) ✅" : "NOT zero ❌"}
+Expected Behavior:
+- Signal [1]: Father identity commitment should be 0
+- Signal [2]: Mother identity commitment should be 0
+- In contract: bytes32(0) when identity commitment is 0
       `.trim(),
       );
     } catch (error) {
-      console.error("❌ Error:", error);
-      setResult(`❌ Error: ${error}`);
+      console.error("Error:", error);
+      setResult(`Error: ${error}`);
     } finally {
       setIsLoading(false);
     }
@@ -188,6 +214,15 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
               className="w-full p-2 border border-gray-300 rounded-md"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Passphrase</label>
+            <input
+              type="text"
+              value={person.passphrase}
+              onChange={(e) => setPerson({ ...person, passphrase: e.target.value })}
+              className="w-full p-2 border border-gray-300 rounded-md"
+            />
+          </div>
         </div>
       </div>
 
@@ -197,7 +232,7 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
           disabled={isLoading}
           className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? "⏳ Generating..." : "🔬 Test with Parents"}
+          {isLoading ? "Generating..." : "Test with Parents"}
         </button>
 
         <button
@@ -205,7 +240,7 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
           disabled={isLoading}
           className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? "⏳ Testing..." : "🚫 Test No Parents"}
+          {isLoading ? "Testing..." : "Test No Parents"}
         </button>
       </div>
 
@@ -217,13 +252,13 @@ ${publicSignals.map((signal, i) => `  [${i}]: ${signal}`).join("\n")}
       )}
 
       <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-        <h3 className="font-semibold text-green-800 mb-2">✅ Status: Files Synchronized</h3>
+        <h3 className="font-semibold text-green-800 mb-2">Circuit Status</h3>
         <ul className="text-sm text-green-700 space-y-1">
-          <li>• Circuit files (wasm/zkey/vkey) are now synchronized and compatible</li>
-          <li>• New zkey generated with witness length matching updated circuit (455324)</li>
-          <li>• Parent existence flags (hasFather/hasMother) fully supported</li>
-          <li>• When parents don't exist, outputs (0,0) limbs → bytes32(0) in contract</li>
-          <li>• Proof generation may take 30-60 seconds due to computation complexity</li>
+          <li>- PersonCommitment circuit with Poseidon4-based identity commitments</li>
+          <li>- DisclosureBinding circuit with disclosure binding</li>
+          <li>- Schema v{DEFAULT_SCHEMA_VERSION}, CryptoSuite v{DEFAULT_CRYPTO_SUITE_VERSION}, HashAlgo {DEFAULT_HASH_ALGO_ID}</li>
+          <li>- Parent existence flags (hasFather/hasMother) fully supported</li>
+          <li>- Proof generation may take 30-60 seconds due to computation complexity</li>
         </ul>
       </div>
     </div>

@@ -6,12 +6,15 @@
  */
 
 /**
- * Normalize full name for hashing
- * Uses NFC (canonical composition); no trimming or other mutation
+ * Normalize full name for identity flows.
+ * Uses NFKC + Unicode whitespace folding + trim.
+ * Returns an empty string when canonicalization yields an invalid empty name.
  */
 export const normalizeNameForHash = (value: string): string => {
   if (!value) return "";
-  return typeof value.normalize === "function" ? value.normalize("NFC") : value;
+  const normalized = typeof value.normalize === "function" ? value.normalize("NFKC") : value;
+  const collapsedWhitespace = normalized.replace(/\s+/gu, " ").trim();
+  return collapsedWhitespace;
 };
 
 /**

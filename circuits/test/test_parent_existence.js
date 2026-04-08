@@ -2,7 +2,7 @@ const { calculateWitnessIsolated } = require("./witness_helper");
 
 async function testParentExistence() {
   try {
-    console.log("🧪 Testing parent existence logic...");
+    console.log("Testing parent existence logic...");
 
     // Base input with valid data
     const baseInput = {
@@ -40,7 +40,7 @@ async function testParentExistence() {
     console.log("\n1. Testing with both parents existing...");
     const bothParentsExist = { ...baseInput, hasFather: 1, hasMother: 1 };
     const result1 = await calculateWitnessIsolated(bothParentsExist);
-    console.log("✅ Both parents exist test passed");
+    console.log("PASS: Both parents exist test passed");
     console.log("   Person hash:", result1.publicSignals[0], result1.publicSignals[1]);
     console.log("   Father hash:", result1.publicSignals[2], result1.publicSignals[3]);
     console.log("   Mother hash:", result1.publicSignals[4], result1.publicSignals[5]);
@@ -49,16 +49,16 @@ async function testParentExistence() {
     console.log("\n2. Testing with no father...");
     const noFather = { ...baseInput, hasFather: 0, hasMother: 1 };
     const result2 = await calculateWitnessIsolated(noFather);
-    console.log("✅ No father test passed");
+    console.log("PASS: No father test passed");
     console.log("   Person hash:", result2.publicSignals[0], result2.publicSignals[1]);
     console.log("   Father hash:", result2.publicSignals[2], result2.publicSignals[3]);
     console.log("   Mother hash:", result2.publicSignals[4], result2.publicSignals[5]);
 
     // Verify father hash is zero when hasFather = 0
     if (result2.publicSignals[2] === "0" && result2.publicSignals[3] === "0") {
-      console.log("   ✅ Father hash correctly set to 0 when hasFather = 0");
+      console.log("   PASS: Father hash correctly set to 0 when hasFather = 0");
     } else {
-      console.log("   ❌ Father hash should be (0,0) when hasFather = 0");
+      console.log("   FAIL: Father hash should be (0,0) when hasFather = 0");
       return false;
     }
 
@@ -66,16 +66,16 @@ async function testParentExistence() {
     console.log("\n3. Testing with no mother...");
     const noMother = { ...baseInput, hasFather: 1, hasMother: 0 };
     const result3 = await calculateWitnessIsolated(noMother);
-    console.log("✅ No mother test passed");
+    console.log("PASS: No mother test passed");
     console.log("   Person hash:", result3.publicSignals[0], result3.publicSignals[1]);
     console.log("   Father hash:", result3.publicSignals[2], result3.publicSignals[3]);
     console.log("   Mother hash:", result3.publicSignals[4], result3.publicSignals[5]);
 
     // Verify mother hash is zero when hasMother = 0
     if (result3.publicSignals[4] === "0" && result3.publicSignals[5] === "0") {
-      console.log("   ✅ Mother hash correctly set to 0 when hasMother = 0");
+      console.log("   PASS: Mother hash correctly set to 0 when hasMother = 0");
     } else {
-      console.log("   ❌ Mother hash should be (0,0) when hasMother = 0");
+      console.log("   FAIL: Mother hash should be (0,0) when hasMother = 0");
       return false;
     }
 
@@ -83,7 +83,7 @@ async function testParentExistence() {
     console.log("\n4. Testing with no parents (orphan)...");
     const orphan = { ...baseInput, hasFather: 0, hasMother: 0 };
     const result4 = await calculateWitnessIsolated(orphan);
-    console.log("✅ Orphan test passed");
+    console.log("PASS: Orphan test passed");
     console.log("   Person hash:", result4.publicSignals[0], result4.publicSignals[1]);
     console.log("   Father hash:", result4.publicSignals[2], result4.publicSignals[3]);
     console.log("   Mother hash:", result4.publicSignals[4], result4.publicSignals[5]);
@@ -95,9 +95,9 @@ async function testParentExistence() {
       result4.publicSignals[4] === "0" &&
       result4.publicSignals[5] === "0"
     ) {
-      console.log("   ✅ Both parent hashes correctly set to 0 when no parents exist");
+      console.log("   PASS: Both parent hashes correctly set to 0 when no parents exist");
     } else {
-      console.log("   ❌ Both parent hashes should be (0,0) when no parents exist");
+      console.log("   FAIL: Both parent hashes should be (0,0) when no parents exist");
       return false;
     }
 
@@ -111,9 +111,9 @@ async function testParentExistence() {
       result2.publicSignals[1] === result3.publicSignals[1] &&
       result3.publicSignals[1] === result4.publicSignals[1]
     ) {
-      console.log("   ✅ Person hash remains consistent regardless of parent existence");
+      console.log("   PASS: Person hash remains consistent regardless of parent existence");
     } else {
-      console.log("   ❌ Person hash should not change based on parent existence flags");
+      console.log("   FAIL: Person hash should not change based on parent existence flags");
       return false;
     }
 
@@ -122,34 +122,34 @@ async function testParentExistence() {
     try {
       const invalidFatherFlag = { ...baseInput, hasFather: 2, hasMother: 1 };
       await calculateWitnessIsolated(invalidFatherFlag);
-      console.log("   ❌ Should have failed with invalid hasFather value");
+      console.log("   FAIL: Should have failed with invalid hasFather value");
       return false;
     } catch (error) {
-      console.log("   ✅ Correctly rejected invalid hasFather value (> 1)");
+      console.log("   PASS: Correctly rejected invalid hasFather value (> 1)");
     }
 
     try {
       const invalidMotherFlag = { ...baseInput, hasFather: 1, hasMother: 3 };
       await calculateWitnessIsolated(invalidMotherFlag);
-      console.log("   ❌ Should have failed with invalid hasMother value");
+      console.log("   FAIL: Should have failed with invalid hasMother value");
       return false;
     } catch (error) {
-      console.log("   ✅ Correctly rejected invalid hasMother value (> 1)");
+      console.log("   PASS: Correctly rejected invalid hasMother value (> 1)");
     }
 
-    console.log("\n🎉 All parent existence tests passed!");
+    console.log("\nAll parent existence tests passed!");
     console.log("\nFeature Summary:");
-    console.log("- ✅ hasFather=1: Outputs computed father hash");
-    console.log("- ✅ hasFather=0: Outputs (0,0) for father limbs");
-    console.log("- ✅ hasMother=1: Outputs computed mother hash");
-    console.log("- ✅ hasMother=0: Outputs (0,0) for mother limbs");
-    console.log("- ✅ Person hash unaffected by parent existence flags");
-    console.log("- ✅ Validates parent existence flags are 0 or 1");
-    console.log("- ✅ Converts to bytes32(0) in smart contract when both limbs are 0");
+    console.log("- hasFather=1: Outputs computed father hash");
+    console.log("- hasFather=0: Outputs (0,0) for father limbs");
+    console.log("- hasMother=1: Outputs computed mother hash");
+    console.log("- hasMother=0: Outputs (0,0) for mother limbs");
+    console.log("- Person hash unaffected by parent existence flags");
+    console.log("- Validates parent existence flags are 0 or 1");
+    console.log("- Converts to bytes32(0) in smart contract when both limbs are 0");
 
     return true;
   } catch (error) {
-    console.error("❌ Parent existence test failed:", error);
+    console.error("Parent existence test failed:", error);
     return false;
   }
 }

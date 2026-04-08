@@ -1,16 +1,16 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import personHashProof from "../lib/personHashProof.js";
+import personCommitmentProof from "../lib/personCommitmentProof.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
-const { generatePersonHashProof } = personHashProof;
+const { generatePersonCommitmentProof } = personCommitmentProof;
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const { deepFamily } = await ensureIntegratedSystem(connection);
   const [signer] = await ethers.getSigners();
-  const sender = await signer.getAddress();
+  const submitterAddress = await signer.getAddress();
 
   // Parse numeric fields
   const birthYearNum = Number(args.birthyear);
@@ -63,7 +63,7 @@ const action = async (args, hre) => {
   const motherData = args.mothername
     ? {
         fullName: args.mothername,
-        passphrase: args.motherpassphrase || "",
+        derivedSecretField: 0n,
         isBirthBC: String(args.motherbirthbc).toLowerCase() === "true",
         birthYear: Number(args.motherbirthyear),
         birthMonth: Number(args.motherbirthmonth),
@@ -72,63 +72,32 @@ const action = async (args, hre) => {
       }
     : null;
 
-  // Generate ZK proof
-  const { proof, publicSignals } = await generatePersonHashProof(
+  personData.derivedSecretField = 0n;
+  if (fatherData) fatherData.derivedSecretField = 0n;
+  if (motherData) motherData.derivedSecretField = 0n;
+
+  const result = await generatePersonCommitmentProof(
     personData,
     fatherData,
     motherData,
-    sender,
+    submitterAddress,
   );
 
-  // Submit to contract
   const tx = await deepFamily
     .connect(signer)
-    .addPersonZK(
-      proof.a,
-      proof.b,
-      proof.c,
-      publicSignals,
-      Number(args.fatherversion),
-      Number(args.motherversion),
+    .addPersonVersion(
+      result.proofEnvelope,
+      result.publicSignalsStruct,
+      fatherData ? Number(args.fatherversion) : 0,
+      motherData ? Number(args.motherversion) : 0,
       args.tag,
       args.ipfs,
     );
-
   const receipt = await tx.wait();
 
-  // Parse events and verify person hash
-  try {
-    const iface = new ethers.Interface([
-      "event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, string tag)",
-    ]);
-
-    // Reconstruct expected personHash from proof
-    const poseidonDigest =
-      "0x" +
-      ((BigInt(publicSignals[0]) << 128n) | BigInt(publicSignals[1]))
-        .toString(16)
-        .padStart(64, "0");
-    const expectedPersonHash = ethers.keccak256(
-      ethers.solidityPacked(["bytes32"], [poseidonDigest]),
-    );
-
-    const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase();
-    for (const log of receipt.logs || []) {
-      if ((log.address || "").toLowerCase() !== deepAddr) continue;
-      try {
-        const parsed = iface.parseLog(log);
-        if (parsed && parsed.name === "PersonVersionAdded") {
-          const actualPersonHash = parsed.args.personHash;
-
-          // Verify personHash matches
-          if (actualPersonHash !== expectedPersonHash) {
-            throw new Error("PersonHash from event does not match ZK proof");
-          }
-          break;
-        }
-      } catch (_) {}
-    }
-  } catch (e) {}
+  console.log(`Person version added: ${result.person.personHash}`);
+  console.log(`Transaction: ${tx.hash}`);
+  console.log(`Block: ${receipt?.blockNumber ?? "n/a"}`);
 };
 
 export default task("add-person", "Add a person version using ZK proof")

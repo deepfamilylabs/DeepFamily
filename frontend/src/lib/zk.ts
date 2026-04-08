@@ -1,5 +1,6 @@
-import { keccak256 } from "ethers";
-import { normalizeNameForHash, normalizePassphraseForHash } from "./passphraseStrength";
+import { keccak256, concat, toUtf8Bytes, zeroPadValue, toBeHex, solidityPacked } from "ethers";
+import { poseidon4 } from "poseidon-lite";
+import { canonicalizeFullName } from "./identityCommitment";
 
 export type Groth16Proof = {
   pi_a: [string | bigint, string | bigint, string | bigint];
@@ -13,7 +14,33 @@ export type Groth16Proof = {
   curve: string;
 };
 
-const textEncoder = new TextEncoder();
+export const SNARK_FIELD = BigInt(
+  "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+);
+
+const DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
+const DOMAIN_SUITE = 1000n;
+const DOMAIN_NAME_SECRET = 1001n;
+const DOMAIN_IDENTITY = 1002n;
+const DOMAIN_DISCLOSURE = 1003n;
+
+export const DEFAULT_SCHEMA_VERSION = 1;
+export const DEFAULT_CRYPTO_SUITE_VERSION = 1;
+export const DEFAULT_HASH_ALGO_ID = 1;
+export const DEFAULT_PROOF_SYSTEM_ID = 0;
+
+export interface PersonData {
+  fullName: string;
+  derivedSecretField: bigint;
+  birthYear: number;
+  birthMonth: number;
+  birthDay: number;
+  isBirthBC: boolean;
+  gender: number;
+  schemaVersion?: number;
+  cryptoSuiteVersion?: number;
+  hashAlgoId?: number;
+}
 
 function toBigInt(v: string | number | bigint): bigint {
   if (typeof v === "bigint") return v;
@@ -25,84 +52,101 @@ function toBigInt(v: string | number | bigint): bigint {
   throw new Error("unsupported type");
 }
 
-/**
- * Validates public signals shape for ZK proof
- * Used for pre-validation before calling addPersonZK
- */
-export function ensurePublicSignalsShape(publicSignals: Array<string | number | bigint>) {
-  if (!Array.isArray(publicSignals) || publicSignals.length !== 7) {
-    throw new Error("publicSignals length must be 7");
-  }
-  const TWO_POW_128 = 1n << 128n;
-  for (let i = 0; i < 6; i++) {
-    const limb = toBigInt(publicSignals[i]);
-    if (limb < 0n || limb >= TWO_POW_128) throw new Error(`publicSignals[${i}] not in [0,2^128)`);
-  }
-  const submitter = toBigInt(publicSignals[6]);
-  const TWO_POW_160 = 1n << 160n;
-  if (submitter < 0n || submitter >= TWO_POW_160) throw new Error("submitter out of uint160 range");
+export function computeNameField(fullName: string): bigint {
+  const canonicalFullName = canonicalizeFullName(fullName);
+  const domainBytes = toUtf8Bytes(DOMAIN_NAME_PREHASH);
+  const nameBytes = toUtf8Bytes(canonicalFullName);
+  const prehash = keccak256(concat([domainBytes, nameBytes]));
+  return BigInt(prehash) % SNARK_FIELD;
 }
 
-// Person data input interface
-export interface PersonData {
-  fullName: string;
-  passphrase: string;
+export function computeSuiteCommitment(
+  schemaVersion: number,
+  cryptoSuiteVersion: number,
+  hashAlgoId: number,
+): bigint {
+  return poseidon4([DOMAIN_SUITE, BigInt(schemaVersion), BigInt(cryptoSuiteVersion), BigInt(hashAlgoId)]);
+}
+
+export function packBirthGenderField(input: {
+  isBirthBC: boolean;
   birthYear: number;
   birthMonth: number;
   birthDay: number;
-  isBirthBC: boolean;
-  gender: number; // 1=male, 2=female
+  gender: number;
+}): bigint {
+  return (
+    (BigInt(input.birthYear) << 24n) |
+    (BigInt(input.birthMonth) << 16n) |
+    (BigInt(input.birthDay) << 8n) |
+    (BigInt(input.gender) << 1n) |
+    (input.isBirthBC ? 1n : 0n)
+  );
 }
 
-// Hash helpers convert UTF-8 string to keccak bytes array (32 elements)
-function keccakStringToBytes(value: string): number[] {
-  const hash = keccak256(textEncoder.encode(value || ""));
-  const bytes = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) {
-    bytes[i] = parseInt(hash.slice(2 + i * 2, 4 + i * 2), 16);
-  }
-  return Array.from(bytes);
+export function computeNameSecretCommitment(
+  nameField: bigint,
+  derivedSecretField: bigint,
+  suiteCommitment: bigint,
+): bigint {
+  return poseidon4([DOMAIN_NAME_SECRET, nameField, derivedSecretField, suiteCommitment]);
 }
 
-export function hashFullName(fullName: string): number[] {
-  const normalized = normalizeNameForHash(fullName);
-  return keccakStringToBytes(normalized);
+export function computeIdentityCommitment(
+  nameSecretCommitment: bigint,
+  packedBirthGenderField: bigint,
+  suiteCommitment: bigint,
+): bigint {
+  return poseidon4([DOMAIN_IDENTITY, nameSecretCommitment, packedBirthGenderField, suiteCommitment]);
 }
 
-type PassphraseInput =
-  | string
-  | number
-  | bigint
-  | Array<string | number | bigint>
-  | undefined
-  | null;
-
-export function hashPassphrase(passphrase: PassphraseInput): number[] {
-  if (Array.isArray(passphrase)) {
-    return passphrase.slice(0, 32).map((v) => Number(v) & 0xff);
-  }
-  const normalized = passphrase == null ? "" : normalizePassphraseForHash(String(passphrase));
-  if (normalized.length === 0) {
-    return Array(32).fill(0);
-  }
-  return keccakStringToBytes(normalized);
+export function computeDisclosureBinding(
+  nameField: bigint,
+  packedBirthGenderField: bigint,
+  suiteCommitment: bigint,
+): bigint {
+  return poseidon4([DOMAIN_DISCLOSURE, nameField, packedBirthGenderField, suiteCommitment]);
 }
 
-export function formatGroth16ProofForContract(proof: Groth16Proof) {
+export function wrapIdentityCommitmentAsPersonHash(identityCommitment: bigint): string {
+  const hex = zeroPadValue(toBeHex(identityCommitment), 32);
+  return keccak256(solidityPacked(["bytes32"], [hex]));
+}
+
+export function computePersonHashFromData(person: PersonData): {
+  identityCommitment: bigint;
+  personHash: string;
+  nameField: bigint;
+  suiteCommitment: bigint;
+  packedBirthGenderField: bigint;
+} {
+  const schemaVersion = person.schemaVersion ?? DEFAULT_SCHEMA_VERSION;
+  const cryptoSuiteVersion = person.cryptoSuiteVersion ?? DEFAULT_CRYPTO_SUITE_VERSION;
+  const hashAlgoId = person.hashAlgoId ?? DEFAULT_HASH_ALGO_ID;
+
+  const suite = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
+  const nameField = computeNameField(person.fullName);
+  const nsc = computeNameSecretCommitment(nameField, person.derivedSecretField, suite);
+  const packed = packBirthGenderField(person);
+  const ic = computeIdentityCommitment(nsc, packed, suite);
+  const personHash = wrapIdentityCommitmentAsPersonHash(ic);
+
+  return { identityCommitment: ic, personHash, nameField, suiteCommitment: suite, packedBirthGenderField: packed };
+}
+
+export type ProofEnvelope = {
+  proofSystemId: number;
+  a: [bigint, bigint];
+  b: [[bigint, bigint], [bigint, bigint]];
+  c: [bigint, bigint];
+};
+
+export function formatGroth16ProofForContract(
+  proof: Groth16Proof,
+  opts?: { proofSystemId?: number },
+): ProofEnvelope {
   if (!proof || !proof.pi_a || !proof.pi_b || !proof.pi_c) {
     throw new Error("Invalid proof structure");
-  }
-
-  if (!Array.isArray(proof.pi_a) || proof.pi_a.length < 2) {
-    throw new Error("Invalid proof.pi_a length");
-  }
-
-  if (!Array.isArray(proof.pi_b) || proof.pi_b.length < 2) {
-    throw new Error("Invalid proof.pi_b length");
-  }
-
-  if (!Array.isArray(proof.pi_c) || proof.pi_c.length < 2) {
-    throw new Error("Invalid proof.pi_c length");
   }
 
   const a: [bigint, bigint] = [toBigInt(proof.pi_a[0]), toBigInt(proof.pi_a[1])];
@@ -112,7 +156,12 @@ export function formatGroth16ProofForContract(proof: Groth16Proof) {
   ];
   const c: [bigint, bigint] = [toBigInt(proof.pi_c[0]), toBigInt(proof.pi_c[1])];
 
-  return { a, b, c };
+  return {
+    proofSystemId: opts?.proofSystemId ?? DEFAULT_PROOF_SYSTEM_ID,
+    a,
+    b,
+    c,
+  };
 }
 
 export function toBigIntArray(values: Array<string | number | bigint>): bigint[] {

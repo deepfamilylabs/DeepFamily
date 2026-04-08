@@ -121,7 +121,7 @@ hre.run = async (taskName, args = {}) => {
     }
 
     case "mint-nft": {
-      return seedHelpers.mintPersonNFT({
+      return seedHelpers.mintPersonVersionNFT({
         deepFamily,
         signer,
         personHash: String(args.person),

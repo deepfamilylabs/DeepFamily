@@ -29,7 +29,7 @@ const action = async (args, hre) => {
   }
   const results = {};
 
-  console.log("🔍 Checking network connectivity...\n");
+  console.log("Checking network connectivity...\n");
 
   for (const name of names) {
     console.log(`\nChecking: ${name}`);
@@ -41,7 +41,8 @@ const action = async (args, hre) => {
       // If missing URL, skip unless includeMissing
       if (!url || typeof url !== "string") {
         if (!args.includeMissing) {
-          console.log("  ⚠️ Skipped: invalid RPC URL (use --include-missing to force check)");
+          console.log("  Skipped: invalid RPC URL (use --include-missing to force check)");
+          results[name] = false;
           continue;
         }
         throw new Error("Invalid RPC URL configured");
@@ -50,6 +51,7 @@ const action = async (args, hre) => {
       // If Infura and missing INFURA_API_KEY, skip unless includeMissing
       if (url.includes("infura.io/v3/") && !process.env.INFURA_API_KEY && !args.includeMissing) {
         console.log("  ⚠️ Skipped: missing INFURA_API_KEY (use --include-missing to force check)");
+        results[name] = false;
         continue;
       }
 
@@ -74,10 +76,10 @@ const action = async (args, hre) => {
         }
       } catch {}
 
-      console.log(`  ✅ ${name} reachable`);
+      console.log(`  ${name} reachable`);
       results[name] = true;
     } catch (e) {
-      console.log(`  ❌ ${name} failed: ${e.message}`);
+      console.log(`  ${name} failed: ${e.message}`);
       results[name] = false;
     }
 
@@ -85,12 +87,20 @@ const action = async (args, hre) => {
   }
 
   const ok = Object.values(results).filter(Boolean).length;
+  const summary = {
+    totalChecked: names.length,
+    success: ok,
+    failed: names.length - ok,
+    results,
+  };
   console.log("\n" + "=".repeat(50));
   console.log("📊 Summary:");
   console.log("=".repeat(50));
-  console.log(`Total checked: ${names.length}`);
-  console.log(`Success: ${ok}`);
-  console.log(`Failed: ${names.length - ok}`);
+  console.log(`Total checked: ${summary.totalChecked}`);
+  console.log(`Success: ${summary.success}`);
+  console.log(`Failed: ${summary.failed}`);
+
+  return summary;
 };
 
 export default task("networks:check", "Check connectivity for networks in hardhat.config.js")

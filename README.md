@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-red?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Node](https://img.shields.io/badge/Node.js-18+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![Node](https://img.shields.io/badge/Node.js-22.10+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
 **A blockchain-based decentralized digital family tree protocol**
 *Leveraging zero-knowledge proofs and community governance for collaborative family history*
@@ -57,14 +57,14 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 |----------|---------|
 | **DeepFamily.sol** | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding |
 | **DeepFamilyToken.sol** | Utility token powering endorsement and incentive mechanics |
-| **PersonHashVerifier.sol** | ZK verifier for family relationship proofs |
-| **NamePoseidonVerifier.sol** | ZK verifier for name ownership proofs |
+| **PersonCommitmentVerifier.sol** | ZK verifier for person identity and parent commitment proofs |
+| **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs |
 
 
 ## Quick Start
 
 ### Prerequisites
-- **Node.js** >= 18.0.0
+- **Node.js** >= 22.10.0
 - **npm** or **yarn**
 - **Git**
 
@@ -96,8 +96,6 @@ npm run frontend:dev    # Start frontend dev server
 ### Testing
 ```bash
 npm test              # Run all contract tests
-npm run test:gas      # Run with gas reporting
-npm run test:coverage # Generate coverage report
 ```
 
 

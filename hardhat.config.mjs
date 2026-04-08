@@ -10,7 +10,7 @@ import addPersonTask from './tasks/contract-add-person.mjs'
 import endorseTask from './tasks/contract-endorse.mjs'
 import mintNftTask from './tasks/contract-mint-nft.mjs'
 import addPersonZkTask from './tasks/zk-add-person.mjs'
-import generateNamePoseidonProofTask from './tasks/zk-generate-name-poseidon-proof.mjs'
+import generateDisclosureBindingProofTask from './tasks/zk-generate-disclosure-binding-proof.mjs'
 import networksCheckTask from './tasks/networks-check.mjs'
 import networksListTask from './tasks/networks-list.mjs'
 import addStoryChunkTask from './tasks/story-add-chunk.mjs'
@@ -34,7 +34,7 @@ export default {
   ],
   solidity: {
     version: "0.8.20",
-    npmFilesToBuild: ["poseidon-solidity/PoseidonT4.sol", "poseidon-solidity/PoseidonT5.sol"],
+    npmFilesToBuild: ["poseidon-solidity/PoseidonT5.sol"],
     settings: {
       optimizer: {
         enabled: true,
@@ -227,7 +227,7 @@ export default {
     endorseTask,
     mintNftTask,
     addPersonZkTask,
-    generateNamePoseidonProofTask,
+    generateDisclosureBindingProofTask,
     networksCheckTask,
     networksListTask,
     addStoryChunkTask,

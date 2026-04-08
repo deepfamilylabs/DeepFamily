@@ -1,7 +1,7 @@
 import type { Groth16Proof, PersonData } from "./zk";
 
 type ZkWorkerCallMap = {
-  generatePersonProof: {
+  generatePersonCommitmentProof: {
     params: {
       person: PersonData;
       father: PersonData | null;
@@ -10,15 +10,18 @@ type ZkWorkerCallMap = {
     };
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
-  verifyPersonProof: {
+  verifyPersonCommitmentProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-  generateNamePoseidonProof: {
-    params: { fullName: string; passphrase: string; minterAddress: string };
+  generateDisclosureBindingProof: {
+    params: {
+      person: PersonData;
+      minterAddress: string;
+    };
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
-  verifyNamePoseidonProof: {
+  verifyDisclosureBindingProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };

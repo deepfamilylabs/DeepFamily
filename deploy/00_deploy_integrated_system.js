@@ -17,15 +17,7 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     redeployIfChanged: true,
   });
 
-  // 2) Deploy Poseidon libraries first
-  const poseidonT4Deployment = await deploy("PoseidonT4", {
-    from: deployer,
-    args: [],
-    log: true,
-    waitConfirmations: network.live ? 2 : 1,
-    redeployIfChanged: true,
-  });
-
+  // 2) Deploy Poseidon library (T5 for 4-input Poseidon used in disclosure binding)
   const poseidonT5Deployment = await deploy("PoseidonT5", {
     from: deployer,
     args: [],
@@ -34,11 +26,10 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     redeployIfChanged: true,
   });
 
-  log(`PoseidonT4 library deployed at: ${poseidonT4Deployment.address}`);
   log(`PoseidonT5 library deployed at: ${poseidonT5Deployment.address}`);
 
-  // 3) Deploy PersonHashVerifier (ZK proof verifier contract)
-  const verifierDeployment = await deploy("PersonHashVerifier", {
+  // 3) Deploy PersonCommitmentVerifier (ZK proof verifier for addPersonVersion)
+  const personVerifierDeployment = await deploy("PersonCommitmentVerifier", {
     from: deployer,
     args: [],
     log: true,
@@ -46,11 +37,10 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     redeployIfChanged: true,
   });
 
-  log(`PersonHashVerifier deployed at: ${verifierDeployment.address}`);
+  log(`PersonCommitmentVerifier deployed at: ${personVerifierDeployment.address}`);
 
-  // 4) Deploy NamePoseidonVerifier (placeholder; replace with generated verifier in production)
-  const nameVerifierDeployment = await deploy("NamePoseidonVerifier", {
-    contract: "NamePoseidonVerifier",
+  // 4) Deploy DisclosureBindingVerifier (ZK proof verifier for mintPersonVersionNFT)
+  const nameVerifierDeployment = await deploy("DisclosureBindingVerifier", {
     from: deployer,
     args: [],
     log: true,
@@ -58,14 +48,13 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     redeployIfChanged: true,
   });
 
-  log(`NamePoseidonVerifier deployed at: ${nameVerifierDeployment.address}`);
+  log(`DisclosureBindingVerifier deployed at: ${nameVerifierDeployment.address}`);
 
-  // 5) Deploy DeepFamily with Poseidon libraries linked
+  // 5) Deploy DeepFamily with PoseidonT5 linked
   const deepFamilyDeployment = await deploy("DeepFamily", {
     from: deployer,
-    args: [tokenDeployment.address, verifierDeployment.address, nameVerifierDeployment.address],
+    args: [tokenDeployment.address],
     libraries: {
-      PoseidonT4: poseidonT4Deployment.address,
       PoseidonT5: poseidonT5Deployment.address,
     },
     log: true,
@@ -75,8 +64,6 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 
   // 6) Initialize the DeepFamilyToken contract (set DeepFamily address)
   const deepFamilyToken = await ethers.getContractAt("DeepFamilyToken", tokenDeployment.address);
-  const initialized = (await deepFamilyToken.totalAdditions()) !== undefined; // Read-only to avoid call revert
-  // initialize can be called only once; read deepFamilyContract and initialize if zero address
   let needInit = true;
   try {
     const bound = await deepFamilyToken.deepFamilyContract();
@@ -90,6 +77,16 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     log("DeepFamilyToken initialized");
   }
 
+  // 7) Register verifiers via the registry (proofSystemId=0 for Groth16/BN254)
+  const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyDeployment.address);
+  const tx1 = await deepFamily.setVerifier(0, 0, personVerifierDeployment.address); // ProofPurpose.Person = 0
+  await tx1.wait();
+  log(`PersonCommitmentVerifier registered in verifierRegistry`);
+
+  const tx2 = await deepFamily.setVerifier(0, 1, nameVerifierDeployment.address); // ProofPurpose.NameDisclosure = 1
+  await tx2.wait();
+  log(`DisclosureBindingVerifier registered in verifierRegistry`);
+
   log("Deployment finished");
 };
 
@@ -97,8 +94,8 @@ module.exports = func;
 module.exports.tags = [
   "DeepFamily",
   "DeepFamilyToken",
-  "PersonHashVerifier",
-  "PoseidonT4",
+  "PersonCommitmentVerifier",
+  "DisclosureBindingVerifier",
   "PoseidonT5",
   "Integrated",
 ];

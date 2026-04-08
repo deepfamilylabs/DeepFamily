@@ -3,10 +3,10 @@ import { poseidon4, poseidon5 } from "poseidon-lite";
 import {
   hexToBytes,
   mapBytesToSnarkField,
-  type DerivedSecretBundleV2,
+  type DerivedSecretBundle,
 } from "./secretDerivation";
 
-export type CanonicalIdentityInputV2 = {
+export type CanonicalIdentityInput = {
   schemaVersion: number;
   cryptoSuiteVersion: number;
   hashAlgoId: number;
@@ -19,11 +19,11 @@ export type CanonicalIdentityInputV2 = {
   passphrase: string;
 };
 
-export type CanonicalizedIdentityV2 = Omit<CanonicalIdentityInputV2, "passphrase"> & {
+export type CanonicalizedIdentity = Omit<CanonicalIdentityInput, "passphrase"> & {
   canonicalFullName: string;
 };
 
-export type IdentityCommitmentV2Result = {
+export type IdentityCommitmentResult = {
   canonicalFullName: string;
   canonicalFullNameBytes: Uint8Array;
   namePrehash: string;
@@ -40,12 +40,12 @@ export type IdentityCommitmentV2Result = {
 };
 
 const textEncoder = new TextEncoder();
-const DOMAIN_NAME_PREHASH_V2 = "deepfamily:name-prehash:v2";
-const DOMAIN_SUITE_V2 = 1000n;
-const DOMAIN_NAME_SECRET_V2 = 1001n;
-const DOMAIN_IDENTITY_V2 = 1002n;
+const DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
+const DOMAIN_SUITE = 1000n;
+const DOMAIN_NAME_SECRET = 1001n;
+const DOMAIN_IDENTITY = 1002n;
 
-export function canonicalizeFullNameV2(value: string): string {
+export function canonicalizeFullName(value: string): string {
   if (typeof value !== "string") return "";
   const normalized = typeof value.normalize === "function" ? value.normalize("NFKC") : value;
   const collapsedWhitespace = normalized.replace(/\s+/gu, " ").trim();
@@ -53,12 +53,20 @@ export function canonicalizeFullNameV2(value: string): string {
   return collapsedWhitespace;
 }
 
-export function canonicalizeIdentityInputV2(input: CanonicalIdentityInputV2): CanonicalizedIdentityV2 {
+export function safeCanonicalizeFullName(value: string): string {
+  try {
+    return canonicalizeFullName(value);
+  } catch {
+    return "";
+  }
+}
+
+export function canonicalizeIdentityInput(input: CanonicalIdentityInput): CanonicalizedIdentity {
   return {
     schemaVersion: input.schemaVersion,
     cryptoSuiteVersion: input.cryptoSuiteVersion,
     hashAlgoId: input.hashAlgoId,
-    canonicalFullName: canonicalizeFullNameV2(input.fullName),
+    canonicalFullName: canonicalizeFullName(input.fullName),
     fullName: input.fullName,
     isBirthBC: input.isBirthBC,
     birthYear: input.birthYear,
@@ -68,17 +76,17 @@ export function canonicalizeIdentityInputV2(input: CanonicalIdentityInputV2): Ca
   };
 }
 
-export function computeNamePrehashV2(canonicalFullName: string): string {
+export function computeNamePrehash(canonicalFullName: string): string {
   const bytes = textEncoder.encode(canonicalFullName);
-  const domainBytes = textEncoder.encode(DOMAIN_NAME_PREHASH_V2);
+  const domainBytes = textEncoder.encode(DOMAIN_NAME_PREHASH);
   return ethers.keccak256(ethers.concat([domainBytes, bytes]));
 }
 
-export function computeNameFieldV2(namePrehash: string): bigint {
+export function computeNameField(namePrehash: string): bigint {
   return mapBytesToSnarkField(hexToBytes(namePrehash));
 }
 
-export function packBirthGenderFieldV2(input: {
+export function packBirthGenderField(input: {
   isBirthBC: boolean;
   birthYear: number;
   birthMonth: number;
@@ -94,46 +102,46 @@ export function packBirthGenderFieldV2(input: {
   );
 }
 
-export function computeSuiteCommitmentV2(input: {
+export function computeSuiteCommitment(input: {
   schemaVersion: number;
   cryptoSuiteVersion: number;
   hashAlgoId: number;
 }): bigint {
   return poseidon4([
-    DOMAIN_SUITE_V2,
+    DOMAIN_SUITE,
     BigInt(input.schemaVersion),
     BigInt(input.cryptoSuiteVersion),
     BigInt(input.hashAlgoId),
   ]);
 }
 
-export function computeNameSecretCommitmentV2(input: {
+export function computeNameSecretCommitment(input: {
   nameField: bigint;
   derivedSecretField: bigint;
   suiteCommitment: bigint;
 }): bigint {
   return poseidon4([
-    DOMAIN_NAME_SECRET_V2,
+    DOMAIN_NAME_SECRET,
     input.nameField,
     input.derivedSecretField,
     input.suiteCommitment,
   ]);
 }
 
-export function computeIdentityCommitmentV2FromFields(input: {
+export function computeIdentityCommitmentFromFields(input: {
   nameSecretCommitment: bigint;
   packedBirthGenderField: bigint;
   suiteCommitment: bigint;
 }): bigint {
   return poseidon4([
-    DOMAIN_IDENTITY_V2,
+    DOMAIN_IDENTITY,
     input.nameSecretCommitment,
     input.packedBirthGenderField,
     input.suiteCommitment,
   ]);
 }
 
-export function wrapIdentityCommitmentAsPersonHashV2(identityCommitment: bigint): string {
+export function wrapIdentityCommitmentAsPersonHash(identityCommitment: bigint): string {
   const hex = `0x${identityCommitment.toString(16).padStart(64, "0")}`;
   return ethers.keccak256(hex);
 }
@@ -142,32 +150,32 @@ export function derivedSecretHexToField(derivedSecretHex: string): bigint {
   return mapBytesToSnarkField(hexToBytes(derivedSecretHex));
 }
 
-export function computeIdentityCommitmentV2(input: {
-  canonicalInput: CanonicalIdentityInputV2;
-  derivedSecretBundle: DerivedSecretBundleV2;
-}): IdentityCommitmentV2Result {
-  const canonical = canonicalizeIdentityInputV2(input.canonicalInput);
+export function computeIdentityCommitment(input: {
+  canonicalInput: CanonicalIdentityInput;
+  derivedSecretBundle: DerivedSecretBundle;
+}): IdentityCommitmentResult {
+  const canonical = canonicalizeIdentityInput(input.canonicalInput);
   const canonicalFullNameBytes = textEncoder.encode(canonical.canonicalFullName);
-  const namePrehash = computeNamePrehashV2(canonical.canonicalFullName);
-  const nameField = computeNameFieldV2(namePrehash);
+  const namePrehash = computeNamePrehash(canonical.canonicalFullName);
+  const nameField = computeNameField(namePrehash);
   const derivedSecretField = derivedSecretHexToField(input.derivedSecretBundle.derivedSecretHex);
-  const packedBirthGenderField = packBirthGenderFieldV2(canonical);
-  const suiteCommitment = computeSuiteCommitmentV2({
+  const packedBirthGenderField = packBirthGenderField(canonical);
+  const suiteCommitment = computeSuiteCommitment({
     schemaVersion: canonical.schemaVersion,
     cryptoSuiteVersion: canonical.cryptoSuiteVersion,
     hashAlgoId: canonical.hashAlgoId,
   });
-  const nameSecretCommitment = computeNameSecretCommitmentV2({
+  const nameSecretCommitment = computeNameSecretCommitment({
     nameField,
     derivedSecretField,
     suiteCommitment,
   });
-  const identityCommitment = computeIdentityCommitmentV2FromFields({
+  const identityCommitment = computeIdentityCommitmentFromFields({
     nameSecretCommitment,
     packedBirthGenderField,
     suiteCommitment,
   });
-  const personHash = wrapIdentityCommitmentAsPersonHashV2(identityCommitment);
+  const personHash = wrapIdentityCommitmentAsPersonHash(identityCommitment);
 
   return {
     canonicalFullName: canonical.canonicalFullName,

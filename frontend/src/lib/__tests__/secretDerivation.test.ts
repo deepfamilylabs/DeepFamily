@@ -3,7 +3,7 @@ import {
   base64ToBytes,
   bytesToBase64,
   bytesToHex,
-  deriveIdentitySecretV2,
+  deriveIdentitySecret,
   generateRandomSalt,
   hexToBytes,
   mapBytesToSnarkField,
@@ -30,8 +30,8 @@ describe("secretDerivation", () => {
 
   it("derives stable identity secret for same inputs", async () => {
     const salt = hexToBytes("00112233445566778899aabbccddeeff");
-    const a = await deriveIdentitySecretV2({ passphrase: "test-passphrase", salt });
-    const b = await deriveIdentitySecretV2({ passphrase: "test-passphrase", salt });
+    const a = await deriveIdentitySecret({ passphrase: "test-passphrase", salt });
+    const b = await deriveIdentitySecret({ passphrase: "test-passphrase", salt });
     expect(a.derivedSecretHex).toBe(b.derivedSecretHex);
     expect(a.saltHex).toBe("00112233445566778899aabbccddeeff");
   }, 30000);

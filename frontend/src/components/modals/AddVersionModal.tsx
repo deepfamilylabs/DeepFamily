@@ -22,13 +22,22 @@ import { ethers } from "ethers";
 import { useWallet } from "../../context/WalletContext";
 import { useContract } from "../../hooks/useContract";
 import { useTreeData } from "../../context/TreeDataContext";
-import { sha256Hex } from "../../lib/metadataCrypto";
-import PersonHashCalculator, { computePersonHash } from "../PersonHashCalculator";
+import { sha256Hex, type MetadataRecoveryV2 } from "../../lib/metadataCrypto";
+import PersonHashCalculator from "../PersonHashCalculator";
 import type { PersonHashCalculatorHandle } from "../PersonHashCalculator";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../lib/errors";
-import { normalizeNameForHash } from "../../lib/passphraseStrength";
 import { cryptoWorkerCall } from "../../lib/cryptoWorkerClient";
 import { zkWorkerCall } from "../../lib/zkWorkerClient";
+import { safeCanonicalizeFullName } from "../../lib/identityCommitment";
+import { formatGroth16ProofForContract } from "../../lib/zk";
+import type { PersonData } from "../../lib/zk";
+import {
+  computeIdentityHashMaterial,
+  generateRandomIdentitySaltHex,
+  normalizeIdentitySaltHex,
+  type IdentitySaltMode,
+} from "../../lib/identityHash";
+import { normalizePassphraseForHash } from "../../lib/passphraseStrength";
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -68,11 +77,31 @@ type PersonInfoPublic = {
   isBirthBC: boolean;
 };
 
+type IdentityMaterial = {
+  personData: PersonData;
+  personHash: string;
+  identityMode: IdentitySaltMode;
+  identitySaltHex: string | null;
+  recovery: MetadataRecoveryV2["identityKdf"] | null;
+};
+
+type IdentityResolutionOptions = {
+  identityMode?: IdentitySaltMode;
+  identitySaltHex?: string | null;
+};
+
+type IdentitySaltSelections = {
+  personIdentitySaltHex: string | null;
+  fatherIdentitySaltHex: string | null;
+  motherIdentitySaltHex: string | null;
+};
+
 interface AddVersionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (result: any) => void;
   onEndorse?: (personHash: string, versionIndex: number) => void;
+  initialPersonHash?: string;
   // Optional: Pre-populated person data (for passing known data when navigating from other pages)
   initialPersonData?: {
     fullName?: string;
@@ -89,11 +118,12 @@ export default function AddVersionModal({
   onClose,
   onSuccess,
   onEndorse,
+  initialPersonHash,
   initialPersonData,
 }: AddVersionModalProps) {
   const { t } = useTranslation();
   const { signer } = useWallet();
-  const { addPersonZK, isContractReady } = useContract();
+  const { addPersonVersion, isContractReady } = useContract();
   const { invalidateByTx } = useTreeData();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [consents, setConsents] = useState({ hash: false, age: false, legal: false });
@@ -125,13 +155,20 @@ export default function AddVersionModal({
   // Person hash and info from PersonHashCalculator
   const [personInfo, setPersonInfo] = useState<PersonInfoPublic | null>(null);
   const [personHasPassphrase, setPersonHasPassphrase] = useState(false);
+  const [personIdentityMode, setPersonIdentityMode] = useState<IdentitySaltMode>("deterministic");
+  const [personRecoverySaltHex, setPersonRecoverySaltHex] = useState("");
+  const [expectedPersonHash, setExpectedPersonHash] = useState(initialPersonHash || "");
   const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   // Father and mother info from PersonHashCalculator components
   const [fatherInfo, setFatherInfo] = useState<PersonInfoPublic | null>(null);
+  const [fatherIdentityMode, setFatherIdentityMode] = useState<IdentitySaltMode>("deterministic");
+  const [fatherRecoverySaltHex, setFatherRecoverySaltHex] = useState("");
   const fatherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   const [motherInfo, setMotherInfo] = useState<PersonInfoPublic | null>(null);
+  const [motherIdentityMode, setMotherIdentityMode] = useState<IdentitySaltMode>("deterministic");
+  const [motherRecoverySaltHex, setMotherRecoverySaltHex] = useState("");
   const motherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
   const encryptionPasswordRef = useRef<HTMLInputElement | null>(null);
   const confirmEncryptionPasswordRef = useRef<HTMLInputElement | null>(null);
@@ -216,9 +253,9 @@ export default function AddVersionModal({
     const versionIndex =
       parentType === "father" ? watchedValues.fatherVersionIndex : watchedValues.motherVersionIndex;
 
-    const normalizedName = normalizeNameForHash(info?.fullName || "");
-    if (!info || !normalizedName) return "empty";
-    if (normalizedName && typeof versionIndex === "number" && versionIndex > 0) return "complete";
+    const canonicalFullName = safeCanonicalizeFullName(info?.fullName || "");
+    if (!info || !canonicalFullName) return "empty";
+    if (typeof versionIndex === "number" && versionIndex > 0) return "complete";
     return "partial";
   };
 
@@ -226,6 +263,11 @@ export default function AddVersionModal({
   const motherStatus = getParentInfoStatus("mother");
   const allConsentsChecked = consents.hash && consents.age && consents.legal;
   const showManualEncryptionInputs = !usePersonPassphraseForEncryption || !personHasPassphrase;
+  const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim());
+  const normalizedExpectedPersonHash = expectedPersonHash.trim();
+  const expectedPersonHashInvalid = Boolean(
+    normalizedExpectedPersonHash && !isBytes32(normalizedExpectedPersonHash),
+  );
 
   // Initialize states if existing data is provided (e.g., from another page)
   useEffect(() => {
@@ -241,18 +283,134 @@ export default function AddVersionModal({
     }
   }, [initialPersonData]);
 
-  const computeHashOrZero = (calc: PersonHashCalculatorHandle | null) => {
-    if (!calc) return ethers.ZeroHash;
-    const publicData = calc?.getPublicFormData();
-    if (!publicData) return ethers.ZeroHash;
-    const normalizedName = normalizeNameForHash(publicData.fullName || "");
-    if (!normalizedName) return ethers.ZeroHash;
-    const { hasPassphrase: _hasPassphrase, ...publicFields } = publicData;
-    const hash = computePersonHash({
-      ...publicFields,
-      passphrase: calc.getSecretInputs().passphrase,
+  useEffect(() => {
+    setExpectedPersonHash(initialPersonHash || "");
+  }, [initialPersonHash, isOpen]);
+
+  const resolveIdentityMaterial = async (
+    calc: PersonHashCalculatorHandle | null,
+    options?: IdentityResolutionOptions,
+  ): Promise<IdentityMaterial | null> => {
+    if (!calc) return null;
+    const publicData = calc.getPublicFormData();
+    const secretInputs = calc.getSecretInputs();
+    const canonicalFullName = safeCanonicalizeFullName(publicData?.fullName || "");
+    if (!publicData || !canonicalFullName) return null;
+
+    const computed = await computeIdentityHashMaterial({
+      fullName: canonicalFullName,
+      passphrase: secretInputs?.passphrase || "",
+      isBirthBC: publicData.isBirthBC,
+      birthYear: publicData.birthYear,
+      birthMonth: publicData.birthMonth,
+      birthDay: publicData.birthDay,
+      gender: publicData.gender,
+      identityMode: options?.identityMode,
+      identitySaltHex: options?.identitySaltHex,
     });
-    return hash && hash.length > 0 ? hash : ethers.ZeroHash;
+
+    return {
+      personData: {
+        fullName: computed.canonicalFullName,
+        derivedSecretField: computed.derivedSecretField,
+        birthYear: publicData.birthYear,
+        birthMonth: publicData.birthMonth,
+        birthDay: publicData.birthDay,
+        isBirthBC: publicData.isBirthBC,
+        gender: publicData.gender,
+      },
+      personHash: computed.personHash,
+      identityMode: computed.identityMode,
+      identitySaltHex: computed.identitySaltHex,
+      recovery: computed.derivedSecretBundle
+        ? {
+            algorithm: computed.derivedSecretBundle.algorithm,
+            kdfVersion: computed.derivedSecretBundle.kdfVersion,
+            params: computed.derivedSecretBundle.params,
+            saltHex: computed.derivedSecretBundle.saltHex,
+          }
+        : null,
+    };
+  };
+
+  const resolveSelectedPersonIdentitySaltHex = (): string | null => {
+    return resolveSelectedIdentitySaltHex({
+      mode: personIdentityMode,
+      calc: personCalcRef.current,
+      recoverySaltHex: personRecoverySaltHex,
+      setRecoverySaltHex: setPersonRecoverySaltHex,
+      errorMessage: t(
+        "addVersion.randomModePassphraseRequired",
+        "Enhanced identity mode requires a non-empty identity passphrase",
+      ),
+    });
+  };
+
+  const resolveSelectedIdentitySaltHex = (input: {
+    mode: IdentitySaltMode;
+    calc: PersonHashCalculatorHandle | null;
+    recoverySaltHex: string;
+    setRecoverySaltHex: (value: string) => void;
+    errorMessage: string;
+  }): string | null => {
+    if (input.mode !== "random") return null;
+    const normalizedPassphrase = normalizePassphraseForHash(
+      input.calc?.getSecretInputs().passphrase || "",
+    );
+    if (!normalizedPassphrase.length) {
+      throw new Error(input.errorMessage);
+    }
+    if (input.recoverySaltHex.trim()) {
+      return normalizeIdentitySaltHex(input.recoverySaltHex);
+    }
+    const generated = generateRandomIdentitySaltHex();
+    input.setRecoverySaltHex(generated);
+    return generated;
+  };
+
+  const hasNamedIdentityInput = (calc: PersonHashCalculatorHandle | null): boolean => {
+    const canonicalFullName = safeCanonicalizeFullName(calc?.getPublicFormData()?.fullName || "");
+    return Boolean(canonicalFullName);
+  };
+
+  const resolveIdentitySaltSelections = (): IdentitySaltSelections => ({
+    personIdentitySaltHex: resolveSelectedPersonIdentitySaltHex(),
+    fatherIdentitySaltHex: hasNamedIdentityInput(fatherCalcRef.current)
+      ? resolveSelectedIdentitySaltHex({
+          mode: fatherIdentityMode,
+          calc: fatherCalcRef.current,
+          recoverySaltHex: fatherRecoverySaltHex,
+          setRecoverySaltHex: setFatherRecoverySaltHex,
+          errorMessage: t(
+            "addVersion.fatherRandomModePassphraseRequired",
+            "Father enhanced mode requires a non-empty identity passphrase",
+          ),
+        })
+      : null,
+    motherIdentitySaltHex: hasNamedIdentityInput(motherCalcRef.current)
+      ? resolveSelectedIdentitySaltHex({
+          mode: motherIdentityMode,
+          calc: motherCalcRef.current,
+          recoverySaltHex: motherRecoverySaltHex,
+          setRecoverySaltHex: setMotherRecoverySaltHex,
+          errorMessage: t(
+            "addVersion.motherRandomModePassphraseRequired",
+            "Mother enhanced mode requires a non-empty identity passphrase",
+          ),
+        })
+      : null,
+  });
+
+  const assertExpectedPersonHash = (computedPersonHash: string) => {
+    if (!normalizedExpectedPersonHash) return;
+    if (computedPersonHash !== normalizedExpectedPersonHash) {
+      throw new Error(
+        t(
+          "addVersion.personHashMismatch",
+          "The selected identity mode or recovery salt does not match the expected person hash",
+        ),
+      );
+    }
   };
 
   /**
@@ -276,7 +434,11 @@ export default function AddVersionModal({
    * Build metadata payload, strictly following schema-defined field order
    * Field order must be consistent to ensure same data generates same CID
    */
-  const buildMetadataPayload = (tagValue: string, processedData: AddVersionFormData) => {
+  const buildMetadataPayload = async (
+    tagValue: string,
+    processedData: AddVersionFormData,
+    options: IdentitySaltSelections,
+  ) => {
     const baseEmpty = {
       fullName: "",
       gender: 0,
@@ -286,17 +448,29 @@ export default function AddVersionModal({
       isBirthBC: false,
     };
 
-    const personHashValue = computeHashOrZero(personCalcRef.current);
-    const fatherHashValue = computeHashOrZero(fatherCalcRef.current);
-    const motherHashValue = computeHashOrZero(motherCalcRef.current);
+    const personIdentity = await resolveIdentityMaterial(personCalcRef.current, {
+      identityMode: personIdentityMode,
+      identitySaltHex: options.personIdentitySaltHex,
+    });
+    const fatherIdentity = await resolveIdentityMaterial(fatherCalcRef.current, {
+      identityMode: fatherIdentityMode,
+      identitySaltHex: options.fatherIdentitySaltHex,
+    });
+    const motherIdentity = await resolveIdentityMaterial(motherCalcRef.current, {
+      identityMode: motherIdentityMode,
+      identitySaltHex: options.motherIdentitySaltHex,
+    });
 
     const personData = sanitizeInfo(personInfo) ?? baseEmpty;
     const fatherData = sanitizeInfo(fatherInfo) ?? baseEmpty;
     const motherData = sanitizeInfo(motherInfo) ?? baseEmpty;
 
-    // Strictly build according to deepfamily/person-version@1.0 schema field order
+    // Strictly build according to deepfamily/person-version@2.0 schema field order
     return {
-      schema: "deepfamily/person-version@1.0",
+      schema: "deepfamily/person-version@2.0",
+      identity: {
+        mode: personIdentity?.identityMode || personIdentityMode,
+      },
       tag: tagValue || "",
       person: {
         fullName: personData.fullName,
@@ -305,7 +479,7 @@ export default function AddVersionModal({
         birthMonth: personData.birthMonth,
         birthDay: personData.birthDay,
         isBirthBC: personData.isBirthBC,
-        personHash: personHashValue,
+        personHash: personIdentity?.personHash || ethers.ZeroHash,
       },
       parents: {
         father: {
@@ -315,7 +489,8 @@ export default function AddVersionModal({
           birthMonth: fatherData.birthMonth,
           birthDay: fatherData.birthDay,
           isBirthBC: fatherData.isBirthBC,
-          personHash: fatherHashValue,
+          personHash: fatherIdentity?.personHash || ethers.ZeroHash,
+          identityMode: fatherIdentity?.identityMode || fatherIdentityMode,
           versionIndex: processedData.fatherVersionIndex ?? 0,
         },
         mother: {
@@ -325,10 +500,22 @@ export default function AddVersionModal({
           birthMonth: motherData.birthMonth,
           birthDay: motherData.birthDay,
           isBirthBC: motherData.isBirthBC,
-          personHash: motherHashValue,
+          personHash: motherIdentity?.personHash || ethers.ZeroHash,
+          identityMode: motherIdentity?.identityMode || motherIdentityMode,
           versionIndex: processedData.motherVersionIndex ?? 0,
         },
       },
+      recovery: personIdentity?.recovery
+        ? {
+            identityMode: personIdentity.identityMode,
+            identityKdf: {
+              algorithm: personIdentity.recovery.algorithm,
+              kdfVersion: personIdentity.recovery.kdfVersion,
+              params: personIdentity.recovery.params,
+              saltHex: personIdentity.recovery.saltHex,
+            },
+          }
+        : null,
     };
   };
 
@@ -337,8 +524,15 @@ export default function AddVersionModal({
     reset();
     setPersonInfo(null);
     setPersonHasPassphrase(false);
+    setPersonIdentityMode("deterministic");
+    setPersonRecoverySaltHex("");
+    setExpectedPersonHash(initialPersonHash || "");
     setFatherInfo(null);
+    setFatherIdentityMode("deterministic");
+    setFatherRecoverySaltHex("");
     setMotherInfo(null);
+    setMotherIdentityMode("deterministic");
+    setMotherRecoverySaltHex("");
     setIsSubmitting(false);
     setProofGenerationStep("");
     if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = "";
@@ -362,8 +556,15 @@ export default function AddVersionModal({
     reset();
     setPersonInfo(null);
     setPersonHasPassphrase(false);
+    setPersonIdentityMode("deterministic");
+    setPersonRecoverySaltHex("");
+    setExpectedPersonHash(initialPersonHash || "");
     setFatherInfo(null);
+    setFatherIdentityMode("deterministic");
+    setFatherRecoverySaltHex("");
     setMotherInfo(null);
+    setMotherIdentityMode("deterministic");
+    setMotherRecoverySaltHex("");
     setIsSubmitting(false);
     setProofGenerationStep("");
     if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = "";
@@ -426,8 +627,15 @@ export default function AddVersionModal({
     reset();
     setPersonInfo(null);
     setPersonHasPassphrase(false);
+    setPersonIdentityMode("deterministic");
+    setPersonRecoverySaltHex("");
+    setExpectedPersonHash(initialPersonHash || "");
     setFatherInfo(null);
+    setFatherIdentityMode("deterministic");
+    setFatherRecoverySaltHex("");
     setMotherInfo(null);
+    setMotherIdentityMode("deterministic");
+    setMotherRecoverySaltHex("");
     setIsSubmitting(false);
     setProofGenerationStep("");
     if (encryptionPasswordRef.current) encryptionPasswordRef.current.value = "";
@@ -494,8 +702,9 @@ export default function AddVersionModal({
     tagValue: string,
     processedData: AddVersionFormData,
     password: string,
+    identitySaltSelections: IdentitySaltSelections,
   ) => {
-    const metadataPayload = buildMetadataPayload(tagValue, processedData);
+    const metadataPayload = await buildMetadataPayload(tagValue, processedData, identitySaltSelections);
     const metadataJson = JSON.stringify(metadataPayload);
     const bundlePlainHash = sha256Hex(metadataJson);
 
@@ -508,7 +717,7 @@ export default function AddVersionModal({
       return encryptedMetadata;
     }
 
-    const bundleResult = await cryptoWorkerCall("encryptMetadataBundle", {
+    const bundleResult = await cryptoWorkerCall("encryptMetadataBundleV2", {
       plaintextJson: metadataJson,
       password,
     });
@@ -525,11 +734,30 @@ export default function AddVersionModal({
   const handleDownloadMetadata = async () => {
     try {
       if (!validateEncryptionPassword()) return;
+      if (expectedPersonHashInvalid) {
+        setEncryptionError(
+          t(
+            "addVersion.expectedPersonHashInvalid",
+            "Expected person hash must be a 0x-prefixed 32-byte hex string",
+          ),
+        );
+        return;
+      }
       const processedData = addVersionSchema.parse(watchedValues);
+      const identitySaltSelections = resolveIdentitySaltSelections();
+      const personIdentity = await resolveIdentityMaterial(personCalcRef.current, {
+        identityMode: personIdentityMode,
+        identitySaltHex: identitySaltSelections.personIdentitySaltHex,
+      });
+      if (!personIdentity) {
+        throw new Error(t("addVersion.personInfoRequired", "Please fill in person information"));
+      }
+      assertExpectedPersonHash(personIdentity.personHash);
       const { json, cid } = await prepareEncryptedMetadata(
         processedData.tag,
         processedData,
         resolveEncryptionPassword(),
+        identitySaltSelections,
       );
       setValue("metadataCID", cid, { shouldDirty: true, shouldValidate: true });
 
@@ -570,13 +798,20 @@ export default function AddVersionModal({
 
     const personCalc = personCalcRef.current;
     const personPublic = personCalc?.getPublicFormData();
-    const personSecret = personCalc?.getSecretInputs();
-    if (!personCalc || !personPublic || !normalizeNameForHash(personPublic.fullName || "")) {
+    const canonicalPersonFullName = safeCanonicalizeFullName(personPublic?.fullName || "");
+    if (!personCalc || !personPublic || !canonicalPersonFullName) {
       alert(t("addVersion.personInfoRequired", "Please fill in person information"));
       return;
     }
-    const { hasPassphrase: _hasPassphrase, ...personPublicFields } = personPublic;
-    const personPrivate = { ...personPublicFields, passphrase: personSecret?.passphrase ?? "" };
+    if (expectedPersonHashInvalid) {
+      alert(
+        t(
+          "addVersion.expectedPersonHashInvalid",
+          "Expected person hash must be a 0x-prefixed 32-byte hex string",
+        ),
+      );
+      return;
+    }
     if (!validateEncryptionPassword()) {
       return;
     }
@@ -598,35 +833,41 @@ export default function AddVersionModal({
         ),
       );
 
-      const fatherPrivate = (() => {
-        const calc = fatherCalcRef.current;
-        const pub = calc?.getPublicFormData();
-        const normalized = normalizeNameForHash(pub?.fullName || "");
-        if (!calc || !pub || !normalized) return null;
-        const { hasPassphrase: _hp, ...fields } = pub;
-        return { ...fields, passphrase: calc.getSecretInputs().passphrase };
-      })();
-      const motherPrivate = (() => {
-        const calc = motherCalcRef.current;
-        const pub = calc?.getPublicFormData();
-        const normalized = normalizeNameForHash(pub?.fullName || "");
-        if (!calc || !pub || !normalized) return null;
-        const { hasPassphrase: _hp, ...fields } = pub;
-        return { ...fields, passphrase: calc.getSecretInputs().passphrase };
-      })();
+      const identitySaltSelections = resolveIdentitySaltSelections();
+      const personIdentity = await resolveIdentityMaterial(personCalcRef.current, {
+        identityMode: personIdentityMode,
+        identitySaltHex: identitySaltSelections.personIdentitySaltHex,
+      });
+      if (!personIdentity) {
+        throw new Error(t("addVersion.personInfoRequired", "Please fill in person information"));
+      }
+      assertExpectedPersonHash(personIdentity.personHash);
+      const fatherIdentity = await resolveIdentityMaterial(fatherCalcRef.current, {
+        identityMode: fatherIdentityMode,
+        identitySaltHex: identitySaltSelections.fatherIdentitySaltHex,
+      });
+      const motherIdentity = await resolveIdentityMaterial(motherCalcRef.current, {
+        identityMode: motherIdentityMode,
+        identitySaltHex: identitySaltSelections.motherIdentitySaltHex,
+      });
+      const fatherData: PersonData | null = fatherIdentity?.personData ?? null;
+      const motherData: PersonData | null = motherIdentity?.personData ?? null;
 
-      // Generate ZK proof in worker to avoid keeping sensitive inputs on the main thread.
       const { proof, publicSignals } = await zkWorkerCall(
-        "generatePersonProof",
-        { person: personPrivate, father: fatherPrivate, mother: motherPrivate, submitterAddress },
+        "generatePersonCommitmentProof",
+        {
+          person: personIdentity.personData,
+          father: fatherData,
+          mother: motherData,
+          submitterAddress,
+        },
         { timeoutMs: 240_000 },
       );
 
       setProofGenerationStep(t("addVersion.verifyingProof", "Verifying proof..."));
 
-      // Verify the generated proof (worker)
       const { ok: isValid } = await zkWorkerCall(
-        "verifyPersonProof",
+        "verifyPersonCommitmentProof",
         { proof, publicSignals },
         { timeoutMs: 120_000 },
       );
@@ -642,6 +883,7 @@ export default function AddVersionModal({
         processedData.tag,
         processedData,
         resolveEncryptionPassword(),
+        identitySaltSelections,
       );
 
       processedData.metadataCID = metadataCID;
@@ -649,10 +891,20 @@ export default function AddVersionModal({
 
       setProofGenerationStep(t("addVersion.submittingToBlockchain", "Submitting to blockchain..."));
 
-      // Use the unified contract hook for blockchain interaction
-      const result = await addPersonZK(
-        proof,
-        publicSignals,
+      const proofEnvelope = formatGroth16ProofForContract(proof);
+      const publicSignalsStruct = {
+        identityCommitment: BigInt(publicSignals[0]),
+        fatherIdentityCommitment: BigInt(publicSignals[1]),
+        motherIdentityCommitment: BigInt(publicSignals[2]),
+        submitter: BigInt(publicSignals[3]),
+        schemaVersion: Number(publicSignals[4]),
+        cryptoSuiteVersion: Number(publicSignals[5]),
+        hashAlgoId: Number(publicSignals[6]),
+      };
+
+      const result = await addPersonVersion(
+        proofEnvelope,
+        publicSignalsStruct,
         processedData.fatherVersionIndex,
         processedData.motherVersionIndex,
         processedData.tag,
@@ -901,6 +1153,8 @@ export default function AddVersionModal({
                     key={`person-${formResetKey}`}
                     showTitle={false}
                     collapsible={false}
+                    identityMode={personIdentityMode}
+                    identitySaltHex={personIdentityMode === "random" ? personRecoverySaltHex : undefined}
                     initialValues={initialPersonData}
                     onPublicFormChange={(formData) => {
                       setPersonInfo({
@@ -914,6 +1168,134 @@ export default function AddVersionModal({
                       setPersonHasPassphrase(formData.hasPassphrase);
                     }}
                   />
+
+                  <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                        {t("addVersion.identityMode", "Identity Recovery Mode")}
+                      </h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                        {t(
+                          "addVersion.identityModeHint",
+                          "Standard mode recomputes the identity salt from public fields. Enhanced mode uses a recovery salt you must keep to continue this identity on other devices.",
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPersonIdentityMode("deterministic")}
+                        className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                          personIdentityMode === "deterministic"
+                            ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                            : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                        }`}
+                      >
+                        <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                          {t("addVersion.identityModeStandard", "Standard")}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          {t(
+                            "addVersion.identityModeStandardHint",
+                            "Deterministic identity salt. No recovery salt input required.",
+                          )}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPersonIdentityMode("random");
+                          setPersonRecoverySaltHex((current) => current || generateRandomIdentitySaltHex());
+                        }}
+                        className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                          personIdentityMode === "random"
+                            ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                            : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                        }`}
+                      >
+                        <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                          {t("addVersion.identityModeEnhanced", "Enhanced")}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          {t(
+                            "addVersion.identityModeEnhancedHint",
+                            "Random identity salt plus recovery. Reuse the same salt when minting or adding later versions.",
+                          )}
+                        </div>
+                      </button>
+                    </div>
+
+                    {personIdentityMode === "random" && (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                            {t("addVersion.identityRecoverySalt", "Recovery Salt")}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setPersonRecoverySaltHex(generateRandomIdentitySaltHex())}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {t("addVersion.regenerateRecoverySalt", "Generate New Salt")}
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={personRecoverySaltHex}
+                          onChange={(e) => setPersonRecoverySaltHex(e.target.value)}
+                          className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                          placeholder={t(
+                            "addVersion.identityRecoverySaltPlaceholder",
+                            "Paste saved recovery salt or keep the generated value",
+                          )}
+                        />
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          {t(
+                            "addVersion.identityRecoverySaltNotice",
+                            "If this is a brand-new identity, keep the generated salt. If this identity was created earlier in enhanced mode, replace it with the saved recovery salt before submitting.",
+                          )}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                        {t("addVersion.expectedPersonHash", "Expected Person Hash")}
+                      </label>
+                      <input
+                        type="text"
+                        value={expectedPersonHash}
+                        onChange={(e) => {
+                          setExpectedPersonHash(e.target.value);
+                          if (encryptionError) setEncryptionError(null);
+                        }}
+                        className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none transition-all ${
+                          expectedPersonHashInvalid
+                            ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            : "border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                        }`}
+                        placeholder={t(
+                          "addVersion.expectedPersonHashPlaceholder",
+                          "Optional: paste an existing person hash to prevent identity split",
+                        )}
+                      />
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                        {t(
+                          "addVersion.expectedPersonHashHint",
+                          "Leave blank when creating a brand-new identity. Paste the existing person hash when adding another version for an identity that already exists.",
+                        )}
+                      </p>
+                      {expectedPersonHashInvalid && (
+                        <p className="text-xs text-red-500 dark:text-red-400 font-medium">
+                          {t(
+                            "addVersion.expectedPersonHashInvalid",
+                            "Expected person hash must be a 0x-prefixed 32-byte hex string",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 {/* Father Information - Using PersonHashCalculator */}
                 <div className="space-y-2">
@@ -983,6 +1365,10 @@ export default function AddVersionModal({
                         showTitle={false}
                         collapsible={false}
                         className="border-0 shadow-none bg-transparent"
+                        identityMode={fatherIdentityMode}
+                        identitySaltHex={
+                          fatherIdentityMode === "random" ? fatherRecoverySaltHex : undefined
+                        }
                         initialValues={{
                           fullName: "",
                           gender: 1, // Default to male
@@ -1002,6 +1388,91 @@ export default function AddVersionModal({
                           });
                         }}
                       />
+
+                      <div className="rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            {t("addVersion.parentIdentityMode", "Parent Identity Recovery Mode")}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {t(
+                              "addVersion.parentIdentityModeHint",
+                              "Use enhanced mode only when the parent identity was originally created with a saved recovery salt.",
+                            )}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setFatherIdentityMode("deterministic")}
+                            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                              fatherIdentityMode === "deterministic"
+                                ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                                : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                              {t("addVersion.identityModeStandard", "Standard")}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                              {t(
+                                "addVersion.identityModeStandardHint",
+                                "Deterministic identity salt. No recovery salt input required.",
+                              )}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFatherIdentityMode("random");
+                              setFatherRecoverySaltHex(
+                                (current) => current || generateRandomIdentitySaltHex(),
+                              );
+                            }}
+                            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                              fatherIdentityMode === "random"
+                                ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                                : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                              {t("addVersion.identityModeEnhanced", "Enhanced")}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                              {t(
+                                "addVersion.identityModeEnhancedHint",
+                                "Random identity salt plus recovery. Reuse the same salt when minting or adding later versions.",
+                              )}
+                            </div>
+                          </button>
+                        </div>
+                        {fatherIdentityMode === "random" && (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                                {t("addVersion.parentRecoverySalt", "Parent Recovery Salt")}
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setFatherRecoverySaltHex(generateRandomIdentitySaltHex())}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                {t("addVersion.regenerateRecoverySalt", "Generate New Salt")}
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={fatherRecoverySaltHex}
+                              onChange={(e) => setFatherRecoverySaltHex(e.target.value)}
+                              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                              placeholder={t(
+                                "addVersion.parentRecoverySaltPlaceholder",
+                                "Paste the father's saved recovery salt",
+                              )}
+                            />
+                          </div>
+                        )}
+                      </div>
 
                       <div className="w-full sm:w-auto">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1092,6 +1563,10 @@ export default function AddVersionModal({
                         showTitle={false}
                         collapsible={false}
                         className="border-0 shadow-none bg-transparent"
+                        identityMode={motherIdentityMode}
+                        identitySaltHex={
+                          motherIdentityMode === "random" ? motherRecoverySaltHex : undefined
+                        }
                         initialValues={{
                           fullName: "",
                           gender: 2, // Default to female
@@ -1111,6 +1586,91 @@ export default function AddVersionModal({
                           });
                         }}
                       />
+
+                      <div className="rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            {t("addVersion.parentIdentityMode", "Parent Identity Recovery Mode")}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {t(
+                              "addVersion.parentIdentityModeHint",
+                              "Use enhanced mode only when the parent identity was originally created with a saved recovery salt.",
+                            )}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setMotherIdentityMode("deterministic")}
+                            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                              motherIdentityMode === "deterministic"
+                                ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                                : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                              {t("addVersion.identityModeStandard", "Standard")}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                              {t(
+                                "addVersion.identityModeStandardHint",
+                                "Deterministic identity salt. No recovery salt input required.",
+                              )}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMotherIdentityMode("random");
+                              setMotherRecoverySaltHex(
+                                (current) => current || generateRandomIdentitySaltHex(),
+                              );
+                            }}
+                            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                              motherIdentityMode === "random"
+                                ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                                : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                              {t("addVersion.identityModeEnhanced", "Enhanced")}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                              {t(
+                                "addVersion.identityModeEnhancedHint",
+                                "Random identity salt plus recovery. Reuse the same salt when minting or adding later versions.",
+                              )}
+                            </div>
+                          </button>
+                        </div>
+                        {motherIdentityMode === "random" && (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                                {t("addVersion.parentRecoverySalt", "Parent Recovery Salt")}
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setMotherRecoverySaltHex(generateRandomIdentitySaltHex())}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                {t("addVersion.regenerateRecoverySalt", "Generate New Salt")}
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={motherRecoverySaltHex}
+                              onChange={(e) => setMotherRecoverySaltHex(e.target.value)}
+                              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                              placeholder={t(
+                                "addVersion.parentRecoverySaltPlaceholderMother",
+                                "Paste the mother's saved recovery salt",
+                              )}
+                            />
+                          </div>
+                        )}
+                      </div>
 
                       <div className="w-full sm:w-auto">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1746,7 +2306,7 @@ export default function AddVersionModal({
                       type="submit"
                       disabled={
                         isSubmitting ||
-                        !normalizeNameForHash(personInfo?.fullName || "").length ||
+                        !safeCanonicalizeFullName(personInfo?.fullName || "").length ||
                         !allConsentsChecked
                       }
                       className="flex-[1.5] px-6 py-4 bg-gradient-to-r from-orange-400 to-red-600 hover:from-orange-500 hover:to-red-700 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 rounded-full disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all hover:scale-[1.02] active:scale-95 text-sm font-bold flex items-center justify-center gap-2"

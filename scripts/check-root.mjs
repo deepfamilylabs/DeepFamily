@@ -22,11 +22,11 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
   });
 
   if (!existsResult.exists) {
-    console.log(`❌ Person does not exist`);
+    console.log(`Person does not exist`);
     return { exists: false, personHash };
   }
 
-  console.log(`✓ Person exists (total versions: ${existsResult.totalVersions})`);
+  console.log(`Person exists (total versions: ${existsResult.totalVersions})`);
 
   // Get version details
   try {
@@ -75,7 +75,7 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
   try {
     const nftId = await deepFamily.personVersionNFT(personHash, versionIndex);
     if (nftId && Number(nftId) !== 0) {
-      console.log(`\n✓ NFT minted`);
+      console.log(`\nNFT minted`);
       console.log(`  TokenID: ${nftId.toString()}`);
       const owner = await deepFamily.ownerOf(nftId);
       console.log(`  Owner: ${owner}`);
@@ -86,7 +86,7 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
         // tokenURI may not exist
       }
     } else {
-      console.log(`\n○ NFT not minted yet`);
+      console.log(`\nNFT not minted yet`);
     }
   } catch (e) {
     console.log(`\n○ NFT not minted yet`);
@@ -134,9 +134,9 @@ async function main() {
 
     const langLabel =
       {
-        en: "🇺🇸 English Root (Kennedy Family)",
-        zh: "🇨🇳 Chinese Root (曹操家族)",
-      }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
+        en: "EN English Root (Kennedy Family)",
+        zh: "ZH Chinese Root (Cao Cao Family)",
+      }[langKey] || `${langKey.toUpperCase()} Root`;
 
     console.log(`\n${langLabel}:`);
     console.log(`  Name: ${personData.fullName}`);
@@ -166,8 +166,8 @@ async function main() {
     for (const [langKey, { hash, personData }] of Object.entries(rootHashes)) {
       const langLabel =
         {
-          en: "🇺🇸 EN",
-          zh: "🇨🇳 ZH",
+          en: "EN",
+          zh: "ZH",
         }[langKey] || langKey.toUpperCase();
 
       const existsResult = await checkPersonExists({
@@ -176,7 +176,7 @@ async function main() {
         versionIndex: 1,
       });
 
-      const status = existsResult.exists ? "✓" : "✗";
+      const status = existsResult.exists ? "ok" : "FAIL";
       const versions = existsResult.exists ? `(${existsResult.totalVersions}v)` : "";
 
       summary.push({
@@ -222,10 +222,10 @@ async function main() {
         try {
           const nftId = await deepFamily.personVersionNFT(item.hash, 1);
           const isMinted = nftId && Number(nftId) !== 0;
-          const mintStatus = isMinted ? `✓ Minted (TokenID: ${nftId.toString()})` : "○ Not minted";
+          const mintStatus = isMinted ? `Minted (TokenID: ${nftId.toString()})` : "Not minted";
           console.log(`[${item.lang}] ${item.name.padEnd(25)} ${mintStatus}`);
         } catch (e) {
-          console.log(`[${item.lang}] ${item.name.padEnd(25)} ○ Not minted`);
+          console.log(`[${item.lang}] ${item.name.padEnd(25)} Not minted`);
         }
       }
     }
@@ -238,9 +238,9 @@ async function main() {
     for (const [langKey, { personData }] of Object.entries(rootHashes)) {
       const langLabel =
         {
-          en: "🇺🇸 English Root",
-          zh: "🇨🇳 Chinese Root",
-        }[langKey] || `🌐 ${langKey.toUpperCase()} Root`;
+          en: "EN English Root",
+          zh: "ZH Chinese Root",
+        }[langKey] || `${langKey.toUpperCase()} Root`;
 
       console.log(`\n${"─".repeat(70)}`);
       console.log(`${langLabel}: ${personData.fullName}`);
@@ -257,7 +257,7 @@ async function main() {
       await checkPerson(deepFamily, rootHashes[checkLang].personData, 1);
     } else {
       console.log(
-        `❌ Language '${checkLang}' not found. Available: ${Object.keys(rootHashes).join(", ")}`,
+        `Language '${checkLang}' not found. Available: ${Object.keys(rootHashes).join(", ")}`,
       );
     }
   } else if (customHash) {
@@ -275,7 +275,7 @@ async function main() {
     });
 
     if (existsResult.exists) {
-      console.log(`✓ Person exists (total versions: ${existsResult.totalVersions})`);
+      console.log(`Person exists (total versions: ${existsResult.totalVersions})`);
       // Get detailed info (reuse logic above)
       try {
         const versionDetails = await deepFamily.getVersionDetails(customHash, version);
@@ -289,7 +289,7 @@ async function main() {
         console.warn(`  Failed to get details: ${e.message}`);
       }
     } else {
-      console.log(`❌ Person does not exist`);
+      console.log(`Person does not exist`);
     }
   } else if (customName) {
     // Query by name and birth info
@@ -312,7 +312,7 @@ async function main() {
   }
 
   console.log("\n" + "=".repeat(70));
-  console.log("✨ Check Complete");
+  console.log("Check Complete");
   console.log("=".repeat(70));
   console.log("\nUsage:");
   console.log("  Default - Quick check all root hashes:");

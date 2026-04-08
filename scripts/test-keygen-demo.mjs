@@ -115,7 +115,7 @@ async function demo() {
     birthDay: 15,
     gender: 1,
     passphrase:
-      "Spring dawn unaware🌸Birds sing everywhere🐦Night wind and rain🌧️How many flowers fall🌺",
+      "Spring dawn unaware, Birds sing everywhere, Night wind and rain, How many flowers fall",
   };
 
   console.log(`Full Name: ${user1.fullName}`);
@@ -126,7 +126,7 @@ async function demo() {
   const passphraseHashDemo = ethers.keccak256(
     textEncoder.encode(normalizePassphraseForHash(user1.passphrase)),
   );
-  console.log(`Passphrase Hash: ${passphraseHashDemo.substring(0, 20)}... 🔒\n`);
+  console.log(`Passphrase Hash: ${passphraseHashDemo.substring(0, 20)}...\n`);
 
   const hash1 = computePersonHash(
     user1.fullName,
@@ -139,7 +139,7 @@ async function demo() {
   console.log(`PersonHash: ${hash1}\n`);
 
   const result1 = await deriveKey(hash1, user1, "PrivateKey", "BALANCED");
-  console.log(`✅ Derived Private Key (BALANCED, N=131072):`);
+  console.log(`Derived Private Key (BALANCED, N=131072):`);
   console.log(`   Elapsed: ${result1.elapsed}ms`);
   console.log(`   Private Key: ${result1.key}`);
   console.log(`   Address: ${result1.address}\n`);
@@ -161,7 +161,7 @@ async function demo() {
   console.log(`   Private Key: ${result2.key}`);
   console.log(`   Address: ${result2.address}`);
   console.log(
-    `\n✅ Completely Identical: ${result1.key === result2.key && result1.address === result2.address}\n`,
+    `\nCompletely Identical: ${result1.key === result2.key && result1.address === result2.address}\n`,
   );
 
   // Scenario 3: Avalanche effect
@@ -179,7 +179,7 @@ async function demo() {
   );
   const result3 = await deriveKey(hash3, user1Modified, "PrivateKey", "FAST");
 
-  console.log(`Passphrase Change ("...🌺" → "...🌺!"):`);
+  console.log(`Passphrase Change (original -> modified):`);;
   console.log(`   Original Key: ${result1.key.substring(0, 20)}...`);
   console.log(`   New Key: ${result3.key.substring(0, 20)}...`);
   console.log(`   Completely Different: ${result1.key !== result3.key}\n`);
@@ -212,11 +212,11 @@ async function demo() {
   console.log("========================================");
   console.log("  Summary");
   console.log("========================================\n");
-  console.log("✅ Deterministic: Same inputs → Same key");
-  console.log("✅ Security: KDF provides 131,072x brute-force protection");
-  console.log("✅ Avalanche Effect: Any minor change → Completely different key");
-  console.log("✅ Practicality: Can be directly used for Ethereum wallets\n");
-  console.log("⚠️  Important: Strong passphrase (20+ characters) is key to security!\n");
+  console.log("Deterministic: Same inputs -> Same key");
+  console.log("Security: KDF provides 131,072x brute-force protection");
+  console.log("Avalanche Effect: Any minor change -> Completely different key");
+  console.log("Practicality: Can be directly used for Ethereum wallets\n");
+  console.log("Important: Strong passphrase (20+ characters) is key to security!\n");
 }
 
 demo().catch(console.error);

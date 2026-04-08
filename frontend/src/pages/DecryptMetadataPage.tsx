@@ -13,7 +13,7 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react";
-import { parseEncryptedPayload, EncryptedMetadataPayload } from "../lib/metadataCrypto";
+import { parseEncryptedPayload, type AnyEncryptedMetadataPayload } from "../lib/metadataCrypto";
 import { sanitizeErrorForLogging } from "../lib/errors";
 import { IPFS_GATEWAY_BASE_URLS } from "../config/ipfs";
 import { cryptoWorkerCall } from "../lib/cryptoWorkerClient";
@@ -49,7 +49,7 @@ export default function DecryptMetadataPage() {
   const [encryptedJson, setEncryptedJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any | null>(null);
-  const [payloadMeta, setPayloadMeta] = useState<EncryptedMetadataPayload | null>(null);
+  const [payloadMeta, setPayloadMeta] = useState<AnyEncryptedMetadataPayload | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [showGatewayList, setShowGatewayList] = useState(false);
@@ -64,6 +64,50 @@ export default function DecryptMetadataPage() {
 
   const normalizedBaseUrl = normalizeGatewayBaseUrl(baseUrl) || baseUrl.trim();
   const isBaseUrlAllowlisted = IPFS_GATEWAY_BASE_URLS.includes(normalizedBaseUrl);
+  const metadataIdentityMode =
+    result?.identity?.mode === "random" || result?.identity?.mode === "deterministic"
+      ? result.identity.mode
+      : null;
+  const fatherIdentityMode =
+    result?.parents?.father?.identityMode === "random" ||
+    result?.parents?.father?.identityMode === "deterministic"
+      ? result.parents.father.identityMode
+      : null;
+  const motherIdentityMode =
+    result?.parents?.mother?.identityMode === "random" ||
+    result?.parents?.mother?.identityMode === "deterministic"
+      ? result.parents.mother.identityMode
+      : null;
+  const hasIdentityRecoverySalt = Boolean(result?.recovery?.identityKdf?.saltHex);
+
+  const renderIdentityModeBadge = (
+    mode: "random" | "deterministic" | null,
+    labels: {
+      empty: string;
+      deterministic: string;
+      random: string;
+    },
+  ) => {
+    if (mode === "random") {
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+          {labels.random}
+        </span>
+      );
+    }
+    if (mode === "deterministic") {
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          {labels.deterministic}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+        {labels.empty}
+      </span>
+    );
+  };
 
   const buildUrl = () => {
     if (!cid.trim()) return "";
@@ -139,7 +183,7 @@ export default function DecryptMetadataPage() {
     try {
       setIsDecrypting(true);
       setError(null);
-      const { data, payload } = await cryptoWorkerCall("decryptMetadataBundle", {
+      const { data, payload } = await cryptoWorkerCall("decryptMetadataBundleV2", {
         payloadOrJson: encryptedJson,
         password,
       });
@@ -179,7 +223,7 @@ export default function DecryptMetadataPage() {
           </h1>
         </div>
         <span className="inline-flex px-4 py-1.5 text-xs font-medium rounded-full bg-orange-50 text-orange-700 border border-orange-100 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-900/30 backdrop-blur-sm">
-          AES-256-GCM · PBKDF2-SHA256
+          AES-256-GCM · Argon2id
         </span>
       </div>
 
@@ -404,10 +448,98 @@ export default function DecryptMetadataPage() {
               </span>
             </div>
             {result ? (
-              <div className="flex-1 rounded-2xl bg-gray-50 dark:bg-gray-950/50 border border-gray-100 dark:border-gray-800 p-4 overflow-hidden">
-                <pre className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-mono overflow-x-auto h-full whitespace-pre-wrap break-words custom-scrollbar">
-                  {JSON.stringify(result, null, 2)}
-                </pre>
+              <div className="flex-1 space-y-4 overflow-hidden">
+                <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/40 dark:bg-blue-900/10 p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                        {t("decryptMetadata.identityModeSummary", "Identity Mode Summary")}
+                      </h3>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        {t(
+                          "decryptMetadata.identityModeSummaryHint",
+                          "This metadata records whether each identity path uses standard deterministic recovery or enhanced random-salt recovery.",
+                        )}
+                      </p>
+                    </div>
+                    {renderIdentityModeBadge(metadataIdentityMode, {
+                      empty: t("decryptMetadata.identityModeUnknown", "Unknown"),
+                      deterministic: t(
+                        "decryptMetadata.identityModeStandardShort",
+                        "Standard",
+                      ),
+                      random: t("decryptMetadata.identityModeEnhancedShort", "Enhanced"),
+                    })}
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-white/60 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 px-4 py-3 space-y-2">
+                      <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                        {t("decryptMetadata.personIdentityMode", "Person")}
+                      </div>
+                      <div>
+                        {renderIdentityModeBadge(metadataIdentityMode, {
+                          empty: t("decryptMetadata.identityModeUnknown", "Unknown"),
+                          deterministic: t(
+                            "decryptMetadata.identityModeStandard",
+                            "Standard deterministic salt",
+                          ),
+                          random: t(
+                            "decryptMetadata.identityModeEnhanced",
+                            "Enhanced random recovery salt",
+                          ),
+                        })}
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                        {hasIdentityRecoverySalt
+                          ? t(
+                              "decryptMetadata.identityRecoveryPresent",
+                              "Recovery salt is present in this metadata package.",
+                            )
+                          : t(
+                              "decryptMetadata.identityRecoveryAbsent",
+                              "No recovery salt stored. This usually means standard deterministic mode.",
+                            )}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/60 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 px-4 py-3 space-y-2">
+                      <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                        {t("decryptMetadata.parentIdentityModes", "Parents")}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {renderIdentityModeBadge(fatherIdentityMode, {
+                          empty: t("decryptMetadata.fatherModeUnknown", "Father: Unknown"),
+                          deterministic: t(
+                            "decryptMetadata.fatherModeStandard",
+                            "Father: Standard",
+                          ),
+                          random: t("decryptMetadata.fatherModeEnhanced", "Father: Enhanced"),
+                        })}
+                        {renderIdentityModeBadge(motherIdentityMode, {
+                          empty: t("decryptMetadata.motherModeUnknown", "Mother: Unknown"),
+                          deterministic: t(
+                            "decryptMetadata.motherModeStandard",
+                            "Mother: Standard",
+                          ),
+                          random: t("decryptMetadata.motherModeEnhanced", "Mother: Enhanced"),
+                        })}
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                        {t(
+                          "decryptMetadata.parentIdentityModesHint",
+                          "Parent modes only affect how their identity proof is reconstructed when linking versions.",
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-950/50 border border-gray-100 dark:border-gray-800 p-4 overflow-hidden">
+                  <pre className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-mono overflow-x-auto whitespace-pre-wrap break-words custom-scrollbar">
+                    {JSON.stringify(result, null, 2)}
+                  </pre>
+                </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">

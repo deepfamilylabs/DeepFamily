@@ -12,32 +12,35 @@
 | `MAX_LONG_TEXT_LENGTH` | 256 | Max length for tags, IPFS CIDs, names, places, stories |
 | `MAX_QUERY_PAGE_SIZE` | 200 | Gas-optimized pagination limit for all query functions |
 | `MAX_CHUNK_CONTENT_LENGTH` | 2048 | Story chunk size limit (≈2KB per shard) |
-| `MAX_STORY_CHUNKS` | — | No protocol cap; chunks append sequentially |
-| `_HASH_LIMBS_REQUIRED` | 6 | Required limbs for person/father/mother hashes in ZK proofs |
+| `PROTOCOL_FEE_BPS_MAX` | 2000 | Maximum protocol endorsement fee (20%) |
+| `FEE_BPS_DENOMINATOR` | 10000 | Basis-point denominator for fee accounting |
+| `MINIMUM_MINT_AGE` | 18 | Minimum age required for NFT minting |
 
 ### Core Data Structures
 
 #### PersonBasicInfo
 ```solidity
 struct PersonBasicInfo {
-    bytes32 fullNameCommitment; // Poseidon(keccak(fullName), keccak(passphrase), 0) - Prevents identity inference
-    bool isBirthBC;              // Birth era flag
-    uint16 birthYear;            // Birth year (0=unknown)
-    uint8 birthMonth;            // Birth month (1-12, 0=unknown)
-    uint8 birthDay;              // Birth day (1-31, 0=unknown)
-    uint8 gender;                // Gender (0=unknown, 1=male, 2=female, 3=other)
+    bytes32 identityCommitment; // bytes32 form of IdentityCommitment
+    bool isBirthBC;             // Birth era flag
+    uint16 birthYear;           // Birth year (0=unknown)
+    uint8 birthMonth;           // Birth month (1-12, 0=unknown)
+    uint8 birthDay;             // Birth day (1-31, 0=unknown)
+    uint8 gender;               // Gender (0=unknown, 1=male, 2=female, 3=other)
 }
 ```
 
-**Salted Passphrase Unlinkability**: The `fullNameCommitment` uses a user-controlled passphrase to prevent:
-- **Identity Inference**: Others cannot compute personHash from known basic information
-- **Pollution Attacks**: Malicious users cannot create fake versions pointing to real people
-- **Dual Tree Models**: Supports public trees (shared passphrase) and private trees (unique passphrase)
+`identityCommitment` is the contract-facing identity anchor. It is derived off-chain from:
+
+- canonicalized full name
+- `derivedSecretField`
+- packed birth / gender fields
+- `schemaVersion`, `cryptoSuiteVersion`, and `hashAlgoId`
 
 #### PersonVersion
 ```solidity
 struct PersonVersion {
-    bytes32 personHash;          // keccak256(Poseidon(fullNameCommitment, packedData))
+    bytes32 personHash;          // keccak256(bytes32(identityCommitment))
     bytes32 fatherHash;          // Father's person hash
     bytes32 motherHash;          // Mother's person hash
     uint256 versionIndex;        // Version index (starts from 1)
@@ -92,39 +95,21 @@ struct StoryMetadata {
 
 ### Core Hash Computation
 
-The system uses a sophisticated hash calculation in `getPersonHash()`:
+The active system derives person hashes as follows:
 
-```solidity
-function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
-    // 1. Extract limbs from Poseidon fullNameCommitment
-    uint256 limb0 = uint256(basicInfo.fullNameCommitment) >> 128;
-    uint256 limb1 = uint256(basicInfo.fullNameCommitment) & ((1 << 128) - 1);
+1. Off-chain code computes `identityCommitment`
+2. The contract derives `personHash` as `keccak256(bytes32(identityCommitment))`
+3. Parent references are validated against wrapped parent commitments
 
-    // 2. Pack birth data efficiently
-    uint256 packedData = (uint256(basicInfo.birthYear) << 24) |
-                        (uint256(basicInfo.birthMonth) << 16) |
-                        (uint256(basicInfo.birthDay) << 8) |
-                        (uint256(basicInfo.gender) << 1) |
-                        (basicInfo.isBirthBC ? 1 : 0);
-
-    // 3. Compute Poseidon hash with 3 inputs
-    uint256[3] memory inputs = [limb0, limb1, packedData];
-    uint256 poseidonResult = PoseidonT4.hash(inputs);
-
-    // 4. Wrap with keccak256 for domain separation
-    return keccak256(abi.encodePacked(bytes32(poseidonResult)));
-}
-```
+The mint flow also computes a separate `disclosureBinding` from the disclosed full name and the same packed birth / suite metadata.
 
 ### Core Functions
 
 #### ZK-Proof Person Addition
 ```solidity
-function addPersonZK(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals,
+function addPersonVersion(
+    ProofEnvelope calldata proof,
+    PersonProofPublicSignals calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
     string calldata tag,
@@ -133,10 +118,10 @@ function addPersonZK(
 ```
 
 **Verification Process**:
-1. Validates `publicSignals[6] == uint256(uint160(msg.sender))`
-2. Calls `PersonHashVerifier.verifyProof(a, b, c, publicSignals)`
-3. Reconstructs person/father/mother hashes from limb pairs
-4. Wraps Poseidon outputs with keccak256
+1. Validates `publicSignals.submitter == uint256(uint160(msg.sender))`
+2. Calls the registered `PersonCommitmentVerifier`
+3. Wraps each non-zero identity commitment as `keccak256(bytes32(identityCommitment))`
+4. Uses the proof-derived parent hashes plus the provided parent version indices to update lineage links
 5. Routes to `_addPersonInternal()` for family tree update
 
 #### Community Endorsement
@@ -151,14 +136,11 @@ function endorseVersion(bytes32 personHash, uint256 versionIndex) external
 - Each account can endorse only one version per person
 - Switching endorsements rebalances vote counts
 
-#### NFT Minting with Name Proof
+#### NFT Minting with Disclosure Proof
 ```solidity
-function mintPersonNFT(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[5] calldata publicSignals,
-    bytes32 personHash,
+function mintPersonVersionNFT(
+    ProofEnvelope calldata proof,
+    DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
     PersonCoreInfo calldata coreInfo
@@ -167,11 +149,12 @@ function mintPersonNFT(
 
 **Minting Requirements**:
 1. Caller must have endorsed this version
-2. `NamePoseidonVerifier.verifyProof()` must succeed
-3. `publicSignals[0:1]` must match `coreInfo.basicInfo.fullNameCommitment`
-4. `publicSignals[2:3]` must match `keccak256(coreInfo.supplementInfo.fullName)`
-5. `publicSignals[4]` must equal `uint256(uint160(msg.sender))`
-6. `getPersonHash(coreInfo.basicInfo)` must equal `personHash`
+2. `DisclosureBindingVerifier.verifyProof()` must succeed
+3. `publicSignals.identityCommitment` must match `coreInfo.basicInfo.identityCommitment`
+4. `publicSignals.disclosureBinding` must match the contract's recomputed disclosure binding
+5. `publicSignals.minter` must equal `uint256(uint160(msg.sender))`
+6. `personHash` is derived from `publicSignals.identityCommitment`
+7. `_enforceAdult(coreInfo.basicInfo)` must pass
 
 #### Story Sharding System
 ```solidity
@@ -239,13 +222,21 @@ function listStoryChunks(uint256 tokenId, uint256 offset, uint256 limit) externa
 ```solidity
 event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, string tag);
 
-event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, uint256 endorsementFee, uint256 timestamp);
+event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, address recipient, uint256 recipientShare, address protocolRecipient, uint256 protocolShare, uint256 endorsementFee, uint256 timestamp);
+
+event EndorsementCancelled(bytes32 indexed personHash, address indexed user, uint256 versionIndex, uint256 timestamp);
 
 event PersonNFTMinted(bytes32 indexed personHash, uint256 indexed tokenId, address indexed owner, uint256 versionIndex, string tokenURI, uint256 timestamp);
 
 event PersonHashZKVerified(bytes32 indexed personHash, address indexed prover);
 
 event TokenRewardDistributed(address indexed miner, bytes32 indexed personHash, uint256 indexed versionIndex, uint256 reward);
+
+event TokenURIUpdated(uint256 indexed tokenId, address indexed owner, string oldURI, string newURI);
+
+event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
+
+event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
 ```
 
 #### Story Events
@@ -282,7 +273,7 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 - **Reentrancy Guards**: Protection on all external value transfers
 - **Input Validation**: Comprehensive parameter checking with constraints
 - **ETH Rejection**: Contract rejects direct ETH transfers (receive/fallback revert)
-- **ZK Proof Validation**: Dual verifier system prevents unauthorized submissions
+- **ZK Proof Validation**: Verifier registry routes person and name-disclosure proofs by proof purpose
 
 ## DeepFamilyToken.sol - DEEP ERC20 Utility Point
 
@@ -391,24 +382,33 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 
 ## ZK Verifier Contracts
 
-### PersonHashVerifier.sol
-**Purpose**: Validates person identity and family relationships for `addPersonZK()`
-**Public Signals**: 7 values (person/father/mother hash limbs + submitter address)
-**Verification**: Groth16 proof with circuit `person_hash_zk.circom`
+### PersonCommitmentVerifier.sol
+**Purpose**: Validates person identity commitments and optional parent commitments for `addPersonVersion()`
+**Public Signals**: 7 values (`identityCommitment`, `fatherIdentityCommitment`, `motherIdentityCommitment`, `submitter`, `schemaVersion`, `cryptoSuiteVersion`, `hashAlgoId`)
+**Verification**: Groth16 proof with circuit `person_commitment.circom`
 
-### NamePoseidonVerifier.sol
-**Purpose**: Proves knowledge of full name and salt for NFT minting
-**Public Signals**: 4 values (Poseidon commitment limbs + name hash limbs)
-**Verification**: Groth16 proof with circuit `name_poseidon_zk.circom`
+### DisclosureBindingVerifier.sol
+**Purpose**: Validates mint disclosure binding for `mintPersonVersionNFT()`
+**Public Signals**: 6 values (`identityCommitment`, `disclosureBinding`, `minter`, `schemaVersion`, `cryptoSuiteVersion`, `hashAlgoId`)
+**Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
-Both verifiers are auto-generated from circom circuits and implement the standard interface:
+Both verifiers are auto-generated from circom circuits. `DeepFamily` calls them through typed interfaces:
 ```solidity
+// PersonCommitmentVerifier (7 public signals)
 function verifyProof(
-    uint[2] memory a,
-    uint[2][2] memory b,
-    uint[2] memory c,
-    uint[] memory publicSignals
-) public view returns (bool)
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[7] calldata publicSignals
+) external view returns (bool);
+
+// DisclosureBindingVerifier (6 public signals)
+function verifyProof(
+    uint256[2] calldata a,
+    uint256[2][2] calldata b,
+    uint256[2] calldata c,
+    uint256[6] calldata publicSignals
+) external view returns (bool);
 ```
 
 ## Contract Security Summary
@@ -440,11 +440,11 @@ error TokenContractNotSet();
 - **Input Validation**: Comprehensive parameter checking with custom constraints
 - **Access Control**: Role-based permissions with explicit error types
 - **Immutability Controls**: Sealed stories and initialized contracts prevent further modification
-- **Domain Separation**: keccak256 wrapper prevents hash collision attacks
+- **Domain Separation**: domain constants (1000–1003) in Poseidon inputs + keccak256 wrapping for personHash
 
 ### Gas Optimization Features
 - **Struct Packing**: Optimized storage layout (`address` + `uint96` timestamp in single slot)
 - **Paginated Queries**: All list functions support efficient pagination with `MAX_QUERY_PAGE_SIZE`
 - **Event-Driven Architecture**: Frontend synchronization via indexed blockchain events
-- **Limb-Based Hashing**: 128-bit limb representation enables efficient ZK verification
+- **Field-Native Public Signals**: Current ZK flows expose full field-element commitments instead of limb pairs
 - **Batch-Ready Design**: Functions designed for future batch operation implementations
