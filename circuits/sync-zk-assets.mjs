@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // Synchronize compiled circuit artifacts into the frontend public assets directory.
 
-const fs = require("fs");
-const path = require("path");
-const snarkjs = require("snarkjs");
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as snarkjs from "snarkjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const logger = {
   info: (...args) => console.log(...args),
@@ -13,22 +17,16 @@ const logger = {
 };
 
 const projectRoot = path.resolve(__dirname, "..");
-const artifactsDir = path.join(projectRoot, "artifacts", "circuits");
+const artifactsDir = path.join(projectRoot, "zk-artifacts", "circuits");
 const targetDir = path.join(projectRoot, "frontend", "public", "zk");
 
 const filesToCopy = [
-  "name_poseidon_zk_final.zkey",
-  "name_poseidon_zk.vkey.json",
-  "name_poseidon_zk.wasm",
-  "person_hash_zk_final.zkey",
-  "person_hash_zk.vkey.json",
-  "person_hash_zk.wasm",
-  "name_disclosure_v2_final.zkey",
-  "name_disclosure_v2.vkey.json",
-  "name_disclosure_v2.wasm",
-  "person_commitment_v2_final.zkey",
-  "person_commitment_v2.vkey.json",
-  "person_commitment_v2.wasm",
+  "disclosure_binding_final.zkey",
+  "disclosure_binding.vkey.json",
+  "disclosure_binding.wasm",
+  "person_commitment_final.zkey",
+  "person_commitment.vkey.json",
+  "person_commitment.wasm",
 ];
 
 async function ensureDirectoryExists(directory) {
@@ -66,11 +64,11 @@ async function findFile(baseDir, fileName) {
 
 async function copyFile(src, dest) {
   await fs.promises.copyFile(src, dest);
-  console.log(`✔ Copied ${path.basename(src)} → ${dest}`);
+  console.log(`Copied ${path.basename(src)} -> ${dest}`);
 }
 
 async function main() {
-  console.log("🔁 Syncing circuit artifacts to frontend/public/zk ...");
+  console.log("Syncing circuit artifacts to frontend/public/zk ...");
 
   await ensureDirectoryExists(targetDir);
 
@@ -88,7 +86,7 @@ async function main() {
       if (zkeyPath) {
         try {
           sourcePath = path.join(artifactsDir, fileName);
-          console.log(`ℹ Generating ${fileName} from ${zkeyPath}`);
+          console.log(`Generating ${fileName} from ${zkeyPath}`);
           const verificationKey = await snarkjs.zKey.exportVerificationKey(zkeyPath, logger);
           await fs.promises.writeFile(
             sourcePath,
@@ -96,7 +94,7 @@ async function main() {
             "utf8",
           );
         } catch (error) {
-          console.error(`✘ Failed to generate ${fileName}:`, error.message);
+          console.error(`Failed to generate ${fileName}:`, error.message);
           sourcePath = null;
         }
       }
@@ -104,26 +102,26 @@ async function main() {
 
     if (!sourcePath) {
       missingFiles.push(path.join(artifactsDir, fileName));
-      console.error(`✘ Missing artifact: ${path.join(artifactsDir, fileName)}`);
+      console.error(`Missing artifact: ${path.join(artifactsDir, fileName)}`);
       continue;
     }
 
     try {
       await copyFile(sourcePath, destinationPath);
     } catch (error) {
-      console.error(`✘ Failed to copy ${fileName}:`, error.message);
+      console.error(`Failed to copy ${fileName}:`, error.message);
       missingFiles.push(sourcePath);
     }
   }
 
   if (missingFiles.length > 0) {
-    console.error("⚠ Finished with missing artifacts:");
+    console.error("Finished with missing artifacts:");
     missingFiles.forEach((filePath) => console.error(`  - ${filePath}`));
     process.exitCode = 1;
     return;
   }
 
-  console.log("✅ Circuit artifacts synchronized successfully.");
+  console.log("Circuit artifacts synchronized successfully.");
 }
 
 main().catch((error) => {

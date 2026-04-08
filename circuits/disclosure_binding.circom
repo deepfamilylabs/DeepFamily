@@ -11,10 +11,9 @@ include "circomlib/circuits/poseidon.circom";
 // 5. cryptoSuiteVersion
 // 6. hashAlgoId
 
-template NameDisclosureV2() {
+template DisclosureBinding() {
     signal input nameField;
     signal input derivedSecretField;
-    signal input disclosureNonceField;
     signal input packedBirthGenderField;
     signal input minter;
     signal input schemaVersion;
@@ -60,7 +59,7 @@ template NameDisclosureV2() {
     component disclosurePoseidon = Poseidon(4);
     disclosurePoseidon.inputs[0] <== domainDisclosure;
     disclosurePoseidon.inputs[1] <== nameField;
-    disclosurePoseidon.inputs[2] <== disclosureNonceField;
+    disclosurePoseidon.inputs[2] <== packedBirthGenderField;
     disclosurePoseidon.inputs[3] <== suitePoseidon.out;
 
     identityCommitment <== identityPoseidon.out;
@@ -71,4 +70,4 @@ template NameDisclosureV2() {
     hashAlgoIdOut <== hashAlgoId;
 }
 
-component main = NameDisclosureV2();
+component main = DisclosureBinding();

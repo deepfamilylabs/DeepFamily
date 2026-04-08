@@ -6,9 +6,13 @@ import { ethers } from "ethers";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
 // Usage:
-// npx hardhat add-person-zk --proof ./proof.json --public ./public.json --father 0 --mother 0 --tag v1 --ipfs Qm...
+// npx hardhat add-person-version --proof ./proof.json --public ./public.json \
+//   --father-version 0 --mother-version 0 \
+//   --tag v1 --ipfs Qm...
 // Notes:
-// - The submitter binding requires the last publicSignals element to equal the msg.sender (signer) address as uint160.
+// - publicSignals order: [identityCommitment, fatherIdentityCommitment,
+//   motherIdentityCommitment, submitter, schemaVersion, cryptoSuiteVersion, hashAlgoId]
+// - The submitter must equal msg.sender as uint160.
 // - Ensure your DeepFamily deployment is configured with a valid verifier address.
 
 function toBigIntArray(arr) {
@@ -36,18 +40,11 @@ function normalizePublicSignals(pubJson, sender) {
     throw new Error(`publicSignals length must be 7, got ${publicSignals.length}`);
   }
 
-  const TWO_POW_128 = 1n << 128n;
-  for (let i = 0; i < 6; i++) {
-    if (publicSignals[i] < 0n || publicSignals[i] >= TWO_POW_128) {
-      throw new Error(`publicSignals[${i}] not in [0, 2^128)`);
-    }
-  }
-
   const senderUint160 = addressToUint160(sender);
-  const submitter = publicSignals[6];
+  const submitter = publicSignals[3];
   if (submitter !== senderUint160) {
     throw new Error(
-      `submitter mismatch: publicSignals[6]=${submitter} expected ${senderUint160} (from ${sender})`,
+      `submitter mismatch: publicSignals[3]=${submitter} expected ${senderUint160} (from ${sender})`,
     );
   }
 
@@ -89,41 +86,48 @@ const action = async (args, hre) => {
   const proofJson = loadJson(args.proof);
   const pubJson = loadJson(args.public);
 
-  // snarkjs groth16 output formats can vary: ensure a,b,c arrays are in uint form
   const { a, b, c } = normalizeProof(proofJson);
   const publicSignals = normalizePublicSignals(pubJson, sender);
 
   console.log("Public signals breakdown:");
-  console.log(
-    "  Person hash (high, low):",
-    publicSignals[0].toString(),
-    publicSignals[1].toString(),
-  );
-  console.log(
-    "  Father hash (high, low):",
-    publicSignals[2].toString(),
-    publicSignals[3].toString(),
-  );
-  console.log(
-    "  Mother hash (high, low):",
-    publicSignals[4].toString(),
-    publicSignals[5].toString(),
-  );
-  console.log("  Submitter address:", publicSignals[6].toString());
+  console.log("  identityCommitment:", publicSignals[0].toString());
+  console.log("  fatherIdentityCommitment:", publicSignals[1].toString());
+  console.log("  motherIdentityCommitment:", publicSignals[2].toString());
+  console.log("  submitter:", publicSignals[3].toString());
+  console.log("  schemaVersion:", publicSignals[4].toString());
+  console.log("  cryptoSuiteVersion:", publicSignals[5].toString());
+  console.log("  hashAlgoId:", publicSignals[6].toString());
+
+  const proofSystemId = Number(args.proofsystem);
+
+  const proofEnvelope = {
+    proofSystemId,
+    a,
+    b,
+    c,
+  };
+
+  const personProofPublicSignals = {
+    identityCommitment: publicSignals[0],
+    fatherIdentityCommitment: publicSignals[1],
+    motherIdentityCommitment: publicSignals[2],
+    submitter: publicSignals[3],
+    schemaVersion: publicSignals[4],
+    cryptoSuiteVersion: publicSignals[5],
+    hashAlgoId: publicSignals[6],
+  };
 
   console.log("DeepFamily:", deepFamily.target || deepFamily.address);
   console.log("Sender:", sender);
-  console.log("Submitting addPersonZK ...");
+  console.log("Submitting addPersonVersion ...");
 
   const tx = await deepFamily
     .connect(signer)
-    .addPersonZK(
-      a,
-      b,
-      c,
-      publicSignals,
-      Number(args.father),
-      Number(args.mother),
+    .addPersonVersion(
+      proofEnvelope,
+      personProofPublicSignals,
+      Number(args.fatherVersion),
+      Number(args.motherVersion),
       args.tag,
       args.ipfs,
     );
@@ -148,7 +152,7 @@ const action = async (args, hre) => {
   } catch (_) {}
 };
 
-export default task("add-person-zk", "Submit Groth16 proof to addPersonZK")
+export default task("add-person-version", "Submit Groth16 proof to addPersonVersion")
   .addOption({
     name: "proof",
     description: "Path to proof.json from snarkjs",
@@ -162,16 +166,22 @@ export default task("add-person-zk", "Submit Groth16 proof to addPersonZK")
     defaultValue: undefined,
   })
   .addOption({
-    name: "father",
-    description: "Father version index",
+    name: "fatherVersion",
+    description: "Father version index (0 if none)",
     type: ArgumentType.STRING,
     defaultValue: "0",
   })
   .addOption({
-    name: "mother",
-    description: "Mother version index",
+    name: "motherVersion",
+    description: "Mother version index (0 if none)",
     type: ArgumentType.STRING,
     defaultValue: "0",
+  })
+  .addOption({
+    name: "proofsystem",
+    description: "Proof system ID (default 1)",
+    type: ArgumentType.STRING,
+    defaultValue: "1",
   })
   .addOption({
     name: "tag",

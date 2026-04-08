@@ -304,7 +304,7 @@
       "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
       "passphraseCharCount": "Characters after trim: {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
-      "description": "Note: Calculation logic is completely consistent with the contract getPersonHash (identity hash).",
+      "description": "Your unique identity hash is computed locally from your name, birth info, and passphrase. Nothing is uploaded.",
       "bcOptions": {
         "ad": "AD",
         "bc": "BC"
@@ -947,8 +947,8 @@
     "title": "🔐 Secure Key Derivation",
     "subtitle": "Derive Ethereum private keys from personal information and a strong passphrase using KDF algorithm. Deterministic recovery without storing private keys.",
     "howItWorks": "💡 How It Works",
-    "description": "PersonHash(name, birthday, gender, passphrase) → scrypt KDF (N=131072) → Private Key → Ethereum Address",
-    "note": "Same input always generates same key | KDF provides 131,072× brute-force protection",
+    "description": "Name + birthday + passphrase → Argon2id-derived PersonHash → scrypt KDF (N=131072) → Private Key → Ethereum Address",
+    "note": "Same input always generates same key | PersonHash uses local Argon2id derivation before scrypt key stretching",
     "component": {
       "title": "Secure Key Derivation",
       "description": "Derive secure Ethereum private keys from personal information and a strong passphrase using KDF algorithm.",

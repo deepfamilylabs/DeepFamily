@@ -1,35 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { deriveIdentitySecretV2, hexToBytes } from "../secretDerivation";
+import { deriveIdentitySecret, hexToBytes } from "../secretDerivation";
 import {
-  canonicalizeFullNameV2,
-  computeIdentityCommitmentV2,
-  computeNameFieldV2,
-  computeNamePrehashV2,
-  wrapIdentityCommitmentAsPersonHashV2,
-} from "../identityCommitmentV2";
+  canonicalizeFullName,
+  computeIdentityCommitment,
+  computeNameField,
+  computeNamePrehash,
+  wrapIdentityCommitmentAsPersonHash,
+} from "../identityCommitment";
 
-describe("identityCommitmentV2", () => {
+describe("identityCommitment", () => {
   it("canonicalizes name with NFKC + whitespace folding", () => {
-    expect(canonicalizeFullNameV2("  Alice\u3000Smith  ")).toBe("Alice Smith");
+    expect(canonicalizeFullName("  Alice\u3000Smith  ")).toBe("Alice Smith");
   });
 
   it("computes stable name prehash and field", () => {
-    const prehash = computeNamePrehashV2("Alice Smith");
-    const field = computeNameFieldV2(prehash);
+    const prehash = computeNamePrehash("Alice Smith");
+    const field = computeNameField(prehash);
     expect(prehash.startsWith("0x")).toBe(true);
     expect(field >= 0n).toBe(true);
   });
 
   it("computes stable identity commitment and person hash", async () => {
-    const derived = await deriveIdentitySecretV2({
+    const derived = await deriveIdentitySecret({
       passphrase: "strong passphrase",
       salt: hexToBytes("00112233445566778899aabbccddeeff"),
     });
 
-    const resultA = computeIdentityCommitmentV2({
+    const resultA = computeIdentityCommitment({
       canonicalInput: {
-        schemaVersion: 2,
-        cryptoSuiteVersion: 2,
+        schemaVersion: 1,
+        cryptoSuiteVersion: 1,
         hashAlgoId: 1,
         fullName: "  Alice\u3000Smith  ",
         isBirthBC: false,
@@ -42,10 +42,10 @@ describe("identityCommitmentV2", () => {
       derivedSecretBundle: derived,
     });
 
-    const resultB = computeIdentityCommitmentV2({
+    const resultB = computeIdentityCommitment({
       canonicalInput: {
-        schemaVersion: 2,
-        cryptoSuiteVersion: 2,
+        schemaVersion: 1,
+        cryptoSuiteVersion: 1,
         hashAlgoId: 1,
         fullName: "Alice Smith",
         isBirthBC: false,
@@ -61,6 +61,6 @@ describe("identityCommitmentV2", () => {
     expect(resultA.canonicalFullName).toBe("Alice Smith");
     expect(resultA.identityCommitment).toBe(resultB.identityCommitment);
     expect(resultA.personHash).toBe(resultB.personHash);
-    expect(resultA.personHash).toBe(wrapIdentityCommitmentAsPersonHashV2(resultA.identityCommitment));
+    expect(resultA.personHash).toBe(wrapIdentityCommitmentAsPersonHash(resultA.identityCommitment));
   }, 30000);
 });

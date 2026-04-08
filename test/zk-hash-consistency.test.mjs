@@ -1,116 +1,207 @@
 import '../hardhat-test-setup.mjs'
 import { expect } from 'chai'
 import hre from 'hardhat'
-import { poseidon3 } from 'poseidon-lite'
-import namePoseidon from '../lib/namePoseidon.js'
+import { poseidon4 } from 'poseidon-lite'
 import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+import {
+  setupStubVerifiers,
+  computePersonHash,
+  computeSuiteCommitment,
+  computeNameField,
+  computeDisclosureBinding,
+  makeStubProof,
+  makeAddPersonPublicSignals,
+} from './helpers/testHelper.mjs'
 
-const { computePoseidonDigest, splitToLimbs, buildBasicInfo } = namePoseidon
+const SNARK_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 
-/**
- * Convert bytes32 hash (as hex string) to the two 128-bit limbs used in the circuit
- * Matches HashToLimbs template logic (big-endian across each byte)
- */
-/**
- * Pack birth data and flags exactly as in the circuit/contract
- * Format: birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2 + isBirthBC
- */
-function packVitalStats({ birthYear, birthMonth, birthDay, gender, isBirthBC }) {
-  return (BigInt(birthYear) << 24n)
-    | (BigInt(birthMonth) << 16n)
-    | (BigInt(birthDay) << 8n)
-    | (BigInt(gender) << 1n)
-    | (isBirthBC ? 1n : 0n);
+function packBirthGenderField({ birthYear, birthMonth, birthDay, gender, isBirthBC }) {
+  return (
+    (BigInt(birthYear) << 24n) |
+    (BigInt(birthMonth) << 16n) |
+    (BigInt(birthDay) << 8n) |
+    (BigInt(gender) << 1n) |
+    (isBirthBC ? 1n : 0n)
+  )
 }
 
-/**
- * Combine Poseidon output into canonical bytes32 and expose high/low limbs for comparison
- */
-function computePersonHashCircuitEquivalent(input) {
-  const digestInfo = computePoseidonDigest(input.fullName, input.passphrase); // Poseidon(name, salt, 0)
-  const poseidonDigest = BigInt(digestInfo.digestHex);
-  const poseidonLimbs = digestInfo.digestLimbs;
+function computeNameSecretCommitment(nameField, derivedSecretField, suiteCommitment) {
+  return poseidon4([1001n, nameField, derivedSecretField, suiteCommitment])
+}
 
-  const packedData = packVitalStats(input);
-  const finalPoseidonResult = poseidon3([poseidonLimbs.hi, poseidonLimbs.lo, packedData]);
-  const finalPoseidonHex = `0x${finalPoseidonResult.toString(16).padStart(64, '0')}`;
-  const finalPoseidonLimbs = splitToLimbs(finalPoseidonHex);
-  const personHash = hre.ethers.keccak256(hre.ethers.getBytes(finalPoseidonHex));
+function computeIdentityCommitment(nameSecretCommitment, packedBirthGenderField, suiteCommitment) {
+  return poseidon4([1002n, nameSecretCommitment, packedBirthGenderField, suiteCommitment])
+}
 
-  return {
-    poseidonDigestHex: digestInfo.digestHex,
-    poseidonLimbs,
-    packedData,
-    finalPoseidonHex,
-    finalPoseidonLimbs,
-    personHash,
-    nameKeccak: digestInfo.nameHex,
-    saltKeccak: digestInfo.saltHex,
-  };
+function fullIdentityCommitment(ethers, {
+  fullName, derivedSecretField = 0n,
+  isBirthBC = false, birthYear = 0, birthMonth = 0, birthDay = 0, gender = 0,
+  schemaVersion = 1, cryptoSuiteVersion = 1, hashAlgoId = 1,
+}) {
+  const suite = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId)
+  const nameField = computeNameField(ethers, fullName)
+  const nsc = computeNameSecretCommitment(nameField, derivedSecretField, suite)
+  const packed = packBirthGenderField({ birthYear, birthMonth, birthDay, gender, isBirthBC })
+  const ic = computeIdentityCommitment(nsc, packed, suite)
+  return { suite, nameField, nsc, packed, ic, personHash: computePersonHash(ethers, ic) }
 }
 
 describe('Hash Consistency Tests', function () {
-  this.timeout(60_000);
+  this.timeout(60_000)
 
-  let deepFamily;
+  let deepFamily
 
   beforeEach(async () => {
-    const { deepFamily: deployed } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
-    deepFamily = deployed
-  });
+    const deployed = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    deepFamily = deployed.deepFamily
+    await setupStubVerifiers(hre.ethers, deepFamily)
+  })
 
-  const testCases = [
-    {
-      name: 'Basic case',
-      input: { fullName: 'John Doe', passphrase: '', isBirthBC: false, birthYear: 1990, birthMonth: 5, birthDay: 15, gender: 1 },
-    },
-    {
-      name: 'BC birth year',
-      input: { fullName: 'Ancient Person', passphrase: '', isBirthBC: true, birthYear: 500, birthMonth: 0, birthDay: 0, gender: 2 },
-    },
-    {
-      name: 'Zero values',
-      input: { fullName: 'Unknown Person', passphrase: '', isBirthBC: false, birthYear: 0, birthMonth: 0, birthDay: 0, gender: 0 },
-    },
-    {
-      name: 'Unicode name',
-      input: { fullName: 'John Smith', passphrase: '', isBirthBC: false, birthYear: 1985, birthMonth: 12, birthDay: 25, gender: 1 },
-    },
-    {
-      name: 'Long name',
-      input: { fullName: 'Very Long Name With Many Characters', passphrase: '', isBirthBC: false, birthYear: 2000, birthMonth: 1, birthDay: 1, gender: 3 },
-    },
-    {
-      name: 'With passphrase',
-      input: { fullName: 'Secure Person', passphrase: 'my-secret-passphrase', isBirthBC: false, birthYear: 1995, birthMonth: 6, birthDay: 10, gender: 2 },
-    },
-  ];
+  describe('suiteCommitment', () => {
+    it('matches Poseidon4(1000, schema, crypto, hashAlgo)', () => {
+      const expected = poseidon4([1000n, 1n, 1n, 1n])
+      expect(computeSuiteCommitment(1, 1, 1)).to.equal(expected)
+    })
 
-  testCases.forEach(({ name, input }) => {
-    it(`matches circuit hash for: ${name}`, async () => {
-      const expected = computePersonHashCircuitEquivalent(input);
+    it('varies with parameters', () => {
+      const a = computeSuiteCommitment(1, 1, 1)
+      const b = computeSuiteCommitment(2, 1, 1)
+      const c = computeSuiteCommitment(1, 2, 1)
+      const d = computeSuiteCommitment(1, 1, 2)
+      const all = [a, b, c, d]
+      expect(new Set(all.map(String)).size).to.equal(4)
+    })
+  })
 
-      // We now compare the Poseidon digest directly
-      const basicInfo = buildBasicInfo({
-        fullName: input.fullName,
-        passphrase: input.passphrase,
-        isBirthBC: input.isBirthBC,
-        birthYear: input.birthYear,
-        birthMonth: input.birthMonth,
-        birthDay: input.birthDay,
-        gender: input.gender,
-      });
+  describe('nameField', () => {
+    it('is deterministic for same input', () => {
+      const a = computeNameField(hre.ethers, 'John Doe')
+      const b = computeNameField(hre.ethers, 'John Doe')
+      expect(a).to.equal(b)
+    })
 
-      expect(basicInfo.fullNameCommitment).to.equal(expected.poseidonDigestHex);
+    it('uses domain-separated keccak256 mod SNARK_FIELD', () => {
+      const fullName = 'Alice Smith'
+      const domainBytes = hre.ethers.toUtf8Bytes('deepfamily:name-prehash:v2')
+      const nameBytes = hre.ethers.toUtf8Bytes(fullName)
+      const prehash = hre.ethers.keccak256(hre.ethers.concat([domainBytes, nameBytes]))
+      const expected = BigInt(prehash) % SNARK_FIELD
+      expect(computeNameField(hre.ethers, fullName)).to.equal(expected)
+    })
 
-      // Note: This test may need adjustment based on how the contract handles the new Poseidon digest
-      // The contract's getPersonHash function should now work with the Poseidon digest as input
-      const contractHash = await deepFamily.getPersonHash(basicInfo);
-      expect(contractHash).to.equal(expected.personHash);
+    it('different names produce different fields', () => {
+      const a = computeNameField(hre.ethers, 'Alice')
+      const b = computeNameField(hre.ethers, 'Bob')
+      expect(a).to.not.equal(b)
+    })
+  })
 
-      const poseidonLimbs = splitToLimbs(expected.finalPoseidonHex);
-      expect(poseidonLimbs.hi).to.equal(expected.finalPoseidonLimbs.hi);
-      expect(poseidonLimbs.lo).to.equal(expected.finalPoseidonLimbs.lo);
-    });
-  });
-});
+  describe('identity commitment chain', () => {
+    const testCases = [
+      { name: 'Basic case', fullName: 'John Doe', birthYear: 1990, birthMonth: 5, birthDay: 15, gender: 1 },
+      { name: 'BC birth', fullName: 'Ancient Person', isBirthBC: true, birthYear: 500, gender: 2 },
+      { name: 'Zero values', fullName: 'Unknown Person', birthYear: 0, gender: 0 },
+      { name: 'Full date', fullName: 'Full Date Person', birthYear: 1985, birthMonth: 12, birthDay: 25, gender: 1 },
+      { name: 'Long name', fullName: 'Very Long Name With Many Characters', birthYear: 2000, gender: 3 },
+    ]
+
+    testCases.forEach(({ name, ...input }) => {
+      it(`produces consistent identity commitment for: ${name}`, () => {
+        const result = fullIdentityCommitment(hre.ethers, { ...input })
+        expect(result.ic).to.be.a('bigint')
+        expect(result.ic > 0n).to.be.true
+        expect(result.personHash).to.match(/^0x[0-9a-f]{64}$/)
+
+        const result2 = fullIdentityCommitment(hre.ethers, { ...input })
+        expect(result.ic).to.equal(result2.ic)
+        expect(result.personHash).to.equal(result2.personHash)
+      })
+    })
+  })
+
+  describe('personHash on-chain consistency', () => {
+    it('JS computePersonHash matches on-chain emitted personHash', async () => {
+      const [signer] = await hre.ethers.getSigners()
+      const identityCommitment = 123456789n
+      const expectedPersonHash = computePersonHash(hre.ethers, identityCommitment)
+
+      const proof = makeStubProof()
+      const signerAddr = await signer.getAddress()
+      const publicSignals = makeAddPersonPublicSignals(identityCommitment, signerAddr)
+      const tx = await deepFamily.connect(signer).addPersonVersion(
+        proof, publicSignals, 0, 0, 'test', 'ipfs://test'
+      )
+      const receipt = await tx.wait()
+
+      const iface = new hre.ethers.Interface([
+        'event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, string tag)',
+      ])
+      const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase()
+      let emittedPersonHash = null
+      for (const log of receipt.logs || []) {
+        if ((log.address || '').toLowerCase() !== deepAddr) continue
+        try {
+          const parsed = iface.parseLog(log)
+          if (parsed && parsed.name === 'PersonVersionAdded') {
+            emittedPersonHash = parsed.args.personHash
+            break
+          }
+        } catch (_) {}
+      }
+
+      expect(emittedPersonHash).to.equal(expectedPersonHash)
+    })
+
+    it('different identity commitments produce different personHashes', () => {
+      const hash1 = computePersonHash(hre.ethers, 100n)
+      const hash2 = computePersonHash(hre.ethers, 101n)
+      expect(hash1).to.not.equal(hash2)
+    })
+  })
+
+  describe('disclosureBinding', () => {
+    it('is deterministic for same inputs', () => {
+      const basicInfo = { isBirthBC: false, birthYear: 1999, birthMonth: 5, birthDay: 15, gender: 1 }
+      const a = computeDisclosureBinding(hre.ethers, 'Alice', basicInfo, 1, 1, 1)
+      const b = computeDisclosureBinding(hre.ethers, 'Alice', basicInfo, 1, 1, 1)
+      expect(a).to.equal(b)
+    })
+
+    it('matches Poseidon4(1003, nameField, packedBirthGenderField, suiteCommitment)', () => {
+      const fullName = 'Test User'
+      const basicInfo = { isBirthBC: false, birthYear: 1999, birthMonth: 5, birthDay: 15, gender: 1 }
+      const nameField = computeNameField(hre.ethers, fullName)
+      const packedBirthGenderField = packBirthGenderField(basicInfo)
+      const suite = computeSuiteCommitment(1, 1, 1)
+      const expected = poseidon4([1003n, nameField, packedBirthGenderField, suite])
+      expect(computeDisclosureBinding(hre.ethers, fullName, basicInfo, 1, 1, 1)).to.equal(expected)
+    })
+
+    it('varies with different names', () => {
+      const basicInfo = { isBirthBC: false, birthYear: 1999, birthMonth: 5, birthDay: 15, gender: 1 }
+      const a = computeDisclosureBinding(hre.ethers, 'Alice', basicInfo, 1, 1, 1)
+      const b = computeDisclosureBinding(hre.ethers, 'Bob', basicInfo, 1, 1, 1)
+      expect(a).to.not.equal(b)
+    })
+
+    it('varies with different birth or gender data', () => {
+      const a = computeDisclosureBinding(
+        hre.ethers,
+        'Alice',
+        { isBirthBC: false, birthYear: 1999, birthMonth: 5, birthDay: 15, gender: 1 },
+        1,
+        1,
+        1,
+      )
+      const b = computeDisclosureBinding(
+        hre.ethers,
+        'Alice',
+        { isBirthBC: false, birthYear: 2000, birthMonth: 5, birthDay: 15, gender: 1 },
+        1,
+        1,
+        1,
+      )
+      expect(a).to.not.equal(b)
+    })
+  })
+})

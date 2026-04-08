@@ -4,6 +4,7 @@ node_modules/
 
 # Build outputs
 artifacts/
+zk-artifacts/
 cache/
 coverage/
 coverage.json

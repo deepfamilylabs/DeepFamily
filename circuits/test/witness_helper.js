@@ -5,9 +5,9 @@ const path = require("path");
 async function calculateWitnessIsolated(inputData) {
   try {
     const wasm = fs.readFileSync(
-      path.join(__dirname, "../../artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm"),
+      path.join(__dirname, "../../zk-artifacts/circuits/person_commitment_js/person_commitment.wasm"),
     );
-    const wc = require("../../artifacts/circuits/person_hash_zk_js/witness_calculator.js");
+    const wc = require("../../zk-artifacts/circuits/person_commitment_js/witness_calculator.js");
 
     const witnessCalculator = await wc(wasm);
     const witness = await witnessCalculator.calculateWitness(inputData, 0);

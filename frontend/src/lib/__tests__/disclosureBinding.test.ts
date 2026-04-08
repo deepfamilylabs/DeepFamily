@@ -1,26 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { deriveIdentitySecretV2, hexToBytes } from "../secretDerivation";
+import { deriveIdentitySecret, hexToBytes } from "../secretDerivation";
 import {
   bigintTo32ByteHex,
-  buildMintDisclosureInputsV2,
-  computeDisclosureBindingV2FromFullName,
-  createDisclosureBindingV2,
-} from "../disclosureBindingV2";
+  buildMintDisclosureInputs,
+  computeDisclosureBindingFromFullName,
+  createDisclosureBinding,
+} from "../disclosureBinding";
 
-describe("disclosureBindingV2", () => {
+describe("disclosureBinding", () => {
   it("creates stable disclosure binding for same inputs", () => {
-    const resultA = computeDisclosureBindingV2FromFullName({
+    const resultA = computeDisclosureBindingFromFullName({
       fullName: "  Alice\u3000Smith  ",
-      disclosureNonceHex: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
+      isBirthBC: false,
+      birthYear: 1990,
+      birthMonth: 5,
+      birthDay: 15,
+      gender: 1,
+      schemaVersion: 1,
+      cryptoSuiteVersion: 1,
       hashAlgoId: 1,
     });
-    const resultB = computeDisclosureBindingV2FromFullName({
+    const resultB = computeDisclosureBindingFromFullName({
       fullName: "Alice Smith",
-      disclosureNonceHex: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
+      isBirthBC: false,
+      birthYear: 1990,
+      birthMonth: 5,
+      birthDay: 15,
+      gender: 1,
+      schemaVersion: 1,
+      cryptoSuiteVersion: 1,
       hashAlgoId: 1,
     });
 
@@ -30,28 +38,33 @@ describe("disclosureBindingV2", () => {
     expect(resultA.disclosureBinding).toBe(resultB.disclosureBinding);
   });
 
-  it("creates disclosure binding with generated nonce", () => {
-    const result = createDisclosureBindingV2({
+  it("creates disclosure binding from name and basicInfo", () => {
+    const result = createDisclosureBinding({
       fullName: "Alice Smith",
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
+      isBirthBC: false,
+      birthYear: 1990,
+      birthMonth: 5,
+      birthDay: 15,
+      gender: 1,
+      schemaVersion: 1,
+      cryptoSuiteVersion: 1,
       hashAlgoId: 1,
     });
 
-    expect(result.disclosureNonceHex).toHaveLength(64);
+    expect(result.packedBirthGenderField.toString()).toBe("33386991362");
     expect(bigintTo32ByteHex(result.disclosureBinding).startsWith("0x")).toBe(true);
   });
 
   it("builds mint disclosure inputs aligned with identity commitment", async () => {
-    const derived = await deriveIdentitySecretV2({
+    const derived = await deriveIdentitySecret({
       passphrase: "strong passphrase",
       salt: hexToBytes("00112233445566778899aabbccddeeff"),
     });
 
-    const result = buildMintDisclosureInputsV2({
+    const result = buildMintDisclosureInputs({
       canonicalInput: {
-        schemaVersion: 2,
-        cryptoSuiteVersion: 2,
+        schemaVersion: 1,
+        cryptoSuiteVersion: 1,
         hashAlgoId: 1,
         fullName: "  Alice\u3000Smith  ",
         isBirthBC: false,
@@ -62,13 +75,9 @@ describe("disclosureBindingV2", () => {
         passphrase: "strong passphrase",
       },
       derivedSecretBundle: derived,
-      disclosureNonce: hexToBytes("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"),
     });
 
     expect(result.fullName).toBe("Alice Smith");
-    expect(result.disclosureNonceHex).toBe(
-      "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-    );
     expect(result.disclosureBindingHex.startsWith("0x")).toBe(true);
     expect(result.identityCommitmentHex.startsWith("0x")).toBe(true);
     expect(result.personHash.startsWith("0x")).toBe(true);

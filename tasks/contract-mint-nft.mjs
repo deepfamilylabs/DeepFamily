@@ -1,15 +1,12 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import { ethers } from "ethers";
-import namePoseidon from "../lib/namePoseidon.js";
-import namePoseidonProof from "../lib/namePoseidonProof.js";
+import personCommitmentProof from "../lib/personCommitmentProof.js";
+import disclosureBindingProof from "../lib/disclosureBindingProof.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
-const { buildBasicInfo } = namePoseidon;
-const { generateNamePoseidonProof } = namePoseidonProof;
-
-// mintPersonNFT(personHash, versionIndex, tokenURI, PersonCoreInfo { basicInfo, supplementInfo })
-// No ETH fee; must have endorsed the version first.
+const { computePersonHashFromInput } = personCommitmentProof;
+const { generateDisclosureBindingProof } = disclosureBindingProof;
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
@@ -54,22 +51,18 @@ const action = async (args, hre) => {
     );
   }
 
-  const basicInfo = buildBasicInfo({
+  const basicInfo = {
     fullName: args.fullname,
-    passphrase: args.passphrase,
+    derivedSecretField: 0n,
     isBirthBC: String(args.birthbc).toLowerCase() === "true",
     birthYear,
     birthMonth,
     birthDay,
     gender,
-  });
-
-  const { proof, publicSignals } = await generateNamePoseidonProof(args.fullname, args.passphrase, {
-    minter: signerAddr,
-  });
+  };
 
   // Recompute hash to sanity check user input matches person hash
-  const computedHash = await deepFamily.getPersonHash(basicInfo);
+  const computedHash = computePersonHashFromInput(basicInfo).personHash;
   if (computedHash.toLowerCase() !== args.person.toLowerCase()) {
     throw new Error(
       `Provided --person hash does not match computed hash (${computedHash}). Check fullname/birth data.`,
@@ -87,38 +80,33 @@ const action = async (args, hre) => {
     story: args.story,
   };
 
-  const coreInfo = { basicInfo, supplementInfo };
+  const result = await generateDisclosureBindingProof(basicInfo, signerAddr);
 
-  const tx = await deepFamily.mintPersonNFT(
-    proof.a,
-    proof.b,
-    proof.c,
-    publicSignals,
-    args.person,
+  const tx = await deepFamily.connect(signer).mintPersonVersionNFT(
+    result.proofEnvelope,
+    result.publicSignalsStruct,
     versionIndex,
     args.tokenuri,
-    coreInfo,
+    {
+      basicInfo: {
+        identityCommitment: ethers.zeroPadValue(ethers.toBeHex(result.person.identityCommitment), 32),
+        isBirthBC: basicInfo.isBirthBC,
+        birthYear: basicInfo.birthYear,
+        birthMonth: basicInfo.birthMonth,
+        birthDay: basicInfo.birthDay,
+        gender: basicInfo.gender,
+      },
+      supplementInfo: {
+        ...supplementInfo,
+        fullName: result.canonicalFullName,
+      },
+    },
   );
   const receipt = await tx.wait();
 
-  // Optionally parse PersonNFTMinted event
-  try {
-    const iface = new ethers.Interface([
-      "event PersonNFTMinted(bytes32 indexed personHash, uint256 indexed tokenId, address indexed owner, uint256 versionIndex, string tokenURI, uint256 timestamp)",
-    ]);
-    const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase();
-    for (const log of receipt.logs || []) {
-      if ((log.address || "").toLowerCase() !== deepAddr) continue;
-      try {
-        const parsed = iface.parseLog(log);
-        if (parsed && parsed.name === "PersonNFTMinted") {
-          break;
-        }
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  } catch (e) {}
+  console.log(`NFT minted for person ${args.person}`);
+  console.log(`Transaction: ${tx.hash}`);
+  console.log(`Block: ${receipt?.blockNumber ?? "n/a"}`);
 };
 
 export default task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")

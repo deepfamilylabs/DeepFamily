@@ -1,30 +1,22 @@
-import type { HashForm } from "../components/PersonHashCalculator";
 import type { EncryptedMetadataPayloadV2 } from "./metadataCrypto";
+import type { IdentityHashInput } from "./identityHash";
 import type {
-  DerivedSecretBundleV2,
+  DerivedSecretBundle,
   FileEncryptionKdfConfig,
   IdentityKdfConfig,
 } from "./secretDerivation";
 import type { DerivedKey, KeyPurpose, KDFPreset } from "./secureKeyDerivation";
 
 type CryptoWorkerCallMap = {
-  computeIdentityHash: { params: { input: HashForm }; result: { identityHash: string } };
+  computeIdentityHash: { params: { input: IdentityHashInput }; result: { identityHash: string } };
   passwordFingerprint: { params: { password: string }; result: { passwordFingerprint: string } };
-  encryptMetadataBundle: {
-    params: { plaintextJson: string; password: string; tag?: string };
-    result: { encryptedJson: string; cid: string; plainHash: string; passwordFingerprint: string };
-  };
-  decryptMetadataBundle: {
-    params: { payloadOrJson: string; password: string };
-    result: { plaintext: string; data: any; hash: string; payload: any };
-  };
   deriveKey: {
-    params: { input: HashForm; purpose?: KeyPurpose; preset?: KDFPreset };
+    params: { input: IdentityHashInput; purpose?: KeyPurpose; preset?: KDFPreset };
     result: DerivedKey;
   };
-  deriveIdentitySecretV2: {
+  deriveIdentitySecret: {
     params: { passphrase: string; saltHex?: string; config?: IdentityKdfConfig };
-    result: DerivedSecretBundleV2;
+    result: DerivedSecretBundle;
   };
   encryptMetadataBundleV2: {
     params: {

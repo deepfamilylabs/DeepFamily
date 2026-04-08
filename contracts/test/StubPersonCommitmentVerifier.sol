@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract StubPersonCommitmentVerifierV2 {
+contract StubPersonCommitmentVerifier {
   bool private immutable shouldVerify;
 
   constructor(bool _shouldVerify) {

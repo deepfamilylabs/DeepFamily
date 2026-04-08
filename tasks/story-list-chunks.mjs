@@ -19,7 +19,7 @@ const action = async (args, hre) => {
 
   await deepFamily.getStoryMetadata(tokenId);
 
-  await deepFamily.listStoryChunks(tokenId, offset, limit);
+  return deepFamily.listStoryChunks(tokenId, offset, limit);
 };
 
 export default task("list-story-chunks", "List story chunks for an NFT with pagination")

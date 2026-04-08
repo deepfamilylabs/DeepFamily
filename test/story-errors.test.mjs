@@ -1,13 +1,11 @@
 import '../hardhat-test-setup.mjs'
 import { expect } from 'chai'
 import hre from 'hardhat'
-import namePoseidon from '../lib/namePoseidon.js'
 import { deployIntegratedFixture } from './fixtures/integrated.mjs'
-
-const { buildBasicInfo } = namePoseidon
-
-// Additional negative & edge-case tests for story sharding (add/seal)
-// Covers: non-owner, index mismatch, oversize, hash mismatch, seal rules, zero-chunk seal
+import {
+  setupStubVerifiers,
+  mintPerson,
+} from './helpers/testHelper.mjs'
 
 describe('Story Sharding - Error & Edge Cases', function () {
   this.timeout(90_000);
@@ -15,39 +13,14 @@ describe('Story Sharding - Error & Edge Cases', function () {
   async function deployAndMint() {
     const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer, other] = await hre.ethers.getSigners();
-    const deepFamilyWithSigner = deepFamily.connect(signer)
+    await setupStubVerifiers(hre.ethers, deepFamily)
 
-    const FULLNAME = 'Edge Person';
-    const BIRTH_YEAR = '1970';
-    const GENDER = '1';
+    await mintPerson(hre.ethers, deepFamily, signer, null, 'Edge Person', {
+      birthYear: 1970,
+      gender: 1,
+    })
 
-    await hre.run('add-person', {
-      fullname: FULLNAME,
-      birthyear: BIRTH_YEAR,
-      gender: GENDER,
-      tag: 'edge',
-      ipfs: 'QmEdgeMeta'
-    });
-    const basicInfo = buildBasicInfo({
-      fullName: FULLNAME,
-      birthYear: parseInt(BIRTH_YEAR, 10),
-      birthMonth: 0,
-      birthDay: 0,
-      gender: parseInt(GENDER, 10),
-    });
-    const personHash = await deepFamilyWithSigner.getPersonHash(basicInfo);
-    await hre.run('endorse', { person: personHash, vindex: '1' });
-    await hre.run('mint-nft', {
-      person: personHash,
-      vindex: '1',
-      tokenuri: 'ipfs://edgeNFT',
-      fullname: FULLNAME,
-      birthyear: BIRTH_YEAR,
-      gender: GENDER,
-      birthplace: 'City',
-      story: 'Edge summary'
-    });
-    return { deepFamily: deepFamilyWithSigner, signer, other, tokenId: 1n, personHash };
+    return { deepFamily: deepFamily.connect(signer), signer, other, tokenId: 1n };
   }
 
   it('reverts when non-owner adds chunk', async () => {
@@ -69,7 +42,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
 
   it('reverts on oversize content', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    const longStr = 'a'.repeat(2049); // > 2048
+    const longStr = 'a'.repeat(2049);
     await expect(
       deepFamily.addStoryChunk(tokenId, 0, 0, longStr, '', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidChunkContent');
@@ -106,7 +79,6 @@ describe('Story Sharding - Error & Edge Cases', function () {
     const c1 = 'Chunk One';
     await deepFamily.addStoryChunk(tokenId, 0, 0, c0, '', hre.ethers.ZeroHash);
     await deepFamily.addStoryChunk(tokenId, 1, 0, c1, '', hre.ethers.ZeroHash);
-    // Compute expected combined hash
     const h0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c0));
     const h1 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c1));
     let expected = hre.ethers.ZeroHash;
@@ -119,7 +91,6 @@ describe('Story Sharding - Error & Edge Cases', function () {
     let meta = await deepFamily.storyMetadata(tokenId);
     expect(meta.fullStoryHash).to.equal(expected);
 
-    // Append chunk 2 and confirm hash expands deterministically
     const c2 = 'Chunk Two';
     await deepFamily.addStoryChunk(tokenId, 2, 0, c2, '', hre.ethers.ZeroHash);
     const h2 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c2));

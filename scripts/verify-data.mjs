@@ -98,12 +98,12 @@ if (byGen[maxGen] && byGen[maxGen].length > 0) {
     "\n【Generation " + maxGen + " Member Details】(Total: " + byGen[maxGen].length + " persons)",
   );
   byGen[maxGen].forEach((m, i) => {
-    const nftStatus = m.mintNFT !== false ? "✓ Mint" : "⊘ Skip";
+    const nftStatus = m.mintNFT !== false ? "Mint" : "Skip";
     const num = String(i + 1).padStart(2, " ");
     console.log("  " + num + ". " + m.fullName.padEnd(40) + nftStatus);
   });
 }
 
 console.log("\n" + "=".repeat(70));
-console.log("✅ Data validation complete!");
+console.log("Data validation complete!");
 console.log("=".repeat(70));

@@ -37,7 +37,7 @@ const { ethers } = connection;
 const {
   addPersonVersion,
   endorseVersion,
-  mintPersonNFT,
+  mintPersonVersionNFT,
   computePersonHash,
   getPersonProgress,
   normalizePersonData,
@@ -287,7 +287,7 @@ function calculateGenerations(members) {
     if (calculatedGen !== undefined) {
       m.generation = calculatedGen;
     } else {
-      console.warn(`⚠ Could not calculate generation for: ${m.fullName}`);
+      console.warn(`Could not calculate generation for: ${m.fullName}`);
       // Keep original generation or set to 1 if not set
       if (m.generation === undefined) {
         m.generation = 1;
@@ -301,7 +301,7 @@ function calculateGenerations(members) {
     genStats[m.generation] = (genStats[m.generation] || 0) + 1;
   });
 
-  console.log("✓ Generation calculation complete:");
+  console.log("Generation calculation complete:");
   Object.keys(genStats)
     .sort((a, b) => a - b)
     .forEach((gen) => {
@@ -333,7 +333,7 @@ function loadHistoricalData(filename) {
     // Validate data structure
     validateFamilyData(data);
 
-    console.log(`✓ Loaded data: ${data.familyName}`);
+    console.log(`Loaded data: ${data.familyName}`);
     console.log(`  Description: ${data.description}`);
     console.log(`  Members: ${data.members.length}\n`);
 
@@ -374,7 +374,7 @@ function validateFamilyData(data) {
     }
   });
 
-  console.log("✓ Data validation passed");
+  console.log("Data validation passed");
 }
 
 // ========== Story Data Processing ==========
@@ -462,7 +462,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       rootHashes.push({ name: rootInfo.fullName, hash: rootHash });
     } catch (error) {
       console.warn(
-        `⚠ Failed to compute root hash for ${rootInfo.fullName}: ${error?.message || "unknown error"}`,
+        `Warning: Failed to compute root hash for ${rootInfo.fullName}: ${error?.message || "unknown error"}`,
       );
     }
   }
@@ -472,13 +472,13 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
   const deepFamilyAddr = deepFamily.target || deepFamily.address;
   const allowance = await token.allowance(signer.address, deepFamilyAddr);
   if (allowance === 0n) {
-    console.log("  ▶ No allowance found, sending approve transaction...");
+    console.log("  >No allowance found, sending approve transaction...");
     const approveTx = await token.approve(deepFamilyAddr, ethers.MaxUint256);
     console.log(`  ⧗ Approve tx sent: ${approveTx.hash}`);
     await approveTx.wait();
-    console.log("✓ Token approved\n");
+    console.log("Token approved\n");
   } else {
-    console.log(`✓ Token already approved (allowance: ${allowance.toString()})\n`);
+    console.log(`Token already approved (allowance: ${allowance.toString()})\n`);
   }
 
   // Step 2: Add historical persons
@@ -502,20 +502,20 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     const personDataWithPassphrase = createPersonDataWithPassphrase(personInfo, familyData);
 
     // Compute personHash
-    console.log("  ▶ Computing personHash locally...");
+    console.log("  >Computing personHash locally...");
     const personHash = await computePersonHash({
       deepFamily,
       personData: personDataWithPassphrase,
     });
-    console.log(`  ✓ personHash computed: ${personHash}`);
+    console.log(`  [ok]personHash computed: ${personHash}`);
 
     // Check on-chain progress for resume support
-    console.log(`  ▶ Checking on-chain existence for hash ${personHash}...`);
+    console.log(`  >Checking on-chain existence for hash ${personHash}...`);
     const progress = await getPersonProgress({ deepFamily, personHash });
 
     if (progress.exists) {
       console.log(
-        `  ○ Already exists on-chain (versions: ${progress.totalVersions}, tokenId: ${progress.tokenId || 0}) — skip addPersonZK`,
+        `  -Already exists on-chain (versions: ${progress.totalVersions}, tokenId: ${progress.tokenId || 0}) — skip addPersonVersion`,
       );
       console.log(
         `  ➜ Existence result: exists=true, version=${progress.versionIndex || 1}, tokenId=${progress.tokenId || 0}`,
@@ -535,7 +535,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       existingPersons++;
       continue;
     }
-    console.log("  ○ Not found on-chain, will add new version");
+    console.log("  -Not found on-chain, will add new version");
     console.log("  ➜ Existence result: exists=false, version will be 1, tokenId=0");
 
     // Find parent data
@@ -584,19 +584,19 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       motherHash,
     });
     const metadataJson = JSON.stringify(metadataPayload);
-    console.log(`  🧾 Metadata JSON size: ${Buffer.byteLength(metadataJson, "utf8")} bytes`);
-    console.log("  📝 Metadata JSON:", metadataJson);
+    console.log(`  Metadata JSON size: ${Buffer.byteLength(metadataJson, "utf8")} bytes`);
+    console.log("  Metadata JSON:", metadataJson);
     const metadataCID =
       personInfo.metadataCID && personInfo.metadataCID.length > 0
         ? personInfo.metadataCID
         : await generateMetadataCID(metadataJson);
     console.log(
-      `  ✓ Metadata prepared — CID: ${metadataCID}${personInfo.metadataCID ? " (from JSON)" : ""}`,
+      `  [ok]Metadata prepared — CID: ${metadataCID}${personInfo.metadataCID ? " (from JSON)" : ""}`,
     );
 
     // Add person (using ZK proof)
-    console.log("  ▶ Generating ZK proof...");
-    console.log("  ▶ Starting addPersonZK (proof + transaction)...");
+    console.log("  >Generating ZK proof...");
+    console.log("  >Starting addPersonVersion (proof + transaction)...");
     const addStart = Date.now();
     const addResult = await addPersonVersion({
       deepFamily,
@@ -615,11 +615,11 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     const txHash = addResult?.tx?.hash || addResult?.receipt?.hash;
     const txBlock = addResult?.receipt?.blockNumber;
     if (proofMs !== null) {
-      console.log(`  ✓ ZK proof generated in ${proofMs}ms`);
+      console.log(`  [ok]ZK proof generated in ${proofMs}ms`);
     }
-    console.log("  ▶ addPersonZK transaction submitted, waiting for confirmation...");
+    console.log("  >addPersonVersion transaction submitted, waiting for confirmation...");
     console.log(
-      `  ✓ addPersonZK confirmed (tx: ${txHash || "unknown"}) — proof ${
+      `  [ok]addPersonVersion confirmed (tx: ${txHash || "unknown"}) — proof ${
         proofMs !== null ? `${proofMs}ms` : "n/a"
       }, tx wait ${txMs !== null ? `${txMs}ms` : `${addElapsed}ms total`}${
         txBlock ? `, block ${txBlock}` : ""
@@ -645,11 +645,11 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     if (rewardAmount !== null) {
       const formattedReward = ethers.formatUnits(rewardAmount, 18);
       console.log(
-        `  ✓ Token reward received: ${formattedReward} DEEP (${rewardAmount.toString()} wei)`,
+        `  [ok]Token reward received: ${formattedReward} DEEP (${rewardAmount.toString()} wei)`,
       );
     } else {
       console.log(
-        "  ○ No TokenRewardDistributed event found (reward may be zero or parents missing)",
+        "  -No TokenRewardDistributed event found (reward may be zero or parents missing)",
       );
     }
 
@@ -667,12 +667,12 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     addedPersons.push(savedPerson);
     newlyAddedPersons++;
 
-    console.log(`✓ Added ${personInfo.fullName}`);
+    console.log(`Added ${personInfo.fullName}`);
     console.log(`  Hash: ${personHash}`);
     console.log(`  Version: 1`);
   }
 
-  console.log(`\n✓ Family tree complete: ${addedPersons.length} persons added\n`);
+  console.log(`\nFamily tree complete: ${addedPersons.length} persons added\n`);
   console.log(
     `Step 2 summary — new versions added: ${newlyAddedPersons}, skipped existing: ${existingPersons}`,
   );
@@ -712,11 +712,11 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     );
 
     if (tokenId > 0) {
-      console.log(`  ○ NFT already minted, tokenId: ${tokenId}`);
+      console.log(`  -NFT already minted, tokenId: ${tokenId}`);
     } else {
       try {
         // Endorse (skip if already endorsed)
-        console.log("  ▶ Endorsing version...");
+        console.log("  >Endorsing version...");
         let alreadyEndorsed = false;
         let endorsementFee = null;
         try {
@@ -735,20 +735,20 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
           const feeStr =
             endorsementFee !== null ? `, fee: ${ethers.formatUnits(endorsementFee, 18)} DEEP` : "";
           console.log(
-            `  ✓ Endorsed (tx: ${endorseTxHash || "unknown"}, ${endorseElapsed}ms${feeStr})`,
+            `  [ok]Endorsed (tx: ${endorseTxHash || "unknown"}, ${endorseElapsed}ms${feeStr})`,
           );
         } catch (endorseErr) {
           const reason = decodeEthersError(endorseErr, deepFamily);
           if (reason === "AlreadyEndorsed") {
             alreadyEndorsed = true;
-            console.log("  ○ Already endorsed by this signer, skip endorsement step");
+            console.log("  -Already endorsed by this signer, skip endorsement step");
           } else {
             const txHash =
               endorseErr?.transactionHash ||
               endorseErr?.receipt?.transactionHash ||
               endorseErr?.tx?.hash;
             const revertData = extractRevertData(endorseErr);
-            console.error(`  ❌ Endorsement failed for ${person.fullName} (hash: ${person.hash})`);
+            console.error(`  Endorsement failed for ${person.fullName} (hash: ${person.hash})`);
             console.error(`     Reason: ${reason}`);
             if (txHash) console.error(`     Tx: ${txHash}`);
             if (revertData) console.error(`     Revert data: ${revertData}`);
@@ -758,11 +758,11 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         }
 
         // Mint NFT
-        console.log("  ▶ Minting NFT (generate proof + submit tx)...");
+        console.log("  >Minting NFT (generate proof + submit tx)...");
         const mintStart = Date.now();
         const supplementInfo = createSupplementInfo(person);
 
-        const mintResult = await mintPersonNFT({
+        const mintResult = await mintPersonVersionNFT({
           deepFamily,
           signer,
           personHash: person.hash,
@@ -776,14 +776,14 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         const mintElapsed = Date.now() - mintStart;
         const mintTxHash = mintResult?.tx?.hash || mintResult?.receipt?.hash;
         console.log(
-          `  ✓ NFT minted, tokenId: ${tokenId}, tx: ${mintTxHash || "unknown"} (${mintElapsed}ms)`,
+          `  [ok]NFT minted, tokenId: ${tokenId}, tx: ${mintTxHash || "unknown"} (${mintElapsed}ms)`,
         );
         nftCount++;
       } catch (error) {
         const reason = decodeEthersError(error, deepFamily);
         const txHash = error?.transactionHash || error?.receipt?.transactionHash || error?.tx?.hash;
         const revertData = extractRevertData(error);
-        console.error(`  ❌ Mint failed for ${person.fullName} (hash: ${person.hash})`);
+        console.error(`  Mint failed for ${person.fullName} (hash: ${person.hash})`);
         console.error(`     Reason: ${reason}`);
         if (txHash) {
           console.error(`     Tx: ${txHash}`);
@@ -877,7 +877,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     }
 
     const targetChunkCount = availableChunks.length;
-    console.log(`  ▶ Story data prepared from JSON: ${targetChunkCount} chunk(s)`);
+    console.log(`  >Story data prepared from JSON: ${targetChunkCount} chunk(s)`);
     expectedChunks += targetChunkCount;
 
     if (!storyMetadata) {
@@ -918,7 +918,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
     if (existingChunks > availableChunks.length) {
       console.log(
-        `  ⚠ On-chain chunks (${existingChunks}) exceed JSON chunks (${availableChunks.length}), skip writing`,
+        `  Warning: On-chain chunks (${existingChunks}) exceed JSON chunks (${availableChunks.length}), skip writing`,
       );
       onChainChunks += existingChunks;
       continue;
@@ -927,7 +927,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     const pendingChunks = availableChunks.slice(existingChunks);
     if (pendingChunks.length === 0) {
       console.log(
-        `  ○ Story already complete on-chain (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`,
+        `  -Story already complete on-chain (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`,
       );
       onChainChunks += existingChunks;
       continue;
@@ -945,7 +945,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       const chunkIndex = existingChunks + i;
 
       console.log(
-        `    ▶ Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex})...`,
+        `    >Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex})...`,
       );
       const chunkStart = Date.now();
       const chunkTx = await deepFamily.addStoryChunk(
@@ -980,13 +980,13 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
           } catch (_) {}
         }
       } catch (_) {}
-      console.log(`    ✓ Chunk ${chunkIndex} added (${chunkElapsed}ms) — hash: ${emittedHash}`);
+      console.log(`    [ok]Chunk ${chunkIndex} added (${chunkElapsed}ms) — hash: ${emittedHash}`);
       totalChunks++;
     }
 
     onChainChunks += existingChunks + pendingChunks.length;
     console.log(
-      `  ✓ Added ${pendingChunks.length} story chunk(s) (JSON target: ${targetChunkCount}, on-chain now: ${existingChunks + pendingChunks.length})`,
+      `  [ok]Added ${pendingChunks.length} story chunk(s) (JSON target: ${targetChunkCount}, on-chain now: ${existingChunks + pendingChunks.length})`,
     );
   }
 
@@ -1057,7 +1057,7 @@ async function main() {
   console.log("=".repeat(70));
 
   // Single mode: explicit file list (comma-separated)
-  console.log("\n📄 File List Mode");
+  console.log("\nFile List Mode");
   console.log("=".repeat(70));
   console.log(`Data files: ${DATA_FILES.join(", ")}\n`);
 
@@ -1065,14 +1065,14 @@ async function main() {
   for (const file of DATA_FILES) {
     try {
       console.log(`\n${"━".repeat(70)}`);
-      console.log(`📂 Starting: ${file}`);
+      console.log(`Starting: ${file}`);
       console.log("━".repeat(70));
 
       const result = await seedSingleLanguage(file, deepFamilyWithSigner, tokenWithSigner, signer);
       results.push({ file, success: true, ...result });
-      console.log(`✓ ${file} completed successfully`);
+      console.log(`${file} completed successfully`);
     } catch (error) {
-      console.error(`\n❌ Failed to seed ${file}:`);
+      console.error(`\nFailed to seed ${file}:`);
       console.error(error.message);
       results.push({ file, success: false, error: error.message });
     }
@@ -1080,7 +1080,7 @@ async function main() {
 
   // Print summary
   console.log("\n" + "=".repeat(70));
-  console.log("📊 FILE LIST SUMMARY");
+  console.log("FILE LIST SUMMARY");
   console.log("=".repeat(70));
 
   let totalPersons = 0;
@@ -1089,7 +1089,7 @@ async function main() {
   let successCount = 0;
 
   for (const result of results) {
-    const status = result.success ? "✓" : "✗";
+    const status = result.success ? "ok" : "FAIL";
     console.log(`\n[${status}] ${result.file}`);
 
     if (result.success) {
@@ -1137,7 +1137,7 @@ async function main() {
     }
   }
 
-  console.log("\n✨ Seeding process complete!\n");
+  console.log("\nSeeding process complete!\n");
 }
 
 // Execute

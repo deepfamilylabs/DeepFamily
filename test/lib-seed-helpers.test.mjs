@@ -3,33 +3,37 @@ import { expect } from 'chai'
 import hre from 'hardhat'
 import seedHelpers from '../lib/seedHelpers.js'
 import { deployIntegratedFixture } from './fixtures/integrated.mjs'
+import { setupStubVerifiers } from './helpers/testHelper.mjs'
 
 const { ethers } = hre
-const { addPersonVersion, endorseVersion, mintPersonNFT, computePersonHash, checkPersonExists } = seedHelpers
+const {
+  addPersonVersion,
+  endorseVersion,
+  mintPersonVersionNFT,
+  computePersonHash,
+  checkPersonExists,
+} = seedHelpers
 
 describe("SeedHelpers Library Tests", function () {
   this.timeout(120_000);
 
-  let deepFamily, token, signer, signerAddr;
-
-  before(async function () {
-    // Deploy contracts
+  async function setupSeedFixture() {
     const { deepFamily: deployedDeepFamily, token: deployedToken } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture)
 
-    ;[signer] = await ethers.getSigners();
-    signerAddr = await signer.getAddress();
+    const [signer] = await ethers.getSigners();
+    const signerAddr = await signer.getAddress();
 
-    deepFamily = deployedDeepFamily.connect(signer)
-    token = deployedToken.connect(signer)
+    const deepFamily = deployedDeepFamily.connect(signer)
+    const token = deployedToken.connect(signer)
 
-    console.log(`  DeepFamily: ${await deepFamily.getAddress()}`);
-    console.log(`  DeepFamilyToken: ${await token.getAddress()}`);
-    console.log(`  Signer: ${signerAddr}\n`);
-  });
+    await setupStubVerifiers(hre.ethers, deployedDeepFamily)
+
+    return { deepFamily, token, signer, signerAddr };
+  }
 
   describe("computePersonHash", function () {
-    it("should correctly compute person hash", async function () {
+    it("should correctly compute person hash", function () {
       const personData = {
         fullName: "TestPerson",
         passphrase: "",
@@ -40,16 +44,16 @@ describe("SeedHelpers Library Tests", function () {
         gender: 1,
       };
 
-      const hash = await computePersonHash({ deepFamily, personData });
+      const hash = computePersonHash({ personData });
 
       expect(hash).to.be.a("string");
       expect(hash).to.match(/^0x[0-9a-f]{64}$/);
     });
 
-    it("should produce same hash for same information", async function () {
+    it("should produce same hash for same information", function () {
       const personData = {
         fullName: "SamePerson",
-        passphrase: "secret",
+        passphrase: "",
         isBirthBC: false,
         birthYear: 1995,
         birthMonth: 6,
@@ -57,16 +61,16 @@ describe("SeedHelpers Library Tests", function () {
         gender: 2,
       };
 
-      const hash1 = await computePersonHash({ deepFamily, personData });
-      const hash2 = await computePersonHash({ deepFamily, personData });
+      const hash1 = computePersonHash({ personData });
+      const hash2 = computePersonHash({ personData });
 
       expect(hash1).to.equal(hash2);
     });
 
-    it("should produce different hash for different passphrase", async function () {
+    it("should produce different hash for different names", function () {
       const personData1 = {
-        fullName: "PassphrasePerson",
-        passphrase: "secret1",
+        fullName: "PersonAlpha",
+        passphrase: "",
         isBirthBC: false,
         birthYear: 2000,
         birthMonth: 1,
@@ -74,10 +78,10 @@ describe("SeedHelpers Library Tests", function () {
         gender: 1,
       };
 
-      const personData2 = { ...personData1, passphrase: "secret2" };
+      const personData2 = { ...personData1, fullName: "PersonBeta" };
 
-      const hash1 = await computePersonHash({ deepFamily, personData: personData1 });
-      const hash2 = await computePersonHash({ deepFamily, personData: personData2 });
+      const hash1 = computePersonHash({ personData: personData1 });
+      const hash2 = computePersonHash({ personData: personData2 });
 
       expect(hash1).to.not.equal(hash2);
     });
@@ -85,6 +89,7 @@ describe("SeedHelpers Library Tests", function () {
 
   describe("checkPersonExists", function () {
     it("should return exists=false for non-existent person", async function () {
+      const { deepFamily } = await setupSeedFixture()
       const personData = {
         fullName: `NonExistent_${Date.now()}`,
         passphrase: "",
@@ -95,7 +100,7 @@ describe("SeedHelpers Library Tests", function () {
         gender: 1,
       };
 
-      const hash = await computePersonHash({ deepFamily, personData });
+      const hash = computePersonHash({ personData });
       const result = await checkPersonExists({ deepFamily, personHash: hash });
 
       expect(result.exists).to.be.false;
@@ -105,6 +110,7 @@ describe("SeedHelpers Library Tests", function () {
 
   describe("addPersonVersion", function () {
     it("should successfully add a new person", async function () {
+      const { deepFamily, signer } = await setupSeedFixture()
       const personData = {
         fullName: `NewPerson_${Date.now()}`,
         passphrase: "",
@@ -128,7 +134,6 @@ describe("SeedHelpers Library Tests", function () {
       expect(result.tx).to.exist;
       expect(result.receipt).to.exist;
 
-      // Verify person has been added
       const checkResult = await checkPersonExists({
         deepFamily,
         personHash: result.personHash,
@@ -138,7 +143,7 @@ describe("SeedHelpers Library Tests", function () {
     });
 
     it("should successfully add person with parent info", async function () {
-      // First add father
+      const { deepFamily, signer } = await setupSeedFixture()
       const fatherData = {
         fullName: `Father_${Date.now()}`,
         passphrase: "",
@@ -157,7 +162,6 @@ describe("SeedHelpers Library Tests", function () {
         ipfs: "QmFather",
       });
 
-      // Add child
       const childData = {
         fullName: `Child_${Date.now()}`,
         passphrase: "",
@@ -181,12 +185,8 @@ describe("SeedHelpers Library Tests", function () {
       expect(childResult.personHash).to.be.a("string");
       expect(childResult.personHash).to.match(/^0x[0-9a-f]{64}$/);
 
-      // Verify relationship
       const versionDetails = await deepFamily.getVersionDetails(childResult.personHash, 1);
-      // getVersionDetails returns (PersonVersion version, uint256 endorsementCount, uint256 tokenId)
-      // Access the first return value (version) using index [0] or named property .version
       const version = versionDetails[0];
-      // Convert both hashes to lowercase for comparison (avoid case sensitivity issues)
       expect(version.fatherHash.toLowerCase()).to.equal(
         fatherResult.personHash.toLowerCase()
       );
@@ -194,12 +194,10 @@ describe("SeedHelpers Library Tests", function () {
     });
   });
 
-  describe("endorseVersion and mintPersonNFT", function () {
-    let testPersonHash, testPersonData;
-
-    before(async function () {
-      // Create a test person
-      testPersonData = {
+  describe("endorseVersion and mintPersonVersionNFT", function () {
+    async function createEndorsedPersonFixture() {
+      const { deepFamily, token, signer, signerAddr } = await setupSeedFixture()
+      const testPersonData = {
         fullName: `MintTestPerson_${Date.now()}`,
         passphrase: "",
         isBirthBC: false,
@@ -217,11 +215,18 @@ describe("SeedHelpers Library Tests", function () {
         ipfs: "QmMintTest",
       });
 
-      testPersonHash = result.personHash;
-      console.log(`    Test person created: ${testPersonHash}`);
-    });
+      return {
+        deepFamily,
+        token,
+        signer,
+        signerAddr,
+        testPersonData,
+        testPersonHash: result.personHash,
+      }
+    }
 
     it("should successfully endorse a version", async function () {
+      const { deepFamily, token, signer, signerAddr, testPersonHash } = await createEndorsedPersonFixture()
       const result = await endorseVersion({
         deepFamily,
         token,
@@ -235,12 +240,22 @@ describe("SeedHelpers Library Tests", function () {
       expect(result.receipt).to.exist;
       expect(result.fee).to.be.a("bigint");
 
-      // Verify endorsement status
       const endorsedIndex = await deepFamily.endorsedVersionIndex(testPersonHash, signerAddr);
       expect(Number(endorsedIndex)).to.equal(1);
     });
 
     it("should successfully mint NFT", async function () {
+      const { deepFamily, token, signer, signerAddr, testPersonHash, testPersonData } =
+        await createEndorsedPersonFixture()
+      await endorseVersion({
+        deepFamily,
+        token,
+        signer,
+        personHash: testPersonHash,
+        versionIndex: 1,
+        autoApprove: true,
+      })
+
       const supplementInfo = {
         birthPlace: "US-CA-San Francisco",
         isDeathBC: false,
@@ -251,7 +266,7 @@ describe("SeedHelpers Library Tests", function () {
         story: "Life story of test person",
       };
 
-      const result = await mintPersonNFT({
+      const result = await mintPersonVersionNFT({
         deepFamily,
         signer,
         personHash: testPersonHash,
@@ -265,7 +280,6 @@ describe("SeedHelpers Library Tests", function () {
       expect(result.receipt).to.exist;
       expect(result.tokenId).to.exist;
 
-      // Verify NFT ownership
       const owner = await deepFamily.ownerOf(result.tokenId);
       expect(owner).to.equal(signerAddr);
 
@@ -273,7 +287,7 @@ describe("SeedHelpers Library Tests", function () {
     });
 
     it("should not be able to mint NFT for non-endorsed version", async function () {
-      // Create another person but don't endorse
+      const { deepFamily, signer } = await setupSeedFixture()
       const newPersonData = {
         fullName: `NoEndorse_${Date.now()}`,
         passphrase: "",
@@ -302,9 +316,8 @@ describe("SeedHelpers Library Tests", function () {
         story: "",
       };
 
-      // Attempt to mint should fail
       await expect(
-        mintPersonNFT({
+        mintPersonVersionNFT({
           deepFamily,
           signer,
           personHash: addResult.personHash,
@@ -319,10 +332,10 @@ describe("SeedHelpers Library Tests", function () {
 
   describe("complete workflow", function () {
     it("should complete full workflow from adding to minting", async function () {
-      // 1. Create person
+      const { deepFamily, token, signer } = await setupSeedFixture()
       const personData = {
         fullName: `FullWorkflow_${Date.now()}`,
-        passphrase: "workflow-secret",
+        passphrase: "",
         isBirthBC: false,
         birthYear: 1992,
         birthMonth: 11,
@@ -341,7 +354,6 @@ describe("SeedHelpers Library Tests", function () {
 
       expect(addResult.personHash).to.exist;
 
-      // 2. Verify person exists
       console.log(`    2. Verifying person exists...`);
       const existsResult = await checkPersonExists({
         deepFamily,
@@ -352,7 +364,6 @@ describe("SeedHelpers Library Tests", function () {
       expect(existsResult.exists).to.be.true;
       expect(existsResult.totalVersions).to.equal(1);
 
-      // 3. Endorse
       console.log(`    3. Endorsing version...`);
       const endorseResult = await endorseVersion({
         deepFamily,
@@ -365,7 +376,6 @@ describe("SeedHelpers Library Tests", function () {
 
       expect(endorseResult.tx).to.exist;
 
-      // 4. Mint NFT
       console.log(`    4. Minting NFT...`);
       const supplementInfo = {
         birthPlace: "Workflow City",
@@ -377,7 +387,7 @@ describe("SeedHelpers Library Tests", function () {
         story: "Life story of complete workflow test",
       };
 
-      const mintResult = await mintPersonNFT({
+      const mintResult = await mintPersonVersionNFT({
         deepFamily,
         signer,
         personHash: addResult.personHash,

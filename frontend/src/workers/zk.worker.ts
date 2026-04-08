@@ -1,13 +1,13 @@
 import type { Groth16Proof, PersonData } from "../lib/zk";
 import {
-  generatePersonProof,
-  verifyProof,
-  generateNamePoseidonProof,
-  verifyNamePoseidonProof,
+  generatePersonCommitmentProof,
+  verifyPersonCommitmentProof,
+  generateDisclosureBindingProof,
+  verifyDisclosureBindingProof,
 } from "../lib/zkSnark";
 
 type ZkWorkerMethods = {
-  generatePersonProof: {
+  generatePersonCommitmentProof: {
     params: {
       person: PersonData;
       father: PersonData | null;
@@ -16,15 +16,18 @@ type ZkWorkerMethods = {
     };
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
-  verifyPersonProof: {
+  verifyPersonCommitmentProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-  generateNamePoseidonProof: {
-    params: { fullName: string; passphrase: string; minterAddress: string };
+  generateDisclosureBindingProof: {
+    params: {
+      person: PersonData;
+      minterAddress: string;
+    };
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
-  verifyNamePoseidonProof: {
+  verifyDisclosureBindingProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
@@ -52,17 +55,17 @@ const handlers: {
     params: ZkWorkerMethods[K]["params"],
   ) => Promise<ZkWorkerMethods[K]["result"]> | ZkWorkerMethods[K]["result"];
 } = {
-  generatePersonProof: async ({ person, father, mother, submitterAddress }) => {
-    return await generatePersonProof(person, father, mother, submitterAddress);
+  generatePersonCommitmentProof: async ({ person, father, mother, submitterAddress }) => {
+    return await generatePersonCommitmentProof(person, father, mother, submitterAddress);
   },
-  verifyPersonProof: async ({ proof, publicSignals }) => {
-    return { ok: await verifyProof(proof, publicSignals) };
+  verifyPersonCommitmentProof: async ({ proof, publicSignals }) => {
+    return { ok: await verifyPersonCommitmentProof(proof, publicSignals) };
   },
-  generateNamePoseidonProof: async ({ fullName, passphrase, minterAddress }) => {
-    return await generateNamePoseidonProof(fullName, passphrase, minterAddress);
+  generateDisclosureBindingProof: async ({ person, minterAddress }) => {
+    return await generateDisclosureBindingProof(person, minterAddress);
   },
-  verifyNamePoseidonProof: async ({ proof, publicSignals }) => {
-    return { ok: await verifyNamePoseidonProof(proof, publicSignals) };
+  verifyDisclosureBindingProof: async ({ proof, publicSignals }) => {
+    return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
   },
 };
 

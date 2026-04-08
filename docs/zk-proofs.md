@@ -2,202 +2,262 @@
 
 ## Overview
 
-DeepFamily implements a privacy-preserving family tree system using two distinct ZK proof circuits based on Groth16. The system enables:
+DeepFamily currently uses two Groth16 circuits:
 
-- **Privacy-Protected Data Submission**: Users can add family tree data via `addPersonZK()` without revealing personal information
-- **Salted Passphrase Unlinkability**: Prevents identity inference and pollution attacks through user-controlled passphrases
-- **Dual Tree Architecture**: Supports both public collaborative trees and private protected trees
-- **Name-Binding Verification**: NFT minting requires proving ownership of full name via `mintPersonNFT()`
+1. `circuits/person_commitment.circom`
+   - Proves the identity commitment for a person and optional parents
+   - Used by `DeepFamily.addPersonVersion()`
 
-## Architecture
+2. `circuits/disclosure_binding.circom`
+   - Proves that an NFT mint request discloses the same canonical full name and birth fields that were used to build an existing identity commitment
+   - Used by `DeepFamily.mintPersonVersionNFT()`
 
-### Two ZK Verification Systems
+## Current Hash Architecture
 
-DeepFamily employs two independent verifier contracts for different purposes:
+The active design is field-native and versioned. The circuits no longer consume raw `keccak(fullName)` limbs or expose 128-bit limb pairs as public signals. Instead, they operate on a small set of field elements plus explicit metadata version fields.
 
-1. **PersonHashVerifier** (circuits/person_hash_zk.circom)
-   - Validates person identity and family relationships
-   - Used by `addPersonZK()` function
-   - 7 public signals: person/father/mother hashes (6 limbs) + submitter address
+### Canonical Full Name
 
-2. **NamePoseidonVerifier** (circuits/name_poseidon_zk.circom)
-   - Proves knowledge of full name and salt for Poseidon commitment
-   - Used by `mintPersonNFT()` function
-   - 4 public signals: Poseidon digest (2 limbs) + keccak(fullName) hash (2 limbs)
+The frontend canonicalizes names before proof generation:
 
-### Salted Passphrase Unlinkability System
+- Unicode normalization: `NFKC`
+- Whitespace normalization: collapse repeated whitespace to a single space
+- Trim leading and trailing whitespace
 
-**Core Innovation**: The system uses salted passphrases to prevent identity inference and pollution attacks:
+The contract does not perform Unicode normalization during mint validation. `mintPersonVersionNFT()` expects the exact canonicalized string bytes that were used when the proof was generated.
 
-```solidity
-// Step 1: Create fullNameCommitment with user passphrase
-fullNameCommitment = Poseidon(keccak(fullName), keccak(passphrase), 0)
+### Domain Constants
 
-// Step 2: Generate final personHash
-personHash = keccak256(Poseidon(fullNameCommitment, packedBirthData))
+The current implementation uses these fixed domains:
+
+- `DOMAIN_SUITE = 1000`
+- `DOMAIN_NAME_SECRET = 1001`
+- `DOMAIN_IDENTITY = 1002`
+- `DOMAIN_DISCLOSURE = 1003`
+- `DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2"`
+
+### Core Derivations
+
+At a high level, the active flow is:
+
+```text
+canonicalFullName
+  -> namePrehash = keccak256(DOMAIN_NAME_PREHASH || utf8(canonicalFullName))
+  -> nameField = uint256(namePrehash) mod SNARK_FIELD
+
+passphrase + salt
+  -> derivedSecretHex via Argon2id
+  -> derivedSecretField = uint256(derivedSecretHex) mod SNARK_FIELD
+
+suiteCommitment =
+  Poseidon4(DOMAIN_SUITE, schemaVersion, cryptoSuiteVersion, hashAlgoId)
+
+nameSecretCommitment =
+  Poseidon4(DOMAIN_NAME_SECRET, nameField, derivedSecretField, suiteCommitment)
+
+packedBirthGenderField =
+  (birthYear << 24) |
+  (birthMonth << 16) |
+  (birthDay << 8) |
+  (gender << 1) |
+  isBirthBC
+
+identityCommitment =
+  Poseidon4(
+    DOMAIN_IDENTITY,
+    nameSecretCommitment,
+    packedBirthGenderField,
+    suiteCommitment
+  )
+
+personHash = keccak256(bytes32(identityCommitment))
+
+disclosureBinding =
+  Poseidon4(
+    DOMAIN_DISCLOSURE,
+    nameField,
+    packedBirthGenderField,
+    suiteCommitment
+  )
 ```
 
-**Security Benefits**:
-- **Identity Inference Prevention**: Without the passphrase, others cannot compute personHash from known basic information
-- **Pollution Attack Protection**: Malicious users cannot create fake versions pointing to real people
-- **Dual Tree Models**:
-  - **Public Trees**: Use shared passphrases for collaborative family building
-  - **Private Trees**: Use unique passphrases for complete protection and relationship correctness
+## Circuit 1: Person Commitment
 
-**Practical Unlinkability & Anti-Pollution**: Each member chooses a private passphrase (“family secret”) that never leaves the client. The full name plus this passphrase are hashed together, producing a unique commitment that is stored on-chain instead of plaintext data. Same name with different passphrases yields distinct commitments, so outsiders cannot correlate records or infer identity, nor can they inject fake nodes pointing to existing people. Relationship proofs run through Groth16 only reveal hashed limbs and the submitter address; names, birthdays, and biographies stay off-chain until the user opts to mint an NFT. NFT minting intentionally discloses the name and story for community verification but does not modify or contaminate the underlying hashed family graph.
-
-### Core Hash Computation
-
-The system uses this salted dual-hash approach in the contract's `getPersonHash()` function:
-
-```solidity
-// Contract implementation in DeepFamily.sol:464
-function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
-    // 1. Split fullNameCommitment (Poseidon digest) into limbs
-    uint256 limb0 = uint256(basicInfo.fullNameCommitment) >> 128;
-    uint256 limb1 = uint256(basicInfo.fullNameCommitment) & ((1 << 128) - 1);
-
-    // 2. Pack birth data
-    uint256 packedData = (uint256(basicInfo.birthYear) << 24) |
-                        (uint256(basicInfo.birthMonth) << 16) |
-                        (uint256(basicInfo.birthDay) << 8) |
-                        (uint256(basicInfo.gender) << 1) |
-                        (basicInfo.isBirthBC ? 1 : 0);
-
-    // 3. Compute Poseidon hash
-    uint256[3] memory inputs = [limb0, limb1, packedData];
-    uint256 poseidonResult = PoseidonT4.hash(inputs);
-
-    // 4. Wrap with keccak256 for domain separation
-    return keccak256(abi.encodePacked(bytes32(poseidonResult)));
-}
-```
-
-## Circuit 1: Person Hash ZK (person_hash_zk.circom)
+File: `circuits/person_commitment.circom`
 
 ### Purpose
-Enables privacy-preserving submission of family tree data through `addPersonZK()`.
 
-### Circuit Structure
+This circuit proves:
 
-#### PersonHasher Template
+- the person's `identityCommitment`
+- the optional father's `identityCommitment`
+- the optional mother's `identityCommitment`
+- the submitter address bound to the proof
+- the active schema / crypto suite / hash algorithm identifiers
+
+It is used for private submission into the lineage graph through `addPersonVersion()`.
+
+### Main Inputs
+
 ```circom
-template PersonHasher() {
-    signal input fullNameHash[32];  // keccak256(fullName) as bytes
-    signal input saltHash[32];      // keccak256(passphrase) as bytes
-    signal input isBirthBC;         // Birth BC flag (0/1)
-    signal input birthYear;         // Birth year (uint16)
-    signal input birthMonth;        // Birth month (1-12)
-    signal input birthDay;          // Birth day (1-31)
-    signal input gender;            // Gender (0-7)
+// Person
+signal input nameField;
+signal input derivedSecretField;
+signal input isBirthBC;
+signal input birthYear;
+signal input birthMonth;
+signal input birthDay;
+signal input gender;
 
-    signal output limb0;            // High 128 bits of final Poseidon
-    signal output limb1;            // Low 128 bits of final Poseidon
-}
+// Father
+signal input fatherNameField;
+signal input fatherDerivedSecretField;
+signal input fatherIsBirthBC;
+signal input fatherBirthYear;
+signal input fatherBirthMonth;
+signal input fatherBirthDay;
+signal input fatherGender;
+
+// Mother
+signal input motherNameField;
+signal input motherDerivedSecretField;
+signal input motherIsBirthBC;
+signal input motherBirthYear;
+signal input motherBirthMonth;
+signal input motherBirthDay;
+signal input motherGender;
+
+// Control + metadata
+signal input hasFather;
+signal input hasMother;
+signal input submitter;
+signal input schemaVersion;
+signal input cryptoSuiteVersion;
+signal input hashAlgoId;
 ```
 
-#### Hash Computation Flow
-1. **Name Commitment**: `Poseidon(keccak(fullName)_limbs, keccak(salt)_limbs, 0)`
-2. **Data Packing**: `birthYear * 2^24 + birthMonth * 2^16 + birthDay * 2^8 + gender * 2 + isBirthBC`
-3. **Final Hash**: `Poseidon(nameCommitment_limbs, packedData)`
-4. **Limb Output**: Split 256-bit result into two 128-bit limbs
+### Internal Structure
 
-#### Input Validation
-- Birth year: 16-bit constraint (0-65535)
-- Birth month: LessEqThan(12) constraint
-- Birth day: 5-bit constraint (0-31)
-- Gender: 3-bit constraint (0-7)
-- All hash bytes: 8-bit constraints
+`IdentityCommitmentCore()` computes three internal values:
 
-### PersonHashTest Main Circuit
+1. `packedBirthGenderField`
+2. `nameSecretCommitment`
+3. `identityCommitment`
 
-#### Inputs
-```circom
-// Person to be added
-signal input fullNameHash[32], saltHash[32];
-signal input isBirthBC, birthYear, birthMonth, birthDay, gender;
+The main `PersonCommitment()` circuit:
 
-// Father data (can be dummy if hasFather=0)
-signal input father_fullNameHash[32], father_saltHash[32];
-signal input father_isBirthBC, father_birthYear, father_birthMonth, father_birthDay, father_gender;
+- computes a shared `suiteCommitment`
+- runs one `IdentityCommitmentCore()` for the person
+- runs one `IdentityCommitmentCore()` for the father
+- runs one `IdentityCommitmentCore()` for the mother
+- zeroes parent commitments when `hasFather == 0` or `hasMother == 0`
 
-// Mother data (can be dummy if hasMother=0)
-signal input mother_fullNameHash[32], mother_saltHash[32];
-signal input mother_isBirthBC, mother_birthYear, mother_birthMonth, mother_birthDay, mother_gender;
+### Range / Shape Constraints
 
-// Control flags
-signal input hasFather, hasMother;  // 0 or 1
-signal input submitter;             // Address as uint160
-```
+The circuit enforces:
 
-#### Public Signals (7 outputs)
-```javascript
+- `hasFather` and `hasMother` are 1-bit flags
+- `submitter` fits in 160 bits
+- `schemaVersion`, `cryptoSuiteVersion`, and `hashAlgoId` fit in 16 bits
+- `isBirthBC` fits in 1 bit
+- `birthYear` fits in 16 bits
+- `birthMonth <= 12`
+- `birthDay` fits in 5 bits
+- `gender` fits in 3 bits
+
+### Public Signals Order
+
+The order is fixed:
+
+```text
 [
-  person_limb0,    // Person hash high 128 bits
-  person_limb1,    // Person hash low 128 bits
-  father_limb0,    // Father hash high 128 bits (0 if hasFather=0)
-  father_limb1,    // Father hash low 128 bits (0 if hasFather=0)
-  mother_limb0,    // Mother hash high 128 bits (0 if hasMother=0)
-  mother_limb1,    // Mother hash low 128 bits (0 if hasMother=0)
-  submitter_out    // Submitter address
+  identityCommitment,
+  fatherIdentityCommitment,
+  motherIdentityCommitment,
+  submitter,
+  schemaVersion,
+  cryptoSuiteVersion,
+  hashAlgoId
 ]
 ```
 
-#### Conditional Logic
-```circom
-// If hasFather=1, output father limbs; if hasFather=0, output (0,0)
-signal father_limb0_selected <== hasFather * fatherHasher.limb0;
-signal father_limb1_selected <== hasFather * fatherHasher.limb1;
-```
+## Circuit 2: Disclosure Binding
 
-## Circuit 2: Name Poseidon ZK (name_poseidon_zk.circom)
+File: `circuits/disclosure_binding.circom`
 
 ### Purpose
-Proves knowledge of full name and salt that produce a specific Poseidon commitment for NFT minting.
 
-### Circuit Structure
+This circuit proves that the minter knows the same private witness material needed to reconstruct the person's `identityCommitment`, while also exposing a deterministic `disclosureBinding` tied to:
 
-#### NamePoseidonBinding Template
+- canonical full name
+- packed birth/gender fields
+- schema / crypto suite / hash algorithm identifiers
+- the intended minter address
+
+It is used by `mintPersonVersionNFT()`.
+
+### Main Inputs
+
 ```circom
-template NamePoseidonBinding() {
-    signal input fullNameHash[32]; // keccak256(fullName) bytes
-    signal input saltHash[32];     // keccak256(passphrase) bytes
-    signal input minter;           // Intended minter address (lower 160 bits)
-
-    signal output poseidonHi;      // High 128 bits of Poseidon digest
-    signal output poseidonLo;      // Low 128 bits of Poseidon digest
-    signal output nameHashHi;      // High 128 bits of keccak(fullName)
-    signal output nameHashLo;      // Low 128 bits of keccak(fullName)
-    signal output minterOut;       // Public minter binding
-}
+signal input nameField;
+signal input derivedSecretField;
+signal input packedBirthGenderField;
+signal input minter;
+signal input schemaVersion;
+signal input cryptoSuiteVersion;
+signal input hashAlgoId;
 ```
 
-#### Computation
-1. Convert input hashes to limbs with byte validation
-2. Compute `Poseidon(nameHash_limbs, saltHash_limbs, 0)`
-3. Output both Poseidon commitment and original name hash as limbs
+### Internal Structure
 
-#### Public Signals (5 outputs)
-```javascript
+The circuit computes:
+
+1. `suiteCommitment = Poseidon4(DOMAIN_SUITE, schemaVersion, cryptoSuiteVersion, hashAlgoId)`
+2. `nameSecretCommitment = Poseidon4(DOMAIN_NAME_SECRET, nameField, derivedSecretField, suiteCommitment)`
+3. `identityCommitment = Poseidon4(DOMAIN_IDENTITY, nameSecretCommitment, packedBirthGenderField, suiteCommitment)`
+4. `disclosureBinding = Poseidon4(DOMAIN_DISCLOSURE, nameField, packedBirthGenderField, suiteCommitment)`
+
+### Public Signals Order
+
+The order is fixed:
+
+```text
 [
-  poseidonHi,      // Poseidon commitment high 128 bits
-  poseidonLo,      // Poseidon commitment low 128 bits
-  nameHashHi,      // keccak(fullName) high 128 bits
-  nameHashLo,      // keccak(fullName) low 128 bits
-  minterOut        // Authorised minter address
+  identityCommitment,
+  disclosureBinding,
+  minter,
+  schemaVersion,
+  cryptoSuiteVersion,
+  hashAlgoId
 ]
 ```
 
 ## Smart Contract Integration
 
-### addPersonZK Function
+`DeepFamily` uses `ProofEnvelope` to carry:
+
+- `proofSystemId`
+- `schemaVersion`
+- `cryptoSuiteVersion`
+- Groth16 proof points `a`, `b`, and `c`
+
+### Verifiers
+
+The active verifier contracts are:
+
+- `contracts/PersonCommitmentVerifier.sol`
+- `contracts/DisclosureBindingVerifier.sol`
+
+`DeepFamily` routes verification through `verifierRegistry[proofSystemId][purpose]`, so the business flow is decoupled from the concrete verifier address.
+
+### Person Submission Flow
+
+Contract entrypoint:
 
 ```solidity
-function addPersonZK(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals,
+function addPersonVersion(
+    ProofEnvelope calldata proof,
+    PersonProofPublicSignals calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
     string calldata tag,
@@ -205,113 +265,168 @@ function addPersonZK(
 ) external
 ```
 
-#### Verification Process
-1. **Submitter Check**: `publicSignals[6] == uint256(uint160(msg.sender))`
-2. **Proof Verification**: `PersonHashVerifier.verifyProof(a, b, c, publicSignals)`
-3. **Hash Reconstruction**: Pack limbs back to bytes32 and wrap with keccak256
-4. **Family Tree Update**: Add person version with verified parent relationships
-
-### mintPersonNFT Function
+`PersonProofPublicSignals` is:
 
 ```solidity
-function mintPersonNFT(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[5] calldata publicSignals,
-    bytes32 personHash,
+struct PersonProofPublicSignals {
+    uint256 identityCommitment;
+    uint256 fatherIdentityCommitment;
+    uint256 motherIdentityCommitment;
+    uint256 submitter;
+    uint256 schemaVersion;
+    uint256 cryptoSuiteVersion;
+    uint256 hashAlgoId;
+}
+```
+
+Verification steps:
+
+1. `publicSignals.submitter` must equal `uint256(uint160(msg.sender))`
+2. The registered `Person` verifier must accept the Groth16 proof
+3. The contract wraps each non-zero identity commitment as `keccak256(bytes32(identityCommitment))`
+4. If a parent commitment is zero, the corresponding parent version index must be `0`
+5. The derived parent hashes plus the provided parent version indices are passed into lineage storage
+
+Important consequence: the contract no longer reconstructs hashes from 128-bit limbs. It works directly with full field-element commitments.
+
+### NFT Mint Flow
+
+Contract entrypoint:
+
+```solidity
+function mintPersonVersionNFT(
+    ProofEnvelope calldata proof,
+    DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
     PersonCoreInfo calldata coreInfo
 ) external
 ```
 
-#### Verification Process
-1. **Endorsement Check**: Caller must have endorsed this version
-2. **Name Proof Verification**: `NamePoseidonVerifier.verifyProof(a, b, c, publicSignals)`
-3. **Commitment Validation**: `publicSignals[0:1]` must match `coreInfo.basicInfo.fullNameCommitment`
-4. **Name Hash Validation**: `publicSignals[2:3]` must match `keccak256(coreInfo.supplementInfo.fullName)`
-5. **Minter Binding**: `publicSignals[4]` must equal `uint256(uint160(msg.sender))`
-6. **Person Hash Validation**: `getPersonHash(coreInfo.basicInfo)` must match `personHash`
+`DisclosureBindingPublicSignals` is:
 
-## Security Features
-
-### Circuit Security
-- **Input Validation**: All numeric inputs are range-constrained
-- **Byte Validation**: Hash inputs validated as proper 8-bit bytes
-- **Deterministic Hashing**: Uses Poseidon for SNARK-friendly operations
-- **No Information Leakage**: Only hash commitments and limbs are public
-
-### Contract Security
-- **Limb Range Checks**: Each limb must be < 2^128 (contracts/DeepFamily.sol:438)
-- **Submitter Authentication**: Prevents proof replay across addresses
-- **Version Consistency**: Parent version indices must exist if parent hashes provided
-- **Domain Separation**: keccak256 wrapper prevents cross-domain hash collisions
-
-### Privacy Protection
-- **Salt-Based Commitments**: Names protected by user-controlled salts
-- **Conditional Parent Disclosure**: Parents only revealed if family relationships exist
-- **Hash-Only Storage**: No plaintext personal data stored on-chain
-
-## Data Flow
-
-### Adding Person with ZK Proof
-1. User generates fullNameHash = keccak256(fullName)
-2. User generates saltHash = keccak256(passphrase)
-3. Circuit computes person/parent Poseidon commitments
-4. Contract verifies proof and extracts final keccak256-wrapped hashes
-5. Family tree updated with cryptographic commitments
-
-### Minting NFT with Name Proof
-1. User proves knowledge of name/salt for existing Poseidon commitment
-2. Contract validates commitment matches person's fullNameCommitment
-3. Contract validates provided fullName hashes to expected value
-4. NFT minted with verified on-chain core information
-
-### Poseidon Hash Benefits
-- **SNARK-Friendly**: ~1000x fewer constraints vs keccak256 in circuits
-- **Collision Resistant**: 128-bit security level with proper domain separation
-- **Compact**: Single field element output vs 32-byte keccak256
-
-## Development & Testing
-
-### Circuit Compilation
-```bash
-circom circuits/person_hash_zk.circom --r1cs --wasm --sym
-circom circuits/name_poseidon_zk.circom --r1cs --wasm --sym
+```solidity
+struct DisclosureBindingPublicSignals {
+    uint256 identityCommitment;
+    uint256 disclosureBinding;
+    uint256 minter;
+    uint256 schemaVersion;
+    uint256 cryptoSuiteVersion;
+    uint256 hashAlgoId;
+}
 ```
 
-### Trusted Setup
-```bash
-# Powers of tau (universal)
-snarkjs powersoftau new bn128 18 pot18_0000.ptau
+Verification steps:
 
-# Phase 2 (circuit-specific)
-snarkjs groth16 setup person_hash_zk.r1cs pot18_final.ptau person_hash_zk_0000.zkey
-snarkjs zkey contribute person_hash_zk_0000.zkey person_hash_zk_final.zkey
+1. The contract derives `personHash = keccak256(bytes32(identityCommitment))`
+2. The target `versionIndex` must exist for that `personHash`
+3. `publicSignals.minter` must equal `uint256(uint160(msg.sender))`
+4. The caller must already endorse that person version
+5. The registered `DisclosureBinding` verifier must accept the Groth16 proof
+6. `coreInfo.basicInfo.identityCommitment` must equal `bytes32(publicSignals.identityCommitment)`
+7. The contract recomputes `disclosureBinding` from:
+   - `coreInfo.supplementInfo.fullName`
+   - `coreInfo.basicInfo`
+   - `publicSignals.schemaVersion`
+   - `publicSignals.cryptoSuiteVersion`
+   - `publicSignals.hashAlgoId`
+8. The recomputed binding must equal `bytes32(publicSignals.disclosureBinding)`
+9. `_enforceAdult(coreInfo.basicInfo)` must pass before minting
+
+This mint proof does not reveal the private derived secret, but it does intentionally bind the public mint payload to the same canonical identity basis used in the original commitment.
+
+## Frontend and Worker Integration
+
+The main runtime helpers are:
+
+- `frontend/src/lib/identityCommitment.ts`
+- `frontend/src/lib/disclosureBinding.ts`
+- `frontend/src/lib/zk.ts`
+- `frontend/src/lib/zkSnark.ts`
+- `frontend/src/workers/zk.worker.ts`
+
+The frontend currently loads these artifact files at runtime:
+
+- `/zk/person_commitment.wasm`
+- `/zk/person_commitment_final.zkey`
+- `/zk/person_commitment.vkey.json`
+- `/zk/disclosure_binding.wasm`
+- `/zk/disclosure_binding_final.zkey`
+- `/zk/disclosure_binding.vkey.json`
+
+Repository location:
+
+- `frontend/public/zk/`
+
+## Development Workflow
+
+### Build Circuits
+
+From repo root:
+
+```bash
+npm run zk:build
 ```
 
-### Frontend Integration
-ZK artifacts located in `frontend/public/zk/`:
-- `person_hash_zk.wasm` - Circuit execution
-- `person_hash_zk_final.zkey` - Proving key
-- `person_hash_zk.vkey.json` - Verification key
-- `name_poseidon_zk.wasm` - Name binding circuit
-- `name_poseidon_zk_final.zkey` - Name binding proving key
-- `name_poseidon_zk.vkey.json` - Name binding verification key
+Or individually:
 
-## Future Enhancements
+```bash
+npm run zk:build:person
+npm run zk:build:disclosure
+```
 
-### Scalability
-- **Batch Proofs**: Multiple person additions in single proof
-- **Layer 2 Deployment**: Deploy verifiers on L2 for reduced costs
-- **Proof Aggregation**: Combine multiple proofs for batch verification
+### Generate Trusted Setup Artifacts
 
-### Privacy Improvements
-- **Recursive Proofs**: Chain proofs for complex family tree operations
-- **Anonymous Endorsements**: Hide endorser identities while maintaining credibility
-- **Selective Disclosure**: Prove specific attributes without revealing full data
+```bash
+npm run zk:ptau
+npm run zk:setup
+```
 
----
+Or individually:
 
-*This documentation reflects the actual ZK proof implementation in DeepFamily based on circuit analysis and contract code review.*
+```bash
+npm run zk:setup:person
+npm run zk:setup:disclosure
+```
+
+### Export Solidity Verifiers
+
+```bash
+npm run zk:verifier
+```
+
+### Sync Frontend Artifacts
+
+```bash
+npm run zk:sync
+```
+
+### Full Refresh
+
+```bash
+npm run zk:refresh
+```
+
+This rebuilds the circuits, regenerates proving artifacts, re-exports verifier contracts, and refreshes `frontend/public/zk/`.
+
+## Security Properties
+
+- Private witness material stays off-chain; only commitments and version metadata are public
+- `submitter` / `minter` binding prevents proof replay across different EOAs
+- `schemaVersion`, `cryptoSuiteVersion`, and `hashAlgoId` are bound into both proofs
+- Parent links are validated against wrapped parent commitments, preventing arbitrary parent references
+- Mint disclosure is deterministic and revalidated on-chain against the calldata payload
+- `personHash` preserves the existing external identifier format while the underlying proof system works on `identityCommitment`
+
+## Notes for Future Updates
+
+If the circuits change again, this document must be kept in sync with all of the following:
+
+- circuit filenames
+- public signal ordering
+- domain constants
+- contract entrypoint names and struct fields
+- frontend artifact filenames under `frontend/public/zk/`
+- npm scripts in `package.json`
+
+Any mismatch between those layers will usually show up as failed proof verification, incorrect parent linkage, or mint binding reverts.

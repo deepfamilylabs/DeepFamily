@@ -20,15 +20,24 @@ import {
 import { useContract } from "../../hooks/useContract";
 import { useWallet } from "../../context/WalletContext";
 import { ethers } from "ethers";
-import { poseidon5 } from "poseidon-lite";
 import { useSearchParams } from "react-router-dom";
 import PersonHashCalculator from "../PersonHashCalculator";
 import type { PersonHashCalculatorHandle } from "../PersonHashCalculator";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../lib/errors";
 import { useTreeData } from "../../context/TreeDataContext";
-import { formatGroth16ProofForContract, toBigIntArray } from "../../lib/zk";
+import {
+  formatGroth16ProofForContract,
+  computeDisclosureBinding,
+  type PersonData,
+} from "../../lib/zk";
 import { zkWorkerCall } from "../../lib/zkWorkerClient";
-import { normalizeNameForHash, normalizePassphraseForHash } from "../../lib/passphraseStrength";
+import { safeCanonicalizeFullName } from "../../lib/identityCommitment";
+import {
+  computeIdentityHashMaterial,
+  normalizeIdentitySaltHex,
+  type IdentitySaltMode,
+} from "../../lib/identityHash";
+import { normalizePassphraseForHash } from "../../lib/passphraseStrength";
 import { makeNodeId, type NodeData } from "../../types/graph";
 
 // Simple themed select component (from PersonHashCalculator)
@@ -104,55 +113,6 @@ const isValidTokenUri = (v: string) => {
   }
 };
 
-const MASK_128 = (1n << 128n) - 1n;
-
-type MintProofArgs = {
-  a: [bigint, bigint];
-  b: [[bigint, bigint], [bigint, bigint]];
-  c: [bigint, bigint];
-  publicSignals: [bigint, bigint, bigint, bigint, bigint];
-};
-
-const splitToLimbs = (hex: string) => {
-  const value = BigInt(hex);
-  return {
-    hi: value >> 128n,
-    lo: value & MASK_128,
-  };
-};
-
-const textEncoder = new TextEncoder();
-
-const computeNameBinding = (fullName: string, passphrase: string) => {
-  const normalizedName = normalizeNameForHash(fullName);
-  const normalizedPassphrase = normalizePassphraseForHash(passphrase);
-
-  const nameHex = ethers.keccak256(textEncoder.encode(normalizedName));
-  const saltHex =
-    normalizedPassphrase && normalizedPassphrase.length > 0
-      ? ethers.keccak256(textEncoder.encode(normalizedPassphrase))
-      : ethers.ZeroHash;
-
-  const nameLimbs = splitToLimbs(nameHex);
-  const saltLimbs = splitToLimbs(saltHex);
-
-  const digestBig = poseidon5([nameLimbs.hi, nameLimbs.lo, saltLimbs.hi, saltLimbs.lo, 0n]);
-  const digestHex = `0x${digestBig.toString(16).padStart(64, "0")}`;
-  const digestLimbs = {
-    hi: digestBig >> 128n,
-    lo: digestBig & MASK_128,
-  };
-
-  return {
-    nameHex,
-    saltHex,
-    nameLimbs,
-    saltLimbs,
-    digestHex,
-    digestLimbs,
-  };
-};
-
 const createMintNFTSchema = (t: (key: string) => string) =>
   z
     .object({
@@ -218,7 +178,7 @@ export default function MintNFTModal({
 }: MintNFTModalProps) {
   const { t } = useTranslation();
   const { address } = useWallet();
-  const { mintPersonNFT, getVersionDetails, contract, getPersonHash } = useContract();
+  const { mintPersonVersionNFT, getVersionDetails, contract } = useContract();
   const { setNodesData, invalidateByTx } = useTreeData();
 
   // Create schema with translations
@@ -281,6 +241,8 @@ export default function MintNFTModal({
     birthDay: number;
     isBirthBC: boolean;
   } | null>(null);
+  const [personIdentityMode, setPersonIdentityMode] = useState<IdentitySaltMode>("deterministic");
+  const [personRecoverySaltHex, setPersonRecoverySaltHex] = useState("");
   const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   // 计算属性
@@ -301,6 +263,30 @@ export default function MintNFTModal({
   const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
   const hasTargetInputs = hasValidTarget;
   const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
+
+  const resolveSelectedPersonIdentitySaltHex = (): string | null => {
+    if (personIdentityMode !== "random") return null;
+    const normalizedPassphrase = normalizePassphraseForHash(
+      personCalcRef.current?.getSecretInputs().passphrase || "",
+    );
+    if (!normalizedPassphrase.length) {
+      throw new Error(
+        t(
+          "mintNFT.randomModePassphraseRequired",
+          "Enhanced identity mode requires a non-empty identity passphrase",
+        ),
+      );
+    }
+    if (personRecoverySaltHex.trim()) {
+      return normalizeIdentitySaltHex(personRecoverySaltHex);
+    }
+    throw new Error(
+      t(
+        "mintNFT.recoverySaltRequired",
+        "Enhanced identity mode requires the saved recovery salt for this identity",
+      ),
+    );
+  };
 
   // Desktop/mobile detection
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
@@ -355,6 +341,8 @@ export default function MintNFTModal({
       // On open: initialize state
       setPersonHash(initialPersonHash || "");
       setVersionIndex(initialVersionIndex || 1);
+      setPersonIdentityMode("deterministic");
+      setPersonRecoverySaltHex("");
       // Animation
       requestAnimationFrame(() => setEntered(true));
     } else {
@@ -364,6 +352,8 @@ export default function MintNFTModal({
       setPersonHash("");
       setVersionIndex(1);
       setPersonInfo(null);
+      setPersonIdentityMode("deterministic");
+      setPersonRecoverySaltHex("");
       setIsSubmitting(false);
       setIsEndorsed(false);
       setIsAlreadyMinted(false);
@@ -486,6 +476,8 @@ export default function MintNFTModal({
     setPersonHash("");
     setVersionIndex(1);
     setPersonInfo(null);
+    setPersonIdentityMode("deterministic");
+    setPersonRecoverySaltHex("");
     setIsSubmitting(false);
     setSuccessResult(null);
     setErrorResult(null);
@@ -555,8 +547,7 @@ export default function MintNFTModal({
     try {
       setProofGenerationStep(t("mintNFT.preparingProof", "Preparing proof inputs..."));
 
-      const normalizedFullName = normalizeNameForHash(personInfo.fullName || "");
-      const passphrase = personCalcRef.current?.getSecretInputs().passphrase || "";
+      const normalizedFullName = safeCanonicalizeFullName(personInfo.fullName || "");
 
       if (!normalizedFullName) {
         alert(t("mintNFT.fullNameRequired", "Full name is required to generate proof"));
@@ -565,12 +556,50 @@ export default function MintNFTModal({
         return;
       }
 
-      // Construct PersonCoreInfo object matching the contract structure
-      const nameBinding = computeNameBinding(normalizedFullName, passphrase);
+      const personIdentitySaltHex = resolveSelectedPersonIdentitySaltHex();
+
+      const {
+        canonicalFullName,
+        derivedSecretField,
+        identityCommitment,
+        personHash: computedPersonHash,
+        nameField,
+        suiteCommitment,
+        packedBirthGenderField,
+      } = await computeIdentityHashMaterial({
+        fullName: normalizedFullName,
+        passphrase: personCalcRef.current?.getSecretInputs().passphrase || "",
+        isBirthBC: personInfo.isBirthBC,
+        birthYear: personInfo.birthYear,
+        birthMonth: personInfo.birthMonth,
+        birthDay: personInfo.birthDay,
+        gender: personInfo.gender,
+        identityMode: personIdentityMode,
+        identitySaltHex: personIdentitySaltHex,
+      });
+
+      if (targetPersonHash && computedPersonHash !== targetPersonHash) {
+        throw new Error(
+          t(
+            "mintNFT.personHashMismatch",
+            "The selected identity mode or recovery salt does not match the target person hash",
+          ),
+        );
+      }
+
+      const personData: PersonData = {
+        fullName: canonicalFullName,
+        derivedSecretField,
+        birthYear: personInfo.birthYear,
+        birthMonth: personInfo.birthMonth,
+        birthDay: personInfo.birthDay,
+        isBirthBC: personInfo.isBirthBC,
+        gender: personInfo.gender,
+      };
 
       const coreInfo = {
         basicInfo: {
-          fullNameCommitment: nameBinding.digestHex,
+          identityCommitment: ethers.zeroPadValue(ethers.toBeHex(identityCommitment), 32),
           isBirthBC: personInfo.isBirthBC,
           birthYear: personInfo.birthYear,
           birthMonth: personInfo.birthMonth,
@@ -578,7 +607,7 @@ export default function MintNFTModal({
           gender: personInfo.gender,
         },
         supplementInfo: {
-          fullName: normalizedFullName,
+          fullName: canonicalFullName,
           birthPlace: processedData.birthPlace,
           isDeathBC: processedData.isDeathBC,
           deathYear: processedData.deathYear,
@@ -599,14 +628,17 @@ export default function MintNFTModal({
         throw new Error(t("mintNFT.walletRequired", "Wallet connection required to mint"));
       }
       const { proof: generatedProof, publicSignals } = await zkWorkerCall(
-        "generateNamePoseidonProof",
-        { fullName: normalizedFullName, passphrase, minterAddress: address },
+        "generateDisclosureBindingProof",
+        {
+          person: personData,
+          minterAddress: address,
+        },
         { timeoutMs: 240_000 },
       );
 
       setProofGenerationStep(t("mintNFT.verifyingProof", "Verifying zero-knowledge proof..."));
       const { ok: isProofValid } = await zkWorkerCall(
-        "verifyNamePoseidonProof",
+        "verifyDisclosureBindingProof",
         { proof: generatedProof, publicSignals },
         { timeoutMs: 120_000 },
       );
@@ -616,34 +648,38 @@ export default function MintNFTModal({
         );
       }
 
-      const formattedProof = formatGroth16ProofForContract(generatedProof);
-      const signalValues = toBigIntArray(publicSignals);
-      if (signalValues.length < 5) {
-        throw new Error("Invalid name poseidon public signals length");
+      const proofEnvelope = formatGroth16ProofForContract(generatedProof);
+      if (publicSignals.length < 6) {
+        throw new Error("Invalid name disclosure public signals length");
       }
-
-      const proof: MintProofArgs = {
-        a: formattedProof.a,
-        b: formattedProof.b,
-        c: formattedProof.c,
-        publicSignals: signalValues.slice(0, 5) as [bigint, bigint, bigint, bigint, bigint],
+      const publicSignalsStruct = {
+        identityCommitment: BigInt(publicSignals[0]),
+        disclosureBinding: BigInt(publicSignals[1]),
+        minter: BigInt(publicSignals[2]),
+        schemaVersion: Number(publicSignals[3]),
+        cryptoSuiteVersion: Number(publicSignals[4]),
+        hashAlgoId: Number(publicSignals[5]),
       };
+
+      const disclosureBindingValue = computeDisclosureBinding(
+        nameField,
+        packedBirthGenderField,
+        suiteCommitment,
+      );
+      if (publicSignalsStruct.disclosureBinding !== disclosureBindingValue) {
+        throw new Error("Disclosure binding mismatch");
+      }
 
       setProofGenerationStep(
         t("mintNFT.proofVerified", "Zero-knowledge proof verified. Submitting transaction..."),
       );
 
-      // Determine personHash/versionIndex
-      let finalPersonHash = targetPersonHash as string | undefined;
-      if (!finalPersonHash && getPersonHash) {
-        // Compute on-chain consistent person hash
-        finalPersonHash = await getPersonHash(coreInfo.basicInfo as any);
-      }
+      let finalPersonHash = targetPersonHash || computedPersonHash;
       if (!finalPersonHash) {
         alert(t("mintNFT.personHashRequired", "Unable to compute person hash"));
         return;
       }
-      const finalVersionIndex = targetVersionIndex || 1; // Default to version 1 if not provided
+      const finalVersionIndex = targetVersionIndex || 1;
 
       // Preflight: ensure endorsement matches target version
       try {
@@ -657,9 +693,9 @@ export default function MintNFTModal({
         }
       } catch {}
 
-      const receipt = await mintPersonNFT(
-        proof,
-        finalPersonHash,
+      const receipt = await mintPersonVersionNFT(
+        proofEnvelope,
+        publicSignalsStruct,
         finalVersionIndex,
         processedData.tokenURI || "",
         coreInfo as any,
@@ -1075,6 +1111,8 @@ export default function MintNFTModal({
                         showTitle={false}
                         collapsible={false}
                         className="bg-transparent border-0 shadow-none !p-0"
+                        identityMode={personIdentityMode}
+                        identitySaltHex={personIdentityMode === "random" ? personRecoverySaltHex : undefined}
                         initialValues={
                           personInfo
                             ? {
@@ -1102,6 +1140,87 @@ export default function MintNFTModal({
                             : undefined
                         }
                       />
+
+                      <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            {t("mintNFT.identityMode", "Identity Recovery Mode")}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {t(
+                              "mintNFT.identityModeHint",
+                              "Use standard mode for deterministic recovery. Use enhanced mode only when this identity was originally created with a saved random recovery salt.",
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setPersonIdentityMode("deterministic")}
+                            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                              personIdentityMode === "deterministic"
+                                ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                                : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                              {t("mintNFT.identityModeStandard", "Standard")}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                              {t(
+                                "mintNFT.identityModeStandardHint",
+                                "Deterministic identity salt from public fields.",
+                              )}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPersonIdentityMode("random");
+                            }}
+                            className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                              personIdentityMode === "random"
+                                ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                                : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                              {t("mintNFT.identityModeEnhanced", "Enhanced")}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                              {t(
+                                "mintNFT.identityModeEnhancedHint",
+                                "Paste the previously saved recovery salt for this identity. Do not create a new salt here.",
+                              )}
+                            </div>
+                          </button>
+                        </div>
+
+                        {personIdentityMode === "random" && (
+                          <div className="space-y-3">
+                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                              {t("mintNFT.identityRecoverySalt", "Recovery Salt")}
+                            </label>
+                            <input
+                              type="text"
+                              value={personRecoverySaltHex}
+                              onChange={(e) => setPersonRecoverySaltHex(e.target.value)}
+                              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                              placeholder={t(
+                                "mintNFT.identityRecoverySaltPlaceholder",
+                                "Paste the saved recovery salt for this identity",
+                              )}
+                            />
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                              {t(
+                                "mintNFT.identityRecoverySaltNotice",
+                                "Minting in enhanced mode only succeeds when this is the exact recovery salt originally saved for the target identity.",
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Supplemental Information (from PersonSupplementInfo) */}

@@ -19,8 +19,8 @@ Optional
 
 Usage examples
   node tasks/zk-limbs-check.js --input ./circuits/test/fullname_hash_input.json
-  node tasks/zk-limbs-check.js --wasm ./artifacts/circuits/person_hash_zk_js/person_hash_zk.wasm \
-    --zkey ./artifacts/circuits/person_hash_zk_final.zkey --input ./circuits/test/fullname_hash_input.json --submitter 0xYourEOA
+  node tasks/zk-person-hash-check.mjs --wasm ./zk-artifacts/circuits/person_commitment_js/person_commitment.wasm \
+    --zkey ./zk-artifacts/circuits/person_commitment_final.zkey --input ./circuits/test/proof/person_commitment_input.json --submitter 0xYourEOA
 */
 
 import fs from "node:fs";

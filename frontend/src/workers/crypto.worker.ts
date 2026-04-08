@@ -3,7 +3,6 @@ import type { IdentityHashInput } from "../lib/identityHash";
 import {
   decryptMetadataPayload,
   decryptMetadataPayloadV2,
-  encryptMetadataJson,
   encryptMetadataJsonV2,
   passwordFingerprint,
   type EncryptedMetadataPayloadV2,
@@ -15,9 +14,9 @@ import {
   type KDFPreset,
 } from "../lib/secureKeyDerivation";
 import {
-  deriveIdentitySecretV2,
+  deriveIdentitySecret,
   hexToBytes,
-  type DerivedSecretBundleV2,
+  type DerivedSecretBundle,
   type FileEncryptionKdfConfig,
   type IdentityKdfConfig,
 } from "../lib/secretDerivation";
@@ -31,14 +30,6 @@ type CryptoWorkerMethods = {
     params: { password: string };
     result: { passwordFingerprint: string };
   };
-  encryptMetadataBundle: {
-    params: { plaintextJson: string; password: string; tag?: string };
-    result: { encryptedJson: string; cid: string; plainHash: string; passwordFingerprint: string };
-  };
-  decryptMetadataBundle: {
-    params: { payloadOrJson: string; password: string };
-    result: { plaintext: string; data: any; hash: string; payload: any };
-  };
   deriveKey: {
     params: { input: IdentityHashInput; purpose?: KeyPurpose; preset?: KDFPreset };
     result: {
@@ -49,9 +40,9 @@ type CryptoWorkerMethods = {
       purpose: string;
     };
   };
-  deriveIdentitySecretV2: {
+  deriveIdentitySecret: {
     params: { passphrase: string; saltHex?: string; config?: IdentityKdfConfig };
-    result: DerivedSecretBundleV2;
+    result: DerivedSecretBundle;
   };
   encryptMetadataBundleV2: {
     params: {
@@ -104,34 +95,16 @@ const handlers: {
   ) => Promise<CryptoWorkerMethods[K]["result"]> | CryptoWorkerMethods[K]["result"];
 } = {
   computeIdentityHash: async ({ input }) => {
-    return { identityHash: computeIdentityHash(input) };
+    return { identityHash: await computeIdentityHash(input) };
   },
   passwordFingerprint: async ({ password }) => {
     return { passwordFingerprint: passwordFingerprint(password) };
   },
-  encryptMetadataBundle: async ({ plaintextJson, password }) => {
-    const { payload, plainHash } = await encryptMetadataJson(plaintextJson, password);
-    const encryptedJson = JSON.stringify(payload);
-    const cid = await generateMetadataCID(encryptedJson);
-    return {
-      encryptedJson,
-      cid,
-      plainHash,
-      passwordFingerprint: passwordFingerprint(password),
-    };
-  },
-  decryptMetadataBundle: async ({ payloadOrJson, password }) => {
-    const { plaintext, data, hash, payload } = await decryptMetadataPayload(
-      payloadOrJson,
-      password,
-    );
-    return { plaintext, data, hash, payload };
-  },
   deriveKey: async ({ input, purpose, preset }) => {
     return await deriveKeyFromPersonData(input, purpose ?? "PRIVATE_KEY", preset ?? "BALANCED");
   },
-  deriveIdentitySecretV2: async ({ passphrase, saltHex, config }) => {
-    return await deriveIdentitySecretV2({
+  deriveIdentitySecret: async ({ passphrase, saltHex, config }) => {
+    return await deriveIdentitySecret({
       passphrase,
       salt: saltHex ? hexToBytes(saltHex) : undefined,
       config,

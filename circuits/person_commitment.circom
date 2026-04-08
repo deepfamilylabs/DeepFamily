@@ -13,7 +13,7 @@ include "circomlib/circuits/poseidon.circom";
 // 6. cryptoSuiteVersion
 // 7. hashAlgoId
 
-template IdentityCommitmentCoreV2() {
+template IdentityCommitmentCore() {
     signal input nameField;
     signal input derivedSecretField;
     signal input isBirthBC;
@@ -60,7 +60,7 @@ template IdentityCommitmentCoreV2() {
     identityCommitment <== identityPoseidon.out;
 }
 
-template PersonCommitmentV2() {
+template PersonCommitment() {
     signal input nameField;
     signal input derivedSecretField;
     signal input isBirthBC;
@@ -111,7 +111,7 @@ template PersonCommitmentV2() {
     suitePoseidon.inputs[2] <== cryptoSuiteVersion;
     suitePoseidon.inputs[3] <== hashAlgoId;
 
-    component personCore = IdentityCommitmentCoreV2();
+    component personCore = IdentityCommitmentCore();
     personCore.nameField <== nameField;
     personCore.derivedSecretField <== derivedSecretField;
     personCore.isBirthBC <== isBirthBC;
@@ -121,7 +121,7 @@ template PersonCommitmentV2() {
     personCore.gender <== gender;
     personCore.suiteCommitment <== suitePoseidon.out;
 
-    component fatherCore = IdentityCommitmentCoreV2();
+    component fatherCore = IdentityCommitmentCore();
     fatherCore.nameField <== fatherNameField;
     fatherCore.derivedSecretField <== fatherDerivedSecretField;
     fatherCore.isBirthBC <== fatherIsBirthBC;
@@ -131,7 +131,7 @@ template PersonCommitmentV2() {
     fatherCore.gender <== fatherGender;
     fatherCore.suiteCommitment <== suitePoseidon.out;
 
-    component motherCore = IdentityCommitmentCoreV2();
+    component motherCore = IdentityCommitmentCore();
     motherCore.nameField <== motherNameField;
     motherCore.derivedSecretField <== motherDerivedSecretField;
     motherCore.isBirthBC <== motherIsBirthBC;
@@ -150,4 +150,4 @@ template PersonCommitmentV2() {
     hashAlgoIdOut <== hashAlgoId;
 }
 
-component main = PersonCommitmentV2();
+component main = PersonCommitment();

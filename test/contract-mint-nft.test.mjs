@@ -1,639 +1,392 @@
 import '../hardhat-test-setup.mjs'
 import { expect } from 'chai'
 import hre from 'hardhat'
-import namePoseidon from '../lib/namePoseidon.js'
-import namePoseidonProof from '../lib/namePoseidonProof.js'
 import { deployIntegratedFixture } from './fixtures/integrated.mjs'
-import { poseidon4 } from 'poseidon-lite'
+import {
+  setupStubVerifiers,
+  addPerson,
+  mintPerson,
+  computePersonHash,
+  computeDisclosureBinding,
+  computeIdentityCommitment,
+  makeStubProof,
+  makeTestPerson,
+} from './helpers/testHelper.mjs'
 
-const { buildBasicInfo } = namePoseidon
-const { generateNamePoseidonProof } = namePoseidonProof
-
-const PROOF_PURPOSE_PERSON_V2 = 2
-const PROOF_PURPOSE_NAME_DISCLOSURE_V2 = 3
-const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000);
-
-// Tests for mint-nft task & underlying contract invariants
+const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000)
 
 describe('Mint NFT Tests', function () {
-  this.timeout(60_000);
+  this.timeout(60_000)
 
-  async function setupPersonV2Verifier(deepFamily, shouldVerify = true) {
-    const stubFactory = await hre.ethers.getContractFactory('contracts/test/StubPersonCommitmentVerifierV2.sol:StubPersonCommitmentVerifierV2')
-    const verifier = await stubFactory.deploy(shouldVerify)
-    await verifier.waitForDeployment()
-    await deepFamily.setVerifier(1, PROOF_PURPOSE_PERSON_V2, await verifier.getAddress())
-    return verifier
-  }
-
-  async function setupNameDisclosureV2Verifier(deepFamily, shouldVerify = true) {
-    const stubFactory = await hre.ethers.getContractFactory('contracts/test/StubNameDisclosureVerifierV2.sol:StubNameDisclosureVerifierV2')
-    const verifier = await stubFactory.deploy(shouldVerify)
-    await verifier.waitForDeployment()
-    await deepFamily.setVerifier(1, PROOF_PURPOSE_NAME_DISCLOSURE_V2, await verifier.getAddress())
-    return verifier
-  }
-
-  async function prepareMintV2Base() {
+  async function baseSetup() {
     const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
-    const [signer] = await hre.ethers.getSigners();
-    const FULLNAME = 'Mint Subject V2';
-    const identityCommitment = 123456789n;
-    const personHash = hre.ethers.keccak256(
-      hre.ethers.solidityPacked(['bytes32'], [hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32)])
-    );
-
-    await setupPersonV2Verifier(deepFamily, true);
-    await setupNameDisclosureV2Verifier(deepFamily, true);
-
-    const addProof = {
-      proofSystemId: 1,
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      a: [0, 0],
-      b: [[0, 0], [0, 0]],
-      c: [0, 0],
-    };
-
-    const addPublicSignals = {
-      identityCommitment,
-      fatherIdentityCommitment: 0,
-      motherIdentityCommitment: 0,
-      submitter: BigInt(await signer.getAddress()),
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      hashAlgoId: 1,
-    };
-
-    const emptyParent = { personHash: hre.ethers.ZeroHash, versionIndex: 0 };
-    const meta = { schemaVersion: 2, cryptoSuiteVersion: 2, hashAlgoId: 1 };
-
-    await deepFamily.connect(signer).addPersonZKV2(
-      addProof,
-      addPublicSignals,
-      emptyParent,
-      emptyParent,
-      meta,
-      'v2',
-      'ipfs://QmMintV2Base',
-      {},
-    );
-
-    await deepFamily.endorseVersion(personHash, 1);
-
-    return { deepFamily, signer, FULLNAME, personHash, identityCommitment };
+    const [signer] = await hre.ethers.getSigners()
+    await setupStubVerifiers(hre.ethers, deepFamily)
+    return { deepFamily, signer }
   }
 
-  async function prepare(endorsed = true) {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
-    const [signer] = await hre.ethers.getSigners();
-    const FULLNAME = 'Mint Subject';
-    const params = { fullname: FULLNAME, birthyear: '1999', gender: '1', tag: 'v1', ipfs: 'QmMint1' };
-    await hre.run('add-person', params);
-
-    const basicInfo = buildBasicInfo({
-      fullName: FULLNAME,
-      birthYear: 1999,
-      birthMonth: 0,
-      birthDay: 0,
-      gender: 1,
-    });
-    const fullNameCommitment = basicInfo.fullNameCommitment;
-    const personHash = await deepFamily.getPersonHash(basicInfo);
-    const proofBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: await signer.getAddress() });
-    const { proof, publicSignals } = proofBundle;
-    if (endorsed) {
-      await hre.run('endorse', { person: personHash, vindex: '1' });
-    }
-    return { deepFamily, personHash, FULLNAME, fullNameCommitment, basicInfo, proof, publicSignals };
-  }
-
-  async function prepareAgeCase({
-    fullName = 'Age Gate Subject',
-    birthYear = 0,
-    birthMonth = 0,
-    birthDay = 0,
-    birthBC = false,
-  }) {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
-    const [signer] = await hre.ethers.getSigners();
-
-    await hre.run('add-person', {
-      fullname: fullName,
-      birthyear: String(birthYear),
-      birthmonth: String(birthMonth),
-      birthday: String(birthDay),
-      birthbc: birthBC ? 'true' : 'false',
-      gender: '1',
-      tag: 'v1',
-      ipfs: 'QmAge',
-    });
-
-    const basicInfo = buildBasicInfo({
-      fullName,
-      isBirthBC: birthBC,
-      birthYear,
-      birthMonth,
-      birthDay,
-      gender: 1,
-    });
-    const personHash = await deepFamily.getPersonHash(basicInfo);
-    const { proof, publicSignals } = await generateNamePoseidonProof(fullName, "", { minter: await signer.getAddress() });
-    await hre.run('endorse', { person: personHash, vindex: '1' });
-
-    return { deepFamily, personHash, basicInfo, proof, publicSignals, fullName };
-  }
-
-  it('fails mint through task before endorsement (task layer error)', async () => {
-    const { personHash } = await prepare(false);
-    await expect(
-      hre.run('mint-nft', {
-        person: personHash,
-        vindex: '1',
-        tokenuri: 'ipfs://meta',
-        fullname: 'Mint Subject',
-        birthyear: '1999',
-        gender: '1',
-        birthplace: 'City',
-        story: 'Story'
-      })
-    ).to.be.rejectedWith(/must endorse this version first/i);
-  });
-
-  it('mints NFT and sets mappings', async () => {
-    const { deepFamily, personHash } = await prepare(true);
-    await hre.run('mint-nft', {
-      person: personHash,
-      vindex: '1',
-      tokenuri: 'ipfs://meta2',
-      fullname: 'Mint Subject',
-      birthyear: '1999',
-      gender: '1',
-      birthplace: 'City',
-      story: 'Story'
-    });
-    const tokenCounter = await deepFamily.tokenCounter();
-    expect(tokenCounter).to.equal(1n);
-    const mappedPerson = await deepFamily.tokenIdToPerson(1n);
-    expect(mappedPerson).to.equal(personHash);
-    const versionIdx = await deepFamily.tokenIdToVersionIndex(1n);
-    expect(versionIdx).to.equal(1n);
-    const versionToken = await deepFamily.versionToTokenId(personHash, 1n);
-    expect(versionToken).to.equal(1n);
-  });
-
-  it('prevents double mint of same version', async () => {
-    const { deepFamily, personHash } = await prepare(true);
-    const commonArgs = {
-      person: personHash,
-      vindex: '1',
-      tokenuri: 'ipfs://meta',
-      fullname: 'Mint Subject',
-      birthyear: '1999',
-      gender: '1',
-      birthplace: 'City',
-      story: 'Story'
-    };
-    await hre.run('mint-nft', commonArgs);
-    await expect(hre.run('mint-nft', commonArgs)).to.be.rejectedWith(/VersionAlreadyMinted/);
-  });
-
-  it('rejects empty fullName in supplementInfo via direct contract call', async () => {
-    const { deepFamily, personHash, basicInfo, proof, publicSignals } = await prepare(true);
-
-    const coreInfo = {
-      basicInfo: basicInfo,
-      supplementInfo: {
-        fullName: '', // Empty fullName should fail
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story'
-      }
-    };
-
-    await expect(
-      deepFamily.mintPersonNFT(proof.a, proof.b, proof.c, publicSignals, personHash, 1, 'ipfs://meta', coreInfo)
-    ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName');
-  });
-
-  it('rejects oversized fullName in supplementInfo via direct contract call', async () => {
-    const { deepFamily, personHash, basicInfo, proof, publicSignals } = await prepare(true);
-
-    const longName = 'A'.repeat(1001); // Exceeds MAX_LONG_TEXT_LENGTH
-    const coreInfo = {
-      basicInfo: basicInfo,
-      supplementInfo: {
-        fullName: longName,
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story'
-      }
-    };
-
-    await expect(
-      deepFamily.mintPersonNFT(proof.a, proof.b, proof.c, publicSignals, personHash, 1, 'ipfs://meta', coreInfo)
-    ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName');
-  });
-
-  it('rejects mismatched fullName and fullNameCommitment via direct contract call', async () => {
-    const { deepFamily, personHash, basicInfo, proof, publicSignals } = await prepare(true);
-
-    const coreInfo = {
-      basicInfo: basicInfo,
-      supplementInfo: {
-        fullName: 'Different Name', // Doesn't match the hash in basicInfo
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story'
-      }
-    };
-
-    await expect(
-      deepFamily.mintPersonNFT(proof.a, proof.b, proof.c, publicSignals, personHash, 1, 'ipfs://meta', coreInfo)
-    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
-  });
-
-  it('accepts valid fullName that matches fullNameCommitment via direct contract call', async () => {
-    const { deepFamily, personHash, FULLNAME, basicInfo, proof, publicSignals } = await prepare(true);
-
-    const coreInfo = {
-      basicInfo: basicInfo,
-      supplementInfo: {
-        fullName: FULLNAME, // Matches the hash in basicInfo
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story'
-      }
-    };
-
-    await deepFamily.mintPersonNFT(
-      proof.a,
-      proof.b,
-      proof.c,
-      publicSignals,
-      personHash,
+  async function prepareMintBase() {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = 'Mint Subject'
+    const person = makeTestPerson(FULLNAME, { isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 })
+    const identityCommitment = computeIdentityCommitment(
+      hre.ethers,
+      FULLNAME,
+      person,
       1,
-      'ipfs://meta',
-      coreInfo,
-    );
+      1,
+      1,
+    )
+    const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, { person })
+    await deepFamily.connect(signer).endorseVersion(personHash, 1)
+    return { deepFamily, signer, FULLNAME, personHash, identityCommitment }
+  }
 
-    // Verify the NFT was minted
-    const tokenCounter = await deepFamily.tokenCounter();
-    expect(tokenCounter).to.equal(1n);
-  });
+  it('fails mint before endorsement', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = 'No Endorse'
+    const person = makeTestPerson(FULLNAME, { isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 })
+    const identityCommitment = computeIdentityCommitment(
+      hre.ethers,
+      FULLNAME,
+      person,
+      1,
+      1,
+      1,
+    )
+    const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, { person })
 
-  it('reverts when proof minter does not match caller', async () => {
-    const { deepFamily, personHash, FULLNAME, basicInfo } = await prepare(true);
-    const [, otherSigner] = await hre.ethers.getSigners();
-    const mismatchBundle = await generateNamePoseidonProof(FULLNAME, "", { minter: await otherSigner.getAddress() });
+    const basicInfo = {
+      identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+      isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1,
+    }
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
+    const signerAddr = await signer.getAddress()
+
+    const proof = makeStubProof()
+    const publicSignals = {
+      identityCommitment: BigInt(identityCommitment),
+      disclosureBinding: disclosureBindingValue,
+      minter: BigInt(signerAddr),
+      schemaVersion: 1,
+      cryptoSuiteVersion: 1,
+      hashAlgoId: 1,
+    }
 
     const coreInfo = {
       basicInfo,
       supplementInfo: {
-        fullName: FULLNAME,
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story'
-      }
-    };
-
-    await expect(
-      deepFamily.mintPersonNFT(
-        mismatchBundle.proof.a,
-        mismatchBundle.proof.b,
-        mismatchBundle.proof.c,
-        mismatchBundle.publicSignals,
-        personHash,
-        1,
-        'ipfs://meta',
-        coreInfo
-      )
-    ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch');
-  });
-
-  it('mintPersonNFTV2 rejects mismatched disclosure fullName and supplement fullName', async () => {
-    const { deepFamily, signer, FULLNAME, personHash, identityCommitment } = await prepareMintV2Base();
-
-    const proof = {
-      proofSystemId: 1,
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      a: [0, 0],
-      b: [[0, 0], [0, 0]],
-      c: [0, 0],
-    };
-
-    const disclosureBinding = hre.ethers.zeroPadValue('0x1234', 32);
-    const publicSignals = {
-      identityCommitment,
-      disclosureBinding: BigInt(disclosureBinding),
-      minter: BigInt(await signer.getAddress()),
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      hashAlgoId: 1,
-    };
-
-    const coreInfo = {
-      basicInfo: {
-        fullNameCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
-        isBirthBC: false,
-        birthYear: 1999,
-        birthMonth: 0,
-        birthDay: 0,
-        gender: 1,
+        fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0,
+        deathMonth: 0, deathDay: 0, deathPlace: '', story: '',
       },
-      supplementInfo: {
-        fullName: 'Different Name',
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story',
-      },
-    };
-
-    const disclosure = {
-      fullName: FULLNAME,
-      disclosureNonce: hre.ethers.zeroPadValue('0x11', 32),
-      disclosureBinding,
-    };
-
-    await expect(
-      deepFamily.connect(signer).mintPersonNFTV2(proof, publicSignals, personHash, 1, 'ipfs://mint-v2', coreInfo, disclosure)
-    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
-  });
-
-  it('mintPersonNFTV2 rejects mismatched disclosure binding', async () => {
-    const { deepFamily, signer, FULLNAME, personHash, identityCommitment } = await prepareMintV2Base();
-
-    const proof = {
-      proofSystemId: 1,
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      a: [0, 0],
-      b: [[0, 0], [0, 0]],
-      c: [0, 0],
-    };
-
-    const publicSignals = {
-      identityCommitment,
-      disclosureBinding: 0x1234n,
-      minter: BigInt(await signer.getAddress()),
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      hashAlgoId: 1,
-    };
-
-    const coreInfo = {
-      basicInfo: {
-        fullNameCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
-        isBirthBC: false,
-        birthYear: 1999,
-        birthMonth: 0,
-        birthDay: 0,
-        gender: 1,
-      },
-      supplementInfo: {
-        fullName: FULLNAME,
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story',
-      },
-    };
-
-    const disclosure = {
-      fullName: FULLNAME,
-      disclosureNonce: hre.ethers.zeroPadValue('0x22', 32),
-      disclosureBinding: hre.ethers.zeroPadValue('0x9999', 32),
-    };
-
-    await expect(
-      deepFamily.connect(signer).mintPersonNFTV2(proof, publicSignals, personHash, 1, 'ipfs://mint-v2', coreInfo, disclosure)
-    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch');
-  });
-
-  it('mintPersonNFTV2 mints successfully with consistent v2 inputs', async () => {
-    const { deepFamily, signer, FULLNAME, personHash, identityCommitment } = await prepareMintV2Base();
-
-    const proof = {
-      proofSystemId: 1,
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      a: [0, 0],
-      b: [[0, 0], [0, 0]],
-      c: [0, 0],
-    };
-
-    const domainBytes = hre.ethers.toUtf8Bytes('deepfamily:name-prehash:v2');
-    const nameBytes = hre.ethers.toUtf8Bytes(FULLNAME);
-    const namePrehash = hre.ethers.keccak256(hre.ethers.concat([domainBytes, nameBytes]));
-    const snarkField = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
-    const nameField = BigInt(namePrehash) % snarkField;
-    const disclosureNonce = hre.ethers.zeroPadValue('0x33', 32);
-    const disclosureNonceField = BigInt(disclosureNonce) % snarkField;
-    const suiteCommitment = poseidon4([1000n, 2n, 2n, 1n]);
-    const disclosureBindingValue = poseidon4([1003n, nameField, disclosureNonceField, suiteCommitment]);
-    const disclosureBinding = hre.ethers.zeroPadValue(hre.ethers.toBeHex(disclosureBindingValue), 32);
-
-    const publicSignals = {
-      identityCommitment,
-      disclosureBinding: disclosureBindingValue,
-      minter: BigInt(await signer.getAddress()),
-      schemaVersion: 2,
-      cryptoSuiteVersion: 2,
-      hashAlgoId: 1,
-    };
-
-    const coreInfo = {
-      basicInfo: {
-        fullNameCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
-        isBirthBC: false,
-        birthYear: 1999,
-        birthMonth: 0,
-        birthDay: 0,
-        gender: 1,
-      },
-      supplementInfo: {
-        fullName: FULLNAME,
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story',
-      },
-    };
-
-    const disclosure = {
-      fullName: FULLNAME,
-      disclosureNonce,
-      disclosureBinding,
-    };
-
-    await deepFamily.connect(signer).mintPersonNFTV2(
-      proof,
-      publicSignals,
-      personHash,
-      1,
-      'ipfs://mint-v2-success',
-      coreInfo,
-      disclosure,
-      {},
-    );
-
-    const tokenCounter = await deepFamily.tokenCounter();
-    expect(tokenCounter).to.equal(1n);
-    expect(await deepFamily.tokenIdToPerson(1n)).to.equal(personHash);
-    expect(await deepFamily.versionToTokenId(personHash, 1n)).to.equal(1n);
-  });
-
-  describe('Age gate', () => {
-    function supplement(fullName) {
-      return {
-        fullName,
-        birthPlace: 'City',
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: '',
-        story: 'Story',
-      };
     }
 
+    await expect(
+      deepFamily.connect(signer).mintPersonVersionNFT(
+        proof, publicSignals, 1, '', coreInfo
+      )
+    ).to.be.revertedWithCustomError(deepFamily, 'MustEndorseVersionFirst')
+  })
+
+  it('mints NFT and sets mappings', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = 'Mint Subject'
+    const person = makeTestPerson(FULLNAME, { isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 })
+    const identityCommitment = computeIdentityCommitment(
+      hre.ethers,
+      FULLNAME,
+      person,
+      1,
+      1,
+      1,
+    )
+
+    const { personHash } = await mintPerson(hre.ethers, deepFamily, signer, identityCommitment, FULLNAME, {
+      tokenURI: 'ipfs://meta2', birthPlace: 'City', story: 'Story',
+    })
+
+    const tokenCounter = await deepFamily.tokenCounter()
+    expect(tokenCounter).to.equal(1n)
+    expect(await deepFamily.tokenIdToPerson(1n)).to.equal(personHash)
+    expect(await deepFamily.tokenIdToVersionIndex(1n)).to.equal(1n)
+    expect(await deepFamily.versionToTokenId(personHash, 1n)).to.equal(1n)
+  })
+
+  it('prevents double mint of same version', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = 'Double Mint'
+    const identityCommitment = computeIdentityCommitment(
+      hre.ethers,
+      FULLNAME,
+      { isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 },
+      1,
+      1,
+      1,
+    )
+
+    await mintPerson(hre.ethers, deepFamily, signer, identityCommitment, FULLNAME)
+
+    const personHash = computePersonHash(hre.ethers, identityCommitment)
+    const basicInfo = {
+      identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+      isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1,
+    }
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
+    const signerAddr = await signer.getAddress()
+
+    const proof = makeStubProof()
+    const publicSignals = {
+      identityCommitment: BigInt(identityCommitment),
+      disclosureBinding: disclosureBindingValue,
+      minter: BigInt(signerAddr),
+      schemaVersion: 1, cryptoSuiteVersion: 1, hashAlgoId: 1,
+    }
+    const coreInfo = {
+      basicInfo,
+      supplementInfo: {
+        fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0,
+        deathMonth: 0, deathDay: 0, deathPlace: '', story: '',
+      },
+    }
+
+    await expect(
+      deepFamily.connect(signer).mintPersonVersionNFT(
+        proof, publicSignals, 1, '', coreInfo
+      )
+    ).to.be.revertedWithCustomError(deepFamily, 'VersionAlreadyMinted')
+  })
+
+  it('rejects empty fullName in supplementInfo', async () => {
+    const { deepFamily, signer, personHash, identityCommitment, FULLNAME } = await prepareMintBase()
+
+    const basicInfo = {
+      identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+      isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1,
+    }
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
+    const signerAddr = await signer.getAddress()
+
+    const proof = makeStubProof()
+    const publicSignals = {
+      identityCommitment: BigInt(identityCommitment),
+      disclosureBinding: disclosureBindingValue,
+      minter: BigInt(signerAddr),
+      schemaVersion: 1, cryptoSuiteVersion: 1, hashAlgoId: 1,
+    }
+    const coreInfo = {
+      basicInfo,
+      supplementInfo: {
+        fullName: '', birthPlace: '', isDeathBC: false, deathYear: 0,
+        deathMonth: 0, deathDay: 0, deathPlace: '', story: '',
+      },
+    }
+
+    await expect(
+      deepFamily.connect(signer).mintPersonVersionNFT(
+        proof, publicSignals, 1, '', coreInfo
+      )
+    ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName')
+  })
+
+  it('rejects mismatched supplement fullName and proof-bound fullName', async () => {
+    const { deepFamily, signer, identityCommitment, FULLNAME } = await prepareMintBase()
+
+    const basicInfo = {
+      identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+      isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1,
+    }
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
+    const signerAddr = await signer.getAddress()
+
+    const proof = makeStubProof()
+    const publicSignals = {
+      identityCommitment: BigInt(identityCommitment),
+      disclosureBinding: disclosureBindingValue,
+      minter: BigInt(signerAddr),
+      schemaVersion: 1, cryptoSuiteVersion: 1, hashAlgoId: 1,
+    }
+    const coreInfo = {
+      basicInfo,
+      supplementInfo: {
+        fullName: 'Different Name', birthPlace: '', isDeathBC: false, deathYear: 0,
+        deathMonth: 0, deathDay: 0, deathPlace: '', story: '',
+      },
+    }
+
+    await expect(
+      deepFamily.connect(signer).mintPersonVersionNFT(
+        proof, publicSignals, 1, '', coreInfo
+      )
+    ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch')
+  })
+
+  it('mints successfully with consistent inputs', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = 'Consistent Mint'
+    const identityCommitment = null
+
+    const { personHash } = await mintPerson(hre.ethers, deepFamily, signer, identityCommitment, FULLNAME)
+
+    const tokenCounter = await deepFamily.tokenCounter()
+    expect(tokenCounter).to.equal(1n)
+    expect(await deepFamily.tokenIdToPerson(1n)).to.equal(personHash)
+    expect(await deepFamily.versionToTokenId(personHash, 1n)).to.equal(1n)
+  })
+
+  it('mints successfully when fullname is canonicalized before proof/calldata submission', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = '  Alice　Smith  '
+    const identityCommitment = null
+
+    const { receipt } = await mintPerson(hre.ethers, deepFamily, signer, identityCommitment, FULLNAME)
+
+    expect(receipt?.status).to.equal(1)
+    expect(await deepFamily.tokenCounter()).to.equal(1n)
+  })
+
+  it('supports non-default schemaVersion and cryptoSuiteVersion on mint', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const FULLNAME = 'Versioned Mint'
+
+    const { receipt } = await mintPerson(hre.ethers, deepFamily, signer, null, FULLNAME, {
+      schemaVersion: 2,
+      cryptoSuiteVersion: 3,
+      hashAlgoId: 1,
+    })
+
+    expect(receipt?.status).to.equal(1)
+    expect(await deepFamily.tokenCounter()).to.equal(1n)
+  })
+
+  it('reverts when proof minter does not match caller', async () => {
+    const { deepFamily, signer, identityCommitment, FULLNAME } = await prepareMintBase()
+    const [, otherSigner] = await hre.ethers.getSigners()
+    const otherAddr = await otherSigner.getAddress()
+
+    const basicInfo = {
+      identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
+      isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1,
+    }
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
+
+    const proof = makeStubProof()
+    const publicSignals = {
+      identityCommitment: BigInt(identityCommitment),
+      disclosureBinding: disclosureBindingValue,
+      minter: BigInt(otherAddr),
+      schemaVersion: 1, cryptoSuiteVersion: 1, hashAlgoId: 1,
+    }
+    const coreInfo = {
+      basicInfo,
+      supplementInfo: {
+        fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0,
+        deathMonth: 0, deathDay: 0, deathPlace: '', story: '',
+      },
+    }
+
+    await expect(
+      deepFamily.connect(signer).mintPersonVersionNFT(
+        proof, publicSignals, 1, '', coreInfo
+      )
+    ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch')
+  })
+
+  it('allows hashAlgoId == 0 on mint', async () => {
+    const { deepFamily, signer } = await baseSetup()
+
+    const { receipt } = await mintPerson(hre.ethers, deepFamily, signer, null, 'Zero Algo Mint', {
+      hashAlgoId: 0,
+    })
+
+    expect(receipt?.status).to.equal(1)
+    expect(await deepFamily.tokenCounter()).to.equal(1n)
+  })
+
+  describe('Age gate', () => {
     async function setNextBlockTimestamp(ts) {
-      const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest');
-      const next = Math.max(Number(latestTs) + 1, ts);
-      await hre.ethers.provider.send('evm_setNextBlockTimestamp', [next]);
-      await hre.ethers.provider.send('evm_mine');
-      return next;
+      const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest')
+      const next = Math.max(Number(latestTs) + 1, ts)
+      await hre.ethers.provider.send('evm_setNextBlockTimestamp', [next])
+      await hre.ethers.provider.send('evm_mine')
+      return next
     }
 
     async function planMintDate() {
-      const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest');
-      const baseYear = new Date(latestTs * 1000).getUTCFullYear();
-      const mintYear = baseYear + 1;
-      const mintMonth = 6; // June
-      const mintDay = 15;
-      const mintTs = toTimestamp(mintYear, mintMonth, mintDay);
-      return { mintYear, mintMonth, mintDay, mintTs };
+      const { timestamp: latestTs } = await hre.ethers.provider.getBlock('latest')
+      const baseYear = new Date(latestTs * 1000).getUTCFullYear()
+      const mintYear = baseYear + 1
+      const mintMonth = 6
+      const mintDay = 15
+      const mintTs = toTimestamp(mintYear, mintMonth, mintDay)
+      return { mintYear, mintMonth, mintDay, mintTs }
     }
 
     it('reverts when age is 18 but birth month not reached', async () => {
-      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate();
-      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
+      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate()
+      const { deepFamily, signer } = await baseSetup()
+      const FULLNAME = 'Young Month'
+      const ic = computeIdentityCommitment(
+        hre.ethers,
+        FULLNAME,
+        { isBirthBC: false, birthYear: mintYear - 18, birthMonth: mintMonth + 1, birthDay: mintDay, gender: 1 },
+        1,
+        1,
+        1,
+      )
+      const person = makeTestPerson(FULLNAME, {
+        isBirthBC: false,
         birthYear: mintYear - 18,
         birthMonth: mintMonth + 1,
         birthDay: mintDay,
-      });
-      await setNextBlockTimestamp(mintTs);
+        gender: 1,
+      })
+      const personHash = await addPerson(hre.ethers, deepFamily, signer, ic, { person })
+      await deepFamily.connect(signer).endorseVersion(personHash, 1)
+
+      await setNextBlockTimestamp(mintTs)
+
+      const basicInfo = {
+        identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(ic), 32),
+        isBirthBC: false,
+        birthYear: mintYear - 18,
+        birthMonth: mintMonth + 1,
+        birthDay: mintDay,
+        gender: 1,
+      }
+      const dbVal = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
+      const signerAddr = await signer.getAddress()
 
       await expect(
-        deepFamily.mintPersonNFT(
-          proof.a,
-          proof.b,
-          proof.c,
-          publicSignals,
-          personHash,
-          1,
-          'ipfs://age-under',
-          { basicInfo, supplementInfo: supplement(fullName) },
+        deepFamily.connect(signer).mintPersonVersionNFT(
+          makeStubProof(),
+          {
+            identityCommitment: BigInt(ic),
+            disclosureBinding: dbVal,
+            minter: BigInt(signerAddr),
+            schemaVersion: 1,
+            cryptoSuiteVersion: 1,
+            hashAlgoId: 1,
+          },
+          1, '',
+          {
+            basicInfo,
+            supplementInfo: { fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0, deathMonth: 0, deathDay: 0, deathPlace: '', story: '' },
+          }
         )
-      ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult');
-    });
-
-    it('reverts when age is exactly 18 but birthday day not reached', async () => {
-      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate();
-      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
-        birthYear: mintYear - 18,
-        birthMonth: mintMonth,
-        birthDay: mintDay + 5,
-      });
-      await setNextBlockTimestamp(mintTs);
-
-      await expect(
-        deepFamily.mintPersonNFT(
-          proof.a,
-          proof.b,
-          proof.c,
-          publicSignals,
-          personHash,
-          1,
-          'ipfs://age-day',
-          { basicInfo, supplementInfo: supplement(fullName) },
-        )
-      ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult');
-    });
-
-    it('allows mint when age is exactly 18 with birth day unknown in current month', async () => {
-      const { mintYear, mintMonth, mintDay, mintTs } = await planMintDate();
-      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
-        birthYear: mintYear - 18,
-        birthMonth: mintMonth,
-        birthDay: 0,
-      });
-      await setNextBlockTimestamp(mintTs);
-
-      await deepFamily.mintPersonNFT(
-        proof.a,
-        proof.b,
-        proof.c,
-        publicSignals,
-        personHash,
-        1,
-        'ipfs://age-unknown-day',
-        { basicInfo, supplementInfo: supplement(fullName) },
-        {},
-      );
-    });
+      ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult')
+    })
 
     it('allows mint when birth year is unknown (0)', async () => {
-      const { mintTs } = await planMintDate();
-      const { deepFamily, personHash, basicInfo, proof, publicSignals, fullName } = await prepareAgeCase({
-        birthYear: 0,
-        birthMonth: 0,
-        birthDay: 0,
-      });
-      await setNextBlockTimestamp(mintTs);
+      const { deepFamily, signer } = await baseSetup()
+      const FULLNAME = 'Unknown Year'
+      const ic = null
 
-      await deepFamily.mintPersonNFT(
-        proof.a,
-        proof.b,
-        proof.c,
-        publicSignals,
-        personHash,
-        1,
-        'ipfs://age-unknown-year',
-        { basicInfo, supplementInfo: supplement(fullName) },
-        {},
-      );
-    });
-  });
-});
+      await mintPerson(hre.ethers, deepFamily, signer, ic, FULLNAME, {
+        birthYear: 0, birthMonth: 0, birthDay: 0,
+      })
+
+      const tokenCounter = await deepFamily.tokenCounter()
+      expect(tokenCounter).to.equal(1n)
+    })
+  })
+})

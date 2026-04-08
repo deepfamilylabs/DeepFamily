@@ -304,7 +304,7 @@
       "entropyDisplay": "真实熵值：{{raw}} bits · 评估强度评分：{{adjusted}}",
       "passphraseCharCount": "去除首尾空格后字符数：{{count}}",
       "nameInputPlaceholder": "例如：张三",
-      "description": "说明：计算逻辑与合约 getPersonHash（身份哈希）完全一致。",
+      "description": "说明：根据姓名、出生信息和口令在本地计算唯一身份哈希，全程不上传任何数据。",
       "bcOptions": {
         "ad": "公元",
         "bc": "公元前"
@@ -947,8 +947,8 @@
     "title": "🔐 安全密钥派生",
     "subtitle": "使用 KDF 算法从个人信息和强口令短语派生以太坊私钥。确定性恢复，无需存储私钥。",
     "howItWorks": "💡 工作原理",
-    "description": "PersonHash(姓名, 生日, 性别, 口令短语) → scrypt KDF (N=131072) → 私钥 → 以太坊地址",
-    "note": "相同输入始终生成相同密钥 | KDF 提供 131,072× 暴力破解保护",
+    "description": "姓名 + 生日 + 口令短语 → 经 Argon2id 派生 PersonHash → scrypt KDF (N=131072) → 私钥 → 以太坊地址",
+    "note": "相同输入始终生成相同密钥 | PersonHash 会先在本地执行 Argon2id 派生，再进入 scrypt 密钥强化",
     "component": {
       "title": "安全密钥派生",
       "description": "使用 KDF 算法从个人信息和强口令短语派生安全的以太坊私钥。",

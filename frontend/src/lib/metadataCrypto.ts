@@ -1,4 +1,5 @@
 import { sha256 } from "@noble/hashes/sha2";
+import type { IdentitySaltMode } from "./identityHash";
 import {
   DEFAULT_FILE_KDF_CONFIG,
   type Argon2idParams,
@@ -10,11 +11,9 @@ import {
 } from "./secretDerivation";
 import { normalizePassphraseForHash } from "./passphraseStrength";
 
-export const METADATA_AAD = "deepfamily/person-version@1.0";
-export const METADATA_SCHEMA = "deepfamily/person-version@1.0";
-export const METADATA_VERSION = "df-meta-v1";
-export const DEFAULT_ITERATIONS = 100000;
-export const MAX_ITERATIONS = 1000000;
+export const METADATA_AAD = "deepfamily/person-version@2.0";
+export const METADATA_SCHEMA = "deepfamily/person-version@2.0";
+export const METADATA_VERSION = "df-meta-v2";
 export const MAX_ENCRYPTED_PAYLOAD_CHARS = 2000000;
 export const MAX_SALT_BYTES = 64;
 export const MAX_IV_BYTES = 64;
@@ -22,17 +21,6 @@ export const MAX_CIPHERTEXT_BYTES = 2000000;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-
-export type EncryptedMetadataPayload = {
-  version: string;
-  schema: string;
-  cipher: string;
-  aad: string;
-  kdf: { alg: string; iter: number; salt: string };
-  iv: string;
-  ciphertext: string;
-  tag: string;
-};
 
 export type EncryptedMetadataPayloadV2 = {
   version: string;
@@ -54,6 +42,7 @@ export type EncryptedMetadataPayloadV2 = {
 };
 
 export type MetadataRecoveryV2 = {
+  identityMode?: IdentitySaltMode;
   identityKdf: {
     algorithm: "Argon2id";
     kdfVersion: number;
@@ -62,7 +51,7 @@ export type MetadataRecoveryV2 = {
   };
 };
 
-export type AnyEncryptedMetadataPayload = EncryptedMetadataPayload | EncryptedMetadataPayloadV2;
+export type AnyEncryptedMetadataPayload = EncryptedMetadataPayloadV2;
 
 export const toBase64 = (data: Uint8Array) => {
   let binary = "";
@@ -100,68 +89,6 @@ const getWebCrypto = (): Crypto => {
     throw new Error("Web Crypto is not available in this environment");
   }
   return cryptoObj;
-};
-
-export const encryptMetadataJson = async (
-  plaintext: string,
-  password: string,
-  opts?: {
-    aad?: string;
-    iterations?: number;
-    schema?: string;
-    version?: string;
-  },
-): Promise<{ payload: EncryptedMetadataPayload; plainHash: string }> => {
-  const cryptoObj = getWebCrypto();
-
-  const normalizedPassword = normalizePassphraseForHash(password || "");
-  const salt = new Uint8Array(new ArrayBuffer(16));
-  const iv = new Uint8Array(new ArrayBuffer(12));
-  cryptoObj.getRandomValues(salt);
-  cryptoObj.getRandomValues(iv);
-  const aad = opts?.aad ?? METADATA_AAD;
-  const iterations = opts?.iterations ?? DEFAULT_ITERATIONS;
-  const keyMaterial = await cryptoObj.subtle.importKey(
-    "raw",
-    encoder.encode(normalizedPassword),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-  const key = await cryptoObj.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt"],
-  );
-
-  const ciphertextBuffer = await cryptoObj.subtle.encrypt(
-    { name: "AES-GCM", iv, additionalData: encoder.encode(aad) },
-    key,
-    encoder.encode(plaintext),
-  );
-
-  const ciphertext = new Uint8Array(ciphertextBuffer);
-  const tag = ciphertext.slice(ciphertext.length - 16);
-  const plainHash = sha256Hex(plaintext);
-
-  const payload: EncryptedMetadataPayload = {
-    version: opts?.version ?? METADATA_VERSION,
-    schema: opts?.schema ?? METADATA_SCHEMA,
-    cipher: "AES-256-GCM",
-    aad,
-    kdf: {
-      alg: "PBKDF2-SHA256",
-      iter: iterations,
-      salt: toBase64(salt),
-    },
-    iv: toBase64(iv),
-    ciphertext: toBase64(ciphertext),
-    tag: toBase64(tag),
-  };
-
-  return { payload, plainHash };
 };
 
 export const encryptMetadataJsonV2 = async (
@@ -203,8 +130,8 @@ export const encryptMetadataJsonV2 = async (
   const plainHash = sha256Hex(plaintext);
 
   const payload: EncryptedMetadataPayloadV2 = {
-    version: opts?.version ?? "df-meta-v2",
-    schema: opts?.schema ?? "deepfamily/person-version@2.0",
+    version: opts?.version ?? METADATA_VERSION,
+    schema: opts?.schema ?? METADATA_SCHEMA,
     cipher: "AES-256-GCM",
     aad,
     kdf: {
@@ -249,16 +176,6 @@ const safeFromBase64 = (
   } catch {
     throw new Error(`Invalid encrypted payload: ${opts.label} base64 decode failed`);
   }
-};
-
-const coerceIterations = (iter: unknown): number => {
-  if (typeof iter !== "number" || !Number.isFinite(iter)) {
-    throw new Error("Invalid encrypted payload: invalid kdf.iter");
-  }
-  const intIter = Math.floor(iter);
-  if (intIter < 1) throw new Error("Invalid encrypted payload: invalid kdf.iter");
-  if (intIter > MAX_ITERATIONS) throw new Error("Invalid encrypted payload: kdf.iter too large");
-  return intIter;
 };
 
 export const decryptMetadataPayloadV2 = async (
@@ -342,107 +259,21 @@ export const decryptMetadataPayloadV2 = async (
 };
 
 export const decryptMetadataPayload = async (
-  payloadOrJson: string | AnyEncryptedMetadataPayload,
+  payloadOrJson: string | EncryptedMetadataPayloadV2,
   password: string,
-  opts?: {
-    aad?: string;
-    iterations?: number;
-  },
 ): Promise<{
   plaintext: string;
   data: any;
   hash: string;
-  payload: EncryptedMetadataPayload;
+  payload: EncryptedMetadataPayloadV2;
 }> => {
-  const cryptoObj = getWebCrypto();
-
-  const normalizedPassword = normalizePassphraseForHash(password || "");
-  if (typeof payloadOrJson === "string" && payloadOrJson.length > MAX_ENCRYPTED_PAYLOAD_CHARS) {
-    throw new Error("Invalid encrypted payload: payload is too large");
-  }
-
-  const payload: AnyEncryptedMetadataPayload =
-    typeof payloadOrJson === "string" ? JSON.parse(payloadOrJson) : payloadOrJson;
-
-  if ((payload as EncryptedMetadataPayloadV2)?.kdf?.alg === "Argon2id") {
-    return await decryptMetadataPayloadV2(payload as EncryptedMetadataPayloadV2, password);
-  }
-
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Invalid encrypted payload: not an object");
-  }
-  if (typeof payload?.version !== "string" || !payload.version) {
-    throw new Error("Invalid encrypted payload: missing version");
-  }
-  if (typeof payload?.schema !== "string" || !payload.schema) {
-    throw new Error("Invalid encrypted payload: missing schema");
-  }
-  if (payload?.cipher && payload.cipher !== "AES-256-GCM") {
-    throw new Error("Invalid encrypted payload: unsupported cipher");
-  }
-  if (payload?.kdf?.alg && payload.kdf.alg !== "PBKDF2-SHA256") {
-    throw new Error("Invalid encrypted payload: unsupported kdf algorithm");
-  }
-
-  const salt = safeFromBase64(payload?.kdf?.salt || "", {
-    maxBytes: MAX_SALT_BYTES,
-    label: "kdf.salt",
-  });
-  const iv = safeFromBase64(payload?.iv || "", { maxBytes: MAX_IV_BYTES, label: "iv" });
-  if (salt.length !== 16) throw new Error("Invalid encrypted payload: salt length mismatch");
-  if (iv.length !== 12) throw new Error("Invalid encrypted payload: iv length mismatch");
-
-  const aad = opts?.aad ?? payload?.aad ?? payload?.schema ?? METADATA_AAD;
-  if (typeof aad !== "string" || !aad) throw new Error("Invalid encrypted payload: missing aad");
-  if (aad.length > 256) throw new Error("Invalid encrypted payload: aad too long");
-
-  const iterations =
-    opts?.iterations ??
-    (payload?.kdf?.iter != null ? coerceIterations(payload.kdf.iter) : DEFAULT_ITERATIONS);
-
-  const keyMaterial = await cryptoObj.subtle.importKey(
-    "raw",
-    encoder.encode(normalizedPassword),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-  const key = await cryptoObj.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"],
-  );
-
-  const cipherBytes = safeFromBase64(payload?.ciphertext || "", {
-    maxBytes: MAX_CIPHERTEXT_BYTES,
-    label: "ciphertext",
-  });
-  if (cipherBytes.length < 16) throw new Error("Invalid encrypted payload: ciphertext too short");
-  const tagBytes = safeFromBase64(payload?.tag || "", { maxBytes: 32, label: "tag" });
-  if (tagBytes.length !== 16) throw new Error("Invalid encrypted payload: tag length mismatch");
-  const tailTag = cipherBytes.slice(cipherBytes.length - 16);
-  for (let i = 0; i < 16; i += 1) {
-    if (tailTag[i] !== tagBytes[i]) throw new Error("Invalid encrypted payload: tag mismatch");
-  }
-  const plainBuffer = await cryptoObj.subtle.decrypt(
-    { name: "AES-GCM", iv, additionalData: encoder.encode(aad) },
-    key,
-    cipherBytes,
-  );
-
-  const plaintext = decoder.decode(plainBuffer);
-  const hashHex = sha256Hex(plaintext);
-  const hashWithPrefix = `sha256:${hashHex}`;
-
-  const data = JSON.parse(plaintext);
-  return { plaintext, data, hash: hashWithPrefix, payload };
+  return await decryptMetadataPayloadV2(payloadOrJson, password);
 };
 
 export const parseEncryptedPayload = (json: string): AnyEncryptedMetadataPayload | null => {
   try {
-    return JSON.parse(json);
+    const payload = JSON.parse(json);
+    return payload?.kdf?.alg === "Argon2id" ? payload : null;
   } catch {
     return null;
   }

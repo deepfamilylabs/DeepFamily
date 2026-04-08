@@ -6,22 +6,9 @@ import { useToast } from "../components/ToastProvider";
 import { useTranslation } from "react-i18next";
 import DeepFamily from "../abi/DeepFamily.json";
 import { extractRevertReason, getFriendlyError, sanitizeErrorForLogging } from "../lib/errors";
+import type { ProofEnvelope } from "../lib/zk";
 
-// Groth16 proof type from snarkjs
-export type Groth16Proof = {
-  pi_a: [string | bigint, string | bigint, string | bigint];
-  pi_b: [
-    [string | bigint, string | bigint],
-    [string | bigint, string | bigint],
-    [string | bigint, string | bigint],
-  ];
-  pi_c: [string | bigint, string | bigint, string | bigint];
-  protocol: string;
-  curve: string;
-};
-
-// Result type for addPersonZK
-export type AddPersonZKResult = {
+export type AddPersonVersionResult = {
   hash: string;
   index: number;
   rewardAmount: number;
@@ -52,16 +39,24 @@ export type AddPersonZKResult = {
   };
 };
 
-// Helper to convert various types to bigint
-function toBigInt(v: string | number | bigint): bigint {
-  if (typeof v === "bigint") return v;
-  if (typeof v === "number") return BigInt(v);
-  if (typeof v === "string") {
-    if (v.startsWith("0x") || v.startsWith("0X")) return BigInt(v);
-    return BigInt(v);
-  }
-  throw new Error("unsupported type");
-}
+export type PersonProofPublicSignals = {
+  identityCommitment: bigint;
+  fatherIdentityCommitment: bigint;
+  motherIdentityCommitment: bigint;
+  submitter: bigint;
+  schemaVersion: number;
+  cryptoSuiteVersion: number;
+  hashAlgoId: number;
+};
+
+export type DisclosureBindingPublicSignals = {
+  identityCommitment: bigint;
+  disclosureBinding: bigint;
+  minter: bigint;
+  schemaVersion: number;
+  cryptoSuiteVersion: number;
+  hashAlgoId: number;
+};
 
 export function useContract() {
   const { signer, provider } = useWallet();
@@ -73,10 +68,8 @@ export function useContract() {
     if (!contractAddress) return null;
 
     if (signer) {
-      // Write operations with signer
       return new ethers.Contract(contractAddress, DeepFamily.abi, signer);
     } else if (provider) {
-      // Read-only operations with provider
       return new ethers.Contract(contractAddress, DeepFamily.abi, provider);
     }
 
@@ -103,24 +96,17 @@ export function useContract() {
       }
 
       try {
-        // Debug wallet and network state
         if (signer && signer.provider) {
           try {
-            const network = await signer.provider.getNetwork();
-            const signerAddress = await signer.getAddress();
-            const balance = await signer.provider.getBalance(signerAddress);
+            await signer.provider.getNetwork();
           } catch (walletStateError) {
             console.warn("Failed to get wallet state:", sanitizeErrorForLogging(walletStateError));
           }
         }
 
-        // Add a small delay to prevent nonce conflicts with rapid successive transactions
         await new Promise((resolve) => setTimeout(resolve, 100));
 
-        // Add timeout for wallet popup interaction (30 seconds)
         const walletTimeout = 30000;
-        console.log(`⏰ Setting ${walletTimeout / 1000}s timeout for wallet confirmation...`);
-
         const contractPromise = contractMethod();
 
         const timeoutPromise = new Promise((_, reject) => {
@@ -133,17 +119,9 @@ export function useContract() {
           }, walletTimeout);
         });
 
-        // Add window focus detection to catch when user switches away
         let windowBlurred = false;
-        const onBlur = () => {
-          windowBlurred = true;
-          console.warn("🔍 Window lost focus - user may have switched to wallet or other app");
-        };
-        const onFocus = () => {
-          if (windowBlurred) {
-            windowBlurred = false;
-          }
-        };
+        const onBlur = () => { windowBlurred = true; };
+        const onFocus = () => { if (windowBlurred) windowBlurred = false; };
 
         window.addEventListener("blur", onBlur);
         window.addEventListener("focus", onFocus);
@@ -173,7 +151,6 @@ export function useContract() {
       } catch (error: any) {
         console.error("Transaction failed:", sanitizeErrorForLogging(error));
 
-        // Use unified error handling from errors.ts
         const friendly = getFriendlyError(error, t);
         const errorMsg = options.errorMessage
           ? `${options.errorMessage}: ${friendly.message}`
@@ -183,7 +160,6 @@ export function useContract() {
           toast.show(errorMsg);
         }
 
-        // Create enhanced error with parsed info
         const enhancedError = {
           ...error,
           parsedMessage: errorMsg,
@@ -196,117 +172,47 @@ export function useContract() {
         };
 
         options.onError?.(enhancedError);
-
-        // Throw enhanced error so calling code can catch it
         throw enhancedError;
       }
     },
     [contract, signer, toast, t],
   );
 
-  // Contract interaction methods based on actual DeepFamily.sol functions
-
   /**
-   * Add a person version using ZK proof
-   * Accepts snarkjs Groth16 proof format and handles conversion internally
-   * Includes gas estimation with fallback, staticCall pre-check, and event parsing
+   * Add a person version using ZK proof (ProofEnvelope + struct-based parameters)
    */
-  const addPersonZK = useCallback(
+  const addPersonVersion = useCallback(
     async (
-      proof: Groth16Proof,
-      publicSignals: Array<string | number | bigint>,
+      proof: ProofEnvelope,
+      publicSignals: PersonProofPublicSignals,
       fatherVersionIndex: number,
       motherVersionIndex: number,
       tag: string,
       metadataCID: string,
-    ): Promise<AddPersonZKResult | null> => {
+    ): Promise<AddPersonVersionResult | null> => {
       if (!contract || !signer) {
         toast.show(t("wallet.notConnected", "Please connect your wallet"));
         return null;
       }
 
-      // Validate proof structure
-      if (!proof || !proof.pi_a || !proof.pi_b || !proof.pi_c) {
-        throw new Error("Invalid proof structure: missing pi_a, pi_b, or pi_c components");
-      }
-
-      if (!Array.isArray(proof.pi_a) || proof.pi_a.length !== 3) {
-        throw new Error("Invalid proof.pi_a: expected array of length 3");
-      }
-
-      if (
-        !Array.isArray(proof.pi_b) ||
-        proof.pi_b.length !== 3 ||
-        !Array.isArray(proof.pi_b[0]) ||
-        !Array.isArray(proof.pi_b[1]) ||
-        !Array.isArray(proof.pi_b[2])
-      ) {
-        throw new Error("Invalid proof.pi_b: expected 3x2 array structure");
-      }
-
-      if (!Array.isArray(proof.pi_c) || proof.pi_c.length !== 3) {
-        throw new Error("Invalid proof.pi_c: expected array of length 3");
-      }
-
-      // Validate public signals
-      if (!Array.isArray(publicSignals) || publicSignals.length !== 7) {
-        throw new Error("publicSignals length must be 7");
-      }
-
-      const TWO_POW_128 = 1n << 128n;
-      const TWO_POW_160 = 1n << 160n;
-
-      for (let i = 0; i < 6; i++) {
-        const limb = toBigInt(publicSignals[i]);
-        if (limb < 0n || limb >= TWO_POW_128) {
-          throw new Error(`publicSignals[${i}] not in [0,2^128)`);
-        }
-      }
-
-      const submitter = toBigInt(publicSignals[6]);
-      if (submitter < 0n || submitter >= TWO_POW_160) {
-        throw new Error("submitter out of uint160 range");
-      }
-
-      // Convert snarkjs format to contract format
-      // Take first 2 elements of pi_a and pi_c
-      const a = [toBigInt(proof.pi_a[0]), toBigInt(proof.pi_a[1])];
-      // Note: snarkjs outputs G2 points as [[bx1, bx2], [by1, by2]] but Solidity verifier expects
-      // the pairs in swapped order per limb for bn128 (see common Groth16 mappings)
-      const b = [
-        [toBigInt(proof.pi_b[0][1]), toBigInt(proof.pi_b[0][0])],
-        [toBigInt(proof.pi_b[1][1]), toBigInt(proof.pi_b[1][0])],
-      ];
-      const c = [toBigInt(proof.pi_c[0]), toBigInt(proof.pi_c[1])];
-      const pub = publicSignals.map(toBigInt);
-
       const addPersonArgs = [
-        a,
-        b,
-        c,
-        pub,
+        proof,
+        publicSignals,
         fatherVersionIndex,
         motherVersionIndex,
         tag,
         metadataCID,
       ] as const;
 
-      // Debug logging
-
-      // Verify submitter matches signer
-      const senderAddress = await signer.getAddress();
-      const expectedSubmitter = BigInt(senderAddress);
-
       try {
         let gasLimit: bigint | undefined;
 
-        // Try to estimate gas, with fallback to 6.5M if estimation fails
         try {
-          const gasEstimate = await contract.addPersonZK.estimateGas(...addPersonArgs);
+          const gasEstimate = await contract.addPersonVersion.estimateGas(...addPersonArgs);
           gasLimit = (gasEstimate * 120n) / 100n;
         } catch (estimateError: any) {
           console.warn(
-            "⚠️ Gas estimation failed, attempting static call and fallback gas limit.",
+            "Gas estimation failed, attempting static call and fallback gas limit.",
             sanitizeErrorForLogging(estimateError),
           );
           const decodedReason = extractRevertReason(contract, estimateError);
@@ -314,9 +220,8 @@ export function useContract() {
             (estimateError as any).__dfDecodedReason = decodedReason;
           }
 
-          // Try staticCall to get a better error message
           try {
-            await contract.addPersonZK.staticCall(...addPersonArgs);
+            await contract.addPersonVersion.staticCall(...addPersonArgs);
             gasLimit = 6_500_000n;
           } catch (staticError: any) {
             const staticReason = extractRevertReason(contract, staticError);
@@ -327,15 +232,13 @@ export function useContract() {
           }
         }
 
-        const tx = await contract.addPersonZK(...addPersonArgs, gasLimit ? { gasLimit } : {});
+        const tx = await contract.addPersonVersion(...addPersonArgs, gasLimit ? { gasLimit } : {});
 
         toast.show(t("transaction.submitted", "Transaction submitted..."));
 
-        // Wait for transaction confirmation
         const receipt = await tx.wait();
 
-        // Parse all events from the transaction receipt
-        const events: AddPersonZKResult["events"] = {
+        const events: AddPersonVersionResult["events"] = {
           PersonHashZKVerified: null,
           PersonVersionAdded: null,
           TokenRewardDistributed: null,
@@ -377,9 +280,11 @@ export function useContract() {
               break;
 
             case "PersonVersionAdded":
+              personHash = parsedEvent.args.personHash;
+              versionIndex = Number(parsedEvent.args.versionIndex);
               events.PersonVersionAdded = {
-                personHash: parsedEvent.args.personHash,
-                versionIndex: Number(parsedEvent.args.versionIndex),
+                personHash,
+                versionIndex,
                 addedBy: parsedEvent.args.addedBy,
                 timestamp: Number(parsedEvent.args.timestamp),
                 fatherHash: parsedEvent.args.fatherHash,
@@ -397,15 +302,8 @@ export function useContract() {
                 versionIndex: Number(parsedEvent.args.versionIndex),
                 reward: parsedEvent.args.reward.toString(),
               };
-              // Convert from wei to token units (divide by 10^18)
               rewardAmount = Number(parsedEvent.args.reward) / Math.pow(10, 18);
               break;
-          }
-        }
-
-        // Additional debugging for TokenRewardDistributed
-        if (!events.TokenRewardDistributed) {
-          if (events.PersonVersionAdded) {
           }
         }
 
@@ -420,23 +318,14 @@ export function useContract() {
           events,
         };
       } catch (contractError: any) {
-        console.error("❌ Contract call failed:", sanitizeErrorForLogging(contractError));
+        console.error("Contract call failed:", sanitizeErrorForLogging(contractError));
 
-        // Use unified error handling from errors.ts
         const friendly = getFriendlyError(contractError, t);
-
-        console.error("📋 Error analysis:", {
-          type: friendly.type,
-          message: friendly.message,
-          details: friendly.details,
-          reason: friendly.reason,
-        });
 
         toast.show(
           t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
         );
 
-        // Throw enhanced error with additional information
         const enhancedError = new Error(friendly.message);
         (enhancedError as any).type = friendly.type;
         (enhancedError as any).details = friendly.details;
@@ -449,20 +338,18 @@ export function useContract() {
     [contract, signer, toast, t, contractAddress, eventInterface],
   );
 
-  const mintPersonNFT = useCallback(
+  /**
+   * Mint NFT using ZK proof
+   */
+  const mintPersonVersionNFT = useCallback(
     async (
-      proof: {
-        a: [bigint, bigint];
-        b: [[bigint, bigint], [bigint, bigint]];
-        c: [bigint, bigint];
-        publicSignals: [bigint, bigint, bigint, bigint, bigint];
-      },
-      personHash: string,
+      proof: ProofEnvelope,
+      publicSignals: DisclosureBindingPublicSignals,
       versionIndex: number,
       tokenURI: string,
       coreInfo: {
         basicInfo: {
-          fullNameCommitment: string;
+          identityCommitment: string;
           isBirthBC: boolean;
           birthYear: number;
           birthMonth: number;
@@ -487,12 +374,9 @@ export function useContract() {
     ) => {
       return executeTransaction(
         () =>
-          contract!.mintPersonNFT(
-            proof.a,
-            proof.b,
-            proof.c,
-            proof.publicSignals,
-            personHash,
+          contract!.mintPersonVersionNFT(
+            proof,
+            publicSignals,
             versionIndex,
             tokenURI,
             coreInfo,
@@ -517,12 +401,11 @@ export function useContract() {
     ) => {
       return executeTransaction(
         async () => {
-          // Check if we can call view functions first
           try {
-            const testReward = await contract!.DEEP_FAMILY_TOKEN_CONTRACT();
+            await contract!.DEEP_FAMILY_TOKEN_CONTRACT();
           } catch (connectivityError) {
             console.error(
-              "❌ Contract connectivity test failed:",
+              "Contract connectivity test failed:",
               sanitizeErrorForLogging(connectivityError),
             );
             throw new Error(
@@ -531,23 +414,15 @@ export function useContract() {
           }
 
           if (overrides && Object.keys(overrides).length > 0) {
-            // Try to estimate gas first to catch issues early
             try {
-              const gasEst = await contract!.endorseVersion.estimateGas(
-                personHash,
-                versionIndex,
-                overrides,
-              );
+              await contract!.endorseVersion.estimateGas(personHash, versionIndex, overrides);
             } catch (gasError) {
-              console.error("❌ Gas estimation failed:", sanitizeErrorForLogging(gasError));
-              // Don't throw here, just log - sometimes gas estimation fails but actual call works
+              console.error("Gas estimation failed:", sanitizeErrorForLogging(gasError));
             }
 
-            const result = await contract!.endorseVersion(personHash, versionIndex, overrides);
-            return result;
+            return await contract!.endorseVersion(personHash, versionIndex, overrides);
           } else {
-            const result = await contract!.endorseVersion(personHash, versionIndex);
-            return result;
+            return await contract!.endorseVersion(personHash, versionIndex);
           }
         },
         {
@@ -562,17 +437,14 @@ export function useContract() {
     [executeTransaction, t, contract],
   );
 
-  // Read methods (no transaction required) - based on SearchPage usage
   const listPersonVersions = useCallback(
     async (personHash: string, offset: number, pageSize: number) => {
       if (!contract) return null;
 
       try {
-        const result = await contract.listPersonVersions(personHash, offset, pageSize);
-        return result;
+        return await contract.listPersonVersions(personHash, offset, pageSize);
       } catch (error) {
         console.error("Failed to list person versions:", sanitizeErrorForLogging(error));
-        console.warn(t("contract.queryFailed", "Failed to query data"));
         return null;
       }
     },
@@ -584,11 +456,9 @@ export function useContract() {
       if (!contract) return null;
 
       try {
-        const result = await contract.getVersionDetails(personHash, versionIndex);
-        return result;
+        return await contract.getVersionDetails(personHash, versionIndex);
       } catch (error) {
         console.error("Failed to get version details:", sanitizeErrorForLogging(error));
-        console.warn(t("contract.queryFailed", "Failed to query data"));
         return null;
       }
     },
@@ -600,38 +470,13 @@ export function useContract() {
       if (!contract) return null;
 
       try {
-        const result = await contract.getNFTDetails(tokenId);
-        return result;
+        return await contract.getNFTDetails(tokenId);
       } catch (error) {
         console.error("Failed to get NFT details:", sanitizeErrorForLogging(error));
-        console.warn(t("contract.queryFailed", "Failed to query data"));
         return null;
       }
     },
     [contract, toast, t],
-  );
-
-  // Utility functions
-  const getPersonHash = useCallback(
-    async (basicInfo: {
-      fullNameCommitment: string;
-      isBirthBC: boolean;
-      birthYear: number;
-      birthMonth: number;
-      birthDay: number;
-      gender: number;
-    }) => {
-      if (!contract) return null;
-
-      try {
-        const result = await contract.getPersonHash(basicInfo);
-        return result;
-      } catch (error) {
-        console.error("Failed to get person hash:", sanitizeErrorForLogging(error));
-        return null;
-      }
-    },
-    [contract],
   );
 
   return {
@@ -639,15 +484,12 @@ export function useContract() {
     isContractReady: !!contract && !!signer,
     executeTransaction,
 
-    // Write methods
-    addPersonZK,
-    mintPersonNFT,
+    addPersonVersion,
+    mintPersonVersionNFT,
     endorseVersion,
 
-    // Read methods
     listPersonVersions,
     getVersionDetails,
     getNFTDetails,
-    getPersonHash,
   };
 }

@@ -9,7 +9,7 @@ DeepFamily is a blockchain-based decentralized global digital family tree protoc
 ### Layer 1: Family Relationship Network
 - Build a global family tree graph through personHash/fatherHash/motherHash connections
 - Groth16 ZK proofs protect privacy — only cryptographic commitments stored on-chain
-- Salted passphrase binding (Poseidon(fullName, passphrase)) prevents identity inference and pollution attacks
+- Domain-separated Poseidon commitment (nameField, derivedSecret, birthData, suiteCommitment) prevents identity inference and pollution attacks
 - Dual tree models: public collaborative trees (shared passphrase) vs. private protected trees (unique passphrase)
 - DEEP token mining triggered only when both fatherHash and motherHash are provided (complete family data)
 - Multiple versions per person allow different contributors to record the same individual
@@ -17,7 +17,7 @@ DeepFamily is a blockchain-based decentralized global digital family tree protoc
 ### Layer 2: Value & Public Records
 - Community endorsement validates data quality (costs `recentReward` amount of DEEP tokens)
 - Endorsed versions can be minted as NFTs, revealing full personal information on-chain
-- NFT minting requires ZK proof of name ownership (NamePoseidonVerifier) + prior endorsement
+- NFT minting requires ZK proof of name ownership (DisclosureBindingVerifier) + prior endorsement
 - Story sharding: biographical data in sequentially indexed, hash-verified chunks (up to 2KB per chunk)
 - Stories can be permanently sealed for historical preservation
 - Fee distribution: majority flows to NFT holders or contributors, protocol share (default 5%, max 20%)
@@ -28,16 +28,16 @@ DeepFamily is a blockchain-based decentralized global digital family tree protoc
 |----------|---------|
 | **DeepFamily.sol** | Core protocol — ZK proof validation, multi-version person data, endorsement governance, NFT minting, story sharding. 50+ custom errors, reentrancy guards, paginated queries (max 200) |
 | **DeepFamilyToken.sol** | ERC20 utility token with progressive halving: initial reward 113,777 DEEP, cycles 1→10→100→1K→10K→100K→1M→10M→100M→Fixed 100M, 100B supply cap |
-| **PersonHashVerifier.sol** | Groth16 verifier for family relationship proofs (7 public signals: person/father/mother hash limbs + submitter address) |
-| **NamePoseidonVerifier.sol** | Groth16 verifier for name ownership proofs (5 public signals: Poseidon commitment limbs + name hash limbs + minter address) |
+| **PersonCommitmentVerifier.sol** | Groth16 verifier for family relationship proofs (7 public signals: identity/father/mother commitment + submitter + schema/suite/algo versions) |
+| **DisclosureBindingVerifier.sol** | Groth16 verifier for disclosure binding proofs (6 public signals: identityCommitment + disclosureBinding + minter + schema/suite/algo versions) |
 
 ## Key Technical Details
 
 ### Zero-Knowledge System
-- Dual-hash design: Poseidon commitments + keccak256 wrapping for domain separation
-- 128-bit limb representation for efficient on-chain ZK verification
-- PersonHashVerifier: validates addPersonZK submissions
-- NamePoseidonVerifier: validates mintPersonNFT name binding
+- Domain-separated Poseidon commitment tree: suiteCommitment → nameSecretCommitment → identityCommitment
+- Versioned crypto suite (schemaVersion, cryptoSuiteVersion, hashAlgoId) for forward compatibility
+- PersonCommitmentVerifier: validates addPersonVersion submissions (person + father + mother identity commitments)
+- DisclosureBindingVerifier: validates mintPersonVersionNFT disclosure binding (proves identity ↔ disclosure link for NFT minting)
 
 ### Data Management
 - Multi-version system with duplicate prevention (keccak256 of version fields)
@@ -72,11 +72,11 @@ DeepFamily is a blockchain-based decentralized global digital family tree protoc
 - **Utils**: Axios v1.11+ for HTTP, scrypt-js v3 for key derivation
 
 ### Zero-Knowledge Infrastructure
-- **Circuits**: person_hash_zk.circom (family relationships), name_poseidon_zk.circom (name binding)
+- **Circuits**: person_commitment.circom (identity commitment with family links), disclosure_binding.circom (identity ↔ disclosure binding for NFT minting)
 - **Libraries**: circomlib v2.0.5, keccak256-circom
 - **Hashing**: Poseidon-lite v0.3, @noble/hashes v1.8
 - **Proof Generation**: snarkjs with Powers of Tau ceremony support
-- **Verifiers**: Auto-generated Solidity verifiers (PersonHashVerifier.sol, NamePoseidonVerifier.sol)
+- **Verifiers**: Auto-generated Solidity verifiers (PersonCommitmentVerifier.sol, DisclosureBindingVerifier.sol)
 
 ### Development Tools
 - **Testing**: Hardhat toolbox, Chai matchers, Mocha with 20min timeout for ZK operations
@@ -94,12 +94,12 @@ DeepFamily/
 ├── contracts/              # Smart Contracts
 │   ├── DeepFamily.sol             # Main family tree protocol (ERC721Enumerable + ZK)
 │   ├── DeepFamilyToken.sol        # DEEP ERC20 token with halving mechanism
-│   ├── PersonHashVerifier.sol     # ZK verifier for family relationships
-│   └── NamePoseidonVerifier.sol   # ZK verifier for name binding
+│   ├── PersonCommitmentVerifier.sol  # ZK verifier for identity commitment (person + parents)
+│   └── DisclosureBindingVerifier.sol # ZK verifier for disclosure binding (NFT minting)
 ├── circuits/               # ZK Circuit Development
-│   ├── person_hash_zk.circom      # Family relationship proofs (Poseidon + keccak256)
-│   ├── name_poseidon_zk.circom    # Name binding proofs for NFT minting
-│   ├── sync-zk-assets.js          # ZK asset synchronization utility
+│   ├── person_commitment.circom     # Identity commitment with family links (domain-separated Poseidon)
+│   ├── disclosure_binding.circom    # Identity ↔ disclosure binding for NFT minting
+│   ├── sync-zk-assets.mjs         # ZK asset synchronization utility
 │   └── test/                      # Circuit test data and inputs
 ├── frontend/               # React dApp
 │   ├── src/
@@ -251,8 +251,8 @@ DeepFamily/
 │   ├── story-tasks.test.mjs              # Story sharding tests
 │   ├── story-errors.test.mjs             # Story error handling tests
 │   ├── zk-hash-consistency.test.mjs      # ZK hash validation tests
-│   ├── zk-name-poseidon-check.test.mjs   # Name proof tests
-│   ├── zk-generate-name-poseidon-proof.test.mjs
+│   ├── zk-disclosure-binding-check.test.mjs   # Name proof tests
+│   ├── zk-generate-disclosure-binding-proof.test.mjs
 │   └── lib-seed-helpers.test.mjs         # Seeding utility tests
 ├── deploy/                 # Hardhat deployment scripts
 │   └── 00_deploy_integrated_system.js   # Integrated deployment
@@ -264,8 +264,8 @@ DeepFamily/
 │   ├── story-list-chunks.mjs             # Story chunk listing
 │   ├── story-seal.mjs                    # Story sealing task
 │   ├── zk-add-person.mjs                 # ZK person addition
-│   ├── zk-generate-name-poseidon-proof.mjs
-│   ├── zk-name-poseidon-check.mjs        # Name proof validation
+│   ├── zk-generate-disclosure-binding-proof.mjs
+│   ├── zk-disclosure-binding-check.mjs        # Name proof validation
 │   ├── zk-person-hash-check.mjs          # Person hash validation
 │   ├── networks-check.mjs                # Network validation
 │   └── networks-list.mjs                 # Network listing
@@ -327,19 +327,21 @@ npm run check:root --net=<network>  # Check root node on network
 ### Zero-Knowledge Proof Development
 ```bash
 npm run zk:fetch             # Download circom compiler v2.1.6
-npm run zk:build             # Build all circuits (person_hash + name_poseidon)
-npm run zk:build:person      # Build person_hash_zk circuit
-npm run zk:build:name        # Build name_poseidon_zk circuit
+npm run zk:build             # Build all circuits (person_commitment + disclosure_binding)
+npm run zk:build:person      # Build person_commitment circuit
+npm run zk:build:disclosure  # Build disclosure_binding circuit
 npm run zk:ptau              # Generate Powers of Tau (trusted setup)
 npm run zk:setup             # Setup both circuits with zkey generation
-npm run zk:setup:person      # Setup person_hash circuit
-npm run zk:setup:name        # Setup name_poseidon circuit
+npm run zk:setup:person      # Setup person_commitment circuit
+npm run zk:setup:disclosure  # Setup disclosure_binding circuit
 npm run zk:check             # Validate both proof systems
-npm run zk:check:person      # Check person hash proof generation
-npm run zk:check:name        # Check name poseidon proof generation
+npm run zk:check:person      # Check person commitment proof generation
+npm run zk:check:disclosure  # Check disclosure binding proof generation
 npm run zk:verifier          # Export both Solidity verifiers
-npm run zk:verifier:person   # Export PersonHashVerifier.sol
-npm run zk:verifier:name     # Export NamePoseidonVerifier.sol
+npm run zk:verifier:person   # Export PersonCommitmentVerifier.sol
+npm run zk:verifier:disclosure # Export DisclosureBindingVerifier.sol
+npm run zk:sync              # Sync compiled artifacts to frontend/public/zk
+npm run zk:refresh           # Full rebuild: build + setup + verifier + sync
 ```
 
 ### Frontend Development
@@ -406,7 +408,7 @@ PRIVATE_KEY=0x...           # Deployer wallet private key (KEEP SECURE!)
 - **Trusted Setup**: Uses community-audited Powers of Tau
 - **Circuit Validation**: All constraints properly implemented
 - **Proof Verification**: On-chain Groth16 verification
-- **Domain Separation**: keccak256 wrapper prevents hash collisions
+- **Domain Separation**: unique domain constants (1000–1003) in Poseidon inputs prevent cross-purpose hash collisions
 
 ### Frontend Security
 - **Wallet Integration**: Secure Web3 provider handling
@@ -418,8 +420,3 @@ PRIVATE_KEY=0x...           # Deployer wallet private key (KEEP SECURE!)
 - English documentation
 - Synchronized test updates with new features
 - Pre-production auditing required
-- **Commit Convention**: Conventional Commits `type(scope): subject`; body uses `-` list for multiple changes
-- **STRICTLY FORBIDDEN**: Never include any AI identifiers, signatures, or acknowledgments in commit messages
-  - No "Generated with Claude", "Co-Authored-By: Claude", "By AI", "AI-generated", "Assisted by", etc.
-  - No references to artificial intelligence, automation tools, or AI assistance
-  - Commit messages must appear as if written by a human developer

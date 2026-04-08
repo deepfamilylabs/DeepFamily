@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "poseidon-solidity/PoseidonT4.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 
 /**
@@ -18,9 +17,9 @@ interface IDeepFamilyToken {
 }
 
 /**
- * @dev Groth16 verifier interface for onboarding person hash commitments.
+ * @dev Groth16 verifier interface for person commitment proofs.
  */
-interface IPersonHashVerifier {
+interface IPersonCommitmentVerifier {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
@@ -30,33 +29,9 @@ interface IPersonHashVerifier {
 }
 
 /**
- * @dev Poseidon name binding proof verifier interface used before minting NFTs.
+ * @dev Groth16 verifier interface for person mint binding proofs.
  */
-interface INamePoseidonVerifier {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[5] calldata publicSignals
-  ) external view returns (bool);
-}
-
-/**
- * @dev Groth16 verifier interface for v2 person commitment proofs.
- */
-interface IPersonCommitmentVerifierV2 {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals
-  ) external view returns (bool);
-}
-
-/**
- * @dev Groth16 verifier interface for v2 name disclosure proofs.
- */
-interface INameDisclosureVerifierV2 {
+interface IDisclosureBindingVerifier {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
@@ -69,10 +44,9 @@ interface INameDisclosureVerifierV2 {
  * @title DeepFamily — Zero-Knowledge Decentralized Family Tree Protocol
  * @notice Verifiable global family lineages through ZK proofs, multi-version management, community endorsement, and NFT assets
  * @dev Architecture:
- *      - Privacy Layer: Groth16 proofs + Poseidon/keccak256 dual-hash for private submissions (addPersonZK)
+ *      - Privacy Layer: Groth16 proofs + Poseidon/keccak256 dual-hash for private submissions
  *      - Incentive Layer: DEEP token mining for complete families, endorsement fees route to NFT holders/contributors
- *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + unlimited story sharding (2KB per chunk)
- *      - Security: Reentrancy guards, paginated queries (max 100), 50+ custom errors, access controls
+ *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + unlimited story sharding
  */
 contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Custom Errors (Unified Error Handling) ==========
@@ -94,12 +68,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error InvalidBirthYear();
   error InvalidStory();
   error InvalidTokenURI();
-  // Added ZK-related errors
   error InvalidZKProof();
-  error VerifierNotSet();
-  error NameVerifierNotSet();
   error VerifierRouteNotSet();
-  error InvalidHashAlgoId();
 
   // Business logic errors
   error DuplicateVersion();
@@ -130,88 +100,60 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error MustBeNFTHolder();
 
   /**
-   * @dev Basic identity information structure
-   * @notice Compatibility note:
-   * - v1: `fullNameCommitment` stores the Poseidon digest derived from keccak(fullName) and salt
-   * - v2: `fullNameCommitment` stores the bytes32 representation of `IdentityCommitmentV2`
-   * Consumers MUST interpret this field together with schema/suite metadata and MUST NOT assume
-   * that `fullNameCommitment` always has v1 semantics.
+   * @dev Basic identity information structure.
+   * `identityCommitment` stores the bytes32 representation of IdentityCommitment.
    */
   struct PersonBasicInfo {
-    bytes32 fullNameCommitment;
-    bool isBirthBC; // Whether birth is BC (Before Christ)
-    uint16 birthYear; // Birth year(0=unknown)
-    uint8 birthMonth; // Birth month (1-12, 0=unknown)
-    uint8 birthDay; // Birth day (1-31, 0=unknown)
-    uint8 gender; // Gender (0=unknown, 1=male, 2=female, 3=other)
+    bytes32 identityCommitment;
+    bool isBirthBC;
+    uint16 birthYear;
+    uint8 birthMonth;
+    uint8 birthDay;
+    uint8 gender;
   }
 
-  /**
-   * @dev Person version information structure
-   */
   struct PersonVersion {
-    bytes32 personHash; // Person identifier hash
-    bytes32 fatherHash; // Father's hash
-    bytes32 motherHash; // Mother's hash
-    uint256 versionIndex; // Version index of this version (starts from 1, determined when written)
-    uint256 fatherVersionIndex; // Father's version index (0 means unspecified)
-    uint256 motherVersionIndex; // Mother's version index (0 means unspecified)
-    address addedBy; // Address of the person who added this - packed with timestamp in slot 3's first 20 bytes
-    uint96 timestamp; // Addition timestamp - packed with addedBy in slot 3's last 12 bytes, sufficient until 2^96 seconds later
-    string tag; // Version tag - dynamic storage
-    string metadataCID; // IPFS CID - dynamic storage
+    bytes32 personHash;
+    bytes32 fatherHash;
+    bytes32 motherHash;
+    uint256 versionIndex;
+    uint256 fatherVersionIndex;
+    uint256 motherVersionIndex;
+    address addedBy;
+    uint96 timestamp;
+    string tag;
+    string metadataCID;
   }
 
-  /**
-   * @dev NFT supplementary information structure
-   */
   struct PersonSupplementInfo {
-    string fullName; // Full name
-    string birthPlace; // Birth place
-    bool isDeathBC; // Whether death is BC (Before Christ)
-    uint16 deathYear; // Death year(0=unknown)
-    uint8 deathMonth; // Death month (0-12, 0=unknown)
-    uint8 deathDay; // Death day (0-31, 0=unknown)
-    string deathPlace; // Death place
-    string story; // Life story summary (currently kept as abstract, detailed content uses sharded storage)
+    string fullName;
+    string birthPlace;
+    bool isDeathBC;
+    uint16 deathYear;
+    uint8 deathMonth;
+    uint8 deathDay;
+    string deathPlace;
+    string story;
   }
 
-  /**
-   * @dev NFT core information structure - combines basic and supplementary information
-   */
   struct PersonCoreInfo {
-    PersonBasicInfo basicInfo; // Basic information
-    PersonSupplementInfo supplementInfo; // Supplementary information
+    PersonBasicInfo basicInfo;
+    PersonSupplementInfo supplementInfo;
   }
 
   enum ProofPurpose {
-    PersonV1,
-    NameV1,
-    PersonV2,
-    NameDisclosureV2
+    Person,
+    DisclosureBinding
   }
 
   struct ProofEnvelope {
     uint16 proofSystemId;
-    uint16 schemaVersion;
-    uint16 cryptoSuiteVersion;
     uint256[2] a;
     uint256[2][2] b;
     uint256[2] c;
   }
 
-  struct ParentRef {
-    bytes32 personHash;
-    uint256 versionIndex;
-  }
-
-  struct VersionMeta {
-    uint16 schemaVersion;
-    uint16 cryptoSuiteVersion;
-    uint16 hashAlgoId;
-  }
-
-  struct PersonProofPublicSignalsV2 {
+  struct PersonProofPublicSignals {
     uint256 identityCommitment;
     uint256 fatherIdentityCommitment;
     uint256 motherIdentityCommitment;
@@ -221,13 +163,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 hashAlgoId;
   }
 
-  struct DisclosureData {
-    string fullName;
-    bytes32 disclosureNonce;
-    bytes32 disclosureBinding;
-  }
-
-  struct NameDisclosurePublicSignalsV2 {
+  struct DisclosureBindingPublicSignals {
     uint256 identityCommitment;
     uint256 disclosureBinding;
     uint256 minter;
@@ -236,162 +172,89 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 hashAlgoId;
   }
 
-  /**
-   * @dev Child version reference (used to query child versions from parent versions)
-   */
   struct ChildRef {
     bytes32 childHash;
-    uint256 childVersionIndex; // Starts from 1
+    uint256 childVersionIndex;
   }
 
-  /**
-   * @dev Story chunk structure - used for sharded storage of detailed life stories
-   */
   struct StoryChunk {
-    uint256 chunkIndex; // Chunk index (starts from 0)
-    bytes32 chunkHash; // Chunk content hash (for data integrity verification)
-    string content; // Chunk content (limited to reasonable range to control gas costs)
-    uint256 timestamp; // Creation timestamp
-    address editor; // Editor's address
-    // Content classification (19 types total):
-    // 0=Summary, 1=Early Life, 2=Education, 3=Life Events, 4=Career, 5=Works, 6=Achievements,
-    // 7=Philosophy, 8=Quotes, 9=Family, 10=Lifestyle, 11=Relations, 12=Activities,
-    // 13=Anecdotes, 14=Controversies, 15=Legacy, 16=Gallery, 17=References, 18=Notes
+    uint256 chunkIndex;
+    bytes32 chunkHash;
+    string content;
+    uint256 timestamp;
+    address editor;
     uint8 chunkType;
-    string attachmentCID; // Optional external attachment CID (IPFS/Arweave)
+    string attachmentCID;
   }
 
-  /**
-   * @dev Story metadata structure - manages metadata of complete stories
-   */
   struct StoryMetadata {
-    uint256 totalChunks; // Current total number of chunks
-    bytes32 fullStoryHash; // Rolling integrity hash (keccak(previousHash, chunkIndex, chunkHash))
-    uint256 lastUpdateTime; // Last update timestamp
-    bool isSealed; // Whether sealed (no further modifications after sealing, ensuring historical record immutability)
-    uint256 totalLength; // Total character count of all chunk contents
+    uint256 totalChunks;
+    bytes32 fullStoryHash;
+    uint256 lastUpdateTime;
+    bool isSealed;
+    uint256 totalLength;
   }
 
-  /**
-   * @dev Pagination calculation result structure
-   */
   struct PaginationResult {
-    uint256 startIndex; // Start index
-    uint256 endIndex; // End index
-    uint256 resultLength; // Result length
-    uint256 nextOffset; // Next offset
-    bool hasMore; // Whether has more
+    uint256 startIndex;
+    uint256 endIndex;
+    uint256 resultLength;
+    uint256 nextOffset;
+    bool hasMore;
   }
 
   // ========== Core Storage Mappings ==========
 
-  /// @dev Person hash => version array, stores all version information of a person
   mapping(bytes32 => PersonVersion[]) public personVersions;
-
-  /// @dev Counter for total number of different persons in the system
   uint256 public totalPersonsCount;
-
-  /// @dev Person hash => version hash => whether exists, prevents duplicate versions
   mapping(bytes32 => mapping(bytes32 => bool)) public versionExists;
-  /// @dev Person hash => user address => endorsed version index, each user can only endorse one version per person
-  /// @notice Version index starts from 1, 0 means no endorsement
   mapping(bytes32 => mapping(address => uint256)) public endorsedVersionIndex;
 
   // ========== NFT Related ==========
 
-  /// @dev NFT counter, incrementally generates tokenId
   uint256 public tokenCounter;
-
-  /// @dev TokenID => person hash, the person corresponding to the NFT
   mapping(uint256 => bytes32) public tokenIdToPerson;
-
-  /// @dev TokenID => version index, the specific version corresponding to the NFT
   mapping(uint256 => uint256) public tokenIdToVersionIndex;
-
-  /// @dev TokenID => core information, implements key information on-chain
   mapping(uint256 => PersonCoreInfo) public nftCoreInfo;
-
-  /// @dev TokenID => TokenURI, stores NFT metadata URI
   mapping(uint256 => string) private _tokenURIs;
-
-  /// @dev TokenID => historical TokenURI array
   mapping(uint256 => string[]) public tokenURIHistory;
-
-  /// @dev (person hash, version index) => TokenID, ensures each version can only be minted once
   mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;
 
   // ========== Story Sharding Storage Mappings ==========
 
-  /// @dev tokenId => story metadata
   mapping(uint256 => StoryMetadata) public storyMetadata;
-
-  /// @dev tokenId => chunkIndex => chunk data
   mapping(uint256 => mapping(uint256 => StoryChunk)) public storyChunks;
 
   // ========== Statistics Mappings ==========
 
-  /// @dev Person hash => version index => endorsement count, reflects version credibility
   mapping(bytes32 => mapping(uint256 => uint256)) public versionEndorsementCount;
-
-  /// @dev Protocol-share fee (in basis points) taken from each endorsement fee（default 5%, max 20%）
   uint256 public protocolEndorsementFeeBps = 500;
-
-  // Name indexing removed for privacy
-
-  /// @dev (parent person hash, parent version index) => children version reference array
   mapping(bytes32 => mapping(uint256 => ChildRef[])) public childrenOf;
-
-  /// @dev User address => list of person hashes they have endorsed
   mapping(address => bytes32[]) private userEndorsedPersons;
-
-  /// @dev User address => person hash => index in userEndorsedPersons array (0 means not endorsed)
   mapping(address => mapping(bytes32 => uint256)) private userEndorsementIndex;
 
   // ========== System Constants ==========
 
-  /// @dev Maximum length for long text (such as life stories)
   uint256 public constant MAX_LONG_TEXT_LENGTH = 256;
-
-  /// @dev Maximum results per query page
   uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
-
-  /// @dev Maximum content length per chunk (2KB text)
   uint256 public constant MAX_CHUNK_CONTENT_LENGTH = 2048;
-
-  /// @dev Maximum basis points the protocol can take from endorsement fees (20%)
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
-
-  /// @dev Basis points denominator (10_000 = 100%)
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
-  /// @dev Minimum age (in years) required to mint an NFT
   uint256 public constant MINIMUM_MINT_AGE = 18;
+  uint256 private constant DOMAIN_SUITE = 1000;
+  uint256 private constant DOMAIN_NAME_SECRET = 1001;
+  uint256 private constant DOMAIN_IDENTITY = 1002;
+  uint256 private constant DOMAIN_DISCLOSURE = 1003;
+  string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
 
   uint256 private constant SECONDS_PER_DAY = 24 * 60 * 60;
   int256 private constant OFFSET19700101 = 2440588;
 
-  /// @dev DeepFamily token contract address (immutable)
   address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
-
-  /// @dev ZK verification contract address (immutable)
-  address public immutable PERSON_HASH_VERIFIER;
-  address public immutable NAME_POSEIDON_VERIFIER;
   mapping(uint16 => mapping(uint8 => address)) public verifierRegistry;
 
   // ========== Event Definitions ==========
 
-  /**
-   * @dev Person version added event (extended: includes parent hashes and version indices for frontend/indexing tree construction)
-   * @notice Version index starts from 1
-   * @param personHash Person hash (keccak256 of Poseidon commitment)
-   * @param versionIndex Version index
-   * @param addedBy Address of the person who added this
-   * @param timestamp Addition timestamp
-   * @param fatherHash Father's hash (keccak256 of Poseidon commitment)
-   * @param fatherVersionIndex Father's version index (0 means unspecified)
-   * @param motherHash Mother's hash (keccak256 of Poseidon commitment)
-   * @param motherVersionIndex Mother's version index (0 means unspecified)
-   * @param tag Version tag
-   */
   event PersonVersionAdded(
     bytes32 indexed personHash,
     uint256 indexed versionIndex,
@@ -404,19 +267,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string tag
   );
 
-  /**
-   * @dev Version endorsement event
-   * @notice Version index starts from 1
-   * @param personHash Person hash (keccak256 of Poseidon commitment)
-   * @param endorser Endorser's address
-   * @param versionIndex Endorsed version index
-   * @param recipient Recipient receiving the non-protocol share (addedBy or NFT holder)
-   * @param recipientShare Recipient share amount
-   * @param protocolRecipient Protocol fee recipient (owner or zero address when burned)
-   * @param protocolShare Protocol fee amount
-   * @param endorsementFee Total endorsement fee (recipientShare + protocolShare)
-   * @param timestamp Endorsement timestamp
-   */
   event PersonVersionEndorsed(
     bytes32 indexed personHash,
     address indexed endorser,
@@ -429,13 +279,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 timestamp
   );
 
-  /**
-   * @dev Endorsement cancelled event
-   * @param personHash Person hash (keccak256 of Poseidon commitment)
-   * @param user User who cancelled the endorsement
-   * @param versionIndex Version index that was endorsed (before cancellation)
-   * @param timestamp Cancellation timestamp
-   */
   event EndorsementCancelled(
     bytes32 indexed personHash,
     address indexed user,
@@ -443,21 +286,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 timestamp
   );
 
-  /**
-   * @dev Person hash ZK verification event (emits final keccak256-wrapped hash)
-   */
   event PersonHashZKVerified(bytes32 indexed personHash, address indexed prover);
 
-  /**
-   * @dev NFT minting event
-   * @notice Version index starts from 1
-   * @param personHash Person hash (keccak256 of Poseidon commitment)
-   * @param tokenId NFT TokenID
-   * @param owner NFT holder
-   * @param versionIndex Corresponding version index
-   * @param tokenURI NFT metadata URI
-   * @param timestamp Minting timestamp
-   */
   event PersonNFTMinted(
     bytes32 indexed personHash,
     uint256 indexed tokenId,
@@ -467,13 +297,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 timestamp
   );
 
-  /**
-   * @dev NFT metadata URI update event
-   * @param tokenId NFT TokenID
-   * @param owner Updater (current holder)
-   * @param oldURI Old URI
-   * @param newURI New URI
-   */
   event TokenURIUpdated(
     uint256 indexed tokenId,
     address indexed owner,
@@ -481,13 +304,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string newURI
   );
 
-  /**
-   * @dev Token mining reward distribution event
-   * @param miner Miner's address
-   * @param personHash Added person hash
-   * @param versionIndex Version index
-   * @param reward Token reward received
-   */
   event TokenRewardDistributed(
     address indexed miner,
     bytes32 indexed personHash,
@@ -495,16 +311,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 reward
   );
 
-  /**
-   * @dev Story chunk added event
-   * @param tokenId NFT TokenID
-   * @param chunkIndex Chunk index
-   * @param chunkHash Chunk hash
-   * @param editor Editor's address
-   * @param contentLength Chunk content length
-   * @param chunkType Chunk classification (0-18: Summary, Early Life, Education, Life Events, Career, Works, Achievements, Philosophy, Quotes, Family, Lifestyle, Relations, Activities, Anecdotes, Controversies, Legacy, Gallery, References, Notes)
-   * @param attachmentCID Optional attachment CID (IPFS/Arweave)
-   */
   event StoryChunkAdded(
     uint256 indexed tokenId,
     uint256 indexed chunkIndex,
@@ -515,13 +321,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     string attachmentCID
   );
 
-  /**
-   * @dev Story sealed event
-   * @param tokenId NFT TokenID
-   * @param totalChunks Total chunks
-   * @param fullStoryHash Complete story hash
-   * @param sealer Sealer's address
-   */
   event StorySealed(
     uint256 indexed tokenId,
     uint256 totalChunks,
@@ -529,25 +328,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     address indexed sealer
   );
 
-  /**
-   * @dev Protocol fee update event
-   * @param previousBps Previous protocol fee in basis points
-   * @param newBps New protocol fee in basis points
-   */
   event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
-  /**
-   * @dev Emitted when a verifier address is updated in the registry
-   */
   event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
 
   // ========== Function Modifiers ==========
 
-  /**
-   * @dev Validates person hash and version index validity (merged version)
-   * @param personHash Person hash
-   * @param versionIndex Version index
-   */
   modifier validPersonAndVersion(bytes32 personHash, uint256 versionIndex) {
     if (personHash == bytes32(0)) revert InvalidPersonHash();
     if (versionIndex == 0 || versionIndex > personVersions[personHash].length) {
@@ -558,13 +344,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   // ========== Internal Functions ==========
 
-  /**
-   * @dev Calculate pagination parameters
-   * @param totalCount Total item count
-   * @param offset Starting position
-   * @param limit Page size limit
-   * @return result Pagination calculation result
-   */
   function _getPaginationParams(
     uint256 totalCount,
     uint256 offset,
@@ -649,17 +428,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
-   * @dev Reassembles 2 128-bit limbs starting from 'start' in publicSignals into raw Poseidon digest bytes32 (big-endian: hi128|lo128).
-   */
-  function _packHashFromTwo128(uint256 hi, uint256 lo) internal pure returns (bytes32 h) {
-    unchecked {
-      if ((hi >> 128) != 0 || (lo >> 128) != 0) revert InvalidZKProof();
-      uint256 v = (hi << 128) | lo;
-      h = bytes32(v);
-    }
-  }
-
-  /**
    * @dev Wrap raw Poseidon digest with keccak256 for domain separation and collision resistance.
    * Returns zero if input is zero (preserves semantics for non-existent parent hashes).
    */
@@ -668,10 +436,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return keccak256(abi.encodePacked(poseidonDigest));
   }
 
-  /**
-   * @dev Unified single string hash tool (only for single string -> keccak256).
-   * @return Calculated hash value
-   */
   function _hashString(string memory value) internal pure returns (bytes32) {
     return keccak256(abi.encodePacked(value));
   }
@@ -682,57 +446,64 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return verifier;
   }
 
-  function _wrapIdentityCommitmentAsPersonHashV2(
+  function _wrapIdentityCommitmentAsPersonHash(
     uint256 identityCommitment
   ) internal pure returns (bytes32) {
     return _wrapPoseidonHash(bytes32(identityCommitment));
   }
 
-  function _computeNamePrehashV2(string memory fullName) internal pure returns (bytes32) {
-    // v2 expects fullName to already match the off-chain canonicalized proof input.
-    if (bytes(fullName).length == 0) revert InvalidFullName();
-    return keccak256(abi.encodePacked("deepfamily:name-prehash:v2", bytes(fullName)));
+  function _packBirthGenderField(
+    PersonBasicInfo calldata basicInfo
+  ) internal pure returns (uint256) {
+    return (uint256(basicInfo.birthYear) << 24) |
+      (uint256(basicInfo.birthMonth) << 16) |
+      (uint256(basicInfo.birthDay) << 8) |
+      (uint256(basicInfo.gender) << 1) |
+      (basicInfo.isBirthBC ? 1 : 0);
   }
 
-  function _computeNameFieldV2(string memory fullName) internal pure returns (uint256) {
+  function _computeNamePrehash(string memory fullName) internal pure returns (bytes32) {
+    if (bytes(fullName).length == 0) revert InvalidFullName();
+    return keccak256(abi.encodePacked(DOMAIN_NAME_PREHASH, bytes(fullName)));
+  }
+
+  function _computeNameField(string memory fullName) internal pure returns (uint256) {
     uint256 fieldModulus =
       21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    return uint256(_computeNamePrehashV2(fullName)) % fieldModulus;
+    return uint256(_computeNamePrehash(fullName)) % fieldModulus;
   }
 
-  function _computeSuiteCommitmentV2(
+  function _computeSuiteCommitment(
     uint256 schemaVersion,
     uint256 cryptoSuiteVersion,
     uint256 hashAlgoId
   ) internal pure returns (uint256) {
     uint256[4] memory inputs;
-    inputs[0] = 1000; // domain_suite_v2
+    inputs[0] = DOMAIN_SUITE;
     inputs[1] = schemaVersion;
     inputs[2] = cryptoSuiteVersion;
     inputs[3] = hashAlgoId;
     return PoseidonT5.hash(inputs);
   }
 
-  function _computeDisclosureBindingV2(
+  function _computeDisclosureBinding(
     string memory fullName,
-    bytes32 disclosureNonce,
+    PersonBasicInfo calldata basicInfo,
     uint256 schemaVersion,
     uint256 cryptoSuiteVersion,
     uint256 hashAlgoId
   ) internal pure returns (bytes32) {
-    uint256 fieldModulus =
-      21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint256[4] memory inputs;
-    inputs[0] = 1003; // domain_disclosure_v2
-    inputs[1] = _computeNameFieldV2(fullName);
-    inputs[2] = uint256(disclosureNonce) % fieldModulus;
-    inputs[3] = _computeSuiteCommitmentV2(schemaVersion, cryptoSuiteVersion, hashAlgoId);
+    inputs[0] = DOMAIN_DISCLOSURE;
+    inputs[1] = _computeNameField(fullName);
+    inputs[2] = _packBirthGenderField(basicInfo);
+    inputs[3] = _computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
 
     uint256 disclosurePoseidon = PoseidonT5.hash(inputs);
     return bytes32(disclosurePoseidon);
   }
 
-  function _validateMintPersonNFTV2Input(
+  function _validateMintInput(
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
@@ -759,11 +530,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     if (coreInfo.supplementInfo.deathDay > 31) revert InvalidDeathDay();
   }
 
-  function _verifyMintPersonNFTV2Proof(
+  function _verifyMintProof(
     ProofEnvelope calldata proof,
-    NameDisclosurePublicSignalsV2 calldata publicSignals
+    DisclosureBindingPublicSignals calldata publicSignals
   ) internal view {
-    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.NameDisclosureV2);
+    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.DisclosureBinding);
     uint256[6] memory ps = [
       publicSignals.identityCommitment,
       publicSignals.disclosureBinding,
@@ -773,53 +544,38 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       publicSignals.hashAlgoId
     ];
 
-    if (!INameDisclosureVerifierV2(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
+    if (!IDisclosureBindingVerifier(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
       revert InvalidZKProof();
     }
   }
 
   /**
-   * @dev Validate v2 mint proof-to-calldata binding consistency.
-   * @notice String comparison is byte-exact; callers MUST submit identically
-   * canonicalized names in both `disclosure.fullName` and `coreInfo.supplementInfo.fullName`.
+   * @dev Validate mint proof-to-calldata binding consistency.
+   * @notice String comparison is byte-exact; callers MUST submit the exact
+   * canonicalized `coreInfo.supplementInfo.fullName` that was used to build the proof.
    * The contract does NOT perform Unicode normalization.
    */
-  function _validateMintPersonNFTV2Bindings(
-    NameDisclosurePublicSignalsV2 calldata publicSignals,
-    bytes32 personHash,
-    PersonCoreInfo calldata coreInfo,
-    DisclosureData calldata disclosure
+  function _validateMintBindings(
+    DisclosureBindingPublicSignals calldata publicSignals,
+    PersonCoreInfo calldata coreInfo
   ) internal pure {
-    bytes32 computedPersonHash = _wrapIdentityCommitmentAsPersonHashV2(
-      publicSignals.identityCommitment
-    );
-    if (computedPersonHash != personHash) revert BasicInfoMismatch();
-
-    if (bytes32(publicSignals.identityCommitment) != coreInfo.basicInfo.fullNameCommitment) {
+    if (bytes32(publicSignals.identityCommitment) != coreInfo.basicInfo.identityCommitment) {
       revert BasicInfoMismatch();
     }
 
-    if (
-      keccak256(abi.encodePacked(disclosure.fullName)) !=
-      keccak256(abi.encodePacked(coreInfo.supplementInfo.fullName))
-    ) {
-      revert BasicInfoMismatch();
-    }
-
-    bytes32 computedDisclosureBinding = _computeDisclosureBindingV2(
-      disclosure.fullName,
-      disclosure.disclosureNonce,
+    bytes32 computedDisclosureBinding = _computeDisclosureBinding(
+      coreInfo.supplementInfo.fullName,
+      coreInfo.basicInfo,
       publicSignals.schemaVersion,
       publicSignals.cryptoSuiteVersion,
       publicSignals.hashAlgoId
     );
-    if (computedDisclosureBinding != disclosure.disclosureBinding) revert BasicInfoMismatch();
-    if (bytes32(publicSignals.disclosureBinding) != disclosure.disclosureBinding) {
+    if (bytes32(publicSignals.disclosureBinding) != computedDisclosureBinding) {
       revert BasicInfoMismatch();
     }
   }
 
-  function _mintPersonNFTV2Internal(
+  function _mintInternal(
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
@@ -836,11 +592,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     _safeMint(msg.sender, newTokenId);
   }
 
-  /**
-   * @dev Internal function to set token URI
-   * @param tokenId Token ID
-   * @param _tokenURI URI string
-   */
   function _setTokenURI(uint256 tokenId, string memory _tokenURI) internal {
     _tokenURIs[tokenId] = _tokenURI;
   }
@@ -850,82 +601,29 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   /**
    * @dev Constructor, initializes ERC721 contract and token contract address
    * @param _deepFamilyTokenContract DeepFamily token contract address
-   * @param _personHashVerifier Person hash ZK verification contract address
    */
   constructor(
-    address _deepFamilyTokenContract,
-    address _personHashVerifier,
-    address _namePoseidonVerifier
+    address _deepFamilyTokenContract
   ) ERC721("DeepFamily", "Family") Ownable(msg.sender) {
     if (_deepFamilyTokenContract == address(0)) revert TokenContractNotSet();
-    if (_personHashVerifier == address(0)) revert VerifierNotSet();
-    if (_namePoseidonVerifier == address(0)) revert NameVerifierNotSet();
     DEEP_FAMILY_TOKEN_CONTRACT = _deepFamilyTokenContract;
-    PERSON_HASH_VERIFIER = _personHashVerifier;
-    NAME_POSEIDON_VERIFIER = _namePoseidonVerifier;
-
-    verifierRegistry[0][uint8(ProofPurpose.PersonV1)] = _personHashVerifier;
-    verifierRegistry[0][uint8(ProofPurpose.NameV1)] = _namePoseidonVerifier;
   }
 
   // ========== Public Functions ==========
 
   /**
    * @notice Register or update a proof verifier address for a given proof system and purpose.
-   * @dev Emits {VerifierUpdated}. Does NOT affect the immutable v1 verifier addresses.
    */
   function setVerifier(
     uint16 proofSystemId,
     ProofPurpose purpose,
     address verifier
   ) external onlyOwner {
-    if (verifier == address(0)) revert VerifierNotSet();
+    if (verifier == address(0)) revert VerifierRouteNotSet();
     verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
   }
 
-  /**
-   * @notice Calculate unique person hash value for the legacy v1 path
-   * @dev v1-only semantics:
-   * - Interprets `basicInfo.fullNameCommitment` as the v1 name/salt Poseidon digest
-   * - Recomputes the final person hash from that v1 structure
-   * - MUST NOT be used for v2 validation, where `fullNameCommitment` carries `IdentityCommitmentV2`
-   */
-  function getPersonHash(PersonBasicInfo memory basicInfo) public pure returns (bytes32) {
-    if (basicInfo.fullNameCommitment == bytes32(0)) revert InvalidFullName();
-    if (basicInfo.birthMonth > 12) revert InvalidBirthMonth();
-    if (basicInfo.birthDay > 31) revert InvalidBirthDay();
-
-    uint256 limb0 = uint256(basicInfo.fullNameCommitment) >> 128;
-    uint256 limb1 = uint256(basicInfo.fullNameCommitment) & ((1 << 128) - 1);
-
-    uint256 packedData = (uint256(basicInfo.birthYear) << 24) |
-      (uint256(basicInfo.birthMonth) << 16) |
-      (uint256(basicInfo.birthDay) << 8) |
-      (uint256(basicInfo.gender) << 1) |
-      (basicInfo.isBirthBC ? 1 : 0);
-
-    uint256[3] memory inputs;
-    inputs[0] = limb0;
-    inputs[1] = limb1;
-    inputs[2] = packedData;
-
-    uint256 poseidonResult = PoseidonT4.hash(inputs);
-    bytes32 poseidonDigest = bytes32(poseidonResult);
-
-    return _wrapPoseidonHash(poseidonDigest);
-  }
-
-  /**
-   * @dev Internal core function for adding person versions and establishing indices
-   * @param personHash Person hash
-   * @param fatherHash Father's hash
-   * @param motherHash Mother's hash
-   * @param fatherVersionIndex Father's version index (0 means unspecified)
-   * @param motherVersionIndex Mother's version index (0 means unspecified)
-   * @param tag Version tag
-   * @param metadataCID Metadata CID (IPFS Content Identifier)
-   */
   function _addPersonInternal(
     bytes32 personHash,
     bytes32 fatherHash,
@@ -998,38 +696,50 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
-   * @dev Zero-knowledge proof based addition entry point (limb version):
-   * publicSignals mapping (fixed order, all are 128-bit limbs, big-endian concatenation hi|lo):
-   * 0..1 => personHash limbs (hi -> lo)
-   * 2..3 => fatherHash limbs (hi -> lo)
-   * 4..5 => motherHash limbs (hi -> lo)
-   * 6    => submitter address (uint160 in lower 160 bits)
+   * @notice Add a person via ZK proof of identity commitment.
+   * @dev Public signals order: identityCommitment, fatherIdentityCommitment,
+   *      motherIdentityCommitment, submitter, schemaVersion, cryptoSuiteVersion, hashAlgoId
    */
-  function addPersonZK(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals,
+  function addPersonVersion(
+    ProofEnvelope calldata proof,
+    PersonProofPublicSignals calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
     string calldata tag,
     string calldata metadataCID
   ) external nonReentrant {
-    if (publicSignals[6] != uint256(uint160(msg.sender))) revert CallerMismatch();
+    if (publicSignals.submitter != uint256(uint160(msg.sender))) revert CallerMismatch();
 
-    if (!IPersonHashVerifier(PERSON_HASH_VERIFIER).verifyProof(a, b, c, publicSignals)) {
+    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.Person);
+    uint256[7] memory ps = [
+      publicSignals.identityCommitment,
+      publicSignals.fatherIdentityCommitment,
+      publicSignals.motherIdentityCommitment,
+      publicSignals.submitter,
+      publicSignals.schemaVersion,
+      publicSignals.cryptoSuiteVersion,
+      publicSignals.hashAlgoId
+    ];
+
+    if (!IPersonCommitmentVerifier(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
       revert InvalidZKProof();
     }
 
-    bytes32 personHash_ = _wrapPoseidonHash(
-      _packHashFromTwo128(publicSignals[0], publicSignals[1])
-    );
-    bytes32 fatherHash_ = _wrapPoseidonHash(
-      _packHashFromTwo128(publicSignals[2], publicSignals[3])
-    );
-    bytes32 motherHash_ = _wrapPoseidonHash(
-      _packHashFromTwo128(publicSignals[4], publicSignals[5])
-    );
+    bytes32 personHash_ = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
+    bytes32 fatherHash_ = publicSignals.fatherIdentityCommitment == 0
+      ? bytes32(0)
+      : _wrapIdentityCommitmentAsPersonHash(publicSignals.fatherIdentityCommitment);
+    bytes32 motherHash_ = publicSignals.motherIdentityCommitment == 0
+      ? bytes32(0)
+      : _wrapIdentityCommitmentAsPersonHash(publicSignals.motherIdentityCommitment);
+
+    if (publicSignals.fatherIdentityCommitment == 0) {
+      if (fatherVersionIndex != 0) revert InvalidParentHash();
+    }
+
+    if (publicSignals.motherIdentityCommitment == 0) {
+      if (motherVersionIndex != 0) revert InvalidParentHash();
+    }
 
     emit PersonHashZKVerified(personHash_, msg.sender);
 
@@ -1044,77 +754,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  function addPersonZKV2(
-    ProofEnvelope calldata proof,
-    PersonProofPublicSignalsV2 calldata publicSignals,
-    ParentRef calldata father,
-    ParentRef calldata mother,
-    VersionMeta calldata meta,
-    string calldata tag,
-    string calldata metadataCID
-  ) external nonReentrant {
-    if (publicSignals.submitter != uint256(uint160(msg.sender))) revert CallerMismatch();
-    if (publicSignals.hashAlgoId == 0) revert InvalidHashAlgoId();
-    if (publicSignals.schemaVersion != proof.schemaVersion) revert BasicInfoMismatch();
-    if (publicSignals.cryptoSuiteVersion != proof.cryptoSuiteVersion) revert BasicInfoMismatch();
-    if (uint16(publicSignals.schemaVersion) != meta.schemaVersion) revert BasicInfoMismatch();
-    if (uint16(publicSignals.cryptoSuiteVersion) != meta.cryptoSuiteVersion) revert BasicInfoMismatch();
-    if (uint16(publicSignals.hashAlgoId) != meta.hashAlgoId) revert BasicInfoMismatch();
-
-    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.PersonV2);
-    uint256[7] memory ps = [
-      publicSignals.identityCommitment,
-      publicSignals.fatherIdentityCommitment,
-      publicSignals.motherIdentityCommitment,
-      publicSignals.submitter,
-      publicSignals.schemaVersion,
-      publicSignals.cryptoSuiteVersion,
-      publicSignals.hashAlgoId
-    ];
-
-    if (!IPersonCommitmentVerifierV2(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
-      revert InvalidZKProof();
-    }
-
-    bytes32 personHash_ = _wrapIdentityCommitmentAsPersonHashV2(publicSignals.identityCommitment);
-    bytes32 fatherHash_ = publicSignals.fatherIdentityCommitment == 0
-      ? bytes32(0)
-      : _wrapIdentityCommitmentAsPersonHashV2(publicSignals.fatherIdentityCommitment);
-    bytes32 motherHash_ = publicSignals.motherIdentityCommitment == 0
-      ? bytes32(0)
-      : _wrapIdentityCommitmentAsPersonHashV2(publicSignals.motherIdentityCommitment);
-
-    if (publicSignals.fatherIdentityCommitment == 0) {
-      if (father.personHash != bytes32(0) || father.versionIndex != 0) revert InvalidParentHash();
-    } else {
-      if (father.personHash != fatherHash_) revert InvalidParentHash();
-    }
-
-    if (publicSignals.motherIdentityCommitment == 0) {
-      if (mother.personHash != bytes32(0) || mother.versionIndex != 0) revert InvalidParentHash();
-    } else {
-      if (mother.personHash != motherHash_) revert InvalidParentHash();
-    }
-
-    emit PersonHashZKVerified(personHash_, msg.sender);
-
-    _addPersonInternal(
-      personHash_,
-      fatherHash_,
-      motherHash_,
-      father.versionIndex,
-      mother.versionIndex,
-      tag,
-      metadataCID
-    );
-  }
-
-  /**
-   * @notice Endorse a supported version
-   * @dev Express trust in a specific version through endorsement, requires spending FamilyTokens equal to current reward amount.
-   * @param personHash Person hash
-   * @param versionIndex Version index to endorse (starts from 1)
-   */
   function endorseVersion(
     bytes32 personHash,
     uint256 versionIndex
@@ -1194,11 +833,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  /**
-   * @notice Cancel endorsement for a person version
-   * @dev Completely removes the person from user's endorsed list and decrements endorsement count
-   * @param personHash Person hash to cancel endorsement for
-   */
   function cancelEndorsement(bytes32 personHash) external nonReentrant {
     if (personHash == bytes32(0)) revert InvalidPersonHash();
 
@@ -1232,102 +866,28 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   /**
-   * @notice Mint family tree NFT and put core information on-chain.
-   * @dev Can only mint when caller has completed endorsement for this version.
-   *      Expected publicSignals order:
-   *        0..1 => fullNameCommitment Poseidon digest limbs (hi -> lo)
-   *        2..3 => keccak256(fullName) limbs (hi -> lo)
-   *        4    => minter address (lower 160 bits)
-   * @param personHash Person hash
-   * @param versionIndex Version index (starts from 1)
-   * @param _tokenURI NFT metadata URI (can be empty string)
-   * @param coreInfo Person core information structure
+   * @notice Mint family tree NFT for a specific person version with a ZK binding proof.
    */
-  function mintPersonNFT(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[5] calldata publicSignals,
-    bytes32 personHash,
+  function mintPersonVersionNFT(
+    ProofEnvelope calldata proof,
+    DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
     PersonCoreInfo calldata coreInfo
-  ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
-    if (publicSignals[4] != uint256(uint160(msg.sender))) revert CallerMismatch();
-
-    if (versionToTokenId[personHash][versionIndex] != 0) revert VersionAlreadyMinted();
-
-    if (endorsedVersionIndex[personHash][msg.sender] != versionIndex) {
-      revert MustEndorseVersionFirst();
+  ) external nonReentrant {
+    bytes32 personHash = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
+    if (personHash == bytes32(0)) revert InvalidPersonHash();
+    if (versionIndex == 0 || versionIndex > personVersions[personHash].length) {
+      revert InvalidVersionIndex();
     }
-
-    if (bytes(_tokenURI).length > MAX_LONG_TEXT_LENGTH) revert InvalidTokenURI();
-    if (bytes(coreInfo.supplementInfo.fullName).length == 0) revert InvalidFullName();
-    if (bytes(coreInfo.supplementInfo.fullName).length > MAX_LONG_TEXT_LENGTH)
-      revert InvalidFullName();
-    if (bytes(coreInfo.supplementInfo.story).length > MAX_LONG_TEXT_LENGTH) revert InvalidStory();
-    if (bytes(coreInfo.supplementInfo.birthPlace).length > MAX_LONG_TEXT_LENGTH)
-      revert InvalidBirthPlace();
-    if (bytes(coreInfo.supplementInfo.deathPlace).length > MAX_LONG_TEXT_LENGTH)
-      revert InvalidDeathPlace();
-    if (coreInfo.supplementInfo.deathMonth > 12) revert InvalidDeathMonth();
-    if (coreInfo.supplementInfo.deathDay > 31) revert InvalidDeathDay();
-
-    bytes32 computedHash = getPersonHash(coreInfo.basicInfo);
-    if (computedHash != personHash) revert BasicInfoMismatch();
-
-    _enforceAdult(coreInfo.basicInfo);
-
-    if (!INamePoseidonVerifier(NAME_POSEIDON_VERIFIER).verifyProof(a, b, c, publicSignals))
-      revert InvalidZKProof();
-
-    bytes32 poseidonDigest = _packHashFromTwo128(publicSignals[0], publicSignals[1]);
-    if (poseidonDigest != coreInfo.basicInfo.fullNameCommitment) revert BasicInfoMismatch();
-
-    bytes32 providedFullNameHash = _packHashFromTwo128(publicSignals[2], publicSignals[3]);
-    bytes32 computedFullNameHash = _hashString(coreInfo.supplementInfo.fullName);
-    if (computedFullNameHash != providedFullNameHash) revert BasicInfoMismatch();
-
-    uint256 newTokenId = ++tokenCounter;
-
-    tokenIdToPerson[newTokenId] = personHash;
-    tokenIdToVersionIndex[newTokenId] = versionIndex;
-    versionToTokenId[personHash][versionIndex] = newTokenId;
-    nftCoreInfo[newTokenId] = coreInfo;
-    _setTokenURI(newTokenId, _tokenURI);
-
-    _safeMint(msg.sender, newTokenId);
-
-    emit PersonNFTMinted(
-      personHash,
-      newTokenId,
-      msg.sender,
-      versionIndex,
-      _tokenURI,
-      block.timestamp
-    );
-  }
-
-  function mintPersonNFTV2(
-    ProofEnvelope calldata proof,
-    NameDisclosurePublicSignalsV2 calldata publicSignals,
-    bytes32 personHash,
-    uint256 versionIndex,
-    string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo,
-    DisclosureData calldata disclosure
-  ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
     if (publicSignals.minter != uint256(uint160(msg.sender))) revert CallerMismatch();
-    if (publicSignals.hashAlgoId == 0) revert InvalidHashAlgoId();
-    if (publicSignals.schemaVersion != proof.schemaVersion) revert BasicInfoMismatch();
-    if (publicSignals.cryptoSuiteVersion != proof.cryptoSuiteVersion) revert BasicInfoMismatch();
 
-    _validateMintPersonNFTV2Input(personHash, versionIndex, _tokenURI, coreInfo);
-    _verifyMintPersonNFTV2Proof(proof, publicSignals);
-    _validateMintPersonNFTV2Bindings(publicSignals, personHash, coreInfo, disclosure);
+    _validateMintInput(personHash, versionIndex, _tokenURI, coreInfo);
+    _verifyMintProof(proof, publicSignals);
+    _validateMintBindings(publicSignals, coreInfo);
     _enforceAdult(coreInfo.basicInfo);
 
-    uint256 newTokenId = _mintPersonNFTV2Internal(personHash, versionIndex, _tokenURI, coreInfo);
+    uint256 newTokenId = _mintInternal(personHash, versionIndex, _tokenURI, coreInfo);
 
     emit PersonNFTMinted(
       personHash,
@@ -1339,21 +899,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  /**
-   * @dev Override tokenURI function to return stored URI
-   * @param tokenId NFT token ID
-   * @return URI string
-   */
   function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
     _requireOwned(tokenId);
     return _tokenURIs[tokenId];
   }
 
-  /**
-   * @notice Allow current NFT holder to update the token's metadata URI
-   * @param tokenId NFT TokenID
-   * @param newURI New metadata URI (recommended to use ipfs://CID format)
-   */
   function updateTokenURI(uint256 tokenId, string calldata newURI) external {
     if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
     if (bytes(newURI).length > MAX_LONG_TEXT_LENGTH) revert InvalidTokenURI();
@@ -1366,10 +916,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     emit TokenURIUpdated(tokenId, msg.sender, oldURI, newURI);
   }
 
-  /**
-   * @notice Update protocol fee share for endorsement payments.
-   * @param newBps New protocol fee in basis points (max 20%)
-   */
   function updateEndorsementFee(uint256 newBps) external onlyOwner {
     if (newBps > PROTOCOL_FEE_BPS_MAX) revert ProtocolFeeTooHigh();
     uint256 previous = protocolEndorsementFeeBps;
@@ -1380,16 +926,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     emit EndorsementFeeUpdated(previous, newBps);
   }
 
-  /**
-   * @notice Add story chunk to NFT
-   * @dev Only NFT holder can add chunks, chunk content will be hash verified
-   * @param tokenId NFT TokenID
-   * @param chunkIndex Chunk index (must be continuous, starting from 0)
-   * @param content Chunk content
-   * @param chunkType Chunk classification
-   * @param attachmentCID Optional attachment CID (IPFS/Arweave)
-   * @param expectedHash Expected chunk hash (for client-side validation)
-   */
   function addStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex,
@@ -1444,11 +980,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  /**
-   * @notice Seal story, making it unmodifiable
-   * @dev Only NFT holders can seal stories, sealing ensures immutability of historical records
-   * @param tokenId NFT TokenID
-   */
   function sealStory(uint256 tokenId) external {
     if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
 
@@ -1465,15 +996,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   // ========== Query Functions ==========
 
-  /**
-   * @notice Get complete information of specified version
-   * @dev Directly query endorsement count and TokenID of single version, version index starts from 1
-   * @param personHash Person hash
-   * @param versionIndex Version index (starts from 1)
-   * @return version Version information
-   * @return endorsementCount Endorsement count
-   * @return tokenId NFT TokenID (0 means not minted)
-   */
   function getVersionDetails(
     bytes32 personHash,
     uint256 versionIndex
@@ -1483,23 +1005,12 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     validPersonAndVersion(personHash, versionIndex)
     returns (PersonVersion memory version, uint256 endorsementCount, uint256 tokenId)
   {
-    uint256 arrayIndex = versionIndex - 1; // Convert to array index (starts from 0)
+    uint256 arrayIndex = versionIndex - 1;
     version = personVersions[personHash][arrayIndex];
     endorsementCount = versionEndorsementCount[personHash][arrayIndex];
     tokenId = versionToTokenId[personHash][versionIndex];
   }
 
-  /**
-   * @notice Get complete NFT information (combined query)
-   * @dev Requires tokenId to exist; single call returns person hash, version index, version info, core info, endorsement count and URI.
-   * @param tokenId NFT TokenID
-   * @return personHash Corresponding person hash
-   * @return versionIndex Corresponding version index (starts from 1)
-   * @return version Version basic information
-   * @return coreInfo NFT core information
-   * @return endorsementCount Endorsement count
-   * @return nftTokenURI NFT metadata URI
-   */
   function getNFTDetails(
     uint256 tokenId
   )
@@ -1526,22 +1037,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     nftTokenURI = tokenURI(tokenId);
   }
 
-  /**
-   * @notice Get NFT's story metadata
-   * @param tokenId NFT TokenID
-   * @return metadata Story metadata
-   */
   function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata memory metadata) {
     _requireOwned(tokenId);
     metadata = storyMetadata[tokenId];
   }
 
-  /**
-   * @notice Get detailed information of specified chunk
-   * @param tokenId NFT TokenID
-   * @param chunkIndex Chunk index
-   * @return chunk Chunk information
-   */
   function getStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex
@@ -1552,19 +1052,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     chunk = storyChunks[tokenId][chunkIndex];
   }
 
-  /**
-   * @notice Get children of specified parent version (paginated)
-   * @dev When limit=0, only returns total count; supports offset/limit, max page length limited by MAX_QUERY_PAGE_SIZE
-   * @param parentHash Parent person hash
-   * @param parentVersionIndex Parent version index (0 = unversioned children, >=1 = specific version)
-   * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (0-100)
-   * @return childHashes Children person hash array
-   * @return childVersionIndices Children version index array (one-to-one correspondence with hashes)
-   * @return totalCount Total children count
-   * @return hasMore Whether there are more
-   * @return nextOffset Starting position for next query
-   */
   function listChildren(
     bytes32 parentHash,
     uint256 parentVersionIndex,
@@ -1581,7 +1068,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       uint256 nextOffset
     )
   {
-    // Custom validation: allow versionIndex=0 for unversioned children
     if (parentHash == bytes32(0)) revert InvalidPersonHash();
     if (parentVersionIndex > personVersions[parentHash].length) {
       revert InvalidVersionIndex();
@@ -1608,17 +1094,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return (childHashes, childVersionIndices, totalCount, page.hasMore, page.nextOffset);
   }
 
-  /**
-   * @notice Get person version basic information (supports pagination)
-   * @dev Query specified person's version basic information, supports pagination to avoid gas attacks
-   * @param personHash Person hash
-   * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (0-100)
-   * @return versions Version information array
-   * @return totalVersions Total version count
-   * @return hasMore Whether there are more versions
-   * @return nextOffset Suggested starting position for next query
-   */
   function listPersonVersions(
     bytes32 personHash,
     uint256 offset,
@@ -1652,19 +1127,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return (versions, totalVersions, page.hasMore, page.nextOffset);
   }
 
-  /**
-   * @notice Get version endorsement statistics (supports pagination)
-   * @dev Used for frontend display of version credibility ranking, supports pagination to avoid gas attacks
-   * @param personHash Person hash
-   * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (0-100)
-   * @return versionIndices Version index array
-   * @return endorsementCounts Corresponding endorsement count array
-   * @return tokenIds Corresponding NFT TokenID array (0 means not minted)
-   * @return totalVersions Total version count
-   * @return hasMore Whether there are more versions
-   * @return nextOffset Suggested starting position for next query
-   */
   function listVersionEndorsements(
     bytes32 personHash,
     uint256 offset,
@@ -1718,20 +1180,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  /**
-   * @notice List all person versions a user has endorsed (paginated)
-   * @dev Returns list of person hashes and their currently endorsed version indices
-   * @param user User address to query
-   * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit (0-100)
-   * @return personHashes Array of person hashes the user has endorsed
-   * @return versionIndices Array of version indices currently endorsed (starts from 1)
-   * @return endorsementCounts Array of total endorsement counts for each version
-   * @return tokenIds Array of NFT token IDs (0 if not minted)
-   * @return totalCount Total number of persons the user has endorsed
-   * @return hasMore Whether there are more results
-   * @return nextOffset Suggested starting position for next query
-   */
   function listUserEndorsements(
     address user,
     uint256 offset,
@@ -1792,12 +1240,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  /**
-   * @notice Paginated query of historical URI for a Token
-   * @param tokenId Token ID
-   * @param offset Starting index
-   * @param limit Return quantity
-   */
   function listTokenURIHistory(
     uint256 tokenId,
     uint256 offset,
@@ -1824,16 +1266,6 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return (uris, totalCount, page.hasMore, page.nextOffset);
   }
 
-  /**
-   * @notice Get story chunks with pagination
-   * @param tokenId NFT TokenID
-   * @param offset Starting position (starts from 0)
-   * @param limit Return quantity limit
-   * @return chunks Chunk array
-   * @return totalChunks Total chunk count
-   * @return hasMore Whether there are more chunks
-   * @return nextOffset Starting position for next query
-   */
   function listStoryChunks(
     uint256 tokenId,
     uint256 offset,

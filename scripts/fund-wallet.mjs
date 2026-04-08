@@ -20,7 +20,7 @@ async function main() {
 
   await tx.wait();
 
-  console.log(`✅ Successfully sent ${ethers.formatEther(amount)} ETH to ${targetAddress}`);
+  console.log(`Successfully sent ${ethers.formatEther(amount)} ETH to ${targetAddress}`);
   console.log(`Transaction hash: ${tx.hash}`);
 
   // Check balance

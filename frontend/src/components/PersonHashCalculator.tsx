@@ -1,9 +1,11 @@
 /**
  * PersonHashCalculator
  *
- * UI component for computing a deterministic identity hash (contract: getPersonHash) used by DeepFamily ZK flows.
- * Security note: the passphrase is treated as sensitive input; callers should prefer
- * `onPublicFormChange`/imperative ref APIs to avoid lifting the passphrase into parent state.
+ * UI component for computing an identity hash (keccak256(identityCommitment))
+ * used by DeepFamily ZK flows. When a passphrase is present, the identity secret
+ * is derived locally via Argon2id in a worker before computing the final hash.
+ * Security note: callers should prefer `onPublicFormChange`/imperative ref APIs
+ * to avoid lifting the passphrase into parent state.
  */
 import React, {
   useState,
@@ -23,10 +25,15 @@ import { formatHashMiddle } from "../types/graph";
 import {
   validatePassphraseStrength,
   normalizePassphraseForHash,
-  normalizeNameForHash,
   getGraphemeLength as getGraphemeLengthUtil,
 } from "../lib/passphraseStrength";
-import { computeIdentityHash, computePersonHash } from "../lib/identityHash";
+import {
+  computeIdentityHash,
+  computePersonHash,
+  type IdentitySaltMode,
+} from "../lib/identityHash";
+import { safeCanonicalizeFullName } from "../lib/identityCommitment";
+import { cryptoWorkerCall } from "../lib/cryptoWorkerClient";
 
 // Align with contract convention: blank passphrase -> zero salt limbs
 
@@ -114,11 +121,8 @@ const hashFormSchema = z.object({
   fullName: z
     .string()
     .min(1)
-    .refine((val) => normalizeNameForHash(val).length > 0, "Name required")
-    .refine(
-      (val) => getByteLength(normalizeNameForHash(val)) <= MAX_FULL_NAME_BYTES,
-      "Name exceeds max bytes",
-    ),
+    .refine((val) => safeCanonicalizeFullName(val).length > 0, "Name required")
+    .refine((val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES, "Name exceeds max bytes"),
   isBirthBC: z.boolean(),
   birthYear: z
     .union([z.number().int().min(0).max(10000), z.literal("")])
@@ -172,6 +176,8 @@ interface PersonHashCalculatorProps {
     birthDay?: number;
     isBirthBC?: boolean;
   };
+  identityMode?: IdentitySaltMode;
+  identitySaltHex?: string;
 }
 
 export type PersonHashCalculatorHandle = {
@@ -193,6 +199,8 @@ export const PersonHashCalculator = forwardRef<
       isOpen = true,
       onToggle,
       initialValues,
+      identityMode = "deterministic",
+      identitySaltHex,
     },
     ref,
   ) => {
@@ -222,10 +230,10 @@ export const PersonHashCalculator = forwardRef<
             fullName: z
               .string()
               .min(1, t("search.validation.required"))
-              .refine((val) => normalizeNameForHash(val).length > 0, {
+              .refine((val) => safeCanonicalizeFullName(val).length > 0, {
                 message: t("search.validation.required"),
               })
-              .refine((val) => getByteLength(normalizeNameForHash(val)) <= MAX_FULL_NAME_BYTES, {
+              .refine((val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES, {
                 message: t("search.validation.nameTooLong"),
               }),
             isBirthBC: z.boolean(),
@@ -324,7 +332,7 @@ export const PersonHashCalculator = forwardRef<
     const buildTransformedData = (values?: Partial<HashFormInput>): HashForm => {
       const snapshot = values ?? getValues();
       return {
-        fullName: snapshot.fullName || "",
+        fullName: safeCanonicalizeFullName(snapshot.fullName || ""),
         isBirthBC: snapshot.isBirthBC || false,
         birthYear:
           snapshot.birthYear === "" || snapshot.birthYear === undefined
@@ -343,18 +351,8 @@ export const PersonHashCalculator = forwardRef<
       };
     };
 
-    const computedHash = useMemo(() => {
-      const transformedData = buildTransformedData({
-        fullName,
-        isBirthBC,
-        birthYear,
-        birthMonth,
-        birthDay,
-        gender: Number(gender || 0),
-      });
-      if (!normalizeNameForHash(transformedData.fullName).length) return "";
-      return computeIdentityHash(transformedData);
-    }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision]);
+    const [computedHash, setComputedHash] = useState("");
+    const [isComputingHash, setIsComputingHash] = useState(false);
 
     const onPublicFormChangeRef = useRef(onPublicFormChange);
 
@@ -392,6 +390,68 @@ export const PersonHashCalculator = forwardRef<
         hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0,
       });
     }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision]);
+
+    useEffect(() => {
+      const transformedData = buildTransformedData({
+        fullName,
+        isBirthBC,
+        birthYear,
+        birthMonth,
+        birthDay,
+        gender: Number(gender || 0),
+      });
+      if (!transformedData.fullName.length) {
+        setComputedHash("");
+        setIsComputingHash(false);
+        return;
+      }
+
+      let cancelled = false;
+      const timer = window.setTimeout(() => {
+        setIsComputingHash(true);
+        cryptoWorkerCall(
+          "computeIdentityHash",
+          {
+            input: {
+              ...transformedData,
+              identityMode,
+              identitySaltHex,
+            },
+          },
+          { timeoutMs: 180_000 },
+        )
+          .then(({ identityHash }) => {
+            if (!cancelled) {
+              setComputedHash(identityHash);
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setComputedHash("");
+            }
+          })
+          .finally(() => {
+            if (!cancelled) {
+              setIsComputingHash(false);
+            }
+          });
+      }, hasPassphrase ? 250 : 0);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }, [
+      fullName,
+      isBirthBC,
+      birthYear,
+      birthMonth,
+      birthDay,
+      gender,
+      passphraseRevision,
+      identityMode,
+      identitySaltHex,
+    ]);
 
     const content = (
       <div className="space-y-2">
@@ -747,52 +807,60 @@ export const PersonHashCalculator = forwardRef<
             )}
           </div>
         </div>
-        {computedHash && (
+        {(computedHash || isComputingHash) && (
           <div className="space-y-2">
             {/* Local calculation result */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:overflow-hidden">
               <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
                 {t("search.hashCalculator.calculatedHash")}:
               </span>
-              <HashInline
-                value={computedHash}
-                className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight"
-                wrapOnMobile
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    if (
-                      navigator.clipboard &&
-                      typeof navigator.clipboard.writeText === "function"
-                    ) {
-                      await navigator.clipboard.writeText(computedHash);
-                      toast.show(t("search.copied"));
-                      return;
-                    }
-                  } catch {}
-                  try {
-                    const ta = document.createElement("textarea");
-                    ta.value = computedHash;
-                    ta.style.position = "fixed";
-                    ta.style.left = "-9999px";
-                    document.body.appendChild(ta);
-                    ta.focus();
-                    ta.select();
-                    const ok = document.execCommand("copy");
-                    document.body.removeChild(ta);
-                    toast.show(ok ? t("search.copied") : t("search.copyFailed"));
-                  } catch {
-                    toast.show(t("search.copyFailed"));
-                  }
-                }}
-                aria-label={t("search.copy")}
-                className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                title={t("search.copy")}
-              >
-                <Clipboard size={14} />
-              </button>
+              {isComputingHash ? (
+                <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                  {t("search.hashCalculator.calculatingHash", "Computing identity hash...")}
+                </span>
+              ) : (
+                <>
+                  <HashInline
+                    value={computedHash}
+                    className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight"
+                    wrapOnMobile
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        if (
+                          navigator.clipboard &&
+                          typeof navigator.clipboard.writeText === "function"
+                        ) {
+                          await navigator.clipboard.writeText(computedHash);
+                          toast.show(t("search.copied"));
+                          return;
+                        }
+                      } catch {}
+                      try {
+                        const ta = document.createElement("textarea");
+                        ta.value = computedHash;
+                        ta.style.position = "fixed";
+                        ta.style.left = "-9999px";
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        const ok = document.execCommand("copy");
+                        document.body.removeChild(ta);
+                        toast.show(ok ? t("search.copied") : t("search.copyFailed"));
+                      } catch {
+                        toast.show(t("search.copyFailed"));
+                      }
+                    }}
+                    aria-label={t("search.copy")}
+                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    title={t("search.copy")}
+                  >
+                    <Clipboard size={14} />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
