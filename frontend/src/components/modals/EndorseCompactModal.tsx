@@ -227,50 +227,12 @@ export default function EndorseCompactModal({
           }
         }
 
-        // Wait for approval confirmation
-        const receipt = await tx.wait();
-
-        // Wait for blockchain state to be updated after approval transaction
-        let postAllowance: bigint = currentAllowance;
-        let retryCount = 0;
-        const maxRetries = 32;
-
-        while (retryCount < maxRetries && postAllowance < fee) {
-          const waitTime = Math.min(500 + retryCount * 300, 2000);
-
-          try {
-            await new Promise((resolve) => setTimeout(resolve, waitTime));
-            postAllowance = await tokenContract.allowance(address, spender);
-
-            if (postAllowance >= fee) {
-              break;
-            }
-          } catch (error) {
-            console.warn(
-              `Post-approval allowance check failed on attempt ${retryCount + 1}:`,
-              error,
-            );
-          }
-
-          retryCount++;
-        }
-      } else {
+        // Wait for approval confirmation — once tx.wait() resolves the
+        // on-chain state is already updated, no polling needed.
+        await tx.wait();
       }
 
-      // Step 8: Final allowance check before endorseVersion call
-      const finalAllowance: bigint = await tokenContract.allowance(address, spender);
-      const finalRequired: bigint = await tokenContract.recentReward();
-
-      if (finalAllowance < finalRequired) {
-        const errorMsg = t(
-          "endorse.errors.needApprove",
-          "Allowance insufficient. Please re-approve the token allowance.",
-        );
-        console.error("Final allowance insufficient");
-        throw new Error(errorMsg);
-      }
-
-      // Step 9: Now proceed with endorsement
+      // Step 8: Proceed with endorsement
       setState("working");
       const result = await endorseVersion(personHash, versionIndex, undefined, {
         suppressToasts: true,

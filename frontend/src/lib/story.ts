@@ -1,8 +1,7 @@
 import { ethers, Contract, type JsonRpcSigner } from "ethers";
 import DeepFamilyAbi from "../abi/DeepFamily.json";
+import { extractRevertReason } from "./errors";
 import type { StoryChunk } from "../types/graph";
-
-const WALLET_CONFIRMATION_TIMEOUT_MS = 30000;
 
 export function computeStoryHash(chunks: StoryChunk[]): string {
   if (!chunks || chunks.length === 0) return ethers.ZeroHash;
@@ -75,18 +74,13 @@ export async function addStoryChunk(
   const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer);
 
   try {
-    // Send transaction (with wallet confirmation timeout)
-    const tx = await withWalletConfirmationTimeout(
-      () =>
-        contract.addStoryChunk(
-          tokenId,
-          chunkIndex,
-          chunkType,
-          content,
-          attachmentCID,
-          expectedHash || ethers.ZeroHash,
-        ),
-      "addStoryChunk",
+    const tx = await contract.addStoryChunk(
+      tokenId,
+      chunkIndex,
+      chunkType,
+      content,
+      attachmentCID,
+      expectedHash || ethers.ZeroHash,
     );
 
     // Wait for confirmation
@@ -159,8 +153,7 @@ export async function sealStory(
   const contract = new Contract(contractAddress, DeepFamilyAbi.abi, signer);
 
   try {
-    // Send transaction (with wallet confirmation timeout)
-    const tx = await withWalletConfirmationTimeout(() => contract.sealStory(tokenId), "sealStory");
+    const tx = await contract.sealStory(tokenId);
 
     // Wait for confirmation
     const receipt = await tx.wait();
@@ -232,6 +225,13 @@ function parseStoryContractError(error: any, contract: Contract): Error {
     return err;
   }
 
+  const revertReason = extractRevertReason(contract, error);
+  if (revertReason) {
+    const err = new Error(getErrorMessage(revertReason));
+    (err as any).type = revertReason;
+    return err;
+  }
+
   if (
     error?.code === -32002 ||
     (typeof error?.message === "string" && /request (?:is )?already pending/i.test(error.message))
@@ -242,32 +242,6 @@ function parseStoryContractError(error: any, contract: Contract): Error {
     (err as any).type = "WALLET_REQUEST_PENDING";
     (err as any).code = "WALLET_REQUEST_PENDING";
     return err;
-  }
-
-  // Check for custom errors in the error data
-  if (error?.data && typeof error.data === "string") {
-    // Common custom error selectors
-    const customErrors: Record<string, string> = {
-      "0xdaffd8a5": "MustBeNFTHolder",
-      "0x82b42900": "Unauthorized",
-      "0x3ee5aeb5": "OnlyOwner",
-      "0x579b9c8a": "StorySealed",
-      "0x6512e97e": "ChunkIndexExists",
-      "0x766e8709": "InvalidChunkIndex",
-      "0x7b51ba7e": "ContentTooLong",
-      "0x9b9623c8": "ExpectedHashMismatch",
-      "0x5b00bc40": "ChunkHashMismatch",
-      "0x7df0b861": "ChunkIndexOutOfRange",
-    };
-
-    const errorSelector = error.data.slice(0, 10);
-    const customError = customErrors[errorSelector];
-
-    if (customError) {
-      const err = new Error(getErrorMessage(customError));
-      (err as any).type = customError;
-      return err;
-    }
   }
 
   // Check for standard error messages
@@ -323,42 +297,4 @@ function getErrorMessage(errorName: string): string {
   };
 
   return messages[errorName] || `Contract error: ${errorName}`;
-}
-
-/**
- * Apply a timeout while waiting for the wallet confirmation step.
- * Prevents the UI from hanging indefinitely when Fluent hides the popup.
- */
-async function withWalletConfirmationTimeout<T>(
-  sendTx: () => Promise<T>,
-  action: string,
-): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeoutError = new Error(
-    "Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.",
-  );
-  (timeoutError as any).type = "WALLET_POPUP_TIMEOUT";
-  (timeoutError as any).code = "WALLET_POPUP_TIMEOUT";
-  (timeoutError as any).action = action;
-
-  const txPromise = sendTx();
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(timeoutError), WALLET_CONFIRMATION_TIMEOUT_MS);
-  });
-
-  try {
-    const result = await Promise.race([txPromise, timeoutPromise]);
-    if (timeoutId) clearTimeout(timeoutId);
-    return result;
-  } catch (err) {
-    if (timeoutId) clearTimeout(timeoutId);
-    // Avoid unhandled rejections if the original txPromise resolves later
-    if (err === timeoutError) {
-      console.warn(
-        `[Wallet] Confirmation timeout exceeded (${WALLET_CONFIRMATION_TIMEOUT_MS}ms) for ${action}`,
-      );
-      txPromise.catch(() => {});
-    }
-    throw err;
-  }
 }

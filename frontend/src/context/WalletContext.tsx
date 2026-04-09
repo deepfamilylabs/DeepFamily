@@ -382,14 +382,33 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleChainChanged = (chainId: string) => {
-      setWalletState((prev) => ({
-        ...prev,
-        chainId: parseInt(chainId, 16),
-      }));
-      // Refresh balance on chain change
-      if (walletState.address) {
-        refreshBalance();
-      }
+      const nextChainId = parseInt(chainId, 16);
+
+      // Recreate ethers provider/signer on every chain switch so they do not
+      // retain the old cached network and throw NETWORK_ERROR on the next call.
+      (async () => {
+        try {
+          const provider = new ethers.BrowserProvider(rawProvider as any);
+          const signer = await provider.getSigner();
+          const address = await signer.getAddress();
+          const balance = await provider.getBalance(address);
+
+          setWalletState((prev) => ({
+            ...prev,
+            provider,
+            signer,
+            address,
+            chainId: nextChainId,
+            balance: ethers.formatEther(balance),
+          }));
+        } catch (error) {
+          console.warn("[WalletContext] Failed to refresh provider after chain change:", error);
+          setWalletState((prev) => ({
+            ...prev,
+            chainId: nextChainId,
+          }));
+        }
+      })();
     };
 
     const handleDisconnect = () => {

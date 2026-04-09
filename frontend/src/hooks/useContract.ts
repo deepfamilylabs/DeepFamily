@@ -5,7 +5,13 @@ import { useConfig } from "../context/ConfigContext";
 import { useToast } from "../components/ToastProvider";
 import { useTranslation } from "react-i18next";
 import DeepFamily from "../abi/DeepFamily.json";
-import { extractRevertReason, getFriendlyError, sanitizeErrorForLogging } from "../lib/errors";
+import {
+  extractRevertReason,
+  formatErrorSummaryForDev,
+  getFriendlyError,
+  sanitizeErrorForLogging,
+} from "../lib/errors";
+import { wrapIdentityCommitmentAsPersonHash } from "../lib/zk";
 import type { ProofEnvelope } from "../lib/zk";
 
 export type AddPersonVersionResult = {
@@ -59,6 +65,7 @@ export type DisclosureBindingPublicSignals = {
 };
 
 export function useContract() {
+  const isDev = import.meta.env.DEV;
   const { signer, provider } = useWallet();
   const { contractAddress } = useConfig();
   const toast = useToast();
@@ -75,6 +82,7 @@ export function useContract() {
 
     return null;
   }, [contractAddress, signer, provider]);
+  const abiCoder = useMemo(() => ethers.AbiCoder.defaultAbiCoder(), []);
   const eventInterface = useMemo(() => new ethers.Interface(DeepFamily.abi), []);
 
   const executeTransaction = useCallback(
@@ -101,38 +109,17 @@ export function useContract() {
             await signer.provider.getNetwork();
           } catch (walletStateError) {
             console.warn("Failed to get wallet state:", sanitizeErrorForLogging(walletStateError));
+            if (isDev) {
+              console.debug(
+                `[useContract] wallet state error detail\n${formatErrorSummaryForDev(walletStateError)}`,
+              );
+            }
           }
         }
 
         await new Promise((resolve) => setTimeout(resolve, 100));
 
-        const walletTimeout = 30000;
-        const contractPromise = contractMethod();
-
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(
-              new Error(
-                "WALLET_POPUP_TIMEOUT: Wallet confirmation timed out. Please check if the wallet popup was closed or hidden.",
-              ),
-            );
-          }, walletTimeout);
-        });
-
-        let windowBlurred = false;
-        const onBlur = () => { windowBlurred = true; };
-        const onFocus = () => { if (windowBlurred) windowBlurred = false; };
-
-        window.addEventListener("blur", onBlur);
-        window.addEventListener("focus", onFocus);
-
-        let tx;
-        try {
-          tx = await Promise.race([contractPromise, timeoutPromise]);
-        } finally {
-          window.removeEventListener("blur", onBlur);
-          window.removeEventListener("focus", onFocus);
-        }
+        const tx = await contractMethod();
 
         if (!options.suppressSubmittedToast) {
           toast.show(t("transaction.submitted", "Transaction submitted..."));
@@ -150,6 +137,11 @@ export function useContract() {
         return receipt;
       } catch (error: any) {
         console.error("Transaction failed:", sanitizeErrorForLogging(error));
+        if (isDev) {
+          console.debug(
+            `[useContract] executeTransaction error detail\n${formatErrorSummaryForDev(error)}`,
+          );
+        }
 
         const friendly = getFriendlyError(error, t);
         const errorMsg = options.errorMessage
@@ -175,7 +167,7 @@ export function useContract() {
         throw enhancedError;
       }
     },
-    [contract, signer, toast, t],
+    [contract, signer, toast, t, isDev],
   );
 
   /**
@@ -205,6 +197,53 @@ export function useContract() {
       ] as const;
 
       try {
+        const expectedPersonHash = wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
+        const expectedFatherHash =
+          publicSignals.fatherIdentityCommitment === 0n
+            ? ethers.ZeroHash
+            : wrapIdentityCommitmentAsPersonHash(publicSignals.fatherIdentityCommitment);
+        const expectedMotherHash =
+          publicSignals.motherIdentityCommitment === 0n
+            ? ethers.ZeroHash
+            : wrapIdentityCommitmentAsPersonHash(publicSignals.motherIdentityCommitment);
+        const versionHash = ethers.keccak256(
+          abiCoder.encode(
+            ["bytes32", "bytes32", "bytes32", "uint256", "uint256", "string"],
+            [
+              expectedPersonHash,
+              expectedFatherHash,
+              expectedMotherHash,
+              fatherVersionIndex,
+              motherVersionIndex,
+              tag,
+            ],
+          ),
+        );
+
+        try {
+          const versionExistsFn = (contract as any).versionExists;
+          if (typeof versionExistsFn === "function") {
+            const exists = await versionExistsFn(expectedPersonHash, versionHash);
+            if (exists) {
+              const duplicateError = new Error("DuplicateVersion");
+              (duplicateError as any).reason = "DuplicateVersion";
+              (duplicateError as any).__dfDecodedReason = "DuplicateVersion";
+              throw duplicateError;
+            }
+          }
+        } catch (preflightError: any) {
+          if ((preflightError as any)?.reason === "DuplicateVersion") {
+            throw preflightError;
+          }
+          if (isDev) {
+            console.debug(
+              `[useContract] addPersonVersion duplicate preflight error detail\n${formatErrorSummaryForDev(
+                preflightError,
+              )}`,
+            );
+          }
+        }
+
         let gasLimit: bigint | undefined;
 
         try {
@@ -215,18 +254,42 @@ export function useContract() {
             "Gas estimation failed, attempting static call and fallback gas limit.",
             sanitizeErrorForLogging(estimateError),
           );
+          if (isDev) {
+            console.debug(
+              `[useContract] addPersonVersion estimateGas error detail\n${formatErrorSummaryForDev(
+                estimateError,
+              )}`,
+            );
+          }
           const decodedReason = extractRevertReason(contract, estimateError);
           if (decodedReason) {
             (estimateError as any).__dfDecodedReason = decodedReason;
+          }
+          if (isDev) {
+            console.debug(
+              `[useContract] addPersonVersion estimateGas decodedReason: ${decodedReason ?? "null"}`,
+            );
           }
 
           try {
             await contract.addPersonVersion.staticCall(...addPersonArgs);
             gasLimit = 6_500_000n;
           } catch (staticError: any) {
+            if (isDev) {
+              console.debug(
+                `[useContract] addPersonVersion staticCall error detail\n${formatErrorSummaryForDev(
+                  staticError,
+                )}`,
+              );
+            }
             const staticReason = extractRevertReason(contract, staticError);
             if (staticReason) {
               (staticError as any).__dfDecodedReason = staticReason;
+            }
+            if (isDev) {
+              console.debug(
+                `[useContract] addPersonVersion staticCall decodedReason: ${staticReason ?? "null"}`,
+              );
             }
             throw staticError;
           }
@@ -319,8 +382,29 @@ export function useContract() {
         };
       } catch (contractError: any) {
         console.error("Contract call failed:", sanitizeErrorForLogging(contractError));
+        if (isDev) {
+          console.debug(
+            `[useContract] addPersonVersion contract error detail\n${formatErrorSummaryForDev(
+              contractError,
+            )}`,
+          );
+        }
 
         const friendly = getFriendlyError(contractError, t);
+        if (isDev) {
+          console.debug(
+            `[useContract] addPersonVersion friendly error: ${JSON.stringify(
+              {
+                type: friendly.type,
+                reason: friendly.reason ?? null,
+                message: friendly.message,
+                details: friendly.details,
+              },
+              null,
+              2,
+            )}`,
+          );
+        }
 
         toast.show(
           t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
@@ -335,7 +419,7 @@ export function useContract() {
         throw enhancedError;
       }
     },
-    [contract, signer, toast, t, contractAddress, eventInterface],
+    [contract, signer, toast, t, contractAddress, eventInterface, isDev, abiCoder],
   );
 
   /**
