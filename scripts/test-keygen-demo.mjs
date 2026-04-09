@@ -75,7 +75,7 @@ async function deriveKey(personHash, userData, purpose, preset = "BALANCED") {
     normalizedFullName, // Full name (NFC)
     `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`, // Birth date
     userData.gender.toString(), // Gender
-    passphraseHash, // 🔒 Passphrase hash (prevents pre-computation)
+    passphraseHash, // Passphrase hash (prevents pre-computation)
   ].join(":");
 
   // Step 11: Hash salt

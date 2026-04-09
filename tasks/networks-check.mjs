@@ -50,7 +50,7 @@ const action = async (args, hre) => {
 
       // If Infura and missing INFURA_API_KEY, skip unless includeMissing
       if (url.includes("infura.io/v3/") && !process.env.INFURA_API_KEY && !args.includeMissing) {
-        console.log("  ⚠️ Skipped: missing INFURA_API_KEY (use --include-missing to force check)");
+        console.log("  Warning: Skipped: missing INFURA_API_KEY (use --include-missing to force check)");
         results[name] = false;
         continue;
       }
@@ -94,7 +94,7 @@ const action = async (args, hre) => {
     results,
   };
   console.log("\n" + "=".repeat(50));
-  console.log("📊 Summary:");
+  console.log("Summary:");
   console.log("=".repeat(50));
   console.log(`Total checked: ${summary.totalChecked}`);
   console.log(`Success: ${summary.success}`);

@@ -14,6 +14,7 @@ import {
   Link,
   User,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
 import {
   StoryChunk,
@@ -768,16 +769,22 @@ export default function PersonPage() {
                         data.integrity.hashMatch === false) && (
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
                           {data.integrity.missing.length > 0 && (
-                            <span>
-                              ⚠{" "}
+                            <span className="inline-flex items-start gap-1">
+                              <AlertTriangle
+                                className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"
+                                aria-hidden
+                              />
                               {t("person.integrityMissing", "Missing indices: {{indices}}", {
                                 indices: data.integrity.missing.join(","),
                               })}
                             </span>
                           )}
                           {!data.integrity.lengthMatch && (
-                            <span>
-                              ⚠{" "}
+                            <span className="inline-flex items-start gap-1">
+                              <AlertTriangle
+                                className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"
+                                aria-hidden
+                              />
                               {t(
                                 "person.integrityLenDiff",
                                 "Length mismatch local={{local}} bytes",
@@ -786,8 +793,12 @@ export default function PersonPage() {
                             </span>
                           )}
                           {data.integrity.hashMatch === false && (
-                            <span>
-                              ⚠ {t("person.integrityLocalHashMismatch", "Local hash mismatch")}
+                            <span className="inline-flex items-start gap-1">
+                              <AlertTriangle
+                                className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400"
+                                aria-hidden
+                              />
+                              {t("person.integrityLocalHashMismatch", "Local hash mismatch")}
                             </span>
                           )}
                         </div>
@@ -967,7 +978,8 @@ export default function PersonPage() {
                       return (
                         <div className="mb-4">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                            ⚠ {t("person.integrityWarn", "Integrity Warning")}
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                            {t("person.integrityWarn", "Integrity Warning")}
                           </span>
                         </div>
                       );

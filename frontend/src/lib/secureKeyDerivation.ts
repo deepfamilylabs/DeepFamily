@@ -100,7 +100,7 @@ export interface DerivedKey {
  *   birthDay: 15,
  *   gender: 1,
  *   isBirthBC: false,
- *   passphrase: "MyStrong🌸Passphrase🐦2024"
+ *   passphrase: "MyStrongPassphrase2024"
  * };
  *
  * const result = await deriveKeyFromPersonData(formData, 'PRIVATE_KEY', 'BALANCED');
@@ -140,7 +140,7 @@ export async function deriveKeyFromPersonData(
     normalizedFullName,
     `${input.birthYear}-${input.birthMonth}-${input.birthDay}`,
     input.gender.toString(),
-    passphraseHash, // 🔒 Critical: includes passphrase hash
+    passphraseHash, // Critical: includes passphrase hash
   ].join(":");
 
   const saltHash = ethers.keccak256(textEncoder.encode(saltComponents));
@@ -297,8 +297,8 @@ export function checkCryptoSupport(): {
     webCrypto,
     scrypt: true, // We use scrypt-js, always available
     recommendation: webCrypto
-      ? "✅ Browser fully supports cryptographic features"
-      : "⚠️ Browser crypto API limited, some features may be slower",
+      ? "Browser fully supports cryptographic features"
+      : "Browser crypto API limited, some features may be slower",
   };
 }
 

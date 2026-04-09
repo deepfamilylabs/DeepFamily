@@ -143,7 +143,7 @@ export async function addStoryChunk(
       events,
     };
   } catch (error: any) {
-    console.error("❌ Add story chunk failed:", error);
+    console.error("Add story chunk failed:", error);
     throw parseStoryContractError(error, contract);
   }
 }
@@ -201,7 +201,7 @@ export async function sealStory(
       events,
     };
   } catch (error: any) {
-    console.error("❌ Seal story failed:", error);
+    console.error("Seal story failed:", error);
     throw parseStoryContractError(error, contract);
   }
 }

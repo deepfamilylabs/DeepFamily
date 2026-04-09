@@ -15,7 +15,7 @@ console.log('  CID Generation Methods Verification')
 console.log('  (Using actual implementation from src/lib/cid.ts)')
 console.log('='.repeat(70))
 
-console.log('\n📝 Test data:')
+console.log('\nTest data:')
 console.log(`  Length: ${testJSON.length} bytes`)
 console.log(`  First 80 chars: ${testJSON.substring(0, 80)}...`)
 
@@ -48,17 +48,17 @@ console.log('='.repeat(70))
 const isIdentical = cid1 === cid2
 
 if (isIdentical) {
-  console.log('\n✅✅✅ SUCCESS: Both methods produce IDENTICAL CIDs!')
+  console.log('\nSUCCESS: Both methods produce IDENTICAL CIDs!')
   console.log('\nThis proves:')
-  console.log('  ✓ src/lib/cid.ts implementation is correct')
-  console.log('  ✓ Both methods are 100% compatible with IPFS standard')
-  console.log('  ✓ Frontend code is verified')
-  console.log(`  ✓ Method 1 is ${(time2/time1).toFixed(1)}x faster`)
+  console.log('  [ok] src/lib/cid.ts implementation is correct')
+  console.log('  [ok] Both methods are 100% compatible with IPFS standard')
+  console.log('  [ok] Frontend code is verified')
+  console.log(`  [ok] Method 1 is ${(time2/time1).toFixed(1)}x faster`)
 } else {
-  console.log('\n❌ FAILURE: CIDs do NOT match!')
+  console.log('\nFAILURE: CIDs do NOT match!')
   console.log(`  Method 1: ${cid1}`)
   console.log(`  Method 2: ${cid2}`)
-  console.log('\n⚠️  There is a bug in src/lib/cid.ts!')
+  console.log('\nWarning: There is a bug in src/lib/cid.ts!')
   process.exit(1)
 }
 
@@ -66,23 +66,23 @@ console.log('\n' + '='.repeat(70))
 console.log('  Environment Check')
 console.log('='.repeat(70))
 
-console.log('\n✅ Node.js environment:')
+console.log('\nNode.js environment:')
 console.log(`  - TextEncoder: ${typeof TextEncoder}`)
 console.log(`  - Buffer: ${typeof Buffer}`)
 console.log(`  - Both methods work perfectly`)
 
-console.log('\n⚠️  Browser environment:')
+console.log('\nBrowser environment:')
 console.log('  - TextEncoder: available')
 console.log('  - Buffer: NOT available (needs polyfill)')
-console.log('  - Method 1: ✅ Works (no Node.js deps)')
-console.log('  - Method 2: ❌ Fails (requires Buffer/Stream polyfills)')
+console.log('  - Method 1: Works (no Node.js deps)')
+console.log('  - Method 2: Fails (requires Buffer/Stream polyfills)')
 
-console.log('\n💡 Recommendation:')
+console.log('\nRecommendation:')
 console.log('  - Node.js scripts: Either method works')
 console.log('  - Browser/Frontend: Use Method 1 (no polyfills needed)')
 console.log('  - Production: Use Method 1 (better performance)')
 
-console.log('\n📝 Note:')
+console.log('\nNote:')
 console.log('  This script tests the ACTUAL code from src/lib/cid.ts')
 console.log('  The same code that runs in the frontend')
 console.log('  Any changes to src/lib/cid.ts will be reflected here')

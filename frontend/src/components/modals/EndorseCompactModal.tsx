@@ -175,7 +175,7 @@ export default function EndorseCompactModal({
 
       // Check if balance is sufficient
       if (balance < fee) {
-        console.error("❌ Insufficient balance:", {
+        console.error("Insufficient balance:", {
           balance: balanceFormatted,
           required: feeFormatted,
         });
@@ -217,7 +217,7 @@ export default function EndorseCompactModal({
         try {
           tx = await tokenContract.approve(spender, fee);
         } catch (approveError: any) {
-          console.error("❌ Direct approve failed:", approveError);
+          console.error("Direct approve failed:", approveError);
           // Fallback: try increaseAllowance if approve fails
           const delta = fee - currentAllowance;
           if (delta > 0n) {
@@ -247,7 +247,7 @@ export default function EndorseCompactModal({
             }
           } catch (error) {
             console.warn(
-              `❌ Post-approval allowance check failed on attempt ${retryCount + 1}:`,
+              `Post-approval allowance check failed on attempt ${retryCount + 1}:`,
               error,
             );
           }
@@ -266,7 +266,7 @@ export default function EndorseCompactModal({
           "endorse.errors.needApprove",
           "Allowance insufficient. Please re-approve the token allowance.",
         );
-        console.error("❌ Final allowance insufficient");
+        console.error("Final allowance insufficient");
         throw new Error(errorMsg);
       }
 
@@ -281,7 +281,7 @@ export default function EndorseCompactModal({
       invalidateByTx({ receipt: result, hints: { personHash, versionIndex } });
       onSuccess?.(result);
     } catch (err: any) {
-      console.error("❌ Endorse flow failed:", err);
+      console.error("Endorse flow failed:", err);
       setState("error");
 
       // Check for specific error types

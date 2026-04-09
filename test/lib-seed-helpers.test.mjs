@@ -398,7 +398,7 @@ describe("SeedHelpers Library Tests", function () {
       });
 
       expect(mintResult.tokenId).to.exist;
-      console.log(`    ✓ Workflow complete, TokenID: ${mintResult.tokenId}`);
+      console.log(`    [ok] Workflow complete, TokenID: ${mintResult.tokenId}`);
     });
   });
 });
