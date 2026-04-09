@@ -90,7 +90,7 @@ function saveJsonFile(filePath, data) {
     fs.writeFileSync(filePath, content, 'utf8');
     return true;
   } catch (error) {
-    console.error(`❌ Unable to save file ${filePath}:`, error.message);
+    console.error(`Unable to save file ${filePath}:`, error.message);
     return false;
   }
 }
@@ -101,7 +101,7 @@ function loadJsonFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(content);
   } catch (error) {
-    console.error(`❌ Unable to read file ${filePath}:`, error.message);
+    console.error(`Unable to read file ${filePath}:`, error.message);
     return null;
   }
 }
@@ -314,7 +314,7 @@ function analyzeLocaleUsage(localeFilePath, sourceDir) {
 
 // Keep the CLI output human-readable so the script is useful both locally and in CI logs.
 function printUsageReport(localeName, report, verbose = false) {
-  console.log(`🧭 Locale usage report: ${localeName}\n`);
+  console.log(`Locale usage report: ${localeName}\n`);
   console.log(`Locale file: ${report.localeFilePath}`);
   console.log(`Source files scanned: ${report.sourceFileCount}`);
   console.log(`Leaf keys in locale: ${report.totalLeafKeys}`);
@@ -325,12 +325,12 @@ function printUsageReport(localeName, report, verbose = false) {
   console.log(`Code references missing from locale: ${report.codeKeysMissingFromLocale.length}`);
 
   if (report.codeKeysMissingFromLocale.length > 0) {
-    console.log(`\n❌ Keys referenced in code but missing from ${localeName}:`);
+    console.log(`\nKeys referenced in code but missing from ${localeName}:`);
     report.codeKeysMissingFromLocale.forEach(key => console.log(`   - ${key}`));
   }
 
   if (report.unusedLeafKeys.length > 0) {
-    console.log(`\n⚠️  Unused candidate leaf keys in ${localeName}:`);
+    console.log(`\nUnused candidate leaf keys in ${localeName}:`);
     const previewLimit = verbose ? report.unusedLeafKeys.length : 80;
     report.unusedLeafKeys.slice(0, previewLimit).forEach(key => console.log(`   - ${key}`));
     if (!verbose && report.unusedLeafKeys.length > previewLimit) {
@@ -338,17 +338,17 @@ function printUsageReport(localeName, report, verbose = false) {
     }
 
     if (report.unusedSummary.length > 0) {
-      console.log('\n📦 Unused candidate summary by namespace:');
+      console.log('\nUnused candidate summary by namespace:');
       report.unusedSummary.forEach(([namespace, count]) => {
         console.log(`   - ${namespace}: ${count}`);
       });
     }
   } else {
-    console.log(`\n✅ No unused leaf key candidates found in ${localeName}.`);
+    console.log(`\nNo unused leaf key candidates found in ${localeName}.`);
   }
 
   if (verbose && report.dynamicPatternMatches.length > 0) {
-    console.log('\n🔄 Dynamic template patterns that matched locale keys:');
+    console.log('\nDynamic template patterns that matched locale keys:');
     report.dynamicPatternMatches.forEach(({ filePath, template, matchCount }) => {
       console.log(`   - ${path.relative(process.cwd(), filePath)} :: \`${template}\` (${matchCount} matches)`);
     });
@@ -475,14 +475,14 @@ function removeKeysFromAll(keysToRemove, localesDir, languages = null) {
   const dirs = languages || fs.readdirSync(localesDir)
     .filter(dir => fs.statSync(path.join(localesDir, dir)).isDirectory());
 
-  console.log(`🗑️  Removing keys from language files:\n`);
+  console.log(`Removing keys from language files:\n`);
   console.log(`Keys to remove: ${keysToRemove.join(', ')}\n`);
 
   for (const lang of dirs) {
     const langPath = path.join(localesDir, lang, 'index.json');
 
     if (!fs.existsSync(langPath)) {
-      console.log(`⚠️  ${lang}/index.json file does not exist`);
+      console.log(`Warning: ${lang}/index.json file does not exist`);
       continue;
     }
 
@@ -490,19 +490,19 @@ function removeKeysFromAll(keysToRemove, localesDir, languages = null) {
 
     if (result.success) {
       if (result.removed > 0) {
-        console.log(`✅ ${lang}: Removed ${result.removed} key(s)`);
+        console.log(`${lang}: Removed ${result.removed} key(s)`);
         results.push({ lang, removed: result.removed, success: true });
       } else {
-        console.log(`ℹ️  ${lang}: No matching keys found`);
+        console.log(`Info: ${lang}: No matching keys found`);
         results.push({ lang, removed: 0, success: true });
       }
     } else {
-      console.log(`❌ ${lang}: Operation failed`);
+      console.log(`${lang}: Operation failed`);
       results.push({ lang, removed: 0, success: false });
     }
   }
 
-  console.log('\n📋 Removal summary:');
+  console.log('\nRemoval summary:');
   const totalRemoved = results.reduce((sum, r) => sum + r.removed, 0);
   console.log(`   Total: Removed ${totalRemoved} key(s) across ${results.filter(r => r.removed > 0).length} file(s)`);
 
@@ -544,7 +544,7 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
   const basePath = path.join(localesDir, baseFile, 'index.json');
 
   if (!fs.existsSync(basePath)) {
-    console.error(`❌ Base file does not exist: ${basePath}`);
+    console.error(`Base file does not exist: ${basePath}`);
     return;
   }
 
@@ -552,7 +552,7 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
     .filter(dir => fs.statSync(path.join(localesDir, dir)).isDirectory())
     .filter(dir => dir !== baseFile);
 
-  console.log(`📊 Comparing other language files with ${baseFile} as base:\n`);
+  console.log(`Comparing other language files with ${baseFile} as base:\n`);
 
   let hasAnyDifference = false;
   let syncResults = [];
@@ -561,7 +561,7 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
     const langPath = path.join(localesDir, lang, 'index.json');
 
     if (!fs.existsSync(langPath)) {
-      console.log(`⚠️  ${lang}/index.json file does not exist`);
+      console.log(`Warning: ${lang}/index.json file does not exist`);
       continue;
     }
 
@@ -572,41 +572,41 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
 
     if (hasDifference) {
       hasAnyDifference = true;
-      console.log(`🔍 ${baseFile} vs ${lang}:`);
+      console.log(`${baseFile} vs ${lang}:`);
       console.log(`   ${baseFile}: ${result.totalKeys1} keys, ${lang}: ${result.totalKeys2} keys`);
 
       if (result.onlyInFile1.length > 0) {
-        console.log(`   ❌ Missing keys in ${lang} (${result.onlyInFile1.length}):`);
+        console.log(`   Missing keys in ${lang} (${result.onlyInFile1.length}):`);
         result.onlyInFile1.sort().forEach(key => console.log(`      - ${key}`));
 
         if (autoSync) {
-          console.log(`   🔄 Syncing missing keys to ${lang}...`);
+          console.log(`   Syncing missing keys to ${lang}...`);
           const syncSuccess = syncMissingKeys(basePath, langPath, result.onlyInFile1);
           if (syncSuccess) {
-            console.log(`   ✅ Successfully synced ${result.onlyInFile1.length} keys to ${lang}`);
+            console.log(`   Successfully synced ${result.onlyInFile1.length} keys to ${lang}`);
             syncResults.push({ lang, synced: result.onlyInFile1.length, aligned: false, success: true });
           } else {
-            console.log(`   ❌ Sync failed: ${lang}`);
+            console.log(`   Sync failed: ${lang}`);
             syncResults.push({ lang, synced: 0, aligned: false, success: false });
           }
         }
       }
 
       if (result.onlyInFile2.length > 0) {
-        console.log(`   ➕ Extra keys in ${lang} (${result.onlyInFile2.length}):`);
+        console.log(`   Extra keys in ${lang} (${result.onlyInFile2.length}):`);
         result.onlyInFile2.sort().forEach(key => console.log(`      - ${key}`));
       }
       console.log('');
     } else {
-      console.log(`✅ ${lang}: Fully consistent with base file (${result.totalKeys2} keys)`);
+      console.log(`${lang}: Fully consistent with base file (${result.totalKeys2} keys)`);
     }
 
     // Align key order if requested
     if (alignKeys) {
-      console.log(`   🔄 Aligning key order in ${lang}...`);
+      console.log(`   Aligning key order in ${lang}...`);
       const alignSuccess = alignWithBase(basePath, langPath);
       if (alignSuccess) {
-        console.log(`   ✅ Successfully aligned ${lang} with base structure`);
+        console.log(`   Successfully aligned ${lang} with base structure`);
         const existingResult = syncResults.find(r => r.lang === lang);
         if (existingResult) {
           existingResult.aligned = true;
@@ -614,24 +614,24 @@ function compareAllWithBase(baseFile, localesDir, autoSync = false, alignKeys = 
           syncResults.push({ lang, synced: 0, aligned: true, success: true });
         }
       } else {
-        console.log(`   ❌ Alignment failed: ${lang}`);
+        console.log(`   Alignment failed: ${lang}`);
       }
       console.log('');
     }
   }
 
   if (!hasAnyDifference && !alignKeys) {
-    console.log('🎉 All language files are consistent with the base file!');
+    console.log('All language files are consistent with the base file!');
   } else if ((autoSync || alignKeys) && syncResults.length > 0) {
-    console.log('\n📋 Operation results summary:');
+    console.log('\nOperation results summary:');
     syncResults.forEach(({ lang, synced, aligned, success }) => {
       if (success) {
         const operations = [];
         if (synced > 0) operations.push(`synced ${synced} keys`);
         if (aligned) operations.push('aligned structure');
-        console.log(`   ✅ ${lang}: ${operations.join(', ') || 'processed'}`);
+        console.log(`   ${lang}: ${operations.join(', ') || 'processed'}`);
       } else {
-        console.log(`   ❌ ${lang}: Operation failed`);
+        console.log(`   ${lang}: Operation failed`);
       }
     });
   }
@@ -643,35 +643,35 @@ function compareTwoFiles(file1, file2, localesDir) {
   const file2Path = path.join(localesDir, file2, 'index.json');
   
   if (!fs.existsSync(file1Path)) {
-    console.error(`❌ File does not exist: ${file1Path}`);
+    console.error(`File does not exist: ${file1Path}`);
     return;
   }
 
   if (!fs.existsSync(file2Path)) {
-    console.error(`❌ File does not exist: ${file2Path}`);
+    console.error(`File does not exist: ${file2Path}`);
     return;
   }
   
   const result = compareKeys(file1Path, file2Path);
   if (!result) return;
   
-  console.log(`🔍 Comparison result: ${file1} vs ${file2}\n`);
+  console.log(`Comparison result: ${file1} vs ${file2}\n`);
   console.log(`${file1}: ${result.totalKeys1} keys`);
   console.log(`${file2}: ${result.totalKeys2} keys\n`);
 
   if (result.onlyInFile1.length === 0 && result.onlyInFile2.length === 0) {
-    console.log('✅ Both files have identical keys!');
+    console.log('Both files have identical keys!');
     return;
   }
 
   if (result.onlyInFile1.length > 0) {
-    console.log(`❌ Missing keys in ${file2} (${result.onlyInFile1.length}):`);
+    console.log(`Missing keys in ${file2} (${result.onlyInFile1.length}):`);
     result.onlyInFile1.sort().forEach(key => console.log(`   - ${key}`));
     console.log('');
   }
 
   if (result.onlyInFile2.length > 0) {
-    console.log(`➕ Extra keys in ${file2} (${result.onlyInFile2.length}):`);
+    console.log(`Extra keys in ${file2} (${result.onlyInFile2.length}):`);
     result.onlyInFile2.sort().forEach(key => console.log(`   - ${key}`));
   }
 }
@@ -685,7 +685,7 @@ function main() {
   const sourceDir = path.join(__dirname, '../src');
   
   if (!fs.existsSync(localesDir)) {
-    console.error(`❌ Locales directory does not exist: ${localesDir}`);
+    console.error(`Locales directory does not exist: ${localesDir}`);
     process.exit(1);
   }
 
@@ -694,7 +694,7 @@ function main() {
   if (removeIndex !== -1) {
     args.splice(removeIndex, 1); // Remove --remove parameter
     if (args.length === 0) {
-      console.error('❌ Error: --remove requires at least one key to remove');
+      console.error('Error: --remove requires at least one key to remove');
       console.log('\nUsage:');
       console.log('  node compare-locales.mjs --remove key1 [key2 ...]');
       console.log('  node compare-locales.mjs --remove settings.theme header.logo');
@@ -737,7 +737,7 @@ function main() {
     const localeFilePath = path.join(localesDir, localeName, 'index.json');
 
     if (!fs.existsSync(localeFilePath)) {
-      console.error(`❌ Locale file does not exist: ${localeFilePath}`);
+      console.error(`Locale file does not exist: ${localeFilePath}`);
       process.exit(1);
     }
 

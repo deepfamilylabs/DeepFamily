@@ -378,7 +378,7 @@ export default function EndorseModal({
 
       // Ensure ERC20 allowance for endorsement fee
       if (!contract || !deepTokenAddress || !signer) {
-        console.error("❌ Contract not ready:", {
+        console.error("Contract not ready:", {
           contract: !!contract,
           deepTokenAddress,
           signer: !!signer,
@@ -416,7 +416,7 @@ export default function EndorseModal({
       // If allowance was reset unexpectedly, log more details
       if (currentAllowance === 0n) {
         console.warn(
-          "⚠️ Allowance is 0 - this may indicate allowance was consumed or reset after previous transaction",
+          "Allowance is 0 - this may indicate allowance was consumed or reset after previous transaction",
         );
         if (userBalance < required) {
           throw new Error(
@@ -459,7 +459,7 @@ export default function EndorseModal({
             try {
               tx = await tokenContract.approve(spender, required);
             } catch (approveError) {
-              console.error("❌ Direct approve failed:", approveError);
+              console.error("Direct approve failed:", approveError);
               // Fallback: try increaseAllowance if approve fails
               const delta = required - currentAllowance;
               if (delta > 0n) {
@@ -486,7 +486,7 @@ export default function EndorseModal({
           try {
             const immediateAllowance = await tokenContract.allowance(address, spender);
           } catch (immediateCheckError) {
-            console.error("❌ Failed to check immediate allowance:", immediateCheckError);
+            console.error("Failed to check immediate allowance:", immediateCheckError);
           }
         } catch (waitError: any) {
           setIsApproving(false);
@@ -510,7 +510,7 @@ export default function EndorseModal({
             }
           } catch (error) {
             console.warn(
-              `❌ Post-approval allowance check failed on attempt ${retryCount + 1}:`,
+              `Post-approval allowance check failed on attempt ${retryCount + 1}:`,
               error,
             );
           }
@@ -531,11 +531,11 @@ export default function EndorseModal({
 
         if (finalAllowance < finalRequired) {
           const errorMsg = `Final allowance check failed: have ${ethers.formatUnits(finalAllowance, deepTokenDecimals)}, need ${ethers.formatUnits(finalRequired, deepTokenDecimals)}`;
-          console.error("❌ Final allowance insufficient:", errorMsg);
+          console.error("Final allowance insufficient:", errorMsg);
           throw new Error(errorMsg);
         }
       } catch (checkError) {
-        console.error("❌ Final allowance check failed:", checkError);
+        console.error("Final allowance check failed:", checkError);
         throw checkError;
       }
 
@@ -545,10 +545,10 @@ export default function EndorseModal({
         if (typeof fn === "function") {
           await fn(targetPersonHash!, targetVersionIndex!);
         } else {
-          console.warn("⚠️ staticCall not available, skipping preflight check");
+          console.warn("staticCall not available, skipping preflight check");
         }
       } catch (simErr: any) {
-        console.error("❌ Preflight check failed:", simErr);
+        console.error("Preflight check failed:", simErr);
         // Handle preflight errors through our error display system instead of alert
         throw simErr;
       }
@@ -685,7 +685,7 @@ export default function EndorseModal({
       try {
         result = await endorsePromise;
       } catch (endorseError: any) {
-        console.error("❌ endorseVersion promise rejected:", endorseError);
+        console.error("endorseVersion promise rejected:", endorseError);
         clearTimeout(timeout);
 
         // Don't throw immediately - let the error handling below take care of it
@@ -728,7 +728,7 @@ export default function EndorseModal({
         });
       }
     } catch (error: any) {
-      console.error("❌ Endorse failed:", error);
+      console.error("Endorse failed:", error);
 
       const friendly = getFriendlyError(error, t);
       setErrorResult({

@@ -101,7 +101,6 @@ interface AddVersionModalProps {
   onClose: () => void;
   onSuccess?: (result: any) => void;
   onEndorse?: (personHash: string, versionIndex: number) => void;
-  initialPersonHash?: string;
   // Optional: Pre-populated person data (for passing known data when navigating from other pages)
   initialPersonData?: {
     fullName?: string;
@@ -118,7 +117,6 @@ export default function AddVersionModal({
   onClose,
   onSuccess,
   onEndorse,
-  initialPersonHash,
   initialPersonData,
 }: AddVersionModalProps) {
   const { t } = useTranslation();
@@ -157,16 +155,17 @@ export default function AddVersionModal({
   const [personHasPassphrase, setPersonHasPassphrase] = useState(false);
   const [personIdentityMode, setPersonIdentityMode] = useState<IdentitySaltMode>("deterministic");
   const [personRecoverySaltHex, setPersonRecoverySaltHex] = useState("");
-  const [expectedPersonHash, setExpectedPersonHash] = useState(initialPersonHash || "");
   const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   // Father and mother info from PersonHashCalculator components
   const [fatherInfo, setFatherInfo] = useState<PersonInfoPublic | null>(null);
+  const [fatherHasPassphrase, setFatherHasPassphrase] = useState(false);
   const [fatherIdentityMode, setFatherIdentityMode] = useState<IdentitySaltMode>("deterministic");
   const [fatherRecoverySaltHex, setFatherRecoverySaltHex] = useState("");
   const fatherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   const [motherInfo, setMotherInfo] = useState<PersonInfoPublic | null>(null);
+  const [motherHasPassphrase, setMotherHasPassphrase] = useState(false);
   const [motherIdentityMode, setMotherIdentityMode] = useState<IdentitySaltMode>("deterministic");
   const [motherRecoverySaltHex, setMotherRecoverySaltHex] = useState("");
   const motherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
@@ -263,11 +262,6 @@ export default function AddVersionModal({
   const motherStatus = getParentInfoStatus("mother");
   const allConsentsChecked = consents.hash && consents.age && consents.legal;
   const showManualEncryptionInputs = !usePersonPassphraseForEncryption || !personHasPassphrase;
-  const isBytes32 = (v: string | undefined | null) => !!v && /^0x[0-9a-fA-F]{64}$/.test(v.trim());
-  const normalizedExpectedPersonHash = expectedPersonHash.trim();
-  const expectedPersonHashInvalid = Boolean(
-    normalizedExpectedPersonHash && !isBytes32(normalizedExpectedPersonHash),
-  );
 
   // Initialize states if existing data is provided (e.g., from another page)
   useEffect(() => {
@@ -282,10 +276,6 @@ export default function AddVersionModal({
       });
     }
   }, [initialPersonData]);
-
-  useEffect(() => {
-    setExpectedPersonHash(initialPersonHash || "");
-  }, [initialPersonHash, isOpen]);
 
   const resolveIdentityMaterial = async (
     calc: PersonHashCalculatorHandle | null,
@@ -401,17 +391,6 @@ export default function AddVersionModal({
       : null,
   });
 
-  const assertExpectedPersonHash = (computedPersonHash: string) => {
-    if (!normalizedExpectedPersonHash) return;
-    if (computedPersonHash !== normalizedExpectedPersonHash) {
-      throw new Error(
-        t(
-          "addVersion.personHashMismatch",
-          "The selected identity mode or recovery salt does not match the expected person hash",
-        ),
-      );
-    }
-  };
 
   /**
    * Extract and normalize person info, ensuring deterministic field order
@@ -526,11 +505,12 @@ export default function AddVersionModal({
     setPersonHasPassphrase(false);
     setPersonIdentityMode("deterministic");
     setPersonRecoverySaltHex("");
-    setExpectedPersonHash(initialPersonHash || "");
     setFatherInfo(null);
+    setFatherHasPassphrase(false);
     setFatherIdentityMode("deterministic");
     setFatherRecoverySaltHex("");
     setMotherInfo(null);
+    setMotherHasPassphrase(false);
     setMotherIdentityMode("deterministic");
     setMotherRecoverySaltHex("");
     setIsSubmitting(false);
@@ -558,11 +538,12 @@ export default function AddVersionModal({
     setPersonHasPassphrase(false);
     setPersonIdentityMode("deterministic");
     setPersonRecoverySaltHex("");
-    setExpectedPersonHash(initialPersonHash || "");
     setFatherInfo(null);
+    setFatherHasPassphrase(false);
     setFatherIdentityMode("deterministic");
     setFatherRecoverySaltHex("");
     setMotherInfo(null);
+    setMotherHasPassphrase(false);
     setMotherIdentityMode("deterministic");
     setMotherRecoverySaltHex("");
     setIsSubmitting(false);
@@ -629,11 +610,12 @@ export default function AddVersionModal({
     setPersonHasPassphrase(false);
     setPersonIdentityMode("deterministic");
     setPersonRecoverySaltHex("");
-    setExpectedPersonHash(initialPersonHash || "");
     setFatherInfo(null);
+    setFatherHasPassphrase(false);
     setFatherIdentityMode("deterministic");
     setFatherRecoverySaltHex("");
     setMotherInfo(null);
+    setMotherHasPassphrase(false);
     setMotherIdentityMode("deterministic");
     setMotherRecoverySaltHex("");
     setIsSubmitting(false);
@@ -734,25 +716,8 @@ export default function AddVersionModal({
   const handleDownloadMetadata = async () => {
     try {
       if (!validateEncryptionPassword()) return;
-      if (expectedPersonHashInvalid) {
-        setEncryptionError(
-          t(
-            "addVersion.expectedPersonHashInvalid",
-            "Expected person hash must be a 0x-prefixed 32-byte hex string",
-          ),
-        );
-        return;
-      }
       const processedData = addVersionSchema.parse(watchedValues);
       const identitySaltSelections = resolveIdentitySaltSelections();
-      const personIdentity = await resolveIdentityMaterial(personCalcRef.current, {
-        identityMode: personIdentityMode,
-        identitySaltHex: identitySaltSelections.personIdentitySaltHex,
-      });
-      if (!personIdentity) {
-        throw new Error(t("addVersion.personInfoRequired", "Please fill in person information"));
-      }
-      assertExpectedPersonHash(personIdentity.personHash);
       const { json, cid } = await prepareEncryptedMetadata(
         processedData.tag,
         processedData,
@@ -803,15 +768,6 @@ export default function AddVersionModal({
       alert(t("addVersion.personInfoRequired", "Please fill in person information"));
       return;
     }
-    if (expectedPersonHashInvalid) {
-      alert(
-        t(
-          "addVersion.expectedPersonHashInvalid",
-          "Expected person hash must be a 0x-prefixed 32-byte hex string",
-        ),
-      );
-      return;
-    }
     if (!validateEncryptionPassword()) {
       return;
     }
@@ -841,7 +797,6 @@ export default function AddVersionModal({
       if (!personIdentity) {
         throw new Error(t("addVersion.personInfoRequired", "Please fill in person information"));
       }
-      assertExpectedPersonHash(personIdentity.personHash);
       const fatherIdentity = await resolveIdentityMaterial(fatherCalcRef.current, {
         identityMode: fatherIdentityMode,
         identitySaltHex: identitySaltSelections.fatherIdentitySaltHex,
@@ -928,7 +883,7 @@ export default function AddVersionModal({
         onSuccess?.(result);
       }
     } catch (error: any) {
-      console.error("❌ Add version failed:", sanitizeErrorForLogging(error));
+      console.error("Add version failed:", sanitizeErrorForLogging(error));
 
       // Set error result for display in UI
       const friendly = getFriendlyError(error, t);
@@ -1166,10 +1121,14 @@ export default function AddVersionModal({
                         isBirthBC: formData.isBirthBC,
                       });
                       setPersonHasPassphrase(formData.hasPassphrase);
+                      if (!formData.hasPassphrase) {
+                        setPersonIdentityMode("deterministic");
+                      }
                     }}
                   />
 
-                  <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                  {personHasPassphrase && (
+                    <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
                     <div className="space-y-1">
                       <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                         {t("addVersion.identityMode", "Identity Recovery Mode")}
@@ -1259,43 +1218,8 @@ export default function AddVersionModal({
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                        {t("addVersion.expectedPersonHash", "Expected Person Hash")}
-                      </label>
-                      <input
-                        type="text"
-                        value={expectedPersonHash}
-                        onChange={(e) => {
-                          setExpectedPersonHash(e.target.value);
-                          if (encryptionError) setEncryptionError(null);
-                        }}
-                        className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none transition-all ${
-                          expectedPersonHashInvalid
-                            ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                            : "border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                        }`}
-                        placeholder={t(
-                          "addVersion.expectedPersonHashPlaceholder",
-                          "Optional: paste an existing person hash to prevent identity split",
-                        )}
-                      />
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                        {t(
-                          "addVersion.expectedPersonHashHint",
-                          "Leave blank when creating a brand-new identity. Paste the existing person hash when adding another version for an identity that already exists.",
-                        )}
-                      </p>
-                      {expectedPersonHashInvalid && (
-                        <p className="text-xs text-red-500 dark:text-red-400 font-medium">
-                          {t(
-                            "addVersion.expectedPersonHashInvalid",
-                            "Expected person hash must be a 0x-prefixed 32-byte hex string",
-                          )}
-                        </p>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
                 {/* Father Information - Using PersonHashCalculator */}
                 <div className="space-y-2">
@@ -1386,10 +1310,15 @@ export default function AddVersionModal({
                             birthDay: formData.birthDay,
                             isBirthBC: formData.isBirthBC,
                           });
+                          setFatherHasPassphrase(formData.hasPassphrase);
+                          if (!formData.hasPassphrase) {
+                            setFatherIdentityMode("deterministic");
+                          }
                         }}
                       />
 
-                      <div className="rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                      {fatherHasPassphrase && (
+                        <div className="rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
                         <div className="space-y-1">
                           <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                             {t("addVersion.parentIdentityMode", "Parent Identity Recovery Mode")}
@@ -1472,7 +1401,8 @@ export default function AddVersionModal({
                             />
                           </div>
                         )}
-                      </div>
+                        </div>
+                      )}
 
                       <div className="w-full sm:w-auto">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1584,10 +1514,15 @@ export default function AddVersionModal({
                             birthDay: formData.birthDay,
                             isBirthBC: formData.isBirthBC,
                           });
+                          setMotherHasPassphrase(formData.hasPassphrase);
+                          if (!formData.hasPassphrase) {
+                            setMotherIdentityMode("deterministic");
+                          }
                         }}
                       />
 
-                      <div className="rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                      {motherHasPassphrase && (
+                        <div className="rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
                         <div className="space-y-1">
                           <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                             {t("addVersion.parentIdentityMode", "Parent Identity Recovery Mode")}
@@ -1670,7 +1605,8 @@ export default function AddVersionModal({
                             />
                           </div>
                         )}
-                      </div>
+                        </div>
+                      )}
 
                       <div className="w-full sm:w-auto">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

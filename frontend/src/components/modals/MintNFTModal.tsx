@@ -241,6 +241,7 @@ export default function MintNFTModal({
     birthDay: number;
     isBirthBC: boolean;
   } | null>(null);
+  const [personHasPassphrase, setPersonHasPassphrase] = useState(false);
   const [personIdentityMode, setPersonIdentityMode] = useState<IdentitySaltMode>("deterministic");
   const [personRecoverySaltHex, setPersonRecoverySaltHex] = useState("");
   const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
@@ -341,6 +342,7 @@ export default function MintNFTModal({
       // On open: initialize state
       setPersonHash(initialPersonHash || "");
       setVersionIndex(initialVersionIndex || 1);
+      setPersonHasPassphrase(false);
       setPersonIdentityMode("deterministic");
       setPersonRecoverySaltHex("");
       // Animation
@@ -352,6 +354,7 @@ export default function MintNFTModal({
       setPersonHash("");
       setVersionIndex(1);
       setPersonInfo(null);
+      setPersonHasPassphrase(false);
       setPersonIdentityMode("deterministic");
       setPersonRecoverySaltHex("");
       setIsSubmitting(false);
@@ -476,6 +479,7 @@ export default function MintNFTModal({
     setPersonHash("");
     setVersionIndex(1);
     setPersonInfo(null);
+    setPersonHasPassphrase(false);
     setPersonIdentityMode("deterministic");
     setPersonRecoverySaltHex("");
     setIsSubmitting(false);
@@ -786,7 +790,7 @@ export default function MintNFTModal({
         if (tokenId > 0) onSuccess?.(tokenId);
       }
     } catch (error: any) {
-      console.error("❌ Mint NFT failed:", sanitizeErrorForLogging(error));
+      console.error("Mint NFT failed:", sanitizeErrorForLogging(error));
 
       const friendly = getFriendlyError(error, t);
 
@@ -1136,12 +1140,17 @@ export default function MintNFTModal({
                                   birthDay: formData.birthDay,
                                   isBirthBC: formData.isBirthBC,
                                 });
+                                setPersonHasPassphrase(formData.hasPassphrase);
+                                if (!formData.hasPassphrase) {
+                                  setPersonIdentityMode("deterministic");
+                                }
                               }
                             : undefined
                         }
                       />
 
-                      <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
+                      {personHasPassphrase && (
+                        <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10 p-4 space-y-4">
                         <div className="space-y-1">
                           <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
                             {t("mintNFT.identityMode", "Identity Recovery Mode")}
@@ -1220,7 +1229,8 @@ export default function MintNFTModal({
                             </p>
                           </div>
                         )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Supplemental Information (from PersonSupplementInfo) */}

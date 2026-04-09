@@ -43,14 +43,14 @@ export async function generateCIDIpfs(jsonString: string): Promise<string> {
  * - 'manual': Use manual implementation (recommended for production, better performance)
  * - 'ipfs': Use ipfs-only-hash (for validation or full IPFS compatibility)
  */
-const CID_METHOD: "manual" | "ipfs" = "manual"; // 👈 Switch here to choose method
+const CID_METHOD: "manual" | "ipfs" = "manual"; // Switch here to choose method
 
 export async function generateMetadataCID(jsonString: string): Promise<string> {
   if (CID_METHOD === "manual") {
-    console.log("🔧 Using Method 1: Manual (multiformats + @noble/hashes)");
+    console.log("Using Method 1: Manual (multiformats + @noble/hashes)");
     return generateCIDManual(jsonString);
   } else {
-    console.log("🔧 Using Method 2: ipfs-only-hash");
+    console.log("Using Method 2: ipfs-only-hash");
     return await generateCIDIpfs(jsonString);
   }
 }

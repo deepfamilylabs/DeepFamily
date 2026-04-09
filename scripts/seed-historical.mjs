@@ -518,7 +518,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         `  -Already exists on-chain (versions: ${progress.totalVersions}, tokenId: ${progress.tokenId || 0}) — skip addPersonVersion`,
       );
       console.log(
-        `  ➜ Existence result: exists=true, version=${progress.versionIndex || 1}, tokenId=${progress.tokenId || 0}`,
+        `  -> Existence result: exists=true, version=${progress.versionIndex || 1}, tokenId=${progress.tokenId || 0}`,
       );
       const savedPerson = {
         ...personInfo,
@@ -536,7 +536,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       continue;
     }
     console.log("  -Not found on-chain, will add new version");
-    console.log("  ➜ Existence result: exists=false, version will be 1, tokenId=0");
+    console.log("  -> Existence result: exists=false, version will be 1, tokenId=0");
 
     // Find parent data
     let fatherData = null;
@@ -708,7 +708,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
     let tokenId = Number(person.tokenId || 0);
     let storyMetadata = person.storyMetadata || null;
     console.log(
-      `  ℹ Version info — hash: ${person.hash.slice(0, 10)}..., version: ${person.version}, tokenId: ${tokenId}`,
+      `  Info: Version info — hash: ${person.hash.slice(0, 10)}..., version: ${person.version}, tokenId: ${tokenId}`,
     );
 
     if (tokenId > 0) {

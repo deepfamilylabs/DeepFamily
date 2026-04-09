@@ -14,7 +14,7 @@ const dataPath = dataFile.includes("/")
 const data = JSON.parse(await fs.readFile(dataPath, "utf8"));
 
 console.log("\n" + "=".repeat(70));
-console.log("📊 " + data.familyName + " Final Data Report");
+console.log(data.familyName + " Final Data Report");
 console.log("=".repeat(70));
 
 console.log("\n【Family Information】");

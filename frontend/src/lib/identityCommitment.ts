@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { poseidon4, poseidon5 } from "poseidon-lite";
+import { poseidon4 } from "poseidon-lite";
 import {
   hexToBytes,
   mapBytesToSnarkField,

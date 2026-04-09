@@ -40,11 +40,7 @@ export default function ActionsPage() {
     if (!tabParam) return;
 
     if (tabParam === "add-version") {
-      setAddVersionModal({
-        isOpen: true,
-        personHash:
-          searchParams.get("hash") || searchParams.get("personHash") || undefined,
-      });
+      setAddVersionModal({ isOpen: true });
     }
     if (tabParam === "mint-nft") {
       setMintNFTModal({ isOpen: true, personHash: undefined, versionIndex: undefined });
@@ -54,7 +50,7 @@ export default function ActionsPage() {
     }
 
     hasAutoOpenedRef.current = true;
-  }, [address, shouldAutoOpen, tabParam, searchParams]);
+  }, [address, shouldAutoOpen, tabParam]);
 
   // Auto-open Endorse modal if URL carries target hash/index
   useEffect(() => {
@@ -93,7 +89,6 @@ export default function ActionsPage() {
   // Modal states
   const [addVersionModal, setAddVersionModal] = useState<{
     isOpen: boolean;
-    personHash?: string;
     existingPersonData?: any;
   }>({ isOpen: false });
 
@@ -339,7 +334,6 @@ export default function ActionsPage() {
             setAddVersionModal({ isOpen: false });
             setEndorseModal({ isOpen: true, personHash, versionIndex });
           }}
-          initialPersonHash={addVersionModal.personHash}
           initialPersonData={addVersionModal.existingPersonData}
         />
 

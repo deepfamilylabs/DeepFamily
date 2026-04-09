@@ -603,7 +603,7 @@ export const PersonHashCalculator = forwardRef<
                             <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
                               {t(
                                 "search.hashCalculator.passphraseHelp.privacy",
-                                "🔒 Privacy Protection",
+                                "Privacy Protection",
                               )}
                             </div>
                             <div className="text-xs leading-relaxed">
@@ -618,7 +618,7 @@ export const PersonHashCalculator = forwardRef<
                             <div className="mb-1 font-medium text-green-600 dark:text-green-400">
                               {t(
                                 "search.hashCalculator.passphraseHelp.optional",
-                                "✅ Completely Optional",
+                                "Completely Optional",
                               )}
                             </div>
                             <div className="text-xs leading-relaxed">
@@ -633,7 +633,7 @@ export const PersonHashCalculator = forwardRef<
                             <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
                               {t(
                                 "search.hashCalculator.passphraseHelp.remember",
-                                "⚠️ Please Remember",
+                                "Please Remember",
                               )}
                             </div>
                             <div className="text-xs leading-relaxed">
@@ -648,7 +648,7 @@ export const PersonHashCalculator = forwardRef<
                             <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
                               {t(
                                 "search.hashCalculator.passphraseHelp.privacyNoteTitle",
-                                "🔐 Local Only",
+                                "Local Only",
                               )}
                             </div>
                             <div className="text-xs leading-relaxed text-gray-500 dark:text-gray-300">
@@ -799,7 +799,7 @@ export const PersonHashCalculator = forwardRef<
                   <div className="text-xs text-amber-600 dark:text-amber-400">
                     {t(
                       "search.hashCalculator.passwordTips.weak",
-                      "💡 Tip: Use at least 15+ mixed characters or 20+ letters for better security",
+                      "Tip: Use at least 15+ mixed characters or 20+ letters for better security",
                     )}
                   </div>
                 )}

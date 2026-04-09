@@ -156,7 +156,7 @@ export function validatePassphraseStrength(
       rawEntropy: 0,
       level: "weak",
       recommendation: includeRecommendation
-        ? "⚠️ Empty passphrase: insufficient security. Strongly recommend 18+ character strong passphrase"
+        ? "Empty passphrase: insufficient security. Strongly recommend 18+ character strong passphrase"
         : undefined,
     };
   }
@@ -171,7 +171,7 @@ export function validatePassphraseStrength(
       rawEntropy: 0,
       level: "weak",
       recommendation: includeRecommendation
-        ? "⚠️ Empty passphrase: insufficient security. Strongly recommend 18+ character strong passphrase"
+        ? "Empty passphrase: insufficient security. Strongly recommend 18+ character strong passphrase"
         : undefined,
     };
   }
@@ -184,7 +184,7 @@ export function validatePassphraseStrength(
       rawEntropy: 10,
       level: "weak",
       recommendation: includeRecommendation
-        ? "❌ Common passphrase detected. Choose a unique phrase with mixed characters."
+        ? "Common passphrase detected. Choose a unique phrase with mixed characters."
         : undefined,
     };
   }
@@ -262,37 +262,37 @@ export function validatePassphraseStrength(
     level = "weak";
     isStrong = false;
     if (includeRecommendation) {
-      recommendation = `❌ Entropy: ${Math.round(safeEntropy)} bits. Insufficient security. Recommend: 15+ mixed characters or 20+ letters`;
+      recommendation = `Entropy: ${Math.round(safeEntropy)} bits. Insufficient security. Recommend: 15+ mixed characters or 20+ letters`;
     }
   } else if (safeEntropy < 80) {
     level = "medium";
     isStrong = false;
     if (includeRecommendation) {
-      recommendation = `⚠️ Entropy: ${Math.round(safeEntropy)} bits. Below recommended threshold. Recommend: 18+ characters with symbols/emoji`;
+      recommendation = `Entropy: ${Math.round(safeEntropy)} bits. Below recommended threshold. Recommend: 18+ characters with symbols`;
     }
   } else if (safeEntropy < 128) {
     level = "strong";
     isStrong = true;
     if (includeRecommendation) {
-      recommendation = `✅ Entropy: ${Math.round(safeEntropy)} bits. Good security`;
+      recommendation = `Entropy: ${Math.round(safeEntropy)} bits. Good security`;
     }
   } else if (safeEntropy < 192) {
     level = "very-strong";
     isStrong = true;
     if (includeRecommendation) {
-      recommendation = `🔐 Entropy: ${Math.round(safeEntropy)} bits. Strong security`;
+      recommendation = `Entropy: ${Math.round(safeEntropy)} bits. Strong security`;
     }
   } else if (safeEntropy < 256) {
     level = "excellent";
     isStrong = true;
     if (includeRecommendation) {
-      recommendation = `🛡️ Entropy: ${Math.round(safeEntropy)} bits. Excellent security`;
+      recommendation = `Entropy: ${Math.round(safeEntropy)} bits. Excellent security`;
     }
   } else {
     level = "excellent";
     isStrong = true;
     if (includeRecommendation) {
-      recommendation = `🛡️ Entropy: ${Math.round(safeEntropy)} bits. Maximum security`;
+      recommendation = `Entropy: ${Math.round(safeEntropy)} bits. Maximum security`;
     }
   }
 
