@@ -50,6 +50,81 @@ export const sanitizeErrorForLogging = (error: any): SafeLogError => {
   return { name, message, shortMessage, code, reason, stack };
 };
 
+const toSafeDebugValue = (value: unknown): SafeLogValue => {
+  if (value == null) return null;
+  if (typeof value === "string") return truncate(value, 400);
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  return null;
+};
+
+const getNestedOwnValue = (value: unknown, path: string[]): unknown => {
+  let current = value;
+  for (const segment of path) {
+    if (!current || typeof current !== "object") return undefined;
+    const obj = current as object;
+    if (!Object.getOwnPropertyNames(obj).includes(segment)) return undefined;
+    try {
+      current = (obj as Record<string, unknown>)[segment];
+    } catch {
+      return undefined;
+    }
+  }
+  return current;
+};
+
+export const summarizeErrorForDev = (error: any): Record<string, SafeLogValue | string[]> => {
+  const summary: Record<string, SafeLogValue | string[]> = {
+    ...sanitizeErrorForLogging(error),
+  };
+
+  if (error && typeof error === "object") {
+    summary.rootKeys = Object.getOwnPropertyNames(error).slice(0, 20);
+  }
+
+  const interestingPaths = [
+    ["data"],
+    ["data", "message"],
+    ["data", "data"],
+    ["error"],
+    ["error", "code"],
+    ["error", "message"],
+    ["error", "data"],
+    ["error", "data", "message"],
+    ["error", "data", "data"],
+    ["info"],
+    ["info", "error"],
+    ["info", "error", "code"],
+    ["info", "error", "message"],
+    ["info", "error", "data"],
+    ["info", "error", "data", "message"],
+    ["info", "error", "data", "data"],
+    ["shortMessage"],
+  ];
+
+  for (const path of interestingPaths) {
+    const value = getNestedOwnValue(error, path);
+    const safeValue = toSafeDebugValue(value);
+    if (safeValue != null) {
+      summary[path.join(".")] = safeValue;
+      continue;
+    }
+
+    if (value && typeof value === "object") {
+      summary[`${path.join(".")}.__keys`] = Object.getOwnPropertyNames(value).slice(0, 20);
+    }
+  }
+
+  return summary;
+};
+
+export const formatErrorSummaryForDev = (error: any): string => {
+  try {
+    return JSON.stringify(summarizeErrorForDev(error), null, 2);
+  } catch {
+    return JSON.stringify(sanitizeErrorForLogging(error), null, 2);
+  }
+};
+
 // Contract selector -> error name
 export const ERROR_SELECTOR_MAP: Record<string, string> = {
   // DeepFamily contract errors (keccak256 selector first 4 bytes)
@@ -160,29 +235,94 @@ const normalizeReason = (val?: string) => {
   return val.replace(/\(\)$/, "");
 };
 
-export const resolveErrorReason = (error: any): string | undefined => {
-  const extractSelectorReason = () => {
-    const dataFields = [
-      error?.data,
-      error?.error?.data,
-      error?.data?.data,
-      error?.error?.error?.data,
-    ];
-    for (const data of dataFields) {
-      if (typeof data !== "string" || !data.startsWith("0x") || data.length < 10) continue;
-      const selector = data.slice(0, 10);
-      if (ERROR_SELECTOR_MAP[selector]) return ERROR_SELECTOR_MAP[selector];
+const collectNestedStrings = (value: unknown): string[] => {
+  const out = new Set<string>();
+  const seen = new WeakSet<object>();
+
+  const visit = (current: unknown) => {
+    if (typeof current === "string") {
+      const trimmed = current.trim();
+      if (trimmed) out.add(trimmed);
+      return;
     }
-    return undefined;
+    if (!current || typeof current !== "object") return;
+    if (seen.has(current as object)) return;
+    seen.add(current as object);
+
+    if (Array.isArray(current)) {
+      for (const item of current) visit(item);
+      return;
+    }
+
+    for (const key of Object.getOwnPropertyNames(current)) {
+      try {
+        visit((current as Record<string, unknown>)[key]);
+      } catch {}
+    }
   };
 
-  const selectorReason = extractSelectorReason();
+  visit(value);
+  return [...out];
+};
+
+const collectNestedHexData = (value: unknown): string[] =>
+  collectNestedStrings(value).filter((item) => item.startsWith("0x") && item.length >= 10);
+
+const extractCustomErrorNameFromMessage = (msg?: string): string | undefined => {
+  if (!msg) return undefined;
+
+  const customPatterns = [
+    /reverted with custom error '([A-Za-z_]\w*)\(/,
+    /execution reverted(?::)?\s*([A-Za-z_]\w*)\(\)/i,
+    /execution reverted(?::)?\s*([A-Za-z_]\w*)$/i,
+  ];
+
+  for (const pattern of customPatterns) {
+    const match = msg.match(pattern);
+    if (match?.[1]) return normalizeReason(match[1]);
+  }
+
+  return undefined;
+};
+
+const extractSelectorReason = (value: unknown): string | undefined => {
+  for (const data of collectNestedHexData(value)) {
+    const selector = data.slice(0, 10);
+    if (ERROR_SELECTOR_MAP[selector]) return ERROR_SELECTOR_MAP[selector];
+  }
+  return undefined;
+};
+
+const extractReasonFromMessages = (value: unknown): string | undefined => {
+  for (const msg of collectNestedStrings(value)) {
+    const customErrorName = extractCustomErrorNameFromMessage(msg);
+    if (customErrorName) return customErrorName;
+  }
+  return undefined;
+};
+
+export const resolveErrorReason = (error: any): string | undefined => {
+  const cachedReason = normalizeReason(error?.__dfDecodedReason);
+  if (cachedReason) return cachedReason;
+
+  const directReasonCandidates = [
+    error?.reason,
+    error?.data?.reason,
+    error?.error?.reason,
+    error?.info?.error?.reason,
+  ];
+  for (const candidate of directReasonCandidates) {
+    const normalized = normalizeReason(candidate);
+    if (normalized) return normalized;
+  }
+
+  const selectorReason = extractSelectorReason(error);
   if (selectorReason) return selectorReason;
 
-  const directReason = normalizeReason(error?.reason);
-  if (directReason) return directReason;
+  const messageReason = extractReasonFromMessages(error);
+  if (messageReason) return messageReason;
 
-  const msg = (error?.message || "") as string;
+  const msg = collectNestedStrings(error).join("\n");
 
   if (
     error?.code === "ACTION_REJECTED" ||
@@ -209,17 +349,14 @@ export const resolveErrorReason = (error: any): string | undefined => {
     return "ERC20InsufficientAllowance";
   if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) return "INSUFFICIENT_FUNDS";
 
-  // Network errors
   if (error?.code === "NETWORK_ERROR" || /network/i.test(msg)) {
     return "NETWORK_ERROR";
   }
 
-  // Wallet popup timeout
   if (/WALLET_POPUP_TIMEOUT/i.test(msg)) {
     return "WALLET_POPUP_TIMEOUT";
   }
 
-  // General call exception (fallback for contract errors without specific reason)
   if (error?.code === "CALL_EXCEPTION") {
     return "CALL_EXCEPTION";
   }
@@ -265,7 +402,7 @@ export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
   const derivedRaw = deriveReadableError(error);
 
   if (reason) {
-    const fallback = humanMessage || REASON_FRIENDLY_MAP[reason] || "Transaction failed.";
+    const fallback = REASON_FRIENDLY_MAP[reason] || humanMessage || "Transaction failed.";
     const translated = t(`errors.contractError.${reason}`, fallback);
     const friendly = typeof translated === "string" ? translated : fallback;
     return {
@@ -299,17 +436,14 @@ export const extractRevertReason = (
   if (!rawError) return null;
   if (rawError.__dfDecodedReason) return rawError.__dfDecodedReason;
 
-  const directReason = rawError?.reason || rawError?.data?.reason || rawError?.error?.reason;
-  if (directReason) return directReason;
+  const directReason =
+    rawError?.reason ??
+    rawError?.data?.reason ??
+    rawError?.error?.reason ??
+    rawError?.info?.error?.reason;
+  if (directReason) return normalizeReason(directReason) ?? directReason;
 
-  const dataFields = [
-    rawError?.data,
-    rawError?.error?.data,
-    rawError?.data?.data,
-    rawError?.error?.error?.data,
-  ];
-  for (const data of dataFields) {
-    if (typeof data !== "string") continue;
+  for (const data of collectNestedHexData(rawError)) {
     try {
       const parsedError = contract?.interface?.parseError?.(data);
       if (parsedError) return parsedError.name;
@@ -321,9 +455,10 @@ export const extractRevertReason = (
     }
   }
 
-  const messageFields = [rawError?.error?.message, rawError?.shortMessage, rawError?.message];
-  for (const msg of messageFields) {
-    if (!msg || typeof msg !== "string") continue;
+  for (const msg of collectNestedStrings(rawError)) {
+    const customErrorName = extractCustomErrorNameFromMessage(msg);
+    if (customErrorName) return customErrorName;
+
     const match = msg.match(/execution reverted:?\s*(.+)/i);
     if (match?.[1]) return match[1];
   }

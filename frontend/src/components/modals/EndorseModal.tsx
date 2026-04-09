@@ -413,11 +413,9 @@ export default function EndorseModal({
         console.warn("Failed to check token balance:", balanceError);
       }
 
-      // If allowance was reset unexpectedly, log more details
+      // Exact-amount approvals are fully consumed by a successful endorsement,
+      // so zero allowance is normal on the next attempt.
       if (currentAllowance === 0n) {
-        console.warn(
-          "Allowance is 0 - this may indicate allowance was consumed or reset after previous transaction",
-        );
         if (userBalance < required) {
           throw new Error(
             `Insufficient DEEP token balance: have ${ethers.formatUnits(userBalance, deepTokenDecimals)}, need ${ethers.formatUnits(required, deepTokenDecimals)}`,
@@ -429,44 +427,19 @@ export default function EndorseModal({
       if (currentAllowance < required) {
         setIsApproving(true);
 
-        // Log comprehensive approval transaction data before sending
-        const approvalData: any = {
-          type: "TOKEN_APPROVAL",
-          spender: spender,
-          tokenAddress: deepTokenAddress,
-          currentAllowance: currentAllowance.toString(),
-          requiredAmount: required.toString(),
-          approver: address,
-          timestamp: new Date().toISOString(),
-        };
-
-        // Get nonce for approval transaction - use 'pending' to get latest nonce
-        try {
-          if (signer && signer.provider) {
-            approvalData.nonce = await signer.provider.getTransactionCount(address, "pending");
-          } else if (signer && typeof signer.getNonce === "function") {
-            approvalData.nonce = await signer.getNonce();
-          }
-        } catch (error) {
-          console.warn("Failed to get nonce for approval:", error);
-        }
-
         let tx;
         try {
-          {
-            // Use direct approve for exact amount (safer than unlimited approval)
-            // This is more reliable than increaseAllowance for precise amount approval
-            try {
-              tx = await tokenContract.approve(spender, required);
-            } catch (approveError) {
-              console.error("Direct approve failed:", approveError);
-              // Fallback: try increaseAllowance if approve fails
-              const delta = required - currentAllowance;
-              if (delta > 0n) {
-                tx = await tokenContract.increaseAllowance(spender, delta);
-              } else {
-                throw approveError;
-              }
+          // Use direct approve for exact amount (safer than unlimited approval)
+          try {
+            tx = await tokenContract.approve(spender, required);
+          } catch (approveError) {
+            console.error("Direct approve failed:", approveError);
+            // Fallback: try increaseAllowance if approve fails
+            const delta = required - currentAllowance;
+            if (delta > 0n) {
+              tx = await tokenContract.increaseAllowance(spender, delta);
+            } else {
+              throw approveError;
             }
           }
         } catch (approveError: any) {
@@ -480,63 +453,14 @@ export default function EndorseModal({
           throw approveError;
         }
         try {
-          const receipt = await tx.wait();
-
-          // Immediately verify the approval was successful
-          try {
-            const immediateAllowance = await tokenContract.allowance(address, spender);
-          } catch (immediateCheckError) {
-            console.error("Failed to check immediate allowance:", immediateCheckError);
-          }
+          // Once tx.wait() resolves the on-chain state is already updated,
+          // no polling needed.
+          await tx.wait();
         } catch (waitError: any) {
           setIsApproving(false);
           throw waitError;
         }
-        // Wait for blockchain state to be updated after approval transaction
-        // This is crucial for the final allowance check to pass
-        let postAllowance: bigint = currentAllowance;
-        let retryCount = 0;
-        const maxRetries = 32;
-
-        while (retryCount < maxRetries && postAllowance < required) {
-          const waitTime = Math.min(500 + retryCount * 300, 2000); // 500ms, 800ms, 1100ms, 1400ms, 1700ms, 2000ms...
-
-          try {
-            await new Promise((resolve) => setTimeout(resolve, waitTime));
-            postAllowance = await tokenContract.allowance(address, spender);
-
-            if (postAllowance >= required) {
-              break;
-            }
-          } catch (error) {
-            console.warn(
-              `Post-approval allowance check failed on attempt ${retryCount + 1}:`,
-              error,
-            );
-          }
-
-          retryCount++;
-        }
         setIsApproving(false);
-      } else {
-      }
-
-      // Final allowance check before endorseVersion call
-      let finalAllowance: bigint = 0n;
-      let finalRequired: bigint = 0n;
-
-      try {
-        finalAllowance = await tokenContract.allowance(address, spender);
-        finalRequired = await tokenContract.recentReward();
-
-        if (finalAllowance < finalRequired) {
-          const errorMsg = `Final allowance check failed: have ${ethers.formatUnits(finalAllowance, deepTokenDecimals)}, need ${ethers.formatUnits(finalRequired, deepTokenDecimals)}`;
-          console.error("Final allowance insufficient:", errorMsg);
-          throw new Error(errorMsg);
-        }
-      } catch (checkError) {
-        console.error("Final allowance check failed:", checkError);
-        throw checkError;
       }
 
       // Preflight: staticCall to catch reverts before wallet pops (ethers v6)
@@ -646,65 +570,7 @@ export default function EndorseModal({
         }
       };
 
-      // Get nonce from signer if available - use 'pending' to get latest nonce including pending transactions
-      let nonce: number | undefined;
-      try {
-        if (signer && signer.provider) {
-          nonce = await signer.provider.getTransactionCount(address, "pending");
-        } else if (signer && typeof signer.getNonce === "function") {
-          nonce = await signer.getNonce();
-        }
-      } catch (error) {
-        console.warn("Failed to get nonce:", error);
-      }
-
-      const endorsePromise = endorseVersion(targetPersonHash!, targetVersionIndex!, overrides);
-
-      // Prevent indefinite spinner if wallet/provider never resolves. Fallback after 40s.
-      let timedOut = false;
-      const timeoutMs = 40_000;
-      const timeout = setTimeout(() => {
-        timedOut = true;
-        console.warn("⏳ Endorse transaction still pending after timeout; keeping UI responsive");
-        setIsSubmitting(false);
-        // Provide a gentle hint in the UI without marking as an error
-        setErrorResult(
-          (prev) =>
-            prev ?? {
-              type: "PENDING_CONFIRMATION",
-              message: t("transaction.pending", "Transaction pending confirmation..."),
-              details: t(
-                "transaction.pendingDetails",
-                "The transaction is submitted or awaiting wallet confirmation. You can keep using the app; we will update once it confirms.",
-              ),
-            },
-        );
-      }, timeoutMs);
-
-      let result: any = null;
-      try {
-        result = await endorsePromise;
-      } catch (endorseError: any) {
-        console.error("endorseVersion promise rejected:", endorseError);
-        clearTimeout(timeout);
-
-        // Don't throw immediately - let the error handling below take care of it
-        if (timedOut) {
-          console.warn("Transaction timed out and also failed");
-          return;
-        }
-
-        // Re-throw to be caught by outer catch block
-        throw endorseError;
-      } finally {
-        clearTimeout(timeout);
-      }
-
-      if (timedOut) {
-        // Receipt arrived later; apply success now without re-enabling spinner
-        if (result) applySuccessFromReceipt(result);
-        return;
-      }
+      const result = await endorseVersion(targetPersonHash!, targetVersionIndex!, overrides);
 
       if (result) {
         const updatedCount = currentEndorsementCount + 1;
