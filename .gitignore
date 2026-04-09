@@ -44,3 +44,5 @@ bin/
 
 .csp*
 .claude/
+.codex
+*.local.md
