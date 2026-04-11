@@ -35,17 +35,23 @@ The FamilyTree UI is designed as a **Rendering Pipeline** (a.k.a. **Pipes & Filt
 - **Renderer** draws nodes/edges and wires view-specific interactions, consuming ViewModel data + Layout output.
 
 **Where to look in code**
-- ViewModel: `frontend/src/hooks/useFamilyTreeViewModel.ts`
-- Layout engines: `frontend/src/layout/`
-- Viewport: `frontend/src/components/GraphViewport.tsx`
-- Renderers: `frontend/src/renderers/`
+- ViewModel: `frontend/src/domains/tree/ui/useFamilyTreeViewModel.ts`
+- Layout engines: `frontend/src/domains/tree/ui/layout/`
+- Viewport: `frontend/src/domains/tree/ui/GraphViewport.tsx`
+- Renderers: `frontend/src/domains/tree/ui/renderers/`
 
 **Extending the system**
 To add a new view, implement a new Layout and/or Renderer strategy and plug it into the pipeline; avoid duplicating ViewModel logic or mixing cross-cutting concerns into view components.
 
 **State & data access**
-- Providers live under `frontend/src/context/` (wallet/config/tree data).
-- Reusable chain/data logic lives under `frontend/src/hooks/`.
+- App shell state lives under `frontend/src/app/`.
+- Domain read/write responsibilities are now grouped by domain:
+  - `frontend/src/domains/config/`: network / contract configuration context and UI
+  - `frontend/src/domains/person/`: person model / queries / UI coordination
+  - `frontend/src/domains/tree/`: tree context / queries / selectors / services
+- `frontend/src/domains/transactions/`: transaction flows / services / tx model
+- `frontend/src/domains/wallet/`: wallet context and wallet/network selection UI
+- Shared runtime utilities live under `frontend/src/shared/` (cache / clients / UI shell).
 
 **On-chain integration**
 - Contract ABIs are stored in `frontend/src/abi/`.
@@ -61,11 +67,15 @@ From repo root:
 - `npm run frontend:dev` (dev server)
 - `npm run frontend:build` (production build)
 - `npm run frontend:preview` (serve build locally)
+- `npm run frontend:check` (frontend lint + typecheck + vitest)
 
 Or from `frontend/`:
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
+- `npm run lint`
+- `npx tsc --noEmit -p tsconfig.json`
+- `npm run test`
 
 ## Local Integrated Development (Contracts + UI)
 
@@ -133,18 +143,21 @@ Practical expectation: if a change makes a worker crash, the most common cause i
 ## Source Layout
 ```
 frontend/src/
-├── components/          # UI components
+├── app/                 # App shell context and layout UI
+├── domains/             # Config / person / tree / transactions / wallet domain code
 ├── pages/               # Routes
-├── context/             # App providers
-├── hooks/               # Data + contract hooks
-├── layout/              # Layout engines (tree/dag/force)
-├── renderers/           # View renderers (SVG/D3/list)
+├── shared/              # Shared cache / clients / UI shells
 ├── lib/                 # Shared logic (worker-safe where possible)
 ├── workers/             # Web worker entrypoints (crypto/ZK)
 ├── abi/                 # Contract ABIs
+├── assets/              # Static assets imported by the app
+├── config/              # Static app/network/wallet configuration
 ├── constants/           # UI/layout constants
+├── i18n/                # i18next initialization
+├── routes/              # Route definitions / lazy route helpers
+├── shims/               # Browser/library shims
 ├── types/               # TypeScript types
-├── utils/               # Misc utilities
+├── utils/               # Non-domain helper utilities only
 └── locales/             # i18n resources
 ```
 

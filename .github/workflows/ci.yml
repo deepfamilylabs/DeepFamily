@@ -31,8 +31,14 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Install frontend dependencies
+        run: npm --prefix frontend install --no-audit --no-fund
+
       - name: Lint (solhint)
         run: npm run lint
+
+      - name: Frontend checks
+        run: npm run frontend:check
 
       - name: Build (compile contracts)
         run: npm run build
@@ -43,4 +49,3 @@ jobs:
         run: npm test
         env:
           REPORT_GAS: "true"
-
