@@ -730,6 +730,7 @@
     "download": "Download",
     "downloadMetadata": "Download metadata JSON file",
     "processing": "Processing...",
+    "validating": "Validating version...",
     "preparingData": "Preparing data...",
     "generatingProof": "Generating zero-knowledge proof...",
     "verifyingProof": "Verifying proof...",

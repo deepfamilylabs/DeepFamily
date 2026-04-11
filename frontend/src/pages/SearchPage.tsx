@@ -3,16 +3,13 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { ethers } from "ethers";
 import { ChevronDown, Clipboard, Search, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
-import { useConfig } from "../context/ConfigContext";
-import { useToast } from "../components/ToastProvider";
-import DeepFamily from "../abi/DeepFamily.json";
+import { useToast } from "../shared/ui";
 import { formatUnixSeconds, formatHashMiddle, type StoryChunk } from "../types/graph";
-import { makeProvider } from "../utils/provider";
-import PersonHashCalculator, {
+import {
+  PersonHashCalculator,
   type PersonHashCalculatorHandle,
-} from "../components/PersonHashCalculator";
+} from "../domains/person/ui";
 import {
   generateRandomIdentitySaltHex,
   type IdentitySaltMode,
@@ -24,6 +21,8 @@ import {
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
 } from "../constants/chunkTypes";
+import { usePersonGateway } from "../domains/person/queries";
+import { useTreeGateway } from "../domains/tree/queries";
 
 const MAX_PAGE_SIZE = 100;
 
@@ -285,8 +284,9 @@ export default function SearchPage() {
   });
 
   const schemas = createSchemas();
-  const { rpcUrl, contractAddress, chainId } = useConfig();
   const toast = useToast();
+  const personGateway = usePersonGateway();
+  const treeGateway = useTreeGateway();
 
   const tokenIdValidationMessage = useMemo(() => t("search.validation.tokenIdRequired"), [t]);
   const pageSizeValidationMessage = useMemo(
@@ -480,19 +480,14 @@ export default function SearchPage() {
     setEndorsementLoading(true);
     setEndorsementError(null);
     try {
-      const provider = makeProvider(rpcUrl, chainId);
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider);
+      if (!personGateway) throw new Error(t("search.queryFailed"));
       const off = startOffset !== undefined ? startOffset : endorsementOffset;
-      const out = await contract.listVersionEndorsements(data.personHash, off, data.pageSize);
-      const versionIndices: number[] = Array.from(out?.[0] || []).map(Number);
-      const endorsementCounts: number[] = Array.from(out?.[1] || []).map(Number);
-      const tokenIds: number[] = Array.from(out?.[2] || []).map(Number);
-      const totalVersions: number = Number(out?.[3] || 0);
-      const more: boolean = Boolean(out?.[4]);
-      const nextOffset: number = Number(out?.[5] || 0);
+      const out = await personGateway.listVersionEndorsements(data.personHash, off, data.pageSize);
+      const { versionIndices, endorsementCounts, tokenIds, totalVersions, hasMore, nextOffset } =
+        out;
       setEndorsementData({ versionIndices, endorsementCounts, tokenIds });
       setEndorsementTotal(totalVersions);
-      setEndorsementHasMore(more);
+      setEndorsementHasMore(hasMore);
       setEndorsementOffset(nextOffset);
     } catch (e: any) {
       setEndorsementError(e?.message || t("search.queryFailed"));
@@ -535,20 +530,16 @@ export default function SearchPage() {
     setUriLoading(true);
     setUriError(null);
     try {
-      const provider = makeProvider(rpcUrl, chainId);
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider);
+      if (!personGateway) throw new Error(t("search.queryFailed"));
       const off = startOffset !== undefined ? startOffset : uriOffset;
       if (data.tokenId === undefined || !Number.isFinite(data.tokenId)) {
         throw new Error(t("search.validation.tokenIdRequired"));
       }
-      const out = await contract.listTokenURIHistory(data.tokenId, off, data.pageSize);
-      const uris: string[] = Array.from(out?.[0] || []);
-      const totalCount: number = Number(out?.[1] || 0);
-      const more: boolean = Boolean(out?.[2]);
-      const nextOffset: number = Number(out?.[3] || 0);
+      const out = await personGateway.listTokenUriHistory(data.tokenId, off, data.pageSize);
+      const { uris, totalCount, hasMore, nextOffset } = out;
       setUriData(uris);
       setUriTotal(totalCount);
-      setUriHasMore(more);
+      setUriHasMore(hasMore);
       setUriOffset(nextOffset);
     } catch (e: any) {
       setUriError(e?.message || t("search.queryFailed"));
@@ -595,17 +586,13 @@ export default function SearchPage() {
     setVersionsLoading(true);
     setVersionsError(null);
     try {
-      const provider = makeProvider(rpcUrl, chainId);
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider);
+      if (!treeGateway) throw new Error(t("search.queryFailed"));
       const off = startOffset !== undefined ? startOffset : versionsOffset;
-      const out = await contract.listPersonVersions(data.personHash, off, data.pageSize);
-      const versions: any[] = Array.from(out?.[0] || []);
-      const totalCount: number = Number(out?.[1] || 0);
-      const more: boolean = Boolean(out?.[2]);
-      const nextOffset: number = Number(out?.[3] || 0);
+      const out = await treeGateway.listPersonVersionsPage(data.personHash, off, data.pageSize);
+      const { versions, totalCount, hasMore, nextOffset } = out;
       setVersionsData(versions);
       setVersionsTotal(totalCount);
-      setVersionsHasMore(more);
+      setVersionsHasMore(hasMore);
       setVersionsOffset(nextOffset);
     } catch (e: any) {
       setVersionsError(e?.message || t("search.queryFailed"));
@@ -645,31 +632,16 @@ export default function SearchPage() {
     setStoryChunksLoading(true);
     setStoryChunksError(null);
     try {
-      const provider = makeProvider(rpcUrl, chainId);
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider);
+      if (!personGateway) throw new Error(t("search.queryFailed"));
       const off = startOffset !== undefined ? startOffset : storyChunksOffset;
       if (data.tokenId === undefined || !Number.isFinite(data.tokenId)) {
         throw new Error(t("search.validation.tokenIdRequired"));
       }
-      const out: any = await contract.listStoryChunks(data.tokenId, off, data.pageSize);
-      const rawChunks: any[] = Array.from(out?.chunks ?? out?.[0] ?? []);
-      const chunks: StoryChunk[] = rawChunks.map(
-        (chunk: any): StoryChunk => ({
-          chunkIndex: Number(chunk?.chunkIndex ?? chunk?.[0] ?? 0),
-          chunkHash: String(chunk?.chunkHash ?? chunk?.[1] ?? ethers.ZeroHash),
-          content: String(chunk?.content ?? chunk?.[2] ?? ""),
-          timestamp: Number(chunk?.timestamp ?? chunk?.[3] ?? 0),
-          editor: String(chunk?.editor ?? chunk?.[4] ?? ethers.ZeroAddress),
-          chunkType: Number(chunk?.chunkType ?? chunk?.[5] ?? 0),
-          attachmentCID: String(chunk?.attachmentCID ?? chunk?.[6] ?? ""),
-        }),
-      );
-      const totalChunks: number = Number(out?.totalChunks ?? out?.[1] ?? 0);
-      const more: boolean = Boolean(out?.hasMore ?? out?.[2]);
-      const nextOffset: number = Number(out?.nextOffset ?? out?.[3] ?? 0);
+      const out = await personGateway.listStoryChunksPage(data.tokenId, off, data.pageSize);
+      const { chunks, totalChunks, hasMore, nextOffset } = out;
       setStoryChunksData(chunks);
       setStoryChunksTotal(totalChunks);
-      setStoryChunksHasMore(more);
+      setStoryChunksHasMore(hasMore);
       setStoryChunksOffset(nextOffset);
     } catch (e: any) {
       setStoryChunksError(e?.message || t("search.queryFailed"));
@@ -716,27 +688,22 @@ export default function SearchPage() {
     setChildrenLoading(true);
     setChildrenError(null);
     try {
-      const provider = makeProvider(rpcUrl, chainId);
-      const contract = new ethers.Contract(contractAddress, (DeepFamily as any).abi, provider);
+      if (!treeGateway) throw new Error(t("search.queryFailed"));
       const off = startOffset !== undefined ? startOffset : childrenOffset;
       const parentVersionIndex = Number(data.parentVersionIndex);
       if (!Number.isFinite(parentVersionIndex)) {
         throw new Error("Invalid parent version index");
       }
-      const out = await contract.listChildren(
+      const out = await treeGateway.listChildrenPage(
         data.parentHash,
         parentVersionIndex,
         off,
         data.pageSize,
       );
-      const childHashes: string[] = Array.from(out?.[0] || []);
-      const childVersions: number[] = Array.from(out?.[1] || []).map(Number);
-      const totalChildren: number = Number(out?.[2] || 0);
-      const more: boolean = Boolean(out?.[3]);
-      const nextOffset: number = Number(out?.[4] || 0);
+      const { childHashes, childVersions, totalChildren, hasMore, nextOffset } = out;
       setChildrenData({ childHashes, childVersions });
       setChildrenTotal(totalChildren);
-      setChildrenHasMore(more);
+      setChildrenHasMore(hasMore);
       setChildrenOffset(nextOffset);
     } catch (e: any) {
       setChildrenError(e?.message || t("search.queryFailed"));

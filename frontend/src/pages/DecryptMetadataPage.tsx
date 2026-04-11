@@ -14,7 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { parseEncryptedPayload, type AnyEncryptedMetadataPayload } from "../lib/metadataCrypto";
-import { sanitizeErrorForLogging } from "../lib/errors";
+import { sanitizeErrorForLogging } from "../shared/lib/errors";
 import { IPFS_GATEWAY_BASE_URLS } from "../config/ipfs";
 import { cryptoWorkerCall } from "../lib/cryptoWorkerClient";
 

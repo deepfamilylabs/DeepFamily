@@ -2,12 +2,10 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Image, Star, Wallet, AlertCircle } from "lucide-react";
-import { useWallet } from "../context/WalletContext";
-import WalletConnectButton from "../components/WalletConnectButton";
-import AddVersionModal from "../components/modals/AddVersionModal";
-import MintNFTModal from "../components/modals/MintNFTModal";
-import EndorseModal from "../components/modals/EndorseModal";
-import PageContainer from "../components/PageContainer";
+import { useWallet } from "../domains/wallet/context";
+import { WalletConnectButton } from "../domains/wallet/ui";
+import { AddVersionModal, EndorseModal, MintNFTModal } from "../domains/transactions/ui";
+import { PageContainer } from "../shared/ui";
 
 type ActionTab = "add-version" | "mint-nft" | "endorse";
 

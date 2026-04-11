@@ -25,11 +25,10 @@ import {
   formatHashMiddle,
   shortAddress,
 } from "../types/graph";
-import { useConfig } from "../context/ConfigContext";
-import { useTreeData } from "../context/TreeDataContext";
-import { useToast } from "../components/ToastProvider";
-import { ethers } from "ethers";
-import { computeStoryHash } from "../lib/story";
+import { useConfig } from "../domains/config/context";
+import { useTreeGraphData, useTreeNodeAccess } from "../domains/tree/context";
+import { buildStorySnapshot, findNodeByTokenId } from "../domains/person/model";
+import { useToast } from "../shared/ui";
 import {
   getChunkTypeOptions,
   getChunkTypeI18nKey,
@@ -37,37 +36,6 @@ import {
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
 } from "../constants/chunkTypes";
-
-function computeStoryIntegrity(chunks: StoryChunk[], metadata: StoryMetadata) {
-  const sorted = [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
-  const missing: number[] = [];
-  for (let i = 0; i < metadata.totalChunks; i++) {
-    if (!sorted.find((c) => c.chunkIndex === i)) missing.push(i);
-  }
-  const fullStory = sorted.map((c) => c.content).join("");
-  const encoder = new TextEncoder();
-  const computedLength = sorted.reduce((acc, c) => acc + encoder.encode(c.content).length, 0);
-  const lengthMatch = computedLength === metadata.totalLength;
-  let hashMatch: boolean | null = null;
-  let computedHash: string | undefined;
-  if (
-    missing.length === 0 &&
-    metadata.totalChunks > 0 &&
-    metadata.fullStoryHash &&
-    metadata.fullStoryHash !== ethers.ZeroHash
-  ) {
-    try {
-      computedHash = computeStoryHash(sorted);
-      hashMatch = computedHash === metadata.fullStoryHash;
-    } catch {
-      /* ignore */
-    }
-  }
-  return {
-    fullStory,
-    integrity: { missing, lengthMatch, hashMatch, computedLength, computedHash },
-  };
-}
 
 interface StoryDetailData {
   tokenId: string;
@@ -107,7 +75,8 @@ export default function PersonPage() {
   const location = useLocation();
   const { t } = useTranslation();
   // Config used in child components (HashAndIndexLine) via useConfig
-  const { getStoryData, getNodeByTokenId, getOwnerOf, nodesData } = useTreeData();
+  const { nodesData } = useTreeGraphData();
+  const { getStoryData, getNodeByTokenId, getOwnerOf } = useTreeNodeAccess();
   const config = useConfig();
   const toast = useToast();
 
@@ -308,7 +277,6 @@ export default function PersonPage() {
         } as StoryDetailData),
     );
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefetched?.tokenId]);
 
   useEffect(() => {
@@ -336,13 +304,7 @@ export default function PersonPage() {
       }
       setError(null);
       // 1) First try to hit in memory nodesData (no network required)
-      let node: any | null = null;
-      for (const nd of Object.values(nodesData || {})) {
-        if (nd?.tokenId && String(nd.tokenId) === String(tokenId)) {
-          node = nd;
-          break;
-        }
-      }
+      let node: any | null = findNodeByTokenId(nodesData || {}, tokenId) ?? null;
 
       // 2) If no node found in memory, use getNodeByTokenId (internally checks local cache first, then decides whether to access network)
       if (!node) {
@@ -357,10 +319,7 @@ export default function PersonPage() {
         const ttl = isSealed ? 7 * 24 * 60 * 60 * 1000 : 2 * 60 * 1000;
         const expired = !fetchedAt || Date.now() - fetchedAt > ttl;
         if (!expired) {
-          const { fullStory, integrity } = computeStoryIntegrity(
-            node.storyChunks,
-            node.storyMetadata,
-          );
+          const { fullStory, integrity } = buildStorySnapshot(node.storyChunks, node.storyMetadata);
           story = { metadata: node.storyMetadata, chunks: node.storyChunks, fullStory, integrity };
         }
       }
