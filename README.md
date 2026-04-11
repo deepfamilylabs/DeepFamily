@@ -74,6 +74,7 @@ git clone https://github.com/deepfamilylabs/DeepFamily.git
 cd DeepFamily
 npm run setup    # Install root + frontend dependencies
 cp .env.example .env
+npm run check    # Frontend checks + contract lint/build/test
 npm run build    # Compile smart contracts
 npm run dev:all  # Start local node + deploy + seed data + frontend
 ```
@@ -81,6 +82,7 @@ npm run dev:all  # Start local node + deploy + seed data + frontend
 ### Step-by-Step Setup
 ```bash
 npm run setup           # Install dependencies
+npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
 npm run dev:deploy      # Deploy contracts
@@ -96,6 +98,8 @@ npm run frontend:dev    # Start frontend dev server
 ### Testing
 ```bash
 npm test              # Run all contract tests
+npm run frontend:check # Run frontend lint + typecheck + tests
+npm run check         # Run frontend checks + contract lint/build/test
 ```
 
 
@@ -152,6 +156,7 @@ npm run verify:net --net=holesky
 - Prettier + Solhint + lint-staged pre-commit (husky)
 - Conventional Commits
 - Tests required for new features
+- Prefer `npm run check` before opening a PR
 - Update README / docs when changing core behaviors
 
 ## License
