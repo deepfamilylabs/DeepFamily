@@ -91,6 +91,12 @@ const getWebCrypto = (): Crypto => {
   return cryptoObj;
 };
 
+const toArrayBufferBytes = (input: Uint8Array): Uint8Array<ArrayBuffer> => {
+  const out = new Uint8Array(new ArrayBuffer(input.byteLength));
+  out.set(input);
+  return out;
+};
+
 export const encryptMetadataJsonV2 = async (
   plaintext: string,
   password: string,
@@ -114,10 +120,15 @@ export const encryptMetadataJsonV2 = async (
     salt,
     config,
   });
+  const rawKeyBytes = toArrayBufferBytes(keyBytes);
 
-  const key = await cryptoObj.subtle.importKey("raw", keyBytes, { name: "AES-GCM", length: 256 }, false, [
-    "encrypt",
-  ]);
+  const key = await cryptoObj.subtle.importKey(
+    "raw",
+    rawKeyBytes,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"],
+  );
 
   const ciphertextBuffer = await cryptoObj.subtle.encrypt(
     { name: "AES-GCM", iv, additionalData: encoder.encode(aad) },
@@ -230,9 +241,14 @@ export const decryptMetadataPayloadV2 = async (
     salt,
     config,
   });
-  const key = await cryptoObj.subtle.importKey("raw", keyBytes, { name: "AES-GCM", length: 256 }, false, [
-    "decrypt",
-  ]);
+  const rawKeyBytes = toArrayBufferBytes(keyBytes);
+  const key = await cryptoObj.subtle.importKey(
+    "raw",
+    rawKeyBytes,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"],
+  );
 
   const cipherBytes = safeFromBase64(payload?.ciphertext || "", {
     maxBytes: MAX_CIPHERTEXT_BYTES,
