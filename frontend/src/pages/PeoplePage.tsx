@@ -3,20 +3,19 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, Users, User, Hash, X, Plus, BookOpen } from "lucide-react";
 import { NodeData, isMinted } from "../types/graph";
-import { useActivePath } from "../context/ActivePathContext";
-import { useTreeData } from "../context/TreeDataContext";
-import { useFamilyTreeProjection } from "../hooks/useFamilyTreeProjection";
-import PersonStoryCard from "../components/PersonStoryCard";
-import StoryChunksModal from "../components/StoryChunksModal";
-import PageContainer from "../components/PageContainer";
-import SortButton from "../components/SortButton";
+import { useActivePath } from "../app/context";
+import { useFamilyTreeProjection, useTreeGraphData, useTreeStatus } from "../domains/tree/context";
+import { PersonStoryCard, StoryChunksModal } from "../domains/person/ui";
+import { PageContainer } from "../shared/ui";
+import SortButton from "./people/ui/SortButton";
 
 type FilterType = "all" | "by_create_time" | "by_name" | "by_endorsement" | "by_birth_year";
 type SortOrder = "asc" | "desc";
 
 export default function PeoplePage() {
   const { t } = useTranslation();
-  const { nodesData, loading } = useTreeData();
+  const { nodesData } = useTreeGraphData();
+  const { loading } = useTreeStatus();
   const [projectionEnabled, setProjectionEnabled] = useState(false);
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();

@@ -19,11 +19,12 @@ import {
   FileText,
   HelpCircle,
 } from "lucide-react";
-import { useConfig } from "../context/ConfigContext";
-import { useTreeData } from "../context/TreeDataContext";
-import { useWallet } from "../context/WalletContext";
-import { useToast } from "../components/ToastProvider";
-import { addStoryChunk, sealStory, computeStoryHash } from "../lib/story";
+import { useConfig } from "../domains/config/context";
+import { useToast } from "../shared/ui";
+import { computeStoryHash } from "../lib/story";
+import { useNFTDetails, useStoryData } from "../domains/person/queries";
+import { getScopedQueryClient } from "../shared/cache/queryClient";
+import { storyKey } from "../shared/cache/queryKeys";
 import type { StoryChunk, StoryChunkCreateData, StoryMetadata, NodeData } from "../types/graph";
 import { formatUnixSeconds, formatHashMiddle, shortAddress } from "../types/graph";
 import {
@@ -33,6 +34,10 @@ import {
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
 } from "../constants/chunkTypes";
+import {
+  useAddStoryChunkFlow,
+  useSealStoryFlow,
+} from "../domains/transactions/flows";
 
 interface PrefetchedState {
   prefetchedStory?: {
@@ -54,9 +59,7 @@ export default function StoryEditorPage() {
   const { tokenId } = useParams<{ tokenId: string }>();
   const location = useLocation();
   const { t } = useTranslation();
-  const { contractAddress } = useConfig();
-  const { getStoryData, setNodesData, getNodeByTokenId } = useTreeData();
-  const { signer, address } = useWallet();
+  const { contractAddress, rpcUrl, chainId } = useConfig();
   const toast = useToast();
 
   const prefetched = (location.state as PrefetchedState | undefined)?.prefetchedStory;
@@ -131,6 +134,16 @@ export default function StoryEditorPage() {
     () => (tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined),
     [tokenId],
   );
+  const scopedQueryClient = useMemo(
+    () => getScopedQueryClient({ rpcUrl, contractAddress, chainId }),
+    [rpcUrl, contractAddress, chainId],
+  );
+  const addStoryChunkFlow = useAddStoryChunkFlow();
+  const sealStoryFlow = useSealStoryFlow();
+
+  // ---------- domain query hooks ----------
+  const nftQuery = useNFTDetails(validTokenId);
+  const storyQuery = useStoryData(validTokenId);
 
   const computeContentHash = useCallback((content: string): string => {
     // Use encodePacked to match the contract's _hashString function
@@ -214,34 +227,24 @@ export default function StoryEditorPage() {
     });
   }, []);
 
-  const loadIfNeeded = useCallback(async () => {
-    if (!validTokenId) {
-      setError(t("person.invalidTokenId", "Invalid token ID"));
-      return;
-    }
-    if (meta && chunks) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getStoryData(validTokenId);
-      if (!data) {
-        setMeta(undefined);
-        setChunks(undefined);
-        setError(t("storyChunkEditor.loading", "Loading..."));
-        return;
-      }
-      setMeta(data.metadata as StoryMetadata);
-      setChunks(data.chunks as StoryChunk[]);
-    } catch (e: any) {
-      setError(e?.message || t("storyChunkEditor.loading", "Loading..."));
-    } finally {
-      setLoading(false);
-    }
-  }, [validTokenId, getStoryData, meta, chunks, t]);
-
+  // Sync story hook data → local state (unless already prefetched or user has made local edits)
+  const storyHydrated = useRef(false);
   useEffect(() => {
-    loadIfNeeded();
-  }, [loadIfNeeded]);
+    if (storyHydrated.current) return; // once local edits start, don't overwrite
+    if (storyQuery.data) {
+      setMeta(storyQuery.data.metadata);
+      setChunks(storyQuery.data.chunks);
+      storyHydrated.current = true;
+    }
+  }, [storyQuery.data]);
+
+  // Surface hook loading/error into local state (only while initial load)
+  useEffect(() => {
+    if (!storyHydrated.current) {
+      setLoading(storyQuery.loading);
+      setError(storyQuery.error);
+    }
+  }, [storyQuery.loading, storyQuery.error]);
 
   // Warn before unload if there are unsaved changes
   useEffect(() => {
@@ -307,22 +310,15 @@ export default function StoryEditorPage() {
 
   const onAddChunk = useCallback(
     async (data: StoryChunkCreateData) => {
-      if (!contractAddress) throw new Error("Missing contract");
-      if (!signer) throw new Error("No wallet connected");
-      if (!address) throw new Error("No wallet address");
-
       try {
-        // Execute blockchain operation
-        const result = await addStoryChunk(
-          signer,
-          contractAddress,
-          data.tokenId,
-          data.chunkIndex,
-          data.content,
-          data.expectedHash || "",
-          data.chunkType ?? 0,
-          data.attachmentCID ?? "",
-        );
+        const result = await addStoryChunkFlow.runOrThrow({
+          tokenId: data.tokenId,
+          chunkIndex: data.chunkIndex,
+          content: data.content,
+          expectedHash: data.expectedHash || "",
+          chunkType: data.chunkType ?? 0,
+          attachmentCID: data.attachmentCID ?? "",
+        });
 
         // After successful operation, immediately update local state
         const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk];
@@ -341,28 +337,10 @@ export default function StoryEditorPage() {
           : undefined;
         setMeta(newMeta);
 
-        // Synchronize updates to TreeDataContext node data cache
-        if (setNodesData && validTokenId) {
-          setNodesData((prev) => {
-            let foundId: string | undefined;
-            for (const [id, nd] of Object.entries(prev)) {
-              if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
-                foundId = id;
-                break;
-              }
-            }
-            if (!foundId) return prev;
-
-            const cur = prev[foundId];
-            return {
-              ...prev,
-              [foundId]: {
-                ...cur,
-                storyMetadata: newMeta,
-                storyChunks: newChunks,
-              },
-            };
-          });
+        // Invalidate story cache so next read gets fresh data
+        if (validTokenId) {
+          scopedQueryClient.clear(storyKey(validTokenId));
+          scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
         }
 
         // Show success message with event data if available
@@ -391,18 +369,13 @@ export default function StoryEditorPage() {
         throw err;
       }
     },
-    [contractAddress, signer, address, toast, t, chunks, meta, validTokenId, setNodesData],
+    [addStoryChunkFlow, toast, t, chunks, meta, validTokenId, scopedQueryClient],
   );
 
   const onSealStory = useCallback(
     async (tid: string) => {
-      if (!contractAddress) throw new Error("Missing contract");
-      if (!signer) throw new Error("No wallet connected");
-      if (!address) throw new Error("No wallet address");
-
       try {
-        // Execute blockchain operation
-        const result = await sealStory(signer, contractAddress, tid);
+        const result = await sealStoryFlow.runOrThrow({ tokenId: tid });
 
         // After successful operation, immediately update sealed status and fullStoryHash in metadata
         const newMeta: StoryMetadata | undefined = meta
@@ -415,27 +388,10 @@ export default function StoryEditorPage() {
           : undefined;
         setMeta(newMeta);
 
-        // Synchronize updates to TreeDataContext node data cache
-        if (setNodesData && validTokenId) {
-          setNodesData((prev) => {
-            let foundId: string | undefined;
-            for (const [id, nd] of Object.entries(prev)) {
-              if (nd.tokenId && String(nd.tokenId) === String(validTokenId)) {
-                foundId = id;
-                break;
-              }
-            }
-            if (!foundId) return prev;
-
-            const cur = prev[foundId];
-            return {
-              ...prev,
-              [foundId]: {
-                ...cur,
-                storyMetadata: newMeta,
-              },
-            };
-          });
+        // Invalidate story cache so next read gets fresh data
+        if (validTokenId) {
+          scopedQueryClient.clear(storyKey(validTokenId));
+          scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
         }
 
         // Show success message with event data if available
@@ -463,7 +419,7 @@ export default function StoryEditorPage() {
         throw err;
       }
     },
-    [contractAddress, signer, address, toast, t, meta, validTokenId, setNodesData],
+    [sealStoryFlow, toast, t, meta, validTokenId, scopedQueryClient],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -610,25 +566,29 @@ export default function StoryEditorPage() {
     }
   }, [prefetched?.fullName]);
 
+  // Derive person name and node details from NFT query hook
   useEffect(() => {
-    if (!validTokenId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const node = await getNodeByTokenId(validTokenId);
-        if (cancelled) return;
-        setNodeDetails(node || null);
-        if (node?.fullName) {
-          setPersonName(node.fullName);
-        }
-      } catch {
-        if (!cancelled) setNodeDetails(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [validTokenId, getNodeByTokenId]);
+    if (!nftQuery.data) return;
+    const core = nftQuery.data.core;
+    if (core?.fullName) setPersonName(core.fullName);
+    // Build a minimal NodeData-like object from NFT details for display
+    setNodeDetails({
+      id: `${nftQuery.data.personHash}:${nftQuery.data.versionIndex}`,
+      personHash: nftQuery.data.personHash,
+      versionIndex: nftQuery.data.versionIndex,
+      fullName: core?.fullName,
+      gender: core?.gender,
+      birthYear: core?.birthYear,
+      birthMonth: core?.birthMonth,
+      birthDay: core?.birthDay,
+      birthPlace: core?.birthPlace,
+      deathYear: core?.deathYear,
+      deathMonth: core?.deathMonth,
+      deathDay: core?.deathDay,
+      deathPlace: core?.deathPlace,
+      tokenId: validTokenId,
+    } as NodeData);
+  }, [nftQuery.data, validTokenId]);
 
   const titleText = personName
     ? t("storyChunkEditor.titleWithName", { name: personName, defaultValue: "{{name}} Biography" })

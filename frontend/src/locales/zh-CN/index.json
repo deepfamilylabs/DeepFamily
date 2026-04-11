@@ -730,6 +730,7 @@
     "download": "下载",
     "downloadMetadata": "下载元数据JSON文件",
     "processing": "处理中...",
+    "validating": "校验版本中...",
     "preparingData": "准备数据...",
     "generatingProof": "生成零知识证明...",
     "verifyingProof": "验证证明...",

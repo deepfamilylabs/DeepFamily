@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Layout from "./components/Layout";
+import { Layout } from "./app/ui";
 import Home from "./pages/Home";
 import TreePage from "./pages/TreePage";
 import SearchPage from "./pages/SearchPage";
@@ -11,15 +11,12 @@ import StoryEditorPage from "./pages/StoryEditorPage";
 import ActionsPage from "./pages/ActionsPage";
 import KeyDerivationPage from "./pages/KeyDerivationPage";
 import DecryptMetadataPage from "./pages/DecryptMetadataPage";
-import { ConfigProvider } from "./context/ConfigContext";
-import { ToastProvider } from "./components/ToastProvider";
-import { VizOptionsProvider } from "./context/VizOptionsContext";
-import { TreeDataProvider } from "./context/TreeDataContext";
-import { WalletProvider } from "./context/WalletContext";
-import { SidebarProvider } from "./context/SidebarContext";
-import { ActivePathProvider } from "./context/ActivePathContext";
-import WalletSelectionLayer from "./components/WalletSelectionLayer";
-import NetworkSelectionLayer from "./components/NetworkSelectionLayer";
+import { ConfigProvider } from "./domains/config/context";
+import { ToastProvider } from "./shared/ui";
+import { TreeViewProvider, VizOptionsProvider } from "./domains/tree/context";
+import { WalletProvider } from "./domains/wallet/context";
+import { ActivePathProvider, SidebarProvider } from "./app/context";
+import { NetworkSelectionLayer, WalletSelectionLayer } from "./domains/wallet/ui";
 
 function TitleUpdater() {
   const { t, i18n } = useTranslation();
@@ -89,14 +86,14 @@ export default function App() {
             <WalletSelectionLayer />
             <NetworkSelectionLayer />
             <VizOptionsProvider>
-              <TreeDataProvider>
+              <TreeViewProvider>
                 <BrowserRouter>
                   <ActivePathProvider>
                     <TitleUpdater />
                     <RouterContent />
                   </ActivePathProvider>
                 </BrowserRouter>
-              </TreeDataProvider>
+              </TreeViewProvider>
             </VizOptionsProvider>
           </SidebarProvider>
         </WalletProvider>

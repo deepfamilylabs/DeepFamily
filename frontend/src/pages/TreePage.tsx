@@ -1,29 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import ViewContainer from "../components/ViewContainer";
-import { useTreeData } from "../context/TreeDataContext";
-import { useConfig } from "../context/ConfigContext";
-import TreeDebugPanel from "../components/TreeDebugPanel";
-import ViewModeSwitch from "../components/ViewModeSwitch";
+import { useTreeGraphData, useTreeStatus } from "../domains/tree/context";
+import { useConfig } from "../domains/config/context";
+import { TreeDebugPanel, ViewContainer, ViewModeSwitch } from "../domains/tree/ui";
 import { Activity, Layers, GitMerge } from "lucide-react";
-import { ColorThemeProvider } from "../context/ColorThemeContext";
+import { ColorThemeProvider } from "../domains/tree/context";
 
 /**
  * TreePage is intentionally a thin UI shell. The actual "data -> UI" pipeline is:
  *
- * Data (L3) — `frontend/src/context/TreeDataContext.tsx`:
- * - JSON-RPC / on-chain reads (ethers) for nodes + edges + details.
+ * Data (L3) — `frontend/src/domains/tree/context`:
+ * - `TreeViewProvider` and the narrow tree hooks own JSON-RPC / on-chain reads for nodes, edges, and details.
  *
  * Caching (L1/L2):
- * - L1 in-memory `QueryCache` (`frontend/src/utils/queryCache.ts`): TTL + inflight de-dupe.
- * - L2 optional IndexedDB (`frontend/src/utils/idbCache.ts`): persisted `nodesData` + edge stores,
+ * - L1 in-memory `QueryCache` (`frontend/src/shared/cache/QueryCache.ts`): TTL + inflight de-dupe.
+ * - L2 optional IndexedDB (`frontend/src/shared/cache/persistence.ts`): persisted `nodesData` + edge stores,
  *   hydrated async and then revalidated.
  *
- * Projection (view-model) — `frontend/src/hooks/useFamilyTreeViewModel.ts` + `frontend/src/utils/treeData.ts`:
- * - Builds a *projected graph* via `buildViewGraphData()` (childrenMode + strictIncludeUnversionedChildren +
- *   optional sibling dedup by endorsements).
+ * Projection (view-model) — `frontend/src/domains/tree/ui/useFamilyTreeViewModel.ts` + `frontend/src/domains/tree/selectors`:
+ * - Builds a projected graph via the tree selector layer (`buildViewGraphData`, tree rows, totals).
  *
- * Rendering (UI) — `frontend/src/components/ViewContainer.tsx`:
+ * Rendering (UI) — `frontend/src/domains/tree/ui/ViewContainer.tsx`:
  * - Swaps view implementations (Tree/DAG/Force/Virtual), all consuming the same projected graph.
  */
 function toBool(val: any) {
@@ -52,15 +49,9 @@ export default function TreePage() {
   const { viewMode, setViewMode } = usePersistedViewMode();
 
   const { t } = useTranslation();
-  const {
-    rootId,
-    rootExists,
-    loading: loadingContract,
-    progress,
-    contractMessage,
-    refresh,
-    clearAllCaches,
-  } = useTreeData();
+  const { rootId, rootExists } = useTreeGraphData();
+  const { loading: loadingContract, progress, contractMessage, refresh, clearAllCaches } =
+    useTreeStatus();
   const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, defaults, update } =
     useConfig();
   const forceEnvConfigSync = useMemo(

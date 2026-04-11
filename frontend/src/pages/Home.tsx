@@ -2,8 +2,8 @@ import { memo, useEffect, useState, lazy, Suspense, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sparkles, ChevronDown } from "lucide-react";
-import LoadingFallback from "../components/home/LoadingFallback";
-import { useActivePath } from "../context/ActivePathContext";
+import LoadingFallback from "./home/ui/LoadingFallback";
+import { useActivePath } from "../app/context";
 import {
   HERO_STYLES as HERO_STYLE_CONSTANTS,
   FLOATING_SHAPES as FLOATING_SHAPE_CONSTANTS,
@@ -14,13 +14,13 @@ import {
 import { ANIMATION_CLASSES } from "../constants/animationStyles";
 
 // Lazy loaded components
-const ValuePropositions = lazy(() => import("../components/home/ValuePropositions"));
-const TwoLayerValueSystem = lazy(() => import("../components/home/TwoLayerValueSystem"));
-const WorkflowSection = lazy(() => import("../components/WorkflowSection"));
-const CoreFeatures = lazy(() => import("../components/home/CoreFeatures"));
-const Tokenomics = lazy(() => import("../components/home/Tokenomics"));
-const Audience = lazy(() => import("../components/home/Audience"));
-const CallToAction = lazy(() => import("../components/home/CallToAction"));
+const ValuePropositions = lazy(() => import("./home/ui/ValuePropositions"));
+const TwoLayerValueSystem = lazy(() => import("./home/ui/TwoLayerValueSystem"));
+const WorkflowSection = lazy(() => import("./home/ui/WorkflowSection"));
+const CoreFeatures = lazy(() => import("./home/ui/CoreFeatures"));
+const Tokenomics = lazy(() => import("./home/ui/Tokenomics"));
+const Audience = lazy(() => import("./home/ui/Audience"));
+const CallToAction = lazy(() => import("./home/ui/CallToAction"));
 
 // Floating shapes component - uses CSS gradients for optimal performance
 const FloatingShapes = memo(() => (

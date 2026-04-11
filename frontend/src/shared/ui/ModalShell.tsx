@@ -1,0 +1,127 @@
+import React, { useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
+
+export interface ModalShellProps {
+  /** Whether the modal is visible */
+  isOpen: boolean;
+  /** Called when the user dismisses (backdrop click, X button, Escape) */
+  onClose: () => void;
+  /** Maximum width utility class (default: "max-w-md") */
+  maxWidth?: string;
+  /** z-index utility class (default: "z-[1300]") */
+  zIndex?: string;
+  /** Accessible label for the dialog */
+  ariaLabel?: string;
+  /** If true, clicking the backdrop does NOT close the modal */
+  disableBackdropClose?: boolean;
+  /** If true, hide the built-in X close button */
+  hideCloseButton?: boolean;
+  /** Close button aria-label override */
+  closeLabel?: string;
+  children: React.ReactNode;
+}
+
+/**
+ * Shared modal shell with:
+ *  - Portal rendering to document.body
+ *  - Backdrop overlay with click-to-close
+ *  - Focus trap (returns focus on close)
+ *  - Escape key handling
+ *  - Scroll lock on body
+ *  - Optional close button
+ *
+ * ModalShell does NOT include drag-to-dismiss or bottom-sheet behaviour;
+ * those remain in per-modal implementations until Stage D standardises them.
+ */
+export function ModalShell({
+  isOpen,
+  onClose,
+  maxWidth = "max-w-md",
+  zIndex = "z-[1300]",
+  ariaLabel,
+  disableBackdropClose,
+  hideCloseButton,
+  closeLabel = "Close",
+  children,
+}: ModalShellProps) {
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Save + restore focus
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+      // Slight delay so the DOM has rendered
+      requestAnimationFrame(() => panelRef.current?.focus());
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [isOpen]);
+
+  // Scroll lock
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
+
+  // Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
+
+  const handleBackdrop = useCallback(() => {
+    if (!disableBackdropClose) onClose();
+  }, [disableBackdropClose, onClose]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 transition-all duration-300`}
+      onClick={handleBackdrop}
+      role="presentation"
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden />
+
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
+        className={`w-full ${maxWidth} bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden outline-none`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {!hideCloseButton && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+            aria-label={closeLabel}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
