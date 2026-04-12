@@ -4,7 +4,7 @@ import {
   DEFAULT_SCHEMA_VERSION,
   DEFAULT_CRYPTO_SUITE_VERSION,
   DEFAULT_HASH_ALGO_ID,
-} from "./zk";
+} from "../zk/zk";
 import { canonicalizeFullName, packBirthGenderField } from "./identityCommitment";
 import { normalizePassphraseForHash } from "./passphraseStrength";
 import {

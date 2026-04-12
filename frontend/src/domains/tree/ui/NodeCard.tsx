@@ -1,5 +1,5 @@
 import React from "react";
-import { getGenderColor } from "../../../constants/genderColors";
+import { getGenderColor } from "./nodeColors";
 import { getFamilyTreeNodeTheme } from "./nodeTheme";
 
 export interface NodeCardProps {

@@ -34,7 +34,7 @@ import {
   formatUnixSeconds,
   shortAddress,
   formatHashMiddle,
-} from "../../../types/graph";
+} from "../../../shared/model";
 import { useTreeMutations, useTreeNodeAccess } from "../../tree/context";
 import {
   getChunkTypeOptions,
@@ -42,7 +42,7 @@ import {
   getChunkTypeIcon,
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
-} from "../../../constants/chunkTypes";
+} from "../config/chunkTypes";
 // owner/address resolution is delegated to the tree node access layer.
 
 interface StoryChunksModalProps {

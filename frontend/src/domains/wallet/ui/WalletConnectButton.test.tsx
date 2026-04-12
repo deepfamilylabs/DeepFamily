@@ -35,7 +35,7 @@ vi.mock("../../config/context", () => ({
   }),
 }));
 
-vi.mock("../../../config/networks", () => ({
+vi.mock("../../../shared/config", () => ({
   isSupportedChain: (...args: any[]) => mocks.isSupportedChain(...args),
 }));
 

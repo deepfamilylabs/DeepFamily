@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
 import MintNFTModal from "./MintNFTModal";
-import { makeNodeId, type NodeData } from "../../../types/graph";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 
 const personHash = `0x${"12".repeat(32)}`;
 const ownerAddress = "0x00000000000000000000000000000000000000aa";
@@ -60,11 +60,11 @@ vi.mock("../flows", () => ({
   }),
 }));
 
-vi.mock("../../../lib/zkWorkerClient", () => ({
+vi.mock("../../../shared/workers/zkWorkerClient", () => ({
   zkWorkerCall: (...args: any[]) => mocks.zkWorkerCall(...args),
 }));
 
-vi.mock("../../../lib/zk", () => ({
+vi.mock("../../../shared/zk/zk", () => ({
   computeDisclosureBinding: () => 99n,
   formatGroth16ProofForContract: () => ({
     a: [1n, 2n],
@@ -76,16 +76,16 @@ vi.mock("../../../lib/zk", () => ({
   }),
 }));
 
-vi.mock("../../../lib/identityCommitment", () => ({
+vi.mock("../../../shared/crypto/identityCommitment", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
 }));
 
-vi.mock("../../../lib/identityHash", () => ({
+vi.mock("../../../shared/crypto/identityHash", () => ({
   computeIdentityHashMaterial: (...args: any[]) => mocks.computeIdentityHashMaterial(...args),
   normalizeIdentitySaltHex: (value: string) => value,
 }));
 
-vi.mock("../../../lib/passphraseStrength", () => ({
+vi.mock("../../../shared/crypto/passphraseStrength", () => ({
   normalizePassphraseForHash: (value: string) => value.trim(),
 }));
 

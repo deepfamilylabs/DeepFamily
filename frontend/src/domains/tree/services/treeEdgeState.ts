@@ -1,5 +1,5 @@
-import { makeNodeId, parseNodeId, type NodeData, type NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import { makeNodeId, parseNodeId, type NodeData, type NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 
 export function collectReachableHashes(reachableNodeIds: NodeId[]): Set<string> {
   return new Set(reachableNodeIds.map((id) => parseNodeId(id).personHash.toLowerCase()));

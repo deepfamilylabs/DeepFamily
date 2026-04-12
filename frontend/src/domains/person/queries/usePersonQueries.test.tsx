@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StoryChunk, StoryMetadata } from "../../../types/graph";
+import type { StoryChunk, StoryMetadata } from "../../../shared/model";
 import { TTL } from "../../../shared/cache/ttl";
 import { useNFTDetails } from "./useNFTDetails";
 import { usePersonDetails } from "./usePersonDetails";

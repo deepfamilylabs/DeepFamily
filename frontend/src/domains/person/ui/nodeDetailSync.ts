@@ -1,4 +1,4 @@
-import { makeNodeId, type NodeData } from "../../../types/graph";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 import type { ParsedNftDetails, ParsedVersionDetails } from "../api/personDetailParsers";
 import { applyNodeEnrichmentPatches, buildNftDetailsPatch, buildVersionDetailsPatch } from "../model/nodeEnrichment";
 import { applySingleNodePatch } from "../model/nodeState";

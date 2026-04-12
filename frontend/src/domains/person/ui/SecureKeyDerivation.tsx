@@ -14,9 +14,9 @@ import {
   validatePassphraseStrength,
   estimateKDFDuration,
   type KDFPreset,
-} from "../../../lib/secureKeyDerivation";
-import { normalizeNameForHash } from "../../../lib/passphraseStrength";
-import { cryptoWorkerCall } from "../../../lib/cryptoWorkerClient";
+} from "../../../shared/crypto/secureKeyDerivation";
+import { normalizeNameForHash } from "../../../shared/crypto/passphraseStrength";
+import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 import { sanitizeErrorForLogging } from "../../../shared/lib/errors";
 
 interface SecureKeyDerivationProps {

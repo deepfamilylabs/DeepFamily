@@ -6,7 +6,7 @@ import {
   getMissingStoryOffset,
   type StoryDataResult,
 } from "../model/storyData";
-import type { StoryChunk } from "../../../types/graph";
+import type { StoryChunk } from "../../../shared/model";
 import { usePersonGateway } from "./usePersonGateway";
 
 const STORY_PAGE_SIZE = 50;

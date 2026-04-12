@@ -5,7 +5,7 @@ import {
   type FamilyTreeLayoutOverrides,
   getFamilyTreeHeight,
   useFamilyTreeHeight,
-} from "../../../constants/layout";
+} from "../config/layout";
 
 export type FamilyTreeViewConfig = {
   layout: FamilyTreeLayout;

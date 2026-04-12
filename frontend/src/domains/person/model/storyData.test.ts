@@ -8,7 +8,7 @@ import {
   mergeStoryChunkRecords,
   parseStoryChunkRecord,
 } from "./storyData";
-import { computeStoryHash } from "../../../lib/story";
+import { computeStoryHash } from "./story";
 
 describe("storyData parseStoryChunkRecord", () => {
   it("normalizes tuple-like chunk records", () => {

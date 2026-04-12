@@ -26,21 +26,22 @@ import {
   type PersonHashCalculatorHandle,
 } from "../../person/ui";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../shared/lib/errors";
+import { ModalShell } from "../../../shared/ui/ModalShell";
 import { useTreeMutations } from "../../tree/context";
 import {
   formatGroth16ProofForContract,
   computeDisclosureBinding,
   type PersonData,
-} from "../../../lib/zk";
-import { zkWorkerCall } from "../../../lib/zkWorkerClient";
-import { safeCanonicalizeFullName } from "../../../lib/identityCommitment";
+} from "../../../shared/zk/zk";
+import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
+import { safeCanonicalizeFullName } from "../../../shared/crypto/identityCommitment";
 import {
   computeIdentityHashMaterial,
   normalizeIdentitySaltHex,
   type IdentitySaltMode,
-} from "../../../lib/identityHash";
-import { normalizePassphraseForHash } from "../../../lib/passphraseStrength";
-import { makeNodeId, type NodeData } from "../../../types/graph";
+} from "../../../shared/crypto/identityHash";
+import { normalizePassphraseForHash } from "../../../shared/crypto/passphraseStrength";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 import { useMintNftFlow } from "../flows";
 
 // Simple themed select component (from PersonHashCalculator)
@@ -819,13 +820,11 @@ export default function MintNFTModal({
     );
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
-      onClick={isDesktop ? undefined : handleClose}
-    >
+    <ModalShell isOpen={isOpen} onClose={handleClose} bare zIndex="z-[1200]" ariaLabel="Mint NFT" disableBackdropClose={isDesktop}>
+      <div className="overflow-x-hidden touch-pan-y h-full"
+        onClick={isDesktop ? undefined : handleClose}
+      >
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -1761,6 +1760,7 @@ export default function MintNFTModal({
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </ModalShell>
   );
 }

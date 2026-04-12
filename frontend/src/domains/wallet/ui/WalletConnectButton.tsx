@@ -2,8 +2,8 @@ import { useWallet } from "../context";
 import { useTranslation } from "react-i18next";
 import { Wallet, LogOut, RefreshCw } from "lucide-react";
 import { parseEther } from "ethers";
-import { shortAddress } from "../../../types/graph";
-import { isSupportedChain } from "../../../config/networks";
+import { shortAddress } from "../../../shared/model";
+import { isSupportedChain } from "../../../shared/config";
 import { useConfig } from "../../config/context";
 
 interface WalletConnectButtonProps {

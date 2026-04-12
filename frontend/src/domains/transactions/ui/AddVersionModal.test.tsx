@@ -58,19 +58,19 @@ vi.mock("../flows", () => ({
   }),
 }));
 
-vi.mock("../../../lib/metadataCrypto", () => ({
+vi.mock("../../../shared/crypto/metadataCrypto", () => ({
   sha256Hex: () => "plainhash",
 }));
 
-vi.mock("../../../lib/cryptoWorkerClient", () => ({
+vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({
   cryptoWorkerCall: (...args: any[]) => mocks.cryptoWorkerCall(...args),
 }));
 
-vi.mock("../../../lib/zkWorkerClient", () => ({
+vi.mock("../../../shared/workers/zkWorkerClient", () => ({
   zkWorkerCall: (...args: any[]) => mocks.zkWorkerCall(...args),
 }));
 
-vi.mock("../../../lib/zk", () => ({
+vi.mock("../../../shared/zk/zk", () => ({
   formatGroth16ProofForContract: () => ({
     a: [1n, 2n],
     b: [
@@ -81,17 +81,17 @@ vi.mock("../../../lib/zk", () => ({
   }),
 }));
 
-vi.mock("../../../lib/identityCommitment", () => ({
+vi.mock("../../../shared/crypto/identityCommitment", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
 }));
 
-vi.mock("../../../lib/identityHash", () => ({
+vi.mock("../../../shared/crypto/identityHash", () => ({
   computeIdentityHashMaterial: (...args: any[]) => mocks.computeIdentityHashMaterial(...args),
   generateRandomIdentitySaltHex: () => "0xrandomsalt",
   normalizeIdentitySaltHex: (value: string) => value,
 }));
 
-vi.mock("../../../lib/passphraseStrength", () => ({
+vi.mock("../../../shared/crypto/passphraseStrength", () => ({
   normalizePassphraseForHash: (value: string) => value.trim(),
 }));
 

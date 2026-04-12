@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
-import { makeNodeId } from "../../../types/graph";
-import { unionParentKey } from "../../../types/treeStore";
+import { makeNodeId } from "../../../shared/model";
+import { unionParentKey } from "../model/treeStore";
 import { nftKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
 
 export interface PersonVersionAddedEvent {

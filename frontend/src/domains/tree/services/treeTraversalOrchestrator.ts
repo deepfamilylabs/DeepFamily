@@ -1,10 +1,10 @@
-import type { NodeData, NodeId } from "../../../types/graph";
+import type { NodeData, NodeId } from "../../../shared/model";
 import type {
   EdgeStrictEntry,
   EdgeStoreStrict,
   EdgeStoreUnion,
   EdgeUnionEntry,
-} from "../../../types/treeStore";
+} from "../model/treeStore";
 import {
   applyEdgeStrictUpserts,
   applyEdgeUnionUpserts,

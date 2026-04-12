@@ -1,11 +1,11 @@
-import type { EncryptedMetadataPayloadV2 } from "./metadataCrypto";
-import type { IdentityHashInput } from "./identityHash";
+import type { EncryptedMetadataPayloadV2 } from "../crypto/metadataCrypto";
+import type { IdentityHashInput } from "../crypto/identityHash";
 import type {
   DerivedSecretBundle,
   FileEncryptionKdfConfig,
   IdentityKdfConfig,
-} from "./secretDerivation";
-import type { DerivedKey, KeyPurpose, KDFPreset } from "./secureKeyDerivation";
+} from "../crypto/secretDerivation";
+import type { DerivedKey, KeyPurpose, KDFPreset } from "../crypto/secureKeyDerivation";
 
 type CryptoWorkerCallMap = {
   computeIdentityHash: { params: { input: IdentityHashInput }; result: { identityHash: string } };
@@ -55,7 +55,7 @@ const ensureWorker = (): Worker => {
     throw new Error("Crypto worker is not available (no window)");
   }
   if (workerSingleton) return workerSingleton;
-  workerSingleton = new Worker(new URL("../workers/crypto.worker.ts", import.meta.url), {
+  workerSingleton = new Worker(new URL("../../workers/crypto.worker.ts", import.meta.url), {
     type: "module",
   });
   workerSingleton.addEventListener("message", (event: MessageEvent<CryptoWorkerResponse>) => {

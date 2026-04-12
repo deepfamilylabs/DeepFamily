@@ -1,5 +1,5 @@
 import { readBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
-import type { NodeData } from "../../../types/graph";
+import type { NodeData } from "../../../shared/model";
 import { findNodeByTokenId, findNodeEntryByTokenId, findNodeIdByTokenId } from "../../person/model/nodeLookup";
 import {
   applyOwnerToTokenNode,

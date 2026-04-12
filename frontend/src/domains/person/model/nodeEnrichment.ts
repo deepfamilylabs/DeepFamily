@@ -1,4 +1,4 @@
-import { makeNodeId, type NodeData, type StoryMetadata } from "../../../types/graph";
+import { makeNodeId, type NodeData, type StoryMetadata } from "../../../shared/model";
 import type { ParsedNftDetails, ParsedVersionDetails } from "../api/personDetailParsers";
 
 export interface NodePair {

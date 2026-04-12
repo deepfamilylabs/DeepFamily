@@ -1,7 +1,7 @@
 import React, { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, GitCommit, ThumbsUp, Gem, PenTool, Lock, GitBranch } from "lucide-react";
-import { ANIMATION_CLASSES } from "../../../constants/animationStyles";
+import { ANIMATION_CLASSES } from "../../../shared/ui/styles/animationStyles";
 import { PageContainer } from "../../../shared/ui";
 
 const WorkflowSection: React.FC = memo(() => {

@@ -1,6 +1,6 @@
 import { keccak256, concat, toUtf8Bytes, zeroPadValue, toBeHex, solidityPacked } from "ethers";
 import { poseidon4 } from "poseidon-lite";
-import { canonicalizeFullName } from "./identityCommitment";
+import { canonicalizeFullName } from "../crypto/identityCommitment";
 
 export type Groth16Proof = {
   pi_a: [string | bigint, string | bigint, string | bigint];

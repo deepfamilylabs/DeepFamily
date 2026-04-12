@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { makeNodeId, type NodeId } from "../../../types/graph";
+import { makeNodeId, type NodeId } from "../../../shared/model";
 import { useConfig } from "../../config/context";
 
 export function useTreeRoot(): NodeId | null {

@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { ethers } from "ethers";
 import { useToast } from "../../../shared/ui";
 import { useTranslation } from "react-i18next";
-import { getAddChainParams } from "../../../config/networks";
-import { SUPPORTED_WALLETS } from "../../../config/wallets";
+import { getAddChainParams } from "../../../shared/config";
+import { SUPPORTED_WALLETS } from "../config/wallets";
 
 // localStorage key for persisting wallet type
 const WALLET_TYPE_STORAGE_KEY = "deepfamily_last_wallet_type";

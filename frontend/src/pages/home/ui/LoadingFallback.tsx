@@ -1,4 +1,4 @@
-import { LOADING_ANIMATIONS } from "../../../constants/animationStyles";
+import { LOADING_ANIMATIONS } from "../../../shared/ui/styles/animationStyles";
 
 interface LoadingFallbackProps {
   variant?: "grid" | "banner";

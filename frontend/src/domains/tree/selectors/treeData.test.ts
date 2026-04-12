@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { buildTreeRows } from "./buildTreeRows";
 import { getProjectedChildIds } from "./buildViewGraph";
-import { makeNodeId, type NodeData, type NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
-import { unionParentKey } from "../../../types/treeStore";
+import { makeNodeId, type NodeData, type NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
+import { unionParentKey } from "../model/treeStore";
 
 const parentHash = "0xparent";
 const childHash = "0xchild";

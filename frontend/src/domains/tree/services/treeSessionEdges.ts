@@ -1,11 +1,11 @@
-import { parseNodeId, type NodeData, type NodeId } from "../../../types/graph";
+import { parseNodeId, type NodeData, type NodeId } from "../../../shared/model";
 import type {
   EdgeStrictEntry,
   EdgeStoreStrict,
   EdgeStoreUnion,
   EdgeUnionEntry,
-} from "../../../types/treeStore";
-import { unionParentKey } from "../../../types/treeStore";
+} from "../model/treeStore";
+import { unionParentKey } from "../model/treeStore";
 import { addPlaceholderNodes, mergeReachableNodeIds } from "./treeEdgeState";
 import { isParentReachable } from "./treeTraversalState";
 

@@ -10,8 +10,8 @@ import {
   CTA_BUTTON_STYLES,
   HERO_CONTENT_STYLES,
   SCROLL_INDICATOR_STYLES,
-} from "../constants/homeStyles";
-import { ANIMATION_CLASSES } from "../constants/animationStyles";
+} from "./home/ui/homeStyles";
+import { ANIMATION_CLASSES } from "../shared/ui/styles/animationStyles";
 
 // Lazy loaded components
 const ValuePropositions = lazy(() => import("./home/ui/ValuePropositions"));

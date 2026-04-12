@@ -1,4 +1,4 @@
-import { makeNodeId, type NodeData } from "../../../types/graph";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 import type { ParsedNftDetails } from "../api/personDetailParsers";
 import { findNodeEntryByTokenId, findNodeIdByTokenId } from "./nodeLookup";
 import { buildNftDetailsPatch } from "./nodeEnrichment";

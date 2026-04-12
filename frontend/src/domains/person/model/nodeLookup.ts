@@ -1,4 +1,4 @@
-import type { NodeData } from "../../../types/graph";
+import type { NodeData } from "../../../shared/model";
 
 export function findNodeEntryByTokenId(
   nodesData: Record<string, NodeData>,

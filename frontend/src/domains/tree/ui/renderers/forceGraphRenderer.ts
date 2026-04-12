@@ -1,8 +1,8 @@
 import * as d3 from "d3";
-import type { ForceLink, ForceNode } from "../../../../types/familyTreeTypes";
+import type { ForceLink, ForceNode } from "../../model/familyTreeTypes";
 import type { TreeGraphData } from "../../selectors";
 import type { NodeUi } from "../nodeUi";
-import { getGenderColorHex } from "../../../../constants/genderColors";
+import { getGenderColorHex } from "../nodeColors";
 import { getFamilyTreeNodeTheme } from "../nodeTheme";
 import { createFamilyTreeForceSimulation, DEFAULT_FORCE_LAYOUT } from "../layout/forceLayout";
 

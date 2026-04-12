@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { X, Wallet, ChevronRight, Shield, Download } from "lucide-react";
 import type { WalletOption } from "../context";
-import { SUPPORTED_WALLETS } from "../../../config/wallets";
+import { SUPPORTED_WALLETS } from "../config/wallets";
 
 interface WalletSelectionModalProps {
   isOpen: boolean;

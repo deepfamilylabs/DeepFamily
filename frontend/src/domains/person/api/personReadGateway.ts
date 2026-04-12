@@ -7,7 +7,7 @@ import {
   type ParsedNftDetails,
   type DetailQueryOptions,
 } from "./personDetailParsers";
-import type { StoryChunk, StoryMetadata } from "../../../types/graph";
+import type { StoryChunk, StoryMetadata } from "../../../shared/model";
 import { parseStoryChunkRecord } from "../model/storyData";
 
 export type { ParsedVersionDetails, ParsedNftDetails, DetailQueryOptions };
@@ -81,32 +81,27 @@ export function createPersonReadGateway(
     options?: DetailQueryOptions,
   ): Promise<ParsedVersionDetails> => {
     const key = vdKey(personHash, versionIndex);
-    if (options?.ttlMs !== undefined) {
-      const cached = queryCache.get<ParsedVersionDetails>(key, options.ttlMs);
+    const ttlMs = options?.ttlMs ?? 0;
+    // Fire cache hooks before delegating to fetchQuery
+    if (ttlMs > 0) {
+      const cached = queryCache.get<ParsedVersionDetails>(key, ttlMs);
       if (cached) {
-        options.onCacheHit?.();
+        options?.onCacheHit?.();
         return cached;
       }
-      options.onCacheMiss?.();
+      options?.onCacheMiss?.();
     }
-    const inflight = queryCache.getInflight<ParsedVersionDetails>(key);
-    if (inflight) return inflight;
 
-    const p = (async () => {
-      const ret = await contract.getVersionDetails(personHash, Number(versionIndex));
-      const parsed = parseVersionDetailsResult(ret);
-      if (options?.ttlMs !== undefined) {
-        queryCache.set(key, parsed);
-      }
-      options?.onFetched?.();
-      return parsed;
-    })();
-    queryCache.setInflight(key, p);
-    try {
-      return await p;
-    } finally {
-      queryCache.deleteInflight(key);
-    }
+    return queryCache.fetchQuery(
+      key,
+      async () => {
+        const ret = await contract.getVersionDetails(personHash, Number(versionIndex));
+        const parsed = parseVersionDetailsResult(ret);
+        options?.onFetched?.();
+        return parsed;
+      },
+      ttlMs,
+    );
   };
 
   const getNFTDetails = async (
@@ -114,32 +109,27 @@ export function createPersonReadGateway(
     options?: DetailQueryOptions,
   ): Promise<ParsedNftDetails> => {
     const key = nftKey(tokenId);
-    if (options?.ttlMs !== undefined) {
-      const cached = queryCache.get<ParsedNftDetails>(key, options.ttlMs);
+    const ttlMs = options?.ttlMs ?? 0;
+    // Fire cache hooks before delegating to fetchQuery
+    if (ttlMs > 0) {
+      const cached = queryCache.get<ParsedNftDetails>(key, ttlMs);
       if (cached) {
-        options.onCacheHit?.();
+        options?.onCacheHit?.();
         return cached;
       }
-      options.onCacheMiss?.();
+      options?.onCacheMiss?.();
     }
-    const inflight = queryCache.getInflight<ParsedNftDetails>(key);
-    if (inflight) return inflight;
 
-    const p = (async () => {
-      const ret = await contract.getNFTDetails(tokenId);
-      const parsed = parseNftDetailsResult(ret);
-      if (options?.ttlMs !== undefined) {
-        queryCache.set(key, parsed);
-      }
-      options?.onFetched?.();
-      return parsed;
-    })();
-    queryCache.setInflight(key, p);
-    try {
-      return await p;
-    } finally {
-      queryCache.deleteInflight(key);
-    }
+    return queryCache.fetchQuery(
+      key,
+      async () => {
+        const ret = await contract.getNFTDetails(tokenId);
+        const parsed = parseNftDetailsResult(ret);
+        options?.onFetched?.();
+        return parsed;
+      },
+      ttlMs,
+    );
   };
 
   const getStoryMetadata = async (
@@ -147,28 +137,33 @@ export function createPersonReadGateway(
     options?: DetailQueryOptions,
   ): Promise<StoryMetadata> => {
     const key = storyKey(tokenId) + ":meta";
-    if (options?.ttlMs !== undefined) {
-      const cached = queryCache.get<StoryMetadata>(key, options.ttlMs);
+    const ttlMs = options?.ttlMs ?? 0;
+    // Fire cache hooks before delegating to fetchQuery
+    if (ttlMs > 0) {
+      const cached = queryCache.get<StoryMetadata>(key, ttlMs);
       if (cached) {
-        options.onCacheHit?.();
+        options?.onCacheHit?.();
         return cached;
       }
-      options.onCacheMiss?.();
+      options?.onCacheMiss?.();
     }
 
-    const ret = await contract.getStoryMetadata(tokenId);
-    const metadata: StoryMetadata = {
-      totalChunks: Number(ret?.totalChunks ?? ret?.[0] ?? 0),
-      totalLength: Number(ret?.totalLength ?? ret?.[1] ?? 0),
-      isSealed: Boolean(ret?.isSealed ?? ret?.[2] ?? false),
-      lastUpdateTime: Number(ret?.lastUpdateTime ?? ret?.[3] ?? 0),
-      fullStoryHash: String(ret?.fullStoryHash ?? ret?.[4] ?? ""),
-    };
-    if (options?.ttlMs !== undefined) {
-      queryCache.set(key, metadata);
-    }
-    options?.onFetched?.();
-    return metadata;
+    return queryCache.fetchQuery(
+      key,
+      async () => {
+        const ret = await contract.getStoryMetadata(tokenId);
+        const metadata: StoryMetadata = {
+          totalChunks: Number(ret?.totalChunks ?? ret?.[0] ?? 0),
+          totalLength: Number(ret?.totalLength ?? ret?.[1] ?? 0),
+          isSealed: Boolean(ret?.isSealed ?? ret?.[2] ?? false),
+          lastUpdateTime: Number(ret?.lastUpdateTime ?? ret?.[3] ?? 0),
+          fullStoryHash: String(ret?.fullStoryHash ?? ret?.[4] ?? ""),
+        };
+        options?.onFetched?.();
+        return metadata;
+      },
+      ttlMs,
+    );
   };
 
   const getStoryChunks = async (

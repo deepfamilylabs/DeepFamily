@@ -21,19 +21,19 @@ import {
 } from "lucide-react";
 import { useConfig } from "../domains/config/context";
 import { useToast } from "../shared/ui";
-import { computeStoryHash } from "../lib/story";
+import { computeStoryHash } from "../domains/person";
 import { useNFTDetails, useStoryData } from "../domains/person/queries";
 import { getScopedQueryClient } from "../shared/cache/queryClient";
 import { storyKey } from "../shared/cache/queryKeys";
-import type { StoryChunk, StoryChunkCreateData, StoryMetadata, NodeData } from "../types/graph";
-import { formatUnixSeconds, formatHashMiddle, shortAddress } from "../types/graph";
+import type { StoryChunk, StoryChunkCreateData, StoryMetadata, NodeData } from "../shared/model";
+import { formatUnixSeconds, formatHashMiddle, shortAddress } from "../shared/model";
 import {
   getChunkTypeOptions,
   getChunkTypeI18nKey,
   getChunkTypeIcon,
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
-} from "../constants/chunkTypes";
+} from "../domains/person/config/chunkTypes";
 import {
   useAddStoryChunkFlow,
   useSealStoryFlow,

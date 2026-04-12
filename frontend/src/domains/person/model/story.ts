@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import type { StoryChunk } from "../types/graph";
+import type { StoryChunk } from "../../../shared/model";
 
 export function computeStoryHash(chunks: StoryChunk[]): string {
   if (!chunks || chunks.length === 0) return ethers.ZeroHash;

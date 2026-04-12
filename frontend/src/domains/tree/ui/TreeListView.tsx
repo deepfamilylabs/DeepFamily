@@ -7,13 +7,13 @@ import React, {
   useState,
 } from "react";
 import type { FixedSizeList as VirtualListHandle } from "react-window";
-import { type NodeId } from "../../../types/graph";
+import { type NodeId } from "../../../shared/model";
 import type { TreeRow } from "../selectors";
 import { useFamilyTreeViewModel } from "./useFamilyTreeViewModel";
 import TreeListRenderer from "./renderers/treeListRenderer";
 import { useColorTheme, useFamilyTreeViewConfig } from "../context";
 import { noPropsForwardRef } from "./noPropsForwardRef";
-import type { FamilyTreeViewHandle } from "../../../types/familyTreeViewHandle";
+import type { FamilyTreeViewHandle } from "../model/familyTreeViewHandle";
 
 const TreeListView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const { layout, height } = useFamilyTreeViewConfig();

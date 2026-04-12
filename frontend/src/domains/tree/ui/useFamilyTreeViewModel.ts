@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
-import type { NodeId } from "../../../types/graph";
-import { makeNodeId, parseNodeId } from "../../../types/graph";
+import type { NodeId } from "../../../shared/model";
+import { makeNodeId, parseNodeId } from "../../../shared/model";
 import type { NodeUi } from "./nodeUi";
 import { getNodeUi } from "./nodeUi";
 import { useTreeGraphData, useVizOptions } from "../context";

@@ -21,6 +21,7 @@ import {
   type ExecuteEndorseFlowResult,
 } from "../flows";
 import { createDeepTokenContract } from "../../../shared/clients/contractFactory";
+import { ModalShell } from "../../../shared/ui/ModalShell";
 
 interface EndorseModalProps {
   isOpen: boolean;
@@ -504,13 +505,11 @@ export default function EndorseModal({
 
   const canAffordEndorsement = userDeepBalanceRaw >= deepTokenFeeRaw;
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
-      onClick={isDesktop ? undefined : handleClose}
-    >
+    <ModalShell isOpen={isOpen} onClose={handleClose} bare zIndex="z-[1200]" ariaLabel="Endorse" disableBackdropClose={isDesktop}>
+      <div className="overflow-x-hidden touch-pan-y h-full"
+        onClick={isDesktop ? undefined : handleClose}
+      >
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -1133,6 +1132,7 @@ export default function EndorseModal({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ModalShell>
   );
 }

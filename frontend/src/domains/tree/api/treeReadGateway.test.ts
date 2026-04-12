@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { QueryCache } from "../../../shared/cache/QueryCache";
-import { makeNodeId } from "../../../types/graph";
+import { makeNodeId } from "../../../shared/model";
 import { createTreeReadGateway } from "./treeReadGateway";
 
 describe("treeReadGateway listChildrenStrictAll", () => {

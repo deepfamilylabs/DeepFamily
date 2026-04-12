@@ -5,7 +5,7 @@ import { Home, Search, Network, Book, Zap, Menu } from "lucide-react";
 import HeaderControls from "./HeaderControls";
 import Logo from "./Logo";
 import { PageContainer } from "../../shared/ui";
-import { getBadgeConfig } from "../../config/brandBadge";
+import { getBadgeConfig } from "../config/brandBadge";
 import { useActivePath, useSidebar } from "../context";
 
 /**

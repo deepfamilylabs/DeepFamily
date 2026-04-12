@@ -3,7 +3,7 @@ import React from "react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NodeDetailProvider, useNodeDetail } from "./NodeDetailProvider";
-import { makeNodeId, type NodeData } from "../../../types/graph";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 
 const mocks = vi.hoisted(() => ({
   nodesData: {} as Record<string, NodeData>,

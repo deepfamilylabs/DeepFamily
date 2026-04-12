@@ -1,10 +1,10 @@
-import type { Groth16Proof, PersonData } from "../lib/zk";
+import type { Groth16Proof, PersonData } from "../shared/zk/zk";
 import {
   generatePersonCommitmentProof,
   verifyPersonCommitmentProof,
   generateDisclosureBindingProof,
   verifyDisclosureBindingProof,
-} from "../lib/zkSnark";
+} from "../shared/zk/zkSnark";
 
 type ZkWorkerMethods = {
   generatePersonCommitmentProof: {

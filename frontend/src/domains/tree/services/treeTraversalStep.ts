@@ -1,11 +1,11 @@
-import { makeNodeId, parseNodeId, type NodeId } from "../../../types/graph";
+import { makeNodeId, parseNodeId, type NodeId } from "../../../shared/model";
 import type {
   EdgeStrictEntry,
   EdgeStoreStrict,
   EdgeStoreUnion,
   EdgeUnionEntry,
-} from "../../../types/treeStore";
-import { unionParentKey } from "../../../types/treeStore";
+} from "../model/treeStore";
+import { unionParentKey } from "../model/treeStore";
 import { mergeChildNodeIds } from "./treeTraversalState";
 
 function isEntryStale(fetchedAt: number | undefined, ttlMs: number): boolean {

@@ -1,7 +1,7 @@
 import React from "react";
 import type { ListChildComponentProps } from "react-window";
-import type { NodeId } from "../../../../types/graph";
-import { getGenderColor } from "../../../../constants/genderColors";
+import type { NodeId } from "../../../../shared/model";
+import { getGenderColor } from "../nodeColors";
 import { getFamilyTreeNodeTheme } from "../nodeTheme";
 import type { TreeRow } from "../../selectors";
 import type { NodeUi } from "../nodeUi";

@@ -15,7 +15,7 @@ import {
 import { useSidebar } from "../context";
 import { FamilyTreeConfigForm } from "../../domains/config/ui";
 import { useTreeStatus, useVizOptions } from "../../domains/tree/context";
-import { languages } from "../../config/languages";
+import { languages } from "../config/languages";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "./Logo";
 
