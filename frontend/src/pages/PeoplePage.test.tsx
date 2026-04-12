@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import PeoplePage from "./PeoplePage";
-import { makeNodeId, type NodeData } from "../types/graph";
+import { makeNodeId, type NodeData } from "../shared/model";
 
 const mocks = vi.hoisted(() => ({
   nodesData: {} as Record<string, NodeData>,

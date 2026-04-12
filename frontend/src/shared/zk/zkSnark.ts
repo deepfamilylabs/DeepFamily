@@ -14,7 +14,7 @@ import {
   DEFAULT_HASH_ALGO_ID,
   SNARK_FIELD,
 } from "./zk";
-import { canonicalizeFullName } from "./identityCommitment";
+import { canonicalizeFullName } from "../crypto/identityCommitment";
 // @ts-ignore
 import * as snarkjs from "snarkjs";
 

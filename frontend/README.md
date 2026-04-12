@@ -53,12 +53,12 @@ src/
 ├── app/                 # App shell context and layout UI
 ├── domains/             # Config, person, tree, transactions, wallet
 ├── pages/               # Route-level composition
-├── shared/              # Cache, clients, common UI shells
-├── lib/                 # Worker-safe crypto/ZK/domain helpers
+├── shared/              # Cache, clients, config, model, crypto, ZK, IPFS, common UI shells
 ├── workers/             # Crypto and ZK worker entrypoints
-├── config/              # Static app/network/wallet configuration
-├── routes/              # Route definitions and lazy route helpers
+├── assets/              # Static assets imported by the app
+├── i18n/                # i18next initialization
 ├── locales/             # i18n resources
+├── shims/               # Browser/library shims and ambient declarations
 └── abi/                 # Synced contract ABI
 ```
 

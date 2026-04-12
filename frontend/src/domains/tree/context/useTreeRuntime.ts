@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfig } from "../../config/context";
-import { makeNodeId, type NodeId } from "../../../types/graph";
+import { makeNodeId, type NodeId } from "../../../shared/model";
 import {
   createDeepFamilyContract,
   createDeepFamilyInterface,

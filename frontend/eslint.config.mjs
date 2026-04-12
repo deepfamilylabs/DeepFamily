@@ -34,6 +34,7 @@ export default [
     files: ["src/shared/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrictedImportRule([
+        ["**/app/**"],
         ["**/domains/**"],
         ["**/pages/**"],
         ["**/components/**"],
@@ -45,11 +46,40 @@ export default [
   {
     files: ["src/domains/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictedImportRule([["**/pages/**"]]),
+      "no-restricted-imports": restrictedImportRule([["**/app/**"], ["**/pages/**"]]),
+    },
+  },
+  {
+    files: ["src/domains/config/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictedImportRule([
+        ["**/app/**"],
+        ["**/pages/**"],
+        ["**/tree/model"],
+        ["**/tree/model/**"],
+        ["**/wallet/config"],
+        ["**/wallet/config/**"],
+      ]),
     },
   },
   {
     files: [
+      "src/domains/person/**/*.{ts,tsx}",
+      "src/domains/transactions/**/*.{ts,tsx}",
+      "src/domains/wallet/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": restrictedImportRule([
+        ["**/app/**"],
+        ["**/pages/**"],
+        ["**/tree/model"],
+        ["**/tree/model/**"],
+      ]),
+    },
+  },
+  {
+    files: [
+      "src/app/**/*.{ts,tsx}",
       "src/pages/**/*.{ts,tsx}",
       "src/components/**/*.{ts,tsx}",
       "src/hooks/**/*.{ts,tsx}",
@@ -66,6 +96,8 @@ export default [
         ["**/domains/transactions/model/*"],
         ["**/domains/transactions/ui/*"],
         ["**/domains/tree/context/*"],
+        ["**/domains/tree/model"],
+        ["**/domains/tree/model/*"],
         ["**/domains/tree/queries/*"],
         ["**/domains/tree/selectors/*"],
         ["**/domains/tree/ui/*"],

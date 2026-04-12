@@ -1,4 +1,4 @@
-import { makeNodeId, type NodeId } from "../../../types/graph";
+import { makeNodeId, type NodeId } from "../../../shared/model";
 import { QueryCache } from "../../../shared/cache/QueryCache";
 import { csKey, cuKey, tvKey } from "../../../shared/cache/queryKeys";
 
@@ -63,6 +63,7 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     options: TotalVersionsOptions,
   ): Promise<number> => {
     const key = tvKey(personHash);
+    // Fire cache hooks before delegating to fetchQuery
     const cached = queryCache.get<number>(key, options.ttlMs);
     if (Number.isFinite(cached)) {
       options.onCacheHit?.();
@@ -70,24 +71,17 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     }
     options.onCacheMiss?.();
 
-    const inflight = queryCache.getInflight<number>(key);
-    if (inflight) return inflight;
-
-    const p = (async () => {
-      const out: any = await contract.listPersonVersions(personHash, 0, 0);
-      let totalVersions = Number(out?.totalVersions ?? out?.[1] ?? 0);
-      if (!Number.isFinite(totalVersions) || totalVersions < 0) totalVersions = 0;
-      queryCache.set(key, totalVersions);
-      options.onFetched?.();
-      return totalVersions;
-    })();
-
-    queryCache.setInflight(key, p);
-    try {
-      return await p;
-    } finally {
-      queryCache.deleteInflight(key);
-    }
+    return queryCache.fetchQuery(
+      key,
+      async () => {
+        const out: any = await contract.listPersonVersions(personHash, 0, 0);
+        let totalVersions = Number(out?.totalVersions ?? out?.[1] ?? 0);
+        if (!Number.isFinite(totalVersions) || totalVersions < 0) totalVersions = 0;
+        options.onFetched?.();
+        return totalVersions;
+      },
+      options.ttlMs,
+    );
   };
 
   const listChildrenStrictAll = async (

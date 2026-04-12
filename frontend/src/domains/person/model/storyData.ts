@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
-import { computeStoryHash } from "../../../lib/story";
-import type { NodeData, StoryChunk, StoryMetadata } from "../../../types/graph";
+import { computeStoryHash } from "./story";
+import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
 
 export interface StoryIntegrity {
   missing: number[];

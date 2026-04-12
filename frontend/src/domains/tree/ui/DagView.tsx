@@ -14,7 +14,7 @@ import { computeDagLayout } from "./layout/dagLayout";
 import { DagDefs, DagEdges, DagNodes } from "./renderers/dagRenderer";
 import { useColorTheme, useFamilyTreeViewConfig } from "../context";
 import { noPropsForwardRef } from "./noPropsForwardRef";
-import type { FamilyTreeViewHandle } from "../../../types/familyTreeViewHandle";
+import type { FamilyTreeViewHandle } from "../model/familyTreeViewHandle";
 
 const DagView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const vm = useFamilyTreeViewModel();

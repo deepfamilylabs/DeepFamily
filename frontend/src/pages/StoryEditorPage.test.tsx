@@ -3,7 +3,7 @@ import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import StoryEditorPage from "./StoryEditorPage";
-import type { StoryChunk } from "../types/graph";
+import type { StoryChunk } from "../shared/model";
 
 const mocks = vi.hoisted(() => ({
   tokenId: "42",

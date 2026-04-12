@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Clipboard, Search, RefreshCw, ArrowLeft, ArrowRight } from "lucide-react";
 import { useToast } from "../shared/ui";
-import { formatUnixSeconds, formatHashMiddle, type StoryChunk } from "../types/graph";
+import { formatUnixSeconds, formatHashMiddle, type StoryChunk } from "../shared/model";
 import {
   PersonHashCalculator,
   type PersonHashCalculatorHandle,
@@ -13,14 +13,14 @@ import {
 import {
   generateRandomIdentitySaltHex,
   type IdentitySaltMode,
-} from "../lib/identityHash";
+} from "../shared/crypto/identityHash";
 import {
   getChunkTypeOptions,
   getChunkTypeI18nKey,
   getChunkTypeIcon,
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
-} from "../constants/chunkTypes";
+} from "../domains/person/config/chunkTypes";
 import { usePersonGateway } from "../domains/person/queries";
 import { useTreeGateway } from "../domains/tree/queries";
 

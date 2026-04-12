@@ -1,5 +1,5 @@
-import metamaskIcon from "../assets/metamask-icon.svg";
-import fluentIcon from "../assets/fluent-icon.svg";
+import metamaskIcon from "../../../assets/metamask-icon.svg";
+import fluentIcon from "../../../assets/fluent-icon.svg";
 
 export interface WalletConfig {
   id: string;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from "react";
-import type { NodeData, NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import type { NodeData, NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import type { TreeTxInvalidationInput } from "../services/treeInvalidation";
 import type { TreeDebugStats, TreeProgress } from "./types";
 

@@ -1,4 +1,4 @@
-import type { NodeId } from "./graph";
+import type { NodeId } from "../../../shared/model";
 
 export type ChildrenMode = "union" | "strict";
 

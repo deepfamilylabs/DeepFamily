@@ -1,8 +1,8 @@
-import type { NodeId, NodeData } from "../../../types/graph";
-import { makeNodeId, parseNodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
-import { unionParentKey } from "../../../types/treeStore";
-import type { BaseEdge, BaseNode } from "../../../types/familyTreeTypes";
+import type { NodeId, NodeData } from "../../../shared/model";
+import { makeNodeId, parseNodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
+import { unionParentKey } from "../model/treeStore";
+import type { BaseEdge, BaseNode } from "../model/familyTreeTypes";
 
 export type TreeGraphData = {
   nodes: BaseNode[];

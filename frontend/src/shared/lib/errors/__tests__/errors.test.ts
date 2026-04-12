@@ -5,7 +5,7 @@ import {
   getFriendlyError,
   resolveErrorReason,
   summarizeErrorForDev,
-} from "../../shared/lib/errors";
+} from "..";
 
 const passthroughT = (_key: string, fallback?: string) => fallback ?? _key;
 

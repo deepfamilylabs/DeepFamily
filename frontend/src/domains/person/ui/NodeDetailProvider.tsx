@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { useTreeGraphData, useTreeMutations } from "../../tree/context";
 import NodeDetailModal from "./NodeDetailModal";
-import { type NodeData } from "../../../types/graph";
+import { type NodeData } from "../../../shared/model";
 import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";
 import {
   applyNodeDetailNftDetails,

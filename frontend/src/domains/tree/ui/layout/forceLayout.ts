@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import type { ForceLink, ForceNode } from "../../../../types/familyTreeTypes";
+import type { ForceLink, ForceNode } from "../../model/familyTreeTypes";
 
 export type ForceLayoutConfig = {
   charge: number;

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Zap, Shield, GitBranch, Coins, Trophy, FileText, TreePine } from "lucide-react";
-import { ANIMATION_CLASSES } from "../../../constants/animationStyles";
+import { ANIMATION_CLASSES } from "../../../shared/ui/styles/animationStyles";
 import { PageContainer } from "../../../shared/ui";
 
 const BorderLine = ({ side, className = "" }: { side: "left" | "right"; className?: string }) => (

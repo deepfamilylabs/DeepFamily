@@ -54,7 +54,7 @@ vi.mock("../domains/tree/queries", () => ({
   useTreeGateway: () => mocks.treeGateway,
 }));
 
-vi.mock("../lib/identityHash", () => ({
+vi.mock("../shared/crypto/identityHash", () => ({
   generateRandomIdentitySaltHex: () =>
     "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 }));

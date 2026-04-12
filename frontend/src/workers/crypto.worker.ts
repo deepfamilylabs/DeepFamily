@@ -1,25 +1,25 @@
-import { computeIdentityHash } from "../lib/identityHash";
-import type { IdentityHashInput } from "../lib/identityHash";
+import { computeIdentityHash } from "../shared/crypto/identityHash";
+import type { IdentityHashInput } from "../shared/crypto/identityHash";
 import {
   decryptMetadataPayload,
   decryptMetadataPayloadV2,
   encryptMetadataJsonV2,
   passwordFingerprint,
   type EncryptedMetadataPayloadV2,
-} from "../lib/metadataCrypto";
-import { generateMetadataCID } from "../lib/cid";
+} from "../shared/crypto/metadataCrypto";
+import { generateMetadataCID } from "../shared/ipfs/cid";
 import {
   deriveKeyFromPersonData,
   type KeyPurpose,
   type KDFPreset,
-} from "../lib/secureKeyDerivation";
+} from "../shared/crypto/secureKeyDerivation";
 import {
   deriveIdentitySecret,
   hexToBytes,
   type DerivedSecretBundle,
   type FileEncryptionKdfConfig,
   type IdentityKdfConfig,
-} from "../lib/secretDerivation";
+} from "../shared/crypto/secretDerivation";
 
 type CryptoWorkerMethods = {
   computeIdentityHash: {

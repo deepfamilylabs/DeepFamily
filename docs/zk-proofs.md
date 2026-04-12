@@ -339,10 +339,10 @@ This mint proof does not reveal the private derived secret, but it does intentio
 
 The main runtime helpers are:
 
-- `frontend/src/lib/identityCommitment.ts`
-- `frontend/src/lib/disclosureBinding.ts`
-- `frontend/src/lib/zk.ts`
-- `frontend/src/lib/zkSnark.ts`
+- `frontend/src/shared/crypto/identityCommitment.ts`
+- `frontend/src/shared/crypto/disclosureBinding.ts`
+- `frontend/src/shared/zk/zk.ts`
+- `frontend/src/shared/zk/zkSnark.ts`
 - `frontend/src/workers/zk.worker.ts`
 
 The frontend currently loads these artifact files at runtime:

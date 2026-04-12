@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeStoryHash } from "../story";
+import { computeStoryHash } from "./story";
 
 describe("story", () => {
   it("computes a stable story hash independent of chunk order", () => {

@@ -2,7 +2,7 @@ import { ethers, type JsonRpcSigner } from "ethers";
 import { createDeepFamilyContract, createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
-import type { StoryChunk } from "../../../types/graph";
+import type { StoryChunk } from "../../../shared/model";
 
 export interface AddStoryChunkResult {
   chunkIndex: number;

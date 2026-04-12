@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
-import type { ProofEnvelope } from "../../../lib/zk";
-import { wrapIdentityCommitmentAsPersonHash } from "../../../lib/zk";
+import type { ProofEnvelope } from "../../../shared/zk/zk";
+import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import {
   estimateGasWithFallback,

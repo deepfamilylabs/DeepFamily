@@ -21,19 +21,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Clipboard, Eye, EyeOff, Info } from "lucide-react";
 import { useToast } from "../../../shared/ui";
-import { formatHashMiddle } from "../../../types/graph";
+import { formatHashMiddle } from "../../../shared/model";
 import {
   validatePassphraseStrength,
   normalizePassphraseForHash,
   getGraphemeLength as getGraphemeLengthUtil,
-} from "../../../lib/passphraseStrength";
+} from "../../../shared/crypto/passphraseStrength";
 import {
   computeIdentityHash,
   computePersonHash,
   type IdentitySaltMode,
-} from "../../../lib/identityHash";
-import { safeCanonicalizeFullName } from "../../../lib/identityCommitment";
-import { cryptoWorkerCall } from "../../../lib/cryptoWorkerClient";
+} from "../../../shared/crypto/identityHash";
+import { safeCanonicalizeFullName } from "../../../shared/crypto/identityCommitment";
+import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 
 // Align with contract convention: blank passphrase -> zero salt limbs
 

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, Users, User, Hash, X, Plus, BookOpen } from "lucide-react";
-import { NodeData, isMinted } from "../types/graph";
+import { NodeData, isMinted } from "../shared/model";
 import { useActivePath } from "../app/context";
 import { useFamilyTreeProjection, useTreeGraphData, useTreeStatus } from "../domains/tree/context";
 import { PersonStoryCard, StoryChunksModal } from "../domains/person/ui";

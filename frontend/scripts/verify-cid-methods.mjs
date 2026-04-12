@@ -2,17 +2,17 @@
 
 /**
  * Verify both CID generation methods produce identical results
- * Uses the actual implementation from src/lib/cid.ts
+ * Uses the actual implementation from src/shared/ipfs/cid.ts
  */
 
-import { generateCIDManual, generateCIDIpfs } from '../src/lib/cid.ts'
+import { generateCIDManual, generateCIDIpfs } from '../src/shared/ipfs/cid.ts'
 
 // Test data - same as user provided
 const testJSON = '{"schema":"deepfamily/person-version@2.0","tag":"v2","person":{"fullName":"a1","gender":0,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0xe1bb518ea41d7194713607378444fa94b9745c3850ecd884f4f96ccdf01cf1c2"},"parents":{"father":{"fullName":"af","gender":1,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0x280cb833b484c9d88bd9db450c6fc401ce0281c5ce35308a22c4fee829cd9789","versionIndex":0},"mother":{"fullName":"am","gender":2,"birthYear":0,"birthMonth":0,"birthDay":0,"isBirthBC":false,"personHash":"0x810cebabcdd9f93367b176271294d83ee77ebc8ef99fadb312202fee39859654","versionIndex":0}},"recovery":{"identityKdf":{"algorithm":"Argon2id","kdfVersion":1,"params":{"memoryKiB":65536,"iterations":3,"parallelism":1,"outputBytes":32},"saltHex":"00112233445566778899aabbccddeeff"}}}'
 
 console.log('='.repeat(70))
 console.log('  CID Generation Methods Verification')
-console.log('  (Using actual implementation from src/lib/cid.ts)')
+console.log('  (Using actual implementation from src/shared/ipfs/cid.ts)')
 console.log('='.repeat(70))
 
 console.log('\nTest data:')
@@ -50,7 +50,7 @@ const isIdentical = cid1 === cid2
 if (isIdentical) {
   console.log('\nSUCCESS: Both methods produce IDENTICAL CIDs!')
   console.log('\nThis proves:')
-  console.log('  [ok] src/lib/cid.ts implementation is correct')
+  console.log('  [ok] src/shared/ipfs/cid.ts implementation is correct')
   console.log('  [ok] Both methods are 100% compatible with IPFS standard')
   console.log('  [ok] Frontend code is verified')
   console.log(`  [ok] Method 1 is ${(time2/time1).toFixed(1)}x faster`)
@@ -58,7 +58,7 @@ if (isIdentical) {
   console.log('\nFAILURE: CIDs do NOT match!')
   console.log(`  Method 1: ${cid1}`)
   console.log(`  Method 2: ${cid2}`)
-  console.log('\nWarning: There is a bug in src/lib/cid.ts!')
+  console.log('\nWarning: There is a bug in src/shared/ipfs/cid.ts!')
   process.exit(1)
 }
 
@@ -83,9 +83,9 @@ console.log('  - Browser/Frontend: Use Method 1 (no polyfills needed)')
 console.log('  - Production: Use Method 1 (better performance)')
 
 console.log('\nNote:')
-console.log('  This script tests the ACTUAL code from src/lib/cid.ts')
+console.log('  This script tests the ACTUAL code from src/shared/ipfs/cid.ts')
 console.log('  The same code that runs in the frontend')
-console.log('  Any changes to src/lib/cid.ts will be reflected here')
+console.log('  Any changes to src/shared/ipfs/cid.ts will be reflected here')
 
 console.log('\n' + '='.repeat(70))
 console.log()

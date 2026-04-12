@@ -24,24 +24,25 @@ import { useToast } from "../../../shared/ui";
 import { useContractClient } from "../hooks/useContractClient";
 import { useAddVersionFlow } from "../flows";
 import { useTreeMutations } from "../../tree/context";
-import { sha256Hex, type MetadataRecoveryV2 } from "../../../lib/metadataCrypto";
+import { sha256Hex, type MetadataRecoveryV2 } from "../../../shared/crypto/metadataCrypto";
 import {
   PersonHashCalculator,
   type PersonHashCalculatorHandle,
 } from "../../person/ui";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../shared/lib/errors";
-import { cryptoWorkerCall } from "../../../lib/cryptoWorkerClient";
-import { zkWorkerCall } from "../../../lib/zkWorkerClient";
-import { safeCanonicalizeFullName } from "../../../lib/identityCommitment";
-import { formatGroth16ProofForContract } from "../../../lib/zk";
-import type { PersonData } from "../../../lib/zk";
+import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
+import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
+import { safeCanonicalizeFullName } from "../../../shared/crypto/identityCommitment";
+import { formatGroth16ProofForContract } from "../../../shared/zk/zk";
+import type { PersonData } from "../../../shared/zk/zk";
 import {
   computeIdentityHashMaterial,
   generateRandomIdentitySaltHex,
   normalizeIdentitySaltHex,
   type IdentitySaltMode,
-} from "../../../lib/identityHash";
-import { normalizePassphraseForHash } from "../../../lib/passphraseStrength";
+} from "../../../shared/crypto/identityHash";
+import { normalizePassphraseForHash } from "../../../shared/crypto/passphraseStrength";
+import { ModalShell } from "../../../shared/ui/ModalShell";
 
 const addVersionSchema = z.object({
   // Parent version indexes: allow empty string input, transform to 0 for processing
@@ -975,13 +976,11 @@ export default function AddVersionModal({
     );
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[1200] overflow-x-hidden touch-pan-y"
-      onClick={isDesktop ? undefined : handleClose}
-    >
+    <ModalShell isOpen={isOpen} onClose={handleClose} bare zIndex="z-[1200]" ariaLabel="Add Version" disableBackdropClose={isDesktop}>
+      <div className="overflow-x-hidden touch-pan-y h-full"
+        onClick={isDesktop ? undefined : handleClose}
+      >
       {/* Modal Container (responsive: bottom sheet on mobile, dialog on desktop) */}
       <div className="flex items-end sm:items-center justify-center h-full w-full p-2 sm:p-4">
         <div
@@ -2279,6 +2278,7 @@ export default function AddVersionModal({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ModalShell>
   );
 }

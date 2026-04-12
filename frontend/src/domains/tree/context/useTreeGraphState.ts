@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readBlob, writeBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { vdKey } from "../../../shared/cache/queryKeys";
-import { getRuntimeFamilyTreeConfig } from "../../../config/familyTreeConfig";
-import type { NodeData, NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import { getRuntimeFamilyTreeConfig } from "../config/familyTreeConfig";
+import type { NodeData, NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import {
   applyNodeDataBackfills,
   applyNodeEnrichmentPatches,

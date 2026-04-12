@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(scriptDir, "..", "src");
-const legacyDirs = ["components", "hooks", "context"];
+const legacyDirs = ["components", "hooks", "context", "lib", "config", "constants", "types"];
 
 function listFiles(dir) {
   if (!existsSync(dir)) {
@@ -26,11 +26,11 @@ function listFiles(dir) {
 const legacyFiles = legacyDirs.flatMap((dir) => listFiles(join(srcRoot, dir)));
 
 if (legacyFiles.length > 0) {
-  console.error("Top-level legacy frontend entrypoints must stay empty:");
+  console.error("Top-level legacy frontend directories must stay empty:");
   for (const file of legacyFiles) {
     console.error(`- ${relative(srcRoot, file)}`);
   }
   process.exit(1);
 }
 
-console.log("Top-level legacy frontend entrypoints are empty.");
+console.log("Top-level legacy frontend directories are empty.");

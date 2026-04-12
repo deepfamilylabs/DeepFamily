@@ -24,7 +24,7 @@ import {
   formatUnixSeconds,
   formatHashMiddle,
   shortAddress,
-} from "../types/graph";
+} from "../shared/model";
 import { useConfig } from "../domains/config/context";
 import { useTreeGraphData, useTreeNodeAccess } from "../domains/tree/context";
 import { buildStorySnapshot, findNodeByTokenId } from "../domains/person/model";
@@ -35,7 +35,7 @@ import {
   getChunkTypeIcon,
   getChunkTypeColorClass,
   getChunkTypeBorderColorClass,
-} from "../constants/chunkTypes";
+} from "../domains/person/config/chunkTypes";
 
 interface StoryDetailData {
   tokenId: string;

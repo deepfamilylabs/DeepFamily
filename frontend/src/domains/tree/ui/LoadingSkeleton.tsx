@@ -1,5 +1,5 @@
 import React from "react";
-import { LOADING_ANIMATIONS } from "../../../constants/animationStyles";
+import { LOADING_ANIMATIONS } from "../../../shared/ui/styles/animationStyles";
 
 interface LoadingSkeletonProps {
   lines?: number;

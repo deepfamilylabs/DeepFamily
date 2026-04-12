@@ -1,7 +1,7 @@
 import React from "react";
 import NodeCard from "../NodeCard";
-import type { NodeId } from "../../../../types/graph";
-import type { BaseEdge, BaseNode } from "../../../../types/familyTreeTypes";
+import type { NodeId } from "../../../../shared/model";
+import type { BaseEdge, BaseNode } from "../../model/familyTreeTypes";
 import type { NodeUi } from "../nodeUi";
 
 export function DagDefs() {

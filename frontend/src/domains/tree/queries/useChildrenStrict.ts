@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NodeId } from "../../../types/graph";
+import type { NodeId } from "../../../shared/model";
 import { useTreeGateway } from "./useTreeGateway";
 
 export interface UseChildrenStrictResult {

@@ -17,7 +17,7 @@ import {
 } from "./renderers/forceGraphRenderer";
 import { useColorTheme, useFamilyTreeViewConfig } from "../context";
 import { noPropsForwardRef } from "./noPropsForwardRef";
-import type { FamilyTreeViewHandle } from "../../../types/familyTreeViewHandle";
+import type { FamilyTreeViewHandle } from "../model/familyTreeViewHandle";
 
 const ForceGraphView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const { layout, height } = useFamilyTreeViewConfig();

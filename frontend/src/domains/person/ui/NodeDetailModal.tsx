@@ -10,7 +10,7 @@ import {
   genderText as genderTextFn,
   isMinted,
   formatUnixSeconds,
-} from "../../../types/graph";
+} from "../../../shared/model";
 import { useNavigate } from "react-router-dom";
 import { useTreeNodeAccess } from "../../tree/context";
 import { useEndorseModal } from "./EndorseModalProvider";

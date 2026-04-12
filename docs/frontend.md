@@ -136,9 +136,9 @@ If proof generation/verification fails, first confirm the expected `/zk/*` files
 The frontend uses workers to keep heavy and sensitive computations out of UI components:
 - Crypto worker entry: `frontend/src/workers/crypto.worker.ts`
 - ZK worker entry: `frontend/src/workers/zk.worker.ts`
-- Client wrappers: `frontend/src/lib/cryptoWorkerClient.ts`, `frontend/src/lib/zkWorkerClient.ts`
+- Client wrappers: `frontend/src/shared/workers/cryptoWorkerClient.ts`, `frontend/src/shared/workers/zkWorkerClient.ts`
 
-Practical expectation: if a change makes a worker crash, the most common cause is accidentally importing React/DOM code into a worker bundle. Keep shared logic in `frontend/src/lib/` and ensure it is worker-safe.
+Practical expectation: if a change makes a worker crash, the most common cause is accidentally importing React/DOM code into a worker bundle. Keep worker-safe crypto/ZK logic under `frontend/src/shared/crypto/` and `frontend/src/shared/zk/`.
 
 ## Source Layout
 ```
@@ -146,18 +146,12 @@ frontend/src/
 ├── app/                 # App shell context and layout UI
 ├── domains/             # Config / person / tree / transactions / wallet domain code
 ├── pages/               # Routes
-├── shared/              # Shared cache / clients / UI shells
-├── lib/                 # Shared logic (worker-safe where possible)
+├── shared/              # Shared cache / clients / config / model / crypto / ZK / IPFS / UI shells
 ├── workers/             # Web worker entrypoints (crypto/ZK)
 ├── abi/                 # Contract ABIs
 ├── assets/              # Static assets imported by the app
-├── config/              # Static app/network/wallet configuration
-├── constants/           # UI/layout constants
 ├── i18n/                # i18next initialization
-├── routes/              # Route definitions / lazy route helpers
 ├── shims/               # Browser/library shims
-├── types/               # TypeScript types
-├── utils/               # Non-domain helper utilities only
 └── locales/             # i18n resources
 ```
 

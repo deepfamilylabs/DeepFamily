@@ -1,5 +1,5 @@
-import type { NodeData, NodeId } from "../../../types/graph";
-import { birthDateString, isMinted, parseNodeId, shortHash } from "../../../types/graph";
+import type { NodeData, NodeId } from "../../../shared/model";
+import { birthDateString, isMinted, parseNodeId, shortHash } from "../../../shared/model";
 
 export type NodeUi = {
   id: NodeId;

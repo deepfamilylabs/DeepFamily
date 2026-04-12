@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
-import { NETWORK_PRESETS } from "../../../config/networks";
+import { NETWORK_PRESETS } from "../../../shared/config";
 
 type ConfigValues = {
   rpcUrl: string;

@@ -4,7 +4,7 @@ import {
   type FixedSizeList as VirtualListHandle,
   type ListChildComponentProps,
 } from "react-window";
-import type { NodeId } from "../../../../types/graph";
+import type { NodeId } from "../../../../shared/model";
 import type { TreeRow } from "../../selectors";
 import type { NodeUi } from "../nodeUi";
 import TreeListRowRenderer from "./treeListRowRenderer";

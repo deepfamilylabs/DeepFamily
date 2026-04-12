@@ -3,8 +3,8 @@ import type React from "react";
 import { deleteBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { csKey, cuKey, nftKey, storyKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
-import type { NodeData, NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import type { NodeData, NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { bumpNodeEndorsementCount } from "../../person/model/nodeState";
 import {
   addPlaceholderNodes,

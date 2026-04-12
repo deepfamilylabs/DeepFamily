@@ -13,10 +13,10 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react";
-import { parseEncryptedPayload, type AnyEncryptedMetadataPayload } from "../lib/metadataCrypto";
+import { parseEncryptedPayload, type AnyEncryptedMetadataPayload } from "../shared/crypto/metadataCrypto";
 import { sanitizeErrorForLogging } from "../shared/lib/errors";
-import { IPFS_GATEWAY_BASE_URLS } from "../config/ipfs";
-import { cryptoWorkerCall } from "../lib/cryptoWorkerClient";
+import { IPFS_GATEWAY_BASE_URLS } from "../shared/ipfs/config";
+import { cryptoWorkerCall } from "../shared/workers/cryptoWorkerClient";
 
 const normalizeGatewayBaseUrl = (value: string): string | null => {
   const trimmed = value.trim();

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Users, Search, Code, PenTool, CheckCircle } from "lucide-react";
-import { ANIMATION_CLASSES } from "../../../constants/animationStyles";
+import { ANIMATION_CLASSES } from "../../../shared/ui/styles/animationStyles";
 import { PageContainer } from "../../../shared/ui";
 
 const BorderLine = ({ side, showDefault }: { side: "left" | "right"; showDefault?: boolean }) => (

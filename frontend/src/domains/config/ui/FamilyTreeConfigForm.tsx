@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useDebounce } from "./useDebounce";
 import { useConfig } from "../context";
-import { formatHashMiddle, shortAddress } from "../../../types/graph";
+import { formatHashMiddle, shortAddress } from "../../../shared/model";
 import { Clipboard, HelpCircle, ChevronDown, Check } from "lucide-react";
 import { useTreeMutations } from "../../tree/context";
 import { useToast } from "../../../shared/ui";
-import { NETWORK_PRESETS } from "../../../config/networks";
+import { NETWORK_PRESETS } from "../../../shared/config";
 
 export interface FamilyTreeConfigFormProps {
   editing: boolean;

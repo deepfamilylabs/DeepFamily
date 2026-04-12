@@ -1,6 +1,6 @@
-import type { NodeId } from "../../../../types/graph";
-import { parseNodeId } from "../../../../types/graph";
-import type { PositionedEdge, PositionedNode } from "../../../../types/familyTreeTypes";
+import type { NodeId } from "../../../../shared/model";
+import { parseNodeId } from "../../../../shared/model";
+import type { PositionedEdge, PositionedNode } from "../../model/familyTreeTypes";
 import type { TreeGraphData } from "../../selectors";
 
 export type TreePositionedNode = PositionedNode;

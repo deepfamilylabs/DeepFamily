@@ -4,7 +4,7 @@ import { useWallet } from "../../wallet/context";
 import { useConfig } from "../../config/context";
 import { createDeepFamilyContract } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
-import type { ProofEnvelope } from "../../../lib/zk";
+import type { ProofEnvelope } from "../../../shared/zk/zk";
 import {
   executeAddVersionFlow,
   type AddVersionPublicSignals,

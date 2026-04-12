@@ -1,6 +1,6 @@
 import React from "react";
 import NodeCard from "../NodeCard";
-import type { NodeId } from "../../../../types/graph";
+import type { NodeId } from "../../../../shared/model";
 import type { NodeUi } from "../nodeUi";
 import type { TreePositionedEdge, TreePositionedNode } from "../layout/treeLayout";
 

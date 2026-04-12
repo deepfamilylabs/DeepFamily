@@ -1,5 +1,5 @@
-import type { NodeId, NodeData } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import type { NodeId, NodeData } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import {
   getProjectedChildIds,
   type TreeGraphData,

@@ -1,6 +1,6 @@
 import { memo, lazy, Suspense, useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
-import { LOADING_ANIMATIONS } from "../../../constants/animationStyles";
+import { LOADING_ANIMATIONS } from "../../../shared/ui/styles/animationStyles";
 
 // Type definition for dynamically imported icons
 type IconName =

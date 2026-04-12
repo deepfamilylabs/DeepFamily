@@ -1,5 +1,5 @@
 import type * as d3 from "d3";
-import type { NodeId } from "./graph";
+import type { NodeId } from "../../../shared/model";
 
 /**
  * FamilyTree shared types.

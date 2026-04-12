@@ -4,7 +4,7 @@ import {
   computePersonHash,
   normalizeIdentitySaltHex,
 } from "../identityHash";
-import { computePersonHashFromData } from "../zk";
+import { computePersonHashFromData } from "../../zk/zk";
 
 describe("identityHash integration", () => {
   it("computes the same personHash for raw and canonicalized names", async () => {

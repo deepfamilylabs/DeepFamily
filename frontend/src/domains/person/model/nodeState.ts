@@ -1,4 +1,4 @@
-import { makeNodeId, type NodeData } from "../../../types/graph";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 
 export function applySingleNodePatch(
   nodesData: Record<string, NodeData>,

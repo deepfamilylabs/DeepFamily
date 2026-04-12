@@ -1,5 +1,5 @@
-import { parseNodeId, type NodeData, type NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import { parseNodeId, type NodeData, type NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 
 export function buildTreeFetchRunKey(options: {
   rootId: string;

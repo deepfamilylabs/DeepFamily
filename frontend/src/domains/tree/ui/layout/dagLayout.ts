@@ -1,5 +1,5 @@
 import type { TreeGraphData } from "../../selectors";
-import type { NodeId } from "../../../../types/graph";
+import type { NodeId } from "../../../../shared/model";
 
 export function computeDagLayout(graph: TreeGraphData, nodeWidth: number, nodeHeight: number) {
   const levels: Map<number, Array<{ id: NodeId; depth: number }>> = new Map();

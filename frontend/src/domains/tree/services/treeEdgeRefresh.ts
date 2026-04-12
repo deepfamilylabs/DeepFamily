@@ -1,5 +1,5 @@
-import { parseNodeId, type NodeId } from "../../../types/graph";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../../../types/treeStore";
+import { parseNodeId, type NodeId } from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { collectReachableHashes, collectStrictParentIds } from "./treeEdgeState";
 
 export interface TreeEdgeRefreshInvalidation {

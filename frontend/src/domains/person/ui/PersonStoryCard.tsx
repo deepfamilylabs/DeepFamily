@@ -22,8 +22,8 @@ import {
   genderText as genderTextFn,
   formatUnixDate,
   isMinted,
-} from "../../../types/graph";
-import { shortHash } from "../../../types/graph";
+} from "../../../shared/model";
+import { shortHash } from "../../../shared/model";
 import EndorseCompactModal from "./EndorseCompactModal";
 
 interface PersonStoryCardProps {

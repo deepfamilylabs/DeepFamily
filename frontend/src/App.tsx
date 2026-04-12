@@ -1,103 +1,10 @@
-import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { Layout } from "./app/ui";
-import Home from "./pages/Home";
-import TreePage from "./pages/TreePage";
-import SearchPage from "./pages/SearchPage";
-import PersonPage from "./pages/PersonPage";
-import PeoplePage from "./pages/PeoplePage";
-import StoryEditorPage from "./pages/StoryEditorPage";
-import ActionsPage from "./pages/ActionsPage";
-import KeyDerivationPage from "./pages/KeyDerivationPage";
-import DecryptMetadataPage from "./pages/DecryptMetadataPage";
-import { ConfigProvider } from "./domains/config/context";
-import { ToastProvider } from "./shared/ui";
-import { TreeViewProvider, VizOptionsProvider } from "./domains/tree/context";
-import { WalletProvider } from "./domains/wallet/context";
-import { ActivePathProvider, SidebarProvider } from "./app/context";
-import { NetworkSelectionLayer, WalletSelectionLayer } from "./domains/wallet/ui";
-
-function TitleUpdater() {
-  const { t, i18n } = useTranslation();
-  const location = useLocation();
-
-  useEffect(() => {
-    const getPageTitle = () => {
-      const baseName = "DeepFamily";
-      switch (location.pathname) {
-        case "/":
-          return `${baseName} - ${t("home.title")}`;
-        case "/familyTree":
-          return `${baseName} - ${t("navigation.familyTree")}`;
-        case "/search":
-          return `${baseName} - ${t("navigation.search")}`;
-        case "/people":
-          return `${baseName} - ${t("navigation.people")}`;
-        case "/actions":
-          return `${baseName} - ${t("navigation.actions", "Actions")}`;
-        case "/keygen":
-          return `${baseName} - Secure Key Derivation`;
-        case "/decrypt":
-          return `${baseName} - ${t("decryptMetadata.title", "Decrypt Metadata")}`;
-        default:
-          if (location.pathname.startsWith("/person/")) {
-            return `${t("person.pageTitle", "Biography Wiki")}`;
-          }
-          if (location.pathname.startsWith("/editor/")) {
-            return `${baseName} - ${t("storyEditor.title", "Story Editor")}`;
-          }
-          return `${baseName} - ${t("home.title")}`;
-      }
-    };
-
-    document.title = getPageTitle();
-  }, [location.pathname, t, i18n.language]);
-
-  return null;
-}
-
-function RouterContent() {
-  return (
-    // Base routes only; providers are applied at App root
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Home />} />
-        <Route path="familyTree" element={<TreePage />} />
-        <Route path="search" element={<SearchPage />} />
-        <Route path="people" element={<PeoplePage />} />
-        <Route path="actions" element={<ActionsPage />} />
-        <Route path="keygen" element={<KeyDerivationPage />} />
-        <Route path="decrypt" element={<DecryptMetadataPage />} />
-        {/* Person and Editor under Layout to keep header/footer */}
-        <Route path="person/:tokenId" element={<PersonPage />} />
-        <Route path="editor/:tokenId" element={<StoryEditorPage />} />
-      </Route>
-    </Routes>
-  );
-}
+import { AppProviders } from "./app/AppProviders";
+import { AppRouter } from "./app/router";
 
 export default function App() {
   return (
-    <ConfigProvider>
-      <ToastProvider>
-        <WalletProvider>
-          <SidebarProvider>
-            <WalletSelectionLayer />
-            <NetworkSelectionLayer />
-            <VizOptionsProvider>
-              <TreeViewProvider>
-                <BrowserRouter>
-                  <ActivePathProvider>
-                    <TitleUpdater />
-                    <RouterContent />
-                  </ActivePathProvider>
-                </BrowserRouter>
-              </TreeViewProvider>
-            </VizOptionsProvider>
-          </SidebarProvider>
-        </WalletProvider>
-      </ToastProvider>
-    </ConfigProvider>
+    <AppProviders>
+      <AppRouter />
+    </AppProviders>
   );
 }

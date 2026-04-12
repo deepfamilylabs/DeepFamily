@@ -2,7 +2,7 @@ import { memo, useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Github, Mail, Globe, ChevronUp } from "lucide-react";
 import { PageContainer } from "../../shared/ui";
-import { languages, getLanguageByCode } from "../../config/languages";
+import { languages, getLanguageByCode } from "../config/languages";
 import Logo from "./Logo";
 
 // Custom X (Twitter) Icon

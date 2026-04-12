@@ -6,7 +6,7 @@ import { computeTreeLayout, type TreePositionedNode } from "./layout/treeLayout"
 import { TreeLayoutDefs, TreeLayoutEdges, TreeLayoutNodes } from "./renderers/treeLayoutRenderer";
 import { useColorTheme, useFamilyTreeViewConfig } from "../context";
 import { noPropsForwardRef } from "./noPropsForwardRef";
-import type { FamilyTreeViewHandle } from "../../../types/familyTreeViewHandle";
+import type { FamilyTreeViewHandle } from "../model/familyTreeViewHandle";
 
 const TreeLayoutView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
   const { layout, height: responsiveHeight } = useFamilyTreeViewConfig();

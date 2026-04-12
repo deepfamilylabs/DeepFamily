@@ -4,8 +4,8 @@ import {
   getInvalidateKeysAfterPersonVersionAdded,
   parseTreeTxEvents,
 } from "./treeInvalidation";
-import { makeNodeId } from "../../../types/graph";
-import { unionParentKey } from "../../../types/treeStore";
+import { makeNodeId } from "../../../shared/model";
+import { unionParentKey } from "../model/treeStore";
 import { nftKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 

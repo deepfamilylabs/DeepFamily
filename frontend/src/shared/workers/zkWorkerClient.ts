@@ -1,4 +1,4 @@
-import type { Groth16Proof, PersonData } from "./zk";
+import type { Groth16Proof, PersonData } from "../zk/zk";
 
 type ZkWorkerCallMap = {
   generatePersonCommitmentProof: {
@@ -41,7 +41,7 @@ const ensureWorker = (): Worker => {
     throw new Error("ZK worker is not available (no window)");
   }
   if (workerSingleton) return workerSingleton;
-  workerSingleton = new Worker(new URL("../workers/zk.worker.ts", import.meta.url), {
+  workerSingleton = new Worker(new URL("../../workers/zk.worker.ts", import.meta.url), {
     type: "module",
   });
   workerSingleton.addEventListener("message", (event: MessageEvent<ZkWorkerResponse>) => {

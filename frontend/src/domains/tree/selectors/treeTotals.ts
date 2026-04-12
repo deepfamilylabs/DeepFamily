@@ -1,4 +1,4 @@
-import { makeNodeId, type NodeData } from "../../../types/graph";
+import { makeNodeId, type NodeData } from "../../../shared/model";
 
 export function parseTotalVersionsResult(result: any): number {
   const totalVersions = Number(result?.totalVersions ?? result?.[1] ?? 0);
