@@ -7,7 +7,7 @@ import { makeNodeId, type NodeData } from "../../../shared/model";
 
 const mocks = vi.hoisted(() => ({
   nodesData: {} as Record<string, NodeData>,
-  setNodesData: vi.fn(),
+  mergeNodeDetail: vi.fn(),
   usePersonDetails: vi.fn(),
   useNFTDetails: vi.fn(),
   useStoryData: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("../../tree/context", () => ({
     nodesData: mocks.nodesData,
   }),
   useTreeMutations: () => ({
-    setNodesData: mocks.setNodesData,
+    mergeNodeDetail: mocks.mergeNodeDetail,
   }),
 }));
 
@@ -79,7 +79,7 @@ describe("NodeDetailProvider", () => {
         tokenId: "7",
       },
     };
-    mocks.setNodesData.mockReset();
+    mocks.mergeNodeDetail.mockReset();
     mocks.usePersonDetails.mockReset();
     mocks.useNFTDetails.mockReset();
     mocks.useStoryData.mockReset();
@@ -221,27 +221,28 @@ describe("NodeDetailProvider", () => {
     expect(screen.getByTestId("loading").textContent).toBe("true");
     expect(screen.getByTestId("error").textContent).toBe("nft warning");
 
-    await waitFor(() => expect(mocks.setNodesData).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.mergeNodeDetail).toHaveBeenCalledTimes(2));
 
-    const versionUpdater = mocks.setNodesData.mock.calls[0][0];
-    const nftUpdater = mocks.setNodesData.mock.calls[1][0];
-    const afterVersion = versionUpdater(mocks.nodesData);
-    const afterNft = nftUpdater(afterVersion);
-    const updatedNode = afterNft[makeNodeId("0xperson", 2)];
-
-    expect(updatedNode).toMatchObject({
-      tokenId: "42",
-      fatherHash: "0xfather",
-      motherHash: "0xmother",
-      metadataCID: "cid://nft-meta",
-      endorsementCount: 9,
-      fullName: "Fetched Ada",
-      gender: 2,
-      birthPlace: "London",
-      nftTokenURI: "ipfs://token",
-      storyFetchedAt: 999,
-    });
-    expect(updatedNode?.storyChunks?.[0]?.content).toBe("story");
-    expect(updatedNode?.storyMetadata?.totalChunks).toBe(1);
+    const selected = { personHash: "0xperson", versionIndex: 2 };
+    expect(mocks.mergeNodeDetail).toHaveBeenNthCalledWith(
+      1,
+      selected,
+      expect.objectContaining({
+        versionDetails: expect.objectContaining({ tokenId: "42" }),
+      }),
+    );
+    expect(mocks.mergeNodeDetail).toHaveBeenNthCalledWith(
+      2,
+      selected,
+      expect.objectContaining({
+        nftDetails: {
+          tokenId: "42",
+          parsed: expect.objectContaining({ nftTokenURI: "ipfs://token" }),
+        },
+        storyData: expect.objectContaining({
+          metadata: expect.objectContaining({ totalChunks: 1 }),
+        }),
+      }),
+    );
   });
 });

@@ -56,6 +56,16 @@ export default {
       gasPrice: "auto",
       blockGasLimit: 30000000,
     },
+    // Network used by `hardhat node` in Hardhat 3. Keep this aligned with the
+    // local simulated networks so oversized dev contracts deploy on localhost.
+    node: {
+      type: "edr-simulated",
+      chainId: 31337,
+      allowUnlimitedContractSize: (process.env.UNLIMITED_SIZE || "true") === "true",
+      gas: "auto",
+      gasPrice: "auto",
+      blockGasLimit: 30000000,
+    },
     // Local development network
     localhost: {
       type: "http",

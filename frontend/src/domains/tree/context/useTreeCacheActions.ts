@@ -5,7 +5,15 @@ import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { csKey, cuKey, nftKey, storyKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
 import type { NodeData, NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
-import { bumpNodeEndorsementCount } from "../../person/model/nodeState";
+import { bumpNodeEndorsementCount, upsertNode } from "../../person/model/nodeState";
+import {
+  applyNodeDetailNftDetails,
+  applyNodeDetailVersionDetails,
+  type NodeKeyMinimal,
+} from "../../person/model/nodeDetailSync";
+import type { ParsedNftDetails, ParsedVersionDetails } from "../../person/api/personDetailParsers";
+import type { StoryDataResult } from "../../person/model/storyData";
+import { makeNodeId } from "../../../shared/model";
 import {
   addPlaceholderNodes,
   mergeReachableNodeIds,
@@ -253,10 +261,79 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     [options.setNodesData],
   );
 
+  const markVersionMinted = useCallback(
+    (params: {
+      personHash: string;
+      versionIndex: number;
+      tokenId: string;
+      tokenURI?: string;
+      receipt?: unknown;
+    }) => {
+      const { personHash, versionIndex, tokenId, tokenURI, receipt } = params;
+      if (!personHash || !Number.isFinite(Number(versionIndex)) || !tokenId) return;
+      const id = makeNodeId(personHash, Number(versionIndex));
+      options.setNodesData((prev) => {
+        const current = prev[id] ?? {
+          personHash,
+          versionIndex: Number(versionIndex),
+          id,
+        };
+        return upsertNode(prev, {
+          ...current,
+          tokenId: String(tokenId),
+          ...(tokenURI ? { nftTokenURI: tokenURI } : {}),
+        });
+      });
+      invalidateByTx({
+        receipt,
+        hints: { personHash, versionIndex: Number(versionIndex), tokenId: String(tokenId) },
+      } as TreeTxInvalidationInput);
+    },
+    [options.setNodesData, invalidateByTx],
+  );
+
+  const mergeNodeDetail = useCallback(
+    (
+      selected: NodeKeyMinimal,
+      details: {
+        versionDetails?: ParsedVersionDetails | null;
+        nftDetails?: { tokenId: string; parsed: ParsedNftDetails } | null;
+        storyData?: StoryDataResult | null;
+      },
+    ) => {
+      if (!selected) return;
+      const { versionDetails, nftDetails, storyData } = details;
+      if (versionDetails) {
+        options.setNodesData((prev) =>
+          applyNodeDetailVersionDetails({
+            nodesData: prev,
+            selected,
+            parsed: versionDetails,
+            fetchedAt: Date.now(),
+          }),
+        );
+      }
+      if (nftDetails) {
+        options.setNodesData((prev) =>
+          applyNodeDetailNftDetails({
+            nodesData: prev,
+            selected,
+            tokenId: nftDetails.tokenId,
+            nftDetails: nftDetails.parsed,
+            storyData: storyData ?? undefined,
+          }),
+        );
+      }
+    },
+    [options.setNodesData],
+  );
+
   return {
     clearAllCaches,
     invalidateTreeRootCache,
     invalidateByTx,
     bumpEndorsementCount,
+    markVersionMinted,
+    mergeNodeDetail,
   };
 }

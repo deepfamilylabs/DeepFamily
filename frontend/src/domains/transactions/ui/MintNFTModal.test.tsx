@@ -4,7 +4,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
 import MintNFTModal from "./MintNFTModal";
-import { makeNodeId, type NodeData } from "../../../shared/model";
 
 const personHash = `0x${"12".repeat(32)}`;
 const ownerAddress = "0x00000000000000000000000000000000000000aa";
@@ -15,8 +14,7 @@ const mocks = vi.hoisted(() => ({
   endorsedVersionIndex: vi.fn(),
   contract: {} as any,
   mintRunOrThrow: vi.fn(),
-  setNodesData: vi.fn(),
-  invalidateByTx: vi.fn(),
+  markVersionMinted: vi.fn(),
   onClose: vi.fn(),
   onSuccess: vi.fn(),
   onGoEndorse: vi.fn(),
@@ -49,8 +47,7 @@ vi.mock("../hooks/useContractClient", () => ({
 
 vi.mock("../../tree/context", () => ({
   useTreeMutations: () => ({
-    setNodesData: mocks.setNodesData,
-    invalidateByTx: mocks.invalidateByTx,
+    markVersionMinted: mocks.markVersionMinted,
   }),
 }));
 
@@ -163,8 +160,7 @@ describe("MintNFTModal", () => {
       endorsedVersionIndex: mocks.endorsedVersionIndex,
     };
     mocks.mintRunOrThrow.mockReset();
-    mocks.setNodesData.mockReset();
-    mocks.invalidateByTx.mockReset();
+    mocks.markVersionMinted.mockReset();
     mocks.onClose.mockReset();
     mocks.onSuccess.mockReset();
     mocks.onGoEndorse.mockReset();
@@ -271,21 +267,13 @@ describe("MintNFTModal", () => {
         }),
       }),
     );
-    expect(mocks.setNodesData).toHaveBeenCalledTimes(1);
-
-    const updater = mocks.setNodesData.mock.calls[0][0];
-    const prev: Record<string, NodeData> = {};
-    const next = updater(prev);
-    expect(next[makeNodeId(personHash, 2)]).toMatchObject({
+    expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1);
+    expect(mocks.markVersionMinted).toHaveBeenCalledWith({
       personHash,
       versionIndex: 2,
       tokenId: "77",
-      nftTokenURI: "ipfs://token",
-    });
-
-    expect(mocks.invalidateByTx).toHaveBeenCalledWith({
+      tokenURI: "ipfs://token",
       receipt: { hash: "0xmint" },
-      hints: { personHash, versionIndex: 2, tokenId: 77 },
     });
     expect(mocks.onSuccess).toHaveBeenCalledWith(77);
     expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
@@ -305,7 +293,7 @@ describe("MintNFTModal", () => {
 
     await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
     expect(mocks.onSuccess).not.toHaveBeenCalled();
-    expect(mocks.invalidateByTx).not.toHaveBeenCalled();
+    expect(mocks.markVersionMinted).not.toHaveBeenCalled();
     expect(await screen.findByText("NFT Minting Failed")).toBeTruthy();
     expect(screen.getAllByText("mint reverted").length).toBeGreaterThan(0);
   });

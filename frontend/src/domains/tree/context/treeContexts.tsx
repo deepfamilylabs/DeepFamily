@@ -2,6 +2,9 @@ import React, { createContext, useContext } from "react";
 import type { NodeData, NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import type { TreeTxInvalidationInput } from "../services/treeInvalidation";
+import type { NodeKeyMinimal } from "../../person/model/nodeDetailSync";
+import type { ParsedNftDetails, ParsedVersionDetails } from "../../person/api/personDetailParsers";
+import type { StoryDataResult } from "../../person/model/storyData";
 import type { TreeDebugStats, TreeProgress } from "./types";
 
 export interface TreeGraphDataValue {
@@ -32,10 +35,24 @@ export interface TreeNodeAccessValue {
 }
 
 export interface TreeMutationsValue {
-  setNodesData?: React.Dispatch<React.SetStateAction<Record<string, NodeData>>>;
   clearAllCaches: () => void;
   bumpEndorsementCount: (personHash: string, versionIndex: number, delta?: number) => void;
   invalidateByTx: (input?: TreeTxInvalidationInput | null) => void;
+  markVersionMinted: (params: {
+    personHash: string;
+    versionIndex: number;
+    tokenId: string;
+    tokenURI?: string;
+    receipt?: unknown;
+  }) => void;
+  mergeNodeDetail: (
+    selected: NodeKeyMinimal,
+    details: {
+      versionDetails?: ParsedVersionDetails | null;
+      nftDetails?: { tokenId: string; parsed: ParsedNftDetails } | null;
+      storyData?: StoryDataResult | null;
+    },
+  ) => void;
 }
 
 export interface TreeDebugValue {

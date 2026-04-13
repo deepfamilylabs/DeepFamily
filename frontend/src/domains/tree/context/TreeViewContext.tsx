@@ -100,8 +100,14 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
 
   const { getNodeByTokenId, getStoryData, preloadStoryData, getOwnerOf } = nodeDataAccess;
 
-  const { clearAllCaches, invalidateTreeRootCache, invalidateByTx, bumpEndorsementCount } =
-    useTreeCacheActions({
+  const {
+    clearAllCaches,
+    invalidateTreeRootCache,
+    invalidateByTx,
+    bumpEndorsementCount,
+    markVersionMinted,
+    mergeNodeDetail,
+  } = useTreeCacheActions({
       api: runtime.api,
       contract: runtime.contract,
       contractAddress: runtime.contractAddress,
@@ -152,10 +158,11 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
   };
 
   const mutationsValue: TreeMutationsValue = {
-    setNodesData,
     clearAllCaches,
     bumpEndorsementCount,
     invalidateByTx,
+    markVersionMinted,
+    mergeNodeDetail,
   };
 
   const debugValue: TreeDebugValue = { getDebugStats };
