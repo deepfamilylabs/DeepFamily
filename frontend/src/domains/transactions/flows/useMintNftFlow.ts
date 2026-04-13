@@ -32,7 +32,7 @@ export function useMintNftFlow() {
         throw new Error(t("wallet.notConnected", "Please connect your wallet"));
       }
 
-      update("validating", t("mint.checkingEndorsement", "Checking endorsement status..."));
+      update("validating", t("mintNFT.checkingEndorsement", "Checking endorsement status..."));
 
       const contract = createDeepFamilyContract(contractAddress, signer);
 
@@ -43,7 +43,7 @@ export function useMintNftFlow() {
         tokenURI: string,
         coreInfo: MintCoreInfo,
       ) => {
-        update("submitting", t("mint.submitting", "Submitting mint transaction..."));
+        update("submitting", t("mintNFT.submittingMintTx", "Submitting mint transaction..."));
         const tx = await contract.mintPersonVersionNFT(
           proof,
           publicSignals,
@@ -51,7 +51,7 @@ export function useMintNftFlow() {
           tokenURI,
           coreInfo,
         );
-        update("confirming", t("mint.confirming", "Waiting for confirmation..."));
+        update("confirming", t("mintNFT.waitingConfirmation", "Waiting for confirmation..."));
         return await waitForTransactionReceipt(tx);
       };
 

@@ -10,14 +10,12 @@ import NodeDetailModal from "./NodeDetailModal";
 import { type NodeData } from "../../../shared/model";
 import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";
 import {
-  applyNodeDetailNftDetails,
-  applyNodeDetailVersionDetails,
   resolveNodeDetailTokenId,
   resolveSelectedNodeData,
   type NodeKeyMinimal,
-} from "./nodeDetailSync";
+} from "../model/nodeDetailSync";
 
-export type { NodeKeyMinimal } from "./nodeDetailSync";
+export type { NodeKeyMinimal } from "../model/nodeDetailSync";
 
 interface NodeDetailValue {
   open: boolean;
@@ -34,7 +32,7 @@ const NodeDetailProviderContext = createContext<NodeDetailValue | undefined>(und
 export function NodeDetailProvider({ children }: { children: React.ReactNode }) {
   const [selected, setSelected] = useState<NodeKeyMinimal | null>(null);
   const { nodesData } = useTreeGraphData();
-  const { setNodesData } = useTreeMutations();
+  const { mergeNodeDetail } = useTreeMutations();
 
   const openNode = useCallback((k: NodeKeyMinimal) => {
     setSelected(k);
@@ -59,32 +57,17 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
   const storyData = useStoryData(effectiveTokenId);
 
   useEffect(() => {
-    if (!selected || !versionDetails.data || !setNodesData) return;
-    const parsedVersionDetails = versionDetails.data;
-    setNodesData((prev: any) =>
-      applyNodeDetailVersionDetails({
-        nodesData: prev,
-        selected,
-        parsed: parsedVersionDetails,
-        fetchedAt: Date.now(),
-      }),
-    );
-  }, [selected, versionDetails.data, setNodesData]);
+    if (!selected || !versionDetails.data) return;
+    mergeNodeDetail(selected, { versionDetails: versionDetails.data });
+  }, [selected, versionDetails.data, mergeNodeDetail]);
 
   useEffect(() => {
-    if (!selected || !effectiveTokenId || !nftDetails.data || !setNodesData) return;
-    const parsedNftDetails = nftDetails.data;
-    const currentStoryData = storyData.data;
-    setNodesData((prev: any) =>
-      applyNodeDetailNftDetails({
-        nodesData: prev,
-        selected,
-        tokenId: String(effectiveTokenId),
-        nftDetails: parsedNftDetails,
-        storyData: currentStoryData,
-      }),
-    );
-  }, [selected, effectiveTokenId, nftDetails.data, storyData.data, setNodesData]);
+    if (!selected || !effectiveTokenId || !nftDetails.data) return;
+    mergeNodeDetail(selected, {
+      nftDetails: { tokenId: String(effectiveTokenId), parsed: nftDetails.data },
+      storyData: storyData.data,
+    });
+  }, [selected, effectiveTokenId, nftDetails.data, storyData.data, mergeNodeDetail]);
 
   const loading = versionDetails.loading || nftDetails.loading || storyData.loading;
   const error = versionDetails.error || nftDetails.error || storyData.error;
