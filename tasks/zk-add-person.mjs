@@ -2,8 +2,9 @@ import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import fs from "node:fs";
 import path from "node:path";
-import { ethers } from "ethers";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import { packGroth16ProofEnvelope } from "../lib/proofEnvelopeCodec.js";
+import { PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC } from "../lib/publicSignalSpecs.js";
 
 // Usage:
 // npx hardhat add-person-version --proof ./proof.json --public ./public.json \
@@ -36,8 +37,10 @@ function normalizePublicSignals(pubJson, sender) {
   const rawSignals = pubJson.publicSignals || pubJson;
   const publicSignals = toBigIntArray(rawSignals);
 
-  if (publicSignals.length !== 7) {
-    throw new Error(`publicSignals length must be 7, got ${publicSignals.length}`);
+  if (publicSignals.length !== PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.length) {
+    throw new Error(
+      `publicSignals length must be ${PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.length}, got ${publicSignals.length}`,
+    );
   }
 
   const senderUint160 = addressToUint160(sender);
@@ -51,18 +54,11 @@ function normalizePublicSignals(pubJson, sender) {
   return publicSignals;
 }
 
-function normalizeProof(proofJson) {
+function extractProofShape(proofJson) {
   const proof = proofJson.proof || proofJson;
 
   if (proof.pi_a && proof.pi_b && proof.pi_c) {
-    return {
-      a: [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])],
-      b: [
-        [BigInt(proof.pi_b[0][0]), BigInt(proof.pi_b[0][1])],
-        [BigInt(proof.pi_b[1][0]), BigInt(proof.pi_b[1][1])],
-      ],
-      c: [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])],
-    };
+    return proof;
   }
 
   if (proof.a && proof.b && proof.c) {
@@ -86,36 +82,24 @@ const action = async (args, hre) => {
   const proofJson = loadJson(args.proof);
   const pubJson = loadJson(args.public);
 
-  const { a, b, c } = normalizeProof(proofJson);
+  const rawProof = extractProofShape(proofJson);
   const publicSignals = normalizePublicSignals(pubJson, sender);
 
   console.log("Public signals breakdown:");
-  console.log("  identityCommitment:", publicSignals[0].toString());
-  console.log("  fatherIdentityCommitment:", publicSignals[1].toString());
-  console.log("  motherIdentityCommitment:", publicSignals[2].toString());
-  console.log("  submitter:", publicSignals[3].toString());
-  console.log("  schemaVersion:", publicSignals[4].toString());
-  console.log("  cryptoSuiteVersion:", publicSignals[5].toString());
-  console.log("  hashAlgoId:", publicSignals[6].toString());
+  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.forEach((fieldName, index) => {
+    console.log(`  ${fieldName}:`, publicSignals[index].toString());
+  });
 
   const proofSystemId = Number(args.proofsystem);
 
-  const proofEnvelope = {
-    proofSystemId,
-    a,
-    b,
-    c,
-  };
+  const proofEnvelope = packGroth16ProofEnvelope(rawProof, { proofSystemId });
 
-  const personProofPublicSignals = {
-    identityCommitment: publicSignals[0],
-    fatherIdentityCommitment: publicSignals[1],
-    motherIdentityCommitment: publicSignals[2],
-    submitter: publicSignals[3],
-    schemaVersion: publicSignals[4],
-    cryptoSuiteVersion: publicSignals[5],
-    hashAlgoId: publicSignals[6],
-  };
+  const personProofPublicSignals = Object.fromEntries(
+    PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.map((fieldName, index) => [
+      fieldName,
+      publicSignals[index],
+    ]),
+  );
 
   console.log("DeepFamily:", deepFamily.target || deepFamily.address);
   console.log("Sender:", sender);
@@ -198,4 +182,4 @@ export default task("add-person-version", "Submit Groth16 proof to addPersonVers
   .setAction(() => Promise.resolve({ default: action }))
   .build();
 
-export { toBigIntArray, loadJson, addressToUint160, normalizePublicSignals, normalizeProof };
+export { toBigIntArray, loadJson, addressToUint160, normalizePublicSignals, extractProofShape };

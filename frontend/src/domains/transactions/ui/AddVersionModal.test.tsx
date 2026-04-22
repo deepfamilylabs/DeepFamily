@@ -72,12 +72,9 @@ vi.mock("../../../shared/workers/zkWorkerClient", () => ({
 
 vi.mock("../../../shared/zk/zk", () => ({
   formatGroth16ProofForContract: () => ({
-    a: [1n, 2n],
-    b: [
-      [3n, 4n],
-      [5n, 6n],
-    ],
-    c: [7n, 8n],
+    proofSystemId: 1,
+    proofEncodingId: 1,
+    proofData: "0x",
   }),
 }));
 

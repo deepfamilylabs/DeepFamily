@@ -171,7 +171,7 @@ describe("addVersionService executeAddVersionFlow", () => {
         preflightContract,
         contractAddress: "0x0000000000000000000000000000000000000abc",
         submitterAddress: "0x00000000000000000000000000000000000000aa",
-        proof: { proofSystemId: 0 } as any,
+        proof: { proofSystemId: 1 } as any,
         publicSignals: {
           identityCommitment: 1n,
           fatherIdentityCommitment: 0n,
@@ -209,7 +209,7 @@ describe("addVersionService executeAddVersionFlow", () => {
         submitContract,
         preflightContract,
         contractAddress: "0x0000000000000000000000000000000000000abc",
-        proof: { proofSystemId: 0 } as any,
+        proof: { proofSystemId: 1 } as any,
         publicSignals: {
           identityCommitment: 1n,
           fatherIdentityCommitment: 0n,
@@ -248,7 +248,7 @@ describe("addVersionService executeAddVersionFlow", () => {
         submitContract,
         preflightContract,
         contractAddress: "0x0000000000000000000000000000000000000abc",
-        proof: { proofSystemId: 0 } as any,
+        proof: { proofSystemId: 1 } as any,
         publicSignals: {
           identityCommitment: 1n,
           fatherIdentityCommitment: 3n,
@@ -287,7 +287,7 @@ describe("addVersionService executeAddVersionFlow", () => {
         submitContract,
         preflightContract,
         contractAddress: "0x0000000000000000000000000000000000000abc",
-        proof: { proofSystemId: 0 } as any,
+        proof: { proofSystemId: 1 } as any,
         publicSignals: {
           identityCommitment: 1n,
           fatherIdentityCommitment: 0n,

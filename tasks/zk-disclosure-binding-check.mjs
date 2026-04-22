@@ -4,7 +4,7 @@ Disclosure-binding checker for the active disclosure_binding circuit.
 Features:
 - Loads a current circuit input JSON containing nameField / derivedSecretField /
   packedBirthGenderField / minter / version metadata.
-- Recomputes the expected public signals order used by the active circuit.
+- Recomputes the expected public signals order from the JS authority spec.
 - Optionally reads an existing publicSignals JSON to compare results.
 - Optionally generates a fresh proof (snarkjs groth16.fullProve) using
   discovered or user-supplied wasm/zkey artifacts.
@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { poseidon4 } from "poseidon-lite";
-
+import { DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC } from "../lib/publicSignalSpecs.js";
 import {
   resolveExistingFile,
   DEFAULT_WASM_CANDIDATES,
@@ -32,7 +32,7 @@ function normalizeBigIntField(value, label) {
       throw new Error(`${label} must be non-negative`);
     }
     return normalized;
-  } catch (error) {
+  } catch {
     throw new Error(`${label} must be a non-negative integer-like value`);
   }
 }
@@ -71,27 +71,28 @@ async function computeExpectedSignals(input) {
     input.derivedSecretField,
     suiteCommitment,
   ]);
-  const identityCommitment = poseidon4([
-    1002n,
-    nameSecretCommitment,
-    input.packedBirthGenderField,
-    suiteCommitment,
-  ]);
-  const disclosureBinding = poseidon4([
-    1003n,
-    input.nameField,
-    input.packedBirthGenderField,
-    suiteCommitment,
-  ]);
+  const signalValues = {
+    identityCommitment: poseidon4([
+      1002n,
+      nameSecretCommitment,
+      input.packedBirthGenderField,
+      suiteCommitment,
+    ]),
+    disclosureBinding: poseidon4([
+      1003n,
+      input.nameField,
+      input.packedBirthGenderField,
+      suiteCommitment,
+    ]),
+    minter: input.minter,
+    schemaVersion: input.schemaVersion,
+    cryptoSuiteVersion: input.cryptoSuiteVersion,
+    hashAlgoId: input.hashAlgoId,
+  };
 
-  return [
-    identityCommitment.toString(),
-    disclosureBinding.toString(),
-    input.minter.toString(),
-    input.schemaVersion.toString(),
-    input.cryptoSuiteVersion.toString(),
-    input.hashAlgoId.toString(),
-  ];
+  return DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.map((fieldName) =>
+    signalValues[fieldName].toString(),
+  );
 }
 
 function loadJson(filePath) {
@@ -135,16 +136,10 @@ function parseArgs(rawArgs) {
   return args;
 }
 
-function formatSignalsForLog(label, signals) {
-  if (label && label.length > 0) {
-    console.log(label);
-  }
-  console.log(`  identityCommitment: ${signals[0]}`);
-  console.log(`  disclosureBinding: ${signals[1]}`);
-  console.log(`  minter: ${signals[2]}`);
-  console.log(`  schemaVersion: ${signals[3]}`);
-  console.log(`  cryptoSuiteVersion: ${signals[4]}`);
-  console.log(`  hashAlgoId: ${signals[5]}`);
+function formatSignalsForLog(signals) {
+  DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.forEach((fieldName, index) => {
+    console.log(`  ${fieldName}: ${signals[index]}`);
+  });
 }
 
 function comparePublicSignals(expected, actual) {
@@ -201,7 +196,7 @@ async function main() {
   console.log("  minter address (decimal):", input.minter.toString());
 
   console.log("\nExpected public signals:");
-  formatSignalsForLog("", expectedSignals);
+  formatSignalsForLog(expectedSignals);
   console.log(`  Array format: ${JSON.stringify(expectedSignals)}`);
 
   if (args.public) {
@@ -221,8 +216,16 @@ async function main() {
   }
 
   if (args.prove) {
-    const wasmPath = resolveExistingFile("disclosure binding circuit wasm", args.wasm, DEFAULT_WASM_CANDIDATES);
-    const zkeyPath = resolveExistingFile("disclosure binding circuit zkey", args.zkey, DEFAULT_ZKEY_CANDIDATES);
+    const wasmPath = resolveExistingFile(
+      "disclosure binding circuit wasm",
+      args.wasm,
+      DEFAULT_WASM_CANDIDATES,
+    );
+    const zkeyPath = resolveExistingFile(
+      "disclosure binding circuit zkey",
+      args.zkey,
+      DEFAULT_ZKEY_CANDIDATES,
+    );
 
     console.log("\nRunning groth16.fullProve for confirmation...");
     const snarkjs = await import("snarkjs");

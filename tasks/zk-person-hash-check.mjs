@@ -1,148 +1,398 @@
 /*
-Poseidon limbs endianness/mapping check for PersonHash (3-input with packedData)
+Person-commitment checker for the active person_commitment circuit.
 
-What it does
-- Reads input JSON (same as circuit inputs) to fetch 32-byte fullNameHash arrays and scalar fields
-- Computes Poseidon commitment over [name_hi128, name_lo128, packedData] where:
-  packedData = (birthYear << 24) | (birthMonth << 16) | (birthDay << 8) | (gender << 1) | isBirthBC
-- Splits each commitment into 2×128-bit limbs in big-endian order: [hi128, lo128]
-- Prints expected publicSignals order for the current circuit/contract mapping:
-  publicSignals = [
-    person_hi128, person_lo128,
-    father_hi128, father_lo128,
-    mother_hi128, mother_lo128,
-    submitter_uint160
-  ]
-
-Optional
-- If snarkjs is installed and you provide --wasm and --zkey and --input, it will also compute proof and compare produced publicSignals with expected.
-
-Usage examples
-  node tasks/zk-limbs-check.js --input ./circuits/test/fullname_hash_input.json
-  node tasks/zk-person-hash-check.mjs --wasm ./zk-artifacts/circuits/person_commitment_js/person_commitment.wasm \
-    --zkey ./zk-artifacts/circuits/person_commitment_final.zkey --input ./circuits/test/proof/person_commitment_input.json --submitter 0xYourEOA
+Features:
+- Loads a current circuit input JSON containing person / father / mother fields,
+  presence flags, submitter, and version metadata.
+- Recomputes the expected public signals order from the JS authority spec.
+- Optionally reads an existing publicSignals JSON to compare results.
+- Optionally generates a fresh proof (snarkjs groth16.fullProve) using
+  discovered or user-supplied wasm/zkey artifacts.
 */
 
 import fs from "node:fs";
-import { getAddress, ZeroAddress } from "ethers";
-import { poseidon3, poseidon5 } from "poseidon-lite";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { poseidon4 } from "poseidon-lite";
+import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
+import { PERSON_COMMITMENT_PROOF_DESCRIPTOR } from "../lib/proofDescriptors.js";
+import { PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC } from "../lib/publicSignalSpecs.js";
 
-function split128FromBigInt(x) {
-  const hi = x >> 128n;
-  const lo = x & ((1n << 128n) - 1n);
-  return [hi, lo];
-}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-function bytesToBigIntBE(bytes) {
-  if (!Array.isArray(bytes) || bytes.length !== 32) {
-    throw new Error("fullNameHash must be 32-byte array");
-  }
-  let acc = 0n;
-  for (let i = 0; i < 32; i++) {
-    const b = BigInt(bytes[i] >>> 0);
-    if (b < 0n || b > 255n) throw new Error("byte out of range");
-    acc = (acc << 8n) + b;
-  }
-  return acc;
-}
+const DEFAULT_WASM_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
+  __dirname,
+  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+  "wasm",
+);
+const DEFAULT_ZKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
+  __dirname,
+  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+  "zkey",
+);
 
-function be128HiLoFromBytes32(bytes) {
-  // Big-endian split to hi/lo 128 bits
-  const big = bytesToBigIntBE(bytes);
-  return [big >> 128n, big & ((1n << 128n) - 1n)];
-}
-
-async function buildExpectedSignalsFromInput(input) {
-  function personCommitmentFrom(inputPrefix) {
-    const nameBytes = input[`${inputPrefix}fullNameHash`];
-    const saltBytes = input[`${inputPrefix}saltHash`] || new Array(32).fill(0);
-    const isBirthBC = BigInt(input[`${inputPrefix}isBirthBC`]);
-    const birthYear = BigInt(input[`${inputPrefix}birthYear`]);
-    const birthMonth = BigInt(input[`${inputPrefix}birthMonth`]);
-    const birthDay = BigInt(input[`${inputPrefix}birthDay`]);
-    const gender = BigInt(input[`${inputPrefix}gender`]);
-
-    const [nameHi, nameLo] = be128HiLoFromBytes32(nameBytes);
-    const [saltHi, saltLo] = be128HiLoFromBytes32(saltBytes);
-
-    const salted = poseidon5([nameHi, nameLo, saltHi, saltLo, 0n]);
-    const saltedBig = BigInt(salted);
-    const [saltedHi, saltedLo] = split128FromBigInt(saltedBig);
-
-    const packedData =
-      (birthYear << 24n) |
-      (birthMonth << 16n) |
-      (birthDay << 8n) |
-      (gender << 1n) |
-      (isBirthBC & 1n);
-    const h = poseidon3([saltedHi, saltedLo, packedData]);
-    const hv = BigInt(h);
-    const [hi, lo] = split128FromBigInt(hv);
-    return [hi, lo];
+function normalizeBigIntField(value, label, { defaultValue } = {}) {
+  const normalizedValue = value ?? defaultValue;
+  if (normalizedValue === undefined || normalizedValue === null || normalizedValue === "") {
+    throw new Error(`${label} is required`);
   }
 
-  const person = personCommitmentFrom("");
-  const father = personCommitmentFrom("father_");
-  const mother = personCommitmentFrom("mother_");
-
-  const submitter = input.submitter
-    ? BigInt(getAddress(input.submitter))
-    : BigInt(getAddress(ZeroAddress));
-
-  return [person[0], person[1], father[0], father[1], mother[0], mother[1], submitter];
+  try {
+    const normalized = BigInt(normalizedValue);
+    if (normalized < 0n) {
+      throw new Error(`${label} must be non-negative`);
+    }
+    return normalized;
+  } catch {
+    throw new Error(`${label} must be a non-negative integer-like value`);
+  }
 }
 
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const out = {};
-  for (let i = 0; i < args.length; i++) {
-    const k = args[i];
-    const v = args[i + 1];
-    if (k === "--wasm") out.wasm = v;
-    if (k === "--zkey") out.zkey = v;
-    if (k === "--input") out.input = v;
-    if (k === "--submitter") out.submitter = v;
+function normalizeBit(value, label, { defaultValue } = {}) {
+  const normalized = normalizeBigIntField(value, label, { defaultValue });
+  if (normalized !== 0n && normalized !== 1n) {
+    throw new Error(`${label} must be 0 or 1`);
   }
-  return out;
+  return normalized;
+}
+
+function validatePersonCommitmentInput(raw) {
+  if (!raw || typeof raw !== "object") {
+    throw new Error(
+      "Input JSON must be an object with person / parent fields, hasFather / hasMother, submitter, schemaVersion, cryptoSuiteVersion, and hashAlgoId",
+    );
+  }
+
+  return {
+    nameField: normalizeBigIntField(raw.nameField, "nameField"),
+    derivedSecretField: normalizeBigIntField(raw.derivedSecretField, "derivedSecretField"),
+    isBirthBC: normalizeBit(raw.isBirthBC, "isBirthBC"),
+    birthYear: normalizeBigIntField(raw.birthYear, "birthYear"),
+    birthMonth: normalizeBigIntField(raw.birthMonth, "birthMonth"),
+    birthDay: normalizeBigIntField(raw.birthDay, "birthDay"),
+    gender: normalizeBigIntField(raw.gender, "gender"),
+    fatherNameField: normalizeBigIntField(raw.fatherNameField, "fatherNameField", { defaultValue: 0 }),
+    fatherDerivedSecretField: normalizeBigIntField(
+      raw.fatherDerivedSecretField,
+      "fatherDerivedSecretField",
+      { defaultValue: 0 },
+    ),
+    fatherIsBirthBC: normalizeBit(raw.fatherIsBirthBC, "fatherIsBirthBC", { defaultValue: 0 }),
+    fatherBirthYear: normalizeBigIntField(raw.fatherBirthYear, "fatherBirthYear", { defaultValue: 0 }),
+    fatherBirthMonth: normalizeBigIntField(raw.fatherBirthMonth, "fatherBirthMonth", { defaultValue: 0 }),
+    fatherBirthDay: normalizeBigIntField(raw.fatherBirthDay, "fatherBirthDay", { defaultValue: 0 }),
+    fatherGender: normalizeBigIntField(raw.fatherGender, "fatherGender", { defaultValue: 0 }),
+    motherNameField: normalizeBigIntField(raw.motherNameField, "motherNameField", { defaultValue: 0 }),
+    motherDerivedSecretField: normalizeBigIntField(
+      raw.motherDerivedSecretField,
+      "motherDerivedSecretField",
+      { defaultValue: 0 },
+    ),
+    motherIsBirthBC: normalizeBit(raw.motherIsBirthBC, "motherIsBirthBC", { defaultValue: 0 }),
+    motherBirthYear: normalizeBigIntField(raw.motherBirthYear, "motherBirthYear", { defaultValue: 0 }),
+    motherBirthMonth: normalizeBigIntField(raw.motherBirthMonth, "motherBirthMonth", { defaultValue: 0 }),
+    motherBirthDay: normalizeBigIntField(raw.motherBirthDay, "motherBirthDay", { defaultValue: 0 }),
+    motherGender: normalizeBigIntField(raw.motherGender, "motherGender", { defaultValue: 0 }),
+    hasFather: normalizeBit(raw.hasFather, "hasFather", { defaultValue: 0 }),
+    hasMother: normalizeBit(raw.hasMother, "hasMother", { defaultValue: 0 }),
+    submitter: normalizeBigIntField(raw.submitter, "submitter"),
+    schemaVersion: normalizeBigIntField(raw.schemaVersion, "schemaVersion"),
+    cryptoSuiteVersion: normalizeBigIntField(raw.cryptoSuiteVersion, "cryptoSuiteVersion"),
+    hashAlgoId: normalizeBigIntField(raw.hashAlgoId, "hashAlgoId"),
+  };
+}
+
+function packBirthGenderField({ birthYear, birthMonth, birthDay, gender, isBirthBC }) {
+  return (
+    (birthYear << 24n) |
+    (birthMonth << 16n) |
+    (birthDay << 8n) |
+    (gender << 1n) |
+    (isBirthBC & 1n)
+  );
+}
+
+function computeIdentityCommitmentFromFields(
+  nameField,
+  derivedSecretField,
+  isBirthBC,
+  birthYear,
+  birthMonth,
+  birthDay,
+  gender,
+  suiteCommitment,
+) {
+  const packedBirthGenderField = packBirthGenderField({
+    birthYear,
+    birthMonth,
+    birthDay,
+    gender,
+    isBirthBC,
+  });
+  const nameSecretCommitment = poseidon4([
+    1001n,
+    nameField,
+    derivedSecretField,
+    suiteCommitment,
+  ]);
+  return poseidon4([
+    1002n,
+    nameSecretCommitment,
+    packedBirthGenderField,
+    suiteCommitment,
+  ]);
+}
+
+async function computeExpectedSignals(input) {
+  const suiteCommitment = poseidon4([
+    1000n,
+    input.schemaVersion,
+    input.cryptoSuiteVersion,
+    input.hashAlgoId,
+  ]);
+
+  const signalValues = {
+    identityCommitment: computeIdentityCommitmentFromFields(
+      input.nameField,
+      input.derivedSecretField,
+      input.isBirthBC,
+      input.birthYear,
+      input.birthMonth,
+      input.birthDay,
+      input.gender,
+      suiteCommitment,
+    ),
+    fatherIdentityCommitment:
+      input.hasFather === 1n
+        ? computeIdentityCommitmentFromFields(
+            input.fatherNameField,
+            input.fatherDerivedSecretField,
+            input.fatherIsBirthBC,
+            input.fatherBirthYear,
+            input.fatherBirthMonth,
+            input.fatherBirthDay,
+            input.fatherGender,
+            suiteCommitment,
+          )
+        : 0n,
+    motherIdentityCommitment:
+      input.hasMother === 1n
+        ? computeIdentityCommitmentFromFields(
+            input.motherNameField,
+            input.motherDerivedSecretField,
+            input.motherIsBirthBC,
+            input.motherBirthYear,
+            input.motherBirthMonth,
+            input.motherBirthDay,
+            input.motherGender,
+            suiteCommitment,
+          )
+        : 0n,
+    submitter: input.submitter,
+    schemaVersion: input.schemaVersion,
+    cryptoSuiteVersion: input.cryptoSuiteVersion,
+    hashAlgoId: input.hashAlgoId,
+  };
+
+  return PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.map((fieldName) =>
+    signalValues[fieldName].toString(),
+  );
+}
+
+function loadJson(filePath) {
+  const resolved = path.resolve(process.cwd(), filePath);
+  return JSON.parse(fs.readFileSync(resolved, "utf8"));
+}
+
+function loadPublicSignals(filePath) {
+  const raw = loadJson(filePath);
+  if (Array.isArray(raw)) {
+    return raw.map((x) => x.toString());
+  }
+  if (raw && Array.isArray(raw.publicSignals)) {
+    return raw.publicSignals.map((x) => x.toString());
+  }
+  throw new Error(`Unsupported public signals JSON structure in ${filePath}`);
+}
+
+function comparePublicSignals(expected, actual) {
+  const result = {
+    match: true,
+    mismatches: [],
+  };
+
+  const maxLength = Math.max(expected.length, actual.length);
+  for (let i = 0; i < maxLength; i++) {
+    const expectedVal = expected[i]?.toString();
+    const actualVal = actual[i]?.toString();
+
+    if (expectedVal !== actualVal) {
+      result.match = false;
+      result.mismatches.push({ index: i, expected: expectedVal, actual: actualVal });
+    }
+  }
+
+  return result;
+}
+
+function resolveExistingFile(label, explicitPath, candidates) {
+  const searchOrder = [];
+  if (explicitPath && explicitPath.trim().length > 0) {
+    searchOrder.push(path.resolve(process.cwd(), explicitPath));
+  }
+  for (const candidate of candidates) {
+    if (!searchOrder.includes(candidate)) {
+      searchOrder.push(candidate);
+    }
+  }
+
+  for (const candidate of searchOrder) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `Unable to locate ${label}. Checked paths:\n${searchOrder.map((p) => `  - ${p}`).join("\n")}`,
+  );
+}
+
+function parseArgs(rawArgs) {
+  const args = {
+    prove: false,
+    help: false,
+  };
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const current = rawArgs[i];
+    switch (current) {
+      case "--input":
+        args.input = rawArgs[++i];
+        break;
+      case "--public":
+        args.public = rawArgs[++i];
+        break;
+      case "--wasm":
+        args.wasm = rawArgs[++i];
+        break;
+      case "--zkey":
+        args.zkey = rawArgs[++i];
+        break;
+      case "--submitter":
+        args.submitter = rawArgs[++i];
+        break;
+      case "--prove":
+        args.prove = true;
+        break;
+      case "--help":
+      case "-h":
+        args.help = true;
+        break;
+      default:
+        throw new Error(`Unknown argument: ${current}`);
+    }
+  }
+
+  return args;
+}
+
+function formatSignalsForLog(signals) {
+  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.forEach((fieldName, index) => {
+    console.log(`  ${fieldName}: ${signals[index]}`);
+  });
+}
+
+function printUsage() {
+  console.log(`Usage:
+  node tasks/zk-person-hash-check.mjs --input person_commitment_input.json [--public person_commitment_public.json] [--prove] [--wasm path] [--zkey path]
+`);
 }
 
 async function main() {
-  const opts = parseArgs();
-  if (!opts.input) {
-    console.log(
-      "Please provide --input pointing to the circuit input JSON (with 32-byte fullNameHash arrays).",
-    );
-    process.exit(1);
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help || !args.input) {
+    printUsage();
+    process.exit(args.input ? 0 : 1);
   }
 
-  const input = JSON.parse(fs.readFileSync(opts.input, "utf8"));
-  if (opts.submitter) input.submitter = opts.submitter;
+  const rawInput = loadJson(args.input);
+  if (args.submitter !== undefined) {
+    rawInput.submitter = args.submitter;
+  }
+  const input = validatePersonCommitmentInput(rawInput);
+  const expectedSignals = await computeExpectedSignals(input);
 
-  const expected = await buildExpectedSignalsFromInput(input);
-  console.log("Expected publicSignals (decimal):");
-  console.log(expected.map((x) => x.toString()));
+  console.log("Person Commitment input summary:");
+  console.log("  hasFather:", input.hasFather.toString());
+  console.log("  hasMother:", input.hasMother.toString());
+  console.log("  submitter:", input.submitter.toString());
 
-  // Optional snarkjs compare
-  if (opts.wasm && opts.zkey && opts.input) {
-    try {
-      const snarkjs = await import("snarkjs");
-      // Ensure submitter matches
-      input.submitter = expected[6].toString();
+  console.log("\nExpected public signals:");
+  formatSignalsForLog(expectedSignals);
+  console.log(`  Array format: ${JSON.stringify(expectedSignals)}`);
 
-      const { publicSignals } = await snarkjs.groth16.fullProve(input, opts.wasm, opts.zkey);
-      console.log("Circuit publicSignals (decimal):", publicSignals);
+  if (args.public) {
+    console.log("\nComparing with provided public signals file...");
+    const actualSignals = loadPublicSignals(args.public);
+    const comparison = comparePublicSignals(expectedSignals, actualSignals);
 
-      const ok =
-        publicSignals.length === expected.length &&
-        publicSignals.every((v, i) => BigInt(v) === expected[i]);
-      console.log("Match:", ok);
-      if (!ok) process.exitCode = 1;
-    } catch (e) {
-      console.warn("snarkjs compare skipped:", e?.message || String(e));
+    if (comparison.match) {
+      console.log("  All signals match");
+    } else {
+      console.log("  Mismatch detected");
+      comparison.mismatches.forEach(({ index, expected, actual }) => {
+        console.log(`    [${index}] expected=${expected} actual=${actual}`);
+      });
+      process.exitCode = 1;
+    }
+  }
+
+  if (args.prove) {
+    const wasmPath = resolveExistingFile(
+      "person commitment circuit wasm",
+      args.wasm,
+      DEFAULT_WASM_CANDIDATES,
+    );
+    const zkeyPath = resolveExistingFile(
+      "person commitment circuit zkey",
+      args.zkey,
+      DEFAULT_ZKEY_CANDIDATES,
+    );
+
+    console.log("\nRunning groth16.fullProve for confirmation...");
+    const snarkjs = await import("snarkjs");
+    const circuitInput = Object.fromEntries(
+      Object.entries(input).map(([key, value]) => [key, value.toString()]),
+    );
+    const { publicSignals } = await snarkjs.groth16.fullProve(circuitInput, wasmPath, zkeyPath);
+
+    const actualSignals = publicSignals.map((value) => value.toString());
+    const comparison = comparePublicSignals(expectedSignals, actualSignals);
+    if (comparison.match) {
+      console.log("  Generated proof public signals match expected values");
+    } else {
+      console.log("  Generated proof public signals mismatch");
+      comparison.mismatches.forEach(({ index, expected, actual }) => {
+        console.log(`    [${index}] expected=${expected} actual=${actual}`);
+      });
+      process.exitCode = 1;
     }
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-});
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
+
+export {
+  validatePersonCommitmentInput,
+  computeExpectedSignals,
+  comparePublicSignals,
+  parseArgs,
+  loadPublicSignals,
+  loadJson,
+};

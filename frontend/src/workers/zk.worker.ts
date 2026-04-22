@@ -1,4 +1,5 @@
 import type { Groth16Proof, PersonData } from "../shared/zk/zk";
+import { getProofDescriptorByPurpose } from "../shared/zk/proofDescriptors";
 import {
   generatePersonCommitmentProof,
   verifyPersonCommitmentProof,
@@ -50,21 +51,29 @@ const getErrorShape = (err: unknown): { message: string; name?: string } => {
   return { message: String(err) };
 };
 
+function assertDescriptorPurpose(purpose: "PersonCommitment" | "DisclosureBinding") {
+  return getProofDescriptorByPurpose(purpose);
+}
+
 const handlers: {
   [K in keyof ZkWorkerMethods]: (
     params: ZkWorkerMethods[K]["params"],
   ) => Promise<ZkWorkerMethods[K]["result"]> | ZkWorkerMethods[K]["result"];
 } = {
   generatePersonCommitmentProof: async ({ person, father, mother, submitterAddress }) => {
+    assertDescriptorPurpose("PersonCommitment");
     return await generatePersonCommitmentProof(person, father, mother, submitterAddress);
   },
   verifyPersonCommitmentProof: async ({ proof, publicSignals }) => {
+    assertDescriptorPurpose("PersonCommitment");
     return { ok: await verifyPersonCommitmentProof(proof, publicSignals) };
   },
   generateDisclosureBindingProof: async ({ person, minterAddress }) => {
+    assertDescriptorPurpose("DisclosureBinding");
     return await generateDisclosureBindingProof(person, minterAddress);
   },
   verifyDisclosureBindingProof: async ({ proof, publicSignals }) => {
+    assertDescriptorPurpose("DisclosureBinding");
     return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
   },
 };

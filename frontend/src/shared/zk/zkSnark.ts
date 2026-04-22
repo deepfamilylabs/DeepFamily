@@ -2,6 +2,7 @@
 // Uses person_commitment and disclosure_binding circuits.
 
 import type { Groth16Proof, PersonData } from "./zk";
+import type { ProofDescriptor } from "./proofDescriptors";
 import {
   computeNameField,
   computeSuiteCommitment,
@@ -14,6 +15,10 @@ import {
   DEFAULT_HASH_ALGO_ID,
   SNARK_FIELD,
 } from "./zk";
+import {
+  DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+} from "./proofDescriptors";
 import { canonicalizeFullName } from "../crypto/identityCommitment";
 // @ts-ignore
 import * as snarkjs from "snarkjs";
@@ -23,10 +28,8 @@ type ZkArtifacts = {
   zkey: Uint8Array;
 };
 
-let personCommitmentArtifactsPromise: Promise<ZkArtifacts> | null = null;
-let disclosureBindingArtifactsPromise: Promise<ZkArtifacts> | null = null;
-let personCommitmentVkeyPromise: Promise<any> | null = null;
-let disclosureBindingVkeyPromise: Promise<any> | null = null;
+const artifactPromiseCache = new Map<string, Promise<ZkArtifacts>>();
+const vkeyPromiseCache = new Map<string, Promise<any>>();
 
 async function loadArtifacts(wasmUrl: string, zkeyUrl: string): Promise<ZkArtifacts> {
   const [wasmRes, zkeyRes] = await Promise.all([fetch(wasmUrl), fetch(zkeyUrl)]);
@@ -45,66 +48,63 @@ async function loadJson(url: string): Promise<any> {
   return await res.json();
 }
 
-async function loadPersonCommitmentArtifacts(): Promise<ZkArtifacts> {
-  if (!personCommitmentArtifactsPromise) {
-    personCommitmentArtifactsPromise = (async () => {
-      try {
-        return await loadArtifacts(
-          "/zk/person_commitment.wasm",
-          "/zk/person_commitment_final.zkey",
-        );
-      } catch (error) {
-        personCommitmentArtifactsPromise = null;
-        throw error;
-      }
-    })();
-  }
-  return personCommitmentArtifactsPromise;
+async function loadArtifactsForDescriptor(descriptor: ProofDescriptor): Promise<ZkArtifacts> {
+  const cached = artifactPromiseCache.get(descriptor.key);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    try {
+      return await loadArtifacts(descriptor.files.browser.wasm, descriptor.files.browser.zkey);
+    } catch (error) {
+      artifactPromiseCache.delete(descriptor.key);
+      throw error;
+    }
+  })();
+
+  artifactPromiseCache.set(descriptor.key, promise);
+  return promise;
 }
 
-async function loadDisclosureBindingArtifacts(): Promise<ZkArtifacts> {
-  if (!disclosureBindingArtifactsPromise) {
-    disclosureBindingArtifactsPromise = (async () => {
-      try {
-        return await loadArtifacts(
-          "/zk/disclosure_binding.wasm",
-          "/zk/disclosure_binding_final.zkey",
-        );
-      } catch (error) {
-        disclosureBindingArtifactsPromise = null;
-        throw error;
-      }
-    })();
-  }
-  return disclosureBindingArtifactsPromise;
+async function loadVerificationKeyForDescriptor(descriptor: ProofDescriptor): Promise<any> {
+  const cached = vkeyPromiseCache.get(descriptor.key);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    try {
+      return await loadJson(descriptor.files.browser.vkey);
+    } catch (error) {
+      vkeyPromiseCache.delete(descriptor.key);
+      throw error;
+    }
+  })();
+
+  vkeyPromiseCache.set(descriptor.key, promise);
+  return promise;
 }
 
-async function loadPersonCommitmentVkey(): Promise<any> {
-  if (!personCommitmentVkeyPromise) {
-    personCommitmentVkeyPromise = (async () => {
-      try {
-        return await loadJson("/zk/person_commitment.vkey.json");
-      } catch (error) {
-        personCommitmentVkeyPromise = null;
-        throw error;
-      }
-    })();
+function assertSupportedProverDriver(descriptor: ProofDescriptor) {
+  if (descriptor.proverDriver !== "snarkjs-groth16") {
+    throw new Error(`Unsupported prover driver: ${descriptor.proverDriver}`);
   }
-  return personCommitmentVkeyPromise;
 }
 
-async function loadDisclosureBindingVkey(): Promise<any> {
-  if (!disclosureBindingVkeyPromise) {
-    disclosureBindingVkeyPromise = (async () => {
-      try {
-        return await loadJson("/zk/disclosure_binding.vkey.json");
-      } catch (error) {
-        disclosureBindingVkeyPromise = null;
-        throw error;
-      }
-    })();
-  }
-  return disclosureBindingVkeyPromise;
+async function fullProveWithDescriptor(
+  descriptor: ProofDescriptor,
+  input: Record<string, string | number>,
+): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
+  assertSupportedProverDriver(descriptor);
+  const { wasm, zkey } = await loadArtifactsForDescriptor(descriptor);
+  return await snarkjs.groth16.fullProve(input, wasm, zkey);
+}
+
+async function verifyWithDescriptor(
+  descriptor: ProofDescriptor,
+  proof: Groth16Proof,
+  publicSignals: string[],
+): Promise<boolean> {
+  assertSupportedProverDriver(descriptor);
+  const vKey = await loadVerificationKeyForDescriptor(descriptor);
+  return await snarkjs.groth16.verify(vKey, publicSignals, proof);
 }
 
 function preparePersonField(person: PersonData | null): {
@@ -186,8 +186,10 @@ export async function generatePersonCommitmentProof(
     hashAlgoId,
   };
 
-  const { wasm, zkey } = await loadPersonCommitmentArtifacts();
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey);
+  const { proof, publicSignals } = await fullProveWithDescriptor(
+    PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+    input,
+  );
   return { proof, publicSignals };
 }
 
@@ -195,8 +197,7 @@ export async function verifyPersonCommitmentProof(
   proof: Groth16Proof,
   publicSignals: string[],
 ): Promise<boolean> {
-  const vKey = await loadPersonCommitmentVkey();
-  return await snarkjs.groth16.verify(vKey, publicSignals, proof);
+  return await verifyWithDescriptor(PERSON_COMMITMENT_PROOF_DESCRIPTOR, proof, publicSignals);
 }
 
 export async function generateDisclosureBindingProof(
@@ -225,8 +226,10 @@ export async function generateDisclosureBindingProof(
     hashAlgoId,
   };
 
-  const { wasm, zkey } = await loadDisclosureBindingArtifacts();
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey);
+  const { proof, publicSignals } = await fullProveWithDescriptor(
+    DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+    input,
+  );
   return { proof, publicSignals };
 }
 
@@ -234,6 +237,5 @@ export async function verifyDisclosureBindingProof(
   proof: Groth16Proof,
   publicSignals: string[],
 ): Promise<boolean> {
-  const vKey = await loadDisclosureBindingVkey();
-  return await snarkjs.groth16.verify(vKey, publicSignals, proof);
+  return await verifyWithDescriptor(DISCLOSURE_BINDING_PROOF_DESCRIPTOR, proof, publicSignals);
 }
