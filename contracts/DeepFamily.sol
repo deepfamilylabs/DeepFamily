@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "poseidon-solidity/PoseidonT5.sol";
+import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
+import {ProofConstants} from "./libraries/ProofConstants.sol";
 
 /**
  * @dev DeepFamily Token Contract Interface
@@ -14,30 +16,6 @@ interface IDeepFamilyToken {
   function recentReward() external view returns (uint256);
   function transferFrom(address from, address to, uint256 amount) external returns (bool);
   function burnFrom(address account, uint256 amount) external;
-}
-
-/**
- * @dev Groth16 verifier interface for person commitment proofs.
- */
-interface IPersonCommitmentVerifier {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals
-  ) external view returns (bool);
-}
-
-/**
- * @dev Groth16 verifier interface for person mint binding proofs.
- */
-interface IDisclosureBindingVerifier {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[6] calldata publicSignals
-  ) external view returns (bool);
 }
 
 /**
@@ -69,7 +47,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error InvalidStory();
   error InvalidTokenURI();
   error InvalidZKProof();
+  error InvalidVerifierAddress();
   error VerifierRouteNotSet();
+  error UnsupportedProofEncoding();
+  error MalformedProofData();
 
   // Business logic errors
   error DuplicateVersion();
@@ -142,15 +123,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   enum ProofPurpose {
-    Person,
+    PersonCommitment,
     DisclosureBinding
   }
 
   struct ProofEnvelope {
     uint16 proofSystemId;
-    uint256[2] a;
-    uint256[2][2] b;
-    uint256[2] c;
+    uint8 proofEncodingId;
+    bytes proofData;
   }
 
   struct PersonProofPublicSignals {
@@ -534,17 +514,23 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     ProofEnvelope calldata proof,
     DisclosureBindingPublicSignals calldata publicSignals
   ) internal view {
-    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.DisclosureBinding);
-    uint256[6] memory ps = [
-      publicSignals.identityCommitment,
-      publicSignals.disclosureBinding,
-      publicSignals.minter,
-      publicSignals.schemaVersion,
-      publicSignals.cryptoSuiteVersion,
-      publicSignals.hashAlgoId
-    ];
+    address adapter = _getVerifier(proof.proofSystemId, ProofPurpose.DisclosureBinding);
+    uint256[] memory ps = new uint256[](ProofConstants.DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN);
+    ps[0] = publicSignals.identityCommitment;
+    ps[1] = publicSignals.disclosureBinding;
+    ps[2] = publicSignals.minter;
+    ps[3] = publicSignals.schemaVersion;
+    ps[4] = publicSignals.cryptoSuiteVersion;
+    ps[5] = publicSignals.hashAlgoId;
 
-    if (!IDisclosureBindingVerifier(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
+    if (
+      !IProofVerifierAdapter(adapter).verifyProof(
+        uint8(ProofPurpose.DisclosureBinding),
+        proof.proofEncodingId,
+        proof.proofData,
+        ps
+      )
+    ) {
       revert InvalidZKProof();
     }
   }
@@ -619,7 +605,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     ProofPurpose purpose,
     address verifier
   ) external onlyOwner {
-    if (verifier == address(0)) revert VerifierRouteNotSet();
+    if (verifier == address(0)) revert InvalidVerifierAddress();
     verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
   }
@@ -710,18 +696,24 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   ) external nonReentrant {
     if (publicSignals.submitter != uint256(uint160(msg.sender))) revert CallerMismatch();
 
-    address verifier = _getVerifier(proof.proofSystemId, ProofPurpose.Person);
-    uint256[7] memory ps = [
-      publicSignals.identityCommitment,
-      publicSignals.fatherIdentityCommitment,
-      publicSignals.motherIdentityCommitment,
-      publicSignals.submitter,
-      publicSignals.schemaVersion,
-      publicSignals.cryptoSuiteVersion,
-      publicSignals.hashAlgoId
-    ];
+    address adapter = _getVerifier(proof.proofSystemId, ProofPurpose.PersonCommitment);
+    uint256[] memory ps = new uint256[](ProofConstants.PERSON_PUBLIC_SIGNALS_LEN);
+    ps[0] = publicSignals.identityCommitment;
+    ps[1] = publicSignals.fatherIdentityCommitment;
+    ps[2] = publicSignals.motherIdentityCommitment;
+    ps[3] = publicSignals.submitter;
+    ps[4] = publicSignals.schemaVersion;
+    ps[5] = publicSignals.cryptoSuiteVersion;
+    ps[6] = publicSignals.hashAlgoId;
 
-    if (!IPersonCommitmentVerifier(verifier).verifyProof(proof.a, proof.b, proof.c, ps)) {
+    if (
+      !IProofVerifierAdapter(adapter).verifyProof(
+        uint8(ProofPurpose.PersonCommitment),
+        proof.proofEncodingId,
+        proof.proofData,
+        ps
+      )
+    ) {
       revert InvalidZKProof();
     }
 
