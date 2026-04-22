@@ -3,6 +3,7 @@
  * All tests use stub verifiers (always return true) to test contract logic
  * without requiring real ZK proof generation.
  */
+import { AbiCoder } from 'ethers'
 import { poseidon4 } from 'poseidon-lite'
 import personCommitmentProof from '../../lib/personCommitmentProof.js'
 import disclosureBindingProof from '../../lib/disclosureBindingProof.js'
@@ -12,7 +13,8 @@ const { buildDisclosureBindingInput } = disclosureBindingProof
 
 const PROOF_PURPOSE_PERSON_COMMITMENT = 0
 const PROOF_PURPOSE_DISCLOSURE_BINDING = 1
-const STUB_PROOF_SYSTEM_ID = 0
+const STUB_PROOF_SYSTEM_ID = 1
+const STUB_PROOF_ENCODING_ID = 1
 
 const SNARK_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 
@@ -130,24 +132,36 @@ export async function setupStubVerifiers(ethers, deepFamily) {
   )
   const personVerifier = await personStubFactory.deploy(true)
   await personVerifier.waitForDeployment()
-  await deepFamily.setVerifier(STUB_PROOF_SYSTEM_ID, PROOF_PURPOSE_PERSON_COMMITMENT, await personVerifier.getAddress())
 
   const nameStubFactory = await ethers.getContractFactory(
     'contracts/test/StubDisclosureBindingVerifier.sol:StubDisclosureBindingVerifier'
   )
   const nameVerifier = await nameStubFactory.deploy(true)
   await nameVerifier.waitForDeployment()
-  await deepFamily.setVerifier(STUB_PROOF_SYSTEM_ID, PROOF_PURPOSE_DISCLOSURE_BINDING, await nameVerifier.getAddress())
 
-  return { personVerifier, nameVerifier }
+  const adapterFactory = await ethers.getContractFactory('Groth16VerifierAdapter')
+  const adapter = await adapterFactory.deploy(
+    await personVerifier.getAddress(),
+    await nameVerifier.getAddress(),
+  )
+  await adapter.waitForDeployment()
+  const adapterAddress = await adapter.getAddress()
+
+  await deepFamily.setVerifier(STUB_PROOF_SYSTEM_ID, PROOF_PURPOSE_PERSON_COMMITMENT, adapterAddress)
+  await deepFamily.setVerifier(STUB_PROOF_SYSTEM_ID, PROOF_PURPOSE_DISCLOSURE_BINDING, adapterAddress)
+
+  return { personVerifier, nameVerifier, adapter }
 }
 
 export function makeStubProof() {
+  const proofData = AbiCoder.defaultAbiCoder().encode(
+    ['uint256[2]', 'uint256[2][2]', 'uint256[2]'],
+    [[0, 0], [[0, 0], [0, 0]], [0, 0]],
+  )
   return {
     proofSystemId: STUB_PROOF_SYSTEM_ID,
-    a: [0, 0],
-    b: [[0, 0], [0, 0]],
-    c: [0, 0],
+    proofEncodingId: STUB_PROOF_ENCODING_ID,
+    proofData,
   }
 }
 
