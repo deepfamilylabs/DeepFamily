@@ -47,6 +47,19 @@ frontend/src/
 └── shims/       # Browser/library shims and ambient declarations
 ```
 
+### Key frontend files
+
+Use the directory tree for ownership boundaries, and these files as first-read entry points when tracing behavior:
+
+- App shell: `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/app/router.tsx`, `frontend/src/app/AppProviders.tsx`, `frontend/src/app/ui/Layout.tsx`
+- Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/app/config/brandBadge.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
+- Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/domains/person/api/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
+- Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
+- Worker/ZK/crypto boundaries: `frontend/src/workers/crypto.worker.ts`, `frontend/src/workers/zk.worker.ts`, `frontend/src/shared/workers/`, `frontend/src/shared/crypto/identityCommitment.ts`, `frontend/src/shared/zk/proofDescriptors.ts`
+- Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`
+
+Update this section when adding or moving stable entry points, route groups, domain gateways, app providers, shared config/client/cache layers, worker boundaries, or boundary-level tests. Do not list ordinary leaf components, local renderers, or one-off helpers here; keep them discoverable through their owning directory.
+
 ### Dependency direction
 
 Imports must flow **downward** through the layers:

@@ -6,6 +6,7 @@ import { useTreeGraphState } from "./useTreeGraphState";
 import { useTreeCacheActions } from "./useTreeCacheActions";
 import { useTreeRuntime } from "./useTreeRuntime";
 import { createTreeNodeDataAccess } from "../services/treeNodeDataAccess";
+import { getTreeQueryPageLimit, isIndexedDbCacheEnabled } from "../../../shared/config/env";
 import {
   TreeProviderContexts,
   useTreeDebugData,
@@ -20,15 +21,13 @@ import {
   type TreeStatusValue,
 } from "./treeContexts";
 import { TTL } from "../../../shared/cache/ttl";
-const env: any = (import.meta as any).env || {};
 const EDGE_TTL_MS = TTL.edges;
 const TOTAL_VERSIONS_TTL_MS = TTL.totalVersions;
 const VERSION_DETAILS_TTL_MS = TTL.versionDetails;
 const NFT_DETAILS_TTL_MS = TTL.nftDetails;
 const STORY_TTL_MS = TTL.story;
-const USE_INDEXEDDB_CACHE =
-  env.VITE_USE_INDEXEDDB_CACHE !== "0" && env.VITE_USE_INDEXEDDB_CACHE !== "false";
-const QUERY_PAGE_LIMIT = Number(env.VITE_DF_QUERY_PAGE_LIMIT || 200);
+const USE_INDEXEDDB_CACHE = isIndexedDbCacheEnabled();
+const QUERY_PAGE_LIMIT = getTreeQueryPageLimit();
 const CHILDREN_PAGE_LIMIT = QUERY_PAGE_LIMIT;
 const STORY_PAGE_LIMIT = QUERY_PAGE_LIMIT;
 

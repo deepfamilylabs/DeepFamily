@@ -4,6 +4,7 @@ import { useWallet } from "../../wallet/context";
 import { useConfig } from "../../config/context";
 import { createDeepFamilyContract } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
+import { isDevMode } from "../../../shared/config/env";
 import type { ProofEnvelope } from "../../../shared/zk/zk";
 import {
   executeAddVersionFlow,
@@ -54,7 +55,7 @@ export function useAddVersionFlow() {
         motherVersionIndex: args.motherVersionIndex,
         tag: args.tag,
         metadataCID: args.metadataCID,
-        isDev: import.meta.env.DEV,
+        isDev: isDevMode(),
         onTransactionSubmitted: () => {
           update("confirming", t("transaction.submitted", "Transaction submitted..."));
         },

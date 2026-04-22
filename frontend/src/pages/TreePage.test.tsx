@@ -31,6 +31,11 @@ const mocks = vi.hoisted(() => ({
     },
     update: vi.fn(),
   },
+  env: {
+    isForceEnvConfigSyncEnabled: vi.fn(() => false),
+    isTreeDebugEnabled: vi.fn(() => false),
+    shouldPreferFlatTree: vi.fn(() => false),
+  },
 }));
 
 vi.mock("react-i18next", () => ({
@@ -49,6 +54,12 @@ vi.mock("../domains/tree/context", () => ({
 
 vi.mock("../domains/config/context", () => ({
   useConfig: () => mocks.config,
+}));
+
+vi.mock("../shared/config/env", () => ({
+  isForceEnvConfigSyncEnabled: mocks.env.isForceEnvConfigSyncEnabled,
+  isTreeDebugEnabled: mocks.env.isTreeDebugEnabled,
+  shouldPreferFlatTree: mocks.env.shouldPreferFlatTree,
 }));
 
 vi.mock("../domains/tree/ui", () => ({
@@ -88,6 +99,12 @@ describe("TreePage", () => {
       rootVersionIndex: 1,
     };
     mocks.config.update.mockReset();
+    mocks.env.isForceEnvConfigSyncEnabled.mockReset();
+    mocks.env.isForceEnvConfigSyncEnabled.mockReturnValue(false);
+    mocks.env.isTreeDebugEnabled.mockReset();
+    mocks.env.isTreeDebugEnabled.mockReturnValue(false);
+    mocks.env.shouldPreferFlatTree.mockReset();
+    mocks.env.shouldPreferFlatTree.mockReturnValue(false);
     vi.unstubAllEnvs();
   });
 
@@ -123,7 +140,7 @@ describe("TreePage", () => {
   });
 
   it("syncs config from env defaults when forced env sync is enabled", async () => {
-    vi.stubEnv("VITE_FORCE_ENV_CONFIG_SYNC", "true");
+    mocks.env.isForceEnvConfigSyncEnabled.mockReturnValue(true);
 
     mocks.config.defaults = {
       rpcUrl: "https://rpc.env",

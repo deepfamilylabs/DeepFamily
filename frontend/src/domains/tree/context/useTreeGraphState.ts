@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readBlob, writeBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { vdKey } from "../../../shared/cache/queryKeys";
+import { isIndexedDbCacheEnabled } from "../../../shared/config/env";
 import { getRuntimeFamilyTreeConfig } from "../config/familyTreeConfig";
 import type { NodeData, NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
@@ -31,9 +32,7 @@ import { applyTotalVersionsToNodes, parseTotalVersionsResult } from "../selector
 import { verifyTreeSessionStartup } from "../services/treeSessionStartup";
 import type { TreeDebugStats, TreeProgress } from "./types";
 
-const env: any = (import.meta as any).env || {};
-const USE_INDEXEDDB_CACHE =
-  env.VITE_USE_INDEXEDDB_CACHE !== "0" && env.VITE_USE_INDEXEDDB_CACHE !== "false";
+const USE_INDEXEDDB_CACHE = isIndexedDbCacheEnabled();
 
 interface UseTreeGraphStateOptions {
   rootId: NodeId | null;

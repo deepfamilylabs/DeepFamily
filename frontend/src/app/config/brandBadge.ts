@@ -1,3 +1,5 @@
+import { getBrandBadgeEnv } from "../../shared/config/env";
+
 /**
  * Brand Badge Configuration
  * Controls the badge display next to the DeepFamily logo
@@ -73,7 +75,7 @@ const BADGE_CONFIGS: Record<BadgeType, BadgeConfig | null> = {
  * Get the current badge configuration from environment
  */
 export function getBadgeConfig(): BadgeConfig | null {
-  const badgeType = (import.meta.env.VITE_BRAND_BADGE || "none").toLowerCase() as BadgeType;
+  const badgeType = getBrandBadgeEnv() as BadgeType;
 
   // Validate badge type
   if (!BADGE_CONFIGS.hasOwnProperty(badgeType)) {
