@@ -10,9 +10,36 @@ const restrictedImportRule = (patterns) => [
   },
 ];
 
+const noAppOrPages = [["**/app/**"], ["**/pages/**"]];
+const noTreeModel = [["**/tree/model"], ["**/tree/model/**"]];
+
 export default [
   {
     ignores: ["dist/**", "coverage/**", "node_modules/**"],
+  },
+  {
+    files: srcFiles,
+    ignores: ["src/shared/config/env.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "MemberExpression[object.type='MetaProperty'][object.meta.name='import'][object.property.name='meta'][property.name='env']",
+          message: "Read Vite env through src/shared/config/env.ts.",
+        },
+        {
+          selector:
+            "MemberExpression[object.type='TSAsExpression'][property.name='env'] > TSAsExpression > MetaProperty[meta.name='import'][property.name='meta']",
+          message: "Read Vite env through src/shared/config/env.ts.",
+        },
+        {
+          selector:
+            "MemberExpression[object.type='MemberExpression'][object.object.name='process'][object.property.name='env']",
+          message: "Read runtime env through src/shared/config/env.ts.",
+        },
+      ],
+    },
   },
   {
     files: srcFiles,
@@ -46,17 +73,25 @@ export default [
   {
     files: ["src/domains/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictedImportRule([["**/app/**"], ["**/pages/**"]]),
+      "no-restricted-imports": restrictedImportRule(noAppOrPages),
+    },
+  },
+  {
+    files: ["src/domains/tree/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictedImportRule([
+        ...noAppOrPages,
+        ["**/wallet/**"],
+        ["**/transactions/**"],
+      ]),
     },
   },
   {
     files: ["src/domains/config/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrictedImportRule([
-        ["**/app/**"],
-        ["**/pages/**"],
-        ["**/tree/model"],
-        ["**/tree/model/**"],
+        ...noAppOrPages,
+        ...noTreeModel,
         ["**/wallet/config"],
         ["**/wallet/config/**"],
       ]),
@@ -70,10 +105,19 @@ export default [
     ],
     rules: {
       "no-restricted-imports": restrictedImportRule([
-        ["**/app/**"],
-        ["**/pages/**"],
-        ["**/tree/model"],
-        ["**/tree/model/**"],
+        ...noAppOrPages,
+        ...noTreeModel,
+      ]),
+    },
+  },
+  {
+    files: ["src/domains/wallet/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictedImportRule([
+        ...noAppOrPages,
+        ...noTreeModel,
+        ["**/person/**"],
+        ["**/transactions/**"],
       ]),
     },
   },

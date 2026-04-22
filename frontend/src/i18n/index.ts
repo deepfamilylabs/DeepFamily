@@ -4,6 +4,7 @@ import LanguageDetector from "i18next-browser-languagedetector";
 
 import zhCN from "../locales/zh-CN/index.json";
 import en from "../locales/en/index.json";
+import { isDevMode } from "../shared/config/env";
 
 const resources = {
   en: { translation: en },
@@ -59,7 +60,7 @@ i18n.use(initReactI18next).init({
   ns: ["translation"],
   defaultNS: "translation",
   interpolation: { escapeValue: false },
-  debug: process.env.NODE_ENV === "development",
+  debug: isDevMode(),
   load: "currentOnly",
   cleanCode: true,
 });

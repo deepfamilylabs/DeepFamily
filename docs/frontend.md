@@ -159,7 +159,7 @@ This reads `deployments/localhost/` and writes `frontend/.env.local`, including 
 npm run frontend:dev        # Vite dev server (auto ABI sync)
 npm run frontend:build      # Production build
 npm run frontend:preview    # Serve the built bundle
-npm run frontend:check      # lint + legacy-entrypoints + typecheck + vitest
+npm run frontend:check      # lint + legacy-entrypoints + typecheck + build + vitest
 ```
 
 `frontend:check` is the gate to run before committing — it matches what CI runs.
