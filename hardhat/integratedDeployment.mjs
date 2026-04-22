@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+const GROTH16_PROOF_SYSTEM_ID = 1
+const PROOF_PURPOSE_PERSON_COMMITMENT = 0
+const PROOF_PURPOSE_DISCLOSURE_BINDING = 1
+
 const resolveConnection = async (hreOrConnection) => {
   if (hreOrConnection?.ethers?.getSigners) {
     return hreOrConnection
@@ -75,6 +79,14 @@ export const deployIntegratedSystem = async (
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress()
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress()
 
+  const Groth16VerifierAdapter = await ethers.getContractFactory('Groth16VerifierAdapter', deployer)
+  const groth16VerifierAdapter = await Groth16VerifierAdapter.deploy(
+    personCommitmentVerifierAddress,
+    nameDisclosureVerifierAddress,
+  )
+  await groth16VerifierAdapter.waitForDeployment()
+  const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress()
+
   const DeepFamily = await ethers.getContractFactory('DeepFamily', {
     signer: deployer,
     libraries: {
@@ -92,9 +104,23 @@ export const deployIntegratedSystem = async (
     await tx.wait()
   }
 
-  // Register verifiers: ProofPurpose.Person=0, ProofPurpose.NameDisclosure=1
-  await (await deepFamily.setVerifier(0, 0, personCommitmentVerifierAddress)).wait()
-  await (await deepFamily.setVerifier(0, 1, nameDisclosureVerifierAddress)).wait()
+  // Register the Groth16 adapter under PROOF_SYSTEM_ID_GROTH16_BN254_V1 = 1
+  // for both purposes (PersonCommitment = 0, DisclosureBinding = 1). The adapter internally
+  // dispatches to the backend verifiers.
+  await (
+    await deepFamily.setVerifier(
+      GROTH16_PROOF_SYSTEM_ID,
+      PROOF_PURPOSE_PERSON_COMMITMENT,
+      groth16VerifierAdapterAddress,
+    )
+  ).wait()
+  await (
+    await deepFamily.setVerifier(
+      GROTH16_PROOF_SYSTEM_ID,
+      PROOF_PURPOSE_DISCLOSURE_BINDING,
+      groth16VerifierAdapterAddress,
+    )
+  ).wait()
 
   if (writeDeployments) {
     const artifacts = hreOrConnection?.artifacts ?? null
@@ -108,11 +134,13 @@ export const deployIntegratedSystem = async (
     const poseidonT5Artifact = await artifacts.readArtifact('PoseidonT5')
     const personVerifierArtifact = await artifacts.readArtifact('PersonCommitmentVerifier')
     const nameVerifierArtifact = await artifacts.readArtifact('DisclosureBindingVerifier')
+    const groth16AdapterArtifact = await artifacts.readArtifact('Groth16VerifierAdapter')
 
     await writeDeployment(connection, 'DeepFamilyToken', tokenAddress, tokenArtifact.abi)
     await writeDeployment(connection, 'PoseidonT5', poseidonT5Address, poseidonT5Artifact.abi)
     await writeDeployment(connection, 'PersonCommitmentVerifier', personCommitmentVerifierAddress, personVerifierArtifact.abi)
     await writeDeployment(connection, 'DisclosureBindingVerifier', nameDisclosureVerifierAddress, nameVerifierArtifact.abi)
+    await writeDeployment(connection, 'Groth16VerifierAdapter', groth16VerifierAdapterAddress, groth16AdapterArtifact.abi)
     await writeDeployment(connection, 'DeepFamily', deepFamilyAddress, deepArtifact.abi)
   }
 
@@ -122,6 +150,7 @@ export const deployIntegratedSystem = async (
     poseidonT5,
     personCommitmentVerifier,
     nameDisclosureVerifier,
+    groth16VerifierAdapter,
     deepFamily,
   }
 }

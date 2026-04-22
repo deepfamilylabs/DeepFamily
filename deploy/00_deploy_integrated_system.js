@@ -50,6 +50,17 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
 
   log(`DisclosureBindingVerifier deployed at: ${nameVerifierDeployment.address}`);
 
+  // 4b) Deploy Groth16VerifierAdapter (Phase 2 transport-layer adapter)
+  const groth16AdapterDeployment = await deploy("Groth16VerifierAdapter", {
+    from: deployer,
+    args: [personVerifierDeployment.address, nameVerifierDeployment.address],
+    log: true,
+    waitConfirmations: network.live ? 2 : 1,
+    redeployIfChanged: true,
+  });
+
+  log(`Groth16VerifierAdapter deployed at: ${groth16AdapterDeployment.address}`);
+
   // 5) Deploy DeepFamily with PoseidonT5 linked
   const deepFamilyDeployment = await deploy("DeepFamily", {
     from: deployer,
@@ -77,15 +88,17 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
     log("DeepFamilyToken initialized");
   }
 
-  // 7) Register verifiers via the registry (proofSystemId=0 for Groth16/BN254)
+  // 7) Register the Groth16 adapter under PROOF_SYSTEM_ID_GROTH16_BN254_V1 = 1
+  //    for both purposes (PersonCommitment = 0, DisclosureBinding = 1). Phase 2 routes business
+  //    entrypoints to the adapter, which internally dispatches to the backend verifiers.
   const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyDeployment.address);
-  const tx1 = await deepFamily.setVerifier(0, 0, personVerifierDeployment.address); // ProofPurpose.Person = 0
+  const tx1 = await deepFamily.setVerifier(1, 0, groth16AdapterDeployment.address);
   await tx1.wait();
-  log(`PersonCommitmentVerifier registered in verifierRegistry`);
+  log(`Groth16VerifierAdapter registered for (proofSystemId=1, purpose=PersonCommitment)`);
 
-  const tx2 = await deepFamily.setVerifier(0, 1, nameVerifierDeployment.address); // ProofPurpose.NameDisclosure = 1
+  const tx2 = await deepFamily.setVerifier(1, 1, groth16AdapterDeployment.address);
   await tx2.wait();
-  log(`DisclosureBindingVerifier registered in verifierRegistry`);
+  log(`Groth16VerifierAdapter registered for (proofSystemId=1, purpose=DisclosureBinding)`);
 
   log("Deployment finished");
 };
@@ -96,6 +109,7 @@ module.exports.tags = [
   "DeepFamilyToken",
   "PersonCommitmentVerifier",
   "DisclosureBindingVerifier",
+  "Groth16VerifierAdapter",
   "PoseidonT5",
   "Integrated",
 ];
