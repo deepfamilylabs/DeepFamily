@@ -4,6 +4,7 @@ import { useTreeDebugData, useTreeGraphData, useTreeStatus, useVizOptions } from
 import { useConfig } from "../../config/context";
 import { isIndexedDBSupported } from "../../../shared/cache/persistence";
 import { TTL } from "../../../shared/cache/ttl";
+import { getTreeQueryPageLimit, isIndexedDbCacheEnabled } from "../../../shared/config/env";
 
 function formatMs(ms: number) {
   if (!Number.isFinite(ms)) return "-";
@@ -18,15 +19,13 @@ export default function TreeDebugPanel() {
   const { childrenMode, deduplicateChildren, strictIncludeUnversionedChildren, traversal } =
     useVizOptions();
   const { rpcUrl, contractAddress, rootHash, rootVersionIndex } = useConfig();
-  const env: any = (import.meta as any).env || {};
   const edgeTTL = TTL.edges;
   const tvTTL = TTL.totalVersions;
   const vdTTL = TTL.versionDetails;
   const nftTTL = TTL.nftDetails;
   const storyTTL = TTL.story;
-  const queryPageLimit = Number(env.VITE_DF_QUERY_PAGE_LIMIT || 200);
-  const idbEnabled =
-    env.VITE_USE_INDEXEDDB_CACHE !== "0" && env.VITE_USE_INDEXEDDB_CACHE !== "false";
+  const queryPageLimit = getTreeQueryPageLimit();
+  const idbEnabled = isIndexedDbCacheEnabled();
   const [debugStats, setDebugStats] = useState(() => {
     const snap = getDebugStats();
     return {

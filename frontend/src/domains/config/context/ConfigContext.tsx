@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { NETWORK_PRESETS } from "../../../shared/config";
+import {
+  getDefaultContractAddress,
+  getDefaultRootHash,
+  getDefaultRootVersionIndex,
+  getDefaultRpcUrl,
+} from "../../../shared/config/env";
 
 type ConfigValues = {
   rpcUrl: string;
@@ -24,15 +30,10 @@ const ROOT_HISTORY_KEY = "ft:rootHistory";
 const ConfigContext = createContext<AppConfig | null>(null);
 
 function getEnvDefaults(): ConfigValues {
-  const env: any = (import.meta as any).env || {};
-  const rvRaw = env.VITE_ROOT_VERSION_INDEX;
-  let rv = Number(rvRaw);
-  if (!Number.isFinite(rv) || rv < 1) rv = 1;
-
-  const rpcUrl = typeof env.VITE_RPC_URL === "string" ? env.VITE_RPC_URL : "";
-  const contractAddress =
-    typeof env.VITE_CONTRACT_ADDRESS === "string" ? env.VITE_CONTRACT_ADDRESS : "";
-  const rootHash = typeof env.VITE_ROOT_PERSON_HASH === "string" ? env.VITE_ROOT_PERSON_HASH : "";
+  const rootVersionIndex = getDefaultRootVersionIndex();
+  const rpcUrl = getDefaultRpcUrl();
+  const contractAddress = getDefaultContractAddress();
+  const rootHash = getDefaultRootHash();
 
   const inferChainId = () => {
     if (!rpcUrl) return 0;
@@ -46,7 +47,7 @@ function getEnvDefaults(): ConfigValues {
     rpcUrl,
     contractAddress,
     rootHash,
-    rootVersionIndex: rv,
+    rootVersionIndex,
     chainId: inferChainId(),
   };
 }

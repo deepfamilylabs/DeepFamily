@@ -1,7 +1,7 @@
+import { getHardNodeLimit } from "../../../shared/config/env";
+
 export const FAMILY_TREE_CONFIG = {
-  DEFAULT_HARD_NODE_LIMIT: Number(
-    ((import.meta as any).env || {}).VITE_DF_HARD_NODE_LIMIT || 20000,
-  ),
+  DEFAULT_HARD_NODE_LIMIT: getHardNodeLimit(),
 };
 
 export type FamilyTreeConfig = typeof FAMILY_TREE_CONFIG;

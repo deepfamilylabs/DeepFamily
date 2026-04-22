@@ -8,21 +8,23 @@
  * debugging or per-deployment tuning.
  */
 
-const env = typeof import.meta !== "undefined" ? (import.meta as any).env ?? {} : {};
+import { getCacheTtlEnv } from "../config/env";
+
+const ttlEnv = getCacheTtlEnv();
 
 export const TTL = {
   /** Version details (per person hash + version index). Default: 5 min */
-  versionDetails: Number(env.VITE_DF_VD_TTL_MS || 300_000),
+  versionDetails: ttlEnv.versionDetails,
 
   /** NFT details (per tokenId). Default: 24 h */
-  nftDetails: Number(env.VITE_DF_NFT_TTL_MS || 86_400_000),
+  nftDetails: ttlEnv.nftDetails,
 
   /** Total versions count (per person hash). Default: 1 min */
-  totalVersions: Number(env.VITE_DF_TV_TTL_MS || 60_000),
+  totalVersions: ttlEnv.totalVersions,
 
   /** Edge data (children union/strict). Default: 2 min */
-  edges: Number(env.VITE_DF_EDGE_TTL_MS || 120_000),
+  edges: ttlEnv.edges,
 
   /** Story metadata + chunks. Default: 5 min */
-  story: Number(env.VITE_DF_STORY_TTL_MS || 300_000),
+  story: ttlEnv.story,
 } as const;

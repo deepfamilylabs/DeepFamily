@@ -5,6 +5,11 @@ import { useConfig } from "../domains/config/context";
 import { TreeDebugPanel, ViewContainer, ViewModeSwitch } from "../domains/tree/ui";
 import { Activity, Layers, GitMerge } from "lucide-react";
 import { ColorThemeProvider } from "../domains/tree/context";
+import {
+  isForceEnvConfigSyncEnabled,
+  isTreeDebugEnabled,
+  shouldPreferFlatTree,
+} from "../shared/config/env";
 
 /**
  * TreePage is intentionally a thin UI shell. The actual "data -> UI" pipeline is:
@@ -23,13 +28,9 @@ import { ColorThemeProvider } from "../domains/tree/context";
  * Rendering (UI) — `frontend/src/domains/tree/ui/ViewContainer.tsx`:
  * - Swaps view implementations (Tree/DAG/Force/Virtual), all consuming the same projected graph.
  */
-function toBool(val: any) {
-  return val === "1" || val === "true" || val === true || val === "yes";
-}
-
 function usePersistedViewMode() {
   const [viewMode, setViewMode] = useState<"dag" | "tree" | "force" | "virtual">(() => {
-    const preferFlat = toBool((import.meta as any).env.VITE_USE_FLAT_TREE);
+    const preferFlat = shouldPreferFlatTree();
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("df:viewMode");
       if (saved === "dag" || saved === "tree" || saved === "force" || saved === "virtual")
@@ -54,11 +55,8 @@ export default function TreePage() {
     useTreeStatus();
   const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, defaults, update } =
     useConfig();
-  const forceEnvConfigSync = useMemo(
-    () => toBool((import.meta as any).env.VITE_FORCE_ENV_CONFIG_SYNC),
-    [],
-  );
-  const showDebugPanel = useMemo(() => toBool((import.meta as any).env.VITE_SHOW_DEBUG), []);
+  const forceEnvConfigSync = useMemo(() => isForceEnvConfigSyncEnabled(), []);
+  const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
 
   useEffect(() => {
     if (!forceEnvConfigSync) return;

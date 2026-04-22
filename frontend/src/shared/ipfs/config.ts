@@ -1,16 +1,10 @@
+import { getIpfsGatewayBaseUrlEnvList } from "../config/env";
+
 const DEFAULT_IPFS_GATEWAY_BASE_URLS = [
   "https://ipfs.io/ipfs/",
   "https://cloudflare-ipfs.com/ipfs/",
   "https://dweb.link/ipfs/",
 ] as const;
-
-const parseList = (value: string | undefined): string[] => {
-  if (!value) return [];
-  return value
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-};
 
 const normalizeGatewayBaseUrl = (value: string): string | null => {
   const trimmed = value.trim();
@@ -33,9 +27,7 @@ const normalizeGatewayBaseUrl = (value: string): string | null => {
 };
 
 const fromEnv = (() => {
-  const env = (import.meta as any).env as Record<string, string | undefined>;
-  const raw = env?.VITE_IPFS_GATEWAY_BASE_URLS;
-  const list = parseList(raw);
+  const list = getIpfsGatewayBaseUrlEnvList();
   const normalized = list.map(normalizeGatewayBaseUrl).filter((v): v is string => Boolean(v));
   return normalized;
 })();

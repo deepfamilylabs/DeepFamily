@@ -7,6 +7,13 @@ import { Clipboard, HelpCircle, ChevronDown, Check } from "lucide-react";
 import { useTreeMutations } from "../../tree/context";
 import { useToast } from "../../../shared/ui";
 import { NETWORK_PRESETS } from "../../../shared/config";
+import {
+  getLocalizedRootHash,
+  getLocalizedRootVersionIndex,
+  isDevMode,
+  shouldShowChildrenModeToggle,
+  shouldShowDeduplicateToggle,
+} from "../../../shared/config/env";
 
 export interface FamilyTreeConfigFormProps {
   editing: boolean;
@@ -42,10 +49,6 @@ type NetworkOption = {
   isCustom?: boolean;
 };
 
-function toBool(val: any) {
-  return val === "1" || val === "true" || val === true || val === "yes";
-}
-
 export default function FamilyTreeConfigForm({
   editing,
   setEditing,
@@ -68,15 +71,9 @@ export default function FamilyTreeConfigForm({
   hideHeader,
 }: FamilyTreeConfigFormProps) {
   const { t, i18n } = useTranslation();
-  const isDev = import.meta.env.DEV;
-  const showDeduplicateToggle = useMemo(
-    () => toBool((import.meta as any).env.VITE_SHOW_DEDUPLICATE_TOGGLE),
-    [],
-  );
-  const showChildrenModeToggle = useMemo(
-    () => toBool((import.meta as any).env.VITE_SHOW_CHILDREN_MODE_TOGGLE),
-    [],
-  );
+  const isDev = isDevMode();
+  const showDeduplicateToggle = useMemo(() => shouldShowDeduplicateToggle(), []);
+  const showChildrenModeToggle = useMemo(() => shouldShowChildrenModeToggle(), []);
   const {
     rpcUrl,
     chainId,
@@ -225,11 +222,8 @@ export default function FamilyTreeConfigForm({
     const activeLocale = (locale || "").toLowerCase();
     const preferZhRoot = LOCALE_NEED_ZH_ROOT.has(activeLocale);
     const suffix = preferZhRoot ? "ZH" : "EN";
-    const env = (import.meta as any).env as Record<string, string | undefined>;
-    const hashKey = `VITE_ROOT_PERSON_HASH_${suffix}`;
-    const versionKey = `VITE_ROOT_VERSION_INDEX_${suffix}`;
-    const localizedHash = env?.[hashKey];
-    const localizedVersion = Number(env?.[versionKey]);
+    const localizedHash = getLocalizedRootHash(suffix);
+    const localizedVersion = getLocalizedRootVersionIndex(suffix);
 
     const safeHash =
       localizedHash && /^0x[a-fA-F0-9]{64}$/.test(localizedHash)

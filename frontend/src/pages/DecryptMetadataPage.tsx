@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { parseEncryptedPayload, type AnyEncryptedMetadataPayload } from "../shared/crypto/metadataCrypto";
 import { sanitizeErrorForLogging } from "../shared/lib/errors";
+import { isDevMode } from "../shared/config/env";
 import { IPFS_GATEWAY_BASE_URLS } from "../shared/ipfs/config";
 import { cryptoWorkerCall } from "../shared/workers/cryptoWorkerClient";
 
@@ -42,7 +43,7 @@ export default function DecryptMetadataPage() {
   const [searchParams] = useSearchParams();
   const initialCID = searchParams.get("cid") || "";
   const initialGateway = searchParams.get("gateway") || IPFS_GATEWAY_BASE_URLS[0];
-  const isDev = import.meta.env.DEV;
+  const isDev = isDevMode();
 
   const [cid, setCid] = useState(initialCID);
   const [baseUrl, setBaseUrl] = useState(initialGateway);
