@@ -31,7 +31,7 @@
     "frontend:legacy-entrypoints": "npm run legacy-entrypoints:check --prefix frontend",
     "frontend:typecheck": "tsc --noEmit -p frontend/tsconfig.json",
     "frontend:test": "npm run test --prefix frontend",
-    "frontend:check": "npm run frontend:lint && npm run frontend:legacy-entrypoints && npm run frontend:typecheck && npm run frontend:test",
+    "frontend:check": "npm run frontend:lint && npm run frontend:legacy-entrypoints && npm run frontend:typecheck && npm run frontend:build && npm run frontend:test",
     "check": "npm run frontend:check && npm run contracts:check",
     "frontend:locales:compare": "npm run locales:compare --prefix frontend",
     "frontend:locales:usage": "npm run locales:usage --prefix frontend",
