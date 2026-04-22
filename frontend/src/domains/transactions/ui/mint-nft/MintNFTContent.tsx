@@ -31,6 +31,7 @@ import {
   computeDisclosureBinding,
   type PersonData,
 } from "../../../../shared/zk/zk";
+import { decodeDisclosureBindingPublicSignals } from "../../../../shared/zk/publicSignalSpecs";
 import { zkWorkerCall } from "../../../../shared/workers/zkWorkerClient";
 import { safeCanonicalizeFullName } from "../../../../shared/crypto/identityCommitment";
 import {
@@ -664,17 +665,7 @@ export default function MintNFTModal({
       }
 
       const proofEnvelope = formatGroth16ProofForContract(generatedProof);
-      if (publicSignals.length < 6) {
-        throw new Error("Invalid name disclosure public signals length");
-      }
-      const publicSignalsStruct = {
-        identityCommitment: BigInt(publicSignals[0]),
-        disclosureBinding: BigInt(publicSignals[1]),
-        minter: BigInt(publicSignals[2]),
-        schemaVersion: Number(publicSignals[3]),
-        cryptoSuiteVersion: Number(publicSignals[4]),
-        hashAlgoId: Number(publicSignals[5]),
-      };
+      const publicSignalsStruct = decodeDisclosureBindingPublicSignals(publicSignals);
 
       const disclosureBindingValue = computeDisclosureBinding(
         nameField,

@@ -1,6 +1,19 @@
-import { keccak256, concat, toUtf8Bytes, zeroPadValue, toBeHex, solidityPacked } from "ethers";
+import {
+  keccak256,
+  concat,
+  toUtf8Bytes,
+  zeroPadValue,
+  toBeHex,
+  solidityPacked,
+} from "ethers";
 import { poseidon4 } from "poseidon-lite";
 import { canonicalizeFullName } from "../crypto/identityCommitment";
+import {
+  DEFAULT_PROOF_SYSTEM_ID as CODEC_DEFAULT_PROOF_SYSTEM_ID,
+  DEFAULT_PROOF_ENCODING_ID as CODEC_DEFAULT_PROOF_ENCODING_ID,
+  packGroth16ProofEnvelope,
+  type ProofEnvelope as CodecProofEnvelope,
+} from "../../../../lib/proofEnvelopeCodec.js";
 
 export type Groth16Proof = {
   pi_a: [string | bigint, string | bigint, string | bigint];
@@ -27,7 +40,8 @@ const DOMAIN_DISCLOSURE = 1003n;
 export const DEFAULT_SCHEMA_VERSION = 1;
 export const DEFAULT_CRYPTO_SUITE_VERSION = 1;
 export const DEFAULT_HASH_ALGO_ID = 1;
-export const DEFAULT_PROOF_SYSTEM_ID = 0;
+export const DEFAULT_PROOF_SYSTEM_ID = CODEC_DEFAULT_PROOF_SYSTEM_ID;
+export const DEFAULT_PROOF_ENCODING_ID = CODEC_DEFAULT_PROOF_ENCODING_ID;
 
 export interface PersonData {
   fullName: string;
@@ -134,34 +148,13 @@ export function computePersonHashFromData(person: PersonData): {
   return { identityCommitment: ic, personHash, nameField, suiteCommitment: suite, packedBirthGenderField: packed };
 }
 
-export type ProofEnvelope = {
-  proofSystemId: number;
-  a: [bigint, bigint];
-  b: [[bigint, bigint], [bigint, bigint]];
-  c: [bigint, bigint];
-};
+export type ProofEnvelope = CodecProofEnvelope;
 
 export function formatGroth16ProofForContract(
   proof: Groth16Proof,
-  opts?: { proofSystemId?: number },
+  opts?: { proofSystemId?: number; proofEncodingId?: number },
 ): ProofEnvelope {
-  if (!proof || !proof.pi_a || !proof.pi_b || !proof.pi_c) {
-    throw new Error("Invalid proof structure");
-  }
-
-  const a: [bigint, bigint] = [toBigInt(proof.pi_a[0]), toBigInt(proof.pi_a[1])];
-  const b: [[bigint, bigint], [bigint, bigint]] = [
-    [toBigInt(proof.pi_b[0][1]), toBigInt(proof.pi_b[0][0])],
-    [toBigInt(proof.pi_b[1][1]), toBigInt(proof.pi_b[1][0])],
-  ];
-  const c: [bigint, bigint] = [toBigInt(proof.pi_c[0]), toBigInt(proof.pi_c[1])];
-
-  return {
-    proofSystemId: opts?.proofSystemId ?? DEFAULT_PROOF_SYSTEM_ID,
-    a,
-    b,
-    c,
-  };
+  return packGroth16ProofEnvelope(proof, opts);
 }
 
 export function toBigIntArray(values: Array<string | number | bigint>): bigint[] {

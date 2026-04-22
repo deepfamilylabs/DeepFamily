@@ -4,6 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ArgumentType } from "hardhat/types/arguments";
 import disclosureBindingProof from "../lib/disclosureBindingProof.js";
+import { DISCLOSURE_BINDING_PROOF_DESCRIPTOR } from "../lib/proofDescriptors.js";
+import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,15 +13,16 @@ const __dirname = path.dirname(__filename);
 const { buildDisclosureBindingInput: buildProofInput, generateDisclosureBindingProof } =
   disclosureBindingProof;
 
-export const DEFAULT_WASM_CANDIDATES = [
-  path.join(__dirname, "../frontend/public/zk/disclosure_binding.wasm"),
-  path.join(__dirname, "../zk-artifacts/circuits/disclosure_binding_js/disclosure_binding.wasm"),
-];
-
-export const DEFAULT_ZKEY_CANDIDATES = [
-  path.join(__dirname, "../frontend/public/zk/disclosure_binding_final.zkey"),
-  path.join(__dirname, "../zk-artifacts/circuits/disclosure_binding_final.zkey"),
-];
+export const DEFAULT_WASM_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
+  __dirname,
+  DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  "wasm",
+);
+export const DEFAULT_ZKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
+  __dirname,
+  DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  "zkey",
+);
 
 export function normalizeNameForHash(value) {
   if (value === undefined || value === null) return "";

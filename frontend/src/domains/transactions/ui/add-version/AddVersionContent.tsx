@@ -34,6 +34,7 @@ import { zkWorkerCall } from "../../../../shared/workers/zkWorkerClient";
 import { safeCanonicalizeFullName } from "../../../../shared/crypto/identityCommitment";
 import { formatGroth16ProofForContract } from "../../../../shared/zk/zk";
 import type { PersonData } from "../../../../shared/zk/zk";
+import { decodePersonCommitmentPublicSignals } from "../../../../shared/zk/publicSignalSpecs";
 import {
   computeIdentityHashMaterial,
   generateRandomIdentitySaltHex,
@@ -856,15 +857,7 @@ export default function AddVersionModal({
       setProofGenerationStep(t("addVersion.submittingToBlockchain", "Submitting to blockchain..."));
 
       const proofEnvelope = formatGroth16ProofForContract(proof);
-      const publicSignalsStruct = {
-        identityCommitment: BigInt(publicSignals[0]),
-        fatherIdentityCommitment: BigInt(publicSignals[1]),
-        motherIdentityCommitment: BigInt(publicSignals[2]),
-        submitter: BigInt(publicSignals[3]),
-        schemaVersion: Number(publicSignals[4]),
-        cryptoSuiteVersion: Number(publicSignals[5]),
-        hashAlgoId: Number(publicSignals[6]),
-      };
+      const publicSignalsStruct = decodePersonCommitmentPublicSignals(publicSignals);
 
       const result = await addVersionFlow.runOrThrow({
         proof: proofEnvelope,
