@@ -2,11 +2,11 @@
  * Minimal hook for accessing read-only and signer-backed contract instances.
  *
  * This replaces the read-side of the old `useContract` hook. Write operations
- * should go through `domains/transactions/flows/*` instead.
+ * should go through feature-local transaction hooks and transaction services.
  */
 import { useMemo } from "react";
-import { useConfig } from "../../config/context";
-import { useWallet } from "../../wallet/context";
+import { useConfig } from "../../config";
+import { useWallet } from "../../wallet";
 import { createDeepFamilyContract } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 

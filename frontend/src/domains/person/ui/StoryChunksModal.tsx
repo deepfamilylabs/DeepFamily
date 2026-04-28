@@ -35,7 +35,7 @@ import {
   shortAddress,
   formatHashMiddle,
 } from "../../../shared/model";
-import { useTreeMutations, useTreeNodeAccess } from "../../tree/context";
+import { useTreeMutations, useTreeNodeAccess } from "../../tree";
 import {
   getChunkTypeOptions,
   getChunkTypeI18nKey,

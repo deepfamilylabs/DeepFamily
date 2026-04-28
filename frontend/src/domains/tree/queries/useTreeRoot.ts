@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { makeNodeId, type NodeId } from "../../../shared/model";
-import { useConfig } from "../../config/context";
+import { useConfig } from "../../config";
 
 export function useTreeRoot(): NodeId | null {
   const { rootHash, rootVersionIndex } = useConfig();

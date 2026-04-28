@@ -1,6 +1,6 @@
 import { memo, useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useTreeMutations, useTreeNodeAccess } from "../../tree/context";
+import { useTreeMutations, useTreeNodeAccess } from "../../tree";
 import {
   User,
   Calendar,

@@ -39,7 +39,7 @@ vi.mock("../app/context", () => ({
   }),
 }));
 
-vi.mock("../domains/tree/context", () => ({
+vi.mock("../domains/tree", () => ({
   useTreeGraphData: () => ({
     nodesData: mocks.nodesData,
   }),
@@ -51,9 +51,15 @@ vi.mock("../domains/tree/context", () => ({
       nodes: mocks.graphNodeIds.map((id) => ({ id })),
     },
   }),
+  useTreeNodeAccess: () => ({
+    preloadStoryData: vi.fn(),
+  }),
+  useTreeMutations: () => ({
+    bumpEndorsementCount: vi.fn(),
+  }),
 }));
 
-vi.mock("../domains/person/ui", () => ({
+vi.mock("../domains/person", () => ({
   PersonStoryCard: ({ person, onOpen }: any) => (
     <button data-testid={`person-card-${person.tokenId}`} onClick={() => onOpen(person)}>
       {person.fullName}

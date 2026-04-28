@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Loader2, AlertCircle, Star, ShieldCheck, Coins } from "lucide-react";
-import { useContractClient } from "../../../transactions/hooks/useContractClient";
-import { useWallet } from "../../../wallet/context";
-import { getFriendlyError } from "../../../../shared/lib/errors";
-import { useTreeMutations } from "../../../tree/context";
 import {
+  useContractClient,
   useEndorseFlow,
   type ExecuteEndorseFlowResult,
-} from "../../../transactions/flows";
+} from "../../../transactions";
+import { useWallet } from "../../../wallet";
+import { useTreeMutations } from "../../../tree";
 import { ModalShell } from "../../../../shared/ui/ModalShell";
 
 export interface EndorseCompactModalProps {
@@ -62,7 +61,8 @@ export default function EndorseCompactModal({
     const err = endorseFlow.error as any;
     const errMsg = err?.message || "";
     return (
-      err?.code === "INSUFFICIENT_DEEP_BALANCE" ||
+      err?.reason === "INSUFFICIENT_DEEP_BALANCE" ||
+      err?.type === "INSUFFICIENT_DEEP_BALANCE" ||
       errMsg.includes("Insufficient DEEP token balance") ||
       errMsg.includes("insufficient")
     );
@@ -73,7 +73,8 @@ export default function EndorseCompactModal({
     const err = endorseFlow.error as any;
     const errMsg = err?.message || "";
     if (
-      err?.code === "INSUFFICIENT_DEEP_BALANCE" ||
+      err?.reason === "INSUFFICIENT_DEEP_BALANCE" ||
+      err?.type === "INSUFFICIENT_DEEP_BALANCE" ||
       errMsg.includes("Insufficient DEEP token balance") ||
       errMsg.includes("insufficient")
     ) {
@@ -87,7 +88,7 @@ export default function EndorseCompactModal({
     ) {
       return t("endorse.errors.userRejected", "Transaction was rejected by user");
     }
-    return getFriendlyError(err, t).message;
+    return err.message || t("endorse.transactionFailed", "Transaction failed. Please try again.");
   }, [endorseFlow.status, endorseFlow.error, t]);
 
   // Map flow status to local display state
@@ -97,7 +98,7 @@ export default function EndorseCompactModal({
     if (s === "idle") return "idle" as const;
     if (s === "validating") return "checking" as const;
     if (s === "approving") return "approving" as const;
-    if (s === "submitting" || s === "confirming") return "working" as const;
+    if (s === "submitting") return "working" as const;
     if (s === "success") return "success" as const;
     if (s === "error") return "error" as const;
     return "idle" as const;

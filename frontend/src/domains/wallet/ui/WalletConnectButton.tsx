@@ -4,7 +4,7 @@ import { Wallet, LogOut, RefreshCw } from "lucide-react";
 import { parseEther } from "ethers";
 import { shortAddress } from "../../../shared/model";
 import { isSupportedChain } from "../../../shared/config";
-import { useConfig } from "../../config/context";
+import { useConfig } from "../../config";
 
 interface WalletConnectButtonProps {
   className?: string;

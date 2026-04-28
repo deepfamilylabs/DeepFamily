@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { usePersonDetails, type UsePersonDetailsResult } from "../../person/queries";
+import { usePersonDetails, type UsePersonDetailsResult } from "../../person";
 
 export function useVersionDetails(
   personHash: string | null | undefined,

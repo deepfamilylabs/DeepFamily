@@ -1,4 +1,4 @@
-import { WalletConnectButton } from "../../domains/wallet/ui";
+import { WalletConnectButton } from "../../domains/wallet";
 
 interface HeaderControlsProps {
   variant?: "home" | "normal";

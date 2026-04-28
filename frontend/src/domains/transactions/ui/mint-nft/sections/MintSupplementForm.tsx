@@ -1,0 +1,180 @@
+import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
+import { Lock } from "lucide-react";
+import { ThemedSelect } from "../../shared/ThemedSelect";
+import type { MintNFTFormValues, MintNFTT } from "../model/mintNftTypes";
+
+export interface MintSupplementFormProps {
+  t: MintNFTT;
+  register: UseFormRegister<MintNFTFormValues>;
+  errors: FieldErrors<MintNFTFormValues>;
+  setValue: UseFormSetValue<MintNFTFormValues>;
+  watch: UseFormWatch<MintNFTFormValues>;
+}
+
+export function MintSupplementForm({
+  t,
+  register,
+  errors,
+  setValue,
+  watch,
+}: MintSupplementFormProps) {
+  const isDeathBC = Boolean(watch("isDeathBC"));
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <>
+      <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+          {t("mintNFT.supplementalInfo", "Supplemental Information")}
+        </h3>
+
+        <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/30">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+            <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed font-medium">
+              {t(
+                "mintNFT.supplementalInfoImmutable",
+                "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+                {t("mintNFT.birthPlace", "Birth Place")}
+              </label>
+              <input
+                {...register("birthPlace")}
+                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                placeholder={t("mintNFT.birthPlacePlaceholder", "Enter birth place")}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+                {t("mintNFT.deathPlace", "Death Place")}
+              </label>
+              <input
+                {...register("deathPlace")}
+                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                placeholder={t(
+                  "mintNFT.deathPlacePlaceholder",
+                  "Enter death place (if applicable)",
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              {t("mintNFT.deathDate", "Death Date (if applicable)")}
+            </h4>
+
+            <div className="flex flex-nowrap items-start gap-1">
+              <div className="flex items-start gap-1">
+                <div className="w-20 relative">
+                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                    {t("search.hashCalculator.isBirthBC")}
+                  </label>
+                  <ThemedSelect
+                    value={isDeathBC ? 1 : 0}
+                    onChange={(value) => setValue("isDeathBC", value === 1)}
+                    options={[
+                      { value: 0, label: t("search.hashCalculator.bcOptions.ad") },
+                      { value: 1, label: t("search.hashCalculator.bcOptions.bc") },
+                    ]}
+                  />
+                </div>
+
+                <div className="w-20 sm:w-[120px]">
+                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                    {t("mintNFT.deathYear", "Death Year")}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={isDeathBC ? 9999 : currentYear}
+                    placeholder={isDeathBC ? "<10000" : "<=" + currentYear}
+                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                    {...register("deathYear", {
+                      setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="w-24">
+                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                  {t("search.hashCalculator.birthMonthLabel")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="12"
+                  placeholder={t("search.hashCalculator.birthMonth")}
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                  {...register("deathMonth", {
+                    setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
+                  })}
+                />
+              </div>
+
+              <div className="w-24">
+                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                  {t("search.hashCalculator.birthDayLabel")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="31"
+                  placeholder={t("search.hashCalculator.birthDay")}
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                  {...register("deathDay", {
+                    setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
+                  })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+              {t("mintNFT.story", "Life Story Summary")}
+            </label>
+            <textarea
+              {...register("story")}
+              rows={4}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all resize-none"
+              placeholder={t("mintNFT.storyPlaceholder", "Enter a brief life story summary...")}
+            />
+            {errors.story && (
+              <p className="mt-1 text-xs text-red-500 font-bold">{String(errors.story.message)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+        <div>
+          <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+            {t("mintNFT.tokenURI", "Token URI")}
+          </label>
+          <input
+            {...register("tokenURI")}
+            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+            placeholder="https://... or ipfs://..."
+          />
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+            {t("mintNFT.tokenURIHint", "Optional: URL or IPFS hash for NFT metadata")}
+          </p>
+          {errors.tokenURI && (
+            <p className="mt-1 text-xs text-red-500 font-bold">{String(errors.tokenURI.message)}</p>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

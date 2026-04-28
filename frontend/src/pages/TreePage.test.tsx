@@ -44,25 +44,12 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../domains/tree/context", () => ({
+vi.mock("../domains/tree", () => ({
   useTreeGraphData: () => mocks.treeGraphData,
   useTreeStatus: () => mocks.treeStatus,
   ColorThemeProvider: ({ children }: any) => (
     <div data-testid="color-theme-provider">{children}</div>
   ),
-}));
-
-vi.mock("../domains/config/context", () => ({
-  useConfig: () => mocks.config,
-}));
-
-vi.mock("../shared/config/env", () => ({
-  isForceEnvConfigSyncEnabled: mocks.env.isForceEnvConfigSyncEnabled,
-  isTreeDebugEnabled: mocks.env.isTreeDebugEnabled,
-  shouldPreferFlatTree: mocks.env.shouldPreferFlatTree,
-}));
-
-vi.mock("../domains/tree/ui", () => ({
   ViewModeSwitch: ({ value, onChange }: any) => (
     <button data-testid="view-mode-switch" onClick={() => onChange("force")}>
       switch:{value}
@@ -74,6 +61,16 @@ vi.mock("../domains/tree/ui", () => ({
     </div>
   ),
   TreeDebugPanel: () => <div data-testid="tree-debug-panel">debug</div>,
+}));
+
+vi.mock("../domains/config", () => ({
+  useConfig: () => mocks.config,
+}));
+
+vi.mock("../shared/config/env", () => ({
+  isForceEnvConfigSyncEnabled: mocks.env.isForceEnvConfigSyncEnabled,
+  isTreeDebugEnabled: mocks.env.isTreeDebugEnabled,
+  shouldPreferFlatTree: mocks.env.shouldPreferFlatTree,
 }));
 
 describe("TreePage", () => {

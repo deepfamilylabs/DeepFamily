@@ -3,7 +3,7 @@ import {
   buildTreeTxInvalidation,
   type TreeTxInvalidationInput,
   type TreeTxInvalidationResult,
-} from "../../tree/services/treeInvalidation";
+} from "../../tree";
 import { QueryCache } from "../../../shared/cache/QueryCache";
 import { queryClient } from "../../../shared/cache/queryClient";
 

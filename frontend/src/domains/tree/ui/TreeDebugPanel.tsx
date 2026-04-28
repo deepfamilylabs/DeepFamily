@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTreeDebugData, useTreeGraphData, useTreeStatus, useVizOptions } from "../context";
-import { useConfig } from "../../config/context";
+import { useConfig } from "../../config";
 import { isIndexedDBSupported } from "../../../shared/cache/persistence";
 import { TTL } from "../../../shared/cache/ttl";
 import { getTreeQueryPageLimit, isIndexedDbCacheEnabled } from "../../../shared/config/env";

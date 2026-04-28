@@ -3,7 +3,7 @@ import ColorPalette from "./ColorPalette";
 import LoadingSkeleton from "./LoadingSkeleton";
 import TreeListView from "./TreeListView";
 import ViewModeSwitch from "./ViewModeSwitch";
-import { EndorseModalProvider, NodeDetailProvider } from "../../person/ui";
+import { EndorseModalProvider, NodeDetailProvider } from "../../person";
 import { FamilyTreeViewConfigProvider } from "../context";
 
 const ForceGraphView = React.lazy(() => import("./ForceGraphView"));
