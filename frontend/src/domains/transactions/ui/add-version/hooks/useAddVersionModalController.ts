@@ -217,6 +217,9 @@ export function useAddVersionModalController({
     setMetadataCid,
   });
 
+  const resetCommitmentProof = commitmentProof.reset;
+  const resetEncryptedMetadata = encryptedMetadata.reset;
+
   const resetBusinessState = useCallback(
     (options?: { remountCalculators?: boolean }) => {
       reset();
@@ -233,8 +236,8 @@ export function useAddVersionModalController({
       setMotherIdentityMode("deterministic");
       setMotherRecoverySaltHex("");
       setIsSubmitting(false);
-      commitmentProof.reset();
-      encryptedMetadata.reset();
+      resetCommitmentProof();
+      resetEncryptedMetadata();
       resetAddVersionFlow();
       setSuccessResult(null);
       setErrorResult(null);
@@ -246,7 +249,7 @@ export function useAddVersionModalController({
         setFormResetKey((current) => current + 1);
       }
     },
-    [commitmentProof, encryptedMetadata, reset, resetAddVersionFlow],
+    [resetCommitmentProof, resetEncryptedMetadata, reset, resetAddVersionFlow],
   );
 
   useEffect(() => {
