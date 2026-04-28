@@ -1,23 +1,23 @@
 import { readBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { NodeData } from "../../../shared/model";
-import { findNodeByTokenId, findNodeEntryByTokenId, findNodeIdByTokenId } from "../../person/model/nodeLookup";
 import {
   applyOwnerToTokenNode,
+  applyStoryDataToNode,
   backfillPersistedTokenNode,
   buildNodeFromNftDetails,
-  getOwnerFromTokenNode,
-} from "../../person/model/tokenNode";
-import { upsertNode } from "../../person/model/nodeState";
-import {
-  applyStoryDataToNode,
   buildStoryDataResult,
   buildStorySnapshot,
+  findNodeByTokenId,
+  findNodeEntryByTokenId,
+  findNodeIdByTokenId,
   getMissingStoryOffset,
+  getOwnerFromTokenNode,
   mergeStoryChunkRecords,
   parseStoryChunkRecord,
+  type ParsedNftDetails,
   type StoryDataResult,
-} from "../../person/model/storyData";
-import type { ParsedNftDetails } from "../../person/api/personReadGateway";
+  upsertNode,
+} from "../../person";
 
 type RefLike<T> = { current: T };
 type SetNodesData = (updater: (prev: Record<string, NodeData>) => Record<string, NodeData>) => void;

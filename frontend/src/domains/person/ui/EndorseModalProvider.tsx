@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import EndorseCompactModal from "./EndorseCompactModal";
-import { useTreeMutations } from "../../tree/context";
+import { useTreeMutations } from "../../tree";
 
 export type EndorseTarget = {
   personHash: string;

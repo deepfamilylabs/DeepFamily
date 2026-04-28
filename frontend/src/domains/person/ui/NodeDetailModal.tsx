@@ -12,7 +12,7 @@ import {
   formatUnixSeconds,
 } from "../../../shared/model";
 import { useNavigate } from "react-router-dom";
-import { useTreeNodeAccess } from "../../tree/context";
+import { useTreeNodeAccess } from "../../tree";
 import { useEndorseModal } from "./EndorseModalProvider";
 
 export default function NodeDetailModal({

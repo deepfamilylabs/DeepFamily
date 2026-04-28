@@ -38,7 +38,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../../wallet/context", () => ({
+vi.mock("../../wallet", () => ({
   useWallet: () => ({
     address,
     signer: {},
@@ -57,7 +57,7 @@ vi.mock("../../../shared/clients/contractFactory", () => ({
   createDeepTokenContract: () => mocks.tokenContract,
 }));
 
-vi.mock("../../tree/context", () => ({
+vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
     bumpEndorsementCount: mocks.bumpEndorsementCount,
     invalidateByTx: mocks.invalidateByTx,
@@ -67,14 +67,30 @@ vi.mock("../../tree/context", () => ({
   }),
 }));
 
-vi.mock("../flows", () => ({
-  useEndorseFlow: () => ({
-    status: mocks.flowState.status,
-    result: mocks.flowState.result,
-    error: mocks.flowState.error,
-    run: mocks.endorseRun,
-  }),
-}));
+vi.mock("./endorse/hooks/useEndorseFlow", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
+
+  return {
+    useEndorseFlow: () => {
+      const [, rerender] = React.useState(0);
+      return {
+        status: mocks.flowState.status,
+        result: mocks.flowState.result,
+        error: mocks.flowState.error,
+        reset: () => {
+          mocks.flowState.status = "idle";
+          mocks.flowState.result = null;
+          mocks.flowState.error = null;
+          rerender((value) => value + 1);
+        },
+        run: (args: any) => {
+          mocks.endorseRun(args);
+          rerender((value) => value + 1);
+        },
+      };
+    },
+  };
+});
 
 vi.mock("../../../shared/lib/errors", () => ({
   getFriendlyError: (error: any) => ({

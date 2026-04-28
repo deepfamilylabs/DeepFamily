@@ -28,7 +28,11 @@ export function TransactionErrorResult({
   retry,
 }: TransactionErrorResultProps) {
   return (
-    <div className="p-5 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-800 animate-fadeIn">
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="p-5 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-800 animate-fadeIn"
+    >
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center flex-shrink-0">
           <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300" />

@@ -4,7 +4,7 @@ import { useDebounce } from "./useDebounce";
 import { useConfig } from "../context";
 import { formatHashMiddle, shortAddress } from "../../../shared/model";
 import { Clipboard, HelpCircle, ChevronDown, Check } from "lucide-react";
-import { useTreeMutations } from "../../tree/context";
+import { useTreeMutations } from "../../tree";
 import { useToast } from "../../../shared/ui";
 import { NETWORK_PRESETS } from "../../../shared/config";
 import {

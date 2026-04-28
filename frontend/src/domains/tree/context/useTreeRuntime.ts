@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useConfig } from "../../config/context";
+import { useConfig } from "../../config";
 import { makeNodeId, type NodeId } from "../../../shared/model";
 import {
   createDeepFamilyContract,
@@ -7,7 +7,7 @@ import {
 } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
-import { createPersonReadGateway } from "../../person/api/personReadGateway";
+import { createPersonReadGateway } from "../../person";
 import { createTreeReadGateway } from "../api/treeReadGateway";
 
 export function useTreeRuntime() {

@@ -4,7 +4,7 @@ import { makeNodeId, parseNodeId } from "../../../shared/model";
 import type { NodeUi } from "./nodeUi";
 import { getNodeUi } from "./nodeUi";
 import { useTreeGraphData, useVizOptions } from "../context";
-import { useEndorseModal, useNodeDetail, type EndorseTarget } from "../../person/ui";
+import { useEndorseModal, useNodeDetail, type EndorseTarget } from "../../person";
 import {
   buildTreeRowsFromGraph,
   buildViewGraphData,

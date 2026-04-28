@@ -33,3 +33,11 @@ export {
   applyOwnerToTokenNode,
   getOwnerFromTokenNode,
 } from "./tokenNode";
+export type { NodeKeyMinimal } from "./nodeDetailSync";
+export {
+  EMPTY_STORY_METADATA,
+  resolveSelectedNodeData,
+  resolveNodeDetailTokenId,
+  applyNodeDetailVersionDetails,
+  applyNodeDetailNftDetails,
+} from "./nodeDetailSync";

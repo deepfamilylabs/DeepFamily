@@ -2,9 +2,12 @@ import React, { createContext, useContext } from "react";
 import type { NodeData, NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import type { TreeTxInvalidationInput } from "../services/treeInvalidation";
-import type { NodeKeyMinimal } from "../../person/model/nodeDetailSync";
-import type { ParsedNftDetails, ParsedVersionDetails } from "../../person/api/personDetailParsers";
-import type { StoryDataResult } from "../../person/model/storyData";
+import type {
+  NodeKeyMinimal,
+  ParsedNftDetails,
+  ParsedVersionDetails,
+  StoryDataResult,
+} from "../../person";
 import type { TreeDebugStats, TreeProgress } from "./types";
 
 export interface TreeGraphDataValue {

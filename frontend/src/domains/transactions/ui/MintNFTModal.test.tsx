@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   endorsedVersionIndex: vi.fn(),
   contract: {} as any,
   mintRunOrThrow: vi.fn(),
+  mintReset: vi.fn(),
   markVersionMinted: vi.fn(),
   onClose: vi.fn(),
   onSuccess: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../../wallet/context", () => ({
+vi.mock("../../wallet", () => ({
   useWallet: () => ({
     address: mocks.address,
   }),
@@ -45,14 +46,16 @@ vi.mock("../hooks/useContractClient", () => ({
   }),
 }));
 
-vi.mock("../../tree/context", () => ({
+vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
     markVersionMinted: mocks.markVersionMinted,
   }),
 }));
 
-vi.mock("../flows", () => ({
+vi.mock("./mint-nft/hooks/useMintNftFlow", () => ({
   useMintNftFlow: () => ({
+    status: "idle",
+    reset: mocks.mintReset,
     runOrThrow: mocks.mintRunOrThrow,
   }),
 }));
@@ -93,7 +96,7 @@ vi.mock("../../../shared/lib/errors", () => ({
   sanitizeErrorForLogging: (error: any) => error,
 }));
 
-vi.mock("../../person/ui", () => ({
+vi.mock("../../person", () => ({
   PersonHashCalculator: forwardRef((props: any, ref) => {
     useImperativeHandle(ref, () => ({
       getSecretInputs: () => ({ passphrase: "" }),
@@ -157,6 +160,7 @@ describe("MintNFTModal", () => {
       endorsedVersionIndex: mocks.endorsedVersionIndex,
     };
     mocks.mintRunOrThrow.mockReset();
+    mocks.mintReset.mockReset();
     mocks.markVersionMinted.mockReset();
     mocks.onClose.mockReset();
     mocks.onSuccess.mockReset();
@@ -293,5 +297,27 @@ describe("MintNFTModal", () => {
     expect(mocks.markVersionMinted).not.toHaveBeenCalled();
     expect(await screen.findByText("NFT Minting Failed")).toBeTruthy();
     expect(screen.getAllByText("mint reverted").length).toBeGreaterThan(0);
+  });
+
+  it("opens the endorsement handoff when the target version is not endorsed", async () => {
+    mocks.endorsedVersionIndex.mockResolvedValue(1);
+
+    renderMintModal();
+
+    await waitFor(() => expect(screen.getByText("Not Endorsed")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Go Endorse" }));
+    });
+
+    expect(screen.getByText("Endorsement Required")).toBeTruthy();
+
+    await act(async () => {
+      const endorseButtons = screen.getAllByRole("button", { name: "Go Endorse" });
+      fireEvent.click(endorseButtons[endorseButtons.length - 1]);
+    });
+
+    expect(mocks.onGoEndorse).toHaveBeenCalledWith(personHash, 2);
+    expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
   });
 });

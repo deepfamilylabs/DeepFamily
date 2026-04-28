@@ -44,7 +44,7 @@ vi.mock("react-i18next", () => {
   };
 });
 
-vi.mock("../domains/config/context", () => ({
+vi.mock("../domains/config", () => ({
   useConfig: () => ({
     contractAddress: "0x0000000000000000000000000000000000000abc",
     rpcUrl: "https://rpc.local",
@@ -60,20 +60,24 @@ vi.mock("../shared/ui", () => ({
   }),
 }));
 
-vi.mock("../domains/person/queries", () => ({
-  useNFTDetails: () => ({
-    data: mocks.nftDetails,
-    loading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-  useStoryData: () => ({
-    data: mocks.storyData,
-    loading: mocks.storyLoading,
-    error: mocks.storyError,
-    refetch: vi.fn(),
-  }),
-}));
+vi.mock("../domains/person", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../domains/person")>();
+  return {
+    ...actual,
+    useNFTDetails: () => ({
+      data: mocks.nftDetails,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }),
+    useStoryData: () => ({
+      data: mocks.storyData,
+      loading: mocks.storyLoading,
+      error: mocks.storyError,
+      refetch: vi.fn(),
+    }),
+  };
+});
 
 vi.mock("../shared/cache/queryClient", () => ({
   getScopedQueryClient: () => ({
@@ -81,7 +85,7 @@ vi.mock("../shared/cache/queryClient", () => ({
   }),
 }));
 
-vi.mock("../domains/transactions/flows", () => ({
+vi.mock("../domains/transactions", () => ({
   useAddStoryChunkFlow: () => ({
     runOrThrow: mocks.addStoryRunOrThrow,
   }),

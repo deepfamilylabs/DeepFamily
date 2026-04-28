@@ -6,7 +6,7 @@
 
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { SecureKeyDerivation } from "../domains/person/ui";
+import { SecureKeyDerivation } from "../domains/person";
 
 export const KeyDerivationPage: React.FC = () => {
   const { t } = useTranslation();

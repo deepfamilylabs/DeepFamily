@@ -29,7 +29,7 @@ vi.mock("../context", () => ({
   useWallet: () => mocks.wallet,
 }));
 
-vi.mock("../../config/context", () => ({
+vi.mock("../../config", () => ({
   useConfig: () => ({
     chainId: mocks.configChainId,
   }),

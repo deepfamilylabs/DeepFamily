@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useTreeGraphData, useTreeStatus } from "../domains/tree/context";
-import { useConfig } from "../domains/config/context";
-import { TreeDebugPanel, ViewContainer, ViewModeSwitch } from "../domains/tree/ui";
+import {
+  ColorThemeProvider,
+  TreeDebugPanel,
+  useTreeGraphData,
+  useTreeStatus,
+  ViewContainer,
+  ViewModeSwitch,
+} from "../domains/tree";
+import { useConfig } from "../domains/config";
 import { Activity, Layers, GitMerge } from "lucide-react";
-import { ColorThemeProvider } from "../domains/tree/context";
 import {
   isForceEnvConfigSyncEnabled,
   isTreeDebugEnabled,

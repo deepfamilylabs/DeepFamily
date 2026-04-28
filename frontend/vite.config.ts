@@ -28,6 +28,47 @@ const parseList = (value: string | undefined): string[] => {
     .filter(Boolean)
 }
 
+const getManualChunk = (id: string): string | undefined => {
+  const normalized = id.replace(/\\/g, '/')
+
+  if (
+    normalized.includes('/src/domains/person/') ||
+    normalized.includes('/src/domains/tree/')
+  ) {
+    return 'domain-person-tree'
+  }
+
+  if (!normalized.includes('/node_modules/')) return undefined
+
+  if (normalized.includes('/node_modules/ethers/')) return 'ethers'
+  if (normalized.includes('/node_modules/d3/')) return 'd3'
+  if (
+    normalized.includes('/node_modules/react/') ||
+    normalized.includes('/node_modules/react-dom/') ||
+    normalized.includes('/node_modules/react-router-dom/') ||
+    normalized.includes('/node_modules/scheduler/')
+  ) {
+    return 'react-vendor'
+  }
+  if (
+    normalized.includes('/node_modules/lucide-react/') ||
+    normalized.includes('/node_modules/react-hook-form/') ||
+    normalized.includes('/node_modules/@hookform/resolvers/') ||
+    normalized.includes('/node_modules/zod/')
+  ) {
+    return 'ui-vendor'
+  }
+  if (
+    normalized.includes('/node_modules/i18next/') ||
+    normalized.includes('/node_modules/react-i18next/') ||
+    normalized.includes('/node_modules/i18next-browser-languagedetector/')
+  ) {
+    return 'i18n'
+  }
+
+  return undefined
+}
+
 const urlToOrigin = (url: string): string | null => {
   try {
     return new URL(url).origin
@@ -239,14 +280,7 @@ export default defineConfig(({ command, mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            // Separate large dependencies into independent chunks
-            ethers: ['ethers'],
-            d3: ['d3'],
-            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'ui-vendor': ['lucide-react', 'react-hook-form', '@hookform/resolvers', 'zod'],
-            i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector']
-          }
+          manualChunks: getManualChunk
         }
       },
       // Increase chunk size warning limit to 1MB since some third-party libraries are indeed large

@@ -75,6 +75,96 @@ app  →  pages  →  domains  →  shared  →  (workers / abi / i18n / assets)
 
 `frontend:legacy-entrypoints` enforces that retired entrypoints stay removed; re-run it after large refactors.
 
+### React page and transaction UI structure
+
+Pages and modal contents are composition shells. They should wire route/modal inputs, feature hooks, and presentational sections, but should not own large business flows, contract calls, worker calls, cache mutation, or long JSX blocks.
+
+Use this responsibility split for React page and transaction UI code:
+
+| Responsibility | Preferred location |
+|----------------|--------------------|
+| UI rendering | Pure component / section component |
+| Stateful UI coordination | Feature hook, such as `useAddVersionFlow` or `useEndorseTargetStatus` |
+| Complex flow state | Reducer or explicit state machine in the owning domain or feature `model/` |
+| Pure domain logic | Types, schema, parser, reducer, transition function, and framework-free helper in domain or feature `model/` |
+| Side effects | Service, gateway, worker client, contract client, or cache coordinator |
+| Route / modal composition | Page shell or modal content shell |
+
+Component props should describe the data and actions a section needs. Do not pass a whole domain object through a section when a smaller view model is enough. DOM events should stay at input boundaries; pass parsed business values upward.
+
+For TypeScript:
+
+- Exported props and public contracts should prefer `interface`.
+- Union state, literal steps, mapped types, utility types, and composed internal types should use `type`.
+- Shared section/hook/service types belong in the owning domain or feature `model/*Types.ts`; private one-off types can stay near their usage.
+- Generics should be limited to genuinely reusable hooks, helpers, and adapters.
+
+Transaction modal flow models may start under `domains/transactions/ui/<flow>/model/` when they are local to one UI flow. Move them upward only after another flow or non-UI caller has a real reuse need.
+
+Each transaction flow should have one canonical React flow hook. When the flow is owned by a transaction modal, place that hook under `domains/transactions/ui/<flow>/hooks/useXxxFlow.ts` and make it the only React orchestration entry point for that flow. Do not keep a parallel `domains/transactions/flows/useXxxFlow.ts` compatibility hook. Shared non-React behavior belongs in `domains/transactions/services/*`, `domains/transactions/api/*`, `domains/transactions/model/*`, or `shared/*`.
+
+### Transaction flow state
+
+Complex transaction UI must use an explicit state machine. Avoid representing mutually exclusive states with independent booleans such as `isSubmitting`, `isSuccess`, and `hasError`.
+
+Prefer a discriminated union that makes illegal combinations impossible:
+
+```ts
+type TransactionState<TResult> =
+  | { step: "idle"; message?: undefined; result?: undefined; error?: undefined }
+  | { step: "checking-target"; message: string; result?: undefined; error?: undefined }
+  | { step: "validating"; message: string; result?: undefined; error?: undefined }
+  | { step: "preparing-proof"; message: string; result?: undefined; error?: undefined }
+  | { step: "encrypting"; message: string; result?: undefined; error?: undefined }
+  | { step: "waiting-wallet"; message: string; result?: undefined; error?: undefined }
+  | { step: "approving"; message: string; result?: undefined; error?: undefined }
+  | { step: "submitting"; message: string; result?: undefined; error?: undefined }
+  | { step: "confirming"; message: string; result?: undefined; error?: undefined }
+  | { step: "success"; message?: string; result: TResult; error?: undefined }
+  | { step: "error"; message?: string; result?: undefined; error: FriendlyError };
+```
+
+UI should derive rendering from `state.step`, `state.result`, and `state.error`, not from scattered local flags.
+
+`FriendlyError` means the app's normalized user-facing error shape, such as the result of `getFriendlyError` or a transaction-domain type with the same fields. Do not invent a new incompatible error object for each flow.
+
+Avoid long-lived nullable transaction state shapes such as `status + error | null + result | null` for complex flows. If multiple transaction UIs need a shared state model, make the shared model a discriminated union instead of adapting UI code around nullable fields.
+
+Sensitive inputs must not enter React state, reducer state, props, persistent storage, or logs. Passphrases, seeds, and raw identity material should be read only at the user action boundary and passed directly to a worker client or service, then cleared as soon as possible. Reducers may store non-sensitive derived status, validation results, task progress, friendly errors, and final non-sensitive results.
+
+### Error handling
+
+Use the narrowest recoverable error surface:
+
+- Field validation errors: inline field error, with `aria-describedby` where relevant.
+- User action failures: toast or action feedback with a retry path when possible.
+- Transaction failures: transaction error panel or flow state error with a friendly message.
+- Async RPC, network, and worker errors: catch in the feature hook/service boundary and convert to friendly flow state or toast.
+- Render crashes and unrecoverable UI failures: app-level Error Boundary.
+
+Do not add new `alert()` calls. Existing `alert()` usage should be replaced as the owning flow is refactored.
+
+### Data fetching strategy
+
+Keep the existing service/gateway boundary as the default data access pattern. Components should not bypass domain services or gateways to talk directly to providers, contract clients, worker clients, or low-level cache internals.
+
+Do not introduce TanStack Query, React Query, or SWR as a prerequisite for page cleanup. They may be evaluated later for read-only, idempotent, cacheable data where repeated hand-written loading/error/cache/refetch logic becomes costly.
+
+Good candidates for a future data fetching library:
+
+- Read-only chain queries such as person details, version lists, and tree summaries.
+- NFT/story metadata and other remote resources.
+- Repeated cross-page queries that need request deduplication, background refresh, polling, pagination, or unified cache invalidation.
+
+Poor candidates:
+
+- Wallet transaction submission, approval, confirmation, success, and error flows.
+- ZK proof generation, metadata encryption, file upload/download, or other one-shot task flows.
+- WebSocket or event subscriptions with dedicated lifecycle management.
+- Optimistic updates that need strong pending/confirmed/reverted semantics before the state model is designed.
+
+If a data fetching library is introduced, query keys must include all result-affecting dimensions such as `chainId`, network, account, contract, person hash, and version. Defaults such as `staleTime`, `gcTime`, `retry`, and `refetchOnWindowFocus` must be configured intentionally to avoid accidental RPC load.
+
 ### FamilyTree rendering pipeline
 
 The tree UI is a **pipes-and-filters** pipeline. Every view renders by passing data through the same fixed sequence:

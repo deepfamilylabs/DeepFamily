@@ -5,14 +5,16 @@ import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { csKey, cuKey, nftKey, storyKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
 import type { NodeData, NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
-import { bumpNodeEndorsementCount, upsertNode } from "../../person/model/nodeState";
 import {
   applyNodeDetailNftDetails,
   applyNodeDetailVersionDetails,
+  bumpNodeEndorsementCount,
   type NodeKeyMinimal,
-} from "../../person/model/nodeDetailSync";
-import type { ParsedNftDetails, ParsedVersionDetails } from "../../person/api/personDetailParsers";
-import type { StoryDataResult } from "../../person/model/storyData";
+  type ParsedNftDetails,
+  type ParsedVersionDetails,
+  type StoryDataResult,
+  upsertNode,
+} from "../../person";
 import { makeNodeId } from "../../../shared/model";
 import {
   addPlaceholderNodes,

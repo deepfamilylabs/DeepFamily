@@ -46,11 +46,7 @@ vi.mock("../shared/ui", () => ({
   }),
 }));
 
-vi.mock("../domains/person/queries", () => ({
-  usePersonGateway: () => mocks.personGateway,
-}));
-
-vi.mock("../domains/tree/queries", () => ({
+vi.mock("../domains/tree", () => ({
   useTreeGateway: () => mocks.treeGateway,
 }));
 
@@ -59,19 +55,24 @@ vi.mock("../shared/crypto/identityHash", () => ({
     "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 }));
 
-vi.mock("../domains/person/ui", () => ({
-  PersonHashCalculator: forwardRef((props: any, ref) => {
-    useImperativeHandle(ref, () => ({
-      hasPassphrase: () => false,
-    }));
+vi.mock("../domains/person", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../domains/person")>();
+  return {
+    ...actual,
+    usePersonGateway: () => mocks.personGateway,
+    PersonHashCalculator: forwardRef((props: any, ref) => {
+      useImperativeHandle(ref, () => ({
+        hasPassphrase: () => false,
+      }));
 
-    useEffect(() => {
-      props.onPublicFormChange?.();
-    }, [props]);
+      useEffect(() => {
+        props.onPublicFormChange?.();
+      }, [props]);
 
-    return <div data-testid="person-hash-calculator" />;
-  }),
-}));
+      return <div data-testid="person-hash-calculator" />;
+    }),
+  };
+});
 
 describe("SearchPage", () => {
   beforeEach(() => {

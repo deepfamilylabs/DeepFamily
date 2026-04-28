@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   useStoryData: vi.fn(),
 }));
 
-vi.mock("../../tree/context", () => ({
+vi.mock("../../tree", () => ({
   useTreeGraphData: () => ({
     nodesData: mocks.nodesData,
   }),

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     getAddress: vi.fn(),
   },
   addVersionRunOrThrow: vi.fn(),
+  addVersionReset: vi.fn(),
   invalidateByTx: vi.fn(),
   toastShow: vi.fn(),
   onClose: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../../wallet/context", () => ({
+vi.mock("../../wallet", () => ({
   useWallet: () => ({
     signer: mocks.signer,
   }),
@@ -46,14 +47,16 @@ vi.mock("../../../shared/ui", () => ({
   }),
 }));
 
-vi.mock("../../tree/context", () => ({
+vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
     invalidateByTx: mocks.invalidateByTx,
   }),
 }));
 
-vi.mock("../flows", () => ({
+vi.mock("./add-version/hooks/useAddVersionFlow", () => ({
   useAddVersionFlow: () => ({
+    status: "idle",
+    reset: mocks.addVersionReset,
     runOrThrow: mocks.addVersionRunOrThrow,
   }),
 }));
@@ -102,7 +105,7 @@ vi.mock("../../../shared/lib/errors", () => ({
   sanitizeErrorForLogging: (error: any) => error,
 }));
 
-vi.mock("../../person/ui", () => ({
+vi.mock("../../person", () => ({
   PersonHashCalculator: forwardRef((props: any, ref) => {
     useImperativeHandle(ref, () => ({
       getSecretInputs: () => ({ passphrase: "" }),
@@ -172,6 +175,7 @@ describe("AddVersionModal", () => {
   beforeEach(() => {
     mocks.signer.getAddress.mockReset();
     mocks.addVersionRunOrThrow.mockReset();
+    mocks.addVersionReset.mockReset();
     mocks.invalidateByTx.mockReset();
     mocks.toastShow.mockReset();
     mocks.onClose.mockReset();
@@ -204,7 +208,7 @@ describe("AddVersionModal", () => {
       }
       if (method === "encryptMetadataBundleV2") {
         return Promise.resolve({
-          encryptedJson: "{\"encrypted\":true}",
+          encryptedJson: '{"encrypted":true}',
           cid: "cid://encrypted",
           plainHash: "plainhash",
           passwordFingerprint: "fingerprint",

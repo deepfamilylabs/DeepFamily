@@ -11,7 +11,22 @@ const restrictedImportRule = (patterns) => [
 ];
 
 const noAppOrPages = [["**/app/**"], ["**/pages/**"]];
+const noDomainInternal = [["**/domains/*/*"], ["**/domains/*/**/*"]];
+const noPersonInternal = [["**/person/*"], ["**/person/**/*"]];
+const noTreeInternal = [["**/tree/*"], ["**/tree/**/*"]];
 const noTreeModel = [["**/tree/model"], ["**/tree/model/**"]];
+const noTransactionsInternal = [["**/transactions/*"], ["**/transactions/**/*"]];
+const noWalletInternal = [["**/wallet/*"], ["**/wallet/**/*"]];
+const noSiblingConfigInternal = [
+  ["../../config/*"],
+  ["../../config/**/*"],
+  ["../../../config/*"],
+  ["../../../config/**/*"],
+  ["../../../../config/*"],
+  ["../../../../config/**/*"],
+  ["../../../../../config/*"],
+  ["../../../../../config/**/*"],
+];
 
 export default [
   {
@@ -81,8 +96,10 @@ export default [
     rules: {
       "no-restricted-imports": restrictedImportRule([
         ...noAppOrPages,
-        ["**/wallet/**"],
-        ["**/transactions/**"],
+        ...noSiblingConfigInternal,
+        ...noPersonInternal,
+        ...noTransactionsInternal,
+        ...noWalletInternal,
       ]),
     },
   },
@@ -91,7 +108,9 @@ export default [
     rules: {
       "no-restricted-imports": restrictedImportRule([
         ...noAppOrPages,
+        ...noTreeInternal,
         ...noTreeModel,
+        ...noWalletInternal,
         ["**/wallet/config"],
         ["**/wallet/config/**"],
       ]),
@@ -111,13 +130,40 @@ export default [
     },
   },
   {
+    files: ["src/domains/person/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictedImportRule([
+        ...noAppOrPages,
+        ...noSiblingConfigInternal,
+        ...noTreeInternal,
+        ...noTreeModel,
+        ...noTransactionsInternal,
+        ...noWalletInternal,
+      ]),
+    },
+  },
+  {
+    files: ["src/domains/transactions/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictedImportRule([
+        ...noAppOrPages,
+        ...noPersonInternal,
+        ...noSiblingConfigInternal,
+        ...noTreeInternal,
+        ...noTreeModel,
+        ...noWalletInternal,
+      ]),
+    },
+  },
+  {
     files: ["src/domains/wallet/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrictedImportRule([
         ...noAppOrPages,
+        ...noPersonInternal,
+        ...noSiblingConfigInternal,
         ...noTreeModel,
-        ["**/person/**"],
-        ["**/transactions/**"],
+        ...noTransactionsInternal,
       ]),
     },
   },
@@ -131,20 +177,7 @@ export default [
     ],
     rules: {
       "no-restricted-imports": restrictedImportRule([
-        ["**/domains/**/services/**"],
-        ["**/domains/**/api/**"],
-        ["**/domains/person/model/*"],
-        ["**/domains/person/queries/*"],
-        ["**/domains/person/ui/*"],
-        ["**/domains/transactions/flows/*"],
-        ["**/domains/transactions/model/*"],
-        ["**/domains/transactions/ui/*"],
-        ["**/domains/tree/context/*"],
-        ["**/domains/tree/model"],
-        ["**/domains/tree/model/*"],
-        ["**/domains/tree/queries/*"],
-        ["**/domains/tree/selectors/*"],
-        ["**/domains/tree/ui/*"],
+        ...noDomainInternal,
       ]),
     },
   },

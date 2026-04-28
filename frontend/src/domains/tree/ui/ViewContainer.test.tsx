@@ -24,7 +24,7 @@ vi.mock("./TreeListView", () => ({
   default: () => <div data-testid="virtual-view" />,
 }));
 
-vi.mock("../../person/ui", () => ({
+vi.mock("../../person", () => ({
   EndorseModalProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="endorse-provider">{children}</div>
   ),

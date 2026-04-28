@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   bumpEndorsementCount: vi.fn(),
 }));
 
-vi.mock("../../tree/context", () => ({
+vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
     bumpEndorsementCount: mocks.bumpEndorsementCount,
   }),

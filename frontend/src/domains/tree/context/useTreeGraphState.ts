@@ -12,7 +12,7 @@ import {
   fetchNodeEnrichmentBatch,
   isVersionDetailsFresh,
   planNodeEnrichmentSlice,
-} from "../../person/model/nodeEnrichment";
+} from "../../person";
 import {
   addPlaceholderNodes,
   mergeReachableNodeIds,

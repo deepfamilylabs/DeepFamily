@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
-import { useTreeGraphData, useTreeMutations } from "../../tree/context";
+import { useTreeGraphData, useTreeMutations } from "../../tree";
 import NodeDetailModal from "./NodeDetailModal";
 import { type NodeData } from "../../../shared/model";
 import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";

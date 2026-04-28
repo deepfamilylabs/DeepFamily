@@ -1,10 +1,9 @@
 import React from "react";
-import { ConfigProvider } from "../domains/config/context";
+import { ConfigProvider } from "../domains/config";
 import { ToastProvider } from "../shared/ui";
-import { TreeViewProvider, VizOptionsProvider } from "../domains/tree/context";
-import { WalletProvider } from "../domains/wallet/context";
+import { TreeViewProvider, VizOptionsProvider } from "../domains/tree";
+import { WalletProvider, NetworkSelectionLayer, WalletSelectionLayer } from "../domains/wallet";
 import { ActivePathProvider, SidebarProvider } from "./context";
-import { NetworkSelectionLayer, WalletSelectionLayer } from "../domains/wallet/ui";
 import { ErrorBoundary } from "./error-boundary";
 
 /**

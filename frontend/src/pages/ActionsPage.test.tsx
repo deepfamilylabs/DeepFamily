@@ -15,13 +15,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../domains/wallet/context", () => ({
+vi.mock("../domains/wallet", () => ({
   useWallet: () => ({
     address: mocks.address,
   }),
-}));
-
-vi.mock("../domains/wallet/ui", () => ({
   WalletConnectButton: ({ alwaysShowLabel: _alwaysShowLabel, ...props }: any) => (
     <button data-testid="wallet-connect-button" {...props}>
       Connect Wallet
@@ -37,7 +34,7 @@ vi.mock("../shared/ui", () => ({
   ),
 }));
 
-vi.mock("../domains/transactions/ui", () => ({
+vi.mock("../domains/transactions", () => ({
   AddVersionModal: ({ isOpen, onClose, onEndorse }: any) =>
     isOpen ? (
       <div data-testid="add-version-modal">

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useConfig } from "../../config/context";
+import { useConfig } from "../../config";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { createDeepFamilyContract } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";

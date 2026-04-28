@@ -6,7 +6,12 @@ type TransactionProgressProps = {
 
 export function TransactionProgress({ title, message, note }: TransactionProgressProps) {
   return (
-    <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20 animate-fadeIn">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20 animate-fadeIn"
+    >
       <div className="flex items-center gap-4">
         <div className="relative w-10 h-10 flex-shrink-0">
           <div className="absolute inset-0 rounded-full border-4 border-orange-200 dark:border-orange-800 opacity-30"></div>

@@ -13,8 +13,8 @@ import {
   Image,
 } from "lucide-react";
 import { useSidebar } from "../context";
-import { FamilyTreeConfigForm } from "../../domains/config/ui";
-import { useTreeStatus, useVizOptions } from "../../domains/tree/context";
+import { FamilyTreeConfigForm } from "../../domains/config";
+import { useTreeStatus, useVizOptions } from "../../domains/tree";
 import { languages } from "../config/languages";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "./Logo";
