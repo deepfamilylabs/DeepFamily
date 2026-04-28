@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Settings,
   Globe,
-  Palette,
   Lock,
   ChevronRight,
   X,
@@ -14,12 +12,9 @@ import {
 } from "lucide-react";
 import { useSidebar } from "../context";
 import { FamilyTreeConfigForm } from "../../domains/config";
-import { useTreeStatus, useVizOptions } from "../../domains/tree";
 import { languages } from "../config/languages";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Logo from "./Logo";
-
-const noop = () => {};
 
 export default function GlobalSidebar() {
   const { isMobileOpen, closeMobileSidebar, activeSection, toggleSection } = useSidebar();
@@ -27,20 +22,6 @@ export default function GlobalSidebar() {
   const [isDark, setIsDark] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const navigate = useNavigate();
-
-  // Viz Options & Tree Data for FamilyTreeConfigForm
-  const {
-    traversal,
-    setTraversal,
-    deduplicateChildren,
-    setDeduplicateChildren,
-    childrenMode,
-    setChildrenMode,
-    strictIncludeUnversionedChildren,
-    setStrictIncludeUnversionedChildren,
-  } = useVizOptions();
-
-  const { loading: loadingContract, progress, contractMessage, refresh } = useTreeStatus();
 
   // Theme Toggle Logic
   useEffect(() => {
@@ -85,27 +66,7 @@ export default function GlobalSidebar() {
         panelTitle: t("familyTree.ui.contractModeConfig", "Configuration"),
         content: (
           <div className="p-4">
-            <FamilyTreeConfigForm
-              editing={true}
-              setEditing={noop}
-              t={t}
-              traversal={traversal}
-              setTraversal={setTraversal}
-              childrenMode={childrenMode}
-              setChildrenMode={setChildrenMode}
-              strictIncludeUnversionedChildren={strictIncludeUnversionedChildren}
-              setStrictIncludeUnversionedChildren={setStrictIncludeUnversionedChildren}
-              deduplicateChildren={deduplicateChildren}
-              setDeduplicateChildren={setDeduplicateChildren}
-              progress={progress}
-              contractMessage={contractMessage}
-              loading={loadingContract}
-              onRefresh={refresh}
-              locale={i18n.language}
-              alwaysShowExtras={true}
-              hideToggle={true}
-              hideHeader={true}
-            />
+            <FamilyTreeConfigForm />
           </div>
         ),
       },
@@ -155,23 +116,7 @@ export default function GlobalSidebar() {
         onClick: () => window.open("/logo-converter.html", "_blank"),
       },
     ],
-    [
-      t,
-      i18n.language,
-      isDark,
-      traversal,
-      childrenMode,
-      strictIncludeUnversionedChildren,
-      deduplicateChildren,
-      progress,
-      contractMessage,
-      loadingContract,
-      refresh,
-      setTraversal,
-      setChildrenMode,
-      setStrictIncludeUnversionedChildren,
-      setDeduplicateChildren,
-    ],
+    [t, i18n.language, isDark],
   );
 
   const handleItemClick = (item: any) => {
