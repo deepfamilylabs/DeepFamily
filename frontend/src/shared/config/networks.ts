@@ -1,5 +1,5 @@
 // Supported networks configuration for DeepFamily
-// Only Conflux eSpace networks are officially supported
+// Officially supported: Ethereum (Mainnet/Sepolia/Holesky) and Conflux eSpace (Mainnet/Testnet)
 
 export interface NetworkConfig {
   chainId: number;
@@ -21,6 +21,42 @@ export interface NetworkPreset {
 }
 
 export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
+  // Ethereum Mainnet
+  1: {
+    chainId: 1,
+    name: "Ethereum Mainnet",
+    rpcUrl: "https://ethereum-rpc.publicnode.com",
+    blockExplorer: "https://etherscan.io",
+    nativeCurrency: {
+      name: "Ether",
+      symbol: "ETH",
+      decimals: 18,
+    },
+  },
+  // Ethereum Sepolia testnet
+  11155111: {
+    chainId: 11155111,
+    name: "Ethereum Sepolia",
+    rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
+    blockExplorer: "https://sepolia.etherscan.io",
+    nativeCurrency: {
+      name: "Sepolia Ether",
+      symbol: "ETH",
+      decimals: 18,
+    },
+  },
+  // Ethereum Holesky testnet
+  17000: {
+    chainId: 17000,
+    name: "Ethereum Holesky",
+    rpcUrl: "https://ethereum-holesky-rpc.publicnode.com",
+    blockExplorer: "https://holesky.etherscan.io",
+    nativeCurrency: {
+      name: "Holesky Ether",
+      symbol: "ETH",
+      decimals: 18,
+    },
+  },
   // Conflux eSpace Mainnet
   1030: {
     chainId: 1030,
@@ -60,6 +96,24 @@ export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
 
 export const NETWORK_PRESETS: NetworkPreset[] = [
   {
+    chainId: 1,
+    nameKey: "wallet.networks.ethereum",
+    defaultName: "Ethereum Mainnet",
+    rpcUrl: "https://ethereum-rpc.publicnode.com",
+  },
+  {
+    chainId: 11155111,
+    nameKey: "wallet.networks.sepolia",
+    defaultName: "Ethereum Sepolia",
+    rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
+  },
+  {
+    chainId: 17000,
+    nameKey: "wallet.networks.holesky",
+    defaultName: "Ethereum Holesky",
+    rpcUrl: "https://ethereum-holesky-rpc.publicnode.com",
+  },
+  {
     chainId: 1030,
     nameKey: "wallet.networks.confluxEspace",
     defaultName: "Conflux eSpace",
@@ -76,72 +130,6 @@ export const NETWORK_PRESETS: NetworkPreset[] = [
     nameKey: "wallet.networks.localDev",
     defaultName: "Localhost",
     rpcUrl: "http://127.0.0.1:8545",
-  },
-  {
-    chainId: 1,
-    nameKey: "wallet.networks.ethereum",
-    defaultName: "Ethereum Mainnet",
-    rpcUrl: "https://mainnet.infura.io/v3/",
-  },
-  {
-    chainId: 11155111,
-    nameKey: "wallet.networks.sepolia",
-    defaultName: "Ethereum Sepolia",
-    rpcUrl: "https://sepolia.infura.io/v3/",
-  },
-  {
-    chainId: 17000,
-    nameKey: "wallet.networks.holesky",
-    defaultName: "Ethereum Holesky",
-    rpcUrl: "https://holesky.infura.io/v3/",
-  },
-  {
-    chainId: 137,
-    nameKey: "wallet.networks.polygon",
-    defaultName: "Polygon Mainnet",
-    rpcUrl: "https://polygon-mainnet.infura.io/v3/",
-  },
-  {
-    chainId: 80002,
-    nameKey: "wallet.networks.polygonAmoy",
-    defaultName: "Polygon Amoy",
-    rpcUrl: "https://polygon-amoy.infura.io/v3/",
-  },
-  {
-    chainId: 56,
-    nameKey: "wallet.networks.bsc",
-    defaultName: "BSC Mainnet",
-    rpcUrl: "https://bsc-dataseed1.binance.org",
-  },
-  {
-    chainId: 97,
-    nameKey: "wallet.networks.bscTestnet",
-    defaultName: "BSC Testnet",
-    rpcUrl: "https://data-seed-prebsc-1-s1.binance.org:8545/",
-  },
-  {
-    chainId: 42161,
-    nameKey: "wallet.networks.arbitrum",
-    defaultName: "Arbitrum One",
-    rpcUrl: "https://arbitrum-mainnet.infura.io/v3/",
-  },
-  {
-    chainId: 421614,
-    nameKey: "wallet.networks.arbitrumSepolia",
-    defaultName: "Arbitrum Sepolia",
-    rpcUrl: "https://arbitrum-sepolia.infura.io/v3/",
-  },
-  {
-    chainId: 10,
-    nameKey: "wallet.networks.optimism",
-    defaultName: "Optimism",
-    rpcUrl: "https://optimism-mainnet.infura.io/v3/",
-  },
-  {
-    chainId: 11155420,
-    nameKey: "wallet.networks.optimismSepolia",
-    defaultName: "Optimism Sepolia",
-    rpcUrl: "https://optimism-sepolia.infura.io/v3/",
   },
 ];
 
