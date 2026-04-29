@@ -347,6 +347,9 @@
     },
     "versionSelector": {},
     "config": {
+      "networkAndContract": "网络与合约",
+      "dataSource": "数据源",
+      "displayOptions": "显示选项",
       "rpc": "RPC",
       "customNetwork": "自定义网络",
       "customNetworks": "自定义",

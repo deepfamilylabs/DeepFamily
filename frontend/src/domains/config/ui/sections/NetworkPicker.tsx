@@ -47,7 +47,7 @@ export default function NetworkPicker({
           <button
             type="button"
             onClick={() => setOpen(!isOpen)}
-            className="w-full px-3 py-2 text-sm rounded-2xl border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 transition-all duration-200 backdrop-blur-sm shadow-sm border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500 flex items-center justify-between"
+            className="w-full px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all duration-200 shadow-sm border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500 flex items-center justify-between"
           >
             <span className="truncate">
               {selected === "custom"
@@ -130,7 +130,7 @@ export default function NetworkPicker({
           type="text"
           value={rpcUrl}
           readOnly
-          className={`flex-1 px-3 py-2 text-sm font-mono rounded-2xl border bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${
+          className={`flex-1 px-3 py-1.5 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 shadow-sm ${
             rpcError
               ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500"
               : "border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"
