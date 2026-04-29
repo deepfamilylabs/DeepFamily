@@ -106,30 +106,24 @@ npm run check         # Run frontend checks + contract lint/build/test
 ## Deployment Guide
 
 ### Supported Networks
-**Ethereum Family:**
-- Mainnet, Sepolia, Holesky 
+**Ethereum:**
+- Mainnet, Sepolia, Holesky
 
-**Layer 2 Solutions:**
-- Polygon: Mainnet, Amoy Testnet
-- Arbitrum: Mainnet , Sepolia Testnet
-- Optimism: Mainnet, Sepolia Testnet
-
-**Alternative Chains:**
-- BSC: Mainnet, Testnet
-- Conflux eSpace: Mainnet, Testnet
+**Conflux eSpace:**
+- Mainnet, Testnet
 
 ### Multi-Network Deployment
 ```bash
 # Deploy to specific network
+npm run deploy:net --net=sepolia
 npm run deploy:net --net=holesky
-npm run deploy:net --net=polygonAmoy
 npm run deploy:net --net=confluxTestnet
 
 # Local development
 npm run dev:deploy
 
 # Verify deployed contracts
-npm run verify:net --net=holesky
+npm run verify:net --net=sepolia
 ```
 
 ## Documentation

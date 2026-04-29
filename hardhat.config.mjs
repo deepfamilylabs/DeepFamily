@@ -120,86 +120,6 @@ export default {
       timeout: 1200000,
     },
     
-    // Polygon Amoy testnet (replacement for Mumbai)
-    polygonAmoy: {
-      type: "http",
-      url: `https://polygon-amoy.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 80002,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // Polygon mainnet
-    polygon: {
-      type: "http",
-      url: `https://polygon-mainnet.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 137,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // BSC testnet
-    bscTestnet: {
-      type: "http",
-      url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 97,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // BSC mainnet
-    bsc: {
-      type: "http",
-      url: "https://bsc-dataseed1.binance.org",
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 56,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // Arbitrum testnet
-    arbitrumSepolia: {
-      type: "http",
-      url: `https://arbitrum-sepolia.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 421614,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // Arbitrum mainnet
-    arbitrum: {
-      type: "http",
-      url: `https://arbitrum-mainnet.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 42161,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // Optimism testnet
-    optimismSepolia: {
-      type: "http",
-      url: `https://optimism-sepolia.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 11155420,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
-    // Optimism mainnet
-    optimism: {
-      type: "http",
-      url: `https://optimism-mainnet.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? [PRIVATE_KEY] : [],
-      chainId: 10,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-    
     // Conflux eSpace testnet
     confluxTestnet: {
       type: "http",
@@ -252,24 +172,8 @@ export default {
       mainnet: ETHERSCAN_API_KEY,
       sepolia: ETHERSCAN_API_KEY,
       holesky: ETHERSCAN_API_KEY,
-      
-      // Polygon networks
-      polygon: process.env.POLYGONSCAN_API_KEY || "",
-      polygonAmoy: process.env.POLYGONSCAN_API_KEY || "",
-      
-      // BSC networks
-      bsc: process.env.BSCSCAN_API_KEY || "",
-      bscTestnet: process.env.BSCSCAN_API_KEY || "",
-      
-      // Arbitrum networks
-      arbitrum: process.env.ARBISCAN_API_KEY || "",
-      arbitrumSepolia: process.env.ARBISCAN_API_KEY || "",
-      
-      // Optimism networks
-      optimism: process.env.OPTIMISTIC_ETHERSCAN_API_KEY || "",
-      optimismSepolia: process.env.OPTIMISTIC_ETHERSCAN_API_KEY || "",
-      
-      // Conflux networks
+
+      // Conflux eSpace networks
       conflux: process.env.CONFLUXSCAN_API_KEY || "",
       confluxTestnet: process.env.CONFLUXSCAN_API_KEY || "",
     },
@@ -280,22 +184,6 @@ export default {
         urls: {
           apiURL: "https://api-holesky.etherscan.io/api",
           browserURL: "https://holesky.etherscan.io"
-        }
-      },
-      {
-        network: "arbitrumSepolia",
-        chainId: 421614,
-        urls: {
-          apiURL: "https://api-sepolia.arbiscan.io/api",
-          browserURL: "https://sepolia.arbiscan.io"
-        }
-      },
-      {
-        network: "optimismSepolia",
-        chainId: 11155420,
-        urls: {
-          apiURL: "https://api-sepolia-optimistic.etherscan.io/api",
-          browserURL: "https://sepolia-optimism.etherscan.io"
         }
       },
       {
