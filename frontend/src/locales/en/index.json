@@ -347,6 +347,9 @@
     },
     "versionSelector": {},
     "config": {
+      "networkAndContract": "Network & Contract",
+      "dataSource": "Data Source",
+      "displayOptions": "Display Options",
       "rpc": "RPC",
       "customNetwork": "Custom network",
       "customNetworks": "Custom",

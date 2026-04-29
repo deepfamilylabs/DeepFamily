@@ -17,7 +17,7 @@ export default function RootHashField({ value, onChange, error }: RootHashFieldP
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full px-3 py-2 text-sm font-mono rounded-2xl border bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 backdrop-blur-sm shadow-sm ${
+        className={`w-full px-3 py-1.5 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 shadow-sm ${
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500"
             : "border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"

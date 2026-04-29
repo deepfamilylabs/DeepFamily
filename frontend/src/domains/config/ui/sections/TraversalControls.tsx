@@ -22,8 +22,8 @@ export default function TraversalControls({
     "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 text-xs">
-      <div className="flex items-center justify-between w-full gap-2 relative">
+    <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 text-xs relative z-50">
+      <div className="flex items-center justify-between w-full gap-2">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
             {t("familyTree.ui.traversal", "Traversal")}:
@@ -57,10 +57,15 @@ export default function TraversalControls({
           </div>
         </div>
         {tooltipOpen && (
-          <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
-            {value === "dfs"
-              ? t("familyTree.ui.traversalDFS", "Depth First Search")
-              : t("familyTree.ui.traversalBFS", "Breadth First Search")}
+          <div className="absolute bottom-full left-0 mb-2 z-[9999] rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-200 border border-slate-700/50 p-3 text-[11px] shadow-xl animate-in fade-in zoom-in-95 duration-200 w-56 whitespace-normal leading-relaxed">
+            <div className="flex flex-col gap-2">
+              <div className={value === "dfs" ? "text-white" : "text-slate-500"}>
+                {t("familyTree.ui.traversalDFS", "DFS Depth First Search")}
+              </div>
+              <div className={value === "bfs" ? "text-white" : "text-slate-500"}>
+                {t("familyTree.ui.traversalBFS", "BFS Breadth First Search")}
+              </div>
+            </div>
           </div>
         )}
       </div>

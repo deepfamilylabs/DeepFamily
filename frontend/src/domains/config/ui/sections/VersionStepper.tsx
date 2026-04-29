@@ -15,13 +15,13 @@ export default function VersionStepper({
 }: VersionStepperProps) {
   const { t } = useTranslation();
   return (
-    <div>
-      <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <label className="text-slate-700 dark:text-slate-300 font-semibold text-xs">
         {t("familyTree.ui.versionNumber")}:
       </label>
-      <div className="inline-flex items-center rounded-2xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm h-[38px] overflow-hidden">
+      <div className="inline-flex items-center rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm h-8 overflow-hidden">
         <button
-          className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 text-sm font-medium"
+          className="w-8 h-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-orange-600 hover:bg-slate-50 dark:hover:bg-slate-700 dark:hover:text-orange-400 transition-colors duration-150 text-sm font-medium"
           onClick={decrement}
           aria-label="Decrease version"
         >
@@ -32,10 +32,10 @@ export default function VersionStepper({
           min={1}
           value={value}
           onChange={(e) => onChange(Math.max(1, Number(e.target.value)))}
-          className="w-24 h-full text-sm text-center border-0 border-l border-r border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium"
+          className="w-12 h-full text-xs text-center border-0 border-l border-r border-slate-200 dark:border-slate-700 bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 font-medium p-0"
         />
         <button
-          className="w-8 h-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 text-sm font-medium"
+          className="w-8 h-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-orange-600 hover:bg-slate-50 dark:hover:bg-slate-700 dark:hover:text-orange-400 transition-colors duration-150 text-sm font-medium"
           onClick={increment}
           aria-label="Increase version"
         >
