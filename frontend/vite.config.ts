@@ -40,6 +40,28 @@ const getManualChunk = (id: string): string | undefined => {
 
   if (!normalized.includes('/node_modules/')) return undefined
 
+  if (
+    normalized.includes('/node_modules/snarkjs/') ||
+    normalized.includes('/node_modules/r1csfile/') ||
+    normalized.includes('/node_modules/fastfile/') ||
+    normalized.includes('/node_modules/ffjavascript/')
+  ) {
+    return 'zk-vendor'
+  }
+  if (
+    normalized.includes('/node_modules/@noble/hashes/') ||
+    normalized.includes('/node_modules/hash-wasm/') ||
+    normalized.includes('/node_modules/poseidon-lite/') ||
+    normalized.includes('/node_modules/scrypt-js/')
+  ) {
+    return 'crypto-vendor'
+  }
+  if (
+    normalized.includes('/node_modules/multiformats/') ||
+    normalized.includes('/node_modules/@multiformats/')
+  ) {
+    return 'ipfs-vendor'
+  }
   if (normalized.includes('/node_modules/ethers/')) return 'ethers'
   if (normalized.includes('/node_modules/d3/')) return 'd3'
   if (
