@@ -24,6 +24,10 @@ function isBytes32(value: string | undefined | null) {
   return Boolean(value && /^0x[0-9a-fA-F]{64}$/.test(value.trim()));
 }
 
+function getTargetKey(personHash: string, versionIndex: number) {
+  return `${personHash.trim().toLowerCase()}:${Number(versionIndex) || 0}`;
+}
+
 export function useEndorseModalController({
   isOpen,
   onClose,
@@ -38,6 +42,8 @@ export function useEndorseModalController({
   const { bumpEndorsementCount, invalidateByTx } = useTreeMutations();
   const { getOwnerOf } = useTreeNodeAccess();
   const endorseFlow = useEndorseFlow();
+  const resetEndorseFlow = endorseFlow.reset;
+  const runEndorseFlow = endorseFlow.run;
 
   const [personHash, setPersonHash] = useState("");
   const [versionIndex, setVersionIndex] = useState(1);
@@ -46,9 +52,11 @@ export function useEndorseModalController({
   const previousTargetRef = useRef({ hash: "", index: 0 });
   const didPatchCacheRef = useRef(false);
   const handledResultRef = useRef<ExecuteEndorseFlowResult | null>(null);
+  const activeRunTargetRef = useRef<string | null>(null);
 
   const targetPersonHash = personHash.trim();
   const targetVersionIndex = versionIndex;
+  const currentTargetKey = getTargetKey(targetPersonHash, targetVersionIndex);
   const isPersonHashFormatValid = isBytes32(targetPersonHash);
   const hasValidTarget = Boolean(targetPersonHash && isPersonHashFormatValid && targetVersionIndex > 0);
   const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
@@ -90,7 +98,9 @@ export function useEndorseModalController({
     previousTargetRef.current = { hash: nextHash, index: nextIndex };
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
-  }, [initialPersonHash, initialVersionIndex, isOpen]);
+    activeRunTargetRef.current = null;
+    resetEndorseFlow();
+  }, [initialPersonHash, initialVersionIndex, isOpen, resetEndorseFlow]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -104,9 +114,12 @@ export function useEndorseModalController({
     setErrorResult(null);
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
-  }, [isOpen, targetPersonHash, targetVersionIndex]);
+    activeRunTargetRef.current = null;
+    resetEndorseFlow();
+  }, [isOpen, resetEndorseFlow, targetPersonHash, targetVersionIndex]);
 
   useEffect(() => {
+    if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
     if (endorseFlow.status !== "success" || !endorseFlow.result) return;
     const result = endorseFlow.result as ExecuteEndorseFlowResult;
     if (handledResultRef.current === result) return;
@@ -151,13 +164,16 @@ export function useEndorseModalController({
     endorseFlow.status,
     feeQuote,
     invalidateByTx,
+    isOpen,
     onSuccess,
+    currentTargetKey,
     targetPersonHash,
     targetStatus,
     targetVersionIndex,
   ]);
 
   useEffect(() => {
+    if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
     if (endorseFlow.status !== "error" || !endorseFlow.error) return;
     const friendly = endorseFlow.error;
     console.error("Endorse failed:", friendly);
@@ -167,7 +183,7 @@ export function useEndorseModalController({
       details: friendly.details,
       retryable: friendly.retryable,
     });
-  }, [endorseFlow.error, endorseFlow.status]);
+  }, [currentTargetKey, endorseFlow.error, endorseFlow.status, isOpen]);
 
   const handleContinueEndorsing = useCallback(() => {
     setPersonHash("");
@@ -175,14 +191,16 @@ export function useEndorseModalController({
     setSuccessResult(null);
     setErrorResult(null);
     targetStatus.reset();
-    endorseFlow.reset();
+    resetEndorseFlow();
     previousTargetRef.current = { hash: "", index: 0 };
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
-  }, [endorseFlow, targetStatus]);
+    activeRunTargetRef.current = null;
+  }, [resetEndorseFlow, targetStatus]);
 
   const handleEndorse = useCallback(() => {
     if (!address) {
+      activeRunTargetRef.current = null;
       setErrorResult(
         toEndorseErrorResult("WALLET_NOT_CONNECTED", t("wallet.notConnected", "Please connect your wallet")),
       );
@@ -190,6 +208,7 @@ export function useEndorseModalController({
     }
 
     if (!hasValidTarget) {
+      activeRunTargetRef.current = null;
       setErrorResult(
         toEndorseErrorResult(
           "INVALID_TARGET",
@@ -200,6 +219,7 @@ export function useEndorseModalController({
     }
 
     if (feeQuote.userDeepBalanceRaw < feeQuote.deepTokenFeeRaw) {
+      activeRunTargetRef.current = null;
       setErrorResult(
         toEndorseErrorResult(
           "INSUFFICIENT_DEEP_BALANCE",
@@ -212,7 +232,8 @@ export function useEndorseModalController({
     setSuccessResult(null);
     setErrorResult(null);
     handledResultRef.current = null;
-    endorseFlow.run({
+    activeRunTargetRef.current = currentTargetKey;
+    runEndorseFlow({
       personHash: targetPersonHash,
       versionIndex: Number(targetVersionIndex),
       deepTokenAddress: feeQuote.deepTokenAddress || undefined,
@@ -220,9 +241,10 @@ export function useEndorseModalController({
     });
   }, [
     address,
-    endorseFlow,
     feeQuote,
     hasValidTarget,
+    currentTargetKey,
+    runEndorseFlow,
     t,
     targetPersonHash,
     targetVersionIndex,

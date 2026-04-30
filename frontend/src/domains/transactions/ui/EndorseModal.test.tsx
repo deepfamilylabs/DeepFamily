@@ -73,20 +73,25 @@ vi.mock("./endorse/hooks/useEndorseFlow", async () => {
   return {
     useEndorseFlow: () => {
       const [, rerender] = React.useState(0);
+      const reset = React.useCallback(() => {
+        mocks.flowState.status = "idle";
+        mocks.flowState.result = null;
+        mocks.flowState.error = null;
+        rerender((value) => value + 1);
+      }, [rerender]);
+      const run = React.useCallback(
+        (args: any) => {
+          mocks.endorseRun(args);
+          rerender((value) => value + 1);
+        },
+        [rerender],
+      );
       return {
         status: mocks.flowState.status,
         result: mocks.flowState.result,
         error: mocks.flowState.error,
-        reset: () => {
-          mocks.flowState.status = "idle";
-          mocks.flowState.result = null;
-          mocks.flowState.error = null;
-          rerender((value) => value + 1);
-        },
-        run: (args: any) => {
-          mocks.endorseRun(args);
-          rerender((value) => value + 1);
-        },
+        reset,
+        run,
       };
     },
   };
@@ -111,6 +116,23 @@ function renderEndorseModal() {
       onSuccess={mocks.onSuccess}
       onMintNFT={mocks.onMintNFT}
     />,
+  );
+}
+
+function renderConfigurableEndorseModal(props: {
+  isOpen: boolean;
+  initialPersonHash?: string;
+  initialVersionIndex?: number;
+}) {
+  return (
+    <EndorseModal
+      isOpen={props.isOpen}
+      initialPersonHash={props.initialPersonHash}
+      initialVersionIndex={props.initialVersionIndex}
+      onClose={mocks.onClose}
+      onSuccess={mocks.onSuccess}
+      onMintNFT={mocks.onMintNFT}
+    />
   );
 }
 
@@ -251,5 +273,82 @@ describe("EndorseModal", () => {
     expect(mocks.invalidateByTx).not.toHaveBeenCalled();
     expect(mocks.onSuccess).not.toHaveBeenCalled();
     expect(screen.getAllByText("endorse reverted").length).toBeGreaterThan(0);
+  });
+
+  it("does not reuse a previous success result when reopened for another version", async () => {
+    const firstResult = {
+      feeFormatted: "1.0",
+      fee: 1_000_000_000_000_000_000n,
+      decimals: 18,
+      symbol: "DEEP",
+      balanceBefore: 10_000_000_000_000_000_000n,
+      transactionHash: "0xendorse-v2",
+      blockNumber: 321,
+      receipt: { hash: "0xendorse-v2" },
+      event: {
+        personHash,
+        endorser: address,
+        versionIndex: 2,
+        recipient,
+        recipientShare: 950_000_000_000_000_000n,
+        protocolRecipient: "0x00000000000000000000000000000000000000cc",
+        protocolShare: 50_000_000_000_000_000n,
+        endorsementFee: 1_000_000_000_000_000_000n,
+        timestamp: 777,
+      },
+    };
+    mocks.getVersionDetails.mockImplementation((_hash: string, index: number) =>
+      Promise.resolve({
+        tokenId: "0",
+        endorsementCount: index === 3 ? 8 : 4,
+        version: {
+          addedBy: recipient,
+          fullName: index === 3 ? "Grace Hopper" : "Ada Lovelace",
+        },
+      }),
+    );
+    mocks.endorseRun.mockImplementation((args: any) => {
+      args.onStageChange?.("submitting");
+      mocks.flowState.status = "success";
+      mocks.flowState.result = firstResult;
+      mocks.flowState.error = null;
+    });
+
+    const { rerender } = render(
+      renderConfigurableEndorseModal({
+        isOpen: true,
+        initialPersonHash: personHash,
+        initialVersionIndex: 2,
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Endorse$/i }));
+    });
+
+    await waitFor(() => expect(screen.getByText("Endorsement Successful")).toBeTruthy());
+    expect(screen.getByText("0xendorse-v2")).toBeTruthy();
+
+    rerender(
+      renderConfigurableEndorseModal({
+        isOpen: false,
+        initialPersonHash: personHash,
+        initialVersionIndex: 2,
+      }),
+    );
+
+    rerender(
+      renderConfigurableEndorseModal({
+        isOpen: true,
+        initialPersonHash: personHash,
+        initialVersionIndex: 3,
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText("Grace Hopper")).toBeTruthy());
+    expect(screen.queryByText("Endorsement Successful")).toBeNull();
+    expect(screen.queryByText("0xendorse-v2")).toBeNull();
   });
 });
