@@ -83,6 +83,34 @@ describe("transaction UI primitives", () => {
     expect(onChange).toHaveBeenCalledWith(2);
   });
 
+  it("supports pointer selection in themed selects", () => {
+    function SelectHarness() {
+      const [value, setValue] = useState(1);
+
+      return (
+        <ThemedSelect
+          value={value}
+          onChange={setValue}
+          options={[
+            { value: 1, label: "One" },
+            { value: 2, label: "Two" },
+          ]}
+        />
+      );
+    }
+
+    render(<SelectHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "One" }));
+
+    const option = screen.getByRole("option", { name: "Two" });
+    fireEvent.mouseDown(option);
+    fireEvent.click(option);
+
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("button", { name: "Two" })).toBeTruthy();
+  });
+
   it("closes themed selects with Escape", () => {
     render(
       <ThemedSelect

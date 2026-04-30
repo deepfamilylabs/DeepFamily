@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   getOwnerOf: vi.fn(),
   configUpdate: vi.fn(),
   toastShow: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
   t: (key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
     if (typeof fallbackOrOptions === "string") {
       return fallbackOrOptions.replace(
@@ -55,11 +57,17 @@ vi.mock("../domains/tree", () => ({
   }),
 }));
 
-vi.mock("../shared/ui", () => ({
-  useToast: () => ({
-    show: mocks.toastShow,
-  }),
-}));
+vi.mock("../shared/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/ui")>();
+  return {
+    ...actual,
+    useToast: () => ({
+      show: mocks.toastShow,
+      success: mocks.toastSuccess,
+      error: mocks.toastError,
+    }),
+  };
+});
 
 function makeChunk(overrides: Partial<StoryChunk>): StoryChunk {
   return {
@@ -126,6 +134,8 @@ describe("PersonPage", () => {
     mocks.getOwnerOf.mockReset();
     mocks.configUpdate.mockReset();
     mocks.toastShow.mockReset();
+    mocks.toastSuccess.mockReset();
+    mocks.toastError.mockReset();
     vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   });
 

@@ -129,7 +129,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     async (selectedProvider: any, walletId?: string) => {
       // Use the selected provider directly instead of getBoundProvider
       if (!selectedProvider) {
-        toast.show(t("wallet.noWallet", "Wallet not available"));
+        toast.warning(t("wallet.noWallet", "Wallet not available"));
         return;
       }
 
@@ -190,17 +190,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           console.warn("Failed to fetch balance:", balanceError);
         }
 
-        toast.show(t("wallet.connected", "Wallet connected successfully"));
+        toast.success(t("wallet.connected", "Wallet connected successfully"));
       } catch (error: any) {
         console.error("[WalletContext] Failed to connect wallet:", error);
         setWalletState((prev) => ({ ...prev, isConnecting: false }));
 
         if (error.code === 4001) {
-          toast.show(t("wallet.rejected", "Connection rejected by user"));
+          toast.warning(t("wallet.rejected", "Connection rejected by user"));
         } else if (error.code === -32002) {
-          toast.show(t("wallet.pending", "Connection request already pending"));
+          toast.warning(t("wallet.pending", "Connection request already pending"));
         } else {
-          toast.show(
+          toast.error(
             t(
               "wallet.connectionFailed",
               `Failed to connect wallet: ${error.message || "Unknown error"}`,
@@ -256,7 +256,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("[WalletContext] Failed to clear wallet type from localStorage:", e);
       }
-      toast.show(t("wallet.disconnected", "Wallet disconnected"));
+      toast.info(t("wallet.disconnected", "Wallet disconnected"));
     }
   }, [t, toast]);
 
@@ -265,7 +265,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Use the connected rawProvider instead of getBoundProvider
       const rawProvider = walletState.rawProvider;
       if (!rawProvider) {
-        toast.show(t("wallet.notConnected", "Please connect your wallet"));
+        toast.warning(t("wallet.notConnected", "Please connect your wallet"));
         return;
       }
 
@@ -281,15 +281,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           chainId: targetChainId,
         }));
 
-        toast.show(t("wallet.chainSwitched", "Chain switched successfully"));
+        toast.success(t("wallet.chainSwitched", "Chain switched successfully"));
       } catch (error: any) {
         console.error("[WalletContext] Failed to switch chain:", error);
         if (error.code === 4902) {
-          toast.show(t("wallet.chainNotAdded", "Chain not added to wallet"));
+          toast.warning(t("wallet.chainNotAdded", "Chain not added to wallet"));
         } else if (error.code === 4001) {
-          toast.show(t("wallet.rejected", "Request rejected by user"));
+          toast.warning(t("wallet.rejected", "Request rejected by user"));
         } else {
-          toast.show(t("wallet.chainSwitchFailed", "Failed to switch chain"));
+          toast.error(t("wallet.chainSwitchFailed", "Failed to switch chain"));
         }
       }
     },
@@ -301,7 +301,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     async (targetChainId: number): Promise<boolean> => {
       const rawProvider = walletState.rawProvider;
       if (!rawProvider) {
-        toast.show(t("wallet.notConnected", "Please connect your wallet"));
+        toast.warning(t("wallet.notConnected", "Please connect your wallet"));
         return false;
       }
 
@@ -315,14 +315,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         });
 
         setWalletState((prev) => ({ ...prev, chainId: targetChainId }));
-        toast.show(t("wallet.chainSwitched", "Chain switched successfully"));
+        toast.success(t("wallet.chainSwitched", "Chain switched successfully"));
         return true;
       } catch (switchError: any) {
         // Error 4902: chain not added to wallet
         if (switchError.code === 4902) {
           const addChainParams = getAddChainParams(targetChainId);
           if (!addChainParams) {
-            toast.show(t("wallet.chainNotSupported", "This network is not supported"));
+            toast.warning(t("wallet.chainNotSupported", "This network is not supported"));
             return false;
           }
 
@@ -333,23 +333,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             });
 
             setWalletState((prev) => ({ ...prev, chainId: targetChainId }));
-            toast.show(t("wallet.chainAdded", "Network added successfully"));
+            toast.success(t("wallet.chainAdded", "Network added successfully"));
             return true;
           } catch (addError: any) {
             console.error("[WalletContext] Failed to add chain:", addError);
             if (addError.code === 4001) {
-              toast.show(t("wallet.rejected", "Request rejected by user"));
+              toast.warning(t("wallet.rejected", "Request rejected by user"));
             } else {
-              toast.show(t("wallet.chainAddFailed", "Failed to add network"));
+              toast.error(t("wallet.chainAddFailed", "Failed to add network"));
             }
             return false;
           }
         } else if (switchError.code === 4001) {
-          toast.show(t("wallet.rejected", "Request rejected by user"));
+          toast.warning(t("wallet.rejected", "Request rejected by user"));
           return false;
         } else {
           console.error("[WalletContext] Failed to switch chain:", switchError);
-          toast.show(t("wallet.chainSwitchFailed", "Failed to switch chain"));
+          toast.error(t("wallet.chainSwitchFailed", "Failed to switch chain"));
           return false;
         }
       }

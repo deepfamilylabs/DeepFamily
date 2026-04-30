@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Clipboard, Edit2, FileText, GitBranch, Layers, List } from "lucide-react";
+import { AlertTriangle, Edit2, FileText, GitBranch, Layers, List } from "lucide-react";
 import {
   getChunkTypeColorClass,
   getChunkTypeI18nKey,
@@ -15,6 +15,7 @@ import {
 } from "../../../shared/model";
 import type { PersonPageController } from "../hooks/usePersonPageController";
 import { hasStoryIntegrityIssues } from "../model/personPageModel";
+import { CopyIconButton } from "../../../shared/ui";
 
 export function PersonMainContent({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
@@ -501,14 +502,12 @@ function MobileCopyValue({
           {value}
         </div>
         {onCopy && (
-          <button
+          <CopyIconButton
             onClick={onCopy}
-            aria-label={t("search.copy")}
-            className="shrink-0 ml-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title={t("search.copy")}
-          >
-            <Clipboard size={14} />
-          </button>
+            label={t("search.copy")}
+            size="sm"
+            className="ml-3"
+          />
         )}
       </div>
     </div>

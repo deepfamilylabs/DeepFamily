@@ -2,7 +2,6 @@ import { useId } from "react";
 import {
   Check,
   ChevronDown,
-  Clipboard,
   FileText,
   HelpCircle,
   Lock,
@@ -10,6 +9,7 @@ import {
   Save,
   X,
 } from "lucide-react";
+import { CopyIconButton } from "../../../shared/ui";
 import { useListboxA11y } from "../../../shared/ui/useListboxA11y";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
@@ -21,6 +21,8 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
   const chunkTypeLabelId = useId();
   const chunkTypeValueId = useId();
   const chunkTypeListboxId = useId();
+  const contentByteStatusId = useId();
+  const contentOverLimit = form.byteLength > form.maxBytes;
   const selectedChunkTypeIndex = editor.chunkTypeOptions.findIndex(
     (option) => option.value === form.data.chunkType,
   );
@@ -76,7 +78,12 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
 
       <div ref={editor.refs.scrollContainerRef} className="flex flex-col gap-6">
         {editor.showError && (
-          <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+          <section
+            className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
             <p className="mb-1 font-bold text-red-800 dark:text-red-300">
               {t("common.error", "Error")}
             </p>
@@ -118,6 +125,8 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                 )}
                 className="h-[500px] w-full resize-none rounded-2xl border-0 bg-gray-50 p-6 text-base leading-relaxed text-gray-900 transition-all placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-orange-500/20 active:ring-orange-500/20 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:bg-gray-800"
                 disabled={editor.submitting}
+                aria-invalid={contentOverLimit}
+                aria-describedby={contentByteStatusId}
               />
 
               <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
@@ -227,7 +236,13 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
               </div>
 
               <div className="flex flex-col justify-between gap-3 text-sm sm:flex-row sm:items-center pt-2">
-                <div className={`font-medium ${editor.getByteWarningColor(form.byteLength)}`}>
+                <div
+                  id={contentByteStatusId}
+                  className={`font-medium ${editor.getByteWarningColor(form.byteLength)}`}
+                  role={contentOverLimit ? "alert" : "status"}
+                  aria-live={contentOverLimit ? "assertive" : "polite"}
+                  aria-atomic="true"
+                >
                   {form.byteLength}/{form.maxBytes} bytes
                   {form.byteLength > form.warningOrangeBytes && form.byteLength <= form.maxBytes && (
                     <span className="ml-2 text-xs">
@@ -249,14 +264,11 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                     <code className="rounded-lg bg-gray-100 px-2 py-1 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                       {editor.formatHash(form.data.expectedHash)}
                     </code>
-                    <button
-                      type="button"
+                    <CopyIconButton
                       onClick={() => editor.copyText(form.data.expectedHash || "")}
-                      className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                      aria-label={t("search.copy", "Copy") as string}
-                    >
-                      <Clipboard size={14} />
-                    </button>
+                      label={t("search.copy", "Copy") as string}
+                      size="sm"
+                    />
                   </div>
                 )}
               </div>
@@ -291,8 +303,16 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
         )}
 
         {editor.loading && (
-          <section className="flex flex-col items-center justify-center gap-4 py-12 text-gray-500 dark:text-gray-400">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 dark:border-blue-800 dark:border-t-blue-400" />
+          <section
+            className="flex flex-col items-center justify-center gap-4 py-12 text-gray-500 dark:text-gray-400"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <div
+              className="h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 dark:border-blue-800 dark:border-t-blue-400"
+              aria-hidden
+            />
             <p className="text-sm font-medium">{t("storyChunkEditor.loading", "Loading...")}</p>
           </section>
         )}

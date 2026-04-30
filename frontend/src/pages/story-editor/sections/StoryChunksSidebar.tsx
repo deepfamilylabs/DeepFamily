@@ -1,7 +1,6 @@
 import {
   ChevronDown,
   ChevronRight,
-  Clipboard,
   Clock,
   Hash,
   Link,
@@ -14,6 +13,7 @@ import {
   getChunkTypeIcon,
 } from "../../../domains/person";
 import { formatUnixSeconds, shortAddress } from "../../../shared/model";
+import { CopyIconButton } from "../../../shared/ui";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 export function StoryChunksSidebar({ editor }: { editor: StoryEditorController }) {
@@ -139,6 +139,8 @@ function ExpandedChunkDetails({
             <CopyIconButton
               label={t("search.copy")}
               onClick={() => editor.copyText(chunk.editor)}
+              size="xs"
+              stopPropagation
             />
           </>
         ) : (
@@ -156,6 +158,8 @@ function ExpandedChunkDetails({
           <CopyIconButton
             label={t("search.copy")}
             onClick={() => editor.copyText(chunk.attachmentCID)}
+            size="xs"
+            stopPropagation
           />
         </div>
       )}
@@ -164,7 +168,12 @@ function ExpandedChunkDetails({
         <span className="font-mono truncate" title={chunk.chunkHash}>
           {editor.formatHash(chunk.chunkHash)}
         </span>
-        <CopyIconButton label={t("search.copy")} onClick={() => editor.copyText(chunk.chunkHash)} />
+        <CopyIconButton
+          label={t("search.copy")}
+          onClick={() => editor.copyText(chunk.chunkHash)}
+          size="xs"
+          stopPropagation
+        />
       </div>
     </div>
   );
@@ -265,34 +274,13 @@ function HashCopyBlock({
           {value}
         </div>
         {canCopy && (
-          <button
+          <CopyIconButton
             onClick={onCopy}
-            className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            aria-label={copyLabel}
-            title={copyLabel}
-            type="button"
-          >
-            <Clipboard size={12} />
-          </button>
+            label={copyLabel}
+            size="xs"
+          />
         )}
       </div>
     </div>
-  );
-}
-
-function CopyIconButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-      aria-label={label}
-      title={label}
-      type="button"
-    >
-      <Clipboard size={12} />
-    </button>
   );
 }

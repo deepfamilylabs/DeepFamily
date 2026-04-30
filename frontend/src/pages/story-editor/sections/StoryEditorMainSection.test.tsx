@@ -18,6 +18,7 @@ function TestIcon({ className, size }: { className?: string; size?: number }) {
 function createEditor(
   overrides: {
     form?: Partial<StoryEditorController["form"]>;
+    editor?: Partial<StoryEditorController>;
   } = {},
 ) {
   const form = {
@@ -76,6 +77,7 @@ function createEditor(
     getByteWarningColor: () => "text-gray-500",
     formatHash: (value: string) => value,
     copyText: vi.fn(),
+    ...overrides.editor,
   } as unknown as StoryEditorController;
 }
 
@@ -130,5 +132,36 @@ describe("StoryEditorMainSection", () => {
 
     fireEvent.keyDown(openTrigger, { key: "Escape" });
     expect(setShowChunkTypeDropdown).toHaveBeenCalledWith(false);
+  });
+
+  it("announces editor errors, loading state, and byte limit status", () => {
+    render(
+      <StoryEditorMainSection
+        editor={createEditor({
+          editor: {
+            showError: true,
+            errorMessage: "Failed to load story",
+            loading: true,
+          },
+          form: {
+            byteLength: 3000,
+          },
+        })}
+      />,
+    );
+
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts.some((alert) => alert.textContent?.includes("Failed to load story"))).toBe(true);
+
+    const textarea = screen.getByPlaceholderText(/Enter chunk content/);
+    const byteStatus = screen.getByText("3000/2048 bytes");
+    expect(textarea.getAttribute("aria-invalid")).toBe("true");
+    expect(textarea.getAttribute("aria-describedby")).toBe(byteStatus.id);
+    expect(byteStatus.getAttribute("role")).toBe("alert");
+    expect(byteStatus.getAttribute("aria-live")).toBe("assertive");
+
+    const loading = screen.getByRole("status");
+    expect(loading.getAttribute("aria-live")).toBe("polite");
+    expect(loading.getAttribute("aria-busy")).toBe("true");
   });
 });

@@ -152,7 +152,11 @@ export function useSearchPageController() {
   const onCopy = useCallback(
     async (text: string) => {
       const ok = await copyText(text);
-      toast.show(ok ? t("search.copied") : t("search.copyFailed"));
+      if (ok) {
+        toast.success(t("search.copied"));
+      } else {
+        toast.error(t("search.copyFailed"));
+      }
     },
     [copyText, t, toast],
   );

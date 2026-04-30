@@ -25,6 +25,8 @@ const TOAST_STYLES: Record<
     container: string;
     icon: React.ComponentType<{ className?: string }>;
     iconColor: string;
+    role: "status" | "alert";
+    live: "polite" | "assertive";
   }
 > = {
   success: {
@@ -32,22 +34,30 @@ const TOAST_STYLES: Record<
       "border-green-200 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-100",
     icon: CheckCircle,
     iconColor: "text-green-600 dark:text-green-400",
+    role: "status",
+    live: "polite",
   },
   error: {
     container: "border-red-200 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-100",
     icon: XCircle,
     iconColor: "text-red-600 dark:text-red-400",
+    role: "alert",
+    live: "assertive",
   },
   info: {
     container: "border-blue-200 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-100",
     icon: Info,
     iconColor: "text-blue-600 dark:text-blue-400",
+    role: "status",
+    live: "polite",
   },
   warning: {
     container:
       "border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-100",
     icon: AlertTriangle,
     iconColor: "text-yellow-600 dark:text-yellow-400",
+    role: "alert",
+    live: "assertive",
   },
 };
 
@@ -104,7 +114,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {/* portal-like container */}
-      <div className="fixed inset-x-0 bottom-4 z-[2000] flex justify-center pointer-events-none">
+      <div className="fixed inset-x-0 bottom-4 z-[11000] flex justify-center pointer-events-none">
         <div className="space-y-2">
           {toasts.map((toast) => {
             const style = TOAST_STYLES[toast.type];
@@ -113,6 +123,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <div
                 key={toast.id}
                 className={`pointer-events-auto mx-auto max-w-md rounded-md border shadow-lg px-3 py-2 text-sm flex items-center gap-2 ${style.container}`}
+                role={style.role}
+                aria-live={style.live}
+                aria-atomic="true"
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 ${style.iconColor}`} />
                 <span className="flex-1">{toast.message}</span>

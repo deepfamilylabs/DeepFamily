@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import NodeDetailModal from "./NodeDetailModal";
 import { makeNodeId, type NodeData } from "../../../shared/model";
+import { ToastProvider } from "../../../shared/ui";
 
 const personHash = `0x${"ab".repeat(32)}`;
 
@@ -65,14 +66,16 @@ function NodeDetailHarness({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <MemoryRouter>
-      <NodeDetailModal
-        open={open}
-        onClose={handleClose}
-        nodeData={makePerson()}
-        fallback={{ hash: personHash, versionIndex: 1 }}
-      />
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter>
+        <NodeDetailModal
+          open={open}
+          onClose={handleClose}
+          nodeData={makePerson()}
+          fallback={{ hash: personHash, versionIndex: 1 }}
+        />
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 
@@ -107,5 +110,20 @@ describe("person detail modals a11y", () => {
     expect(
       screen.queryByRole("dialog", { name: "familyTree.personVersionDetail.title" }),
     ).toBeNull();
+  });
+
+  it("uses the global toast for copy feedback", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<NodeDetailHarness onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy" })[0]);
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(personHash));
+    expect(screen.getByRole("status").textContent).toContain("search.copied");
   });
 });

@@ -54,10 +54,10 @@ export function useStoryEditorController() {
     }
   }, []);
 
-  const [meta, setMeta] = useState<StoryMetadata | undefined>(prefetched?.storyMetadata);
-  const [chunks, setChunks] = useState<StoryChunk[] | undefined>(prefetchedChunks);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [optimistic, setOptimistic] = useState<{
+    meta?: StoryMetadata;
+    chunks?: StoryChunk[];
+  } | null>(null);
   const [dirty, setDirty] = useState<boolean>(false);
   const [formData, setFormData] = useState<ChunkFormData>(initialChunkFormData);
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +73,6 @@ export function useStoryEditorController() {
   const formRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const chunkTypeDropdownRef = useRef<HTMLDivElement | null>(null);
-  const storyHydrated = useRef(false);
 
   const validTokenId = useMemo(() => getValidTokenId(tokenId), [tokenId]);
   const scopedQueryClient = useMemo(
@@ -85,6 +84,15 @@ export function useStoryEditorController() {
   const nftQuery = useNFTDetails(validTokenId);
   const storyQuery = useStoryData(validTokenId);
   const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
+
+  useEffect(() => {
+    if (storyQuery.data) setOptimistic(null);
+  }, [storyQuery.data]);
+
+  const meta = optimistic?.meta ?? storyQuery.data?.metadata ?? prefetched?.storyMetadata;
+  const chunks = optimistic?.chunks ?? storyQuery.data?.chunks ?? prefetchedChunks;
+  const loading = !meta && storyQuery.loading;
+  const queryError = meta ? null : storyQuery.error;
 
   const getChunkTypeLabel = useCallback(
     (type: number | string | null | undefined) => {
@@ -100,7 +108,7 @@ export function useStoryEditorController() {
       try {
         if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
           await navigator.clipboard.writeText(text);
-          toast.show(t("search.copied"));
+          toast.success(t("search.copied"));
           return;
         }
       } catch {}
@@ -114,29 +122,17 @@ export function useStoryEditorController() {
         textarea.select();
         const ok = document.execCommand("copy");
         document.body.removeChild(textarea);
-        toast.show(ok ? t("search.copied") : t("search.copyFailed"));
+        if (ok) {
+          toast.success(t("search.copied"));
+        } else {
+          toast.error(t("search.copyFailed"));
+        }
       } catch {
-        toast.show(t("search.copyFailed"));
+        toast.error(t("search.copyFailed"));
       }
     },
     [toast, t],
   );
-
-  useEffect(() => {
-    if (storyHydrated.current) return;
-    if (storyQuery.data) {
-      setMeta(storyQuery.data.metadata);
-      setChunks(storyQuery.data.chunks);
-      storyHydrated.current = true;
-    }
-  }, [storyQuery.data]);
-
-  useEffect(() => {
-    if (!storyHydrated.current) {
-      setLoading(storyQuery.loading);
-      setError(storyQuery.error);
-    }
-  }, [storyQuery.loading, storyQuery.error]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -232,8 +228,6 @@ export function useStoryEditorController() {
         });
 
         const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk];
-        setChunks(newChunks);
-
         const newFullStoryHash = computeStoryHash(newChunks);
         const newMeta: StoryMetadata | undefined = meta
           ? {
@@ -244,12 +238,13 @@ export function useStoryEditorController() {
               fullStoryHash: newFullStoryHash,
             }
           : undefined;
-        setMeta(newMeta);
+        setOptimistic({ meta: newMeta, chunks: newChunks });
 
         if (validTokenId) {
           scopedQueryClient.clear(storyKey(validTokenId));
           scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
         }
+        storyQuery.refetch();
 
         if (result.events.StoryChunkAdded) {
           toast.success(
@@ -276,7 +271,7 @@ export function useStoryEditorController() {
         throw error;
       }
     },
-    [addStoryChunkFlow, toast, t, chunks, meta, validTokenId, scopedQueryClient],
+    [addStoryChunkFlow, toast, t, chunks, meta, validTokenId, scopedQueryClient, storyQuery.refetch],
   );
 
   const onSealStory = useCallback(
@@ -292,12 +287,16 @@ export function useStoryEditorController() {
               fullStoryHash: result.fullStoryHash,
             }
           : undefined;
-        setMeta(newMeta);
+        setOptimistic((prev) => ({
+          meta: newMeta,
+          chunks: prev?.chunks ?? chunks,
+        }));
 
         if (validTokenId) {
           scopedQueryClient.clear(storyKey(validTokenId));
           scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
         }
+        storyQuery.refetch();
 
         if (result.events.StorySealed) {
           toast.success(
@@ -323,7 +322,7 @@ export function useStoryEditorController() {
         throw error;
       }
     },
-    [sealStoryFlow, toast, t, meta, validTokenId, scopedQueryClient],
+    [sealStoryFlow, toast, t, meta, chunks, validTokenId, scopedQueryClient, storyQuery.refetch],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -401,9 +400,9 @@ export function useStoryEditorController() {
     ? t("storyChunkEditor.titleWithName", { name: personName, defaultValue: "{{name}} Biography" })
     : t("storyChunkEditor.titleFallback", { defaultValue: "Biography" });
   const showEditorForm = !isSealed;
-  const showError = Boolean(error || localError);
+  const showError = Boolean(queryError || localError);
   const showEmptySealed = !loading && sortedChunks.length === 0 && !showError && isSealed;
-  const errorMessage = error || localError;
+  const errorMessage = queryError || localError;
   const formByteLength = getByteLength(formData.content);
 
   return {

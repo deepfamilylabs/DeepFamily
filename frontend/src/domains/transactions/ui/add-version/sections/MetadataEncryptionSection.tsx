@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import { useId, type Ref } from "react";
 import { AlertTriangle, Download, Eye, EyeOff, Lock } from "lucide-react";
 import type { UseFormRegister } from "react-hook-form";
 import type { AddVersionFormInput, AddVersionT } from "../model/addVersionTypes";
@@ -40,6 +40,19 @@ export function MetadataEncryptionSection({
   onToggleConfirmEncryptionPassword,
   onDownloadMetadata,
 }: MetadataEncryptionSectionProps) {
+  const encryptionErrorId = useId();
+  const encryptionNoticeId = useId();
+  const passphraseMissingId = useId();
+  const showPassphraseMissing =
+    showManualEncryptionInputs && usePersonPassphraseForEncryption && !personHasPassphrase;
+  const encryptionDescribedBy = [
+    showPassphraseMissing ? passphraseMissingId : null,
+    encryptionError ? encryptionErrorId : null,
+    encryptionNoticeId,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800 !mt-2">
       <div className="space-y-2">
@@ -84,8 +97,13 @@ export function MetadataEncryptionSection({
 
         {showManualEncryptionInputs ? (
           <div className="space-y-3 pt-2 animate-fadeIn">
-            {usePersonPassphraseForEncryption && !personHasPassphrase && (
-              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-100 dark:border-amber-900/30">
+            {showPassphraseMissing && (
+              <div
+                id={passphraseMissingId}
+                className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-100 dark:border-amber-900/30"
+                role="alert"
+                aria-live="assertive"
+              >
                 <AlertTriangle className="w-3.5 h-3.5" />
                 <span>
                   {t(
@@ -102,6 +120,8 @@ export function MetadataEncryptionSection({
                   ref={encryptionPasswordRef}
                   onChange={onEncryptionErrorClear}
                   className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  aria-invalid={Boolean(encryptionError)}
+                  aria-describedby={encryptionDescribedBy || undefined}
                   placeholder={t(
                     "addVersion.encryptionPasswordPlaceholder",
                     "Password (min 8 chars)",
@@ -116,6 +136,11 @@ export function MetadataEncryptionSection({
                   type="button"
                   onClick={onToggleEncryptionPassword}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
+                  aria-label={
+                    showEncryptionPassword
+                      ? t("addVersion.hideEncryptionPassword", "Hide encryption password")
+                      : t("addVersion.showEncryptionPassword", "Show encryption password")
+                  }
                 >
                   {showEncryptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -126,6 +151,8 @@ export function MetadataEncryptionSection({
                   ref={confirmEncryptionPasswordRef}
                   onChange={onEncryptionErrorClear}
                   className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  aria-invalid={Boolean(encryptionError)}
+                  aria-describedby={encryptionDescribedBy || undefined}
                   placeholder={t("addVersion.encryptionPasswordConfirm", "Confirm password")}
                   inputMode="text"
                   autoCapitalize="none"
@@ -137,18 +164,31 @@ export function MetadataEncryptionSection({
                   type="button"
                   onClick={onToggleConfirmEncryptionPassword}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1"
+                  aria-label={
+                    showConfirmEncryptionPassword
+                      ? t("addVersion.hideConfirmEncryptionPassword", "Hide confirm password")
+                      : t("addVersion.showConfirmEncryptionPassword", "Show confirm password")
+                  }
                 >
                   {showConfirmEncryptionPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
             {encryptionError && (
-              <p className="text-xs text-red-500 dark:text-red-400 font-medium flex items-center gap-1">
+              <p
+                id={encryptionErrorId}
+                className="text-xs text-red-500 dark:text-red-400 font-medium flex items-center gap-1"
+                role="alert"
+                aria-live="assertive"
+              >
                 <AlertTriangle className="w-3 h-3" />
                 {encryptionError}
               </p>
             )}
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug pl-1">
+            <p
+              id={encryptionNoticeId}
+              className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug pl-1"
+            >
               {t(
                 "addVersion.encryptionNotice",
                 "Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.",
@@ -157,14 +197,22 @@ export function MetadataEncryptionSection({
           </div>
         ) : (
           <div className="pl-1 pt-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            <p
+              id={encryptionNoticeId}
+              className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed"
+            >
               {t(
                 "addVersion.encryptionNotice",
                 "Metadata is encrypted locally before generating CID. Please keep your password safe, as it cannot be recovered if lost.",
               )}
             </p>
             {encryptionError && (
-              <p className="text-xs text-red-500 dark:text-red-400 font-medium mt-1">
+              <p
+                id={encryptionErrorId}
+                className="text-xs text-red-500 dark:text-red-400 font-medium mt-1"
+                role="alert"
+                aria-live="assertive"
+              >
                 {encryptionError}
               </p>
             )}

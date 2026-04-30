@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { NodeData, isMinted } from "../../../shared/model";
 import { useNavigate } from "react-router-dom";
 import { useTreeNodeAccess } from "../../tree";
-import { ResponsiveModalFrame, useResponsiveModalMode } from "../../../shared/ui";
+import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
 import { useEndorseModal } from "./EndorseModalProvider";
 import {
   NodeDetailHeaderActions,
@@ -30,6 +30,7 @@ export default function NodeDetailModal({
   error,
 }: NodeDetailModalProps) {
   const { t } = useTranslation();
+  const toast = useToast();
   // Track close origin to coordinate with history state
   const pushedRef = React.useRef(false);
   const closedBySelfRef = React.useRef(false);
@@ -56,7 +57,6 @@ export default function NodeDetailModal({
       return false;
     }
   }, []);
-  const [centerHint, setCenterHint] = React.useState<string | null>(null);
   const [entered, setEntered] = React.useState(false);
   const isDesktop = useResponsiveModalMode();
   const navigate = useNavigate();
@@ -136,8 +136,11 @@ export default function NodeDetailModal({
 
   const onCopy = async (text: string) => {
     const ok = await copyText(text);
-    setCenterHint(ok ? t("search.copied") : t("search.copyFailed"));
-    window.setTimeout(() => setCenterHint(null), 1200);
+    if (ok) {
+      toast.success(t("search.copied"));
+    } else {
+      toast.error(t("search.copyFailed"));
+    }
   };
 
   const openMint = () => {
@@ -190,13 +193,6 @@ export default function NodeDetailModal({
       entered={entered}
       closeLabel={t("common.close", "Close")}
     >
-      {centerHint && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
-          <div className="rounded bg-black/80 dark:bg-black/70 text-white px-3 py-1.5 text-xs animate-fade-in">
-            {centerHint}
-          </div>
-        </div>
-      )}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth text-[13px] text-gray-900 dark:text-gray-100 touch-pan-y">
         <div className="p-6 space-y-2.5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
           <NodeDetailHashRows

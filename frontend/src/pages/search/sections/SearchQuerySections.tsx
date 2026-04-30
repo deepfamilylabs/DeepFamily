@@ -1,5 +1,6 @@
-import { ArrowLeft, ArrowRight, Clipboard, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, RefreshCw, Search } from "lucide-react";
 import { formatUnixSeconds } from "../../../shared/model";
+import { CopyIconButton } from "../../../shared/ui";
 import type { SearchPageController } from "../hooks/useSearchPageController";
 import {
   ButtonPrimary,
@@ -103,13 +104,11 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                             value={String(version.addedBy || "")}
                             className="font-mono text-xs text-gray-900 dark:text-gray-200 flex-1 min-w-0"
                           />
-                          <button
-                            type="button"
+                          <CopyIconButton
                             onClick={() => search.onCopy(String(version.addedBy || ""))}
-                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
-                          >
-                            <Clipboard size={12} />
-                          </button>
+                            label={t("search.copy", "Copy") as string}
+                            size="xs"
+                          />
                         </div>
                       </div>
                       <div className="text-gray-500 dark:text-gray-500 text-xs">
@@ -132,13 +131,11 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                             >
                               {version.metadataCID}
                             </span>
-                            <button
-                              type="button"
+                            <CopyIconButton
                               onClick={() => search.onCopy(version.metadataCID || "")}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
-                            >
-                              <Clipboard size={12} />
-                            </button>
+                              label={t("search.copy", "Copy") as string}
+                              size="xs"
+                            />
                           </div>
                         </div>
                       )}
@@ -148,12 +145,14 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                         hash={version.fatherHash}
                         versionIndex={Number(version.fatherVersionIndex)}
                         onCopy={search.onCopy}
+                        copyLabel={t("search.copy", "Copy") as string}
                       />
                       <VersionParentRow
                         label={t("search.versionsQuery.motherHash")}
                         hash={version.motherHash}
                         versionIndex={Number(version.motherVersionIndex)}
                         onCopy={search.onCopy}
+                        copyLabel={t("search.copy", "Copy") as string}
                       />
                     </div>
                   </div>
@@ -182,11 +181,13 @@ function VersionParentRow({
   hash,
   versionIndex,
   onCopy,
+  copyLabel,
 }: {
   label: string;
   hash: string;
   versionIndex: number;
   onCopy: (text: string) => void;
+  copyLabel: string;
 }) {
   return (
     <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
@@ -199,13 +200,11 @@ function VersionParentRow({
             value={hash}
             className="font-mono text-xs text-gray-900 dark:text-gray-200 min-w-0"
           />
-          <button
-            type="button"
+          <CopyIconButton
             onClick={() => onCopy(hash)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
-          >
-            <Clipboard size={12} />
-          </button>
+            label={copyLabel}
+            size="xs"
+          />
         </div>
         <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
           (v{versionIndex})
@@ -441,13 +440,11 @@ export function ChildrenQuerySection({ search }: { search: SearchPageController 
                             value={childHash}
                             className="font-mono text-xs text-gray-900 dark:text-gray-200 flex-1 min-w-0"
                           />
-                          <button
-                            type="button"
+                          <CopyIconButton
                             onClick={() => search.onCopy(childHash)}
-                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex-shrink-0"
-                          >
-                            <Clipboard size={12} />
-                          </button>
+                            label={t("search.copy", "Copy") as string}
+                            size="xs"
+                          />
                         </div>
                       </div>
                       <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
@@ -594,14 +591,16 @@ export function StoryChunksQuerySection({ search }: { search: SearchPageControll
                           label={`${t("search.storyChunksQuery.chunkHash")}:`}
                           value={String(chunk.chunkHash || "")}
                           onCopy={search.onCopy}
-                          iconSize={10}
+                          copyLabel={t("search.copy", "Copy") as string}
+                          size="xs"
                         />
                         {chunk.editor && (
                           <HashDataRow
                             label={`${t("search.storyChunksQuery.editor")}:`}
                             value={String(chunk.editor)}
                             onCopy={search.onCopy}
-                            iconSize={10}
+                            copyLabel={t("search.copy", "Copy") as string}
+                            size="xs"
                           />
                         )}
                         {chunk.attachmentCID && chunk.attachmentCID.length > 0 && (
@@ -616,13 +615,11 @@ export function StoryChunksQuerySection({ search }: { search: SearchPageControll
                               >
                                 {chunk.attachmentCID}
                               </span>
-                              <button
-                                type="button"
+                              <CopyIconButton
                                 onClick={() => search.onCopy(String(chunk.attachmentCID))}
-                                className="flex-shrink-0"
-                              >
-                                <Clipboard size={10} />
-                              </button>
+                                label={t("search.copy", "Copy") as string}
+                                size="xs"
+                              />
                             </div>
                           </div>
                         )}
@@ -740,13 +737,11 @@ export function UriHistoryQuerySection({ search }: { search: SearchPageControlle
                         >
                           {uri}
                         </span>
-                        <button
-                          type="button"
+                        <CopyIconButton
                           onClick={() => search.onCopy(uri)}
-                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                        >
-                          <Clipboard size={14} />
-                        </button>
+                          label={t("search.copy", "Copy") as string}
+                          size="sm"
+                        />
                       </div>
                     </div>
                   </div>
@@ -774,21 +769,21 @@ function HashDataRow({
   label,
   value,
   onCopy,
-  iconSize,
+  copyLabel,
+  size,
 }: {
   label: string;
   value: string;
   onCopy: (text: string) => void;
-  iconSize: number;
+  copyLabel: string;
+  size: "xs" | "sm";
 }) {
   return (
     <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
       <span className="whitespace-nowrap flex-shrink-0 text-right">{label}</span>
       <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded min-w-0 w-fit max-w-full">
         <HashInline value={value} className="font-mono flex-1 min-w-0" />
-        <button type="button" onClick={() => onCopy(value)} className="flex-shrink-0">
-          <Clipboard size={iconSize} />
-        </button>
+        <CopyIconButton label={copyLabel} onClick={() => onCopy(value)} size={size} />
       </div>
     </div>
   );

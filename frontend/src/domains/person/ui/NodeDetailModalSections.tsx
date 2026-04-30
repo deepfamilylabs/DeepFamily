@@ -1,7 +1,8 @@
 import type React from "react";
 import type { TFunction } from "i18next";
-import { Clipboard, Edit2, Image, Star, BookOpen } from "lucide-react";
+import { Edit2, Image, Star, BookOpen } from "lucide-react";
 import { ethers } from "ethers";
+import { CopyIconButton } from "../../../shared/ui";
 import {
   NodeData,
   birthDateString,
@@ -65,14 +66,12 @@ function NodeDetailRow({
             {value}
           </div>
           {copy ? (
-            <button
-              type="button"
-              aria-label={copyLabel}
+            <CopyIconButton
+              label={copyLabel}
               onClick={() => onCopy(copy)}
-              className="opacity-0 group-hover:opacity-100 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            >
-              <Clipboard size={14} strokeWidth={2.5} />
-            </button>
+              visibility="group-hover"
+              size="sm"
+            />
           ) : null}
         </div>
       </div>

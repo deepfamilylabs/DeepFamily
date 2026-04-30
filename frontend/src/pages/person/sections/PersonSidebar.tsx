@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, Clipboard, Clock, Hash, Link, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, Hash, Link, User } from "lucide-react";
 import {
   getChunkTypeBorderColorClass,
   getChunkTypeColorClass,
@@ -10,6 +10,7 @@ import {
 import { formatHashMiddle, formatUnixSeconds, shortAddress, type StoryChunk } from "../../../shared/model";
 import type { PersonPageController } from "../hooks/usePersonPageController";
 import { getChunkTypeLabel } from "../model/personPageModel";
+import { CopyIconButton } from "../../../shared/ui";
 
 export function PersonSidebar({ person }: { person: PersonPageController }) {
   const data = person.data;
@@ -157,17 +158,12 @@ function ChunkDetails({
             <span className="truncate" title={chunk.editor}>
               {shortAddress(chunk.editor)}
             </span>
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                person.copyText(chunk.editor);
-              }}
-              className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              aria-label={t("search.copy")}
-              title={t("search.copy")}
-            >
-              <Clipboard size={12} />
-            </button>
+            <CopyIconButton
+              label={t("search.copy")}
+              onClick={() => person.copyText(chunk.editor)}
+              size="xs"
+              stopPropagation
+            />
           </>
         ) : (
           <span>-</span>
@@ -185,17 +181,12 @@ function ChunkDetails({
               ? `${chunk.attachmentCID.slice(0, 8)}...${chunk.attachmentCID.slice(-8)}`
               : chunk.attachmentCID}
           </span>
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              person.copyText(chunk.attachmentCID);
-            }}
-            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            aria-label={t("search.copy")}
-            title={t("search.copy")}
-          >
-            <Clipboard size={12} />
-          </button>
+          <CopyIconButton
+            label={t("search.copy")}
+            onClick={() => person.copyText(chunk.attachmentCID)}
+            size="xs"
+            stopPropagation
+          />
         </div>
       )}
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -203,17 +194,12 @@ function ChunkDetails({
         <span className="font-mono truncate" title={chunk.chunkHash}>
           {formatHashMiddle(chunk.chunkHash)}
         </span>
-        <button
-          onClick={(event) => {
-            event.stopPropagation();
-            person.copyText(chunk.chunkHash);
-          }}
-          className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          aria-label={t("search.copy")}
-          title={t("search.copy")}
-        >
-          <Clipboard size={12} />
-        </button>
+        <CopyIconButton
+          label={t("search.copy")}
+          onClick={() => person.copyText(chunk.chunkHash)}
+          size="xs"
+          stopPropagation
+        />
       </div>
     </div>
   );
@@ -328,14 +314,11 @@ function DesktopCopyValue({
           {value}
         </div>
         {onCopy && (
-          <button
+          <CopyIconButton
             onClick={onCopy}
-            aria-label={t("search.copy")}
-            className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title={t("search.copy")}
-          >
-            <Clipboard size={12} />
-          </button>
+            label={t("search.copy")}
+            size="xs"
+          />
         )}
       </div>
     </div>

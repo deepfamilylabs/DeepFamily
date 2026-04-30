@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   addVersionRunOrThrow: vi.fn(),
   addVersionReset: vi.fn(),
   invalidateByTx: vi.fn(),
-  toastShow: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
   onClose: vi.fn(),
   onSuccess: vi.fn(),
   onEndorse: vi.fn(),
@@ -46,7 +47,8 @@ vi.mock("../../../shared/ui", async (importOriginal) => {
   return {
     ...actual,
     useToast: () => ({
-      show: mocks.toastShow,
+      success: mocks.toastSuccess,
+      error: mocks.toastError,
     }),
     useResponsiveModalMode: () => true,
   };
@@ -182,7 +184,8 @@ describe("AddVersionModal", () => {
     mocks.addVersionRunOrThrow.mockReset();
     mocks.addVersionReset.mockReset();
     mocks.invalidateByTx.mockReset();
-    mocks.toastShow.mockReset();
+    mocks.toastSuccess.mockReset();
+    mocks.toastError.mockReset();
     mocks.onClose.mockReset();
     mocks.onSuccess.mockReset();
     mocks.onEndorse.mockReset();
@@ -307,7 +310,7 @@ describe("AddVersionModal", () => {
         }),
       }),
     );
-    expect(mocks.toastShow).toHaveBeenCalledWith("Person version added successfully");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Person version added successfully");
     expect(mocks.invalidateByTx).toHaveBeenCalledWith({
       events: { PersonVersionAdded: flowResult.events.PersonVersionAdded },
       hints: { personHash, versionIndex: 3 },
@@ -331,7 +334,7 @@ describe("AddVersionModal", () => {
     await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(1));
     expect(mocks.onSuccess).not.toHaveBeenCalled();
     expect(mocks.invalidateByTx).not.toHaveBeenCalled();
-    expect(mocks.toastShow).toHaveBeenCalledWith(
+    expect(mocks.toastError).toHaveBeenCalledWith(
       "Failed to add person version: add version reverted",
     );
     expect(await screen.findByText("Transaction Failed")).toBeTruthy();

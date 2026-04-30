@@ -58,7 +58,8 @@ interface UseAddVersionSubmitArgs {
     metadataCID: string;
   }) => Promise<AddVersionResult>;
   setMetadataCid: (cid: string) => void;
-  toastShow: (message: string) => void;
+  toastSuccess: (message: string) => void;
+  toastError: (message: string) => void;
   invalidateByTx: (args: any) => void;
   onSuccess?: (result: any) => void;
   setConsentError: (value: string | null) => void;
@@ -87,7 +88,8 @@ export function useAddVersionSubmit({
   setProofGenerationStep,
   runAddVersionOrThrow,
   setMetadataCid,
-  toastShow,
+  toastSuccess,
+  toastError,
   invalidateByTx,
   onSuccess,
   setConsentError,
@@ -190,7 +192,7 @@ export function useAddVersionSubmit({
           metadataCID: processedData.metadataCID || "",
         });
 
-        toastShow(t("contract.addVersionSuccess", "Person version added successfully"));
+        toastSuccess(t("contract.addVersionSuccess", "Person version added successfully"));
         setSuccessResult(buildAddVersionSuccessResultView(result));
         setProofGenerationStep("");
         invalidateByTx({
@@ -201,7 +203,7 @@ export function useAddVersionSubmit({
       } catch (error) {
         console.error("Add version failed:", sanitizeErrorForLogging(error));
         const friendly = getFriendlyError(error, t);
-        toastShow(
+        toastError(
           t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
         );
         setErrorResult({
@@ -239,7 +241,8 @@ export function useAddVersionSubmit({
       setSuccessResult,
       signer,
       t,
-      toastShow,
+      toastError,
+      toastSuccess,
       validateEncryptionPassword,
     ],
   );

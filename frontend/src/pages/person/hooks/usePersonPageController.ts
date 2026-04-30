@@ -241,7 +241,7 @@ export function usePersonPageController() {
       try {
         if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
           await navigator.clipboard.writeText(text);
-          toast.show(t("search.copied"));
+          toast.success(t("search.copied"));
           return;
         }
       } catch {}
@@ -255,9 +255,13 @@ export function usePersonPageController() {
         textarea.select();
         const ok = document.execCommand("copy");
         document.body.removeChild(textarea);
-        toast.show(ok ? t("search.copied") : t("search.copyFailed"));
+        if (ok) {
+          toast.success(t("search.copied"));
+        } else {
+          toast.error(t("search.copyFailed"));
+        }
       } catch {
-        toast.show(t("search.copyFailed"));
+        toast.error(t("search.copyFailed"));
       }
     },
     [t, toast],
