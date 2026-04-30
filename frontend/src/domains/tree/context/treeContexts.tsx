@@ -1,13 +1,14 @@
 import React, { createContext, useContext } from "react";
-import type { NodeData, NodeId } from "../../../shared/model";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
-import type { TreeTxInvalidationInput } from "../services/treeInvalidation";
 import type {
+  NodeData,
+  NodeId,
   NodeKeyMinimal,
   ParsedNftDetails,
   ParsedVersionDetails,
   StoryDataResult,
-} from "../../person";
+} from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
+import type { TreeTxInvalidationInput } from "../services/treeInvalidation";
 import type { TreeDebugStats, TreeProgress } from "./types";
 
 export interface TreeGraphDataValue {
@@ -88,7 +89,9 @@ export function TreeProviderContexts({
       <TreeStatusProviderContext.Provider value={status}>
         <TreeNodeAccessProviderContext.Provider value={nodeAccess}>
           <TreeMutationsProviderContext.Provider value={mutations}>
-            <TreeDebugProviderContext.Provider value={debug}>{children}</TreeDebugProviderContext.Provider>
+            <TreeDebugProviderContext.Provider value={debug}>
+              {children}
+            </TreeDebugProviderContext.Provider>
           </TreeMutationsProviderContext.Provider>
         </TreeNodeAccessProviderContext.Provider>
       </TreeStatusProviderContext.Provider>

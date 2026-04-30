@@ -1,5 +1,4 @@
 import { readBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
-import type { NodeData } from "../../../shared/model";
 import {
   applyOwnerToTokenNode,
   applyStoryDataToNode,
@@ -14,20 +13,18 @@ import {
   getOwnerFromTokenNode,
   mergeStoryChunkRecords,
   parseStoryChunkRecord,
+  type NodeData,
   type ParsedNftDetails,
   type StoryDataResult,
   upsertNode,
-} from "../../person";
+} from "../../../shared/model";
 
 type RefLike<T> = { current: T };
 type SetNodesData = (updater: (prev: Record<string, NodeData>) => Record<string, NodeData>) => void;
 
 interface TreeNodeDataAccessOptions {
   api: {
-    getNFTDetails: (
-      tokenId: string,
-      options?: { ttlMs?: number },
-    ) => Promise<ParsedNftDetails>;
+    getNFTDetails: (tokenId: string, options?: { ttlMs?: number }) => Promise<ParsedNftDetails>;
   } | null;
   contract: any;
   contractAddress?: string | null;
@@ -55,9 +52,7 @@ const isStale = (fetchedAt?: number, ttlMs?: number) => {
   return Date.now() - Number(fetchedAt) > ttl;
 };
 
-async function readPersistedNodesData(
-  storageNS: string,
-): Promise<Record<string, NodeData> | null> {
+async function readPersistedNodesData(storageNS: string): Promise<Record<string, NodeData> | null> {
   if (!isIndexedDBSupported()) return null;
   try {
     return (await readBlob<Record<string, NodeData>>(`${storageNS}::nodesData`)) ?? null;
@@ -66,9 +61,7 @@ async function readPersistedNodesData(
   }
 }
 
-export function createTreeNodeDataAccess(
-  options: TreeNodeDataAccessOptions,
-): TreeNodeDataAccess {
+export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): TreeNodeDataAccess {
   const getNodeByTokenId = async (tokenId: string): Promise<NodeData | null> => {
     const cachedNode = findNodeByTokenId(options.nodesDataRef.current, tokenId);
     if (cachedNode) return cachedNode;

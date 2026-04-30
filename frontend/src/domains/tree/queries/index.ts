@@ -4,4 +4,4 @@ export type { UseChildrenUnionResult } from "./useChildrenUnion";
 export { useChildrenUnion } from "./useChildrenUnion";
 export { useTreeGateway } from "./useTreeGateway";
 export { useTreeRoot } from "./useTreeRoot";
-export { useVersionDetails, useTreeVersionDetailsKey } from "./useVersionDetails";
+export { useTreeVersionDetailsKey } from "./useVersionDetails";

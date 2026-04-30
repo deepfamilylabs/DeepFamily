@@ -70,6 +70,7 @@ app  →  pages  →  domains  →  shared  →  (workers / abi / i18n / assets)
 
 - `shared/` must not import from `domains/`, `pages/`, or `app/`.
 - `domains/*` must not import from sibling domains. Cross-domain needs belong in `shared/` or are wired at the `pages/` / `app/` layer.
+- Contract result parsers, `NodeData` merge helpers, and shared read gateways used by multiple domains live under `shared/model` or `shared/clients`; domain-local files may re-export them for compatibility.
 - `pages/` compose domains; they should not contain reusable logic — extract to the relevant domain instead.
 - Code imported by a worker (`workers/*.worker.ts`) must stay worker-safe: no React, no DOM, no `window`. Put such code under `shared/crypto/`, `shared/zk/`, or `shared/lib/`.
 
