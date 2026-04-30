@@ -1,5 +1,5 @@
 import { Star } from "lucide-react";
-import { TransactionModalFrame } from "../shared/TransactionModalFrame";
+import { ResponsiveModalFrame } from "../../../../shared/ui";
 import { useEndorseModalController } from "./hooks/useEndorseModalController";
 import { EndorseBenefitsPanel } from "./sections/EndorseBenefitsPanel";
 import { EndorseFeePanel } from "./sections/EndorseFeePanel";
@@ -21,7 +21,7 @@ export default function EndorseModal(props: EndorseModalProps) {
   const { t } = endorse;
 
   return (
-    <TransactionModalFrame
+    <ResponsiveModalFrame
       {...endorse.frame}
       ariaLabel="Endorse"
       icon={<Star className="w-6 h-6 text-white" />}
@@ -38,6 +38,6 @@ export default function EndorseModal(props: EndorseModalProps) {
 
         <EndorseFooter t={t} {...endorse.footer} />
       </div>
-    </TransactionModalFrame>
+    </ResponsiveModalFrame>
   );
 }

@@ -65,10 +65,10 @@ vi.mock("../domains/person", () => ({
       {person.fullName}
     </button>
   ),
-  StoryChunksModal: ({ person, isOpen, onClose }: any) =>
+  PersonStoryModal: ({ person, isOpen, onClose }: any) =>
     isOpen ? (
-      <div data-testid="story-chunks-modal">
-        <span data-testid="story-chunks-name">{person.fullName}</span>
+      <div data-testid="person-story-modal">
+        <span data-testid="person-story-name">{person.fullName}</span>
         <button onClick={onClose}>close-story-modal</button>
       </div>
     ) : null,
@@ -160,8 +160,8 @@ describe("PeoplePage", () => {
   it("opens the selected person modal from the URL when the person exists in the current projection", async () => {
     renderPeoplePage("/people?person=7");
 
-    await waitFor(() => expect(screen.getByTestId("story-chunks-modal")).toBeTruthy());
-    expect(screen.getByTestId("story-chunks-name").textContent).toBe("Ada Lovelace");
+    await waitFor(() => expect(screen.getByTestId("person-story-modal")).toBeTruthy());
+    expect(screen.getByTestId("person-story-name").textContent).toBe("Ada Lovelace");
     expect(screen.getByTestId("location-search").textContent).toBe("?person=7");
   });
 

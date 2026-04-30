@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
 import { useTreeMutations, useTreeNodeAccess } from "../../../../tree";
-import { useResponsiveModalMode } from "../../shared/useResponsiveModalMode";
+import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
 import { useEndorseFlow, type ExecuteEndorseFlowResult } from "./useEndorseFlow";
 import { useEndorseFeeQuote } from "./useEndorseFeeQuote";

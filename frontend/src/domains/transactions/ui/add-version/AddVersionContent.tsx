@@ -1,5 +1,5 @@
 import { UserPlus } from "lucide-react";
-import { TransactionModalFrame } from "../shared/TransactionModalFrame";
+import { ResponsiveModalFrame } from "../../../../shared/ui";
 import { useAddVersionModalController } from "./hooks/useAddVersionModalController";
 import { AddVersionConsentSection } from "./sections/AddVersionConsentSection";
 import { AddVersionFooter } from "./sections/AddVersionFooter";
@@ -29,7 +29,7 @@ export default function AddVersionModal(props: AddVersionModalProps) {
   const { t } = addVersion;
 
   return (
-    <TransactionModalFrame
+    <ResponsiveModalFrame
       {...addVersion.frame}
       ariaLabel="Add Version"
       icon={<UserPlus className="w-6 h-6 text-white" />}
@@ -63,6 +63,6 @@ export default function AddVersionModal(props: AddVersionModalProps) {
           <AddVersionFooter t={t} {...addVersion.footer} />
         </form>
       </div>
-    </TransactionModalFrame>
+    </ResponsiveModalFrame>
   );
 }

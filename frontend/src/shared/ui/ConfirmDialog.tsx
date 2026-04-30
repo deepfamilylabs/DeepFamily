@@ -1,6 +1,6 @@
-import { useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useCallback, useId } from "react";
 import { X } from "lucide-react";
+import { ModalShell } from "./ModalShell";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -25,21 +25,23 @@ export default function ConfirmDialog({
   confirmBtnClassName,
   type = "info",
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const messageId = useId();
   const onKey = useCallback(
     (e: KeyboardEvent) => {
       if (!open) return;
-      if (e.key === "Escape") onCancel();
       if (e.key === "Enter") {
         e.preventDefault();
         onConfirm();
       }
     },
-    [open, onCancel, onConfirm],
+    [open, onConfirm],
   );
   useEffect(() => {
+    if (!open) return;
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onKey]);
+  }, [onKey, open]);
   if (!open) return null;
   const typeClasses = (() => {
     switch (type) {
@@ -54,31 +56,50 @@ export default function ConfirmDialog({
         return "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500/40 dark:bg-blue-600 dark:hover:bg-blue-500 dark:focus:ring-blue-400/40";
     }
   })();
-  return createPortal(
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center">
-      <div className="fixed inset-0" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-gray-900 dark:border dark:border-gray-700 rounded-lg shadow-xl w-[420px] max-w-[95vw] p-6 transition-colors">
+  return (
+    <ModalShell
+      isOpen={open}
+      onClose={onCancel}
+      bare
+      zIndex="z-[1200]"
+      ariaLabel={title ? undefined : message}
+      ariaLabelledBy={title ? titleId : undefined}
+      ariaDescribedBy={messageId}
+    >
+      <div className="h-full flex items-center justify-center p-4">
+        <div
+          className="relative bg-white dark:bg-gray-900 dark:border dark:border-gray-700 rounded-lg shadow-xl w-[420px] max-w-[95vw] p-6 transition-colors"
+          onClick={(event) => event.stopPropagation()}
+        >
         <button
-          aria-label="close"
+          type="button"
+          aria-label="Close"
           className="absolute top-3 right-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
           onClick={onCancel}
         >
           <X size={18} />
         </button>
         {title ? (
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{title}</h3>
+          <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            {title}
+          </h3>
         ) : null}
-        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line mb-5 leading-relaxed">
+        <div
+          id={messageId}
+          className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line mb-5 leading-relaxed"
+        >
           {message}
         </div>
         <div className="flex justify-end gap-3">
           <button
+            type="button"
             onClick={onCancel}
             className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             {cancelText}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             className={
               "px-4 py-2 rounded-md text-sm text-white shadow-sm focus:outline-none focus:ring-2 transition-colors " +
@@ -89,8 +110,8 @@ export default function ConfirmDialog({
             {confirmText}
           </button>
         </div>
+        </div>
       </div>
-    </div>,
-    document.body,
+    </ModalShell>
   );
 }

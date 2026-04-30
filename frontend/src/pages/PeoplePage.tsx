@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { StoryChunksModal } from "../domains/person";
+import { PersonStoryModal } from "../domains/person";
 import { usePeoplePageController } from "./people/hooks/usePeoplePageController";
 import { PeopleFiltersPanel } from "./people/sections/PeopleFiltersPanel";
 import { PeopleHeroSection } from "./people/sections/PeopleHeroSection";
@@ -34,7 +34,7 @@ export default function PeoplePage() {
       />
 
       {peoplePage.modal.selectedPerson ? (
-        <StoryChunksModal
+        <PersonStoryModal
           person={peoplePage.modal.selectedPerson}
           isOpen={!!peoplePage.modal.selectedPerson}
           onClose={peoplePage.modal.closePerson}

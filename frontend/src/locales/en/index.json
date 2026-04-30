@@ -28,6 +28,10 @@
     "people": "People",
     "actions": "Actions"
   },
+  "story": {
+    "addingChunk": "Adding story chunk...",
+    "sealing": "Sealing story..."
+  },
   "home": {
     "title": "Decentralized Digital Family Tree",
     "subtitle": "ZK privacy · Unlinkability · Multi-version · Community endorsement · NFT bios",
@@ -709,7 +713,9 @@
     "endorseDesc": "Support quality data by endorsing versions with DEEP utility points",
     "startAddVersion": "Start Adding Version",
     "openMintNFT": "Open NFT Minting",
-    "openEndorse": "Open Endorsement"
+    "openEndorse": "Open Endorsement",
+    "openMenu": "Open actions menu",
+    "closeMenu": "Close actions menu"
   },
   "addVersion": {
     "title": "Add Version",

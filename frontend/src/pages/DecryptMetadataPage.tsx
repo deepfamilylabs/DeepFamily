@@ -91,20 +91,23 @@ export default function DecryptMetadataPage() {
   ) => {
     if (mode === "random") {
       return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50 shadow-sm transition-transform hover:scale-105 cursor-default">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
           {labels.random}
         </span>
       );
     }
     if (mode === "deterministic") {
       return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200/60 dark:bg-gray-800/80 dark:text-gray-300 dark:border-gray-700/60 shadow-sm transition-transform hover:scale-105 cursor-default">
+          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500"></span>
           {labels.deterministic}
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-50/50 text-gray-500 border border-gray-100 dark:bg-gray-900/30 dark:text-gray-500 dark:border-gray-800/50 transition-transform hover:scale-105 cursor-default">
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700"></span>
         {labels.empty}
       </span>
     );
@@ -216,41 +219,46 @@ export default function DecryptMetadataPage() {
   };
 
   return (
-    <div className="space-y-8 text-gray-900 dark:text-gray-100">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between border-b border-gray-200 dark:border-gray-800 pb-6">
+    <div className="space-y-10 text-gray-900 dark:text-gray-100 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between border-b border-gray-200/60 dark:border-gray-800/60 pb-6">
         <div className="space-y-1">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 drop-shadow-sm">
             {t("decryptMetadata.title", "Decrypt Metadata")}
           </h1>
         </div>
-        <span className="inline-flex px-4 py-1.5 text-xs font-medium rounded-full bg-orange-50 text-orange-700 border border-orange-100 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-900/30 backdrop-blur-sm">
-          AES-256-GCM · Argon2id
+        <span className="inline-flex px-4 py-1.5 text-xs font-semibold tracking-wide rounded-full bg-orange-50/80 text-orange-700 border border-orange-200/50 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-900/30 backdrop-blur-md shadow-sm">
+          AES-256-GCM <span className="mx-2 opacity-40">·</span> Argon2id
         </span>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_0.9fr] gap-6 lg:gap-8">
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900/50 backdrop-blur-xl shadow-xl shadow-gray-200/40 dark:shadow-black/20 p-6 sm:p-8 space-y-6 transition-all duration-300 hover:shadow-2xl hover:shadow-gray-200/60 dark:hover:shadow-black/30">
-            <div className="flex items-center gap-3 text-base font-semibold text-gray-900 dark:text-white">
-              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+        <div className="space-y-6 lg:space-y-8">
+
+          {/* Source Section */}
+          <div className="group/card relative rounded-3xl border border-gray-200/60 dark:border-gray-800/60 bg-white/70 dark:bg-gray-900/40 backdrop-blur-xl shadow-lg shadow-gray-200/20 dark:shadow-black/10 p-6 sm:p-8 space-y-6 transition-all duration-500 hover:shadow-2xl hover:shadow-orange-500/5 hover:-translate-y-1 hover:border-orange-500/20 dark:hover:border-orange-500/20 z-10">
+            <div className="flex items-center gap-4 text-base font-bold text-gray-900 dark:text-white">
+              <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 group-hover/card:scale-110 group-hover/card:bg-blue-100 dark:group-hover/card:bg-blue-900/40 group-hover/card:shadow-inner transition-all duration-300">
                 <Link2 className="w-5 h-5" />
               </div>
-              <span>{t("decryptMetadata.source", "Fetch Encrypted Data")}</span>
+              <span className="text-lg">{t("decryptMetadata.source", "Fetch Encrypted Data")}</span>
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
+
+            <div className="grid sm:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 ml-1">
+                <label className="text-xs font-bold tracking-wide uppercase text-gray-500 dark:text-gray-400 ml-1">
                   {t("decryptMetadata.baseUrl", "Base URL")}
                 </label>
                 <div className="relative group">
-                  <div className="flex items-center h-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 focus-within:border-orange-500 focus-within:ring-4 focus-within:ring-orange-500/10 transition-all duration-300">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
+                  <div className="relative flex items-center h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all duration-300 shadow-sm">
                     <input
                       value={baseUrl}
                       onChange={(e) => setBaseUrl(e.target.value)}
                       onFocus={() => setShowGatewayList(true)}
                       onBlur={() => setTimeout(() => setShowGatewayList(false), 120)}
                       readOnly={!isDev}
-                      className="flex-1 min-w-0 h-full bg-transparent border-none outline-none px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                      className="flex-1 min-w-0 h-full bg-transparent border-none outline-none px-4 text-sm font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400"
                       placeholder="https://ipfs.io/ipfs/"
                     />
                     <button
@@ -259,11 +267,11 @@ export default function DecryptMetadataPage() {
                       onClick={() => setShowGatewayList((v) => !v)}
                       className="h-full px-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                     >
-                      <ChevronDown className="w-4 h-4" />
+                      <ChevronDown className="w-5 h-5" />
                     </button>
                   </div>
                   {showGatewayList && (
-                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-black/50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-100 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-xl shadow-gray-200/50 dark:shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                       {IPFS_GATEWAY_BASE_URLS.map((g) => (
                         <button
                           type="button"
@@ -273,7 +281,7 @@ export default function DecryptMetadataPage() {
                             setBaseUrl(g);
                             setShowGatewayList(false);
                           }}
-                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          className="w-full text-left px-4 py-3.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                         >
                           {g}
                         </button>
@@ -282,7 +290,7 @@ export default function DecryptMetadataPage() {
                   )}
                 </div>
                 {!isDev && (
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500 px-1">
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 px-1">
                     {t(
                       "decryptMetadata.gatewayCspHint",
                       "Restricted by CSP in production. Use listed gateways or file upload.",
@@ -291,35 +299,42 @@ export default function DecryptMetadataPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 ml-1">
+                <label className="text-xs font-bold tracking-wide uppercase text-gray-500 dark:text-gray-400 ml-1">
                   CID
                 </label>
-                <input
-                  value={cid}
-                  onChange={(e) => setCid(e.target.value)}
-                  className="w-full h-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 px-4 text-sm focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all duration-300 placeholder-gray-400"
-                  placeholder={t("decryptMetadata.cidPlaceholder", "Paste CID")}
-                />
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
+                  <input
+                    value={cid}
+                    onChange={(e) => setCid(e.target.value)}
+                    className="relative w-full h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 px-4 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-sm placeholder-gray-400"
+                    placeholder={t("decryptMetadata.cidPlaceholder", "Paste CID")}
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3 pt-2">
+
+            <div className="flex flex-wrap gap-4 pt-2">
               <button
                 type="button"
                 onClick={handleFetch}
                 disabled={isFetching || (!isDev && !isBaseUrlAllowlisted)}
-                className="inline-flex items-center gap-2 px-6 h-12 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-sm font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-60 disabled:hover:scale-100 disabled:shadow-none"
+                className="group relative inline-flex items-center gap-2 px-7 h-12 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-sm font-bold transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
               >
-                {isFetching ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CloudDownload className="w-4 h-4" />
-                )}
-                {t("decryptMetadata.fetch", "Fetch Data")}
+                <div className="absolute -inset-1 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                <div className="relative flex items-center gap-2">
+                  {isFetching ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CloudDownload className="w-4 h-4" />
+                  )}
+                  {t("decryptMetadata.fetch", "Fetch Data")}
+                </div>
               </button>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 px-6 h-12 rounded-full border-2 border-gray-200 dark:border-gray-700 bg-transparent text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-orange-400 dark:hover:border-orange-500 hover:text-orange-500 dark:hover:text-orange-400 transition-all duration-300 active:scale-95"
+                className="inline-flex items-center gap-2 px-7 h-12 rounded-full border-2 border-gray-200/80 dark:border-gray-700/80 bg-white/50 dark:bg-gray-800/50 text-sm font-bold text-gray-600 dark:text-gray-300 hover:border-orange-400 hover:text-orange-500 dark:hover:border-orange-500 dark:hover:text-orange-400 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shadow-sm"
               >
                 <Upload className="w-4 h-4" />
                 {t("decryptMetadata.upload", "Upload File")}
@@ -332,81 +347,91 @@ export default function DecryptMetadataPage() {
                 onChange={(e) => handleFile(e.target.files?.[0])}
               />
             </div>
-            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800/50">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5 ml-1">
+
+            <div className="space-y-3 pt-6 border-t border-gray-100 dark:border-gray-800/60">
+              <label className="text-xs font-bold tracking-wide uppercase text-gray-500 dark:text-gray-400 flex items-center gap-1.5 ml-1">
                 <Lock className="w-3.5 h-3.5 text-orange-500" />
                 {t("decryptMetadata.password", "Decryption Password")}
               </label>
               <div className="relative group">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  ref={passwordRef}
-                  onChange={() => {
-                    if (error) setError(null);
-                  }}
-                  className="w-full h-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 pl-4 pr-12 text-sm focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all duration-300 placeholder-gray-400"
-                  placeholder={t(
-                    "decryptMetadata.passwordPlaceholder",
-                    "Enter decryption password",
-                  )}
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoComplete="new-password"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-center"
-                  aria-label={
-                    showPassword
-                      ? t("decryptMetadata.hidePassword", "Hide password")
-                      : t("decryptMetadata.showPassword", "Show password")
-                  }
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    ref={passwordRef}
+                    onChange={() => {
+                      if (error) setError(null);
+                    }}
+                    className="w-full h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 pl-5 pr-14 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-sm placeholder-gray-400"
+                    placeholder={t(
+                      "decryptMetadata.passwordPlaceholder",
+                      "Enter decryption password",
+                    )}
+                    inputMode="text"
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all flex items-center justify-center"
+                    aria-label={
+                      showPassword
+                        ? t("decryptMetadata.hidePassword", "Hide password")
+                        : t("decryptMetadata.showPassword", "Show password")
+                    }
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900/50 backdrop-blur-xl shadow-xl shadow-gray-200/40 dark:shadow-black/20 p-6 sm:p-8 space-y-4 transition-all duration-300 hover:shadow-2xl hover:shadow-gray-200/60 dark:hover:shadow-black/30">
-            <div className="flex items-center gap-3 text-base font-semibold text-gray-900 dark:text-white">
-              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400">
+          {/* Payload Section */}
+          <div className="group/card relative rounded-3xl border border-gray-200/60 dark:border-gray-800/60 bg-white/70 dark:bg-gray-900/40 backdrop-blur-xl shadow-lg shadow-gray-200/20 dark:shadow-black/10 p-6 sm:p-8 space-y-5 transition-all duration-500 hover:shadow-2xl hover:shadow-orange-500/5 hover:-translate-y-1 hover:border-orange-500/20 dark:hover:border-orange-500/20 z-10">
+            <div className="flex items-center gap-4 text-base font-bold text-gray-900 dark:text-white">
+              <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 group-hover/card:scale-110 group-hover/card:bg-purple-100 dark:group-hover/card:bg-purple-900/40 group-hover/card:shadow-inner transition-all duration-300">
                 <Shield className="w-5 h-5" />
               </div>
-              <span>{t("decryptMetadata.payload", "Encrypted Content")}</span>
+              <span className="text-lg">{t("decryptMetadata.payload", "Encrypted Content")}</span>
             </div>
-            <textarea
-              value={encryptedJson}
-              onChange={(e) => setEncryptedJson(e.target.value)}
-              className="w-full min-h-[200px] rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950/50 px-4 py-4 text-sm font-mono focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all duration-300 placeholder-gray-400"
-              placeholder="Encrypted JSON content will appear here..."
-            />
+
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500 pointer-events-none"></div>
+              <textarea
+                value={encryptedJson}
+                onChange={(e) => setEncryptedJson(e.target.value)}
+                className="relative w-full min-h-[220px] rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-gray-50/80 dark:bg-gray-950/80 px-5 py-5 text-sm font-mono focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-inner placeholder-gray-400 custom-scrollbar resize-y leading-relaxed text-gray-700 dark:text-gray-300"
+                placeholder="Encrypted JSON content will appear here..."
+              />
+            </div>
+
             {payloadMeta && (
-              <div className="grid sm:grid-cols-3 gap-3 text-xs">
-                <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+              <div className="grid sm:grid-cols-3 gap-4 text-xs">
+                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-sm transition-transform hover:scale-[1.02]">
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                     {t("decryptMetadata.payloadMeta.version", "Format Version")}
                   </span>
-                  <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                  <span className="text-gray-900 dark:text-gray-100 font-bold text-sm">
                     {payloadMeta.version || "—"}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-sm transition-transform hover:scale-[1.02]">
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                     Schema
                   </span>
-                  <span className="text-gray-900 dark:text-gray-100 font-semibold break-words">
+                  <span className="text-gray-900 dark:text-gray-100 font-bold text-sm truncate" title={payloadMeta.schema || payloadMeta.aad}>
                     {payloadMeta.schema || payloadMeta.aad || "—"}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-sm transition-transform hover:scale-[1.02]">
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                     {t("decryptMetadata.payloadMeta.cipher", "Algorithm")}
                   </span>
-                  <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                  <span className="text-gray-900 dark:text-gray-100 font-bold text-sm">
                     {payloadMeta.cipher || "—"}
                   </span>
                 </div>
@@ -415,67 +440,74 @@ export default function DecryptMetadataPage() {
           </div>
 
           {error && (
-            <div className="p-4 rounded-2xl border border-red-200/50 bg-red-50/50 dark:bg-red-900/10 dark:border-red-900/30 text-red-600 dark:text-red-400 text-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <span className="font-medium">{error}</span>
+            <div className="p-5 rounded-2xl border border-red-200/60 bg-red-50/80 dark:bg-red-900/20 dark:border-red-900/40 text-red-700 dark:text-red-400 text-sm flex items-start gap-3.5 animate-in fade-in slide-in-from-top-4 duration-300 shadow-sm">
+              <div className="p-1.5 rounded-full bg-red-100 dark:bg-red-900/40 shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <span className="font-semibold pt-0.5 leading-relaxed">{error}</span>
             </div>
           )}
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-4">
             <button
               type="button"
               onClick={handleDecrypt}
               disabled={isDecrypting}
-              className="inline-flex items-center gap-2 px-8 h-14 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-base font-bold shadow-xl shadow-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/50 hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-60 disabled:hover:scale-100 disabled:shadow-none w-full sm:w-auto justify-center"
+              className="relative group inline-flex items-center justify-center gap-3 px-10 h-16 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-lg font-extrabold transition-all duration-300 hover:scale-[1.03] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 w-full sm:w-auto"
             >
-              {isDecrypting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Eye className="w-5 h-5" />
-              )}
-              {t("decryptMetadata.decrypt", "Decrypt and View")}
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur opacity-40 group-hover:opacity-70 transition duration-300"></div>
+              <div className="relative flex items-center gap-2">
+                {isDecrypting ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <Eye className="w-6 h-6 group-hover:scale-110 transition-transform duration-300" />
+                )}
+                <span>{t("decryptMetadata.decrypt", "Decrypt and View")}</span>
+              </div>
             </button>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900/50 backdrop-blur-xl shadow-xl shadow-gray-200/40 dark:shadow-black/20 p-6 sm:p-8 min-h-[400px] flex flex-col transition-all duration-300 hover:shadow-2xl hover:shadow-gray-200/60 dark:hover:shadow-black/30">
-            <div className="flex items-center gap-3 mb-6 text-base font-semibold">
-              <div className="p-2 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400">
+        {/* Result Section */}
+        <div className="space-y-6 lg:space-y-8">
+          <div className="group/card relative rounded-3xl border border-gray-200/60 dark:border-gray-800/60 bg-white/70 dark:bg-gray-900/40 backdrop-blur-xl shadow-lg shadow-gray-200/20 dark:shadow-black/10 p-6 sm:p-8 min-h-[500px] flex flex-col transition-all duration-500 hover:shadow-2xl hover:shadow-orange-500/5 hover:-translate-y-1 hover:border-orange-500/20 dark:hover:border-orange-500/20 z-10">
+            <div className="flex items-center gap-4 mb-8 text-base font-bold text-gray-900 dark:text-white">
+              <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 group-hover/card:scale-110 group-hover/card:bg-green-100 dark:group-hover/card:bg-green-900/40 group-hover/card:shadow-inner transition-all duration-300">
                 <Eye className="w-5 h-5" />
               </div>
-              <span className="text-gray-900 dark:text-white">
-                {t("decryptMetadata.result", "Decryption Result")}
-              </span>
+              <span className="text-lg">{t("decryptMetadata.result", "Decryption Result")}</span>
             </div>
+
             {result ? (
-              <div className="flex-1 space-y-4 overflow-hidden">
-                <div className="rounded-2xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/40 dark:bg-blue-900/10 p-4 space-y-4">
-                  <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 space-y-6 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="rounded-2xl border border-blue-100/80 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-900/10 p-5 space-y-5 shadow-inner">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      <h3 className="text-sm font-extrabold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         {t("decryptMetadata.identityModeSummary", "Identity Mode Summary")}
                       </h3>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-2 leading-relaxed max-w-md">
                         {t(
                           "decryptMetadata.identityModeSummaryHint",
                           "This metadata records whether each identity path uses standard deterministic recovery or enhanced random-salt recovery.",
                         )}
                       </p>
                     </div>
-                    {renderIdentityModeBadge(metadataIdentityMode, {
-                      empty: t("decryptMetadata.identityModeUnknown", "Unknown"),
-                      deterministic: t(
-                        "decryptMetadata.identityModeStandardShort",
-                        "Standard",
-                      ),
-                      random: t("decryptMetadata.identityModeEnhancedShort", "Enhanced"),
-                    })}
+                    <div className="shrink-0">
+                      {renderIdentityModeBadge(metadataIdentityMode, {
+                        empty: t("decryptMetadata.identityModeUnknown", "Unknown"),
+                        deterministic: t(
+                          "decryptMetadata.identityModeStandardShort",
+                          "Standard",
+                        ),
+                        random: t("decryptMetadata.identityModeEnhancedShort", "Enhanced"),
+                      })}
+                    </div>
                   </div>
 
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-white/60 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 px-4 py-3 space-y-2">
-                      <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-white/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/60 p-4 space-y-3 shadow-sm transition-colors hover:border-blue-200 dark:hover:border-blue-800">
+                      <div className="text-[10px] font-extrabold tracking-widest uppercase text-blue-600 dark:text-blue-400">
                         {t("decryptMetadata.personIdentityMode", "Person")}
                       </div>
                       <div>
@@ -491,7 +523,7 @@ export default function DecryptMetadataPage() {
                           ),
                         })}
                       </div>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                      <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-800/50 pt-3">
                         {hasIdentityRecoverySalt
                           ? t(
                               "decryptMetadata.identityRecoveryPresent",
@@ -504,29 +536,29 @@ export default function DecryptMetadataPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-2xl border border-white/60 dark:border-gray-800 bg-white/70 dark:bg-gray-950/40 px-4 py-3 space-y-2">
-                      <div className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-bold">
+                    <div className="rounded-xl border border-white/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/60 p-4 space-y-3 shadow-sm transition-colors hover:border-blue-200 dark:hover:border-blue-800">
+                      <div className="text-[10px] font-extrabold tracking-widest uppercase text-blue-600 dark:text-blue-400">
                         {t("decryptMetadata.parentIdentityModes", "Parents")}
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {renderIdentityModeBadge(fatherIdentityMode, {
-                          empty: t("decryptMetadata.fatherModeUnknown", "Father: Unknown"),
-                          deterministic: t(
-                            "decryptMetadata.fatherModeStandard",
-                            "Father: Standard",
-                          ),
-                          random: t("decryptMetadata.fatherModeEnhanced", "Father: Enhanced"),
-                        })}
-                        {renderIdentityModeBadge(motherIdentityMode, {
-                          empty: t("decryptMetadata.motherModeUnknown", "Mother: Unknown"),
-                          deterministic: t(
-                            "decryptMetadata.motherModeStandard",
-                            "Mother: Standard",
-                          ),
-                          random: t("decryptMetadata.motherModeEnhanced", "Mother: Enhanced"),
-                        })}
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Father</span>
+                          {renderIdentityModeBadge(fatherIdentityMode, {
+                            empty: "Unknown",
+                            deterministic: "Standard",
+                            random: "Enhanced",
+                          })}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Mother</span>
+                          {renderIdentityModeBadge(motherIdentityMode, {
+                            empty: "Unknown",
+                            deterministic: "Standard",
+                            random: "Enhanced",
+                          })}
+                        </div>
                       </div>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                      <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-800/50 pt-3">
                         {t(
                           "decryptMetadata.parentIdentityModesHint",
                           "Parent modes only affect how their identity proof is reconstructed when linking versions.",
@@ -536,21 +568,31 @@ export default function DecryptMetadataPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-950/50 border border-gray-100 dark:border-gray-800 p-4 overflow-hidden">
-                  <pre className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-mono overflow-x-auto whitespace-pre-wrap break-words custom-scrollbar">
+                <div className="relative flex-1 rounded-2xl bg-[#0d1117] dark:bg-black/40 border border-gray-800/40 p-1 overflow-hidden shadow-xl group/code">
+                  <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-[#161b22] to-transparent pointer-events-none z-10" />
+                  <div className="absolute top-3 left-4 flex gap-1.5 z-20 opacity-50 group-hover/code:opacity-100 transition-opacity">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+                  </div>
+                  <pre className="h-full pt-10 pb-4 px-5 text-sm text-[#e6edf3] font-mono overflow-auto whitespace-pre-wrap break-words custom-scrollbar leading-relaxed">
                     {JSON.stringify(result, null, 2)}
                   </pre>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">
-                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4 text-gray-400 dark:text-gray-500">
-                  <Lock className="w-8 h-8 opacity-50" />
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border-2 border-dashed border-gray-200/80 dark:border-gray-700/80 bg-gray-50/40 dark:bg-gray-900/20 group/lock transition-colors hover:border-orange-300 dark:hover:border-orange-700/50">
+                <div className="relative w-20 h-20 mb-6 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 rounded-full scale-100 group-hover/lock:scale-110 group-hover/lock:bg-orange-50 dark:group-hover/lock:bg-orange-900/20 transition-all duration-500 ease-out shadow-sm" />
+                  <Lock className="w-8 h-8 text-gray-400 dark:text-gray-500 relative z-10 group-hover/lock:text-orange-500 transition-colors duration-300" />
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[200px]">
+                <h4 className="text-base font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  Ready to Decrypt
+                </h4>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-500 max-w-[240px] leading-relaxed">
                   {t(
                     "decryptMetadata.resultPlaceholder",
-                    "Decrypted plaintext metadata will be displayed here",
+                    "Decrypted plaintext metadata will be displayed here securely.",
                   )}
                 </p>
               </div>

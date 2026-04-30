@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, Image, Star, UserPlus, X } from "lucide-react";
@@ -14,6 +14,27 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
   const location = useLocation();
   const { setActivePath } = useActivePath();
   const [isOpen, setIsOpen] = useState(false);
+  const menuId = useId();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+
+    if (isOpen) {
+      menu.removeAttribute("inert");
+    } else {
+      menu.setAttribute("inert", "");
+    }
+  }, [isOpen]);
+
+  const closeMenu = useCallback(() => {
+    if (menuRef.current?.contains(document.activeElement)) {
+      triggerRef.current?.focus();
+    }
+    setIsOpen(false);
+  }, []);
 
   // Hide FAB on Actions page since FAB represents that page
   if (location.pathname === "/actions") {
@@ -63,25 +84,31 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
   ];
 
   const handleActionClick = (tab: string) => {
-    setIsOpen(false);
+    closeMenu();
     setActivePath("/actions");
     navigate(`/actions?tab=${tab}&open=1`);
   };
 
   const toggleMenu = () => {
-    setIsOpen(!isOpen);
+    if (isOpen) {
+      closeMenu();
+    } else {
+      setIsOpen(true);
+    }
   };
 
   return (
     <>
       {/* Transparent backdrop for closing menu when clicking outside */}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] bg-transparent" onClick={() => setIsOpen(false)} />
+        <div className="fixed inset-0 z-[9999] bg-transparent" onClick={closeMenu} />
       )}
 
       <div className={`fixed right-6 md:right-10 z-[10000] bottom-24 md:bottom-10 ${className}`}>
         {/* Action menu items */}
         <div
+          ref={menuRef}
+          id={menuId}
           className={`absolute bottom-24 right-0 flex flex-col-reverse gap-4 items-stretch transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) ${
             isOpen
               ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -100,6 +127,8 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
                 `}
               >
                 <button
+                  type="button"
+                  tabIndex={isOpen ? 0 : -1}
                   onClick={() => handleActionClick(action.tab)}
                   className={`
                     group flex items-center gap-3 pl-4 pr-6 py-2.5 rounded-full
@@ -124,7 +153,16 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
 
         {/* Main FAB button */}
         <button
+          ref={triggerRef}
+          type="button"
           onClick={toggleMenu}
+          aria-controls={menuId}
+          aria-expanded={isOpen}
+          aria-label={
+            isOpen
+              ? t("actions.closeMenu", "Close actions menu")
+              : t("actions.openMenu", "Open actions menu")
+          }
           className={`
             relative w-14 h-14 md:w-16 md:h-16 rounded-full 
             flex items-center justify-center transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)
