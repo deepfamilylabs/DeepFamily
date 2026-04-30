@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
+import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import {
   type ParsedVersionDetails,
 } from "../api/personReadGateway";
@@ -44,7 +45,14 @@ export function usePersonDetails(
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err?.message || "Failed to fetch version details");
+          setError(
+            getFriendlyErrorMessage(
+              err,
+              defaultErrorTranslator as any,
+              "Failed to fetch version details",
+              { preferDetailsForUnknown: true },
+            ),
+          );
           setLoading(false);
         }
       });

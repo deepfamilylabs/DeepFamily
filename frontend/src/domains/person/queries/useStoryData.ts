@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
+import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import {
   buildStoryDataResult,
   mergeStoryChunkRecords,
@@ -67,7 +68,14 @@ export function useStoryData(
         }
       } catch (err: any) {
         if (!cancelled) {
-          setError(err?.message || "Failed to fetch story data");
+          setError(
+            getFriendlyErrorMessage(
+              err,
+              defaultErrorTranslator as any,
+              "Failed to fetch story data",
+              { preferDetailsForUnknown: true },
+            ),
+          );
           setLoading(false);
         }
       }

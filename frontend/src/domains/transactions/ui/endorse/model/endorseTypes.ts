@@ -47,4 +47,5 @@ export interface EndorseErrorResultView {
   type: string;
   message: string;
   details: string;
+  retryable?: boolean;
 }

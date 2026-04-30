@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { useToast } from "../../../shared/ui";
 import { useTranslation } from "react-i18next";
 import { getAddChainParams } from "../../../shared/config";
+import { normalizeFriendlyError, sanitizeErrorForLogging } from "../../../shared/lib/errors";
 import { SUPPORTED_WALLETS } from "../config/wallets";
 
 // localStorage key for persisting wallet type
@@ -54,6 +55,31 @@ export function useWallet() {
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const getWalletError = useCallback(
+    (error: unknown, fallbackMessage: string, messageOverrides?: Record<string, string>) =>
+      normalizeFriendlyError(error, t, {
+        fallbackMessage,
+        messageOverrides: {
+          USER_REJECTED: t("wallet.rejected", "Request rejected by user"),
+          WALLET_REQUEST_PENDING: t("wallet.pending", "Connection request already pending"),
+          ...messageOverrides,
+        },
+      }),
+    [t],
+  );
+
+  const showWalletError = useCallback(
+    (error: unknown, fallbackMessage: string, messageOverrides?: Record<string, string>) => {
+      const friendly = getWalletError(error, fallbackMessage, messageOverrides);
+      if (friendly.reason === "USER_REJECTED" || friendly.reason === "WALLET_REQUEST_PENDING") {
+        toast.warning(friendly.message);
+      } else {
+        toast.error(friendly.message);
+      }
+      return friendly;
+    },
+    [getWalletError, toast],
+  );
 
   const [walletState, setWalletState] = useState<WalletState>({
     address: null,
@@ -79,7 +105,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         balance: ethers.formatEther(balance),
       }));
     } catch (error) {
-      console.error("[WalletContext] Failed to fetch balance:", error);
+      console.error("[WalletContext] Failed to fetch balance:", sanitizeErrorForLogging(error));
     }
   }, [walletState.provider, walletState.address]);
 
@@ -192,24 +218,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
         toast.success(t("wallet.connected", "Wallet connected successfully"));
       } catch (error: any) {
-        console.error("[WalletContext] Failed to connect wallet:", error);
+        console.error("[WalletContext] Failed to connect wallet:", sanitizeErrorForLogging(error));
         setWalletState((prev) => ({ ...prev, isConnecting: false }));
-
-        if (error.code === 4001) {
-          toast.warning(t("wallet.rejected", "Connection rejected by user"));
-        } else if (error.code === -32002) {
-          toast.warning(t("wallet.pending", "Connection request already pending"));
-        } else {
-          toast.error(
-            t(
-              "wallet.connectionFailed",
-              `Failed to connect wallet: ${error.message || "Unknown error"}`,
-            ),
-          );
-        }
+        showWalletError(error, t("wallet.connectionFailed", "Failed to connect wallet"), {
+          USER_REJECTED: t("wallet.rejected", "Connection rejected by user"),
+        });
       }
     },
-    [t, toast],
+    [showWalletError, t, toast],
   );
 
   const connect = useCallback(async () => {
@@ -283,17 +299,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
         toast.success(t("wallet.chainSwitched", "Chain switched successfully"));
       } catch (error: any) {
-        console.error("[WalletContext] Failed to switch chain:", error);
+        console.error("[WalletContext] Failed to switch chain:", sanitizeErrorForLogging(error));
         if (error.code === 4902) {
           toast.warning(t("wallet.chainNotAdded", "Chain not added to wallet"));
-        } else if (error.code === 4001) {
-          toast.warning(t("wallet.rejected", "Request rejected by user"));
         } else {
-          toast.error(t("wallet.chainSwitchFailed", "Failed to switch chain"));
+          showWalletError(error, t("wallet.chainSwitchFailed", "Failed to switch chain"));
         }
       }
     },
-    [t, toast, walletState.rawProvider],
+    [showWalletError, t, toast, walletState.rawProvider],
   );
 
   // Switch to chain, or add it first if not present in wallet
@@ -336,25 +350,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             toast.success(t("wallet.chainAdded", "Network added successfully"));
             return true;
           } catch (addError: any) {
-            console.error("[WalletContext] Failed to add chain:", addError);
-            if (addError.code === 4001) {
-              toast.warning(t("wallet.rejected", "Request rejected by user"));
-            } else {
-              toast.error(t("wallet.chainAddFailed", "Failed to add network"));
-            }
+            console.error("[WalletContext] Failed to add chain:", sanitizeErrorForLogging(addError));
+            showWalletError(addError, t("wallet.chainAddFailed", "Failed to add network"));
             return false;
           }
-        } else if (switchError.code === 4001) {
-          toast.warning(t("wallet.rejected", "Request rejected by user"));
-          return false;
         } else {
-          console.error("[WalletContext] Failed to switch chain:", switchError);
-          toast.error(t("wallet.chainSwitchFailed", "Failed to switch chain"));
+          console.error(
+            "[WalletContext] Failed to switch chain:",
+            sanitizeErrorForLogging(switchError),
+          );
+          showWalletError(switchError, t("wallet.chainSwitchFailed", "Failed to switch chain"));
           return false;
         }
       }
     },
-    [t, toast, walletState.rawProvider],
+    [showWalletError, t, toast, walletState.rawProvider],
   );
 
   // Listen to account and chain changes - use rawProvider from state
@@ -375,7 +385,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             setWalletState((prev) => ({ ...prev, provider, signer, address }));
             refreshBalance();
           } catch (e) {
-            console.warn("Failed to refresh after account change:", e);
+            console.warn("Failed to refresh after account change:", sanitizeErrorForLogging(e));
           }
         })();
       }
@@ -402,7 +412,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             balance: ethers.formatEther(balance),
           }));
         } catch (error) {
-          console.warn("[WalletContext] Failed to refresh provider after chain change:", error);
+          console.warn(
+            "[WalletContext] Failed to refresh provider after chain change:",
+            sanitizeErrorForLogging(error),
+          );
           setWalletState((prev) => ({
             ...prev,
             chainId: nextChainId,
@@ -450,7 +463,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.warn(
           "[WalletContext] Failed to add wallet listener, falling back to polling:",
-          error,
+          sanitizeErrorForLogging(error),
         );
         // Fallback to polling
         pollTimer = setInterval(async () => {
@@ -561,7 +574,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
         isAutoConnectDone.current = true;
       } catch (error) {
-        console.warn("[WalletContext] Auto-connect failed:", error);
+        console.warn("[WalletContext] Auto-connect failed:", sanitizeErrorForLogging(error));
         isAutoConnectDone.current = true;
       }
     };

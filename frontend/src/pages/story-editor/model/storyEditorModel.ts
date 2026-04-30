@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
 import { formatHashMiddle } from "../../../shared/model";
 
@@ -116,52 +117,19 @@ export function getValidTokenId(tokenId: string | undefined): string | undefined
 }
 
 export function mapStorySubmitError(error: any, t: (key: string, fallback: string) => string): string {
-  const errorType = error?.type || error?.code;
-  let message =
-    error instanceof Error ? error.message : t("storyChunkEditor.operationFailed", "Operation failed");
-
-  if (errorType === "USER_REJECTED") {
-    message = t("storyChunkEditor.errors.userRejected", "Transaction was rejected by user");
-  } else if (errorType === "WALLET_POPUP_TIMEOUT") {
-    message = t(
-      "storyChunkEditor.errors.walletTimeout",
-      "Wallet confirmation timed out. Please reopen your wallet and confirm in Fluent.",
-    );
-  } else if (errorType === "WALLET_REQUEST_PENDING") {
-    message = t(
-      "storyChunkEditor.errors.walletPending",
-      "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
-    );
-  }
-
-  return message;
+  return getFriendlyErrorMessage(
+    error,
+    t as any,
+    t("storyChunkEditor.operationFailed", "Operation failed"),
+    { preferDetailsForUnknown: true },
+  );
 }
 
 export function mapStorySealError(error: any, t: (key: string, fallback: string) => string): string {
-  const errorMessage = error?.message || String(error);
-  const errorType = error?.type || error?.code;
-
-  if (errorMessage.toLowerCase().includes("no wallet connected") || errorType === "NO_WALLET") {
-    return t(
-      "storyChunkEditor.errors.noWallet",
-      "No wallet connected. Please connect your wallet first.",
-    );
-  }
-  if (errorType === "USER_REJECTED") {
-    return t("storyChunkEditor.errors.userRejected", "Transaction was rejected by user");
-  }
-  if (errorType === "WALLET_POPUP_TIMEOUT") {
-    return t(
-      "storyChunkEditor.errors.walletTimeout",
-      "Wallet confirmation timed out. Please reopen your wallet and confirm.",
-    );
-  }
-  if (errorType === "WALLET_REQUEST_PENDING") {
-    return t(
-      "storyChunkEditor.errors.walletPending",
-      "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
-    );
-  }
-
-  return error instanceof Error ? error.message : t("storyChunkEditor.sealFailed", "Seal failed");
+  return getFriendlyErrorMessage(
+    error,
+    t as any,
+    t("storyChunkEditor.sealFailed", "Seal failed"),
+    { preferDetailsForUnknown: true },
+  );
 }

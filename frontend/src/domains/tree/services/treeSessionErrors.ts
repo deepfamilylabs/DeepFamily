@@ -1,3 +1,5 @@
+import { resolveErrorReason } from "../../../shared/lib/errors";
+
 export type TreeSessionStatus =
   | "rateLimited"
   | "networkError"
@@ -25,6 +27,7 @@ function getErrorCode(error: any): any {
 export function classifyTreeSessionConnectionError(error: any): TreeSessionStatus {
   const message = getErrorMessage(error);
   const code = getErrorCode(error);
+  const reason = resolveErrorReason(error);
   const isRateLimit =
     code === -32005 ||
     /Too\s*many\s*requests|daily\s*request\s*count\s*exceeded|rate[-\s]?limit|status\s*429/i.test(
@@ -37,6 +40,8 @@ export function classifyTreeSessionConnectionError(error: any): TreeSessionStatu
   const isFetchFail =
     /Failed\s*to\s*fetch|NetworkError\s*when\s*attempting\s*to\s*fetch/i.test(message);
   const isNetwork =
+    reason === "NETWORK_ERROR" ||
+    reason === "WALLET_POPUP_TIMEOUT" ||
     isConnectionRefused ||
     isAbort ||
     isFetchFail ||
@@ -54,8 +59,11 @@ export function classifyTreeRootCheckError(error: any): {
 } {
   const message = getErrorMessage(error);
   const name = String(error?.errorName || "");
+  const reason = resolveErrorReason(error);
   const baseStatus = classifyTreeSessionConnectionError(error);
   const isRootInvalid =
+    reason === "InvalidPersonHash" ||
+    reason === "InvalidVersionIndex" ||
     name.includes("InvalidPersonHash") ||
     name.includes("InvalidVersionIndex") ||
     /InvalidPersonHash|InvalidVersionIndex/i.test(message);

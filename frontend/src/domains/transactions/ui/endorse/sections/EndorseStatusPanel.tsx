@@ -63,7 +63,7 @@ export function EndorseStatusPanel({
           messageLabel={t("endorse.errorMessage", "Message")}
           detailsLabel={t("endorse.errorDetails", "Details")}
           retry={
-            errorResult.type === "WALLET_TIMEOUT"
+            errorResult.retryable
               ? {
                   label: t("endorse.retryTransaction", "Retry Transaction"),
                   onClick: () => {

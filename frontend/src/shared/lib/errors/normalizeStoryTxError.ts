@@ -1,4 +1,4 @@
-import { extractRevertReason, resolveErrorReason } from "./core";
+import { defaultErrorTranslator, normalizeErrorToError } from "./core";
 
 const STORY_ERROR_MESSAGES: Record<string, string> = {
   MustBeNFTHolder: "You must own this NFT to edit its story",
@@ -28,52 +28,19 @@ const makeTypedError = (message: string, type: string, code?: string): Error => 
  * detection pipeline so story flows do not maintain a separate parser.
  */
 export function normalizeStoryTxError(error: any, contract: any): Error {
-  const reason = resolveErrorReason(error);
-  if (reason === "WALLET_POPUP_TIMEOUT") {
-    return makeTypedError(
-      "Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.",
-      "WALLET_POPUP_TIMEOUT",
-      "WALLET_POPUP_TIMEOUT",
-    );
-  }
-
-  if (reason === "USER_REJECTED") {
-    return makeTypedError("Transaction was rejected by user", "USER_REJECTED", "USER_REJECTED");
-  }
-
-  if (reason === "INSUFFICIENT_FUNDS") {
-    return makeTypedError("Insufficient funds for gas", "INSUFFICIENT_FUNDS");
-  }
-
-  if (reason) {
-    return makeTypedError(STORY_ERROR_MESSAGES[reason] || `Contract error: ${reason}`, reason);
-  }
-
-  const revertReason = extractRevertReason(contract, error);
-  if (revertReason) {
-    return makeTypedError(
-      STORY_ERROR_MESSAGES[revertReason] || `Contract error: ${revertReason}`,
-      revertReason,
-    );
-  }
-
-  if (
-    error?.code === -32002 ||
-    (typeof error?.message === "string" && /request (?:is )?already pending/i.test(error.message))
-  ) {
-    return makeTypedError(
-      "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
-      "WALLET_REQUEST_PENDING",
-      "WALLET_REQUEST_PENDING",
-    );
-  }
-
-  if (
-    typeof error?.message === "string" &&
-    error.message.includes("execution reverted")
-  ) {
-    return makeTypedError("Transaction failed: execution reverted", "EXECUTION_REVERTED");
-  }
-
-  return makeTypedError(error?.message || "An unknown error occurred", "UNKNOWN_ERROR");
+  const normalized = normalizeErrorToError(error, defaultErrorTranslator as any, {
+    contract,
+    fallbackMessage: error?.message || "An unknown error occurred",
+    messageOverrides: STORY_ERROR_MESSAGES,
+  });
+  const typed = makeTypedError(
+    normalized.message,
+    (normalized as any).type || "UNKNOWN_ERROR",
+    (normalized as any).code,
+  );
+  (typed as any).reason = (normalized as any).reason;
+  (typed as any).details = (normalized as any).details;
+  (typed as any).retryable = (normalized as any).retryable;
+  (typed as any).friendly = (normalized as any).friendly;
+  return typed;
 }

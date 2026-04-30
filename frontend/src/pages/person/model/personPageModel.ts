@@ -1,5 +1,6 @@
 import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
 import { buildStorySnapshot } from "../../../domains/person";
+import { getFriendlyErrorMessage, resolveErrorReason } from "../../../shared/lib/errors";
 
 export type PersonStoryViewMode = "sections" | "paragraph" | "raw";
 export type PersonSectionKey = string | number;
@@ -261,27 +262,14 @@ export function buildStoryDetailData(options: {
 }
 
 export function mapPersonStoryFetchError(error: unknown, t: Translate): string {
-  const raw =
-    error && typeof error === "object"
-      ? ((error as { message?: string; shortMessage?: string }).message ||
-          (error as { shortMessage?: string }).shortMessage ||
-          "")
-      : "";
-  const full = error && typeof error === "object" ? JSON.stringify(error) : "";
-  const lower = (raw + full).toLowerCase();
-
-  if (lower.includes("invalidtokenid") || lower.includes("invalid token id")) {
+  const reason = resolveErrorReason(error);
+  if (reason === "InvalidTokenId") {
     return t("person.invalidTokenId", "Invalid token ID");
   }
-  if (
-    lower.includes("nonexistent token") ||
-    lower.includes("query for nonexistent token") ||
-    lower.includes("token does not exist")
-  ) {
+  if (reason === "ERC721NonexistentToken") {
     return t("person.nonexistentToken", "Token does not exist");
   }
-  if (lower.includes("execution reverted")) {
-    return t("person.fetchFailed", "Failed to load token");
-  }
-  return raw || "Failed to fetch story data";
+  return getFriendlyErrorMessage(error, t as any, t("person.fetchFailed", "Failed to load token"), {
+    preferDetailsForUnknown: false,
+  });
 }

@@ -14,6 +14,7 @@ import {
   generateRandomIdentitySaltHex,
   type IdentitySaltMode,
 } from "../../../shared/crypto/identityHash";
+import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { StoryChunk } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import {
@@ -40,6 +41,10 @@ export function useSearchPageController() {
   const toast = useToast();
   const personGateway = usePersonGateway();
   const treeGateway = useTreeGateway();
+  const getQueryErrorMessage = useCallback(
+    (error: unknown) => getFriendlyErrorMessage(error, t as any, t("search.queryFailed")),
+    [t],
+  );
 
   const schemas = useMemo(
     () => ({
@@ -304,12 +309,12 @@ export function useSearchPageController() {
         setEndorsementHasMore(hasMore);
         setEndorsementOffset(nextOffset);
       } catch (error: any) {
-        setEndorsementError(error?.message || t("search.queryFailed"));
+        setEndorsementError(getQueryErrorMessage(error));
       } finally {
         setEndorsementLoading(false);
       }
     },
-    [endorsementOffset, personGateway, t],
+    [endorsementOffset, getQueryErrorMessage, personGateway, t],
   );
 
   const onResetEndorsementQuery = useCallback(() => {
@@ -360,12 +365,12 @@ export function useSearchPageController() {
         setUriHasMore(hasMore);
         setUriOffset(nextOffset);
       } catch (error: any) {
-        setUriError(error?.message || t("search.queryFailed"));
+        setUriError(getQueryErrorMessage(error));
       } finally {
         setUriLoading(false);
       }
     },
-    [personGateway, t, uriOffset],
+    [getQueryErrorMessage, personGateway, t, uriOffset],
   );
 
   const onResetUriQuery = useCallback(() => {
@@ -421,12 +426,12 @@ export function useSearchPageController() {
         setVersionsHasMore(hasMore);
         setVersionsOffset(nextOffset);
       } catch (error: any) {
-        setVersionsError(error?.message || t("search.queryFailed"));
+        setVersionsError(getQueryErrorMessage(error));
       } finally {
         setVersionsLoading(false);
       }
     },
-    [t, treeGateway, versionsOffset],
+    [getQueryErrorMessage, t, treeGateway, versionsOffset],
   );
 
   const onResetVersionsQuery = useCallback(() => {
@@ -477,12 +482,12 @@ export function useSearchPageController() {
         setStoryChunksHasMore(hasMore);
         setStoryChunksOffset(nextOffset);
       } catch (error: any) {
-        setStoryChunksError(error?.message || t("search.queryFailed"));
+        setStoryChunksError(getQueryErrorMessage(error));
       } finally {
         setStoryChunksLoading(false);
       }
     },
-    [personGateway, storyChunksOffset, t],
+    [getQueryErrorMessage, personGateway, storyChunksOffset, t],
   );
 
   const onResetStoryChunksQuery = useCallback(() => {
@@ -543,12 +548,12 @@ export function useSearchPageController() {
         setChildrenHasMore(hasMore);
         setChildrenOffset(nextOffset);
       } catch (error: any) {
-        setChildrenError(error?.message || t("search.queryFailed"));
+        setChildrenError(getQueryErrorMessage(error));
       } finally {
         setChildrenLoading(false);
       }
     },
-    [childrenOffset, t, treeGateway],
+    [childrenOffset, getQueryErrorMessage, t, treeGateway],
   );
 
   const onResetChildrenQuery = useCallback(() => {

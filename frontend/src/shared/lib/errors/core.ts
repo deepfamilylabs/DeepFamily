@@ -1,13 +1,15 @@
-import { TFunction } from "i18next";
+import type { TFunction } from "i18next";
+
+type SafeLogValue = string | number | boolean | null;
 
 export type FriendlyError = {
   type: string;
   message: string;
   details: string;
   reason?: string;
+  code?: SafeLogValue;
+  retryable?: boolean;
 };
-
-type SafeLogValue = string | number | boolean | null;
 
 export type SafeLogError = {
   name?: string;
@@ -23,6 +25,15 @@ const truncate = (value: string, maxLen: number) => {
   if (value.length <= maxLen) return value;
   return value.slice(0, maxLen) + "…";
 };
+
+const MAX_ERROR_DETAILS_LENGTH = 1200;
+const MAX_NESTED_STRING_COUNT = 80;
+const MAX_NESTED_DEPTH = 6;
+const MAX_OBJECT_KEYS_PER_LEVEL = 30;
+const MAX_COLLECTED_STRING_LENGTH = 4096;
+
+const STANDARD_ERROR_SELECTOR = "0x08c379a0";
+const STANDARD_PANIC_SELECTOR = "0x4e487b71";
 
 /**
  * Return a minimal, whitelisted error shape safe for console logging.
@@ -48,6 +59,25 @@ export const sanitizeErrorForLogging = (error: any): SafeLogError => {
   const stack = typeof error?.stack === "string" ? truncate(error.stack, 2000) : undefined;
 
   return { name, message, shortMessage, code, reason, stack };
+};
+
+const getPrimaryErrorCode = (error: any): SafeLogValue | undefined => {
+  const candidates = [
+    error?.code,
+    error?.error?.code,
+    error?.info?.error?.code,
+    error?.cause?.code,
+  ];
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === "string" ||
+      typeof candidate === "number" ||
+      typeof candidate === "boolean"
+    ) {
+      return candidate;
+    }
+  }
+  return undefined;
 };
 
 const toSafeDebugValue = (value: unknown): SafeLogValue => {
@@ -145,8 +175,11 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0xf283c519": "InvalidStory",
   "0x13f04adb": "InvalidTokenURI",
   "0x076490f6": "InvalidZKProof",
-  "0x5fce01bb": "VerifierRouteNotSet",
-  "0xabd45c1f": "NameVerifierRouteNotSet",
+  "0x10c40e8c": "InvalidVerifierAddress",
+  "0x98dce1a9": "VerifierRouteNotSet",
+  "0xc5556b05": "UnsupportedProofEncoding",
+  "0x67610d0b": "MalformedProofData",
+  "0xdd90c870": "UnsupportedPurpose",
   "0x2872d6ce": "DuplicateVersion",
   "0xf0d7613e": "MustEndorseVersionFirst",
   "0x8051cbca": "VersionAlreadyMinted",
@@ -156,7 +189,18 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x0e745b7a": "MustBeAdult",
   "0x9865d99a": "TokenContractNotSet",
   "0x7e273289": "ERC721NonexistentToken",
-  "0x3f6cc768": "InvalidTokenId",
+  "0x59171fc1": "ERC721EnumerableForbiddenBatchMint",
+  "0x64283d7b": "ERC721IncorrectOwner",
+  "0x177e802f": "ERC721InsufficientApproval",
+  "0xa9fbf51f": "ERC721InvalidApprover",
+  "0x5b08ba18": "ERC721InvalidOperator",
+  "0x89c62b64": "ERC721InvalidOwner",
+  "0x64a0ae92": "ERC721InvalidReceiver",
+  "0x73c6ac6e": "ERC721InvalidSender",
+  "0xa57d13dc": "ERC721OutOfBoundsIndex",
+  "0x1e4fbdf7": "OwnableInvalidOwner",
+  "0x118cdaa7": "OwnableUnauthorizedAccount",
+  "0x3ee5aeb5": "ReentrancyGuardReentrantCall",
   "0xbb43d2ee": "EndorsementFeeTransferFailed",
   "0x499fddb1": "ProtocolFeeTooHigh",
   "0x54d92fcb": "AlreadyEndorsed",
@@ -169,6 +213,11 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x5b00bc40": "ChunkHashMismatch",
   "0xfb8cd7ea": "StoryNotFound",
   "0xdaffd8a5": "MustBeNFTHolder",
+  "0x081f37d2": "OnlyDeepFamilyContract",
+  "0xd92e233d": "ZeroAddress",
+  "0x0dc149f0": "AlreadyInitialized",
+  "0x87138d5c": "NotInitialized",
+  "0xf62a0f66": "AllowanceBelowZero",
   "0xfb8f41b2": "ERC20InsufficientAllowance",
   "0x08c379a0": "Error",
 };
@@ -192,8 +241,11 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   InvalidStory: "Story content is invalid.",
   InvalidTokenURI: "Token URI is invalid.",
   InvalidZKProof: "Zero-knowledge proof failed verification.",
+  InvalidVerifierAddress: "Verifier contract address is invalid.",
   VerifierRouteNotSet: "Verifier contract is not configured.",
-  NameVerifierRouteNotSet: "Name verifier contract is not configured.",
+  UnsupportedProofEncoding: "Proof encoding is not supported.",
+  MalformedProofData: "Proof data is malformed.",
+  UnsupportedPurpose: "Proof purpose is not supported by the verifier.",
   DuplicateVersion: "This version already exists on-chain.",
   MustEndorseVersionFirst: "You must endorse a version before this action.",
   VersionAlreadyMinted: "Version has already been minted.",
@@ -203,6 +255,18 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   MustBeAdult: "The person must be an adult to proceed.",
   TokenContractNotSet: "Token contract is not configured.",
   ERC721NonexistentToken: "Token ID does not exist.",
+  ERC721EnumerableForbiddenBatchMint: "Batch minting is not supported by this NFT contract.",
+  ERC721IncorrectOwner: "NFT owner does not match the expected owner.",
+  ERC721InsufficientApproval: "NFT approval is insufficient for this action.",
+  ERC721InvalidApprover: "NFT approver address is invalid.",
+  ERC721InvalidOperator: "NFT operator address is invalid.",
+  ERC721InvalidOwner: "NFT owner address is invalid.",
+  ERC721InvalidReceiver: "NFT receiver address is invalid.",
+  ERC721InvalidSender: "NFT sender address is invalid.",
+  ERC721OutOfBoundsIndex: "NFT index is out of bounds.",
+  OwnableInvalidOwner: "Owner address is invalid.",
+  OwnableUnauthorizedAccount: "Current wallet is not authorized for this owner-only action.",
+  ReentrancyGuardReentrantCall: "Contract rejected a reentrant call.",
   InvalidTokenId: "Token ID is invalid.",
   EndorsementFeeTransferFailed: "Endorsement fee transfer failed.",
   ProtocolFeeTooHigh: "Protocol fee exceeds allowed limit.",
@@ -216,7 +280,14 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   ChunkHashMismatch: "Story chunk hash mismatch.",
   StoryNotFound: "Story not found.",
   MustBeNFTHolder: "NFT holder permission required for this action.",
+  OnlyDeepFamilyContract: "Only the DeepFamily contract can call this token function.",
+  ZeroAddress: "Address cannot be zero.",
+  AlreadyInitialized: "Contract has already been initialized.",
+  NotInitialized: "Contract has not been initialized.",
+  AllowanceBelowZero: "Token allowance cannot be reduced below zero.",
+  Error: "Contract reverted.",
   rejected: "Transaction was cancelled by user.",
+  EVM_PANIC: "Contract execution hit a Solidity panic.",
   WALLET_POPUP_TIMEOUT:
     "Wallet confirmation timed out. Please try again and make sure to confirm in the wallet popup.",
   REPLACEMENT_UNDERPRICED:
@@ -224,25 +295,71 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   GAS_ERROR: "Gas limit or price too low. Please increase gas and retry.",
   OUT_OF_GAS: "Transaction ran out of gas during execution.",
   INSUFFICIENT_FUNDS: "Insufficient balance to cover gas fees.",
+  INSUFFICIENT_DEEP_BALANCE: "Insufficient DEEP token balance for endorsement.",
   NETWORK_ERROR: "Network error. Please check your connection.",
   USER_REJECTED: "Transaction was cancelled by user.",
+  WALLET_NOT_CONNECTED: "Please connect your wallet.",
+  WALLET_UNAUTHORIZED: "Wallet authorization is required for this action.",
+  WALLET_METHOD_UNSUPPORTED: "Wallet does not support this request.",
+  WALLET_DISCONNECTED: "Wallet is disconnected. Please reconnect your wallet.",
+  WALLET_CHAIN_DISCONNECTED: "Wallet is not connected to the requested network.",
+  WALLET_CHAIN_NOT_ADDED: "This network is not added to your wallet.",
+  WALLET_REQUEST_PENDING:
+    "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
   CALL_EXCEPTION: "Contract validation failed. Please check input data.",
   ERC20InsufficientAllowance: "Allowance insufficient. Please re-approve the token allowance.",
 };
+
+const RETRYABLE_REASONS = new Set([
+  "USER_REJECTED",
+  "WALLET_POPUP_TIMEOUT",
+  "WALLET_REQUEST_PENDING",
+  "NETWORK_ERROR",
+  "WALLET_UNAUTHORIZED",
+  "WALLET_DISCONNECTED",
+  "WALLET_CHAIN_DISCONNECTED",
+  "WALLET_CHAIN_NOT_ADDED",
+  "REPLACEMENT_UNDERPRICED",
+  "GAS_ERROR",
+]);
 
 const normalizeReason = (val?: string) => {
   if (!val) return undefined;
   return val.replace(/\(\)$/, "");
 };
 
+const getKnownReasonFromErrorCode = (error: any): string | undefined => {
+  const code = getPrimaryErrorCode(error);
+  if (code === -32002) return "WALLET_REQUEST_PENDING";
+  if (code === 4001 || code === "ACTION_REJECTED") return "USER_REJECTED";
+  if (code === 4100) return "WALLET_UNAUTHORIZED";
+  if (code === 4200) return "WALLET_METHOD_UNSUPPORTED";
+  if (code === 4900) return "WALLET_DISCONNECTED";
+  if (code === 4901) return "WALLET_CHAIN_DISCONNECTED";
+  if (code === 4902) return "WALLET_CHAIN_NOT_ADDED";
+  if (typeof code !== "string") return undefined;
+
+  const normalized = normalizeReason(code);
+  if (!normalized) return undefined;
+  if (normalized === "UserRejected" || normalized === "UserRejectedRequestError") {
+    return "USER_REJECTED";
+  }
+  if (REASON_FRIENDLY_MAP[normalized]) return normalized;
+  return undefined;
+};
+
+const isRetryableReason = (reason?: string) => Boolean(reason && RETRYABLE_REASONS.has(reason));
+
 const collectNestedStrings = (value: unknown): string[] => {
   const out = new Set<string>();
   const seen = new WeakSet<object>();
 
-  const visit = (current: unknown) => {
+  const visit = (current: unknown, depth: number) => {
+    if (out.size >= MAX_NESTED_STRING_COUNT || depth > MAX_NESTED_DEPTH) return;
+
     if (typeof current === "string") {
       const trimmed = current.trim();
-      if (trimmed) out.add(trimmed);
+      if (trimmed) out.add(truncate(trimmed, MAX_COLLECTED_STRING_LENGTH));
       return;
     }
     if (!current || typeof current !== "object") return;
@@ -250,23 +367,74 @@ const collectNestedStrings = (value: unknown): string[] => {
     seen.add(current as object);
 
     if (Array.isArray(current)) {
-      for (const item of current) visit(item);
+      for (const item of current.slice(0, MAX_OBJECT_KEYS_PER_LEVEL)) {
+        visit(item, depth + 1);
+        if (out.size >= MAX_NESTED_STRING_COUNT) break;
+      }
       return;
     }
 
-    for (const key of Object.getOwnPropertyNames(current)) {
+    for (const key of Object.getOwnPropertyNames(current).slice(0, MAX_OBJECT_KEYS_PER_LEVEL)) {
       try {
-        visit((current as Record<string, unknown>)[key]);
+        visit((current as Record<string, unknown>)[key], depth + 1);
       } catch {}
+      if (out.size >= MAX_NESTED_STRING_COUNT) break;
     }
   };
 
-  visit(value);
+  visit(value, 0);
   return [...out];
 };
 
 const collectNestedHexData = (value: unknown): string[] =>
-  collectNestedStrings(value).filter((item) => item.startsWith("0x") && item.length >= 10);
+  collectNestedStrings(value).filter((item) => /^0x[0-9a-fA-F]{8,}/.test(item));
+
+const parseHexWord = (word: string): number | null => {
+  if (!/^[0-9a-fA-F]{64}$/.test(word)) return null;
+  try {
+    const value = BigInt(`0x${word}`);
+    if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    return Number(value);
+  } catch {
+    return null;
+  }
+};
+
+const decodeUtf8Hex = (hex: string): string | null => {
+  if (!hex || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) return null;
+  try {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    const decoded = new TextDecoder().decode(bytes).trim();
+    return decoded || null;
+  } catch {
+    return null;
+  }
+};
+
+const decodeStandardRevertData = (data: string): string | undefined => {
+  const normalized = data.toLowerCase();
+  if (normalized.startsWith(STANDARD_PANIC_SELECTOR)) return "EVM_PANIC";
+  if (!normalized.startsWith(STANDARD_ERROR_SELECTOR)) return undefined;
+
+  const payload = data.slice(10);
+  if (payload.length < 128) return undefined;
+
+  const offsetBytes = parseHexWord(payload.slice(0, 64));
+  if (offsetBytes == null) return undefined;
+
+  const lengthOffset = offsetBytes * 2;
+  const lengthBytes = parseHexWord(payload.slice(lengthOffset, lengthOffset + 64));
+  if (lengthBytes == null) return undefined;
+
+  const textOffset = lengthOffset + 64;
+  if (payload.length < textOffset + lengthBytes * 2) return undefined;
+
+  const textHex = payload.slice(textOffset, textOffset + lengthBytes * 2);
+  return decodeUtf8Hex(textHex) ?? undefined;
+};
 
 const extractCustomErrorNameFromMessage = (msg?: string): string | undefined => {
   if (!msg) return undefined;
@@ -287,6 +455,9 @@ const extractCustomErrorNameFromMessage = (msg?: string): string | undefined => 
 
 const extractSelectorReason = (value: unknown): string | undefined => {
   for (const data of collectNestedHexData(value)) {
+    const standardReason = decodeStandardRevertData(data);
+    if (standardReason) return normalizeReason(standardReason);
+
     const selector = data.slice(0, 10);
     if (ERROR_SELECTOR_MAP[selector]) return ERROR_SELECTOR_MAP[selector];
   }
@@ -316,6 +487,9 @@ export const resolveErrorReason = (error: any): string | undefined => {
     if (normalized) return normalized;
   }
 
+  const typedReason = normalizeReason(error?.type);
+  if (typedReason && REASON_FRIENDLY_MAP[typedReason]) return typedReason;
+
   const selectorReason = extractSelectorReason(error);
   if (selectorReason) return selectorReason;
 
@@ -323,6 +497,7 @@ export const resolveErrorReason = (error: any): string | undefined => {
   if (messageReason) return messageReason;
 
   const msg = collectNestedStrings(error).join("\n");
+  const codeReason = getKnownReasonFromErrorCode(error);
 
   if (
     error?.code === "ACTION_REJECTED" ||
@@ -333,16 +508,44 @@ export const resolveErrorReason = (error: any): string | undefined => {
     return "USER_REJECTED";
   }
 
+  if (/connect your wallet|no wallet connected/i.test(msg)) {
+    return "WALLET_NOT_CONNECTED";
+  }
+
+  if (/invalidtokenid|invalid token id/i.test(msg)) {
+    return "InvalidTokenId";
+  }
+
+  if (/nonexistent token|query for nonexistent token|token does not exist/i.test(msg)) {
+    return "ERC721NonexistentToken";
+  }
+
+  if (
+    codeReason === "WALLET_REQUEST_PENDING" ||
+    /request (?:is )?already pending/i.test(msg)
+  ) {
+    return "WALLET_REQUEST_PENDING";
+  }
+
+  if (codeReason && codeReason !== "CALL_EXCEPTION") {
+    return codeReason;
+  }
+
   if (error?.code === "REPLACEMENT_UNDERPRICED" || /replacement fee too low/i.test(msg)) {
     return "REPLACEMENT_UNDERPRICED";
   }
 
-  if (error?.code === "UNPREDICTABLE_GAS_LIMIT" || /gas/i.test(msg)) {
-    return "GAS_ERROR";
-  }
-
   if (/out of gas/i.test(msg)) {
     return "OUT_OF_GAS";
+  }
+
+  if (
+    error?.code === "UNPREDICTABLE_GAS_LIMIT" ||
+    /cannot estimate gas|gas required exceeds allowance|intrinsic gas too low|gas limit|gas price/i.test(
+      msg,
+    )
+  ) {
+    return "GAS_ERROR";
   }
 
   if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg))
@@ -360,6 +563,8 @@ export const resolveErrorReason = (error: any): string | undefined => {
   if (error?.code === "CALL_EXCEPTION") {
     return "CALL_EXCEPTION";
   }
+
+  if (codeReason) return codeReason;
 
   return undefined;
 };
@@ -400,6 +605,7 @@ export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
   const reason = resolveErrorReason(error);
   const humanMessage = error?.humanMessage || error?.message;
   const derivedRaw = deriveReadableError(error);
+  const code = getPrimaryErrorCode(error);
 
   if (reason) {
     const fallback = REASON_FRIENDLY_MAP[reason] || humanMessage || "Transaction failed.";
@@ -410,6 +616,8 @@ export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
       message: friendly,
       details: friendly,
       reason,
+      code,
+      retryable: isRetryableReason(reason),
     };
   }
 
@@ -420,11 +628,14 @@ export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
     typeof error?.details === "string"
       ? error.details
       : String(error?.details ?? derivedRaw ?? error?.message ?? fallbackUnknown);
+  const safeDetails = truncate(details, MAX_ERROR_DETAILS_LENGTH);
 
   return {
     type: error?.type || "UNKNOWN_ERROR",
     message: fallbackUnknown,
-    details,
+    details: safeDetails,
+    code,
+    retryable: false,
   };
 };
 
@@ -444,6 +655,9 @@ export const extractRevertReason = (
   if (directReason) return normalizeReason(directReason) ?? directReason;
 
   for (const data of collectNestedHexData(rawError)) {
+    const standardReason = decodeStandardRevertData(data);
+    if (standardReason) return normalizeReason(standardReason) ?? standardReason;
+
     try {
       const parsedError = contract?.interface?.parseError?.(data);
       if (parsedError) return parsedError.name;
@@ -464,4 +678,97 @@ export const extractRevertReason = (
   }
 
   return null;
+};
+
+export type NormalizeFriendlyErrorOptions = {
+  contract?: { interface?: any } | null;
+  fallbackMessage?: string;
+  fallbackType?: string;
+  messageOverrides?: Record<string, string>;
+};
+
+export const defaultErrorTranslator = (_key: string, fallback?: string) => fallback ?? _key;
+
+const attachDecodedReason = (error: any, contract?: { interface?: any } | null): any => {
+  if (!contract) return error;
+  const decodedReason = extractRevertReason(contract, error);
+  if (!decodedReason) return error;
+
+  if (error && typeof error === "object") {
+    try {
+      Object.defineProperty(error, "__dfDecodedReason", {
+        value: decodedReason,
+        configurable: true,
+        writable: true,
+      });
+      return error;
+    } catch {}
+  }
+
+  return {
+    message: typeof error?.message === "string" ? error.message : String(error),
+    __dfDecodedReason: decodedReason,
+  };
+};
+
+export const normalizeFriendlyError = (
+  error: any,
+  t: TFunction,
+  options: NormalizeFriendlyErrorOptions = {},
+): FriendlyError => {
+  const enrichedError = attachDecodedReason(error, options.contract);
+  const friendly = getFriendlyError(enrichedError, t);
+  const reason = friendly.reason || friendly.type;
+  const overriddenMessage = reason ? options.messageOverrides?.[reason] : undefined;
+  const isUnknown = friendly.type === "UNKNOWN_ERROR";
+  const message =
+    overriddenMessage ||
+    (isUnknown && options.fallbackMessage ? options.fallbackMessage : friendly.message);
+  const details =
+    overriddenMessage && friendly.details === friendly.message
+      ? overriddenMessage
+      : friendly.details;
+
+  return {
+    ...friendly,
+    type: isUnknown && options.fallbackType ? options.fallbackType : friendly.type,
+    message,
+    details,
+    retryable: friendly.retryable ?? isRetryableReason(reason),
+  };
+};
+
+export const getFriendlyErrorMessage = (
+  error: any,
+  t: TFunction,
+  fallbackMessage: string,
+  options: Omit<NormalizeFriendlyErrorOptions, "fallbackMessage"> & {
+    preferDetailsForUnknown?: boolean;
+  } = {},
+): string => {
+  const { preferDetailsForUnknown, ...normalizeOptions } = options;
+  const friendly = normalizeFriendlyError(error, t, {
+    ...normalizeOptions,
+    fallbackMessage,
+  });
+  if (preferDetailsForUnknown && friendly.type === "UNKNOWN_ERROR" && friendly.details) {
+    return friendly.details;
+  }
+  return friendly.message;
+};
+
+export const normalizeErrorToError = (
+  error: any,
+  t: TFunction = defaultErrorTranslator as TFunction,
+  options: NormalizeFriendlyErrorOptions = {},
+): Error => {
+  const friendly = normalizeFriendlyError(error, t, options);
+  const normalized = new Error(friendly.message);
+  (normalized as any).type = friendly.type;
+  (normalized as any).reason = friendly.reason;
+  (normalized as any).details = friendly.details;
+  (normalized as any).code = friendly.reason || friendly.type || friendly.code;
+  (normalized as any).retryable = friendly.retryable;
+  (normalized as any).friendly = friendly;
+  return normalized;
 };

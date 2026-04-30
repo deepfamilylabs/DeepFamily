@@ -263,10 +263,7 @@ export function useStoryEditorController() {
           );
         }
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : t("storyChunkEditor.operationFailed", "Operation failed");
+        const message = mapStorySubmitError(error, t);
         toast.error(message);
         throw error;
       }
@@ -314,10 +311,7 @@ export function useStoryEditorController() {
           );
         }
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : t("storyChunkEditor.operationFailed", "Operation failed");
+        const message = mapStorySealError(error, t);
         toast.error(message);
         throw error;
       }

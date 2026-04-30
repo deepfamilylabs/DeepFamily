@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { NodeId } from "../../../shared/model";
 import { useTreeGateway } from "./useTreeGateway";
 
@@ -41,7 +42,14 @@ export function useChildrenStrict(
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err?.message || "Failed to fetch strict children");
+          setError(
+            getFriendlyErrorMessage(
+              err,
+              defaultErrorTranslator as any,
+              "Failed to fetch strict children",
+              { preferDetailsForUnknown: true },
+            ),
+          );
           setLoading(false);
         }
       });

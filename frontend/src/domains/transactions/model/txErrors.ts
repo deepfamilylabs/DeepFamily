@@ -4,7 +4,11 @@
  * Provides utilities for normalizing raw ethers/wallet errors into the
  * structured TxFlowError format used by all transaction flows.
  */
-import { resolveErrorReason } from "../../../shared/lib/errors";
+import {
+  defaultErrorTranslator,
+  normalizeFriendlyError,
+  resolveErrorReason,
+} from "../../../shared/lib/errors";
 import type { TxFlowError } from "./txStatus";
 
 /** Well-known error types for transaction flows. */
@@ -35,12 +39,14 @@ export function toTxFlowError(
   message: string,
   type?: string,
 ): TxFlowError {
-  const e = error as any;
-  const reason = resolveErrorReason(error);
+  const friendly = normalizeFriendlyError(error, defaultErrorTranslator as any, {
+    fallbackMessage: message,
+    fallbackType: type,
+  });
   return {
-    type: type ?? (reason === "USER_REJECTED" ? TX_ERROR_TYPES.USER_REJECTED : TX_ERROR_TYPES.UNKNOWN),
-    message,
-    details: e?.shortMessage || e?.message || String(error),
-    reason: e?.reason ?? reason,
+    type: type ?? friendly.reason ?? friendly.type ?? TX_ERROR_TYPES.UNKNOWN,
+    message: friendly.reason ? friendly.message : message,
+    details: friendly.details,
+    reason: friendly.reason,
   };
 }
