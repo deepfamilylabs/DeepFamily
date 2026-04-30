@@ -1,12 +1,4 @@
 import { useMemo } from "react";
-import { usePersonDetails, type UsePersonDetailsResult } from "../../person";
-
-export function useVersionDetails(
-  personHash: string | null | undefined,
-  versionIndex: number | null | undefined,
-): UsePersonDetailsResult {
-  return usePersonDetails(personHash, versionIndex);
-}
 
 export function useTreeVersionDetailsKey(
   personHash: string | null | undefined,

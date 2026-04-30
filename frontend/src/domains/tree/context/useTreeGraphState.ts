@@ -4,19 +4,17 @@ import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { vdKey } from "../../../shared/cache/queryKeys";
 import { isIndexedDbCacheEnabled } from "../../../shared/config/env";
 import { getRuntimeFamilyTreeConfig } from "../config/familyTreeConfig";
-import type { NodeData, NodeId } from "../../../shared/model";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import {
   applyNodeDataBackfills,
   applyNodeEnrichmentPatches,
   fetchNodeEnrichmentBatch,
   isVersionDetailsFresh,
+  type NodeData,
+  type NodeId,
   planNodeEnrichmentSlice,
-} from "../../person";
-import {
-  addPlaceholderNodes,
-  mergeReachableNodeIds,
-} from "../services/treeEdgeState";
+} from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
+import { addPlaceholderNodes, mergeReachableNodeIds } from "../services/treeEdgeState";
 import { buildTreeFetchRunKey } from "../services/treeTraversalState";
 import {
   applyTreeBuildNodeSnapshots,
@@ -477,7 +475,8 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
             versionDetailsTtlMs: options.versionDetailsTtlMs,
             nftDetailsTtlMs: options.nftDetailsTtlMs,
             getVersionDetailsFetchedAt: (pair) =>
-              options.queryCacheRef.current.getEntry(vdKey(pair.h, pair.v))?.fetchedAt ?? Date.now(),
+              options.queryCacheRef.current.getEntry(vdKey(pair.h, pair.v))?.fetchedAt ??
+              Date.now(),
             getCurrentNode: (id) => nodesDataRef.current[id],
             readStoryMetadata: async (tokenId) => {
               const metadata = await options.contract.getStoryMetadata(tokenId);

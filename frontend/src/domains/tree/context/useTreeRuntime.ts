@@ -6,8 +6,8 @@ import {
   createDeepFamilyInterface,
 } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
+import { createPersonReadGateway } from "../../../shared/clients/personReadGateway";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
-import { createPersonReadGateway } from "../../person";
 import { createTreeReadGateway } from "../api/treeReadGateway";
 
 export function useTreeRuntime() {

@@ -3,19 +3,20 @@ import type React from "react";
 import { deleteBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
 import { csKey, cuKey, nftKey, storyKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
-import type { NodeData, NodeId } from "../../../shared/model";
-import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import {
   applyNodeDetailNftDetails,
   applyNodeDetailVersionDetails,
   bumpNodeEndorsementCount,
+  makeNodeId,
+  type NodeData,
+  type NodeId,
   type NodeKeyMinimal,
   type ParsedNftDetails,
   type ParsedVersionDetails,
   type StoryDataResult,
   upsertNode,
-} from "../../person";
-import { makeNodeId } from "../../../shared/model";
+} from "../../../shared/model";
+import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import {
   addPlaceholderNodes,
   mergeReachableNodeIds,
@@ -141,9 +142,12 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.useIndexedDbCache,
   ]);
 
-  const updateTotalVersions = useCallback((personHash: string, totalVersions: number) => {
-    options.setNodesData((prev) => applyTotalVersionsToNodes(prev, personHash, totalVersions));
-  }, [options.setNodesData]);
+  const updateTotalVersions = useCallback(
+    (personHash: string, totalVersions: number) => {
+      options.setNodesData((prev) => applyTotalVersionsToNodes(prev, personHash, totalVersions));
+    },
+    [options.setNodesData],
+  );
 
   const refreshInvalidatedEdges = useCallback(
     async (invalidation: ReturnType<typeof getInvalidateKeysAfterPersonVersionAdded>) => {
@@ -151,8 +155,8 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         options.refresh();
         return;
       }
-      const { unionUpserts, strictUpserts, newReachableChildren } = await reloadInvalidatedTreeEdges(
-        {
+      const { unionUpserts, strictUpserts, newReachableChildren } =
+        await reloadInvalidatedTreeEdges({
           api: options.api,
           invalidation,
           reachableNodeIds: options.reachableNodeIdsRef.current,
@@ -160,8 +164,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
           childrenPageLimit: options.childrenPageLimit,
           totalVersionsTtlMs: options.totalVersionsTtlMs,
           onTotalVersions: updateTotalVersions,
-        },
-      );
+        });
 
       if (Object.keys(unionUpserts).length) {
         options.setEdgesUnion((prev) => ({ ...prev, ...unionUpserts }));
@@ -210,7 +213,9 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       }
 
       if (invalidation.versionDetailKeys.length > 0) {
-        options.setNodesData((prev) => zeroVersionDetailFetchTimes(prev, invalidation.versionDetailKeys));
+        options.setNodesData((prev) =>
+          zeroVersionDetailFetchTimes(prev, invalidation.versionDetailKeys),
+        );
       }
 
       if (invalidation.unionKeys.length > 0) {
