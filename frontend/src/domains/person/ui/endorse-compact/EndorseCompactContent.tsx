@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Loader2, AlertCircle, Star, ShieldCheck, Coins } from "lucide-react";
 import {
@@ -22,6 +22,10 @@ export interface EndorseCompactModalProps {
   onSuccess?: (result: any) => void;
 }
 
+function getTargetKey(personHash: string, versionIndex: number) {
+  return `${personHash.trim().toLowerCase()}:${Number(versionIndex) || 0}`;
+}
+
 export default function EndorseCompactModal({
   isOpen,
   onClose,
@@ -35,12 +39,17 @@ export default function EndorseCompactModal({
   const { getVersionDetails } = useContractClient();
   const { invalidateByTx } = useTreeMutations();
   const endorseFlow = useEndorseFlow();
+  const resetEndorseFlow = endorseFlow.reset;
+  const runEndorseFlow = endorseFlow.run;
 
   const [displayName, setDisplayName] = useState<string | null>(versionData?.fullName || null);
   const [endorsementCount, setEndorsementCount] = useState<number | null>(
     versionData?.endorsementCount ?? null,
   );
   const [hasTriggered, setHasTriggered] = useState(false);
+  const activeRunTargetRef = useRef<string | null>(null);
+  const handledResultRef = useRef<ExecuteEndorseFlowResult | null>(null);
+  const currentTargetKey = getTargetKey(personHash, versionIndex);
 
   const hasValidTarget = useMemo(
     () => Boolean(personHash && /^0x[0-9a-fA-F]{64}$/.test(personHash) && Number(versionIndex) > 0),
@@ -48,7 +57,12 @@ export default function EndorseCompactModal({
   );
 
   // Derive display values from flow result
-  const flowResult = endorseFlow.result as ExecuteEndorseFlowResult | null;
+  const flowBelongsToCurrentTarget = activeRunTargetRef.current === currentTargetKey;
+  const flowStatus = flowBelongsToCurrentTarget ? endorseFlow.status : "idle";
+  const flowResult = (
+    flowBelongsToCurrentTarget ? endorseFlow.result : null
+  ) as ExecuteEndorseFlowResult | null;
+  const flowError = flowBelongsToCurrentTarget ? endorseFlow.error : null;
   const isAlreadyEndorsed = flowResult?.alreadyEndorsed === true;
   const successResult = flowResult && !flowResult.alreadyEndorsed ? flowResult : null;
   const endorsementFee = successResult?.feeFormatted ?? null;
@@ -57,26 +71,26 @@ export default function EndorseCompactModal({
   const userBalanceRaw = successResult?.balanceBefore ?? 0n;
   const txHash = successResult?.transactionHash ?? null;
 
-  const isInsufficientBalance = endorseFlow.status === "error" && (() => {
-    const err = endorseFlow.error as any;
+  const isInsufficientBalance = flowStatus === "error" && (() => {
+    const err = flowError as any;
     const reason = err?.reason || err?.type;
     return reason === "INSUFFICIENT_DEEP_BALANCE";
   })();
 
   const errorMessage = useMemo(() => {
-    if (endorseFlow.status !== "error" || !endorseFlow.error) return null;
-    const err = endorseFlow.error as any;
+    if (flowStatus !== "error" || !flowError) return null;
+    const err = flowError as any;
     const reason = err?.reason || err?.type;
     if (reason === "INSUFFICIENT_DEEP_BALANCE") {
       return err.message || t("endorse.insufficientBalance", "Insufficient DEEP balance");
     }
     return err.message || t("endorse.transactionFailed", "Transaction failed. Please try again.");
-  }, [endorseFlow.status, endorseFlow.error, t]);
+  }, [flowError, flowStatus, t]);
 
   // Map flow status to local display state
   const state = useMemo(() => {
     if (isAlreadyEndorsed) return "already-endorsed" as const;
-    const s = endorseFlow.status;
+    const s = flowStatus;
     if (s === "idle") return "idle" as const;
     if (s === "validating") return "checking" as const;
     if (s === "approving") return "approving" as const;
@@ -84,17 +98,24 @@ export default function EndorseCompactModal({
     if (s === "success") return "success" as const;
     if (s === "error") return "error" as const;
     return "idle" as const;
-  }, [endorseFlow.status, isAlreadyEndorsed]);
+  }, [flowStatus, isAlreadyEndorsed]);
 
   // Reset between openings
   useEffect(() => {
-    if (!isOpen) return;
-    endorseFlow.reset();
+    activeRunTargetRef.current = null;
+    handledResultRef.current = null;
+    resetEndorseFlow();
     setHasTriggered(false);
-    if (versionData?.endorsementCount !== undefined) {
-      setEndorsementCount(versionData.endorsementCount);
-    }
-  }, [isOpen, personHash, versionIndex]);
+    setDisplayName(versionData?.fullName || null);
+    setEndorsementCount(versionData?.endorsementCount ?? null);
+  }, [
+    isOpen,
+    personHash,
+    resetEndorseFlow,
+    versionData?.endorsementCount,
+    versionData?.fullName,
+    versionIndex,
+  ]);
 
   // Lightweight detail fetch for context
   useEffect(() => {
@@ -128,21 +149,34 @@ export default function EndorseCompactModal({
 
   // Handle success side-effects
   useEffect(() => {
+    if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
     if (state === "success" && successResult) {
+      if (handledResultRef.current === successResult) return;
+      handledResultRef.current = successResult;
       setEndorsementCount((prev) => (prev === null ? 1 : prev + 1));
       invalidateByTx({ receipt: successResult.receipt, hints: { personHash, versionIndex } });
       onSuccess?.(successResult.receipt);
     }
-  }, [state]);
+  }, [currentTargetKey, invalidateByTx, isOpen, onSuccess, personHash, state, successResult, versionIndex]);
 
   // Auto-endorse as soon as the modal opens with a valid target
   useEffect(() => {
     if (!isOpen || hasTriggered) return;
     if (hasValidTarget && address) {
       setHasTriggered(true);
-      endorseFlow.run({ personHash, versionIndex, suppressToasts: true });
+      activeRunTargetRef.current = currentTargetKey;
+      runEndorseFlow({ personHash, versionIndex, suppressToasts: true });
     }
-  }, [isOpen, hasTriggered, hasValidTarget, address]);
+  }, [
+    address,
+    currentTargetKey,
+    hasTriggered,
+    hasValidTarget,
+    isOpen,
+    personHash,
+    runEndorseFlow,
+    versionIndex,
+  ]);
 
   const isProcessing = state === "checking" || state === "approving" || state === "working";
 
