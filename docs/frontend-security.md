@@ -72,6 +72,10 @@ Minimum practices:
 - Prefer audited, actively maintained crypto and ZK libraries.
 - Avoid libraries that rely on `eval`/`new Function` in production builds.
 
+Project-specific dependency notes:
+- Metadata CID generation intentionally uses `multiformats` + `@noble/hashes` directly. Do not re-add IPFS hashing wrapper packages that pull protobuf-based importer stacks unless there is a reviewed need and `npm run security:audit` stays clean.
+- `frontend/package.json` overrides `bfj` to `9.1.3` because `snarkjs` depends on a broad `bfj` range and older resolved versions pull `jsonpath -> underscore`, which is flagged by production audit. Keep the override until `snarkjs` resolves to a non-vulnerable dependency tree on its own.
+
 ## Workers & Isolation (Recommended)
 
 Moving crypto and ZK into Web Workers:
