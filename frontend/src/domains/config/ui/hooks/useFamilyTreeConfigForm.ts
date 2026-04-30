@@ -262,7 +262,7 @@ export function useFamilyTreeConfigForm() {
     setCustomName("");
     setCustomChainId("");
     setCustomRpc("");
-    toast.show(t("familyTree.config.customNetworkAdded", "Custom network added"));
+    toast.success(t("familyTree.config.customNetworkAdded", "Custom network added"));
   }, [
     customChainId,
     customName,

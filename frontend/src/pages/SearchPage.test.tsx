@@ -9,6 +9,8 @@ const personHashB = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 const mocks = vi.hoisted(() => ({
   toastShow: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
   personGateway: {
     listVersionEndorsements: vi.fn(),
     listTokenUriHistory: vi.fn(),
@@ -40,11 +42,17 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../shared/ui", () => ({
-  useToast: () => ({
-    show: mocks.toastShow,
-  }),
-}));
+vi.mock("../shared/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/ui")>();
+  return {
+    ...actual,
+    useToast: () => ({
+      show: mocks.toastShow,
+      success: mocks.toastSuccess,
+      error: mocks.toastError,
+    }),
+  };
+});
 
 vi.mock("../domains/tree", () => ({
   useTreeGateway: () => mocks.treeGateway,
@@ -77,6 +85,8 @@ vi.mock("../domains/person", async (importOriginal) => {
 describe("SearchPage", () => {
   beforeEach(() => {
     mocks.toastShow.mockReset();
+    mocks.toastSuccess.mockReset();
+    mocks.toastError.mockReset();
     mocks.personGateway.listVersionEndorsements.mockReset();
     mocks.personGateway.listTokenUriHistory.mockReset();
     mocks.personGateway.listStoryChunksPage.mockReset();

@@ -11,7 +11,7 @@ import {
   isMinted,
 } from "../../../shared/model";
 import { useTreeMutations, useTreeNodeAccess } from "../../tree";
-import { ResponsiveModalFrame, useResponsiveModalMode } from "../../../shared/ui";
+import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
 import { getChunkTypeOptions } from "../config/chunkTypes";
 import {
   BasicStorySection,
@@ -33,6 +33,7 @@ interface PersonStoryModalProps {
 
 export default function PersonStoryModal({ person, isOpen, onClose }: PersonStoryModalProps) {
   const { t } = useTranslation();
+  const toast = useToast();
   const { getStoryData, getOwnerOf } = useTreeNodeAccess();
   const { bumpEndorsementCount } = useTreeMutations();
   const nameContainerRef = useRef<HTMLDivElement | null>(null);
@@ -49,7 +50,6 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
 
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<"chunks" | "full">("chunks");
-  const [centerHint, setCenterHint] = useState<string | null>(null);
   const [entered, setEntered] = useState(false);
   const [owner, setOwner] = useState<string | undefined>(person.owner);
   const [showEndorseModal, setShowEndorseModal] = useState(false);
@@ -121,8 +121,7 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
       try {
         if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
           await navigator.clipboard.writeText(text);
-          setCenterHint(t("common.copied", "Copied"));
-          setTimeout(() => setCenterHint(null), 1200);
+          toast.success(t("common.copied", "Copied"));
           return true;
         }
       } catch {}
@@ -137,16 +136,18 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
         // Using deprecated execCommand as fallback for older browsers
         const ok = document.execCommand("copy");
         document.body.removeChild(ta);
-        setCenterHint(ok ? t("common.copied", "Copied") : t("common.copyFailed", "Failed to copy"));
-        setTimeout(() => setCenterHint(null), 1200);
+        if (ok) {
+          toast.success(t("common.copied", "Copied"));
+        } else {
+          toast.error(t("common.copyFailed", "Failed to copy"));
+        }
         return ok;
       } catch {
-        setCenterHint(t("common.copyFailed", "Failed to copy"));
-        setTimeout(() => setCenterHint(null), 1200);
+        toast.error(t("common.copyFailed", "Failed to copy"));
         return false;
       }
     },
-    [t],
+    [t, toast],
   );
 
   // Fetch story data through the tree node access layer.
@@ -361,13 +362,6 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
       entered={entered}
       closeLabel={t("common.close", "Close")}
     >
-      {centerHint && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
-          <div className="rounded-lg bg-black/80 dark:bg-black/70 text-white px-4 py-2 text-sm font-medium animate-fade-in shadow-lg">
-            {centerHint}
-          </div>
-        </div>
-      )}
       <EndorseCompactModal
         isOpen={showEndorseModal}
         onClose={() => setShowEndorseModal(false)}

@@ -35,7 +35,7 @@ const mocks = vi.hoisted(() => ({
     clearAllCaches: vi.fn(),
   },
   toast: {
-    show: vi.fn(),
+    success: vi.fn(),
   },
   envFlags: {
     isDev: false,
@@ -89,7 +89,7 @@ describe("useFamilyTreeConfigForm", () => {
     mocks.config.update.mockReset();
     mocks.config.removeRootFromHistory.mockReset();
     mocks.config.clearRootHistory.mockReset();
-    mocks.toast.show.mockReset();
+    mocks.toast.success.mockReset();
     mocks.envFlags.localizedRoot = "";
     mocks.envFlags.localizedVersion = 0;
   });
@@ -197,7 +197,7 @@ describe("useFamilyTreeConfigForm", () => {
     expect(JSON.parse(localStorage.getItem("ft:customNetworks") || "[]")).toEqual([
       { chainId: 31338, name: "My Local", rpcUrl: "http://my-local" },
     ]);
-    expect(mocks.toast.show).toHaveBeenCalledWith("Custom network added");
+    expect(mocks.toast.success).toHaveBeenCalledWith("Custom network added");
   });
 
   it("history selectors push hash into the root field", () => {

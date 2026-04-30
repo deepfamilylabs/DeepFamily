@@ -14,13 +14,14 @@ import React, {
   useMemo,
   forwardRef,
   useImperativeHandle,
+  useId,
 } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Clipboard, Eye, EyeOff, Info } from "lucide-react";
-import { useToast } from "../../../shared/ui";
+import { ChevronDown, Eye, EyeOff, Info } from "lucide-react";
+import { CopyIconButton, ModalShell, useListboxA11y, useToast } from "../../../shared/ui";
 import { formatHashMiddle } from "../../../shared/model";
 import {
   validatePassphraseStrength,
@@ -60,6 +61,31 @@ const ThemedSelect: React.FC<{
 }> = ({ value, onChange, options, className = "" }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listboxId = useId();
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  const {
+    activeIndex,
+    activeOptionId,
+    getOptionId,
+    handleButtonKeyDown,
+    selectOption,
+    setActiveIndex,
+  } = useListboxA11y({
+    open,
+    options,
+    selectedIndex,
+    listboxId,
+    getOptionKey: (option) => option.value,
+    onOpen: () => setOpen(true),
+    onClose: () => setOpen(false),
+    onSelect: (option) => {
+      onChange(option.value);
+      setOpen(false);
+    },
+    buttonRef,
+    focusButtonOnSelect: true,
+  });
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -71,34 +97,48 @@ const ThemedSelect: React.FC<{
   }, []);
 
   const current = options.find((o) => o.value === value)?.label ?? "";
+  const handleRootBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const nextFocusedElement = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+    if (!event.currentTarget.contains(nextFocusedElement)) {
+      setOpen(false);
+    }
+  };
 
   return (
-    <div ref={rootRef} className={`relative ${className}`}>
+    <div ref={rootRef} onBlur={handleRootBlur} className={`relative ${className}`}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={handleButtonKeyDown}
         className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={activeOptionId}
       >
         <span className="truncate">{current}</span>
         <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
-          <ul role="listbox" className="max-h-60 overflow-auto">
-            {options.map((o) => (
+          <ul id={listboxId} role="listbox" className="max-h-60 overflow-auto">
+            {options.map((o, index) => (
               <li
                 key={o.value}
+                id={getOptionId(o, index)}
                 role="option"
                 aria-selected={o.value === value}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  onChange(o.value);
-                  setOpen(false);
+                  selectOption(index);
                 }}
                 className={`px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
                   o.value === value
                     ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
+                    : index === activeIndex
+                      ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-50"
                     : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}
               >
@@ -211,6 +251,8 @@ export const PersonHashCalculator = forwardRef<
     const [passphraseRevision, setPassphraseRevision] = useState(0);
     const toast = useToast();
     const passphraseInputRef = useRef<HTMLInputElement | null>(null);
+    const passphraseHelpTitleId = useId();
+    const passphraseHelpDescriptionId = useId();
 
     // Use external state if provided, otherwise use internal state
     const currentOpen = collapsible ? (onToggle ? isOpen : internalOpen) : true;
@@ -573,97 +615,104 @@ export const PersonHashCalculator = forwardRef<
                 >
                   <Info size={14} />
                 </button>
-                {showPassphraseHelp && (
-                  <>
-                    {/* Backdrop */}
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowPassphraseHelp(false)}
-                    />
-                    {/* Modal */}
-                    <div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold text-gray-800 dark:text-gray-100">
+                <ModalShell
+                  isOpen={showPassphraseHelp}
+                  onClose={() => setShowPassphraseHelp(false)}
+                  ariaLabelledBy={passphraseHelpTitleId}
+                  ariaDescribedBy={passphraseHelpDescriptionId}
+                  closeLabel={t("common.close", "Close")}
+                  bare
+                  zIndex="z-50"
+                >
+                  <div
+                    className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div
+                          id={passphraseHelpTitleId}
+                          className="font-semibold text-gray-800 dark:text-gray-100"
+                        >
+                          {t(
+                            "search.hashCalculator.passphraseHelp.title",
+                            "Passphrase Information",
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPassphraseHelp(false)}
+                          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          aria-label={t("common.close", "Close")}
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div id={passphraseHelpDescriptionId} className="space-y-3 text-sm">
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
                             {t(
-                              "search.hashCalculator.passphraseHelp.title",
-                              "Passphrase Information",
+                              "search.hashCalculator.passphraseHelp.privacy",
+                              "Privacy Protection",
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowPassphraseHelp(false)}
-                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                          >
-                            ×
-                          </button>
+                          <div className="text-xs leading-relaxed">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.privacyDesc",
+                              "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
+                            )}
+                          </div>
                         </div>
 
-                        <div className="space-y-3 text-sm">
-                          <div className="text-gray-600 dark:text-gray-300">
-                            <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.privacy",
-                                "Privacy Protection",
-                              )}
-                            </div>
-                            <div className="text-xs leading-relaxed">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.privacyDesc",
-                                "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
-                              )}
-                            </div>
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-green-600 dark:text-green-400">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.optional",
+                              "Completely Optional",
+                            )}
                           </div>
-
-                          <div className="text-gray-600 dark:text-gray-300">
-                            <div className="mb-1 font-medium text-green-600 dark:text-green-400">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.optional",
-                                "Completely Optional",
-                              )}
-                            </div>
-                            <div className="text-xs leading-relaxed">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.optionalDesc",
-                                "Can be left blank, but using longer family mottos, poems, or emoji combinations is recommended for enhanced privacy.",
-                              )}
-                            </div>
+                          <div className="text-xs leading-relaxed">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.optionalDesc",
+                              "Can be left blank, but using longer family mottos, poems, or emoji combinations is recommended for enhanced privacy.",
+                            )}
                           </div>
+                        </div>
 
-                          <div className="text-gray-600 dark:text-gray-300">
-                            <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.remember",
-                                "Please Remember",
-                              )}
-                            </div>
-                            <div className="text-xs leading-relaxed">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.rememberDesc",
-                                "Passphrases cannot be recovered. Forgetting it will generate a different identity hash.",
-                              )}
-                            </div>
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.remember",
+                              "Please Remember",
+                            )}
                           </div>
+                          <div className="text-xs leading-relaxed">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.rememberDesc",
+                              "Passphrases cannot be recovered. Forgetting it will generate a different identity hash.",
+                            )}
+                          </div>
+                        </div>
 
-                          <div className="text-gray-600 dark:text-gray-300">
-                            <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.privacyNoteTitle",
-                                "Local Only",
-                              )}
-                            </div>
-                            <div className="text-xs leading-relaxed text-gray-500 dark:text-gray-300">
-                              {t(
-                                "search.hashCalculator.passphraseHelp.privacyNote",
-                                "The passphrase is hashed locally only; nothing is uploaded or stored.",
-                              )}
-                            </div>
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.privacyNoteTitle",
+                              "Local Only",
+                            )}
+                          </div>
+                          <div className="text-xs leading-relaxed text-gray-500 dark:text-gray-300">
+                            {t(
+                              "search.hashCalculator.passphraseHelp.privacyNote",
+                              "The passphrase is hashed locally only; nothing is uploaded or stored.",
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
-                  </>
-                )}
+                  </div>
+                </ModalShell>
               </div>
             </div>
             <div className="relative">
@@ -826,8 +875,7 @@ export const PersonHashCalculator = forwardRef<
                     className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight"
                     wrapOnMobile
                   />
-                  <button
-                    type="button"
+                  <CopyIconButton
                     onClick={async () => {
                       try {
                         if (
@@ -835,7 +883,7 @@ export const PersonHashCalculator = forwardRef<
                           typeof navigator.clipboard.writeText === "function"
                         ) {
                           await navigator.clipboard.writeText(computedHash);
-                          toast.show(t("search.copied"));
+                          toast.success(t("search.copied"));
                           return;
                         }
                       } catch {}
@@ -849,17 +897,18 @@ export const PersonHashCalculator = forwardRef<
                         ta.select();
                         const ok = document.execCommand("copy");
                         document.body.removeChild(ta);
-                        toast.show(ok ? t("search.copied") : t("search.copyFailed"));
+                        if (ok) {
+                          toast.success(t("search.copied"));
+                        } else {
+                          toast.error(t("search.copyFailed"));
+                        }
                       } catch {
-                        toast.show(t("search.copyFailed"));
+                        toast.error(t("search.copyFailed"));
                       }
                     }}
-                    aria-label={t("search.copy")}
-                    className="shrink-0 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/70 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                    title={t("search.copy")}
-                  >
-                    <Clipboard size={14} />
-                  </button>
+                    label={t("search.copy")}
+                    size="sm"
+                  />
                 </>
               )}
             </div>

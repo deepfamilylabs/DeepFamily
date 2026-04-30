@@ -83,6 +83,7 @@ export function ThemedSelect({ value, onChange, options, className = "" }: Theme
                 role="option"
                 aria-selected={option.value === value}
                 onMouseEnter={() => setActiveIndex(index)}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   selectOption(index);
                 }}

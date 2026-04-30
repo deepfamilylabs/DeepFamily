@@ -8,7 +8,6 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
-  Copy,
   Layers,
   Hash,
   AlertCircle,
@@ -24,6 +23,7 @@ import {
   shortAddress,
   formatHashMiddle,
 } from "../../../shared/model";
+import { CopyIconButton } from "../../../shared/ui";
 import { getChunkTypeIcon, getChunkTypeColorClass } from "../config/chunkTypes";
 
 export interface StoryData {
@@ -133,19 +133,12 @@ function CopyButton({
   compact?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
+    <CopyIconButton
+      label={label}
       onClick={onClick}
-      className={
-        compact
-          ? "p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-          : "p-2 opacity-0 group-hover:opacity-100 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all"
-      }
-      title={label}
-    >
-      <Copy size={compact ? 12 : 14} strokeWidth={compact ? undefined : 2.5} />
-    </button>
+      size={compact ? "xs" : "sm"}
+      visibility={compact ? "always" : "group-hover"}
+    />
   );
 }
 

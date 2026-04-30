@@ -27,28 +27,54 @@ const THEMES: { id: ColorTheme; color: string; label: string }[] = [
 export default function ColorPalette() {
   const { theme, setTheme } = useColorTheme();
   const [isOpen, setIsOpen] = React.useState(false);
+  const paletteId = React.useId();
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   return (
     <div className="relative group">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 flex items-center gap-2"
         title="Change Color Theme"
+        aria-label="Change color theme"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? paletteId : undefined}
       >
         <Palette className="w-5 h-5 text-slate-600 dark:text-slate-300" />
         <div
           className="w-3 h-3 rounded-full"
           style={{ backgroundColor: THEMES.find((t) => t.id === theme)?.color }}
+          aria-hidden
         />
       </button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 grid grid-cols-5 gap-2 w-64">
+          <div
+            id={paletteId}
+            className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 grid grid-cols-5 gap-2 w-64"
+            role="group"
+            aria-label="Color themes"
+          >
             {THEMES.filter((t) => t.id !== "default").map((t) => (
               <button
                 key={t.id}
+                type="button"
                 onClick={() => {
                   setTheme(t.id);
                   setIsOpen(false);
@@ -58,6 +84,8 @@ export default function ColorPalette() {
                 }`}
                 style={{ backgroundColor: t.color }}
                 title={t.label}
+                aria-label={`Set color theme to ${t.label}`}
+                aria-pressed={theme === t.id}
               />
             ))}
           </div>

@@ -52,13 +52,17 @@ vi.mock("../domains/config", () => ({
   }),
 }));
 
-vi.mock("../shared/ui", () => ({
-  useToast: () => ({
-    success: mocks.toastSuccess,
-    error: mocks.toastError,
-    show: mocks.toastShow,
-  }),
-}));
+vi.mock("../shared/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/ui")>();
+  return {
+    ...actual,
+    useToast: () => ({
+      success: mocks.toastSuccess,
+      error: mocks.toastError,
+      show: mocks.toastShow,
+    }),
+  };
+});
 
 vi.mock("../domains/person", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../domains/person")>();

@@ -58,7 +58,11 @@ export function MintConsentSection({
             ))}
           </div>
           {consentError && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fadeIn">
+            <div
+              className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fadeIn"
+              role="alert"
+              aria-live="assertive"
+            >
               <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
               <p className="text-xs text-red-700 dark:text-red-300 font-bold">{consentError}</p>
             </div>

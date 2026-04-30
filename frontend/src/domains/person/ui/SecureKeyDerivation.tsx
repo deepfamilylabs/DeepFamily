@@ -6,8 +6,8 @@
 
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Key, Copy, Loader, Eye, EyeOff, CheckCircle } from "lucide-react";
-import { ConfirmDialog, useToast } from "../../../shared/ui";
+import { Key, Loader, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { ConfirmDialog, CopyIconButton, useToast } from "../../../shared/ui";
 import { PersonHashCalculator } from "./PersonHashCalculator";
 import type { HashForm, PersonHashCalculatorHandle, PublicHashForm } from "./PersonHashCalculator";
 import {
@@ -56,12 +56,12 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
   const startDerivation = useCallback(async () => {
     const formData = buildHashFormOrNull();
     if (!formData) {
-      toast.show(t("keyDerivation.component.fillInfoFirst"));
+      toast.warning(t("keyDerivation.component.fillInfoFirst"));
       return;
     }
 
     if (!normalizeNameForHash(formData.fullName || "").length) {
-      toast.show(t("keyDerivation.component.nameRequired"));
+      toast.warning(t("keyDerivation.component.nameRequired"));
       return;
     }
 
@@ -85,10 +85,10 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
 
       setDerivedKey(result.key);
       setDerivedAddress(result.address || null);
-      toast.show(t("keyDerivation.component.success"));
+      toast.success(t("keyDerivation.component.success"));
     } catch (error) {
       console.error("Key derivation failed:", sanitizeErrorForLogging(error));
-      toast.show(t("keyDerivation.component.failed"));
+      toast.error(t("keyDerivation.component.failed"));
     } finally {
       setIsGenerating(false);
       setProgress(0);
@@ -100,12 +100,12 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
   const handleGenerateKey = () => {
     const formData = buildHashFormOrNull();
     if (!formData) {
-      toast.show(t("keyDerivation.component.fillInfoFirst"));
+      toast.warning(t("keyDerivation.component.fillInfoFirst"));
       return;
     }
 
     if (!normalizeNameForHash(formData.fullName || "").length) {
-      toast.show(t("keyDerivation.component.nameRequired"));
+      toast.warning(t("keyDerivation.component.nameRequired"));
       return;
     }
 
@@ -162,7 +162,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       // Try modern API
       if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
         await navigator.clipboard.writeText(text);
-        toast.show(t("keyDerivation.component.copied", { label }));
+        toast.success(t("keyDerivation.component.copied", { label }));
         return;
       }
     } catch (err) {
@@ -183,13 +183,13 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       document.body.removeChild(ta);
 
       if (successful) {
-        toast.show(t("keyDerivation.component.copied", { label }));
+        toast.success(t("keyDerivation.component.copied", { label }));
       } else {
-        toast.show(t("keyDerivation.component.copyFailed"));
+        toast.error(t("keyDerivation.component.copyFailed"));
       }
     } catch (err) {
       console.error("Copy failed:", sanitizeErrorForLogging(err));
-      toast.show(t("keyDerivation.component.copyFailed"));
+      toast.error(t("keyDerivation.component.copyFailed"));
     }
   };
 
@@ -308,14 +308,13 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
               <code className="flex-1 text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 break-all leading-relaxed">
                 {derivedAddress}
               </code>
-              <button
+              <CopyIconButton
                 onClick={() =>
                   copyToClipboard(derivedAddress, t("keyDerivation.component.address"))
                 }
-                className="flex-shrink-0 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                <Copy size={14} className="text-gray-600 dark:text-gray-400" />
-              </button>
+                label={t("common.copy", "Copy")}
+                size="md"
+              />
             </div>
           </div>
 
@@ -339,14 +338,13 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
                     <Eye size={14} className="text-gray-600 dark:text-gray-400" />
                   )}
                 </button>
-                <button
+                <CopyIconButton
                   onClick={() =>
                     copyToClipboard(derivedKey, t("keyDerivation.component.privateKeyLabel"))
                   }
-                  className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-                >
-                  <Copy size={14} className="text-gray-600 dark:text-gray-400" />
-                </button>
+                  label={t("common.copy", "Copy")}
+                  size="md"
+                />
               </div>
             </div>
           </div>

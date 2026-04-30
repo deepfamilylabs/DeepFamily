@@ -5,6 +5,8 @@ export type { ResponsiveModalFrameProps } from "./ResponsiveModalFrame";
 export { default as PageContainer } from "./PageContainer";
 export { default as ConfirmDialog } from "./ConfirmDialog";
 export { ToastProvider, useToast } from "./ToastProvider";
+export { CopyIconButton } from "./CopyIconButton";
+export type { CopyIconButtonProps } from "./CopyIconButton";
 export { useDialogA11y } from "./useDialogA11y";
 export type { UseDialogA11yOptions } from "./useDialogA11y";
 export { useBottomSheetDrag } from "./useBottomSheetDrag";
