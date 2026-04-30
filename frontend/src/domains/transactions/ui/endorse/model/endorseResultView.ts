@@ -10,11 +10,16 @@ interface BuildEndorseSuccessResultArgs {
   endorser?: string;
 }
 
-export function toEndorseErrorResult(type: string, message: string): EndorseErrorResultView {
+export function toEndorseErrorResult(
+  type: string,
+  message: string,
+  retryable?: boolean,
+): EndorseErrorResultView {
   return {
     type,
     message,
     details: message,
+    retryable,
   };
 }
 

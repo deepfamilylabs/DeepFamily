@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../config";
+import { normalizeFriendlyError, type FriendlyError } from "../../../shared/lib/errors";
 import {
   addStoryChunkService,
   type AddStoryChunkResult,
@@ -44,5 +45,7 @@ export function useAddStoryChunkFlow() {
     [signer, contractAddress, t],
   );
 
-  return useTxFlow(runner);
+  return useTxFlow<AddStoryChunkResult, [AddStoryChunkFlowArgs], FriendlyError>(runner, {
+    normalizeError: (error) => normalizeFriendlyError(error, t),
+  });
 }

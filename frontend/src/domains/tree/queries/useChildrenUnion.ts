@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NodeId } from "../../../shared/model";
 import { TTL } from "../../../shared/cache/ttl";
+import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useTreeGateway } from "./useTreeGateway";
 
 export interface UseChildrenUnionResult {
@@ -47,7 +48,14 @@ export function useChildrenUnion(
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err?.message || "Failed to fetch union children");
+          setError(
+            getFriendlyErrorMessage(
+              err,
+              defaultErrorTranslator as any,
+              "Failed to fetch union children",
+              { preferDetailsForUnknown: true },
+            ),
+          );
           setLoading(false);
         }
       });

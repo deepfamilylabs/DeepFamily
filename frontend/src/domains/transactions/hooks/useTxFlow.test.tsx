@@ -60,6 +60,23 @@ describe("useTxFlow", () => {
     expect(result.current.stepMessage).toBeNull();
   });
 
+  it("stores normalized errors when a normalizer is supplied", async () => {
+    const failure = new Error("wallet pending");
+    const runner: TxFlowRunner<string, []> = vi.fn(async () => {
+      throw failure;
+    });
+    const normalizeError = vi.fn(() => ({ type: "WALLET_REQUEST_PENDING", message: "pending" }));
+
+    const { result } = renderHook(() => useTxFlow(runner, { normalizeError }));
+
+    await act(async () => {
+      await expect(result.current.runOrThrow()).rejects.toBe(failure);
+    });
+
+    expect(normalizeError).toHaveBeenCalledWith(failure);
+    expect(result.current.error).toEqual({ type: "WALLET_REQUEST_PENDING", message: "pending" });
+  });
+
   it("runOrThrow rejects superseded requests without letting stale completion win", async () => {
     const first = createDeferred<string>();
     const second = createDeferred<string>();

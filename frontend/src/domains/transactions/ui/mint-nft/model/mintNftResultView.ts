@@ -14,11 +14,16 @@ interface BuildMintNFTSuccessResultArgs {
   owner?: string | null;
 }
 
-export function toMintNFTErrorResult(type: string, message: string): MintNFTErrorResultView {
+export function toMintNFTErrorResult(
+  type: string,
+  message: string,
+  retryable?: boolean,
+): MintNFTErrorResultView {
   return {
     type,
     message,
     details: message,
+    retryable,
   };
 }
 

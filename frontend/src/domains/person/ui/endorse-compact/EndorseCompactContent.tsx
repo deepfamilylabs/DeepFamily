@@ -59,34 +59,16 @@ export default function EndorseCompactModal({
 
   const isInsufficientBalance = endorseFlow.status === "error" && (() => {
     const err = endorseFlow.error as any;
-    const errMsg = err?.message || "";
-    return (
-      err?.reason === "INSUFFICIENT_DEEP_BALANCE" ||
-      err?.type === "INSUFFICIENT_DEEP_BALANCE" ||
-      errMsg.includes("Insufficient DEEP token balance") ||
-      errMsg.includes("insufficient")
-    );
+    const reason = err?.reason || err?.type;
+    return reason === "INSUFFICIENT_DEEP_BALANCE";
   })();
 
   const errorMessage = useMemo(() => {
     if (endorseFlow.status !== "error" || !endorseFlow.error) return null;
     const err = endorseFlow.error as any;
-    const errMsg = err?.message || "";
-    if (
-      err?.reason === "INSUFFICIENT_DEEP_BALANCE" ||
-      err?.type === "INSUFFICIENT_DEEP_BALANCE" ||
-      errMsg.includes("Insufficient DEEP token balance") ||
-      errMsg.includes("insufficient")
-    ) {
-      return errMsg || t("endorse.insufficientBalance", "Insufficient DEEP balance");
-    }
-    if (
-      err?.code === "ACTION_REJECTED" ||
-      err?.code === 4001 ||
-      errMsg.includes("user rejected") ||
-      errMsg.includes("User denied")
-    ) {
-      return t("endorse.errors.userRejected", "Transaction was rejected by user");
+    const reason = err?.reason || err?.type;
+    if (reason === "INSUFFICIENT_DEEP_BALANCE") {
+      return err.message || t("endorse.insufficientBalance", "Insufficient DEEP balance");
     }
     return err.message || t("endorse.transactionFailed", "Transaction failed. Please try again.");
   }, [endorseFlow.status, endorseFlow.error, t]);

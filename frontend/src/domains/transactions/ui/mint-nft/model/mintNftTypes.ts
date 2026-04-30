@@ -86,4 +86,5 @@ export interface MintNFTErrorResultView {
   type: string;
   message: string;
   details: string;
+  retryable?: boolean;
 }

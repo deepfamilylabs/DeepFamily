@@ -225,6 +225,7 @@ export function useMintNftSubmit({
           type: friendly.reason || friendly.type || "UNKNOWN_ERROR",
           message: friendly.message,
           details: friendly.details,
+          retryable: friendly.retryable,
         });
       } finally {
         resetDisclosureProof();

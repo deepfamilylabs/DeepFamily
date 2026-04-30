@@ -25,20 +25,33 @@ export type TxFlowRunner<TResult, TArgs extends unknown[]> = (
   ...args: TArgs
 ) => Promise<TResult>;
 
-export type UseTxFlowReturn<TResult, TArgs extends unknown[]> = TxFlowState<TResult> &
+export type UseTxFlowOptions<TError = unknown> = {
+  normalizeError?: (error: unknown) => TError;
+};
+
+export type UseTxFlowReturn<TResult, TArgs extends unknown[], TError = unknown> = TxFlowState<
+  TResult,
+  TError
+> &
   TxFlowActions<TArgs, TResult>;
 
-export function useTxFlow<TResult = unknown, TArgs extends unknown[] = []>(
+export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TError = unknown>(
   runner: TxFlowRunner<TResult, TArgs>,
-): UseTxFlowReturn<TResult, TArgs> {
+  options: UseTxFlowOptions<TError> = {},
+): UseTxFlowReturn<TResult, TArgs, TError> {
   const [status, setStatus] = useState<TxFlowStatus>("idle");
   const [stepMessage, setStepMessage] = useState<string | null>(null);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<TError | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<unknown | null>(null);
   const [result, setResult] = useState<TResult | null>(null);
 
   const runIdRef = useRef(0);
+  const normalizeError = options.normalizeError;
+  const toFlowError = useCallback(
+    (err: unknown): TError => (normalizeError ? normalizeError(err) : (err as TError)),
+    [normalizeError],
+  );
 
   const update = useCallback((nextStatus: TxFlowStatus, message?: string) => {
     setStatus(nextStatus);
@@ -82,12 +95,12 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = []>(
       } catch (err: any) {
         if (runIdRef.current !== thisRunId) return;
 
-        setError(err);
+        setError(toFlowError(err));
         setStatus("error");
         setStepMessage(null);
       }
     },
-    [runner, resetState, update],
+    [runner, resetState, toFlowError, update],
   );
 
   const runOrThrow = useCallback(
@@ -118,13 +131,13 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = []>(
           throw err;
         }
 
-        setError(err);
+        setError(toFlowError(err));
         setStatus("error");
         setStepMessage(null);
         throw err;
       }
     },
-    [runner, resetState, update],
+    [runner, resetState, toFlowError, update],
   );
 
   return { status, stepMessage, error, txHash, receipt, result, reset, run, runOrThrow };

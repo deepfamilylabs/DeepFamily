@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
+import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { ParsedNftDetails } from "../api/personReadGateway";
 import { usePersonGateway } from "./usePersonGateway";
 
@@ -41,7 +42,14 @@ export function useNFTDetails(
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err?.message || "Failed to fetch NFT details");
+          setError(
+            getFriendlyErrorMessage(
+              err,
+              defaultErrorTranslator as any,
+              "Failed to fetch NFT details",
+              { preferDetailsForUnknown: true },
+            ),
+          );
           setLoading(false);
         }
       });

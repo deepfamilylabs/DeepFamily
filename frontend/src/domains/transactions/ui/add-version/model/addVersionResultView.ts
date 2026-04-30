@@ -4,11 +4,16 @@ import type {
   AddVersionSuccessResultView,
 } from "./addVersionTypes";
 
-export function toAddVersionErrorResult(type: string, message: string): AddVersionErrorResultView {
+export function toAddVersionErrorResult(
+  type: string,
+  message: string,
+  retryable?: boolean,
+): AddVersionErrorResultView {
   return {
     type,
     message,
     details: message,
+    retryable,
   };
 }
 

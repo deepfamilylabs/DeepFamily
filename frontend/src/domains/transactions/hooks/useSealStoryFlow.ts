@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../config";
+import { normalizeFriendlyError, type FriendlyError } from "../../../shared/lib/errors";
 import { sealStoryService, type SealStoryResult } from "../services/sealStoryService";
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
@@ -27,5 +28,7 @@ export function useSealStoryFlow() {
     [signer, contractAddress, t],
   );
 
-  return useTxFlow(runner);
+  return useTxFlow<SealStoryResult, [SealStoryFlowArgs], FriendlyError>(runner, {
+    normalizeError: (error) => normalizeFriendlyError(error, t),
+  });
 }
