@@ -298,6 +298,16 @@ Proof workflows load public artifacts from `/zk/*` at runtime:
 
 If proof generation or verification fails, first confirm the expected files exist in `public/zk/` and are reachable under `/zk/…` in dev/preview.
 
+## Metadata CIDs
+
+Metadata CID generation uses CIDv1 with the raw codec and sha2-256 multihash:
+
+- Frontend worker path: `frontend/src/shared/ipfs/cid.ts`
+- Node seed path: `lib/versionMetadata.js`
+- Fixture check: `node frontend/scripts/verify-cid-methods.mjs`
+
+Do not reintroduce IPFS hashing runtime wrappers for metadata CID generation unless they are audited and necessary. The current `multiformats` + `@noble/hashes` path avoids Node polyfills in the browser and keeps the vulnerable protobuf-based hashing dependency chain out of production installs.
+
 ## Security
 
 - Passphrases and other sensitive inputs must not be placed in React state/props or persistent storage. Pass them directly to a worker and clear as soon as possible.
