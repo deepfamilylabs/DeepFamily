@@ -17,9 +17,8 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (_key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
       if (typeof fallbackOrOptions === "string") {
-        return fallbackOrOptions.replace(
-          /{{\s*(\w+)\s*}}/g,
-          (_match, key) => String(options?.[key] ?? ""),
+        return fallbackOrOptions.replace(/{{\s*(\w+)\s*}}/g, (_match, key) =>
+          String(options?.[key] ?? ""),
         );
       }
       if (fallbackOrOptions && typeof fallbackOrOptions === "object") {
@@ -52,10 +51,13 @@ vi.mock("../domains/tree", () => ({
     },
   }),
   useTreeNodeAccess: () => ({
+    getOwnerOf: vi.fn(),
+    getStoryData: vi.fn(),
     preloadStoryData: vi.fn(),
   }),
   useTreeMutations: () => ({
     bumpEndorsementCount: vi.fn(),
+    invalidateByTx: vi.fn(),
   }),
 }));
 
@@ -121,7 +123,13 @@ describe("PeoplePage", () => {
       personHash: "0xada",
       tokenId: "7",
       fullName: "Ada Lovelace",
-      storyMetadata: { totalChunks: 1, fullStoryHash: "0xstory", lastUpdateTime: 1, isSealed: false, totalLength: 42 },
+      storyMetadata: {
+        totalChunks: 1,
+        fullStoryHash: "0xstory",
+        lastUpdateTime: 1,
+        isSealed: false,
+        totalLength: 42,
+      },
     });
     const grace = makePerson({
       personHash: "0xgrace",

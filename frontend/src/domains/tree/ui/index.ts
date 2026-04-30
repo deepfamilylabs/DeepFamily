@@ -6,6 +6,13 @@ export const DagView = React.lazy(() => import("./DagView"));
 export const TreeLayoutView = React.lazy(() => import("./TreeLayoutView"));
 export { default as TreeDebugPanel } from "./TreeDebugPanel";
 export { default as TreeListView } from "./TreeListView";
+export {
+  TreeInteractionProvider,
+  useTreeInteraction,
+  type TreeEndorseTarget,
+  type TreeInteractionValue,
+  type TreeNodeTarget,
+} from "./treeInteractionContext";
 export { default as ViewContainer } from "./ViewContainer";
 export { default as ViewModeSwitch } from "./ViewModeSwitch";
 export type { ViewMode } from "./ViewModeSwitch";

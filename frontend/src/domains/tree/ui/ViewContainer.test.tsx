@@ -24,15 +24,6 @@ vi.mock("./TreeListView", () => ({
   default: () => <div data-testid="virtual-view" />,
 }));
 
-vi.mock("../../person", () => ({
-  EndorseModalProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="endorse-provider">{children}</div>
-  ),
-  NodeDetailProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="node-detail-provider">{children}</div>
-  ),
-}));
-
 vi.mock("../context", () => ({
   FamilyTreeViewConfigProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="tree-config-provider">{children}</div>
@@ -50,9 +41,7 @@ const viewModeLabels = {
   virtual: "List",
 };
 
-function renderViewContainer(
-  overrides: Partial<React.ComponentProps<typeof ViewContainer>> = {},
-) {
+function renderViewContainer(overrides: Partial<React.ComponentProps<typeof ViewContainer>> = {}) {
   return render(
     <ViewContainer
       viewMode="tree"
@@ -82,8 +71,6 @@ describe("ViewContainer", () => {
       renderViewContainer({ viewMode });
 
       expect(await screen.findByTestId(testId)).toBeTruthy();
-      expect(screen.getByTestId("endorse-provider")).toBeTruthy();
-      expect(screen.getByTestId("node-detail-provider")).toBeTruthy();
       expect(screen.getByTestId("tree-config-provider")).toBeTruthy();
     },
   );

@@ -1,11 +1,8 @@
-export {
-  NodeDetailProvider,
-  useNodeDetail,
-  type NodeKeyMinimal,
-} from "./NodeDetailProvider";
+export { NodeDetailProvider, useNodeDetail, type NodeKeyMinimal } from "./NodeDetailProvider";
 export {
   EndorseModalProvider,
   useEndorseModal,
+  type EndorseSuccessHandler,
   type EndorseTarget,
 } from "./EndorseModalProvider";
 export { default as PersonStoryCard } from "./PersonStoryCard";

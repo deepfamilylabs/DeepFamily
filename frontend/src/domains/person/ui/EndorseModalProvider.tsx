@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import EndorseCompactModal from "./EndorseCompactModal";
-import { useTreeMutations } from "../../tree";
 
 export type EndorseTarget = {
   personHash: string;
@@ -9,6 +8,14 @@ export type EndorseTarget = {
   endorsementCount?: number;
 };
 
+export type EndorseReceiptLike = { logs?: any[] } | null;
+
+export type EndorseSuccessHandler = (
+  target: EndorseTarget,
+  delta: number,
+  receipt?: EndorseReceiptLike,
+) => void;
+
 type EndorseModalValue = {
   openEndorse: (t: EndorseTarget) => void;
   closeEndorse: () => void;
@@ -16,8 +23,13 @@ type EndorseModalValue = {
 
 const EndorseModalProviderContext = createContext<EndorseModalValue | null>(null);
 
-export function EndorseModalProvider({ children }: { children: React.ReactNode }) {
-  const { bumpEndorsementCount } = useTreeMutations();
+export function EndorseModalProvider({
+  children,
+  onEndorseSuccess,
+}: {
+  children: React.ReactNode;
+  onEndorseSuccess?: EndorseSuccessHandler;
+}) {
   const [target, setTarget] = useState<EndorseTarget | null>(null);
 
   const openEndorse = useCallback((t: EndorseTarget) => {
@@ -48,9 +60,9 @@ export function EndorseModalProvider({ children }: { children: React.ReactNode }
           fullName: target?.fullName,
           endorsementCount: target?.endorsementCount,
         }}
-        onSuccess={() => {
+        onSuccess={(receipt) => {
           if (!target) return;
-          bumpEndorsementCount?.(target.personHash, target.versionIndex, 1);
+          onEndorseSuccess?.(target, 1, receipt);
         }}
       />
     </EndorseModalProviderContext.Provider>

@@ -81,14 +81,14 @@ Pages and modal contents are composition shells. They should wire route/modal in
 
 Use this responsibility split for React page and transaction UI code:
 
-| Responsibility | Preferred location |
-|----------------|--------------------|
-| UI rendering | Pure component / section component |
-| Stateful UI coordination | Feature hook, such as `useAddVersionFlow` or `useEndorseTargetStatus` |
-| Complex flow state | Reducer or explicit state machine in the owning domain or feature `model/` |
-| Pure domain logic | Types, schema, parser, reducer, transition function, and framework-free helper in domain or feature `model/` |
-| Side effects | Service, gateway, worker client, contract client, or cache coordinator |
-| Route / modal composition | Page shell or modal content shell |
+| Responsibility            | Preferred location                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| UI rendering              | Pure component / section component                                                                           |
+| Stateful UI coordination  | Feature hook, such as `useAddVersionFlow` or `useEndorseTargetStatus`                                        |
+| Complex flow state        | Reducer or explicit state machine in the owning domain or feature `model/`                                   |
+| Pure domain logic         | Types, schema, parser, reducer, transition function, and framework-free helper in domain or feature `model/` |
+| Side effects              | Service, gateway, worker client, contract client, or cache coordinator                                       |
+| Route / modal composition | Page shell or modal content shell                                                                            |
 
 Component props should describe the data and actions a section needs. Do not pass a whole domain object through a section when a smaller view model is enough. DOM events should stay at input boundaries; pass parsed business values upward.
 
@@ -176,17 +176,18 @@ ViewModel  →  Layout  →  Viewport  →  Renderer
 - The pipeline order is fixed (Template Method). Views orchestrate stages; they do not reshuffle responsibilities.
 - **Layout** and **Renderer** are pluggable strategies. New views swap only geometry and visuals while sharing ViewModel and Viewport.
 
-| Stage     | Responsibility                                               | Code |
-|-----------|--------------------------------------------------------------|------|
+| Stage     | Responsibility                                                                                     | Code                                        |
+| --------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | ViewModel | Single source of truth for `graph`, `nodeUiById`, selection, and user actions (open/copy/endorse). | `domains/tree/ui/useFamilyTreeViewModel.ts` |
-| Layout    | Pure geometry: positions, simulation coordinates. No DOM, no modals, no filtering. | `domains/tree/ui/layout/` |
-| Viewport  | Zoom, pan, and minimap; shared across graph-based views.     | `domains/tree/ui/GraphViewport.tsx` |
-| Renderer  | Draws nodes/edges and wires view-specific interactions using ViewModel + Layout output. | `domains/tree/ui/renderers/` |
+| Layout    | Pure geometry: positions, simulation coordinates. No DOM, no modals, no filtering.                 | `domains/tree/ui/layout/`                   |
+| Viewport  | Zoom, pan, and minimap; shared across graph-based views.                                           | `domains/tree/ui/GraphViewport.tsx`         |
+| Renderer  | Draws nodes/edges and wires view-specific interactions using ViewModel + Layout output.            | `domains/tree/ui/renderers/`                |
 
 **Rules for view code**
 
 - Do not re-assemble node UI fields or re-derive graph structure inside a view — consume ViewModel output.
 - Do not put filtering, modal wiring, or data fetching inside Layout.
+- Tree view actions should flow through `TreeInteractionProvider`; page shells bridge those actions to person modals and transaction side effects.
 - To add a new view, implement a new Layout and/or Renderer and plug it into the pipeline. Do not duplicate ViewModel logic.
 
 ### Workers (crypto + ZK)
@@ -221,15 +222,15 @@ VITE_ROOT_VERSION_INDEX=...
 
 **Commonly used optional vars**
 
-| Variable | Purpose |
-|----------|---------|
-| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`) |
-| `VITE_IPFS_GATEWAY_BASE_URLS` | Override IPFS gateway dropdown; must match CSP allowlist |
-| `VITE_DF_HARD_NODE_LIMIT` | Cap tree node count for public/low-budget RPCs |
-| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT` | Query cache tuning |
-| `VITE_USE_INDEXEDDB_CACHE` | Persist tree caches in IndexedDB |
-| `VITE_SHOW_DEBUG` | Enable debug UI (tree debug panel, etc.) |
-| `VITE_BRAND_BADGE` | Show a build/brand badge in the header |
+| Variable                                                         | Purpose                                                  |
+| ---------------------------------------------------------------- | -------------------------------------------------------- |
+| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`)          |
+| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override IPFS gateway dropdown; must match CSP allowlist |
+| `VITE_DF_HARD_NODE_LIMIT`                                        | Cap tree node count for public/low-budget RPCs           |
+| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                       |
+| `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                         |
+| `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                 |
+| `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                   |
 
 ### Local auto-config
 
@@ -346,11 +347,11 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 
 ## Troubleshooting
 
-| Symptom | First thing to check |
-|---------|----------------------|
-| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS`, and that the node is reachable |
-| ABI mismatch / missing methods | Re-run `npm run frontend:sync:abi` (or restart `frontend:dev`) |
-| Proof generation fails | Confirm `/zk/*` artifacts exist and match the deployed verifier version |
-| Worker crashes on import | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph |
-| Stale tree/query data | Clear IndexedDB (`VITE_USE_INDEXEDDB_CACHE=1`) or toggle it off for a run |
-| Root node not found | Verify `VITE_ROOT_PERSON_HASH` / `VITE_ROOT_VERSION_INDEX` (or their per-language variants) |
+| Symptom                         | First thing to check                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------- |
+| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS`, and that the node is reachable                     |
+| ABI mismatch / missing methods  | Re-run `npm run frontend:sync:abi` (or restart `frontend:dev`)                              |
+| Proof generation fails          | Confirm `/zk/*` artifacts exist and match the deployed verifier version                     |
+| Worker crashes on import        | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph    |
+| Stale tree/query data           | Clear IndexedDB (`VITE_USE_INDEXEDDB_CACHE=1`) or toggle it off for a run                   |
+| Root node not found             | Verify `VITE_ROOT_PERSON_HASH` / `VITE_ROOT_VERSION_INDEX` (or their per-language variants) |

@@ -4,12 +4,8 @@ import { makeNodeId, parseNodeId } from "../../../shared/model";
 import type { NodeUi } from "./nodeUi";
 import { getNodeUi } from "./nodeUi";
 import { useTreeGraphData, useVizOptions } from "../context";
-import { useEndorseModal, useNodeDetail, type EndorseTarget } from "../../person";
-import {
-  buildTreeRowsFromGraph,
-  buildViewGraphData,
-  type TreeRow,
-} from "../selectors";
+import { useTreeInteraction, type TreeEndorseTarget } from "./treeInteractionContext";
+import { buildTreeRowsFromGraph, buildViewGraphData, type TreeRow } from "../selectors";
 
 export type FamilyTreeViewModel = {
   graph: ReturnType<typeof buildViewGraphData>;
@@ -30,9 +26,9 @@ export type FamilyTreeViewModel = {
     treeListRows: (expanded: Set<NodeId>) => TreeRow[];
   };
   actions: {
-    openNode: ReturnType<typeof useNodeDetail>["openNode"];
+    openNode: ReturnType<typeof useTreeInteraction>["openNode"];
     openNodeById: (id: NodeId) => void;
-    openEndorse: (t: EndorseTarget) => void;
+    openEndorse: (t: TreeEndorseTarget) => void;
     openEndorseById: (id: NodeId) => void;
     copyHash: (personHash: string) => void;
   };
@@ -42,13 +38,12 @@ export function useFamilyTreeViewModel(): FamilyTreeViewModel {
   const { rootId, reachableNodeIds, endorsementsReady, nodesData, edgesUnion, edgesStrict } =
     useTreeGraphData();
   const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions();
-  const { openNode, selected } = useNodeDetail();
-  const { openEndorse } = useEndorseModal();
+  const { openNode, selectedNode, openEndorse, copyHash } = useTreeInteraction();
 
   const selectedId = useMemo(() => {
-    if (!selected) return null;
-    return makeNodeId(selected.personHash, selected.versionIndex);
-  }, [selected]);
+    if (!selectedNode) return null;
+    return makeNodeId(selectedNode.personHash, selectedNode.versionIndex);
+  }, [selectedNode]);
 
   const openNodeById = useCallback(
     (id: NodeId) => {
@@ -57,10 +52,6 @@ export function useFamilyTreeViewModel(): FamilyTreeViewModel {
     },
     [openNode],
   );
-
-  const copyHash = useCallback((personHash: string) => {
-    navigator.clipboard?.writeText(personHash).catch(() => {});
-  }, []);
 
   const graph = useMemo(() => {
     return buildViewGraphData({

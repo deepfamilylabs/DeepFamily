@@ -18,9 +18,8 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (_key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
       if (typeof fallbackOrOptions === "string") {
-        return fallbackOrOptions.replace(
-          /{{\s*(\w+)\s*}}/g,
-          (_match, key) => String(options?.[key] ?? ""),
+        return fallbackOrOptions.replace(/{{\s*(\w+)\s*}}/g, (_match, key) =>
+          String(options?.[key] ?? ""),
         );
       }
       if (fallbackOrOptions && typeof fallbackOrOptions === "object") {
@@ -31,12 +30,6 @@ vi.mock("react-i18next", () => ({
       }
       return _key;
     },
-  }),
-}));
-
-vi.mock("../../tree", () => ({
-  useTreeNodeAccess: () => ({
-    getOwnerOf: mocks.getOwnerOf,
   }),
 }));
 
@@ -73,6 +66,7 @@ function NodeDetailHarness({ onClose }: { onClose: () => void }) {
           onClose={handleClose}
           nodeData={makePerson()}
           fallback={{ hash: personHash, versionIndex: 1 }}
+          getOwnerOf={mocks.getOwnerOf}
         />
       </MemoryRouter>
     </ToastProvider>
@@ -83,10 +77,12 @@ describe("person detail modals a11y", () => {
   beforeEach(() => {
     mocks.getOwnerOf.mockResolvedValue(undefined);
     mocks.openEndorse.mockReset();
-    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
-      callback(0);
-      return 0;
-    });
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation(
+      (callback: FrameRequestCallback) => {
+        callback(0);
+        return 0;
+      },
+    );
   });
 
   afterEach(() => {

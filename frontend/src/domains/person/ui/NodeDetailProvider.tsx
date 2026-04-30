@@ -1,13 +1,8 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-} from "react";
-import { useTreeGraphData, useTreeMutations } from "../../tree";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import NodeDetailModal from "./NodeDetailModal";
 import { type NodeData } from "../../../shared/model";
+import type { ParsedNftDetails, ParsedVersionDetails } from "../api/personReadGateway";
+import type { StoryDataResult } from "../model/storyData";
 import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";
 import {
   resolveNodeDetailTokenId,
@@ -29,10 +24,27 @@ interface NodeDetailValue {
 
 const NodeDetailProviderContext = createContext<NodeDetailValue | undefined>(undefined);
 
-export function NodeDetailProvider({ children }: { children: React.ReactNode }) {
+export interface NodeDetailProviderProps {
+  children: React.ReactNode;
+  nodesData: Record<string, NodeData>;
+  getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
+  mergeNodeDetail: (
+    selected: NodeKeyMinimal,
+    details: {
+      versionDetails?: ParsedVersionDetails | null;
+      nftDetails?: { tokenId: string; parsed: ParsedNftDetails } | null;
+      storyData?: StoryDataResult | null;
+    },
+  ) => void;
+}
+
+export function NodeDetailProvider({
+  children,
+  nodesData,
+  getOwnerOf,
+  mergeNodeDetail,
+}: NodeDetailProviderProps) {
   const [selected, setSelected] = useState<NodeKeyMinimal | null>(null);
-  const { nodesData } = useTreeGraphData();
-  const { mergeNodeDetail } = useTreeMutations();
 
   const openNode = useCallback((k: NodeKeyMinimal) => {
     setSelected(k);
@@ -84,6 +96,7 @@ export function NodeDetailProvider({ children }: { children: React.ReactNode }) 
         fallback={{ hash: selected?.personHash || "", versionIndex: selected?.versionIndex }}
         loading={loading}
         error={error}
+        getOwnerOf={getOwnerOf}
       />
     </NodeDetailProviderContext.Provider>
   );

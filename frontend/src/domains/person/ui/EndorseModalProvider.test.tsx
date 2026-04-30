@@ -5,13 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EndorseModalProvider, useEndorseModal } from "./EndorseModalProvider";
 
 const mocks = vi.hoisted(() => ({
-  bumpEndorsementCount: vi.fn(),
-}));
-
-vi.mock("../../tree", () => ({
-  useTreeMutations: () => ({
-    bumpEndorsementCount: mocks.bumpEndorsementCount,
-  }),
+  onEndorseSuccess: vi.fn(),
 }));
 
 vi.mock("./EndorseCompactModal", () => ({
@@ -21,7 +15,7 @@ vi.mock("./EndorseCompactModal", () => ({
       <div data-testid="version-index">{String(props.versionIndex)}</div>
       <div data-testid="full-name">{props.versionData?.fullName ?? ""}</div>
       <div data-testid="endorsement-count">{String(props.versionData?.endorsementCount ?? "")}</div>
-      <button type="button" onClick={props.onSuccess}>
+      <button type="button" onClick={() => props.onSuccess("receipt-1")}>
         success
       </button>
       <button type="button" onClick={props.onClose}>
@@ -52,7 +46,7 @@ function Harness() {
 
 describe("EndorseModalProvider", () => {
   beforeEach(() => {
-    mocks.bumpEndorsementCount.mockReset();
+    mocks.onEndorseSuccess.mockReset();
   });
 
   afterEach(() => {
@@ -61,7 +55,7 @@ describe("EndorseModalProvider", () => {
 
   it("opens the compact modal with the selected target and bumps count on success", async () => {
     render(
-      <EndorseModalProvider>
+      <EndorseModalProvider onEndorseSuccess={mocks.onEndorseSuccess}>
         <Harness />
       </EndorseModalProvider>,
     );
@@ -82,12 +76,21 @@ describe("EndorseModalProvider", () => {
       screen.getByText("success").click();
     });
 
-    expect(mocks.bumpEndorsementCount).toHaveBeenCalledWith("0xperson", 2, 1);
+    expect(mocks.onEndorseSuccess).toHaveBeenCalledWith(
+      {
+        personHash: "0xperson",
+        versionIndex: 2,
+        fullName: "Ada Lovelace",
+        endorsementCount: 7,
+      },
+      1,
+      "receipt-1",
+    );
   });
 
   it("closes the modal through the provided close handler", async () => {
     render(
-      <EndorseModalProvider>
+      <EndorseModalProvider onEndorseSuccess={mocks.onEndorseSuccess}>
         <Harness />
       </EndorseModalProvider>,
     );

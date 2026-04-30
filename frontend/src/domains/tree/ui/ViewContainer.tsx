@@ -3,7 +3,6 @@ import ColorPalette from "./ColorPalette";
 import LoadingSkeleton from "./LoadingSkeleton";
 import TreeListView from "./TreeListView";
 import ViewModeSwitch from "./ViewModeSwitch";
-import { EndorseModalProvider, NodeDetailProvider } from "../../person";
 import { FamilyTreeViewConfigProvider } from "../context";
 
 const ForceGraphView = React.lazy(() => import("./ForceGraphView"));
@@ -31,31 +30,26 @@ export default function ViewContainer({
   hideSwitch,
 }: ViewContainerProps) {
   // useVizOptions internally inside views / contexts
-  const content = (
-    <Suspense fallback={<LoadingSkeleton />}>
-      {" "}
-      {hasRoot ? (
-        viewMode === "force" ? (
-          <ForceGraphView />
-        ) : viewMode === "dag" ? (
-          <DagView />
-        ) : viewMode === "tree" ? (
-          <TreeLayoutView />
-        ) : (
-          <TreeListView />
-        )
+  const content = hasRoot ? (
+    viewMode === "force" ? (
+      <ForceGraphView />
+    ) : viewMode === "dag" ? (
+      <DagView />
+    ) : viewMode === "tree" ? (
+      <TreeLayoutView />
+    ) : (
+      <TreeListView />
+    )
+  ) : (
+    <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 flex items-center justify-center">
+      {loading ? (
+        <LoadingSkeleton />
+      ) : contractMessage ? (
+        <div className="text-sm text-slate-700 dark:text-slate-300">{contractMessage}</div>
       ) : (
-        <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 flex items-center justify-center">
-          {loading ? (
-            <LoadingSkeleton />
-          ) : contractMessage ? (
-            <div className="text-sm text-slate-700 dark:text-slate-300">{contractMessage}</div>
-          ) : (
-            <LoadingSkeleton />
-          )}
-        </div>
-      )}{" "}
-    </Suspense>
+        <LoadingSkeleton />
+      )}
+    </div>
   );
   return (
     <div className="w-full h-full transition-colors relative">
@@ -76,13 +70,9 @@ export default function ViewContainer({
         <ColorPalette />
       </div>
 
-      <EndorseModalProvider>
-        <NodeDetailProvider>
-          <FamilyTreeViewConfigProvider>
-            <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
-          </FamilyTreeViewConfigProvider>
-        </NodeDetailProvider>
-      </EndorseModalProvider>
+      <FamilyTreeViewConfigProvider>
+        <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
+      </FamilyTreeViewConfigProvider>
     </div>
   );
 }
