@@ -1,6 +1,5 @@
 import { memo, useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useTreeMutations, useTreeNodeAccess } from "../../tree";
 import {
   User,
   Calendar,
@@ -25,16 +24,22 @@ import {
 } from "../../../shared/model";
 import { shortHash } from "../../../shared/model";
 import EndorseCompactModal from "./EndorseCompactModal";
+import type { EndorseSuccessHandler } from "./EndorseModalProvider";
 
 interface PersonStoryCardProps {
   person: NodeData;
   onOpen: (person: NodeData) => void;
+  preloadStoryData?: (tokenId: string) => void;
+  onEndorseSuccess?: EndorseSuccessHandler;
 }
 
-function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
+function PersonStoryCard({
+  person,
+  onOpen,
+  preloadStoryData,
+  onEndorseSuccess,
+}: PersonStoryCardProps) {
   const { t } = useTranslation();
-  const { preloadStoryData } = useTreeNodeAccess();
-  const { bumpEndorsementCount } = useTreeMutations();
   const [showEndorseModal, setShowEndorseModal] = useState(false);
   const [endorsementCount, setEndorsementCount] = useState<number>(person.endorsementCount ?? 0);
 
@@ -47,7 +52,7 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
   // Preload story data on hover
   const handleMouseEnter = useCallback(() => {
     if (person.tokenId && hasDetailedStory) {
-      preloadStoryData(person.tokenId);
+      preloadStoryData?.(person.tokenId);
     }
   }, [person.tokenId, hasDetailedStory, preloadStoryData]);
 
@@ -73,7 +78,7 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       if (!person.tokenId) return;
-      preloadStoryData(person.tokenId);
+      preloadStoryData?.(person.tokenId);
 
       // Open person encyclopedia page in new tab
       window.open(`/person/${person.tokenId}`, "_blank", "noopener,noreferrer");
@@ -228,9 +233,18 @@ function PersonStoryCard({ person, onOpen }: PersonStoryCardProps) {
             fullName: person.fullName,
             endorsementCount,
           }}
-          onSuccess={() => {
+          onSuccess={(receipt) => {
             setEndorsementCount((c) => c + 1);
-            bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1);
+            onEndorseSuccess?.(
+              {
+                personHash: person.personHash,
+                versionIndex: Number(person.versionIndex || 1),
+                fullName: person.fullName,
+                endorsementCount,
+              },
+              1,
+              receipt,
+            );
           }}
         />
       ) : null}

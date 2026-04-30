@@ -10,9 +10,9 @@ import {
   genderText as genderTextFn,
   isMinted,
 } from "../../../shared/model";
-import { useTreeMutations, useTreeNodeAccess } from "../../tree";
 import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
 import { getChunkTypeOptions } from "../config/chunkTypes";
+import type { EndorseSuccessHandler } from "./EndorseModalProvider";
 import {
   BasicStorySection,
   DetailedStorySection,
@@ -27,15 +27,25 @@ interface PersonStoryModalProps {
   person: NodeData;
   isOpen: boolean;
   onClose: () => void;
+  getStoryData?: (
+    tokenId: string,
+  ) => Promise<Pick<StoryData, "chunks" | "fullStory" | "integrity"> | null>;
+  getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
+  onEndorseSuccess?: EndorseSuccessHandler;
 }
 
 // Story integrity is derived by the shared tree node access helpers.
 
-export default function PersonStoryModal({ person, isOpen, onClose }: PersonStoryModalProps) {
+export default function PersonStoryModal({
+  person,
+  isOpen,
+  onClose,
+  getStoryData,
+  getOwnerOf,
+  onEndorseSuccess,
+}: PersonStoryModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
-  const { getStoryData, getOwnerOf } = useTreeNodeAccess();
-  const { bumpEndorsementCount } = useTreeMutations();
   const nameContainerRef = useRef<HTMLDivElement | null>(null);
   const nameTextRef = useRef<HTMLSpanElement | null>(null);
   const [marquee, setMarquee] = useState(false);
@@ -155,6 +165,17 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
     if (!person.tokenId) {
       return;
     }
+    if (!getStoryData) {
+      setStoryData({
+        chunks: [],
+        fullStory: "",
+        integrity: { missing: [], lengthMatch: true, hashMatch: null, computedLength: 0 },
+        loading: false,
+        integrityChecking: false,
+        error: t("storyChunksModal.noStoryData", "No story data available"),
+      });
+      return;
+    }
 
     setStoryData((prev) => ({
       ...prev,
@@ -224,7 +245,7 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
       try {
         if (!isOpen) return;
         if (!person.tokenId || person.tokenId === "0") return;
-        const addr = await getOwnerOf(person.tokenId);
+        const addr = await getOwnerOf?.(person.tokenId);
         if (!cancelled) setOwner(addr || undefined);
       } catch {
         if (!cancelled) setOwner(undefined);
@@ -371,9 +392,18 @@ export default function PersonStoryModal({ person, isOpen, onClose }: PersonStor
           fullName: person.fullName,
           endorsementCount,
         }}
-        onSuccess={() => {
+        onSuccess={(receipt) => {
           setEndorsementCount((c) => c + 1);
-          bumpEndorsementCount(person.personHash, Number(person.versionIndex || 1), 1);
+          onEndorseSuccess?.(
+            {
+              personHash: person.personHash,
+              versionIndex: Number(person.versionIndex || 1),
+              fullName: person.fullName,
+              endorsementCount,
+            },
+            1,
+            receipt,
+          );
         }}
       />
       <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0 touch-pan-y">

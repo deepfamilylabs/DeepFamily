@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   treeGraphData: {
     rootId: "root-1",
     rootExists: true,
+    nodesData: {},
   },
   treeStatus: {
     loading: false,
@@ -46,9 +47,20 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../domains/tree", () => ({
   useTreeGraphData: () => mocks.treeGraphData,
+  useTreeMutations: () => ({
+    bumpEndorsementCount: vi.fn(),
+    invalidateByTx: vi.fn(),
+    mergeNodeDetail: vi.fn(),
+  }),
+  useTreeNodeAccess: () => ({
+    getOwnerOf: vi.fn(),
+  }),
   useTreeStatus: () => mocks.treeStatus,
   ColorThemeProvider: ({ children }: any) => (
     <div data-testid="color-theme-provider">{children}</div>
+  ),
+  TreeInteractionProvider: ({ children }: any) => (
+    <div data-testid="tree-interaction-provider">{children}</div>
   ),
   ViewModeSwitch: ({ value, onChange }: any) => (
     <button data-testid="view-mode-switch" onClick={() => onChange("force")}>
@@ -61,6 +73,15 @@ vi.mock("../domains/tree", () => ({
     </div>
   ),
   TreeDebugPanel: () => <div data-testid="tree-debug-panel">debug</div>,
+}));
+
+vi.mock("../domains/person", () => ({
+  EndorseModalProvider: ({ children }: any) => <div data-testid="endorse-provider">{children}</div>,
+  NodeDetailProvider: ({ children }: any) => (
+    <div data-testid="node-detail-provider">{children}</div>
+  ),
+  useEndorseModal: () => ({ openEndorse: vi.fn() }),
+  useNodeDetail: () => ({ openNode: vi.fn(), selected: null }),
 }));
 
 vi.mock("../domains/config", () => ({
@@ -78,6 +99,7 @@ describe("TreePage", () => {
     localStorage.clear();
     mocks.treeGraphData.rootId = "root-1";
     mocks.treeGraphData.rootExists = true;
+    mocks.treeGraphData.nodesData = {};
     mocks.treeStatus.loading = false;
     mocks.treeStatus.progress = { created: 12, depth: 4 };
     mocks.treeStatus.contractMessage = "ready";

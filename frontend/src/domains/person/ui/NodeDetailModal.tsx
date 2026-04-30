@@ -3,7 +3,6 @@ import { User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NodeData, isMinted } from "../../../shared/model";
 import { useNavigate } from "react-router-dom";
-import { useTreeNodeAccess } from "../../tree";
 import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
 import { useEndorseModal } from "./EndorseModalProvider";
 import {
@@ -19,6 +18,7 @@ interface NodeDetailModalProps {
   fallback: { hash: string; versionIndex?: number };
   loading?: boolean;
   error?: string | null;
+  getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
 }
 
 export default function NodeDetailModal({
@@ -28,6 +28,7 @@ export default function NodeDetailModal({
   fallback,
   loading,
   error,
+  getOwnerOf,
 }: NodeDetailModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -60,7 +61,6 @@ export default function NodeDetailModal({
   const [entered, setEntered] = React.useState(false);
   const isDesktop = useResponsiveModalMode();
   const navigate = useNavigate();
-  const { getOwnerOf } = useTreeNodeAccess();
   const { openEndorse } = useEndorseModal();
   const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner);
   const [endorsementCount, setEndorsementCount] = React.useState<number>(
@@ -120,7 +120,7 @@ export default function NodeDetailModal({
         if (!open) return;
         if (!nodeData?.tokenId || nodeData.tokenId === "0") return;
         if (owner) return;
-        const addr = await getOwnerOf(String(nodeData.tokenId));
+        const addr = await getOwnerOf?.(String(nodeData.tokenId));
         if (!cancelled) setOwner(addr || undefined);
       } catch {
         if (!cancelled) setOwner(undefined);

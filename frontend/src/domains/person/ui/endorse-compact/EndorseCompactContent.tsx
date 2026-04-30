@@ -7,8 +7,9 @@ import {
   type ExecuteEndorseFlowResult,
 } from "../../../transactions";
 import { useWallet } from "../../../wallet";
-import { useTreeMutations } from "../../../tree";
 import { ModalShell } from "../../../../shared/ui/ModalShell";
+
+type EndorseReceiptLike = { logs?: any[] } | null;
 
 export interface EndorseCompactModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export interface EndorseCompactModalProps {
     fullName?: string;
     endorsementCount?: number;
   };
-  onSuccess?: (result: any) => void;
+  onSuccess?: (receipt?: EndorseReceiptLike) => void;
 }
 
 function getTargetKey(personHash: string, versionIndex: number) {
@@ -37,7 +38,6 @@ export default function EndorseCompactModal({
   const { t } = useTranslation();
   const { address } = useWallet();
   const { getVersionDetails } = useContractClient();
-  const { invalidateByTx } = useTreeMutations();
   const endorseFlow = useEndorseFlow();
   const resetEndorseFlow = endorseFlow.reset;
   const runEndorseFlow = endorseFlow.run;
@@ -71,11 +71,13 @@ export default function EndorseCompactModal({
   const userBalanceRaw = successResult?.balanceBefore ?? 0n;
   const txHash = successResult?.transactionHash ?? null;
 
-  const isInsufficientBalance = flowStatus === "error" && (() => {
-    const err = flowError as any;
-    const reason = err?.reason || err?.type;
-    return reason === "INSUFFICIENT_DEEP_BALANCE";
-  })();
+  const isInsufficientBalance =
+    flowStatus === "error" &&
+    (() => {
+      const err = flowError as any;
+      const reason = err?.reason || err?.type;
+      return reason === "INSUFFICIENT_DEEP_BALANCE";
+    })();
 
   const errorMessage = useMemo(() => {
     if (flowStatus !== "error" || !flowError) return null;
@@ -154,10 +156,9 @@ export default function EndorseCompactModal({
       if (handledResultRef.current === successResult) return;
       handledResultRef.current = successResult;
       setEndorsementCount((prev) => (prev === null ? 1 : prev + 1));
-      invalidateByTx({ receipt: successResult.receipt, hints: { personHash, versionIndex } });
       onSuccess?.(successResult.receipt);
     }
-  }, [currentTargetKey, invalidateByTx, isOpen, onSuccess, personHash, state, successResult, versionIndex]);
+  }, [currentTargetKey, isOpen, onSuccess, state, successResult]);
 
   // Auto-endorse as soon as the modal opens with a valid target
   useEffect(() => {
@@ -194,8 +195,7 @@ export default function EndorseCompactModal({
     }
   };
 
-  const canAfford =
-    userBalance && endorsementFee ? userBalanceRaw >= endorsementFeeRaw : true;
+  const canAfford = userBalance && endorsementFee ? userBalanceRaw >= endorsementFeeRaw : true;
 
   return (
     <ModalShell

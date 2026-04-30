@@ -13,15 +13,6 @@ const mocks = vi.hoisted(() => ({
   useStoryData: vi.fn(),
 }));
 
-vi.mock("../../tree", () => ({
-  useTreeGraphData: () => ({
-    nodesData: mocks.nodesData,
-  }),
-  useTreeMutations: () => ({
-    mergeNodeDetail: mocks.mergeNodeDetail,
-  }),
-}));
-
 vi.mock("../queries", () => ({
   usePersonDetails: (...args: any[]) => mocks.usePersonDetails(...args),
   useNFTDetails: (...args: any[]) => mocks.useNFTDetails(...args),
@@ -94,7 +85,7 @@ describe("NodeDetailProvider", () => {
 
   it("opens the modal with selected node data and closes through the modal handler", async () => {
     render(
-      <NodeDetailProvider>
+      <NodeDetailProvider nodesData={mocks.nodesData} mergeNodeDetail={mocks.mergeNodeDetail}>
         <Harness />
       </NodeDetailProvider>,
     );
@@ -206,7 +197,7 @@ describe("NodeDetailProvider", () => {
     });
 
     render(
-      <NodeDetailProvider>
+      <NodeDetailProvider nodesData={mocks.nodesData} mergeNodeDetail={mocks.mergeNodeDetail}>
         <Harness />
       </NodeDetailProvider>,
     );
