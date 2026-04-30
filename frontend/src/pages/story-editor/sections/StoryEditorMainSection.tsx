@@ -1,4 +1,16 @@
-import { Check, ChevronDown, Clipboard, FileText, HelpCircle, Lock, Plus, Save, X } from "lucide-react";
+import { useId } from "react";
+import {
+  Check,
+  ChevronDown,
+  Clipboard,
+  FileText,
+  HelpCircle,
+  Lock,
+  Plus,
+  Save,
+  X,
+} from "lucide-react";
+import { useListboxA11y } from "../../../shared/ui/useListboxA11y";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 export function StoryEditorMainSection({ editor }: { editor: StoryEditorController }) {
@@ -6,6 +18,29 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
   const form = editor.form;
   const selected = editor.chunkTypeOptions.find((option) => option.value === form.data.chunkType);
   const SelectedIcon = selected?.icon || FileText;
+  const chunkTypeLabelId = useId();
+  const chunkTypeValueId = useId();
+  const chunkTypeListboxId = useId();
+  const selectedChunkTypeIndex = editor.chunkTypeOptions.findIndex(
+    (option) => option.value === form.data.chunkType,
+  );
+  const {
+    activeOptionId: activeChunkTypeId,
+    getOptionId: getChunkTypeOptionId,
+    handleButtonKeyDown: handleChunkTypeKeyDown,
+    selectOption: selectChunkTypeOption,
+    setActiveIndex: setActiveChunkTypeIndex,
+  } = useListboxA11y({
+    open: form.showChunkTypeDropdown,
+    options: editor.chunkTypeOptions,
+    selectedIndex: selectedChunkTypeIndex,
+    listboxId: chunkTypeListboxId,
+    getOptionKey: (option) => option.value,
+    onOpen: () => form.setShowChunkTypeDropdown(true),
+    onClose: () => form.setShowChunkTypeDropdown(false),
+    onSelect: (option) => form.updateChunkType(option.value),
+    disabled: editor.submitting,
+  });
 
   return (
     <section className="xl:col-span-2 flex flex-col gap-6">
@@ -88,7 +123,10 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
               <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <label className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    <label
+                      id={chunkTypeLabelId}
+                      className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                    >
                       {t("storyChunkEditor.chunkTypeLabel", "Chunk Type")}
                     </label>
                     <button
@@ -104,14 +142,23 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                     <button
                       type="button"
                       onClick={() =>
-                        !editor.submitting && form.setShowChunkTypeDropdown(!form.showChunkTypeDropdown)
+                        !editor.submitting &&
+                        form.setShowChunkTypeDropdown(!form.showChunkTypeDropdown)
                       }
+                      onKeyDown={handleChunkTypeKeyDown}
                       disabled={editor.submitting}
                       className="w-full flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
+                      aria-haspopup="listbox"
+                      aria-expanded={form.showChunkTypeDropdown}
+                      aria-controls={form.showChunkTypeDropdown ? chunkTypeListboxId : undefined}
+                      aria-activedescendant={activeChunkTypeId}
+                      aria-labelledby={`${chunkTypeLabelId} ${chunkTypeValueId}`}
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <SelectedIcon size={16} className={selected?.color || "text-gray-400"} />
-                        <span className="truncate">{selected?.label || "Select type"}</span>
+                        <span id={chunkTypeValueId} className="truncate">
+                          {selected?.label || "Select type"}
+                        </span>
                       </div>
                       <ChevronDown
                         size={16}
@@ -121,15 +168,25 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
 
                     {form.showChunkTypeDropdown && (
                       <div className="absolute z-50 mt-2 w-full rounded-xl border border-gray-100 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
-                        <div className="max-h-60 overflow-y-auto py-2">
-                          {editor.chunkTypeOptions.map((option) => {
+                        <div
+                          id={chunkTypeListboxId}
+                          role="listbox"
+                          aria-labelledby={chunkTypeLabelId}
+                          className="max-h-60 overflow-y-auto py-2"
+                        >
+                          {editor.chunkTypeOptions.map((option, optionIndex) => {
                             const Icon = option.icon;
                             const isSelected = option.value === form.data.chunkType;
                             return (
                               <button
                                 key={option.value}
+                                id={getChunkTypeOptionId(option, optionIndex)}
                                 type="button"
-                                onClick={() => form.updateChunkType(option.value)}
+                                role="option"
+                                aria-selected={isSelected}
+                                tabIndex={-1}
+                                onMouseEnter={() => setActiveChunkTypeIndex(optionIndex)}
+                                onClick={() => selectChunkTypeOption(optionIndex)}
                                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
                                   isSelected
                                     ? "bg-orange-50 text-orange-900 dark:bg-orange-900/20 dark:text-orange-100"

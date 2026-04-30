@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import { getFieldErrorA11y } from "../../../../../shared/ui";
 import type { EndorseT } from "../model/endorseTypes";
 
 export interface EndorseTargetFormProps {
@@ -26,6 +27,11 @@ export function EndorseTargetForm({
   onPersonHashChange,
   onVersionIndexChange,
 }: EndorseTargetFormProps) {
+  const personHashA11y = getFieldErrorA11y({
+    invalid: hashInputInvalid,
+    errorId: "endorse-person-hash-error",
+  });
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-bold text-gray-900 dark:text-gray-50">
@@ -42,6 +48,7 @@ export function EndorseTargetForm({
               type="text"
               value={personHash}
               onChange={(event) => onPersonHashChange(event.target.value)}
+              {...personHashA11y.fieldProps}
               className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 font-mono transition-all outline-none ${
                 hashInputInvalid
                   ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:border-red-500"
@@ -50,7 +57,10 @@ export function EndorseTargetForm({
               placeholder={t("search.versionsQuery.placeholder", "Search by person hash")}
             />
             {hashInputInvalid && (
-              <div className="flex items-center gap-2 text-xs font-medium text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/30">
+              <div
+                {...personHashA11y.errorProps}
+                className="flex items-center gap-2 text-xs font-medium text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/30"
+              >
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 {t(
                   "endorse.invalidPersonHashFormat",

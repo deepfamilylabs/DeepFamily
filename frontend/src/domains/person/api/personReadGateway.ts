@@ -171,8 +171,8 @@ export function createPersonReadGateway(
     offset: number,
     limit: number,
   ): Promise<StoryChunk[]> => {
-    const ret = await contract.getStoryChunks(tokenId, offset, limit);
-    const rawChunks = Array.isArray(ret?.[0]) ? ret[0] : Array.isArray(ret) ? ret : [];
+    const ret: any = await contract.listStoryChunks(tokenId, offset, limit);
+    const rawChunks = Array.isArray(ret?.chunks) ? ret.chunks : Array.isArray(ret?.[0]) ? ret[0] : Array.isArray(ret) ? ret : [];
     return rawChunks.map(parseStoryChunkRecord);
   };
 

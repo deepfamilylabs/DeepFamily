@@ -1,25 +1,44 @@
-import { createPortal } from "react-dom";
+import { useCallback, useId } from "react";
 import { HelpCircle, Lock, X } from "lucide-react";
 import { getChunkTypeColorClass, getChunkTypeIcon } from "../../../domains/person";
+import { ModalShell } from "../../../shared/ui";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 export function SealConfirmDialog({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
-  if (!editor.seal.showConfirm) return null;
+  const titleId = useId();
+  const descriptionId = useId();
+  const { setShowConfirm, showConfirm } = editor.seal;
+  const closeDialog = useCallback(() => setShowConfirm(false), [setShowConfirm]);
 
-  return createPortal(
-    <div className="fixed inset-0 z-[1002] flex items-center justify-center p-4" data-seal-dialog>
-      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 overflow-hidden">
+  return (
+    <ModalShell
+      isOpen={showConfirm}
+      onClose={closeDialog}
+      bare
+      zIndex="z-[1002]"
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={descriptionId}
+      disableBackdropClose
+    >
+      <div className="h-full flex items-center justify-center p-4" data-seal-dialog>
+        <div
+          className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 overflow-hidden"
+          onClick={(event) => event.stopPropagation()}
+        >
         <div className="p-8">
           <div className="flex flex-col items-center text-center gap-4 mb-8">
             <div className="flex-shrink-0 w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
               <Lock size={32} className="text-orange-600 dark:text-orange-500" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                 {t("storyChunkEditor.sealDialog.title", "Seal Story")}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-xs mx-auto">
+              <p
+                id={descriptionId}
+                className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-xs mx-auto"
+              >
                 {t(
                   "storyChunkEditor.sealDialog.description",
                   "Are you sure you want to seal the story? Once sealed, it cannot be modified.",
@@ -30,13 +49,15 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
 
           <div className="flex gap-4">
             <button
-              onClick={() => editor.seal.setShowConfirm(false)}
+              type="button"
+              onClick={closeDialog}
               disabled={editor.submitting}
               className="flex-1 px-4 py-3 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"
             >
               {t("storyChunkEditor.sealDialog.cancel", "Cancel")}
             </button>
             <button
+              type="button"
               onClick={editor.seal.execute}
               disabled={editor.submitting}
               className="flex-1 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-orange-400 to-red-600 hover:shadow-lg shadow-orange-500/20 rounded-full disabled:opacity-50 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
@@ -55,37 +76,47 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
             </button>
           </div>
         </div>
+        </div>
       </div>
-    </div>,
-    document.body,
+    </ModalShell>
   );
 }
 
 export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
-  if (!editor.form.showChunkTypeHelp) return null;
+  const titleId = useId();
+  const descriptionId = useId();
+  const { setShowChunkTypeHelp, showChunkTypeHelp } = editor.form;
+  const closeDialog = useCallback(() => setShowChunkTypeHelp(false), [setShowChunkTypeHelp]);
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
-      onClick={() => editor.form.setShowChunkTypeHelp(false)}
-      data-chunk-help-dialog
+  return (
+    <ModalShell
+      isOpen={showChunkTypeHelp}
+      onClose={closeDialog}
+      bare
+      zIndex="z-[1002]"
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={descriptionId}
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-3xl border border-gray-100 dark:border-gray-800 max-h-[75vh] overflow-hidden flex flex-col"
-        onClick={(event) => event.stopPropagation()}
+        className="h-full flex items-center justify-center p-4"
+        data-chunk-help-dialog
       >
+        <div
+          className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-3xl border border-gray-100 dark:border-gray-800 max-h-[75vh] overflow-hidden flex flex-col"
+          onClick={(event) => event.stopPropagation()}
+        >
         <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
               <HelpCircle size={24} className="text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-gray-100">
               {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
             </h3>
           </div>
           <button
-            onClick={() => editor.form.setShowChunkTypeHelp(false)}
+            onClick={closeDialog}
             className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 hover:rotate-90"
             aria-label="Close"
             type="button"
@@ -96,7 +127,10 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
 
         <div className="overflow-y-auto p-8 space-y-8">
           <div className="prose dark:prose-invert max-w-none">
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            <p
+              id={descriptionId}
+              className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed"
+            >
               {t(
                 "storyChunkEditor.chunkTypeHelp.intro",
                 "Story chunks are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple chunks of the same type in any order.",
@@ -232,9 +266,9 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             </ul>
           </section>
         </div>
+        </div>
       </div>
-    </div>,
-    document.body,
+    </ModalShell>
   );
 }
 

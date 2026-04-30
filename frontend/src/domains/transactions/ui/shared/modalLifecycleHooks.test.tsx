@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useBottomSheetDrag } from "./useBottomSheetDrag";
+import { useBottomSheetDrag, useResponsiveModalMode } from "../../../../shared/ui";
 import { useModalHistoryClose } from "./useModalHistoryClose";
-import { useResponsiveModalMode } from "./useResponsiveModalMode";
 
 type MatchMediaController = {
   setMatches: (matches: boolean) => void;
@@ -19,7 +18,7 @@ function mockMatchMedia(initialMatches: boolean): MatchMediaController {
       get matches() {
         return matches;
       },
-      media: "(min-width: 640px)",
+      media: "(min-width: 768px)",
       addEventListener: vi.fn((_type: string, nextListener: EventListener) => {
         listener = nextListener as (event: MediaQueryListEvent) => void;
       }),

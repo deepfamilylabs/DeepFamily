@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { ChevronDown } from "lucide-react";
+import { useListboxA11y } from "../../../../shared/ui/useListboxA11y";
 
 interface ThemedSelectProps {
   value: number;
@@ -10,16 +11,33 @@ interface ThemedSelectProps {
 
 export function ThemedSelect({ value, onChange, options, className = "" }: ThemedSelectProps) {
   const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(() =>
-    Math.max(0, options.findIndex((option) => option.value === value)),
-  );
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
   const current = options.find((option) => option.value === value)?.label ?? "";
   const selectedIndex = options.findIndex((option) => option.value === value);
-  const activeOptionId =
-    open && options[activeIndex] ? `${listboxId}-option-${options[activeIndex].value}` : undefined;
+  const {
+    activeIndex,
+    activeOptionId,
+    getOptionId,
+    handleButtonKeyDown,
+    selectOption,
+    setActiveIndex,
+  } = useListboxA11y({
+    open,
+    options,
+    selectedIndex,
+    listboxId,
+    getOptionKey: (option) => option.value,
+    onOpen: () => setOpen(true),
+    onClose: () => setOpen(false),
+    onSelect: (option) => {
+      onChange(option.value);
+      setOpen(false);
+    },
+    buttonRef,
+    focusButtonOnSelect: true,
+  });
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -32,76 +50,10 @@ export function ThemedSelect({ value, onChange, options, className = "" }: Theme
     return () => document.removeEventListener("mousedown", handleDocumentMouseDown);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [open, selectedIndex]);
-
-  const selectOption = (index: number) => {
-    const option = options[index];
-    if (!option) return;
-    onChange(option.value);
-    setOpen(false);
-    buttonRef.current?.focus();
-  };
-
-  const moveActive = (delta: number) => {
-    if (options.length === 0) return;
-    setActiveIndex((index) => (index + delta + options.length) % options.length);
-  };
-
   const handleRootBlur = (event: FocusEvent<HTMLDivElement>) => {
     const nextFocusedElement = event.relatedTarget instanceof Node ? event.relatedTarget : null;
     if (!event.currentTarget.contains(nextFocusedElement)) {
       setOpen(false);
-    }
-  };
-
-  const handleButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault();
-        if (!open) {
-          setOpen(true);
-          setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-          return;
-        }
-        moveActive(1);
-        break;
-      case "ArrowUp":
-        event.preventDefault();
-        if (!open) {
-          setOpen(true);
-          setActiveIndex(selectedIndex >= 0 ? selectedIndex : options.length - 1);
-          return;
-        }
-        moveActive(-1);
-        break;
-      case "Home":
-        if (!open) return;
-        event.preventDefault();
-        setActiveIndex(0);
-        break;
-      case "End":
-        if (!open) return;
-        event.preventDefault();
-        setActiveIndex(Math.max(0, options.length - 1));
-        break;
-      case "Enter":
-      case " ":
-        event.preventDefault();
-        if (!open) {
-          setOpen(true);
-          setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-          return;
-        }
-        selectOption(activeIndex);
-        break;
-      case "Escape":
-        if (!open) return;
-        event.preventDefault();
-        setOpen(false);
-        break;
     }
   };
 
@@ -127,7 +79,7 @@ export function ThemedSelect({ value, onChange, options, className = "" }: Theme
             {options.map((option, index) => (
               <li
                 key={option.value}
-                id={`${listboxId}-option-${option.value}`}
+                id={getOptionId(option, index)}
                 role="option"
                 aria-selected={option.value === value}
                 onMouseEnter={() => setActiveIndex(index)}

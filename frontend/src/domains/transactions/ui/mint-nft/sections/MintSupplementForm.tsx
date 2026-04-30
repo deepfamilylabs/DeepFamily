@@ -1,5 +1,6 @@
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
 import { Lock } from "lucide-react";
+import { getFieldErrorA11y } from "../../../../../shared/ui";
 import { ThemedSelect } from "../../shared/ThemedSelect";
 import type { MintNFTFormValues, MintNFTT } from "../model/mintNftTypes";
 
@@ -20,6 +21,18 @@ export function MintSupplementForm({
 }: MintSupplementFormProps) {
   const isDeathBC = Boolean(watch("isDeathBC"));
   const currentYear = new Date().getFullYear();
+  const storyErrorId = "mint-nft-story-error";
+  const tokenUriHintId = "mint-nft-token-uri-hint";
+  const tokenUriErrorId = "mint-nft-token-uri-error";
+  const storyA11y = getFieldErrorA11y({
+    invalid: Boolean(errors.story),
+    errorId: storyErrorId,
+  });
+  const tokenUriA11y = getFieldErrorA11y({
+    invalid: Boolean(errors.tokenURI),
+    errorId: tokenUriErrorId,
+    describedByIds: [tokenUriHintId],
+  });
 
   return (
     <>
@@ -147,11 +160,14 @@ export function MintSupplementForm({
             <textarea
               {...register("story")}
               rows={4}
+              {...storyA11y.fieldProps}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all resize-none"
               placeholder={t("mintNFT.storyPlaceholder", "Enter a brief life story summary...")}
             />
             {errors.story && (
-              <p className="mt-1 text-xs text-red-500 font-bold">{String(errors.story.message)}</p>
+              <p {...storyA11y.errorProps} className="mt-1 text-xs text-red-500 font-bold">
+                {String(errors.story.message)}
+              </p>
             )}
           </div>
         </div>
@@ -164,14 +180,17 @@ export function MintSupplementForm({
           </label>
           <input
             {...register("tokenURI")}
+            {...tokenUriA11y.fieldProps}
             className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
             placeholder="https://... or ipfs://..."
           />
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+          <p id={tokenUriHintId} className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
             {t("mintNFT.tokenURIHint", "Optional: URL or IPFS hash for NFT metadata")}
           </p>
           {errors.tokenURI && (
-            <p className="mt-1 text-xs text-red-500 font-bold">{String(errors.tokenURI.message)}</p>
+            <p {...tokenUriA11y.errorProps} className="mt-1 text-xs text-red-500 font-bold">
+              {String(errors.tokenURI.message)}
+            </p>
           )}
         </div>
       </div>

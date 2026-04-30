@@ -9,7 +9,7 @@ export {
   type EndorseTarget,
 } from "./EndorseModalProvider";
 export { default as PersonStoryCard } from "./PersonStoryCard";
-export { default as StoryChunksModal } from "./StoryChunksModal";
+export { default as PersonStoryModal } from "./PersonStoryModal";
 export {
   default as PersonHashCalculator,
   type HashForm,

@@ -28,6 +28,10 @@
     "people": "人物",
     "actions": "操作"
   },
+  "story": {
+    "addingChunk": "正在添加故事分段...",
+    "sealing": "正在封存故事..."
+  },
   "home": {
     "title": "去中心化数字族谱",
     "subtitle": "零知识隐私保护 · 去链接性 · 多版本共识 · 社区背书 · NFT人物百科",
@@ -709,7 +713,9 @@
     "endorseDesc": "使用 DEEP 功能积分支持优质数据版本",
     "startAddVersion": "开始添加版本",
     "openMintNFT": "打开 NFT 铸造",
-    "openEndorse": "打开背书"
+    "openEndorse": "打开背书",
+    "openMenu": "打开操作菜单",
+    "closeMenu": "关闭操作菜单"
   },
   "addVersion": {
     "title": "添加版本",

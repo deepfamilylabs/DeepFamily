@@ -240,7 +240,6 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       refreshTick: options.refreshTick,
     });
     if (fetchRunKeyRef.current === runKey) return;
-    fetchRunKeyRef.current = runKey;
 
     let cancelled = false;
     const controller = new AbortController();
@@ -376,6 +375,10 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
         setReachableNodeIds(visitedIds);
         setProgress(nextProgress);
         setContractMessage("");
+        // Mark this runKey as fully built only on success, so an aborted run
+        // (e.g. StrictMode dev double-mount) does not block a re-mount with
+        // the same deps from restarting the build.
+        fetchRunKeyRef.current = runKey;
       }
       setLoading(false);
     })().catch((error: any) => {

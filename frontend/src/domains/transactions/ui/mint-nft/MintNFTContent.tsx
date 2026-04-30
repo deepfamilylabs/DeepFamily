@@ -1,5 +1,5 @@
 import { Image } from "lucide-react";
-import { TransactionModalFrame } from "../shared/TransactionModalFrame";
+import { ResponsiveModalFrame } from "../../../../shared/ui";
 import { useMintNftModalController } from "./hooks/useMintNftModalController";
 import { EndorseRequiredDialog } from "./sections/EndorseRequiredDialog";
 import { MintConsentSection } from "./sections/MintConsentSection";
@@ -23,7 +23,7 @@ export default function MintNFTModal(props: MintNFTModalProps) {
   const { t } = mint;
 
   return (
-    <TransactionModalFrame
+    <ResponsiveModalFrame
       {...mint.frame}
       ariaLabel="Mint NFT"
       icon={<Image className="w-6 h-6 text-white" />}
@@ -61,6 +61,6 @@ export default function MintNFTModal(props: MintNFTModalProps) {
       </div>
 
       <EndorseRequiredDialog t={t} {...mint.endorseDialog} />
-    </TransactionModalFrame>
+    </ResponsiveModalFrame>
   );
 }

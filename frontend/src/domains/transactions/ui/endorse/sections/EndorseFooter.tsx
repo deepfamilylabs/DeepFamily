@@ -34,7 +34,7 @@ export function EndorseFooter({
   onMintNFT,
 }: EndorseFooterProps) {
   return (
-    <div className="flex gap-4 p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 pb-[calc(4rem+env(safe-area-inset-bottom))] sticky bottom-0 z-20">
+    <div className="flex gap-4 p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 pb-[calc(2rem+env(safe-area-inset-bottom))]">
       {successResult ? (
         <div className="flex flex-col sm:flex-row gap-3 w-full">
           <TransactionButton

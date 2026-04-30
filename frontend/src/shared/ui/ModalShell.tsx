@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useDialogA11y } from "./useDialogA11y";
 
 export interface ModalShellProps {
   /** Whether the modal is visible */
@@ -13,6 +14,10 @@ export interface ModalShellProps {
   zIndex?: string;
   /** Accessible label for the dialog */
   ariaLabel?: string;
+  /** ID of the visible dialog title. Prefer this over ariaLabel when a title exists. */
+  ariaLabelledBy?: string;
+  /** ID of the visible dialog description. */
+  ariaDescribedBy?: string;
   /** If true, clicking the backdrop does NOT close the modal */
   disableBackdropClose?: boolean;
   /** If true, hide the built-in X close button. Ignored when bare=true. */
@@ -48,26 +53,19 @@ export function ModalShell({
   maxWidth = "max-w-md",
   zIndex = "z-[1300]",
   ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
   disableBackdropClose,
   hideCloseButton,
   closeLabel = "Close",
   bare,
   children,
 }: ModalShellProps) {
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Save + restore focus
-  useEffect(() => {
-    if (isOpen) {
-      previousFocusRef.current = document.activeElement as HTMLElement | null;
-      // Slight delay so the DOM has rendered
-      requestAnimationFrame(() => panelRef.current?.focus());
-    } else if (previousFocusRef.current) {
-      previousFocusRef.current.focus();
-      previousFocusRef.current = null;
-    }
-  }, [isOpen]);
+  const panelRef = useDialogA11y({
+    open: isOpen,
+    onEscape: onClose,
+    stopPropagationOnEscape: true,
+  });
 
   // Scroll lock
   useEffect(() => {
@@ -78,19 +76,6 @@ export function ModalShell({
       document.body.style.overflow = prev;
     };
   }, [isOpen]);
-
-  // Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, onClose]);
 
   const handleBackdrop = useCallback(() => {
     if (!disableBackdropClose) onClose();
@@ -105,7 +90,9 @@ export function ModalShell({
         className={`fixed inset-0 ${zIndex}`}
         role="dialog"
         aria-modal="true"
-        aria-label={ariaLabel}
+        aria-label={ariaLabelledBy ? undefined : ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         tabIndex={-1}
         style={{ outline: "none" }}
         onClick={handleBackdrop}
@@ -130,7 +117,9 @@ export function ModalShell({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={ariaLabel}
+        aria-label={ariaLabelledBy ? undefined : ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         tabIndex={-1}
         className={`w-full ${maxWidth} bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden outline-none`}
         onClick={(e) => e.stopPropagation()}

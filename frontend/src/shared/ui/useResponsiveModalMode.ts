@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const DEFAULT_DESKTOP_QUERY = "(min-width: 640px)";
+const DEFAULT_DESKTOP_QUERY = "(min-width: 768px)";
 
 function getMatches(query: string) {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { X, Wallet, ChevronRight, Shield, Download } from "lucide-react";
 import type { WalletOption } from "../context";
 import { SUPPORTED_WALLETS } from "../config/wallets";
+import { ModalShell } from "../../../shared/ui";
 
 interface WalletSelectionModalProps {
   isOpen: boolean;
@@ -46,19 +47,26 @@ export default function WalletSelectionModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[1300] flex items-center justify-center p-4 transition-all duration-300"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={t("wallet.selectWallet", "Select Wallet")}
+      closeLabel={t("common.close", "Close")}
+      bare
     >
-      <div className="w-full max-w-md bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-8 relative overflow-hidden">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
-          aria-label={t("common.close", "Close")}
+      <div className="flex h-full items-center justify-center p-4 transition-all duration-300">
+        <div
+          className="w-full max-w-md bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-8 relative overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
         >
-          <X className="w-5 h-5" />
-        </button>
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+            aria-label={t("common.close", "Close")}
+          >
+            <X className="w-5 h-5" />
+          </button>
 
         {/* Header Section */}
         <div className="flex flex-col items-center text-center space-y-4">
@@ -186,7 +194,8 @@ export default function WalletSelectionModal({
             {t("wallet.securityNote", "Your keys stay in your wallet. We never have access.")}
           </p>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }

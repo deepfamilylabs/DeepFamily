@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import { getFieldErrorA11y } from "../../../../../shared/ui";
 import type { MintMissingParents, MintNFTT } from "../model/mintNftTypes";
 
 export interface MintTargetSectionProps {
@@ -28,6 +29,11 @@ export function MintTargetSection({
   onPersonHashChange,
   onVersionIndexChange,
 }: MintTargetSectionProps) {
+  const personHashA11y = getFieldErrorA11y({
+    invalid: hashInputInvalid,
+    errorId: "mint-nft-person-hash-error",
+  });
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -44,6 +50,7 @@ export function MintTargetSection({
               type="text"
               value={personHash}
               onChange={(event) => onPersonHashChange(event.target.value)}
+              {...personHashA11y.fieldProps}
               className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none transition-all font-mono ${
                 hashInputInvalid
                   ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
@@ -69,7 +76,10 @@ export function MintTargetSection({
         </div>
 
         {hashInputInvalid && (
-          <div className="mt-3 p-3 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-2">
+          <div
+            {...personHashA11y.errorProps}
+            className="mt-3 p-3 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-2"
+          >
             <AlertCircle className="w-4 h-4" />
             {t(
               "mintNFT.invalidPersonHashFormat",

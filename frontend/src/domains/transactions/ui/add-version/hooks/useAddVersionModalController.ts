@@ -4,12 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import type { IdentitySaltMode } from "../../../../../shared/crypto/identityHash";
 import { safeCanonicalizeFullName } from "../../../../../shared/crypto/identityCommitment";
-import { useToast } from "../../../../../shared/ui";
+import { useResponsiveModalMode, useToast } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
 import { useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
-import { useResponsiveModalMode } from "../../shared/useResponsiveModalMode";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
 import { addVersionSchema } from "../model/addVersionSchema";
 import type {

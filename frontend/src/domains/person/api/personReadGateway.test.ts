@@ -125,7 +125,7 @@ describe("personReadGateway", () => {
         lastUpdateTime: 123,
         fullStoryHash: "0xhash",
       })),
-      getStoryChunks: vi.fn(async () => [
+      listStoryChunks: vi.fn(async () => [
         [
           [0, "0x1", "hello ", 11, "0x00000000000000000000000000000000000000aa", 0, ""],
           [1, "0x2", "world", 12, "0x00000000000000000000000000000000000000aa", 1, "cid://a"],

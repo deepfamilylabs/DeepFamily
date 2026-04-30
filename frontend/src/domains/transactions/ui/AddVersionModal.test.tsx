@@ -41,11 +41,16 @@ vi.mock("../hooks/useContractClient", () => ({
   }),
 }));
 
-vi.mock("../../../shared/ui", () => ({
-  useToast: () => ({
-    show: mocks.toastShow,
-  }),
-}));
+vi.mock("../../../shared/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../shared/ui")>();
+  return {
+    ...actual,
+    useToast: () => ({
+      show: mocks.toastShow,
+    }),
+    useResponsiveModalMode: () => true,
+  };
+});
 
 vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
