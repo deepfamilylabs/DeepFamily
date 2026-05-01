@@ -1,16 +1,16 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import NodeDetailModal from "./NodeDetailModal";
-import { type NodeData } from "../../../shared/model";
-import type { ParsedNftDetails, ParsedVersionDetails } from "../api/personReadGateway";
-import type { StoryDataResult } from "../model/storyData";
-import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";
 import {
   resolveNodeDetailTokenId,
   resolveSelectedNodeData,
+  type NodeData,
   type NodeKeyMinimal,
-} from "../model/nodeDetailSync";
+  type StoryDataResult,
+} from "../../../shared/model";
+import type { ParsedNftDetails, ParsedVersionDetails } from "../api/personReadGateway";
+import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";
 
-export type { NodeKeyMinimal } from "../model/nodeDetailSync";
+export type { NodeKeyMinimal } from "../../../shared/model";
 
 interface NodeDetailValue {
   open: boolean;

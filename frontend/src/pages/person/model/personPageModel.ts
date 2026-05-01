@@ -1,5 +1,9 @@
-import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
-import { buildStorySnapshot } from "../../../domains/person";
+import {
+  buildStorySnapshot,
+  type NodeData,
+  type StoryChunk,
+  type StoryMetadata,
+} from "../../../shared/model";
 import { getFriendlyErrorMessage, resolveErrorReason } from "../../../shared/lib/errors";
 
 export type PersonStoryViewMode = "sections" | "paragraph" | "raw";
