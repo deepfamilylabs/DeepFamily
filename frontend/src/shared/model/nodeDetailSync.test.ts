@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StoryDataResult } from "../model/storyData";
+import type { StoryDataResult } from "./storyData";
 import {
   applyNodeDetailNftDetails,
   applyNodeDetailVersionDetails,

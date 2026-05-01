@@ -2,16 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../../domains/config";
-import {
-  computeStoryHash,
-  getChunkTypeOptions,
-  useNFTDetails,
-  useStoryData,
-} from "../../../domains/person";
+import { getChunkTypeOptions, useNFTDetails, useStoryData } from "../../../domains/person";
 import { useAddStoryChunkFlow, useSealStoryFlow } from "../../../domains/transactions";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { storyKey } from "../../../shared/cache/queryKeys";
-import type { NodeData, StoryChunk, StoryChunkCreateData, StoryMetadata } from "../../../shared/model";
+import {
+  computeStoryHash,
+  type NodeData,
+  type StoryChunk,
+  type StoryChunkCreateData,
+  type StoryMetadata,
+} from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import {
   buildNodeDetailsFromNft,

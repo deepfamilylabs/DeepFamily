@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../../domains/config";
-import { findNodeByTokenId } from "../../../domains/person";
 import { useTreeGraphData, useTreeNodeAccess } from "../../../domains/tree";
-import type { NodeData } from "../../../shared/model";
+import { findNodeByTokenId, type NodeData } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import {
   buildPrefetchedStoryDetailData,
