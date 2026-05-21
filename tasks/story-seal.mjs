@@ -29,7 +29,53 @@ const action = async (args, hre) => {
     throw new Error("Cannot seal empty story (no chunks)");
   }
 
-  const tx = await deepFamilyWithSigner.sealStory(tokenId);
+  const network = await ethers.provider.getNetwork();
+  const actor = await signer.getAddress();
+  const contractAddress = await deepFamily.getAddress();
+  const subjectHash = ethers.keccak256(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ["string", "uint256"],
+      ["DeepFamily.Subject.Token.V1", tokenId],
+    ),
+  );
+  const actionDigest = ethers.keccak256(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ["string", "uint256", "address", "uint16", "address", "uint256", "uint256", "bytes32"],
+      [
+        "DeepFamily.AttestationAction.V1",
+        network.chainId,
+        contractAddress,
+        3,
+        actor,
+        tokenId,
+        metadata.totalChunks,
+        metadata.fullStoryHash,
+      ],
+    ),
+  );
+  const latestBlock = await ethers.provider.getBlock("latest");
+  const attestationRef = {
+    attestationRefVersion: 1,
+    subjectType: 3,
+    subjectHash,
+    actionType: 3,
+    actionDigest,
+    attestationPayloadDigest: ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "address", "uint256"],
+        [actionDigest, actor, tokenId],
+      ),
+    ),
+    signatureSuiteId: 1,
+    signerKeyId: ethers.zeroPadValue(actor, 32),
+    uri: `ipfs://story-seal-attestation-${tokenId.toString()}`,
+    issuedAt: Number(latestBlock.timestamp),
+    expiresAt: Number(latestBlock.timestamp) + 3600,
+    revocationType: 0,
+    revocationRef: ethers.ZeroHash,
+  };
+
+  const tx = await deepFamilyWithSigner.sealStory(tokenId, attestationRef);
   const receipt = await tx.wait();
 
   try {

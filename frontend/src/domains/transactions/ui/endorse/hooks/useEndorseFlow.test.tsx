@@ -54,6 +54,22 @@ const flowArgs = {
   suppressToasts: true,
 };
 
+const attestationRef = {
+  attestationRefVersion: 1,
+  subjectType: 2,
+  subjectHash: `0x${"11".repeat(32)}`,
+  actionType: 2,
+  actionDigest: `0x${"22".repeat(32)}`,
+  attestationPayloadDigest: `0x${"33".repeat(32)}`,
+  signatureSuiteId: 1,
+  signerKeyId: `0x${"00".repeat(12)}00000000000000000000000000000000000000aa`,
+  uri: "ipfs://draft-attestation",
+  issuedAt: 1,
+  expiresAt: 2,
+  revocationType: 0,
+  revocationRef: `0x${"00".repeat(32)}`,
+};
+
 describe("useEndorseFlow", () => {
   beforeEach(() => {
     mocks.wallet.signer = { id: "signer" };
@@ -88,9 +104,14 @@ describe("useEndorseFlow", () => {
       params.onStageChange("checking");
       params.onStageChange("approving");
       params.onStageChange("submitting");
-      const receipt = await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, {
-        gasLimit: 123n,
-      });
+      const receipt = await params.endorseVersion(
+        flowArgs.personHash,
+        flowArgs.versionIndex,
+        attestationRef,
+        {
+          gasLimit: 123n,
+        },
+      );
       expect(receipt).toBe(mocks.receipt);
       return serviceResult;
     });
@@ -113,7 +134,7 @@ describe("useEndorseFlow", () => {
       mocks.config.contractAddress,
       mocks.wallet.signer,
     );
-    expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2, {
+    expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2, attestationRef, {
       gasLimit: 123n,
     });
     expect(mocks.waitForTransactionReceipt).toHaveBeenCalledWith(mocks.tx);
@@ -135,7 +156,7 @@ describe("useEndorseFlow", () => {
 
   it("calls endorseVersion without overrides when no gas overrides are provided", async () => {
     mocks.executeEndorseFlow.mockImplementation(async (params) => {
-      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex);
+      await params.endorseVersion(flowArgs.personHash, flowArgs.versionIndex, attestationRef);
       return { alreadyEndorsed: true };
     });
 
@@ -145,7 +166,7 @@ describe("useEndorseFlow", () => {
       await result.current.runOrThrow(flowArgs);
     });
 
-    expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2);
+    expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2, attestationRef);
     expect(result.current.state).toEqual({ step: "success", result: { alreadyEndorsed: true } });
   });
 

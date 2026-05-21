@@ -4,6 +4,48 @@
 const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
   const { deploy, log, save } = deployments;
   const { deployer } = await getNamedAccounts();
+  let attestationNonce = 1n;
+
+  const makeSetVerifierAttestationRef = async (deepFamily, proofSystemId, purpose, verifier) => {
+    const net = await ethers.provider.getNetwork();
+    const actionDigest = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ["string", "uint256", "address", "uint16", "address", "uint16", "uint8", "address"],
+        [
+          "DeepFamily.AttestationAction.V1",
+          net.chainId,
+          await deepFamily.getAddress(),
+          4,
+          deployer,
+          proofSystemId,
+          purpose,
+          verifier,
+        ],
+      ),
+    );
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const nonce = attestationNonce++;
+    return {
+      attestationRefVersion: 1,
+      subjectType: 6,
+      subjectHash: actionDigest,
+      actionType: 4,
+      actionDigest,
+      attestationPayloadDigest: ethers.keccak256(
+        ethers.AbiCoder.defaultAbiCoder().encode(
+          ["bytes32", "address", "uint256"],
+          [actionDigest, deployer, nonce],
+        ),
+      ),
+      signatureSuiteId: 1,
+      signerKeyId: ethers.zeroPadValue(deployer, 32),
+      uri: `ipfs://deploy-attestation-${nonce.toString()}`,
+      issuedAt: Number(latestBlock.timestamp),
+      expiresAt: Number(latestBlock.timestamp) + 3600,
+      revocationType: 0,
+      revocationRef: ethers.ZeroHash,
+    };
+  };
 
   log(`Deployment account: ${deployer}`);
   log(`Current network: ${network.name}`);
@@ -92,11 +134,21 @@ const func = async ({ getNamedAccounts, deployments, ethers, network }) => {
   //    for both purposes (PersonCommitment = 0, DisclosureBinding = 1). Phase 2 routes business
   //    entrypoints to the adapter, which internally dispatches to the backend verifiers.
   const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyDeployment.address);
-  const tx1 = await deepFamily.setVerifier(1, 0, groth16AdapterDeployment.address);
+  const tx1 = await deepFamily.setVerifier(
+    1,
+    0,
+    groth16AdapterDeployment.address,
+    await makeSetVerifierAttestationRef(deepFamily, 1, 0, groth16AdapterDeployment.address),
+  );
   await tx1.wait();
   log(`Groth16VerifierAdapter registered for (proofSystemId=1, purpose=PersonCommitment)`);
 
-  const tx2 = await deepFamily.setVerifier(1, 1, groth16AdapterDeployment.address);
+  const tx2 = await deepFamily.setVerifier(
+    1,
+    1,
+    groth16AdapterDeployment.address,
+    await makeSetVerifierAttestationRef(deepFamily, 1, 1, groth16AdapterDeployment.address),
+  );
   await tx2.wait();
   log(`Groth16VerifierAdapter registered for (proofSystemId=1, purpose=DisclosureBinding)`);
 

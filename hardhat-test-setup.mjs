@@ -172,7 +172,10 @@ hre.run = async (taskName, args = {}) => {
 
     case "seal-story": {
       const tokenId = BigInt(String(args.tokenid));
-      const tx = await deepFamily.connect(signer).sealStory(tokenId);
+      const tx = await deepFamily.connect(signer).sealStory(
+        tokenId,
+        await seedHelpers.makeSealStoryAttestationRef({ deepFamily, signer, tokenId }),
+      );
       return tx.wait();
     }
 
@@ -182,4 +185,3 @@ hre.run = async (taskName, args = {}) => {
     }
   }
 };
-

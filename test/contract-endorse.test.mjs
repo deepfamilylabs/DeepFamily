@@ -9,6 +9,8 @@ import {
   computeProfileIdentityCommitment,
   makeStubProof,
   makeTestPerson,
+  makeEndorseAttestationRef,
+  makeMintAttestationRef,
 } from './helpers/testHelper.mjs'
 
 const endorsementEventInterface = new hre.ethers.Interface([
@@ -26,6 +28,25 @@ function getEndorsementEventArgs(receipt, deepFamily) {
     } catch (_) {}
   }
   throw new Error('PersonVersionEndorsed event not found')
+}
+
+async function endorseVersion(deepFamily, signer, personHash, versionIndex = 1) {
+  return deepFamily.connect(signer).endorseVersion(
+    personHash,
+    versionIndex,
+    await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, personHash, versionIndex),
+  )
+}
+
+async function mintPersonVersionNFT(deepFamily, signer, personHash, proof, ps, versionIndex, tokenURI, coreInfo) {
+  return deepFamily.connect(signer).mintPersonVersionNFT(
+    proof,
+    ps,
+    versionIndex,
+    tokenURI,
+    coreInfo,
+    await makeMintAttestationRef(hre.ethers, deepFamily, signer, personHash, versionIndex, tokenURI, coreInfo),
+  )
 }
 
 describe('Endorse Tests', function () {
@@ -75,17 +96,17 @@ describe('Endorse Tests', function () {
   }
 
   it('endorses version 1 and increments count', async () => {
-    const { deepFamily, personHash } = await createBasicPerson()
-    await deepFamily.endorseVersion(personHash, 1)
+    const { deepFamily, signers, personHash } = await createBasicPerson()
+    await endorseVersion(deepFamily, signers[0], personHash, 1)
     const endorsementCount = await deepFamily.versionEndorsementCount(personHash, 0)
     expect(endorsementCount).to.equal(1n)
   })
 
   it('second endorsement of same version by the same account reverts', async () => {
-    const { deepFamily, personHash } = await createBasicPerson()
-    await deepFamily.endorseVersion(personHash, 1)
+    const { deepFamily, signers, personHash } = await createBasicPerson()
+    await endorseVersion(deepFamily, signers[0], personHash, 1)
     await expect(
-      deepFamily.endorseVersion(personHash, 1)
+      endorseVersion(deepFamily, signers[0], personHash, 1)
     ).to.be.revertedWithCustomError(deepFamily, 'AlreadyEndorsed')
     const endorsementCount = await deepFamily.versionEndorsementCount(personHash, 0)
     expect(endorsementCount).to.equal(1n)
@@ -102,7 +123,7 @@ describe('Endorse Tests', function () {
 
     const ownerBalanceBefore = await token.balanceOf(newOwner.address)
 
-    await expect(deepFamily.connect(endorser).endorseVersion(personHash, 1)).to.emit(
+    await expect(endorseVersion(deepFamily, endorser, personHash, 1)).to.emit(
       deepFamily,
       'PersonVersionEndorsed'
     )
@@ -152,7 +173,7 @@ describe('Endorse Tests', function () {
 
     const addedByBalanceBefore = await token.balanceOf(addedBy.address)
 
-    const tx = await deepFamily.connect(endorser).endorseVersion(targetHash, 1)
+    const tx = await endorseVersion(deepFamily, endorser, targetHash, 1)
     const receipt = await tx.wait()
     const eventArgs = getEndorsementEventArgs(receipt, deepFamily)
 
@@ -173,7 +194,7 @@ describe('Endorse Tests', function () {
     const bps = await deepFamily.protocolEndorsementFeeBps()
     const protocolShare = (fee * bps) / 10_000n
 
-    await expect(deepFamily.connect(endorser).endorseVersion(personHash, 1)).to.emit(
+    await expect(endorseVersion(deepFamily, endorser, personHash, 1)).to.emit(
       deepFamily,
       'PersonVersionEndorsed'
     )
@@ -208,7 +229,7 @@ describe('Endorse Tests', function () {
 
     await token.connect(endorser).transfer(nftHolder.address, fee)
     await token.connect(nftHolder).approve(deepFamily.target, fee)
-    await deepFamily.connect(nftHolder).endorseVersion(personHash, 1)
+    await endorseVersion(deepFamily, nftHolder, personHash, 1)
 
     const FULLNAME = childPerson.fullName
     const basicInfo = {
@@ -232,12 +253,12 @@ describe('Endorse Tests', function () {
       basicInfo,
       supplementInfo: { fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0, deathMonth: 0, deathDay: 0, deathPlace: '', story: '' },
     }
-    await deepFamily.connect(nftHolder).mintPersonVersionNFT(proof, ps, 1, 'ipfs://child', coreInfo)
+    await mintPersonVersionNFT(deepFamily, nftHolder, personHash, proof, ps, 1, 'ipfs://child', coreInfo)
 
     const holderBalanceBefore = await token.balanceOf(nftHolder.address)
     await token.connect(endorser).approve(deepFamily.target, fee)
 
-    const tx = await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+    const tx = await endorseVersion(deepFamily, endorser, personHash, 1)
     const receipt = await tx.wait()
     const eventArgs = getEndorsementEventArgs(receipt, deepFamily)
 
@@ -254,7 +275,7 @@ describe('Endorse Tests', function () {
 
     await token.connect(endorser).approve(deepFamily.target, fee - 1n)
     await expect(
-      deepFamily.connect(endorser).endorseVersion(personHash, 1)
+      endorseVersion(deepFamily, endorser, personHash, 1)
     ).to.be.revertedWithCustomError(token, 'ERC20InsufficientAllowance')
   })
 
@@ -263,13 +284,13 @@ describe('Endorse Tests', function () {
     await addPerson(hre.ethers, deepFamily, signers[0], commitment, { person, tag: 'second' })
 
     const [endorser] = signers
-    await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+    await endorseVersion(deepFamily, endorser, personHash, 1)
     let firstVersionCount = await deepFamily.versionEndorsementCount(personHash, 0)
     let secondVersionCount = await deepFamily.versionEndorsementCount(personHash, 1)
     expect(firstVersionCount).to.equal(1n)
     expect(secondVersionCount).to.equal(0n)
 
-    await deepFamily.connect(endorser).endorseVersion(personHash, 2)
+    await endorseVersion(deepFamily, endorser, personHash, 2)
     firstVersionCount = await deepFamily.versionEndorsementCount(personHash, 0)
     secondVersionCount = await deepFamily.versionEndorsementCount(personHash, 1)
     expect(firstVersionCount).to.equal(0n)
@@ -287,7 +308,7 @@ describe('Endorse Tests', function () {
     it('returns single endorsement after user endorses one person', async () => {
       const { deepFamily, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
-      await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+      await endorseVersion(deepFamily, endorser, personHash, 1)
 
       const result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(1)
@@ -304,7 +325,7 @@ describe('Endorse Tests', function () {
         const person = makeTestPerson(`Endorse List ${i}`)
         const h = await addPerson(hre.ethers, deepFamily, endorser, null, { person, tag: `v${i}` })
         hashes.push(h)
-        await deepFamily.connect(endorser).endorseVersion(h, 1)
+        await endorseVersion(deepFamily, endorser, h, 1)
       }
       const result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(3)
@@ -319,7 +340,7 @@ describe('Endorse Tests', function () {
         const person = makeTestPerson(`Endorse Page ${i}`)
         const h = await addPerson(hre.ethers, deepFamily, endorser, null, { person, tag: `v${i}` })
         persons.push(h)
-        await deepFamily.connect(endorser).endorseVersion(h, 1)
+        await endorseVersion(deepFamily, endorser, h, 1)
       }
 
       let result = await deepFamily.listUserEndorsements(endorser.address, 0, 2)
@@ -344,7 +365,7 @@ describe('Endorse Tests', function () {
     it('successfully cancels endorsement and decrements count', async () => {
       const { deepFamily, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
-      await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+      await endorseVersion(deepFamily, endorser, personHash, 1)
 
       await expect(
         deepFamily.connect(endorser).cancelEndorsement(personHash)
@@ -359,7 +380,7 @@ describe('Endorse Tests', function () {
     it('removes person from user endorsed list', async () => {
       const { deepFamily, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
-      await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+      await endorseVersion(deepFamily, endorser, personHash, 1)
 
       let result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(1)
@@ -374,9 +395,9 @@ describe('Endorse Tests', function () {
       const { deepFamily, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
 
-      await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+      await endorseVersion(deepFamily, endorser, personHash, 1)
       await deepFamily.connect(endorser).cancelEndorsement(personHash)
-      await deepFamily.connect(endorser).endorseVersion(personHash, 1)
+      await endorseVersion(deepFamily, endorser, personHash, 1)
 
       const endorsedVersion = await deepFamily.endorsedVersionIndex(personHash, endorser.address)
       expect(endorsedVersion).to.equal(1n)
@@ -390,7 +411,7 @@ describe('Endorse Tests', function () {
         const person = makeTestPerson(`Cancel List ${i}`)
         const h = await addPerson(hre.ethers, deepFamily, endorser, null, { person, tag: `v${i}` })
         hashes.push(h)
-        await deepFamily.connect(endorser).endorseVersion(h, 1)
+        await endorseVersion(deepFamily, endorser, h, 1)
       }
 
       await deepFamily.connect(endorser).cancelEndorsement(hashes[1])

@@ -4,6 +4,13 @@ import path from 'node:path'
 const GROTH16_PROOF_SYSTEM_ID = 1
 const PROOF_PURPOSE_PERSON_COMMITMENT = 0
 const PROOF_PURPOSE_DISCLOSURE_BINDING = 1
+const ATTESTATION_REF_VERSION_V1 = 1
+const SUBJECT_TYPE_ACTION = 6
+const ACTION_TYPE_VERIFIER_UPDATE = 4
+const SIG_SUITE_ECDSA_SECP256K1_V1 = 1
+const REVOCATION_TYPE_NONE = 0
+const DOMAIN_ATTESTATION_ACTION = 'DeepFamily.AttestationAction.V1'
+let attestationNonce = 1n
 
 const resolveConnection = async (hreOrConnection) => {
   if (hreOrConnection?.ethers?.getSigners) {
@@ -46,6 +53,56 @@ const writeDeployment = async (connection, contractName, address, abi) => {
   const filePath = path.join(dir, `${contractName}.json`)
   const payload = { address, abi }
   await fs.writeFile(filePath, JSON.stringify(payload, null, 2))
+}
+
+const makeSetVerifierAttestationRef = async (
+  ethers,
+  deepFamily,
+  signer,
+  proofSystemId,
+  purpose,
+  verifier,
+) => {
+  const network = await ethers.provider.getNetwork()
+  const contractAddress = await deepFamily.getAddress()
+  const actor = await signer.getAddress()
+  const actionDigest = ethers.keccak256(
+    ethers.AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256', 'address', 'uint16', 'address', 'uint16', 'uint8', 'address'],
+      [
+        DOMAIN_ATTESTATION_ACTION,
+        network.chainId,
+        contractAddress,
+        ACTION_TYPE_VERIFIER_UPDATE,
+        actor,
+        proofSystemId,
+        purpose,
+        verifier,
+      ],
+    ),
+  )
+  const latestBlock = await ethers.provider.getBlock('latest')
+  const nonce = attestationNonce++
+  return {
+    attestationRefVersion: ATTESTATION_REF_VERSION_V1,
+    subjectType: SUBJECT_TYPE_ACTION,
+    subjectHash: actionDigest,
+    actionType: ACTION_TYPE_VERIFIER_UPDATE,
+    actionDigest,
+    attestationPayloadDigest: ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ['bytes32', 'address', 'uint256'],
+        [actionDigest, actor, nonce],
+      ),
+    ),
+    signatureSuiteId: SIG_SUITE_ECDSA_SECP256K1_V1,
+    signerKeyId: ethers.zeroPadValue(actor, 32),
+    uri: `ipfs://deploy-attestation-${nonce.toString()}`,
+    issuedAt: Number(latestBlock.timestamp),
+    expiresAt: Number(latestBlock.timestamp) + 3600,
+    revocationType: REVOCATION_TYPE_NONE,
+    revocationRef: ethers.ZeroHash,
+  }
 }
 
 export const deployIntegratedSystem = async (
@@ -112,6 +169,14 @@ export const deployIntegratedSystem = async (
       GROTH16_PROOF_SYSTEM_ID,
       PROOF_PURPOSE_PERSON_COMMITMENT,
       groth16VerifierAdapterAddress,
+      await makeSetVerifierAttestationRef(
+        ethers,
+        deepFamily,
+        deployer,
+        GROTH16_PROOF_SYSTEM_ID,
+        PROOF_PURPOSE_PERSON_COMMITMENT,
+        groth16VerifierAdapterAddress,
+      ),
     )
   ).wait()
   await (
@@ -119,6 +184,14 @@ export const deployIntegratedSystem = async (
       GROTH16_PROOF_SYSTEM_ID,
       PROOF_PURPOSE_DISCLOSURE_BINDING,
       groth16VerifierAdapterAddress,
+      await makeSetVerifierAttestationRef(
+        ethers,
+        deepFamily,
+        deployer,
+        GROTH16_PROOF_SYSTEM_ID,
+        PROOF_PURPOSE_DISCLOSURE_BINDING,
+        groth16VerifierAdapterAddress,
+      ),
     )
   ).wait()
 

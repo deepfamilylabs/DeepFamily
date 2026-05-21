@@ -11,12 +11,33 @@ import {
   computeIdentityCommitment,
   makeStubProof,
   makeTestPerson,
+  makeEndorseAttestationRef,
+  makeMintAttestationRef,
 } from './helpers/testHelper.mjs'
 
 const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000)
 
 describe('Mint NFT Tests', function () {
   this.timeout(60_000)
+
+  async function endorseVersion(deepFamily, signer, personHash, versionIndex = 1) {
+    return deepFamily.connect(signer).endorseVersion(
+      personHash,
+      versionIndex,
+      await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, personHash, versionIndex),
+    )
+  }
+
+  async function mintPersonVersionNFT(deepFamily, signer, personHash, proof, ps, versionIndex, tokenURI, coreInfo) {
+    return deepFamily.connect(signer).mintPersonVersionNFT(
+      proof,
+      ps,
+      versionIndex,
+      tokenURI,
+      coreInfo,
+      await makeMintAttestationRef(hre.ethers, deepFamily, signer, personHash, versionIndex, tokenURI, coreInfo),
+    )
+  }
 
   async function baseSetup() {
     const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
@@ -38,7 +59,7 @@ describe('Mint NFT Tests', function () {
       1,
     )
     const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, { person })
-    await deepFamily.connect(signer).endorseVersion(personHash, 1)
+    await endorseVersion(deepFamily, signer, personHash, 1)
     return { deepFamily, signer, FULLNAME, personHash, identityCommitment }
   }
 
@@ -82,9 +103,7 @@ describe('Mint NFT Tests', function () {
     }
 
     await expect(
-      deepFamily.connect(signer).mintPersonVersionNFT(
-        proof, publicSignals, 1, '', coreInfo
-      )
+      mintPersonVersionNFT(deepFamily, signer, personHash, proof, publicSignals, 1, '', coreInfo)
     ).to.be.revertedWithCustomError(deepFamily, 'MustEndorseVersionFirst')
   })
 
@@ -150,9 +169,7 @@ describe('Mint NFT Tests', function () {
     }
 
     await expect(
-      deepFamily.connect(signer).mintPersonVersionNFT(
-        proof, publicSignals, 1, '', coreInfo
-      )
+      mintPersonVersionNFT(deepFamily, signer, personHash, proof, publicSignals, 1, '', coreInfo)
     ).to.be.revertedWithCustomError(deepFamily, 'VersionAlreadyMinted')
   })
 
@@ -182,14 +199,12 @@ describe('Mint NFT Tests', function () {
     }
 
     await expect(
-      deepFamily.connect(signer).mintPersonVersionNFT(
-        proof, publicSignals, 1, '', coreInfo
-      )
+      mintPersonVersionNFT(deepFamily, signer, personHash, proof, publicSignals, 1, '', coreInfo)
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidFullName')
   })
 
   it('rejects mismatched supplement fullName and proof-bound fullName', async () => {
-    const { deepFamily, signer, identityCommitment, FULLNAME } = await prepareMintBase()
+    const { deepFamily, signer, personHash, identityCommitment, FULLNAME } = await prepareMintBase()
 
     const basicInfo = {
       identityCommitment: hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
@@ -214,9 +229,7 @@ describe('Mint NFT Tests', function () {
     }
 
     await expect(
-      deepFamily.connect(signer).mintPersonVersionNFT(
-        proof, publicSignals, 1, '', coreInfo
-      )
+      mintPersonVersionNFT(deepFamily, signer, personHash, proof, publicSignals, 1, '', coreInfo)
     ).to.be.revertedWithCustomError(deepFamily, 'BasicInfoMismatch')
   })
 
@@ -259,7 +272,7 @@ describe('Mint NFT Tests', function () {
   })
 
   it('reverts when proof minter does not match caller', async () => {
-    const { deepFamily, signer, identityCommitment, FULLNAME } = await prepareMintBase()
+    const { deepFamily, signer, personHash, identityCommitment, FULLNAME } = await prepareMintBase()
     const [, otherSigner] = await hre.ethers.getSigners()
     const otherAddr = await otherSigner.getAddress()
 
@@ -285,9 +298,7 @@ describe('Mint NFT Tests', function () {
     }
 
     await expect(
-      deepFamily.connect(signer).mintPersonVersionNFT(
-        proof, publicSignals, 1, '', coreInfo
-      )
+      mintPersonVersionNFT(deepFamily, signer, personHash, proof, publicSignals, 1, '', coreInfo)
     ).to.be.revertedWithCustomError(deepFamily, 'CallerMismatch')
   })
 
@@ -341,7 +352,7 @@ describe('Mint NFT Tests', function () {
         gender: 1,
       })
       const personHash = await addPerson(hre.ethers, deepFamily, signer, ic, { person })
-      await deepFamily.connect(signer).endorseVersion(personHash, 1)
+      await endorseVersion(deepFamily, signer, personHash, 1)
 
       await setNextBlockTimestamp(mintTs)
 
@@ -356,22 +367,29 @@ describe('Mint NFT Tests', function () {
       const dbVal = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1)
       const signerAddr = await signer.getAddress()
 
+      const publicSignals = {
+        identityCommitment: BigInt(ic),
+        disclosureBinding: dbVal,
+        minter: BigInt(signerAddr),
+        schemaVersion: 1,
+        cryptoSuiteVersion: 1,
+        hashAlgoId: 1,
+      }
+      const coreInfo = {
+        basicInfo,
+        supplementInfo: { fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0, deathMonth: 0, deathDay: 0, deathPlace: '', story: '' },
+      }
+
       await expect(
-        deepFamily.connect(signer).mintPersonVersionNFT(
+        mintPersonVersionNFT(
+          deepFamily,
+          signer,
+          personHash,
           makeStubProof(),
-          {
-            identityCommitment: BigInt(ic),
-            disclosureBinding: dbVal,
-            minter: BigInt(signerAddr),
-            schemaVersion: 1,
-            cryptoSuiteVersion: 1,
-            hashAlgoId: 1,
-          },
-          1, '',
-          {
-            basicInfo,
-            supplementInfo: { fullName: FULLNAME, birthPlace: '', isDeathBC: false, deathYear: 0, deathMonth: 0, deathDay: 0, deathPlace: '', story: '' },
-          }
+          publicSignals,
+          1,
+          '',
+          coreInfo,
         )
       ).to.be.revertedWithCustomError(deepFamily, 'MustBeAdult')
     })

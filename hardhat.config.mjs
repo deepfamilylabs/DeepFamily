@@ -16,6 +16,7 @@ import networksListTask from './tasks/networks-list.mjs'
 import addStoryChunkTask from './tasks/story-add-chunk.mjs'
 import listStoryChunksTask from './tasks/story-list-chunks.mjs'
 import sealStoryTask from './tasks/story-seal.mjs'
+import attestationVerifyTask from './tasks/attestation-verify.mjs'
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
@@ -163,6 +164,7 @@ export default {
     addStoryChunkTask,
     listStoryChunksTask,
     sealStoryTask,
+    attestationVerifyTask,
   ],
   
   // Contract verification configuration

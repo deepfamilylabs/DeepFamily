@@ -1,0 +1,24 @@
+export const ATTESTATION_REF_VERSION_V1 = 1;
+
+export const SUBJECT_TYPE_VERSION = 2;
+export const SUBJECT_TYPE_TOKEN = 3;
+export const SUBJECT_TYPE_ACTION = 6;
+
+export const ACTION_TYPE_AUTHORITATIVE_MINT = 1;
+export const ACTION_TYPE_HIGH_TRUST_ENDORSEMENT = 2;
+export const ACTION_TYPE_STORY_SEAL = 3;
+export const ACTION_TYPE_VERIFIER_UPDATE = 4;
+export const ACTION_TYPE_PROTOCOL_FEE_UPDATE = 5;
+
+export const SIG_SUITE_ECDSA_SECP256K1_V1 = 1;
+export const SIG_SUITE_HYBRID_ECDSA_ML_DSA_V1 = 2;
+export const SIG_SUITE_PQ_ML_DSA_V1 = 3;
+
+export const REVOCATION_TYPE_NONE = 0;
+
+export const DOMAIN_ATTESTATION_ACTION = "DeepFamily.AttestationAction.V1";
+export const DOMAIN_ATTESTATION_PAYLOAD = "DeepFamily.Attestation.V1";
+export const DOMAIN_ATTESTATION_SUBJECT_VERSION = "DeepFamily.Subject.Version.V1";
+export const DOMAIN_ATTESTATION_SUBJECT_TOKEN = "DeepFamily.Subject.Token.V1";
+
+export const ZERO_REF = "0x0000000000000000000000000000000000000000000000000000000000000000";

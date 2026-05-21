@@ -105,11 +105,18 @@ describe("storyWriteServices", () => {
           logs: [{ address: contractAddress, topics: sealLog.topics, data: sealLog.data }],
         })),
       })),
+      storyMetadata: vi.fn(async () => ({
+        totalChunks: 3n,
+        fullStoryHash: "0x" + "22".repeat(32),
+      })),
     };
     createDeepFamilyContractMock.mockReturnValue(contract);
 
     const signer = {
       getAddress: vi.fn().mockResolvedValue("0x00000000000000000000000000000000000000bb"),
+      provider: {
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 31337n }),
+      },
     };
 
     const addResult = await addStoryChunkService(
@@ -126,6 +133,14 @@ describe("storyWriteServices", () => {
     expect(addResult.newChunk.chunkType).toBe(2);
 
     const sealResult = await sealStoryService(signer as any, contractAddress, "1");
+    expect(contract.sealStory).toHaveBeenCalledWith(
+      "1",
+      expect.objectContaining({
+        actionType: 3,
+        subjectType: 3,
+        uri: expect.stringMatching(/^ipfs:\/\//),
+      }),
+    );
     expect(sealResult.events.StorySealed?.totalChunks).toBe(3);
     expect(sealResult.fullStoryHash).toBe("0x" + "22".repeat(32));
   });
