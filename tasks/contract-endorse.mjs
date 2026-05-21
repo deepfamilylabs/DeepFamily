@@ -1,6 +1,7 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import { makeEndorseAttestationRef } from "../lib/seedHelpers.js";
 
 // Fee is paid in DeepFamilyToken equal to recentReward(), requiring ERC20 allowance
 
@@ -48,7 +49,16 @@ const action = async (args, hre) => {
   }
 
   // Call endorseVersion
-  const tx = await deepFamily.endorseVersion(args.person, versionIndex);
+  const tx = await deepFamily.endorseVersion(
+    args.person,
+    versionIndex,
+    await makeEndorseAttestationRef({
+      deepFamily,
+      signer,
+      personHash: args.person,
+      versionIndex,
+    }),
+  );
   const receipt = await tx.wait();
 
   // Decode PersonVersionEndorsed event

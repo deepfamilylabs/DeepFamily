@@ -3,6 +3,8 @@ import { createDeepFamilyInterface } from "../../../shared/clients/contractFacto
 import { executeMintFlow } from "./mintNftService";
 
 describe("mintService executeMintFlow", () => {
+  const identityCommitmentHex = `0x${"01".padStart(64, "0")}`;
+
   it("returns requiresEndorsement when the wallet has not endorsed the target version", async () => {
     const contract = {
       endorsedVersionIndex: vi.fn(async () => 1),
@@ -25,7 +27,7 @@ describe("mintService executeMintFlow", () => {
       tokenURI: "",
       coreInfo: {
         basicInfo: {
-          identityCommitment: "1",
+          identityCommitment: identityCommitmentHex,
           isBirthBC: false,
           birthYear: 2000,
           birthMonth: 1,
@@ -68,6 +70,11 @@ describe("mintService executeMintFlow", () => {
     const contract = {
       endorsedVersionIndex: vi.fn(async () => 2),
       getAddress: vi.fn(async () => contractAddress),
+      runner: {
+        provider: {
+          getNetwork: vi.fn(async () => ({ chainId: 31337n })),
+        },
+      },
     };
     const mintPersonVersionNFT = vi.fn(async () => ({
       transactionHash: "0xtxhash",
@@ -99,7 +106,7 @@ describe("mintService executeMintFlow", () => {
       tokenURI: "ipfs://token",
       coreInfo: {
         basicInfo: {
-          identityCommitment: "1",
+          identityCommitment: identityCommitmentHex,
           isBirthBC: false,
           birthYear: 2000,
           birthMonth: 1,
@@ -126,6 +133,27 @@ describe("mintService executeMintFlow", () => {
       throw new Error("Expected a minted result");
     }
     expect(mintPersonVersionNFT).toHaveBeenCalledTimes(1);
+    expect(mintPersonVersionNFT).toHaveBeenCalledWith(
+      { proof: "ok" },
+      {
+        identityCommitment: 1n,
+        disclosureBinding: 2n,
+        minter: 3n,
+        schemaVersion: 1,
+        cryptoSuiteVersion: 1,
+        hashAlgoId: 1,
+      },
+      2,
+      "ipfs://token",
+      expect.objectContaining({
+        basicInfo: expect.objectContaining({ identityCommitment: identityCommitmentHex }),
+      }),
+      expect.objectContaining({
+        actionType: 1,
+        subjectType: 2,
+        uri: expect.stringMatching(/^ipfs:\/\//),
+      }),
+    );
     expect(getVersionDetails).toHaveBeenCalledWith(
       "0x00000000000000000000000000000000000000000000000000000000000000aa",
       2,

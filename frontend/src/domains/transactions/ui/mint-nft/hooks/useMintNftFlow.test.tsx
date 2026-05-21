@@ -63,7 +63,7 @@ const flowArgs = {
   tokenURI: "ipfs://token",
   coreInfo: {
     basicInfo: {
-      identityCommitment: "1",
+      identityCommitment: `0x${"01".padStart(64, "0")}`,
       isBirthBC: false,
       birthYear: 2000,
       birthMonth: 1,
@@ -81,6 +81,22 @@ const flowArgs = {
       story: "",
     },
   },
+};
+
+const attestationRef = {
+  attestationRefVersion: 1,
+  subjectType: 2,
+  subjectHash: `0x${"11".repeat(32)}`,
+  actionType: 1,
+  actionDigest: `0x${"22".repeat(32)}`,
+  attestationPayloadDigest: `0x${"33".repeat(32)}`,
+  signatureSuiteId: 1,
+  signerKeyId: `0x${"00".repeat(12)}00000000000000000000000000000000000000aa`,
+  uri: "ipfs://draft-attestation",
+  issuedAt: 1,
+  expiresAt: 2,
+  revocationType: 0,
+  revocationRef: `0x${"00".repeat(32)}`,
 };
 
 describe("useMintNftFlow", () => {
@@ -115,6 +131,7 @@ describe("useMintNftFlow", () => {
         flowArgs.versionIndex,
         flowArgs.tokenURI,
         flowArgs.coreInfo,
+        attestationRef,
       );
       const versionDetails = await params.getVersionDetails(
         flowArgs.personHash,
@@ -141,6 +158,7 @@ describe("useMintNftFlow", () => {
       flowArgs.versionIndex,
       flowArgs.tokenURI,
       flowArgs.coreInfo,
+      attestationRef,
     );
     expect(mocks.waitForTransactionReceipt).toHaveBeenCalledWith(mocks.tx);
     expect(mocks.contract.getVersionDetails).toHaveBeenCalledWith(

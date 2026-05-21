@@ -299,9 +299,12 @@ function mintPersonVersionNFT(
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo
+    PersonCoreInfo calldata coreInfo,
+    AttestationRef calldata attestationRef
 ) external
 ```
+
+`attestationRef` is Phase 3 action anchoring metadata. It is validated by the contract around the mint action but is not a disclosure-proof public signal and does not change the ZK circuit shape.
 
 `DisclosureBindingPublicSignals` is:
 

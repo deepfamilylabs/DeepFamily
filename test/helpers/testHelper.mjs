@@ -15,8 +15,23 @@ const PROOF_PURPOSE_PERSON_COMMITMENT = 0
 const PROOF_PURPOSE_DISCLOSURE_BINDING = 1
 const STUB_PROOF_SYSTEM_ID = 1
 const STUB_PROOF_ENCODING_ID = 1
+const ATTESTATION_REF_VERSION_V1 = 1
+const SUBJECT_TYPE_VERSION = 2
+const SUBJECT_TYPE_TOKEN = 3
+const SUBJECT_TYPE_ACTION = 6
+const ACTION_TYPE_AUTHORITATIVE_MINT = 1
+const ACTION_TYPE_HIGH_TRUST_ENDORSEMENT = 2
+const ACTION_TYPE_STORY_SEAL = 3
+const ACTION_TYPE_VERIFIER_UPDATE = 4
+const ACTION_TYPE_PROTOCOL_FEE_UPDATE = 5
+const SIG_SUITE_ECDSA_SECP256K1_V1 = 1
+const REVOCATION_TYPE_NONE = 0
+const DOMAIN_ATTESTATION_ACTION = 'DeepFamily.AttestationAction.V1'
+const DOMAIN_ATTESTATION_SUBJECT_VERSION = 'DeepFamily.Subject.Version.V1'
+const DOMAIN_ATTESTATION_SUBJECT_TOKEN = 'DeepFamily.Subject.Token.V1'
 
 const SNARK_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
+let attestationNonce = 1n
 
 function canonicalizeFullName(fullName) {
   if (fullName === undefined || fullName === null) return ''
@@ -116,6 +131,350 @@ export function computePersonHash(ethers, identityCommitment) {
   return ethers.keccak256(ethers.solidityPacked(['bytes32'], [hex]))
 }
 
+export function computeVersionSubjectHash(ethers, personHash, versionIndex) {
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'bytes32', 'uint256'],
+      [DOMAIN_ATTESTATION_SUBJECT_VERSION, personHash, versionIndex],
+    ),
+  )
+}
+
+export function computeTokenSubjectHash(ethers, tokenId) {
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256'],
+      [DOMAIN_ATTESTATION_SUBJECT_TOKEN, tokenId],
+    ),
+  )
+}
+
+export function computeCoreInfoDigest(ethers, coreInfo) {
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      [
+        'bytes32',
+        'bool',
+        'uint16',
+        'uint8',
+        'uint8',
+        'uint8',
+        'bytes32',
+        'bytes32',
+        'bool',
+        'uint16',
+        'uint8',
+        'uint8',
+        'bytes32',
+        'bytes32',
+      ],
+      [
+        coreInfo.basicInfo.identityCommitment,
+        coreInfo.basicInfo.isBirthBC,
+        coreInfo.basicInfo.birthYear,
+        coreInfo.basicInfo.birthMonth,
+        coreInfo.basicInfo.birthDay,
+        coreInfo.basicInfo.gender,
+        ethers.keccak256(ethers.toUtf8Bytes(coreInfo.supplementInfo.fullName)),
+        ethers.keccak256(ethers.toUtf8Bytes(coreInfo.supplementInfo.birthPlace)),
+        coreInfo.supplementInfo.isDeathBC,
+        coreInfo.supplementInfo.deathYear,
+        coreInfo.supplementInfo.deathMonth,
+        coreInfo.supplementInfo.deathDay,
+        ethers.keccak256(ethers.toUtf8Bytes(coreInfo.supplementInfo.deathPlace)),
+        ethers.keccak256(ethers.toUtf8Bytes(coreInfo.supplementInfo.story)),
+      ],
+    ),
+  )
+}
+
+async function getAttestationDomain(ethers, deepFamily) {
+  const network = await ethers.provider.getNetwork()
+  const contractAddress = await deepFamily.getAddress()
+  return { chainId: network.chainId, contractAddress }
+}
+
+export async function computeAuthoritativeMintActionDigest(
+  ethers,
+  deepFamily,
+  actor,
+  personHash,
+  versionIndex,
+  tokenURI,
+  coreInfo,
+) {
+  const { chainId, contractAddress } = await getAttestationDomain(ethers, deepFamily)
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256', 'address', 'uint16', 'address', 'bytes32', 'uint256', 'bytes32', 'bytes32'],
+      [
+        DOMAIN_ATTESTATION_ACTION,
+        chainId,
+        contractAddress,
+        ACTION_TYPE_AUTHORITATIVE_MINT,
+        actor,
+        personHash,
+        versionIndex,
+        ethers.keccak256(ethers.toUtf8Bytes(tokenURI)),
+        computeCoreInfoDigest(ethers, coreInfo),
+      ],
+    ),
+  )
+}
+
+export async function computeHighTrustEndorsementActionDigest(
+  ethers,
+  deepFamily,
+  actor,
+  personHash,
+  versionIndex,
+) {
+  const { chainId, contractAddress } = await getAttestationDomain(ethers, deepFamily)
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256', 'address', 'uint16', 'address', 'bytes32', 'uint256'],
+      [
+        DOMAIN_ATTESTATION_ACTION,
+        chainId,
+        contractAddress,
+        ACTION_TYPE_HIGH_TRUST_ENDORSEMENT,
+        actor,
+        personHash,
+        versionIndex,
+      ],
+    ),
+  )
+}
+
+export async function computeStorySealActionDigest(ethers, deepFamily, actor, tokenId) {
+  const { chainId, contractAddress } = await getAttestationDomain(ethers, deepFamily)
+  const metadata = await deepFamily.storyMetadata(tokenId)
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256', 'address', 'uint16', 'address', 'uint256', 'uint256', 'bytes32'],
+      [
+        DOMAIN_ATTESTATION_ACTION,
+        chainId,
+        contractAddress,
+        ACTION_TYPE_STORY_SEAL,
+        actor,
+        tokenId,
+        metadata.totalChunks,
+        metadata.fullStoryHash,
+      ],
+    ),
+  )
+}
+
+export async function computeVerifierUpdateActionDigest(
+  ethers,
+  deepFamily,
+  actor,
+  proofSystemId,
+  purpose,
+  verifier,
+) {
+  const { chainId, contractAddress } = await getAttestationDomain(ethers, deepFamily)
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256', 'address', 'uint16', 'address', 'uint16', 'uint8', 'address'],
+      [
+        DOMAIN_ATTESTATION_ACTION,
+        chainId,
+        contractAddress,
+        ACTION_TYPE_VERIFIER_UPDATE,
+        actor,
+        proofSystemId,
+        purpose,
+        verifier,
+      ],
+    ),
+  )
+}
+
+export async function computeProtocolFeeUpdateActionDigest(ethers, deepFamily, actor, newBps) {
+  const { chainId, contractAddress } = await getAttestationDomain(ethers, deepFamily)
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['string', 'uint256', 'address', 'uint16', 'address', 'uint256'],
+      [
+        DOMAIN_ATTESTATION_ACTION,
+        chainId,
+        contractAddress,
+        ACTION_TYPE_PROTOCOL_FEE_UPDATE,
+        actor,
+        newBps,
+      ],
+    ),
+  )
+}
+
+export function computeAttestationKey(ethers, ref) {
+  return ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['uint16', 'uint16', 'bytes32', 'uint16', 'bytes32', 'bytes32'],
+      [
+        ref.attestationRefVersion,
+        ref.subjectType,
+        ref.subjectHash,
+        ref.actionType,
+        ref.actionDigest,
+        ref.attestationPayloadDigest,
+      ],
+    ),
+  )
+}
+
+export async function makeAttestationRef(ethers, deepFamily, signer, params) {
+  const latestBlock = await ethers.provider.getBlock('latest')
+  const issuedAt = params.issuedAt ?? Number(latestBlock.timestamp)
+  const expiresAt = params.expiresAt ?? issuedAt + 3600
+  const signerAddress = params.signerAddress ?? await signer.getAddress()
+  const nonce = params.nonce ?? attestationNonce++
+  const payloadDigest = params.attestationPayloadDigest ?? ethers.keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ['bytes32', 'address', 'uint256'],
+      [params.actionDigest, signerAddress, nonce],
+    ),
+  )
+
+  return {
+    attestationRefVersion: params.attestationRefVersion ?? ATTESTATION_REF_VERSION_V1,
+    subjectType: params.subjectType,
+    subjectHash: params.subjectHash,
+    actionType: params.actionType,
+    actionDigest: params.actionDigest,
+    attestationPayloadDigest: payloadDigest,
+    signatureSuiteId: params.signatureSuiteId ?? SIG_SUITE_ECDSA_SECP256K1_V1,
+    signerKeyId: params.signerKeyId ?? ethers.zeroPadValue(signerAddress, 32),
+    uri: params.uri ?? `ipfs://attestation-${nonce.toString()}`,
+    issuedAt,
+    expiresAt,
+    revocationType: params.revocationType ?? REVOCATION_TYPE_NONE,
+    revocationRef: params.revocationRef ?? ethers.ZeroHash,
+  }
+}
+
+export async function makeSetVerifierAttestationRef(
+  ethers,
+  deepFamily,
+  signer,
+  proofSystemId,
+  purpose,
+  verifier,
+  overrides = {},
+) {
+  const actor = await signer.getAddress()
+  const actionDigest = await computeVerifierUpdateActionDigest(
+    ethers,
+    deepFamily,
+    actor,
+    proofSystemId,
+    purpose,
+    verifier,
+  )
+  return makeAttestationRef(ethers, deepFamily, signer, {
+    subjectType: SUBJECT_TYPE_ACTION,
+    subjectHash: actionDigest,
+    actionType: ACTION_TYPE_VERIFIER_UPDATE,
+    actionDigest,
+    ...overrides,
+  })
+}
+
+export async function makeEndorseAttestationRef(
+  ethers,
+  deepFamily,
+  signer,
+  personHash,
+  versionIndex,
+  overrides = {},
+) {
+  const actor = await signer.getAddress()
+  const subjectHash = computeVersionSubjectHash(ethers, personHash, versionIndex)
+  const actionDigest = await computeHighTrustEndorsementActionDigest(
+    ethers,
+    deepFamily,
+    actor,
+    personHash,
+    versionIndex,
+  )
+  return makeAttestationRef(ethers, deepFamily, signer, {
+    subjectType: SUBJECT_TYPE_VERSION,
+    subjectHash,
+    actionType: ACTION_TYPE_HIGH_TRUST_ENDORSEMENT,
+    actionDigest,
+    ...overrides,
+  })
+}
+
+export async function makeMintAttestationRef(
+  ethers,
+  deepFamily,
+  signer,
+  personHash,
+  versionIndex,
+  tokenURI,
+  coreInfo,
+  overrides = {},
+) {
+  const actor = await signer.getAddress()
+  const subjectHash = computeVersionSubjectHash(ethers, personHash, versionIndex)
+  const actionDigest = await computeAuthoritativeMintActionDigest(
+    ethers,
+    deepFamily,
+    actor,
+    personHash,
+    versionIndex,
+    tokenURI,
+    coreInfo,
+  )
+  return makeAttestationRef(ethers, deepFamily, signer, {
+    subjectType: SUBJECT_TYPE_VERSION,
+    subjectHash,
+    actionType: ACTION_TYPE_AUTHORITATIVE_MINT,
+    actionDigest,
+    ...overrides,
+  })
+}
+
+export async function makeSealStoryAttestationRef(
+  ethers,
+  deepFamily,
+  signer,
+  tokenId,
+  overrides = {},
+) {
+  const actor = await signer.getAddress()
+  const subjectHash = computeTokenSubjectHash(ethers, tokenId)
+  const actionDigest = await computeStorySealActionDigest(ethers, deepFamily, actor, tokenId)
+  return makeAttestationRef(ethers, deepFamily, signer, {
+    subjectType: SUBJECT_TYPE_TOKEN,
+    subjectHash,
+    actionType: ACTION_TYPE_STORY_SEAL,
+    actionDigest,
+    ...overrides,
+  })
+}
+
+export async function makeProtocolFeeAttestationRef(
+  ethers,
+  deepFamily,
+  signer,
+  newBps,
+  overrides = {},
+) {
+  const actor = await signer.getAddress()
+  const actionDigest = await computeProtocolFeeUpdateActionDigest(ethers, deepFamily, actor, newBps)
+  return makeAttestationRef(ethers, deepFamily, signer, {
+    subjectType: SUBJECT_TYPE_ACTION,
+    subjectHash: actionDigest,
+    actionType: ACTION_TYPE_PROTOCOL_FEE_UPDATE,
+    actionDigest,
+    ...overrides,
+  })
+}
+
 export function packBirthGenderField({ birthYear = 0, birthMonth = 0, birthDay = 0, gender = 0, isBirthBC = false }) {
   return (
     (BigInt(birthYear) << 24n) |
@@ -127,6 +486,7 @@ export function packBirthGenderField({ birthYear = 0, birthMonth = 0, birthDay =
 }
 
 export async function setupStubVerifiers(ethers, deepFamily) {
+  const [owner] = await ethers.getSigners()
   const personStubFactory = await ethers.getContractFactory(
     'contracts/test/StubPersonCommitmentVerifier.sol:StubPersonCommitmentVerifier'
   )
@@ -147,8 +507,32 @@ export async function setupStubVerifiers(ethers, deepFamily) {
   await adapter.waitForDeployment()
   const adapterAddress = await adapter.getAddress()
 
-  await deepFamily.setVerifier(STUB_PROOF_SYSTEM_ID, PROOF_PURPOSE_PERSON_COMMITMENT, adapterAddress)
-  await deepFamily.setVerifier(STUB_PROOF_SYSTEM_ID, PROOF_PURPOSE_DISCLOSURE_BINDING, adapterAddress)
+  await deepFamily.setVerifier(
+    STUB_PROOF_SYSTEM_ID,
+    PROOF_PURPOSE_PERSON_COMMITMENT,
+    adapterAddress,
+    await makeSetVerifierAttestationRef(
+      ethers,
+      deepFamily,
+      owner,
+      STUB_PROOF_SYSTEM_ID,
+      PROOF_PURPOSE_PERSON_COMMITMENT,
+      adapterAddress,
+    ),
+  )
+  await deepFamily.setVerifier(
+    STUB_PROOF_SYSTEM_ID,
+    PROOF_PURPOSE_DISCLOSURE_BINDING,
+    adapterAddress,
+    await makeSetVerifierAttestationRef(
+      ethers,
+      deepFamily,
+      owner,
+      STUB_PROOF_SYSTEM_ID,
+      PROOF_PURPOSE_DISCLOSURE_BINDING,
+      adapterAddress,
+    ),
+  )
 
   return { personVerifier, nameVerifier, adapter }
 }
@@ -328,7 +712,11 @@ export async function mintPerson(ethers, deepFamily, signer, identityCommitment,
     }),
   })
 
-  await deepFamily.connect(signer).endorseVersion(personHash, 1)
+  await deepFamily.connect(signer).endorseVersion(
+    personHash,
+    1,
+    await makeEndorseAttestationRef(ethers, deepFamily, signer, personHash, 1),
+  )
 
   const disclosureBindingValue = disclosureBindingBuilt.disclosureBinding
 
@@ -357,7 +745,20 @@ export async function mintPerson(ethers, deepFamily, signer, identityCommitment,
   }
 
   const tx = await deepFamily.connect(signer).mintPersonVersionNFT(
-    proof, publicSignals, 1, opts.tokenURI ?? '', coreInfo
+    proof,
+    publicSignals,
+    1,
+    opts.tokenURI ?? '',
+    coreInfo,
+    await makeMintAttestationRef(
+      ethers,
+      deepFamily,
+      signer,
+      personHash,
+      1,
+      opts.tokenURI ?? '',
+      coreInfo,
+    ),
   )
   const receipt = await tx.wait()
 

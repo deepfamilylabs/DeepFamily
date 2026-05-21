@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import personCommitmentProof from "../lib/personCommitmentProof.js";
 import disclosureBindingProof from "../lib/disclosureBindingProof.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import { makeMintAttestationRef } from "../lib/seedHelpers.js";
 
 const { computePersonHashFromInput } = personCommitmentProof;
 const { generateDisclosureBindingProof } = disclosureBindingProof;
@@ -82,25 +83,35 @@ const action = async (args, hre) => {
 
   const result = await generateDisclosureBindingProof(basicInfo, signerAddr);
 
+  const coreInfo = {
+    basicInfo: {
+      identityCommitment: ethers.zeroPadValue(ethers.toBeHex(result.person.identityCommitment), 32),
+      isBirthBC: basicInfo.isBirthBC,
+      birthYear: basicInfo.birthYear,
+      birthMonth: basicInfo.birthMonth,
+      birthDay: basicInfo.birthDay,
+      gender: basicInfo.gender,
+    },
+    supplementInfo: {
+      ...supplementInfo,
+      fullName: result.canonicalFullName,
+    },
+  };
+
   const tx = await deepFamily.connect(signer).mintPersonVersionNFT(
     result.proofEnvelope,
     result.publicSignalsStruct,
     versionIndex,
     args.tokenuri,
-    {
-      basicInfo: {
-        identityCommitment: ethers.zeroPadValue(ethers.toBeHex(result.person.identityCommitment), 32),
-        isBirthBC: basicInfo.isBirthBC,
-        birthYear: basicInfo.birthYear,
-        birthMonth: basicInfo.birthMonth,
-        birthDay: basicInfo.birthDay,
-        gender: basicInfo.gender,
-      },
-      supplementInfo: {
-        ...supplementInfo,
-        fullName: result.canonicalFullName,
-      },
-    },
+    coreInfo,
+    await makeMintAttestationRef({
+      deepFamily,
+      signer,
+      personHash: args.person,
+      versionIndex,
+      tokenURI: args.tokenuri,
+      coreInfo,
+    }),
   );
   const receipt = await tx.wait();
 

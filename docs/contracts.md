@@ -126,7 +126,11 @@ function addPersonVersion(
 
 #### Community Endorsement
 ```solidity
-function endorseVersion(bytes32 personHash, uint256 versionIndex) external
+function endorseVersion(
+    bytes32 personHash,
+    uint256 versionIndex,
+    AttestationRef calldata attestationRef
+) external
 ```
 
 **Endorsement Mechanics**:
@@ -135,6 +139,7 @@ function endorseVersion(bytes32 personHash, uint256 versionIndex) external
 - Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
 - Switching endorsements rebalances vote counts
+- Phase 3 requires `attestationRef` to bind high-trust endorsement references to this action
 
 #### NFT Minting with Disclosure Proof
 ```solidity
@@ -143,7 +148,8 @@ function mintPersonVersionNFT(
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo
+    PersonCoreInfo calldata coreInfo,
+    AttestationRef calldata attestationRef
 ) external nonReentrant
 ```
 
@@ -155,6 +161,7 @@ function mintPersonVersionNFT(
 5. `publicSignals.minter` must equal `uint256(uint160(msg.sender))`
 6. `personHash` is derived from `publicSignals.identityCommitment`
 7. `_enforceAdult(coreInfo.basicInfo)` must pass
+8. Phase 3 `attestationRef` must match the mint action digest and version subject
 
 #### Story Sharding System
 ```solidity
@@ -166,7 +173,7 @@ function addStoryChunk(
     string calldata attachmentCID,
     bytes32 expectedHash
 ) external
-function sealStory(uint256 tokenId) external
+function sealStory(uint256 tokenId, AttestationRef calldata attestationRef) external
 ```
 
 **Story Management**:
@@ -176,6 +183,7 @@ function sealStory(uint256 tokenId) external
 - Optional `chunkType` classifies content (narrative/quote/etc.)
 - Optional `attachmentCID` links to decentralized media evidence
 - Sealing makes stories permanently immutable
+- Phase 3 `attestationRef` binds the seal to the token and current story hash
 
 **chunkType Mapping**
 

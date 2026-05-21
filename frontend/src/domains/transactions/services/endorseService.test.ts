@@ -62,6 +62,11 @@ describe("endorseService executeEndorseFlow", () => {
       DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
       getAddress: vi.fn(async () => contractAddress),
       endorseVersion: endorseMethod,
+      runner: {
+        provider: {
+          getNetwork: vi.fn(async () => ({ chainId: 31337n })),
+        },
+      },
     } as any;
 
     const eventInterface = createDeepFamilyInterface();
@@ -111,6 +116,11 @@ describe("endorseService executeEndorseFlow", () => {
     expect(endorseVersion).toHaveBeenCalledWith(
       "0x00000000000000000000000000000000000000000000000000000000000000aa",
       2,
+      expect.objectContaining({
+        actionType: 2,
+        subjectType: 2,
+        uri: expect.stringMatching(/^ipfs:\/\//),
+      }),
       { gasLimit: 120n },
       { suppressToasts: true },
     );

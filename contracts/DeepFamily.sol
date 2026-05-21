@@ -51,6 +51,17 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   error VerifierRouteNotSet();
   error UnsupportedProofEncoding();
   error MalformedProofData();
+  error InvalidAttestationRefVersion();
+  error InvalidAttestationSubject();
+  error InvalidAttestationAction();
+  error InvalidAttestationPayloadDigest();
+  error InvalidAttestationSignatureSuite();
+  error InvalidAttestationSignerKey();
+  error InvalidAttestationURI();
+  error InvalidAttestationIssuedAt();
+  error InvalidAttestationExpiresAt();
+  error InvalidAttestationRevocation();
+  error DuplicateAttestationReference();
 
   // Business logic errors
   error DuplicateVersion();
@@ -152,6 +163,22 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 hashAlgoId;
   }
 
+  struct AttestationRef {
+    uint16 attestationRefVersion;
+    uint16 subjectType;
+    bytes32 subjectHash;
+    uint16 actionType;
+    bytes32 actionDigest;
+    bytes32 attestationPayloadDigest;
+    uint16 signatureSuiteId;
+    bytes32 signerKeyId;
+    string uri;
+    uint64 issuedAt;
+    uint64 expiresAt;
+    uint8 revocationType;
+    bytes32 revocationRef;
+  }
+
   struct ChildRef {
     bytes32 childHash;
     uint256 childVersionIndex;
@@ -213,6 +240,11 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   mapping(address => bytes32[]) private userEndorsedPersons;
   mapping(address => mapping(bytes32 => uint256)) private userEndorsementIndex;
 
+  // ========== Attestation Storage ==========
+
+  mapping(bytes32 => AttestationRef) public attestationRefs;
+  mapping(bytes32 => bool) public attestationRefExists;
+
   // ========== System Constants ==========
 
   uint256 public constant MAX_LONG_TEXT_LENGTH = 256;
@@ -221,11 +253,35 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
   uint256 public constant MINIMUM_MINT_AGE = 18;
+  uint16 public constant ATTESTATION_REF_VERSION_V1 = 1;
+  uint16 public constant SUBJECT_TYPE_PERSON = 1;
+  uint16 public constant SUBJECT_TYPE_VERSION = 2;
+  uint16 public constant SUBJECT_TYPE_TOKEN = 3;
+  uint16 public constant SUBJECT_TYPE_STORY = 4;
+  uint16 public constant SUBJECT_TYPE_ACTION = 6;
+  uint16 public constant ACTION_TYPE_AUTHORITATIVE_MINT = 1;
+  uint16 public constant ACTION_TYPE_HIGH_TRUST_ENDORSEMENT = 2;
+  uint16 public constant ACTION_TYPE_STORY_SEAL = 3;
+  uint16 public constant ACTION_TYPE_VERIFIER_UPDATE = 4;
+  uint16 public constant ACTION_TYPE_PROTOCOL_FEE_UPDATE = 5;
+  uint16 public constant SIG_SUITE_ECDSA_SECP256K1_V1 = 1;
+  uint16 public constant SIG_SUITE_HYBRID_ECDSA_ML_DSA_V1 = 2;
+  uint16 public constant SIG_SUITE_PQ_ML_DSA_V1 = 3;
+  uint8 public constant REVOCATION_TYPE_NONE = 0;
+  uint8 public constant REVOCATION_TYPE_ONCHAIN_REGISTRY = 1;
+  uint8 public constant REVOCATION_TYPE_EXTERNAL_LIST_DIGEST = 2;
+  uint8 public constant REVOCATION_TYPE_EXTERNAL_STATUS_URI = 3;
+  uint64 public constant ATTESTATION_CLOCK_SKEW_SECONDS = 300;
+  uint64 public constant ATTESTATION_MAX_BACKDATE_SECONDS = 365 days;
+  uint16 public constant ATTESTATION_URI_MAX_LENGTH = 256;
   uint256 private constant DOMAIN_SUITE = 1000;
   uint256 private constant DOMAIN_NAME_SECRET = 1001;
   uint256 private constant DOMAIN_IDENTITY = 1002;
   uint256 private constant DOMAIN_DISCLOSURE = 1003;
   string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
+  string private constant DOMAIN_ATTESTATION_ACTION = "DeepFamily.AttestationAction.V1";
+  string private constant DOMAIN_ATTESTATION_SUBJECT_VERSION = "DeepFamily.Subject.Version.V1";
+  string private constant DOMAIN_ATTESTATION_SUBJECT_TOKEN = "DeepFamily.Subject.Token.V1";
 
   uint256 private constant SECONDS_PER_DAY = 24 * 60 * 60;
   int256 private constant OFFSET19700101 = 2440588;
@@ -311,6 +367,22 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
   event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
+
+  event AttestationReferenceAnchored(
+    bytes32 indexed attestationKey,
+    uint16 indexed actionType,
+    bytes32 indexed subjectHash,
+    uint16 subjectType,
+    bytes32 actionDigest,
+    bytes32 attestationPayloadDigest,
+    uint16 signatureSuiteId,
+    bytes32 signerKeyId,
+    string uri,
+    uint64 issuedAt,
+    uint64 expiresAt,
+    uint8 revocationType,
+    bytes32 revocationRef
+  );
 
   // ========== Function Modifiers ==========
 
@@ -582,6 +654,285 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     _tokenURIs[tokenId] = _tokenURI;
   }
 
+  function _computeVersionSubjectHash(
+    bytes32 personHash,
+    uint256 versionIndex
+  ) internal pure returns (bytes32) {
+    return keccak256(abi.encode(DOMAIN_ATTESTATION_SUBJECT_VERSION, personHash, versionIndex));
+  }
+
+  function _computeTokenSubjectHash(uint256 tokenId) internal pure returns (bytes32) {
+    return keccak256(abi.encode(DOMAIN_ATTESTATION_SUBJECT_TOKEN, tokenId));
+  }
+
+  function _computeCoreInfoDigest(
+    PersonCoreInfo calldata coreInfo
+  ) internal pure returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          coreInfo.basicInfo.identityCommitment,
+          coreInfo.basicInfo.isBirthBC,
+          coreInfo.basicInfo.birthYear,
+          coreInfo.basicInfo.birthMonth,
+          coreInfo.basicInfo.birthDay,
+          coreInfo.basicInfo.gender,
+          _hashString(coreInfo.supplementInfo.fullName),
+          _hashString(coreInfo.supplementInfo.birthPlace),
+          coreInfo.supplementInfo.isDeathBC,
+          coreInfo.supplementInfo.deathYear,
+          coreInfo.supplementInfo.deathMonth,
+          coreInfo.supplementInfo.deathDay,
+          _hashString(coreInfo.supplementInfo.deathPlace),
+          _hashString(coreInfo.supplementInfo.story)
+        )
+      );
+  }
+
+  function _computeAuthoritativeMintActionDigest(
+    address actor,
+    bytes32 personHash,
+    uint256 versionIndex,
+    string calldata tokenURI_,
+    PersonCoreInfo calldata coreInfo
+  ) internal view returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          DOMAIN_ATTESTATION_ACTION,
+          block.chainid,
+          address(this),
+          ACTION_TYPE_AUTHORITATIVE_MINT,
+          actor,
+          personHash,
+          versionIndex,
+          _hashString(tokenURI_),
+          _computeCoreInfoDigest(coreInfo)
+        )
+      );
+  }
+
+  function _computeHighTrustEndorsementActionDigest(
+    address actor,
+    bytes32 personHash,
+    uint256 versionIndex
+  ) internal view returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          DOMAIN_ATTESTATION_ACTION,
+          block.chainid,
+          address(this),
+          ACTION_TYPE_HIGH_TRUST_ENDORSEMENT,
+          actor,
+          personHash,
+          versionIndex
+        )
+      );
+  }
+
+  function _computeStorySealActionDigest(
+    address actor,
+    uint256 tokenId
+  ) internal view returns (bytes32) {
+    StoryMetadata storage metadata = storyMetadata[tokenId];
+    return
+      keccak256(
+        abi.encode(
+          DOMAIN_ATTESTATION_ACTION,
+          block.chainid,
+          address(this),
+          ACTION_TYPE_STORY_SEAL,
+          actor,
+          tokenId,
+          metadata.totalChunks,
+          metadata.fullStoryHash
+        )
+      );
+  }
+
+  function _computeVerifierUpdateActionDigest(
+    address actor,
+    uint16 proofSystemId,
+    ProofPurpose purpose,
+    address verifier
+  ) internal view returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          DOMAIN_ATTESTATION_ACTION,
+          block.chainid,
+          address(this),
+          ACTION_TYPE_VERIFIER_UPDATE,
+          actor,
+          proofSystemId,
+          purpose,
+          verifier
+        )
+      );
+  }
+
+  function _computeProtocolFeeUpdateActionDigest(
+    address actor,
+    uint256 newBps
+  ) internal view returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          DOMAIN_ATTESTATION_ACTION,
+          block.chainid,
+          address(this),
+          ACTION_TYPE_PROTOCOL_FEE_UPDATE,
+          actor,
+          newBps
+        )
+      );
+  }
+
+  function _computeAttestationKey(
+    AttestationRef calldata ref
+  ) internal pure returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          ref.attestationRefVersion,
+          ref.subjectType,
+          ref.subjectHash,
+          ref.actionType,
+          ref.actionDigest,
+          ref.attestationPayloadDigest
+        )
+      );
+  }
+
+  function _isSupportedSignatureSuite(uint16 signatureSuiteId) internal pure returns (bool) {
+    return
+      signatureSuiteId == SIG_SUITE_ECDSA_SECP256K1_V1 ||
+      signatureSuiteId == SIG_SUITE_HYBRID_ECDSA_ML_DSA_V1 ||
+      signatureSuiteId == SIG_SUITE_PQ_ML_DSA_V1;
+  }
+
+  function _isSupportedRevocationType(uint8 revocationType) internal pure returns (bool) {
+    return
+      revocationType == REVOCATION_TYPE_NONE ||
+      revocationType == REVOCATION_TYPE_ONCHAIN_REGISTRY ||
+      revocationType == REVOCATION_TYPE_EXTERNAL_LIST_DIGEST ||
+      revocationType == REVOCATION_TYPE_EXTERNAL_STATUS_URI;
+  }
+
+  function _isValidAttestationUri(string calldata uri) internal pure returns (bool) {
+    bytes calldata uriBytes = bytes(uri);
+    if (uriBytes.length == 0 || uriBytes.length > ATTESTATION_URI_MAX_LENGTH) return false;
+    if (uriBytes.length >= 7) {
+      if (
+        uriBytes[0] == bytes1("i") &&
+        uriBytes[1] == bytes1("p") &&
+        uriBytes[2] == bytes1("f") &&
+        uriBytes[3] == bytes1("s") &&
+        uriBytes[4] == bytes1(":") &&
+        uriBytes[5] == bytes1("/") &&
+        uriBytes[6] == bytes1("/")
+      ) {
+        return true;
+      }
+    }
+    if (uriBytes.length >= 4) {
+      return
+        uriBytes[0] == bytes1("b") &&
+        uriBytes[1] == bytes1("a") &&
+        uriBytes[2] == bytes1("f") &&
+        uriBytes[3] == bytes1("y");
+    }
+    return false;
+  }
+
+  function _validateAttestationRef(
+    AttestationRef calldata ref,
+    uint16 expectedSubjectType,
+    bytes32 expectedSubjectHash,
+    uint16 expectedActionType,
+    bytes32 expectedActionDigest
+  ) internal view {
+    if (ref.attestationRefVersion != ATTESTATION_REF_VERSION_V1) {
+      revert InvalidAttestationRefVersion();
+    }
+    if (ref.subjectType != expectedSubjectType || ref.subjectHash != expectedSubjectHash) {
+      revert InvalidAttestationSubject();
+    }
+    if (ref.actionType != expectedActionType || ref.actionDigest != expectedActionDigest) {
+      revert InvalidAttestationAction();
+    }
+    if (ref.attestationPayloadDigest == bytes32(0)) revert InvalidAttestationPayloadDigest();
+    if (!_isSupportedSignatureSuite(ref.signatureSuiteId)) revert InvalidAttestationSignatureSuite();
+    if (ref.signerKeyId == bytes32(0)) revert InvalidAttestationSignerKey();
+    if (!_isValidAttestationUri(ref.uri)) revert InvalidAttestationURI();
+
+    uint256 now_ = block.timestamp;
+    uint256 issuedAt_ = uint256(ref.issuedAt);
+    if (issuedAt_ > now_ + uint256(ATTESTATION_CLOCK_SKEW_SECONDS)) {
+      revert InvalidAttestationIssuedAt();
+    }
+    if (issuedAt_ + uint256(ATTESTATION_MAX_BACKDATE_SECONDS) < now_) {
+      revert InvalidAttestationIssuedAt();
+    }
+    if (ref.expiresAt != 0) {
+      if (ref.expiresAt <= ref.issuedAt) revert InvalidAttestationExpiresAt();
+      if (uint256(ref.expiresAt) < now_) revert InvalidAttestationExpiresAt();
+    }
+    if (!_isSupportedRevocationType(ref.revocationType)) revert InvalidAttestationRevocation();
+    if (ref.revocationType == REVOCATION_TYPE_NONE) {
+      if (ref.revocationRef != bytes32(0)) revert InvalidAttestationRevocation();
+    } else if (ref.revocationRef == bytes32(0)) {
+      revert InvalidAttestationRevocation();
+    }
+  }
+
+  function _anchorAttestationRef(
+    AttestationRef calldata ref
+  ) internal returns (bytes32 attestationKey) {
+    attestationKey = _computeAttestationKey(ref);
+    if (attestationRefExists[attestationKey]) revert DuplicateAttestationReference();
+
+    AttestationRef storage stored = attestationRefs[attestationKey];
+    stored.attestationRefVersion = ref.attestationRefVersion;
+    stored.subjectType = ref.subjectType;
+    stored.subjectHash = ref.subjectHash;
+    stored.actionType = ref.actionType;
+    stored.actionDigest = ref.actionDigest;
+    stored.attestationPayloadDigest = ref.attestationPayloadDigest;
+    stored.signatureSuiteId = ref.signatureSuiteId;
+    stored.signerKeyId = ref.signerKeyId;
+    stored.uri = ref.uri;
+    stored.issuedAt = ref.issuedAt;
+    stored.expiresAt = ref.expiresAt;
+    stored.revocationType = ref.revocationType;
+    stored.revocationRef = ref.revocationRef;
+    attestationRefExists[attestationKey] = true;
+
+    _emitAttestationReferenceAnchored(attestationKey, ref);
+  }
+
+  function _emitAttestationReferenceAnchored(
+    bytes32 attestationKey,
+    AttestationRef calldata ref
+  ) internal {
+    emit AttestationReferenceAnchored(
+      attestationKey,
+      ref.actionType,
+      ref.subjectHash,
+      ref.subjectType,
+      ref.actionDigest,
+      ref.attestationPayloadDigest,
+      ref.signatureSuiteId,
+      ref.signerKeyId,
+      ref.uri,
+      ref.issuedAt,
+      ref.expiresAt,
+      ref.revocationType,
+      ref.revocationRef
+    );
+  }
+
   // ========== Constructor ==========
 
   /**
@@ -603,8 +954,31 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   function setVerifier(
     uint16 proofSystemId,
     ProofPurpose purpose,
-    address verifier
+    address verifier,
+    AttestationRef calldata attestationRef
   ) external onlyOwner {
+    bytes32 actionDigest = _computeVerifierUpdateActionDigest(
+      msg.sender,
+      proofSystemId,
+      purpose,
+      verifier
+    );
+    _validateAttestationRef(
+      attestationRef,
+      SUBJECT_TYPE_ACTION,
+      actionDigest,
+      ACTION_TYPE_VERIFIER_UPDATE,
+      actionDigest
+    );
+    _anchorAttestationRef(attestationRef);
+    _setVerifierInternal(proofSystemId, purpose, verifier);
+  }
+
+  function _setVerifierInternal(
+    uint16 proofSystemId,
+    ProofPurpose purpose,
+    address verifier
+  ) internal {
     if (verifier == address(0)) revert InvalidVerifierAddress();
     verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
@@ -748,8 +1122,27 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
 
   function endorseVersion(
     bytes32 personHash,
-    uint256 versionIndex
+    uint256 versionIndex,
+    AttestationRef calldata attestationRef
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
+    bytes32 subjectHash = _computeVersionSubjectHash(personHash, versionIndex);
+    bytes32 actionDigest = _computeHighTrustEndorsementActionDigest(
+      msg.sender,
+      personHash,
+      versionIndex
+    );
+    _validateAttestationRef(
+      attestationRef,
+      SUBJECT_TYPE_VERSION,
+      subjectHash,
+      ACTION_TYPE_HIGH_TRUST_ENDORSEMENT,
+      actionDigest
+    );
+    _anchorAttestationRef(attestationRef);
+    _endorseVersionInternal(personHash, versionIndex);
+  }
+
+  function _endorseVersionInternal(bytes32 personHash, uint256 versionIndex) internal {
     uint256 prev = endorsedVersionIndex[personHash][msg.sender];
     if (prev == versionIndex) revert AlreadyEndorsed();
 
@@ -865,8 +1258,36 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo
+    PersonCoreInfo calldata coreInfo,
+    AttestationRef calldata attestationRef
   ) external nonReentrant {
+    bytes32 personHash = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
+    bytes32 subjectHash = _computeVersionSubjectHash(personHash, versionIndex);
+    bytes32 actionDigest = _computeAuthoritativeMintActionDigest(
+      msg.sender,
+      personHash,
+      versionIndex,
+      _tokenURI,
+      coreInfo
+    );
+    _validateAttestationRef(
+      attestationRef,
+      SUBJECT_TYPE_VERSION,
+      subjectHash,
+      ACTION_TYPE_AUTHORITATIVE_MINT,
+      actionDigest
+    );
+    _anchorAttestationRef(attestationRef);
+    _mintPersonVersionNFTInternal(proof, publicSignals, versionIndex, _tokenURI, coreInfo);
+  }
+
+  function _mintPersonVersionNFTInternal(
+    ProofEnvelope calldata proof,
+    DisclosureBindingPublicSignals calldata publicSignals,
+    uint256 versionIndex,
+    string calldata _tokenURI,
+    PersonCoreInfo calldata coreInfo
+  ) internal {
     bytes32 personHash = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
     if (personHash == bytes32(0)) revert InvalidPersonHash();
     if (versionIndex == 0 || versionIndex > personVersions[personHash].length) {
@@ -908,7 +1329,23 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     emit TokenURIUpdated(tokenId, msg.sender, oldURI, newURI);
   }
 
-  function updateEndorsementFee(uint256 newBps) external onlyOwner {
+  function updateEndorsementFee(
+    uint256 newBps,
+    AttestationRef calldata attestationRef
+  ) external onlyOwner {
+    bytes32 actionDigest = _computeProtocolFeeUpdateActionDigest(msg.sender, newBps);
+    _validateAttestationRef(
+      attestationRef,
+      SUBJECT_TYPE_ACTION,
+      actionDigest,
+      ACTION_TYPE_PROTOCOL_FEE_UPDATE,
+      actionDigest
+    );
+    _anchorAttestationRef(attestationRef);
+    _updateEndorsementFeeInternal(newBps);
+  }
+
+  function _updateEndorsementFeeInternal(uint256 newBps) internal {
     if (newBps > PROTOCOL_FEE_BPS_MAX) revert ProtocolFeeTooHigh();
     uint256 previous = protocolEndorsementFeeBps;
     if (previous == newBps) {
@@ -972,7 +1409,21 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  function sealStory(uint256 tokenId) external {
+  function sealStory(uint256 tokenId, AttestationRef calldata attestationRef) external {
+    bytes32 subjectHash = _computeTokenSubjectHash(tokenId);
+    bytes32 actionDigest = _computeStorySealActionDigest(msg.sender, tokenId);
+    _validateAttestationRef(
+      attestationRef,
+      SUBJECT_TYPE_TOKEN,
+      subjectHash,
+      ACTION_TYPE_STORY_SEAL,
+      actionDigest
+    );
+    _anchorAttestationRef(attestationRef);
+    _sealStoryInternal(tokenId);
+  }
+
+  function _sealStoryInternal(uint256 tokenId) internal {
     if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
 
     StoryMetadata storage metadata = storyMetadata[tokenId];

@@ -10,6 +10,9 @@ import {
   makeAddPersonPublicSignals,
   makeStubProof,
   makeTestPerson,
+  makeEndorseAttestationRef,
+  makeMintAttestationRef,
+  makeSetVerifierAttestationRef,
   setupStubVerifiers,
 } from './helpers/testHelper.mjs'
 
@@ -93,7 +96,11 @@ async function buildMintAttempt(deepFamily, signer, opts = {}) {
     person,
     ...(opts.meta ?? {}),
   })
-  await deepFamily.connect(signer).endorseVersion(personHash, 1)
+  await deepFamily.connect(signer).endorseVersion(
+    personHash,
+    1,
+    await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, personHash, 1),
+  )
 
   const signerAddr = await signer.getAddress()
   const built = buildDisclosureBindingInput(person, signerAddr, opts.meta)
@@ -165,9 +172,22 @@ describe('Proof transport layer tests', function () {
   describe('DeepFamily proof-route failures', () => {
     it('rejects zero verifier address registration', async () => {
       const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+      const [owner] = await hre.ethers.getSigners()
 
       await expect(
-        deepFamily.setVerifier(1, PURPOSE_PERSON, hre.ethers.ZeroAddress)
+        deepFamily.setVerifier(
+          1,
+          PURPOSE_PERSON,
+          hre.ethers.ZeroAddress,
+          await makeSetVerifierAttestationRef(
+            hre.ethers,
+            deepFamily,
+            owner,
+            1,
+            PURPOSE_PERSON,
+            hre.ethers.ZeroAddress,
+          ),
+        )
       ).to.be.revertedWithCustomError(deepFamily, 'InvalidVerifierAddress')
     })
 
@@ -194,7 +214,19 @@ describe('Proof transport layer tests', function () {
       const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
       const [signer] = await hre.ethers.getSigners()
       const { adapter } = await deployStubAdapter({ personShouldVerify: false })
-      await deepFamily.setVerifier(FALSE_PROOF_SYSTEM_ID, PURPOSE_PERSON, await adapter.getAddress())
+      await deepFamily.setVerifier(
+        FALSE_PROOF_SYSTEM_ID,
+        PURPOSE_PERSON,
+        await adapter.getAddress(),
+        await makeSetVerifierAttestationRef(
+          hre.ethers,
+          deepFamily,
+          signer,
+          FALSE_PROOF_SYSTEM_ID,
+          PURPOSE_PERSON,
+          await adapter.getAddress(),
+        ),
+      )
 
       const attempt = await buildAddPersonAttempt(signer, {
         proofOverrides: { proofSystemId: FALSE_PROOF_SYSTEM_ID },
@@ -227,7 +259,16 @@ describe('Proof transport layer tests', function () {
           attempt.publicSignals,
           1,
           '',
-          attempt.coreInfo
+          attempt.coreInfo,
+          await makeMintAttestationRef(
+            hre.ethers,
+            deepFamily,
+            signer,
+            attempt.personHash,
+            1,
+            '',
+            attempt.coreInfo,
+          ),
         )
       ).to.be.revertedWithCustomError(deepFamily, 'VerifierRouteNotSet')
     })
@@ -242,6 +283,14 @@ describe('Proof transport layer tests', function () {
         FALSE_PROOF_SYSTEM_ID,
         PURPOSE_DISCLOSURE_BINDING,
         await adapter.getAddress(),
+        await makeSetVerifierAttestationRef(
+          hre.ethers,
+          deepFamily,
+          signer,
+          FALSE_PROOF_SYSTEM_ID,
+          PURPOSE_DISCLOSURE_BINDING,
+          await adapter.getAddress(),
+        ),
       )
 
       const attempt = await buildMintAttempt(deepFamily, signer, {
@@ -254,7 +303,16 @@ describe('Proof transport layer tests', function () {
           attempt.publicSignals,
           1,
           '',
-          attempt.coreInfo
+          attempt.coreInfo,
+          await makeMintAttestationRef(
+            hre.ethers,
+            deepFamily,
+            signer,
+            attempt.personHash,
+            1,
+            '',
+            attempt.coreInfo,
+          ),
         )
       ).to.be.revertedWithCustomError(deepFamily, 'InvalidZKProof')
     })

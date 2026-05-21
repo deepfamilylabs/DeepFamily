@@ -5,6 +5,7 @@ import { deployIntegratedFixture } from './fixtures/integrated.mjs'
 import {
   setupStubVerifiers,
   mintPerson,
+  makeSealStoryAttestationRef,
 } from './helpers/testHelper.mjs'
 
 describe('Story Sharding - Error & Edge Cases', function () {
@@ -21,6 +22,13 @@ describe('Story Sharding - Error & Edge Cases', function () {
     })
 
     return { deepFamily: deepFamily.connect(signer), signer, other, tokenId: 1n };
+  }
+
+  async function sealStory(deepFamily, signer, tokenId) {
+    return deepFamily.sealStory(
+      tokenId,
+      await makeSealStoryAttestationRef(hre.ethers, deepFamily, signer, tokenId),
+    )
   }
 
   it('reverts when non-owner adds chunk', async () => {
@@ -59,15 +67,16 @@ describe('Story Sharding - Error & Edge Cases', function () {
   it('cannot append after sealing', async () => {
     const { deepFamily, tokenId } = await deployAndMint();
     await deepFamily.addStoryChunk(tokenId, 0, 0, 'c0', '', hre.ethers.ZeroHash);
-    await deepFamily.sealStory(tokenId);
+    const [signer] = await hre.ethers.getSigners();
+    await sealStory(deepFamily, signer, tokenId);
     await expect(
       deepFamily.addStoryChunk(tokenId, 1, 0, 'c1', '', hre.ethers.ZeroHash)
     ).to.be.revertedWithCustomError(deepFamily, 'StoryAlreadySealed');
   });
 
   it('reverts sealing with zero chunks', async () => {
-    const { deepFamily, tokenId } = await deployAndMint();
-    await expect(deepFamily.sealStory(tokenId)).to.be.revertedWithCustomError(
+    const { deepFamily, signer, tokenId } = await deployAndMint();
+    await expect(sealStory(deepFamily, signer, tokenId)).to.be.revertedWithCustomError(
       deepFamily,
       'StoryNotFound'
     );
