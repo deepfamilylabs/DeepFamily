@@ -75,6 +75,11 @@ const readTotalVersions = async (
   preflightContract: any,
   personHash: string,
 ): Promise<number | null> => {
+  const personVersionsCountFn = preflightContract?.personVersionsCount;
+  if (typeof personVersionsCountFn === "function") {
+    return Number(await personVersionsCountFn(personHash));
+  }
+
   const listPersonVersionsFn = preflightContract?.listPersonVersions;
   if (typeof listPersonVersionsFn !== "function") return null;
   const out = await listPersonVersionsFn(personHash, 0, 0);

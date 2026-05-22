@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfig } from "../../config";
 import { makeNodeId, type NodeId } from "../../../shared/model";
 import {
-  createDeepFamilyContract,
   createDeepFamilyInterface,
+  createDeepFamilyReaderContract,
 } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { createPersonReadGateway } from "../../../shared/clients/personReadGateway";
@@ -11,7 +11,7 @@ import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { createTreeReadGateway } from "../api/treeReadGateway";
 
 export function useTreeRuntime() {
-  const { rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId } = useConfig();
+  const { rpcUrl, contractAddress, readerAddress, rootHash, rootVersionIndex, chainId } = useConfig();
   const [refreshTick, setRefreshTick] = useState(1);
   const refresh = useCallback(() => setRefreshTick((tick) => tick + 1), []);
 
@@ -25,13 +25,13 @@ export function useTreeRuntime() {
   }, [rpcUrl, chainId]);
 
   const contract = useMemo(() => {
-    if (!provider || !contractAddress) return null;
+    if (!provider || !readerAddress) return null;
     try {
-      return createDeepFamilyContract(contractAddress, provider);
+      return createDeepFamilyReaderContract(readerAddress, provider);
     } catch {
       return null;
     }
-  }, [provider, contractAddress]);
+  }, [provider, contractAddress, readerAddress]);
 
   const scopedQueryCache = useMemo(
     () => getScopedQueryClient({ rpcUrl, contractAddress, chainId }),

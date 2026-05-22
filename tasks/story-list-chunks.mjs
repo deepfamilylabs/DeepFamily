@@ -12,14 +12,14 @@ import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
-  const { deepFamily } = await ensureIntegratedSystem(connection);
+  const { deepFamilyReader } = await ensureIntegratedSystem(connection);
   const tokenId = BigInt(args.tokenid);
   const offset = Number(args.offset);
   const limit = Number(args.limit);
 
-  await deepFamily.getStoryMetadata(tokenId);
+  await deepFamilyReader.getStoryMetadata(tokenId);
 
-  return deepFamily.listStoryChunks(tokenId, offset, limit);
+  return deepFamilyReader.listStoryChunks(tokenId, offset, limit);
 };
 
 export default task("list-story-chunks", "List story chunks for an NFT with pagination")

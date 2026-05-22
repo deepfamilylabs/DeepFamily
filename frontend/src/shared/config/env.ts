@@ -110,8 +110,20 @@ export function getDefaultRpcUrl(): string {
   return getStringEnv("VITE_RPC_URL");
 }
 
+export function getDefaultEntryReaderAddress(): string {
+  return getStringEnv("VITE_CONTRACT_ADDRESS") || getStringEnv("VITE_READER_ADDRESS");
+}
+
 export function getDefaultContractAddress(): string {
-  return getStringEnv("VITE_CONTRACT_ADDRESS");
+  return getDefaultEntryReaderAddress();
+}
+
+export function getDefaultReaderAddress(): string {
+  return getDefaultEntryReaderAddress();
+}
+
+export function getDefaultAttestationRegistryAddress(): string {
+  return getStringEnv("VITE_ATTESTATION_REGISTRY_ADDRESS");
 }
 
 export function getDefaultRootHash(): string {

@@ -12,7 +12,8 @@ describe('Story Sharding - Error & Edge Cases', function () {
   this.timeout(90_000);
 
   async function deployAndMint() {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyReader } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer, other] = await hre.ethers.getSigners();
     await setupStubVerifiers(hre.ethers, deepFamily)
 
@@ -21,7 +22,7 @@ describe('Story Sharding - Error & Edge Cases', function () {
       gender: 1,
     })
 
-    return { deepFamily: deepFamily.connect(signer), signer, other, tokenId: 1n };
+    return { deepFamily: deepFamily.connect(signer), reader: deepFamilyReader, signer, other, tokenId: 1n };
   }
 
   async function sealStory(deepFamily, signer, tokenId) {
@@ -111,10 +112,10 @@ describe('Story Sharding - Error & Edge Cases', function () {
   });
 
   it('records chunkType and attachment CID when provided', async () => {
-    const { deepFamily, tokenId } = await deployAndMint();
+    const { deepFamily, reader, tokenId } = await deployAndMint();
     const attachment = 'ipfs://exampleAttachmentCID';
     await deepFamily.addStoryChunk(tokenId, 0, 3, 'Source citation entry', attachment, hre.ethers.ZeroHash);
-    const chunk = await deepFamily.getStoryChunk(tokenId, 0);
+    const chunk = await reader.getStoryChunk(tokenId, 0);
     expect(chunk.chunkType).to.equal(3);
     expect(chunk.attachmentCID).to.equal(attachment);
   });

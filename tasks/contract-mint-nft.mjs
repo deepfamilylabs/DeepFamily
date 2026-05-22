@@ -39,7 +39,7 @@ const action = async (args, hre) => {
   if (deathDay < 0 || deathDay > 31) throw new Error("deathDay must be 0-31");
 
   // Check version existence
-  const [, totalVersions] = await deepFamily.listPersonVersions(args.person, 0, 0);
+  const totalVersions = await deepFamily.personVersionsCount(args.person);
   if (versionIndex > totalVersions) {
     throw new Error(`Version index ${versionIndex} out of range (total=${totalVersions}).`);
   }

@@ -21,12 +21,18 @@ const mocks = vi.hoisted(() => ({
     rpcUrl: "https://rpc.current",
     chainId: 1,
     contractAddress: "0x0000000000000000000000000000000000000001",
+    readerAddress: "0x0000000000000000000000000000000000000002",
+    attestationRegistryAddress: "0x0000000000000000000000000000000000000003",
+    tokenAddress: "0x0000000000000000000000000000000000000004",
     rootHash: "0x1111111111111111111111111111111111111111111111111111111111111111",
     rootVersionIndex: 1,
     defaults: {
       rpcUrl: "",
       chainId: 1,
       contractAddress: "",
+      readerAddress: "",
+      attestationRegistryAddress: "",
+      tokenAddress: "",
       rootHash: "",
       rootVersionIndex: 1,
     },
@@ -108,12 +114,18 @@ describe("TreePage", () => {
     mocks.config.rpcUrl = "https://rpc.current";
     mocks.config.chainId = 1;
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000001";
+    mocks.config.readerAddress = "0x0000000000000000000000000000000000000002";
+    mocks.config.attestationRegistryAddress = "0x0000000000000000000000000000000000000003";
+    mocks.config.tokenAddress = "0x0000000000000000000000000000000000000004";
     mocks.config.rootHash = "0x1111111111111111111111111111111111111111111111111111111111111111";
     mocks.config.rootVersionIndex = 1;
     mocks.config.defaults = {
       rpcUrl: "",
       chainId: 1,
       contractAddress: "",
+      readerAddress: "",
+      attestationRegistryAddress: "",
+      tokenAddress: "",
       rootHash: "",
       rootVersionIndex: 1,
     };
@@ -164,7 +176,10 @@ describe("TreePage", () => {
     mocks.config.defaults = {
       rpcUrl: "https://rpc.env",
       chainId: 10,
-      contractAddress: "0x00000000000000000000000000000000000000aa",
+      contractAddress: "",
+      readerAddress: "0x00000000000000000000000000000000000000aa",
+      attestationRegistryAddress: "",
+      tokenAddress: "",
       rootHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       rootVersionIndex: 2,
     };
@@ -175,7 +190,10 @@ describe("TreePage", () => {
       expect(mocks.config.update).toHaveBeenCalledWith({
         rpcUrl: "https://rpc.env",
         chainId: 10,
-        contractAddress: "0x00000000000000000000000000000000000000aa",
+        readerAddress: "0x00000000000000000000000000000000000000aa",
+        contractAddress: "",
+        attestationRegistryAddress: "",
+        tokenAddress: "",
         rootHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         rootVersionIndex: 2,
       }),

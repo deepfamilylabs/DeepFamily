@@ -34,16 +34,33 @@ export default {
     hardhatVerify,
   ],
   solidity: {
-    version: "0.8.20",
     npmFilesToBuild: ["poseidon-solidity/PoseidonT5.sol"],
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+          viaIR: (process.env.VIA_IR || "false") === "true",
+          // Allow overriding EVM version via environment variable (default istanbul)
+          evmVersion: process.env.EVM_VERSION || "istanbul",
+        },
       },
-      viaIR: (process.env.VIA_IR || "false") === "true",
-      // Allow overriding EVM version via environment variable (default istanbul)
-      evmVersion: process.env.EVM_VERSION || "istanbul",
+    ],
+    overrides: {
+      "poseidon-solidity/PoseidonT5.sol": {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+          viaIR: false,
+          evmVersion: process.env.EVM_VERSION || "istanbul",
+        },
+      },
     },
   },
   

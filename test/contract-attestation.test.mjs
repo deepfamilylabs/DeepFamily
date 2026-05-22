@@ -77,7 +77,8 @@ describe('Attestation reference anchoring', function () {
   }
 
   it('anchors an endorsement reference and rejects duplicate attestation keys', async () => {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyAttestationRegistry } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer] = await hre.ethers.getSigners()
     await setupStubVerifiers(hre.ethers, deepFamily)
     const { personHash } = await setupPerson(deepFamily, signer)
@@ -86,7 +87,7 @@ describe('Attestation reference anchoring', function () {
     const key = computeAttestationKey(hre.ethers, ref)
 
     await expect(deepFamily.connect(signer).endorseVersion(personHash, 1, ref))
-      .to.emit(deepFamily, 'AttestationReferenceAnchored')
+      .to.emit(deepFamilyAttestationRegistry, 'AttestationReferenceAnchored')
       .withArgs(
         key,
         ref.actionType,
@@ -102,11 +103,44 @@ describe('Attestation reference anchoring', function () {
         ref.revocationType,
         ref.revocationRef,
       )
-    expect(await deepFamily.attestationRefExists(key)).to.equal(true)
+    expect(await deepFamilyAttestationRegistry.attestationRefExists(key)).to.equal(true)
 
     await expect(
       deepFamily.connect(signer).endorseVersion(personHash, 1, ref),
     ).to.be.revertedWithCustomError(deepFamily, 'DuplicateAttestationReference')
+  })
+
+  it('binds the registry once and rejects non-DeepFamily anchor callers', async () => {
+    const { deepFamily, deepFamilyAttestationRegistry, token } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const [signer] = await hre.ethers.getSigners()
+    const deepFamilyAddress = await deepFamily.getAddress()
+
+    expect(await deepFamilyAttestationRegistry.deepFamily()).to.equal(deepFamilyAddress)
+    await expect(
+      deepFamilyAttestationRegistry.bindDeepFamily(deepFamilyAddress),
+    ).to.be.revertedWithCustomError(deepFamilyAttestationRegistry, 'DeepFamilyAlreadyBound')
+
+    await expect(
+      deepFamilyAttestationRegistry
+        .connect(signer)
+        .anchorEndorsementRef(
+          await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, hre.ethers.ZeroHash, 1),
+          await signer.getAddress(),
+          hre.ethers.ZeroHash,
+          1,
+        ),
+    ).to.be.revertedWithCustomError(deepFamilyAttestationRegistry, 'OnlyDeepFamily')
+
+    const Registry = await hre.ethers.getContractFactory('DeepFamilyAttestationRegistry')
+    const standaloneRegistry = await Registry.deploy()
+    await standaloneRegistry.waitForDeployment()
+    await expect(
+      standaloneRegistry.bindDeepFamily(await signer.getAddress()),
+    ).to.be.revertedWithCustomError(standaloneRegistry, 'InvalidDeepFamilyAddress')
+    await expect(
+      standaloneRegistry.bindDeepFamily(await token.getAddress()),
+    ).to.be.revertedWithCustomError(standaloneRegistry, 'InvalidDeepFamilyAddress')
   })
 
   it('rejects invalid URI prefixes and action digest mismatches', async () => {
@@ -134,6 +168,21 @@ describe('Attestation reference anchoring', function () {
         }),
       ),
     ).to.be.revertedWithCustomError(deepFamily, 'InvalidAttestationAction')
+  })
+
+  it('rejects expired attestation reference windows', async () => {
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const [signer] = await hre.ethers.getSigners()
+    await setupStubVerifiers(hre.ethers, deepFamily)
+    const { personHash } = await setupPerson(deepFamily, signer)
+    const ref = await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, personHash, 1)
+
+    await expect(
+      deepFamily.connect(signer).endorseVersion(personHash, 1, {
+        ...ref,
+        expiresAt: ref.issuedAt,
+      }),
+    ).to.be.revertedWithCustomError(deepFamily, 'InvalidAttestationExpiresAt')
   })
 
   it('rejects mint references when the coreInfo digest changes', async () => {
@@ -171,7 +220,8 @@ describe('Attestation reference anchoring', function () {
   })
 
   it('anchors mint, story seal, verifier update, and protocol fee update references', async () => {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyReader } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [owner, verifier, signer] = await hre.ethers.getSigners()
     await setupStubVerifiers(hre.ethers, deepFamily)
 
@@ -193,7 +243,7 @@ describe('Attestation reference anchoring', function () {
     ).to.emit(deepFamily, 'EndorsementFeeUpdated')
 
     const minted = await mintPerson(hre.ethers, deepFamily, signer, undefined, 'Attested Story Owner')
-    const [, , tokenId] = await deepFamily.getVersionDetails(minted.personHash, 1)
+    const [, , tokenId] = await deepFamilyReader.getVersionDetails(minted.personHash, 1)
     await deepFamily.connect(signer).addStoryChunk(tokenId, 0, 0, 'hello', '', hre.ethers.ZeroHash)
 
     await expect(

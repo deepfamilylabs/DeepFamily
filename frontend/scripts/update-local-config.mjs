@@ -101,15 +101,27 @@ async function updateLocalConfig() {
     }
 
     const deepFamilyPath = path.join(DEPLOYMENTS_DIR, 'DeepFamily.json');
+    const readerPath = path.join(DEPLOYMENTS_DIR, 'DeepFamilyReader.json');
+    const registryPath = path.join(DEPLOYMENTS_DIR, 'DeepFamilyAttestationRegistry.json');
     if (!fs.existsSync(deepFamilyPath)) {
       console.log('DeepFamily contract not deployed. Run `npm run dev:deploy` first.');
       process.exit(1);
     }
+    if (!fs.existsSync(readerPath) || !fs.existsSync(registryPath)) {
+      console.log('DeepFamily reader/registry modules not deployed. Run `npm run dev:deploy` first.');
+      process.exit(1);
+    }
 
     const deepFamilyDeployment = JSON.parse(fs.readFileSync(deepFamilyPath, 'utf8'));
+    const readerDeployment = JSON.parse(fs.readFileSync(readerPath, 'utf8'));
+    const registryDeployment = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
     const contractAddress = deepFamilyDeployment.address;
+    const readerAddress = readerDeployment.address;
+    const attestationRegistryAddress = registryDeployment.address;
 
     console.log(`Found DeepFamily contract at: ${contractAddress}`);
+    console.log(`Found DeepFamilyReader contract at: ${readerAddress}`);
+    console.log(`Found DeepFamilyAttestationRegistry contract at: ${attestationRegistryAddress}`);
 
     const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
     
@@ -173,7 +185,9 @@ async function updateLocalConfig() {
 
     const updates = {
       'VITE_RPC_URL': 'http://127.0.0.1:8545',
-      'VITE_CONTRACT_ADDRESS': contractAddress,
+      'VITE_CONTRACT_ADDRESS': readerAddress,
+      'VITE_READER_ADDRESS': readerAddress,
+      'VITE_ATTESTATION_REGISTRY_ADDRESS': attestationRegistryAddress,
       'VITE_ROOT_PERSON_HASH': defaultRoot.hash,
       'VITE_ROOT_VERSION_INDEX': defaultRoot.versionIndex
     };
@@ -211,6 +225,8 @@ async function updateLocalConfig() {
     console.log('\nCurrent configuration:');
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Contract: ${contractAddress}`);
+    console.log(`   Reader: ${readerAddress}`);
+    console.log(`   Attestation registry: ${attestationRegistryAddress}`);
     console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
     
     console.log('\nYou can now start the frontend with: npm run dev');

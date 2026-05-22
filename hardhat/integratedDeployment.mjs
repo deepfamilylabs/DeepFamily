@@ -35,6 +35,8 @@ const readJson = async (filePath) => {
   return JSON.parse(raw)
 }
 
+const sameAddress = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase()
+
 const safeReadDeployment = async (connection, contractName) => {
   try {
     const dir = getNetworkDeploymentsDir(connection)
@@ -53,6 +55,72 @@ const writeDeployment = async (connection, contractName, address, abi) => {
   const filePath = path.join(dir, `${contractName}.json`)
   const payload = { address, abi }
   await fs.writeFile(filePath, JSON.stringify(payload, null, 2))
+}
+
+const assertExistingIntegratedWiring = async ({
+  ethers,
+  deepFamily,
+  token,
+  deepFamilyAttestationRegistry,
+  deepFamilyReader,
+  expectedGroth16Adapter,
+}) => {
+  const deepFamilyAddress = await deepFamily.getAddress()
+  const registryAddress = await deepFamilyAttestationRegistry.getAddress()
+
+  const deepFamilyRegistry = await deepFamily.ATTESTATION_REGISTRY()
+  if (!sameAddress(deepFamilyRegistry, registryAddress)) {
+    throw new Error(
+      `Deployment wiring mismatch: DeepFamily.ATTESTATION_REGISTRY=${deepFamilyRegistry}, ` +
+        `expected ${registryAddress}`,
+    )
+  }
+
+  const boundRegistryMain = await deepFamilyAttestationRegistry.deepFamily()
+  if (!sameAddress(boundRegistryMain, deepFamilyAddress)) {
+    throw new Error(
+      `Deployment wiring mismatch: registry.deepFamily=${boundRegistryMain}, ` +
+        `expected ${deepFamilyAddress}`,
+    )
+  }
+
+  const readerMain = await deepFamilyReader.DEEP_FAMILY()
+  if (!sameAddress(readerMain, deepFamilyAddress)) {
+    throw new Error(
+      `Deployment wiring mismatch: reader.DEEP_FAMILY=${readerMain}, expected ${deepFamilyAddress}`,
+    )
+  }
+
+  const tokenMain = await token.deepFamilyContract()
+  if (!sameAddress(tokenMain, deepFamilyAddress)) {
+    throw new Error(
+      `Deployment wiring mismatch: token.deepFamilyContract=${tokenMain}, ` +
+        `expected ${deepFamilyAddress}`,
+    )
+  }
+
+  const personVerifier = await deepFamily.verifierRegistry(
+    GROTH16_PROOF_SYSTEM_ID,
+    PROOF_PURPOSE_PERSON_COMMITMENT,
+  )
+  const disclosureVerifier = await deepFamily.verifierRegistry(
+    GROTH16_PROOF_SYSTEM_ID,
+    PROOF_PURPOSE_DISCLOSURE_BINDING,
+  )
+  if (personVerifier === ethers.ZeroAddress || disclosureVerifier === ethers.ZeroAddress) {
+    throw new Error('Deployment wiring mismatch: Groth16 verifier routes are not registered')
+  }
+  if (expectedGroth16Adapter?.address) {
+    if (
+      !sameAddress(personVerifier, expectedGroth16Adapter.address) ||
+      !sameAddress(disclosureVerifier, expectedGroth16Adapter.address)
+    ) {
+      throw new Error(
+        `Deployment wiring mismatch: verifier routes are ${personVerifier}/${disclosureVerifier}, ` +
+          `expected ${expectedGroth16Adapter.address}`,
+      )
+    }
+  }
 }
 
 const makeSetVerifierAttestationRef = async (
@@ -123,6 +191,10 @@ export const deployIntegratedSystem = async (
   const poseidonT5 = await PoseidonT5.deploy()
   await poseidonT5.waitForDeployment()
 
+  const AdultAgeGate = await ethers.getContractFactory('AdultAgeGate', deployer)
+  const adultAgeGate = await AdultAgeGate.deploy()
+  await adultAgeGate.waitForDeployment()
+
   const PersonCommitmentVerifier = await ethers.getContractFactory('PersonCommitmentVerifier', deployer)
   const personCommitmentVerifier = await PersonCommitmentVerifier.deploy()
   await personCommitmentVerifier.waitForDeployment()
@@ -133,6 +205,7 @@ export const deployIntegratedSystem = async (
 
   const tokenAddress = await token.getAddress()
   const poseidonT5Address = await poseidonT5.getAddress()
+  const adultAgeGateAddress = await adultAgeGate.getAddress()
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress()
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress()
 
@@ -144,16 +217,31 @@ export const deployIntegratedSystem = async (
   await groth16VerifierAdapter.waitForDeployment()
   const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress()
 
+  const DeepFamilyAttestationRegistry = await ethers.getContractFactory(
+    'DeepFamilyAttestationRegistry',
+    deployer,
+  )
+  const deepFamilyAttestationRegistry = await DeepFamilyAttestationRegistry.deploy()
+  await deepFamilyAttestationRegistry.waitForDeployment()
+  const deepFamilyAttestationRegistryAddress = await deepFamilyAttestationRegistry.getAddress()
+
   const DeepFamily = await ethers.getContractFactory('DeepFamily', {
     signer: deployer,
     libraries: {
       PoseidonT5: poseidonT5Address,
+      AdultAgeGate: adultAgeGateAddress,
     },
   })
-  const deepFamily = await DeepFamily.deploy(tokenAddress)
+  const deepFamily = await DeepFamily.deploy(tokenAddress, deepFamilyAttestationRegistryAddress)
   await deepFamily.waitForDeployment()
 
   const deepFamilyAddress = await deepFamily.getAddress()
+  await (await deepFamilyAttestationRegistry.bindDeepFamily(deepFamilyAddress)).wait()
+
+  const DeepFamilyReader = await ethers.getContractFactory('DeepFamilyReader', deployer)
+  const deepFamilyReader = await DeepFamilyReader.deploy(deepFamilyAddress)
+  await deepFamilyReader.waitForDeployment()
+  const deepFamilyReaderAddress = await deepFamilyReader.getAddress()
 
   const bound = await token.deepFamilyContract().catch(() => ethers.ZeroAddress)
   if (bound === ethers.ZeroAddress) {
@@ -204,27 +292,36 @@ export const deployIntegratedSystem = async (
 
     const tokenArtifact = await artifacts.readArtifact('DeepFamilyToken')
     const deepArtifact = await artifacts.readArtifact('DeepFamily')
+    const attestationRegistryArtifact = await artifacts.readArtifact('DeepFamilyAttestationRegistry')
+    const readerArtifact = await artifacts.readArtifact('DeepFamilyReader')
     const poseidonT5Artifact = await artifacts.readArtifact('PoseidonT5')
+    const adultAgeGateArtifact = await artifacts.readArtifact('AdultAgeGate')
     const personVerifierArtifact = await artifacts.readArtifact('PersonCommitmentVerifier')
     const nameVerifierArtifact = await artifacts.readArtifact('DisclosureBindingVerifier')
     const groth16AdapterArtifact = await artifacts.readArtifact('Groth16VerifierAdapter')
 
     await writeDeployment(connection, 'DeepFamilyToken', tokenAddress, tokenArtifact.abi)
     await writeDeployment(connection, 'PoseidonT5', poseidonT5Address, poseidonT5Artifact.abi)
+    await writeDeployment(connection, 'AdultAgeGate', adultAgeGateAddress, adultAgeGateArtifact.abi)
     await writeDeployment(connection, 'PersonCommitmentVerifier', personCommitmentVerifierAddress, personVerifierArtifact.abi)
     await writeDeployment(connection, 'DisclosureBindingVerifier', nameDisclosureVerifierAddress, nameVerifierArtifact.abi)
     await writeDeployment(connection, 'Groth16VerifierAdapter', groth16VerifierAdapterAddress, groth16AdapterArtifact.abi)
+    await writeDeployment(connection, 'DeepFamilyAttestationRegistry', deepFamilyAttestationRegistryAddress, attestationRegistryArtifact.abi)
     await writeDeployment(connection, 'DeepFamily', deepFamilyAddress, deepArtifact.abi)
+    await writeDeployment(connection, 'DeepFamilyReader', deepFamilyReaderAddress, readerArtifact.abi)
   }
 
   return {
     deployerAddress,
     token,
     poseidonT5,
+    adultAgeGate,
     personCommitmentVerifier,
     nameDisclosureVerifier,
     groth16VerifierAdapter,
+    deepFamilyAttestationRegistry,
     deepFamily,
+    deepFamilyReader,
   }
 }
 
@@ -237,14 +334,50 @@ export const ensureIntegratedSystem = async (hreOrConnection, { writeDeployments
 
   const existingDeep = await safeReadDeployment(connection, 'DeepFamily')
   const existingToken = await safeReadDeployment(connection, 'DeepFamilyToken')
-  if (existingDeep?.address && existingToken?.address) {
+  const existingRegistry = await safeReadDeployment(connection, 'DeepFamilyAttestationRegistry')
+  const existingReader = await safeReadDeployment(connection, 'DeepFamilyReader')
+  const existingGroth16Adapter = await safeReadDeployment(connection, 'Groth16VerifierAdapter')
+  if (
+    existingDeep?.address &&
+    existingToken?.address &&
+    existingRegistry?.address &&
+    existingReader?.address
+  ) {
     const deepFamily = await ethers.getContractAt('DeepFamily', existingDeep.address, defaultSigner)
     const token = await ethers.getContractAt('DeepFamilyToken', existingToken.address, defaultSigner)
-    connection.__deepfamilyIntegrated = { deepFamily, token }
+    const deepFamilyAttestationRegistry = await ethers.getContractAt(
+      'DeepFamilyAttestationRegistry',
+      existingRegistry.address,
+      defaultSigner,
+    )
+    const deepFamilyReader = await ethers.getContractAt(
+      'DeepFamilyReader',
+      existingReader.address,
+      defaultSigner,
+    )
+    await assertExistingIntegratedWiring({
+      ethers,
+      deepFamily,
+      token,
+      deepFamilyAttestationRegistry,
+      deepFamilyReader,
+      expectedGroth16Adapter: existingGroth16Adapter,
+    })
+    connection.__deepfamilyIntegrated = {
+      deepFamily,
+      token,
+      deepFamilyAttestationRegistry,
+      deepFamilyReader,
+    }
     return connection.__deepfamilyIntegrated
   }
 
   const deployed = await deployIntegratedSystem(connection, { writeDeployments, signer: defaultSigner })
-  connection.__deepfamilyIntegrated = { deepFamily: deployed.deepFamily, token: deployed.token }
+  connection.__deepfamilyIntegrated = {
+    deepFamily: deployed.deepFamily,
+    token: deployed.token,
+    deepFamilyAttestationRegistry: deployed.deepFamilyAttestationRegistry,
+    deepFamilyReader: deployed.deepFamilyReader,
+  }
   return connection.__deepfamilyIntegrated
 }

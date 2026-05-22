@@ -12,6 +12,7 @@ import {
   ZERO_REF,
 } from "./catalogue";
 import { computeAttestationPayloadDigest, computeHighTrustEndorsementActionDigest, computeVersionSubjectHash } from "./digest";
+import { readAnchoredAttestationRef } from "./registry";
 import { deriveAttestationStatus } from "./status";
 import { verifySignedAttestationEnvelope } from "./verify";
 import type { AttestationRef, CanonicalAttestationPayload, SignedAttestationEnvelope } from "./types";
@@ -172,5 +173,27 @@ describe("attestation verification", () => {
         ],
       }),
     ).toMatchObject({ ok: false, status: "unsupported-signature-suite" });
+  });
+
+  it("reads anchored refs from the registry getter shape", async () => {
+    const { ref } = buildPayloadAndRef();
+    await expect(
+      readAnchoredAttestationRef(
+        {
+          attestationRefExists: async () => true,
+          attestationRefs: async () => ({
+            ...ref,
+            attestationRefVersion: BigInt(ref.attestationRefVersion),
+            subjectType: BigInt(ref.subjectType),
+            actionType: BigInt(ref.actionType),
+            signatureSuiteId: BigInt(ref.signatureSuiteId),
+            issuedAt: BigInt(ref.issuedAt),
+            expiresAt: BigInt(ref.expiresAt),
+            revocationType: BigInt(ref.revocationType),
+          }),
+        },
+        `0x${"55".repeat(32)}`,
+      ),
+    ).resolves.toEqual(ref);
   });
 });

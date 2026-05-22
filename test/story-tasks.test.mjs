@@ -15,7 +15,8 @@ describe('Story Tasks Integration', function () {
   });
 
   it('runs full lifecycle of story tasks', async () => {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyReader } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer] = await hre.ethers.getSigners();
     await setupStubVerifiers(hre.ethers, deepFamily)
 
@@ -41,15 +42,15 @@ describe('Story Tasks Integration', function () {
       content: 'Second chunk content',
     });
 
-    const meta = await deepFamily.getStoryMetadata(1n);
+    const meta = await deepFamilyReader.getStoryMetadata(1n);
     expect(meta.totalChunks).to.equal(2n);
     expect(meta.isSealed).to.equal(false);
 
-    const chunk0 = await deepFamily.getStoryChunk(1n, 0);
+    const chunk0 = await deepFamilyReader.getStoryChunk(1n, 0);
     expect(chunk0.content).to.equal('First chunk content');
     expect(chunk0.chunkType).to.equal(0);
     expect(chunk0.attachmentCID).to.equal('');
-    const chunk1 = await deepFamily.getStoryChunk(1n, 1);
+    const chunk1 = await deepFamilyReader.getStoryChunk(1n, 1);
     expect(chunk1.content).to.equal('Second chunk content');
     expect(chunk1.chunkType).to.equal(0);
     expect(chunk1.attachmentCID).to.equal('');
@@ -58,7 +59,7 @@ describe('Story Tasks Integration', function () {
 
     await hre.run('seal-story', { tokenid: '1' });
 
-    const sealedMeta = await deepFamily.getStoryMetadata(1n);
+    const sealedMeta = await deepFamilyReader.getStoryMetadata(1n);
     expect(sealedMeta.isSealed).to.equal(true);
 
     let failed = false;

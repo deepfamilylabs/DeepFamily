@@ -18,7 +18,7 @@ describe("SeedHelpers Library Tests", function () {
   this.timeout(120_000);
 
   async function setupSeedFixture() {
-    const { deepFamily: deployedDeepFamily, token: deployedToken } =
+    const { deepFamily: deployedDeepFamily, deepFamilyReader, token: deployedToken } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture)
 
     const [signer] = await ethers.getSigners();
@@ -29,7 +29,7 @@ describe("SeedHelpers Library Tests", function () {
 
     await setupStubVerifiers(hre.ethers, deployedDeepFamily)
 
-    return { deepFamily, token, signer, signerAddr };
+    return { deepFamily, reader: deepFamilyReader, token, signer, signerAddr };
   }
 
   describe("computePersonHash", function () {
@@ -143,7 +143,7 @@ describe("SeedHelpers Library Tests", function () {
     });
 
     it("should successfully add person with parent info", async function () {
-      const { deepFamily, signer } = await setupSeedFixture()
+      const { deepFamily, reader, signer } = await setupSeedFixture()
       const fatherData = {
         fullName: `Father_${Date.now()}`,
         passphrase: "",
@@ -185,7 +185,7 @@ describe("SeedHelpers Library Tests", function () {
       expect(childResult.personHash).to.be.a("string");
       expect(childResult.personHash).to.match(/^0x[0-9a-f]{64}$/);
 
-      const versionDetails = await deepFamily.getVersionDetails(childResult.personHash, 1);
+      const versionDetails = await reader.getVersionDetails(childResult.personHash, 1);
       const version = versionDetails[0];
       expect(version.fatherHash.toLowerCase()).to.equal(
         fatherResult.personHash.toLowerCase()

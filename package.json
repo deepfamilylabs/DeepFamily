@@ -16,7 +16,7 @@
     "list-networks": "hardhat --config hardhat.config.mjs networks:list",
     "node": "hardhat --config hardhat.config.mjs node",
     "clean": "hardhat --config hardhat.config.mjs clean",
-    "size": "node -e \"console.error('size is not available after Hardhat 3 migration (hardhat-contract-sizer is Hardhat 2-only).'); process.exit(1)\"",
+    "size": "node scripts/check-contract-size.mjs",
     "lint": "solhint 'contracts/**/*.sol'",
     "lint:fix": "solhint 'contracts/**/*.sol' --fix",
     "contracts:check": "npm run lint && npm run build && npm test",

@@ -83,12 +83,13 @@ function verifyEcdsaLeg(ref, payloadDigest, signatureEntry) {
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
-  const { deepFamily: defaultDeepFamily } = await ensureIntegratedSystem(connection);
-  const deepFamily = args.contract
-    ? await ethers.getContractAt("DeepFamily", args.contract)
-    : defaultDeepFamily;
+  const { deepFamilyAttestationRegistry: defaultRegistry } =
+    await ensureIntegratedSystem(connection);
+  const registry = args.contract
+    ? await ethers.getContractAt("DeepFamilyAttestationRegistry", args.contract)
+    : defaultRegistry;
 
-  const rawRef = await deepFamily.attestationRefs(args.key);
+  const rawRef = await registry.attestationRefs(args.key);
   const ref = normalizeRef(rawRef);
   if (ref.attestationPayloadDigest === ethers.ZeroHash) {
     throw new Error(`No attestation reference found for key ${args.key}`);
@@ -147,7 +148,7 @@ export default task("attestation-verify", "Verify an anchored attestation envelo
   })
   .addOption({
     name: "contract",
-    description: "DeepFamily contract address; defaults to integrated deployment",
+    description: "DeepFamilyAttestationRegistry address; defaults to integrated deployment",
     type: ArgumentType.STRING,
     defaultValue: "",
   })

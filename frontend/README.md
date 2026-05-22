@@ -36,7 +36,7 @@ npm run dev:local
 For manual configuration, copy `.env.example` to `.env` and set at minimum:
 
 - `VITE_RPC_URL`
-- `VITE_CONTRACT_ADDRESS`
+- `VITE_CONTRACT_ADDRESS` (DeepFamilyReader module entry address)
 - `VITE_ROOT_PERSON_HASH`
 - `VITE_ROOT_VERSION_INDEX`
 

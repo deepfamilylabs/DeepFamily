@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
     rpcUrl: "http://rpc.local",
     chainId: 31337,
     contractAddress: "0x" + "a".repeat(40),
+    readerAddress: "0x" + "1".repeat(40),
+    attestationRegistryAddress: "0x" + "2".repeat(40),
+    tokenAddress: "0x" + "3".repeat(40),
     rootHash: "0x" + "b".repeat(64),
     rootVersionIndex: 1,
     rootHistory: ["0x" + "c".repeat(64)],
@@ -17,6 +20,9 @@ const mocks = vi.hoisted(() => ({
       rpcUrl: "http://default-rpc",
       chainId: 1,
       contractAddress: "0x" + "d".repeat(40),
+      readerAddress: "0x" + "4".repeat(40),
+      attestationRegistryAddress: "",
+      tokenAddress: "",
       rootHash: "0x" + "e".repeat(64),
       rootVersionIndex: 7,
     },
@@ -101,7 +107,7 @@ describe("useFamilyTreeConfigForm", () => {
   it("seeds local form values from config and reports no diff initially", () => {
     const { result } = renderHook(() => useFamilyTreeConfigForm());
     expect(result.current.network.rpcUrl).toBe(mocks.config.rpcUrl);
-    expect(result.current.contract.value).toBe(mocks.config.contractAddress);
+    expect(result.current.contract.value).toBe(mocks.config.readerAddress);
     expect(result.current.root.value).toBe(mocks.config.rootHash);
     expect(result.current.version.value).toBe(mocks.config.rootVersionIndex);
     expect(result.current.actions.hasDiff).toBe(false);
@@ -133,7 +139,10 @@ describe("useFamilyTreeConfigForm", () => {
     expect(mocks.config.update).toHaveBeenCalledWith({
       rpcUrl: mocks.config.rpcUrl,
       chainId: mocks.config.chainId,
-      contractAddress: "0x" + "f".repeat(40),
+      readerAddress: "0x" + "f".repeat(40),
+      contractAddress: "",
+      attestationRegistryAddress: "",
+      tokenAddress: "",
       rootHash: mocks.config.rootHash,
       rootVersionIndex: mocks.config.rootVersionIndex,
     });
@@ -145,7 +154,7 @@ describe("useFamilyTreeConfigForm", () => {
       result.current.actions.reset();
     });
     expect(result.current.network.rpcUrl).toBe(mocks.config.defaults.rpcUrl);
-    expect(result.current.contract.value).toBe(mocks.config.defaults.contractAddress);
+    expect(result.current.contract.value).toBe(mocks.config.defaults.readerAddress);
     expect(result.current.root.value).toBe(mocks.config.defaults.rootHash);
     expect(result.current.version.value).toBe(mocks.config.defaults.rootVersionIndex);
   });

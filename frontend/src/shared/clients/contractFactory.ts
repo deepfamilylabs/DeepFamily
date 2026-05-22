@@ -1,5 +1,7 @@
 import { ethers } from "ethers";
 import DeepFamily from "../../abi/DeepFamily.json";
+import DeepFamilyReader from "../../abi/DeepFamilyReader.json";
+import DeepFamilyAttestationRegistry from "../../abi/DeepFamilyAttestationRegistry.json";
 
 export const DEEP_TOKEN_ABI = [
   "function recentReward() view returns (uint256)",
@@ -23,6 +25,20 @@ export function createDeepTokenContract(
   runner: ethers.ContractRunner,
 ): ethers.Contract {
   return new ethers.Contract(tokenAddress, DEEP_TOKEN_ABI, runner);
+}
+
+export function createDeepFamilyReaderContract(
+  readerAddress: string,
+  runner: ethers.ContractRunner,
+): ethers.Contract {
+  return new ethers.Contract(readerAddress, DeepFamilyReader.abi, runner);
+}
+
+export function createDeepFamilyAttestationRegistryContract(
+  registryAddress: string,
+  runner: ethers.ContractRunner,
+): ethers.Contract {
+  return new ethers.Contract(registryAddress, DeepFamilyAttestationRegistry.abi, runner);
 }
 
 export function createDeepFamilyInterface(): ethers.Interface {

@@ -10,11 +10,9 @@
 | Constant | Value | Purpose & Impact |
 |----------|-------|------------------|
 | `MAX_LONG_TEXT_LENGTH` | 256 | Max length for tags, IPFS CIDs, names, places, stories |
-| `MAX_QUERY_PAGE_SIZE` | 200 | Gas-optimized pagination limit for all query functions |
 | `MAX_CHUNK_CONTENT_LENGTH` | 2048 | Story chunk size limit (≈2KB per shard) |
 | `PROTOCOL_FEE_BPS_MAX` | 2000 | Maximum protocol endorsement fee (20%) |
 | `FEE_BPS_DENOMINATOR` | 10000 | Basis-point denominator for fee accounting |
-| `MINIMUM_MINT_AGE` | 18 | Minimum age required for NFT minting |
 
 ### Core Data Structures
 
@@ -160,7 +158,7 @@ function mintPersonVersionNFT(
 4. `publicSignals.disclosureBinding` must match the contract's recomputed disclosure binding
 5. `publicSignals.minter` must equal `uint256(uint160(msg.sender))`
 6. `personHash` is derived from `publicSignals.identityCommitment`
-7. `_enforceAdult(coreInfo.basicInfo)` must pass
+7. Linked `AdultAgeGate` age validation must pass
 8. Phase 3 `attestationRef` must match the mint action digest and version subject
 
 #### Story Sharding System
@@ -199,6 +197,12 @@ function sealStory(uint256 tokenId, AttestationRef calldata attestationRef) exte
 | 7 | Correction |
 | 8 | Editorial note |
 
+## DeepFamilyReader.sol - Aggregated Read Contract
+
+Phase 3 moves expensive detail and paginated read aggregation out of `DeepFamily`.
+`DeepFamilyReader` is constructed with the main contract address and uses the main
+contract's primitive getters. Write calls continue to target `DeepFamily`.
+
 ### Query Functions (Paginated)
 
 #### Version Queries
@@ -223,6 +227,13 @@ function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata 
 function getStoryChunk(uint256 tokenId, uint256 chunkIndex) external view returns (StoryChunk memory)
 function listStoryChunks(uint256 tokenId, uint256 offset, uint256 limit) external view returns (StoryChunk[] memory, uint256, bool, uint256)
 ```
+
+## DeepFamilyAttestationRegistry.sol - Phase 3 Anchors
+
+Phase 3 attestation reference storage and `AttestationReferenceAnchored` events live in
+`DeepFamilyAttestationRegistry`. The registry is bound once to the deployed
+`DeepFamily` address. Its external anchor methods are action-specific and reject
+callers other than that bound main contract; there is no generic public anchor path.
 
 ### Events System
 

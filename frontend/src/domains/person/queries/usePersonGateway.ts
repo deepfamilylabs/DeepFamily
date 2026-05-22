@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useConfig } from "../../config";
-import { createDeepFamilyContract } from "../../../shared/clients/contractFactory";
+import { createDeepFamilyReaderContract } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { createPersonReadGateway, type PersonReadGateway } from "../api/personReadGateway";
@@ -10,15 +10,15 @@ import { createPersonReadGateway, type PersonReadGateway } from "../api/personRe
  * scoped to the active chain/RPC/contract tuple.
  */
 export function usePersonGateway(): PersonReadGateway | null {
-  const { rpcUrl, contractAddress, chainId } = useConfig();
+  const { rpcUrl, contractAddress, readerAddress, chainId } = useConfig();
 
   return useMemo(() => {
-    if (!rpcUrl || !contractAddress) return null;
+    if (!rpcUrl || !readerAddress) return null;
     const provider = getReadonlyProvider(rpcUrl, chainId);
-    const contract = createDeepFamilyContract(contractAddress, provider);
+    const contract = createDeepFamilyReaderContract(readerAddress, provider);
     return createPersonReadGateway(
       contract,
       getScopedQueryClient({ rpcUrl, contractAddress, chainId }),
     );
-  }, [rpcUrl, contractAddress, chainId]);
+  }, [rpcUrl, contractAddress, readerAddress, chainId]);
 }

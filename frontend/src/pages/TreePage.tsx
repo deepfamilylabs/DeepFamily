@@ -96,7 +96,7 @@ export default function TreePage() {
     refresh,
     clearAllCaches,
   } = useTreeStatus();
-  const { rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex, defaults, update } =
+  const { rpcUrl, chainId, readerAddress, rootHash, rootVersionIndex, defaults, update } =
     useConfig();
   const forceEnvConfigSync = useMemo(() => isForceEnvConfigSyncEnabled(), []);
   const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
@@ -104,13 +104,13 @@ export default function TreePage() {
   useEffect(() => {
     if (!forceEnvConfigSync) return;
     const envRpcUrl = (defaults.rpcUrl || "").trim();
-    const envContract = (defaults.contractAddress || "").trim();
+    const envReader = (defaults.readerAddress || "").trim();
     const envRootHash = (defaults.rootHash || "").trim();
     const envRootVersion = Number(defaults.rootVersionIndex);
     const envChainId = Number(defaults.chainId);
 
     // Nothing to enforce.
-    if (!envRpcUrl && !envContract) return;
+    if (!envRpcUrl && !envReader) return;
 
     const nextUpdate: any = {};
     const normalize = (v: string) => v.trim();
@@ -123,8 +123,11 @@ export default function TreePage() {
     if (Number.isFinite(envChainId) && envChainId > 0 && envChainId !== Number(chainId || 0)) {
       nextUpdate.chainId = envChainId;
     }
-    if (envContract && normalizeAddr(envContract) !== normalizeAddr(contractAddress || "")) {
-      nextUpdate.contractAddress = envContract;
+    if (envReader && normalizeAddr(envReader) !== normalizeAddr(readerAddress || "")) {
+      nextUpdate.readerAddress = envReader;
+      nextUpdate.contractAddress = "";
+      nextUpdate.attestationRegistryAddress = "";
+      nextUpdate.tokenAddress = "";
     }
     const hasEnvRoot = isValidRootHash(envRootHash);
     if (hasEnvRoot && normalizeHash(envRootHash) !== normalizeHash(rootHash || "")) {
@@ -148,13 +151,13 @@ export default function TreePage() {
   }, [
     forceEnvConfigSync,
     defaults.rpcUrl,
-    defaults.contractAddress,
+    defaults.readerAddress,
     defaults.rootHash,
     defaults.rootVersionIndex,
     defaults.chainId,
     rpcUrl,
     chainId,
-    contractAddress,
+    readerAddress,
     rootHash,
     rootVersionIndex,
     clearAllCaches,
