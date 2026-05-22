@@ -15,7 +15,7 @@ export default function ContractAddressField({
   return (
     <div className="flex-1">
       <label className="block text-slate-700 dark:text-slate-300 mb-2 font-semibold">
-        {t("familyTree.config.contract")}:
+        {t("familyTree.config.readerAddress")}:
       </label>
       <input
         type="text"
@@ -29,7 +29,7 @@ export default function ContractAddressField({
       />
       {error && (
         <div className="text-red-500 dark:text-red-400 text-xs mt-1.5 font-medium">
-          {t(error, "Contract address format error")}
+          {t(error, "Reader address format error")}
         </div>
       )}
     </div>

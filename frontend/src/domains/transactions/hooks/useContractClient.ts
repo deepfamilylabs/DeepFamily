@@ -7,12 +7,15 @@
 import { useMemo } from "react";
 import { useConfig } from "../../config";
 import { useWallet } from "../../wallet";
-import { createDeepFamilyContract } from "../../../shared/clients/contractFactory";
+import {
+  createDeepFamilyContract,
+  createDeepFamilyReaderContract,
+} from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 
 export function useContractClient() {
   const { signer, provider } = useWallet();
-  const { rpcUrl, chainId, contractAddress } = useConfig();
+  const { rpcUrl, chainId, contractAddress, readerAddress } = useConfig();
 
   const readonlyProvider = useMemo(() => {
     if (!rpcUrl) return null;
@@ -29,31 +32,29 @@ export function useContractClient() {
 
   /** Read-only contract backed by a dedicated provider (no wallet dependency). */
   const readContract = useMemo(() => {
-    if (!contractAddress || !readonlyProvider) return null;
-    return createDeepFamilyContract(contractAddress, readonlyProvider);
-  }, [contractAddress, readonlyProvider]);
-
-  const bestReadContract = readContract ?? contract;
+    if (!readerAddress || !readonlyProvider) return null;
+    return createDeepFamilyReaderContract(readerAddress, readonlyProvider);
+  }, [readerAddress, readonlyProvider]);
 
   const isContractReady = !!contract && !!signer;
 
   const getVersionDetails = useMemo(() => {
-    if (!bestReadContract) return null;
+    if (!readContract) return null;
     return async (personHash: string, versionIndex: number) => {
-      return await bestReadContract.getVersionDetails(personHash, versionIndex);
+      return await readContract.getVersionDetails(personHash, versionIndex);
     };
-  }, [bestReadContract]);
+  }, [readContract]);
 
   const getNFTDetails = useMemo(() => {
-    if (!bestReadContract) return null;
+    if (!readContract) return null;
     return async (tokenId: number) => {
-      return await bestReadContract.getNFTDetails(tokenId);
+      return await readContract.getNFTDetails(tokenId);
     };
-  }, [bestReadContract]);
+  }, [readContract]);
 
   return {
     contract,
-    readContract: bestReadContract,
+    readContract,
     isContractReady,
     getVersionDetails,
     getNFTDetails,

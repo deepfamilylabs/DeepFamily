@@ -13,6 +13,7 @@ describe("Hardhat Tasks Integration", function () {
 
   let connection;
   let deepFamily;
+  let deepFamilyReader;
   let signer;
   let signerAddress;
   let originalConnect;
@@ -48,7 +49,7 @@ describe("Hardhat Tasks Integration", function () {
     originalConnect = hre.network.connect.bind(hre.network);
     hre.network.connect = async () => connection;
 
-    ({ deepFamily } = await ensureIntegratedSystem(connection));
+    ({ deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection));
     [signer] = await connection.ethers.getSigners();
     signerAddress = await signer.getAddress();
   });
@@ -92,7 +93,7 @@ describe("Hardhat Tasks Integration", function () {
   it("runs add-person, endorse, mint, and story tasks end-to-end", async function () {
     await hre.tasks.getTask("add-person").run(personArgs);
 
-    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 10);
+    const [, totalVersions] = await deepFamilyReader.listPersonVersions(personHash, 0, 10);
     expect(Number(totalVersions)).to.equal(1);
 
     await hre.tasks.getTask("endorse").run({
@@ -155,7 +156,7 @@ describe("Hardhat Tasks Integration", function () {
       tokenid: tokenId.toString(),
     });
 
-    const metadata = await deepFamily.getStoryMetadata(tokenId);
+    const metadata = await deepFamilyReader.getStoryMetadata(tokenId);
     expect(metadata.isSealed).to.equal(true);
   });
 

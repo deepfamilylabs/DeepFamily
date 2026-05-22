@@ -9,7 +9,7 @@ const { computePersonHash, checkPersonExists, getAllRoots } = seedHelpers;
 /**
  * Check detailed information for a specific person
  */
-async function checkPerson(deepFamily, personData, versionIndex = 1) {
+async function checkPerson(deepFamily, reader, personData, versionIndex = 1) {
   const personHash = await computePersonHash({ deepFamily, personData });
 
   console.log(`\nPerson: ${personData.fullName}`);
@@ -30,7 +30,7 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
 
   // Get version details
   try {
-    const versionDetails = await deepFamily.getVersionDetails(personHash, versionIndex);
+    const [versionDetails] = await reader.getVersionDetails(personHash, versionIndex);
     console.log(`\nVersion ${versionIndex} details:`);
     console.log(`  Tag: ${versionDetails.tag}`);
     console.log(`  IPFS CID: ${versionDetails.ipfsCID}`);
@@ -52,13 +52,13 @@ async function checkPerson(deepFamily, personData, versionIndex = 1) {
 
   // Check children
   try {
-    const res = await deepFamily.listChildren(personHash, versionIndex, 0, 0);
+    const res = await reader.listChildren(personHash, versionIndex, 0, 0);
     const total = Number(res[2]);
     console.log(`\nTotal children: ${total}`);
 
     if (total > 0) {
       const showCount = Math.min(5, total);
-      const childrenRes = await deepFamily.listChildren(personHash, versionIndex, 0, showCount);
+      const childrenRes = await reader.listChildren(personHash, versionIndex, 0, showCount);
       console.log(`First ${showCount} children:`);
       for (let i = 0; i < childrenRes[0].length; i++) {
         console.log(`  ${i + 1}. ${childrenRes[0][i]} (v${childrenRes[1][i]})`);
@@ -102,7 +102,7 @@ async function main() {
 
   const connection = await hre.network.connect();
   const { ethers } = connection;
-  const { deepFamily, token } = await ensureIntegratedSystem(connection, {
+  const { deepFamily, deepFamilyReader, token } = await ensureIntegratedSystem(connection, {
     writeDeployments: true,
   });
 
@@ -245,7 +245,7 @@ async function main() {
       console.log(`\n${"─".repeat(70)}`);
       console.log(`${langLabel}: ${personData.fullName}`);
       console.log("─".repeat(70));
-      await checkPerson(deepFamily, personData, 1);
+      await checkPerson(deepFamily, deepFamilyReader, personData, 1);
     }
   } else if (checkLang) {
     // Check specific language root
@@ -254,7 +254,7 @@ async function main() {
     console.log("=".repeat(70));
 
     if (rootHashes[checkLang]) {
-      await checkPerson(deepFamily, rootHashes[checkLang].personData, 1);
+      await checkPerson(deepFamily, deepFamilyReader, rootHashes[checkLang].personData, 1);
     } else {
       console.log(
         `Language '${checkLang}' not found. Available: ${Object.keys(rootHashes).join(", ")}`,
@@ -278,7 +278,7 @@ async function main() {
       console.log(`Person exists (total versions: ${existsResult.totalVersions})`);
       // Get detailed info (reuse logic above)
       try {
-        const versionDetails = await deepFamily.getVersionDetails(customHash, version);
+        const [versionDetails] = await deepFamilyReader.getVersionDetails(customHash, version);
         console.log(`\nVersion ${version} details:`);
         console.log(`  Tag: ${versionDetails.tag}`);
         console.log(`  IPFS CID: ${versionDetails.ipfsCID}`);
@@ -308,7 +308,7 @@ async function main() {
     };
 
     const version = Number(process.env.PERSON_VERSION || 1);
-    await checkPerson(deepFamily, customPersonData, version);
+    await checkPerson(deepFamily, deepFamilyReader, customPersonData, version);
   }
 
   console.log("\n" + "=".repeat(70));

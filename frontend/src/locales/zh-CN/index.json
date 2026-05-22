@@ -351,7 +351,7 @@
     },
     "versionSelector": {},
     "config": {
-      "networkAndContract": "网络与合约",
+      "networkAndContract": "网络与模块",
       "dataSource": "数据源",
       "displayOptions": "显示选项",
       "rpc": "RPC",
@@ -365,6 +365,7 @@
       "customNetworkAdded": "已添加自定义网络",
       "unknownNetwork": "未知",
       "contract": "合约",
+      "readerAddress": "Reader 地址",
       "root": "根节点哈希",
       "clearAndRefresh": "清空",
       "rootHistory": "根哈希历史",
@@ -452,6 +453,7 @@
     "validation": {
       "rpc": "请输入有效的 RPC 地址",
       "contract": "请输入有效的合约地址 (0x + 40位16进制)",
+      "reader": "请输入有效的 Reader 地址 (0x + 40位16进制)",
       "root": "请输入有效的根哈希 (0x + 64位16进制)",
       "chainIdInvalid": "请输入有效的链 ID",
       "customNetwork": "请输入网络名称、有效的链 ID 和 RPC URL",

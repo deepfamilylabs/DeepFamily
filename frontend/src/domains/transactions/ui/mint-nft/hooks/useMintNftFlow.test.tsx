@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   } as { signer: any; address: string | null },
   config: {
     contractAddress: "0x0000000000000000000000000000000000000abc",
+    readerAddress: "0x0000000000000000000000000000000000000def",
   },
   tx: { hash: "0xtx" },
   receipt: { transactionHash: "0xtx", blockNumber: 10 },
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     getVersionDetails: vi.fn(),
   },
   createDeepFamilyContract: vi.fn(),
+  createDeepFamilyReaderContract: vi.fn(),
   waitForTransactionReceipt: vi.fn(),
   executeMintFlow: vi.fn(),
 }));
@@ -38,6 +40,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../../../../../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: mocks.createDeepFamilyContract,
+  createDeepFamilyReaderContract: mocks.createDeepFamilyReaderContract,
 }));
 
 vi.mock("../../../api/txGateway", () => ({
@@ -104,14 +107,17 @@ describe("useMintNftFlow", () => {
     mocks.wallet.signer = { id: "signer" };
     mocks.wallet.address = "0x00000000000000000000000000000000000000aa";
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000abc";
+    mocks.config.readerAddress = "0x0000000000000000000000000000000000000def";
     mocks.contract.mintPersonVersionNFT.mockReset();
     mocks.contract.getVersionDetails.mockReset();
     mocks.createDeepFamilyContract.mockReset();
+    mocks.createDeepFamilyReaderContract.mockReset();
     mocks.waitForTransactionReceipt.mockReset();
     mocks.executeMintFlow.mockReset();
     mocks.contract.mintPersonVersionNFT.mockResolvedValue(mocks.tx);
     mocks.contract.getVersionDetails.mockResolvedValue({ tokenId: 17 });
     mocks.createDeepFamilyContract.mockReturnValue(mocks.contract);
+    mocks.createDeepFamilyReaderContract.mockReturnValue(mocks.contract);
     mocks.waitForTransactionReceipt.mockResolvedValue(mocks.receipt);
   });
 

@@ -1,15 +1,19 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { NETWORK_PRESETS } from "../../../shared/config";
 import {
-  getDefaultContractAddress,
   getDefaultRootHash,
   getDefaultRootVersionIndex,
   getDefaultRpcUrl,
+  getDefaultReaderAddress,
 } from "../../../shared/config/env";
+import { resolveModuleAddresses } from "../services";
 
 type ConfigValues = {
   rpcUrl: string;
   contractAddress: string;
+  readerAddress: string;
+  attestationRegistryAddress: string;
+  tokenAddress: string;
   rootHash: string;
   rootVersionIndex: number;
   chainId: number;
@@ -19,6 +23,7 @@ export type AppConfig = ConfigValues & {
   update: (partial: Partial<ConfigValues>) => void;
   reset: () => void;
   defaults: ConfigValues;
+  moduleResolutionError: string | null;
   rootHistory: string[];
   addRootToHistory: (hash: string) => void;
   removeRootFromHistory: (hash: string) => void;
@@ -32,7 +37,7 @@ const ConfigContext = createContext<AppConfig | null>(null);
 function getEnvDefaults(): ConfigValues {
   const rootVersionIndex = getDefaultRootVersionIndex();
   const rpcUrl = getDefaultRpcUrl();
-  const contractAddress = getDefaultContractAddress();
+  const readerAddress = getDefaultReaderAddress();
   const rootHash = getDefaultRootHash();
 
   const inferChainId = () => {
@@ -45,7 +50,10 @@ function getEnvDefaults(): ConfigValues {
   };
   return {
     rpcUrl,
-    contractAddress,
+    contractAddress: "",
+    readerAddress,
+    attestationRegistryAddress: "",
+    tokenAddress: "",
     rootHash,
     rootVersionIndex,
     chainId: inferChainId(),
@@ -61,12 +69,56 @@ function loadStoredConfig(): Partial<ConfigValues> | null {
   }
 }
 
+function normalizeStoredConfig(defaults: ConfigValues): ConfigValues {
+  const stored = loadStoredConfig() || {};
+  const readerAddress = String(stored.readerAddress || defaults.readerAddress || "").trim();
+
+  return {
+    ...defaults,
+    ...stored,
+    readerAddress,
+    contractAddress: "",
+    attestationRegistryAddress: "",
+    tokenAddress: "",
+  };
+}
+
+function persistConfig(next: ConfigValues): void {
+  try {
+    const {
+      rpcUrl,
+      contractAddress,
+      readerAddress,
+      attestationRegistryAddress,
+      tokenAddress,
+      rootHash,
+      rootVersionIndex,
+      chainId,
+    } = next;
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        rpcUrl,
+        contractAddress,
+        readerAddress,
+        attestationRegistryAddress,
+        tokenAddress,
+        rootHash,
+        rootVersionIndex,
+        chainId,
+      }),
+    );
+  } catch {}
+}
+
+function sameAddress(a: string, b: string): boolean {
+  return String(a || "").toLowerCase() === String(b || "").toLowerCase();
+}
+
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const defaults = useMemo(() => getEnvDefaults(), []);
-  const [state, setState] = useState<ConfigValues>(() => ({
-    ...defaults,
-    ...(loadStoredConfig() || {}),
-  }));
+  const [state, setState] = useState<ConfigValues>(() => normalizeStoredConfig(defaults));
+  const [moduleResolutionError, setModuleResolutionError] = useState<string | null>(null);
   const [rootHistory, setRootHistory] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(ROOT_HISTORY_KEY);
@@ -104,6 +156,73 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
+  useEffect(() => {
+    const rpcUrl = state.rpcUrl.trim();
+    const readerAddress = state.readerAddress.trim();
+    if (!rpcUrl || !readerAddress) {
+      setModuleResolutionError(null);
+      return;
+    }
+
+    let cancelled = false;
+    resolveModuleAddresses({
+      rpcUrl,
+      chainId: state.chainId,
+      readerAddress,
+    })
+      .then((resolved) => {
+        if (cancelled) return;
+        setModuleResolutionError(null);
+        setState((prev) => {
+          if (prev.rpcUrl.trim() !== rpcUrl || prev.readerAddress.trim() !== readerAddress) {
+            return prev;
+          }
+          const next = {
+            ...prev,
+            readerAddress: resolved.readerAddress,
+            contractAddress: resolved.contractAddress,
+            attestationRegistryAddress: resolved.attestationRegistryAddress,
+            tokenAddress: resolved.tokenAddress,
+          };
+          if (
+            sameAddress(prev.readerAddress, next.readerAddress) &&
+            sameAddress(prev.contractAddress, next.contractAddress) &&
+            sameAddress(prev.attestationRegistryAddress, next.attestationRegistryAddress) &&
+            sameAddress(prev.tokenAddress, next.tokenAddress)
+          ) {
+            return prev;
+          }
+          persistConfig(next);
+          return next;
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setModuleResolutionError(message);
+        setState((prev) => {
+          if (prev.rpcUrl.trim() !== rpcUrl || prev.readerAddress.trim() !== readerAddress) {
+            return prev;
+          }
+          if (!prev.contractAddress && !prev.attestationRegistryAddress && !prev.tokenAddress) {
+            return prev;
+          }
+          const next = {
+            ...prev,
+            contractAddress: "",
+            attestationRegistryAddress: "",
+            tokenAddress: "",
+          };
+          persistConfig(next);
+          return next;
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state.rpcUrl, state.chainId, state.readerAddress]);
+
   const saveRootHistory = (list: string[]) => {
     try {
       localStorage.setItem(ROOT_HISTORY_KEY, JSON.stringify(list));
@@ -137,14 +256,19 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   };
 
   const update = (partial: Partial<ConfigValues>) => {
+    if (partial.readerAddress != null) setModuleResolutionError(null);
     setState((prev) => {
       const next = { ...prev, ...partial };
+      if (
+        partial.readerAddress != null &&
+        !sameAddress(partial.readerAddress, prev.readerAddress)
+      ) {
+        next.contractAddress = "";
+        next.attestationRegistryAddress = "";
+        next.tokenAddress = "";
+      }
       try {
-        const { rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId } = next;
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ rpcUrl, contractAddress, rootHash, rootVersionIndex, chainId }),
-        );
+        persistConfig(next);
         if (partial.rootHash && /^0x[a-fA-F0-9]{64}$/.test(partial.rootHash.trim())) {
           // also record root history globally
           const normalized = partial.rootHash.trim();
@@ -175,6 +299,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
     setState(getEnvDefaults());
+    setModuleResolutionError(null);
   };
 
   const value = useMemo<AppConfig>(
@@ -183,12 +308,13 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       update,
       reset,
       defaults,
+      moduleResolutionError,
       rootHistory,
       addRootToHistory,
       removeRootFromHistory,
       clearRootHistory,
     }),
-    [state, defaults, rootHistory],
+    [state, defaults, moduleResolutionError, rootHistory],
   );
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;

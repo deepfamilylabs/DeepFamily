@@ -19,22 +19,22 @@ describe('Person Version (add-person) Tests', function () {
   this.timeout(120_000)
 
   async function baseSetup() {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyReader } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer] = await hre.ethers.getSigners()
     await setupStubVerifiers(hre.ethers, deepFamily)
-    return { deepFamily, signer }
+    return { deepFamily, reader: deepFamilyReader, signer }
   }
 
   it('adds a basic person and emits event', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Basic Person')
     const personHash = await addPerson(hre.ethers, deepFamily, signer, null, { person })
-    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 0)
+    const [, totalVersions] = await reader.listPersonVersions(personHash, 0, 0)
     expect(totalVersions).to.equal(1n)
   })
 
   it('prevents duplicate version (same inputs)', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Duplicate Subject')
     await addPerson(hre.ethers, deepFamily, signer, null, { person, tag: 'v1', metadataCID: 'QmCIDx' })
     await expect(
@@ -43,18 +43,18 @@ describe('Person Version (add-person) Tests', function () {
   })
 
   it('adds person without parents (zero hash preserved)', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('No Parent Subject')
     const personHash = await addPerson(hre.ethers, deepFamily, signer, null, { person })
 
-    const [versions, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 100)
+    const [versions, totalVersions] = await reader.listPersonVersions(personHash, 0, 100)
     expect(totalVersions).to.equal(1n)
     expect(versions[0].fatherHash).to.equal(ZERO_HASH)
     expect(versions[0].motherHash).to.equal(ZERO_HASH)
   })
 
   it('adds person with complete parent information', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const fatherPerson = makeTestPerson('Father Version Person', { birthYear: 1970 })
     const motherPerson = makeTestPerson('Mother Version Person', { birthYear: 1972, gender: 2 })
     const childPerson = makeTestPerson('Child Version Person', { birthYear: 2001 })
@@ -78,14 +78,14 @@ describe('Person Version (add-person) Tests', function () {
       tag: 'child',
     })
 
-    const [versions, totalVersions] = await deepFamily.listPersonVersions(childHash, 0, 100)
+    const [versions, totalVersions] = await reader.listPersonVersions(childHash, 0, 100)
     expect(totalVersions).to.equal(1n)
     expect(versions[0].fatherHash).to.equal(fatherHash)
     expect(versions[0].motherHash).to.equal(motherHash)
   })
 
   it('adds multiple versions for same person', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Multi Version Subject')
     const commitment = commitmentOf(person)
 
@@ -93,14 +93,14 @@ describe('Person Version (add-person) Tests', function () {
     await addPerson(hre.ethers, deepFamily, signer, commitment, { person, tag: 'second' })
 
     const personHash = computePersonHash(hre.ethers, commitment)
-    const [versions, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 100)
+    const [versions, totalVersions] = await reader.listPersonVersions(personHash, 0, 100)
     expect(totalVersions).to.equal(2n)
     expect(versions[0].tag).to.equal('first')
     expect(versions[1].tag).to.equal('second')
   })
 
   it('allows providing parent hash with unknown (0) version index when parent exists', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const fatherPerson = makeTestPerson('Father Zero Index', { birthYear: 1970 })
     const childPerson = makeTestPerson('Child Zero Index', { birthYear: 2004 })
     const fatherCommitment = commitmentOf(fatherPerson)
@@ -116,17 +116,17 @@ describe('Person Version (add-person) Tests', function () {
       tag: 'child',
     })
 
-    const [childVersions] = await deepFamily.listPersonVersions(childHash, 0, 10)
+    const [childVersions] = await reader.listPersonVersions(childHash, 0, 10)
     expect(childVersions[0].fatherHash).to.equal(fatherHash)
     expect(childVersions[0].fatherVersionIndex).to.equal(0n)
     expect(childVersions[0].motherHash).to.equal(ZERO_HASH)
 
-    const [zeroIdxChildren] = await deepFamily.listChildren(fatherHash, 0, 0, 10)
+    const [zeroIdxChildren] = await reader.listChildren(fatherHash, 0, 0, 10)
     expect(zeroIdxChildren).to.include(childHash)
   })
 
   it('allows re-submitting a version to backfill parents and link trees', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const fatherPerson = makeTestPerson('Father Linked', { birthYear: 1971 })
     const motherPerson = makeTestPerson('Mother Linked', { birthYear: 1973, gender: 2 })
     const childPerson = makeTestPerson('Child Linked', { birthYear: 2002 })
@@ -153,7 +153,7 @@ describe('Person Version (add-person) Tests', function () {
     })
 
     const childHash = computePersonHash(hre.ethers, childCommitment)
-    const [versions, totalVersions] = await deepFamily.listPersonVersions(childHash, 0, 10)
+    const [versions, totalVersions] = await reader.listPersonVersions(childHash, 0, 10)
     expect(totalVersions).to.equal(2n)
     expect(versions[0].fatherHash).to.equal(ZERO_HASH)
     expect(versions[0].motherHash).to.equal(ZERO_HASH)
@@ -162,14 +162,14 @@ describe('Person Version (add-person) Tests', function () {
     expect(versions[1].fatherHash).to.equal(fatherHash)
     expect(versions[1].motherHash).to.equal(motherHash)
 
-    const [fatherChildren] = await deepFamily.listChildren(fatherHash, 1, 0, 10)
+    const [fatherChildren] = await reader.listChildren(fatherHash, 1, 0, 10)
     expect(fatherChildren).to.include(childHash)
-    const [motherChildren] = await deepFamily.listChildren(motherHash, 1, 0, 10)
+    const [motherChildren] = await reader.listChildren(motherHash, 1, 0, 10)
     expect(motherChildren).to.include(childHash)
   })
 
   it('reverts when proof submitter does not match caller', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const [, mismatchedCaller] = await hre.ethers.getSigners()
     const commitment = 123456789n
     const signerAddr = await signer.getAddress()
@@ -184,18 +184,18 @@ describe('Person Version (add-person) Tests', function () {
   })
 
   it('addPersonVersion allows zero parents when parent commitments are zero', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Zero Parent Subject')
     const commitment = commitmentOf(person)
 
     await addPerson(hre.ethers, deepFamily, signer, commitment, { person })
     const personHash = computePersonHash(hre.ethers, commitment)
-    const [, total] = await deepFamily.listPersonVersions(personHash, 0, 0)
+    const [, total] = await reader.listPersonVersions(personHash, 0, 0)
     expect(total).to.equal(1n)
   })
 
   it('addPersonVersion rejects non-zero parent ref when corresponding commitment is zero', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const commitment = 123456790n
     const signerAddr = await signer.getAddress()
 
@@ -209,7 +209,7 @@ describe('Person Version (add-person) Tests', function () {
   })
 
   it('allows hashAlgoId == 0', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Zero Algo Subject', { hashAlgoId: 0 })
     const personHash = await addPerson(hre.ethers, deepFamily, signer, null, {
       person,
@@ -217,12 +217,12 @@ describe('Person Version (add-person) Tests', function () {
       tag: 'v0',
       metadataCID: 'ipfs://zero-algo',
     })
-    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 0)
+    const [, totalVersions] = await reader.listPersonVersions(personHash, 0, 0)
     expect(totalVersions).to.equal(1n)
   })
 
   it('supports non-default schemaVersion and cryptoSuiteVersion in public signals', async () => {
-    const { deepFamily, signer } = await baseSetup()
+    const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Versioned Subject', {
       schemaVersion: 2,
       cryptoSuiteVersion: 3,
@@ -236,7 +236,7 @@ describe('Person Version (add-person) Tests', function () {
       tag: 'v2',
       metadataCID: 'ipfs://versioned',
     })
-    const [, totalVersions] = await deepFamily.listPersonVersions(personHash, 0, 0)
+    const [, totalVersions] = await reader.listPersonVersions(personHash, 0, 0)
     expect(totalVersions).to.equal(1n)
   })
 })

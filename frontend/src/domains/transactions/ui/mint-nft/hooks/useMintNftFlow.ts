@@ -2,7 +2,10 @@ import { useCallback, useMemo, useReducer, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
-import { createDeepFamilyContract } from "../../../../../shared/clients/contractFactory";
+import {
+  createDeepFamilyContract,
+  createDeepFamilyReaderContract,
+} from "../../../../../shared/clients/contractFactory";
 import { getFriendlyError } from "../../../../../shared/lib/errors";
 import { waitForTransactionReceipt } from "../../../api/txGateway";
 import { executeMintFlow } from "../../../services/mintNftService";
@@ -14,7 +17,7 @@ export type { ExecuteMintFlowResult, MintNftFlowArgs };
 
 export function useMintNftFlow() {
   const { signer, address } = useWallet();
-  const { contractAddress } = useConfig();
+  const { contractAddress, readerAddress } = useConfig();
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(mintNftReducer, initialMintNftFlowState);
   const runIdRef = useRef(0);
@@ -74,10 +77,12 @@ export function useMintNftFlow() {
           return await waitForTransactionReceipt(tx);
         };
 
-        const getVersionDetails = async (personHash: string, versionIndex: number) => {
-          const readContract = createDeepFamilyContract(contractAddress, signer);
-          return await readContract.getVersionDetails(personHash, versionIndex);
-        };
+        const getVersionDetails = readerAddress
+          ? async (personHash: string, versionIndex: number) => {
+              const readContract = createDeepFamilyReaderContract(readerAddress, signer);
+              return await readContract.getVersionDetails(personHash, versionIndex);
+            }
+          : undefined;
 
         const result = await executeMintFlow({
           contract,
@@ -107,7 +112,7 @@ export function useMintNftFlow() {
         throw error;
       }
     },
-    [address, contractAddress, signer, t],
+    [address, contractAddress, readerAddress, signer, t],
   );
 
   const run = useCallback(

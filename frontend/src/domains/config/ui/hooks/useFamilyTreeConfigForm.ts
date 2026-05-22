@@ -34,7 +34,7 @@ export function useFamilyTreeConfigForm() {
   const {
     rpcUrl,
     chainId,
-    contractAddress,
+    readerAddress,
     rootHash,
     rootVersionIndex,
     update,
@@ -61,7 +61,7 @@ export function useFamilyTreeConfigForm() {
 
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl);
   const [localChainId, setLocalChainId] = useState(chainId);
-  const [localContractAddress, setLocalContractAddress] = useState(contractAddress);
+  const [localReaderAddress, setLocalReaderAddress] = useState(readerAddress);
   const [localRootHash, setLocalRootHash] = useState(rootHash);
   const [localVersion, setLocalVersion] = useState(rootVersionIndex);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -76,10 +76,10 @@ export function useFamilyTreeConfigForm() {
   useEffect(() => {
     setLocalRpcUrl(rpcUrl);
     setLocalChainId(chainId);
-    setLocalContractAddress(contractAddress);
+    setLocalReaderAddress(readerAddress);
     setLocalRootHash(rootHash);
     setLocalVersion(rootVersionIndex);
-  }, [rpcUrl, chainId, contractAddress, rootHash, rootVersionIndex]);
+  }, [rpcUrl, chainId, readerAddress, rootHash, rootVersionIndex]);
 
   const presetNetworks = useMemo<NetworkOption[]>(
     () =>
@@ -131,11 +131,11 @@ export function useFamilyTreeConfigForm() {
     if (!isUrl(localRpcUrl)) next.rpc = "familyTree.validation.rpc";
     if (!Number.isFinite(localChainId) || (localChainId || 0) <= 0)
       next.chainId = "familyTree.validation.chainIdInvalid";
-    if (!isAddress(localContractAddress)) next.contract = "familyTree.validation.contract";
+    if (!isAddress(localReaderAddress)) next.contract = "familyTree.validation.reader";
     if (!isHash32(localRootHash)) next.root = "familyTree.validation.root";
     setErrors(next);
     return Object.keys(next).length === 0;
-  }, [localRpcUrl, localChainId, localContractAddress, localRootHash]);
+  }, [localRpcUrl, localChainId, localReaderAddress, localRootHash]);
 
   useEffect(() => {
     validateAll();
@@ -144,7 +144,7 @@ export function useFamilyTreeConfigForm() {
   const hasDiff =
     localRpcUrl !== rpcUrl ||
     localChainId !== chainId ||
-    localContractAddress !== contractAddress ||
+    localReaderAddress !== readerAddress ||
     localRootHash !== rootHash ||
     localVersion !== rootVersionIndex;
 
@@ -171,7 +171,7 @@ export function useFamilyTreeConfigForm() {
     const localized = getLocalizedDefaultRoot();
     setLocalRpcUrl(defaults.rpcUrl);
     setLocalChainId(defaults.chainId);
-    setLocalContractAddress(defaults.contractAddress);
+    setLocalReaderAddress(defaults.readerAddress);
     setLocalRootHash(localized.hash);
     setLocalVersion(localized.version);
   }, [defaults, getLocalizedDefaultRoot]);
@@ -181,7 +181,10 @@ export function useFamilyTreeConfigForm() {
     update({
       rpcUrl: localRpcUrl,
       chainId: localChainId,
-      contractAddress: localContractAddress,
+      readerAddress: localReaderAddress,
+      contractAddress: "",
+      attestationRegistryAddress: "",
+      tokenAddress: "",
       rootHash: localRootHash,
       rootVersionIndex: localVersion,
     });
@@ -190,7 +193,7 @@ export function useFamilyTreeConfigForm() {
     validateAll,
     localRpcUrl,
     localChainId,
-    localContractAddress,
+    localReaderAddress,
     localRootHash,
     localVersion,
   ]);
@@ -317,8 +320,8 @@ export function useFamilyTreeConfigForm() {
     },
 
     contract: {
-      value: localContractAddress,
-      onChange: setLocalContractAddress,
+      value: localReaderAddress,
+      onChange: setLocalReaderAddress,
       error: errors.contract,
     },
 

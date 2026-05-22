@@ -351,7 +351,7 @@
     },
     "versionSelector": {},
     "config": {
-      "networkAndContract": "Network & Contract",
+      "networkAndContract": "Network & Module",
       "dataSource": "Data Source",
       "displayOptions": "Display Options",
       "rpc": "RPC",
@@ -365,6 +365,7 @@
       "customNetworkAdded": "Custom network added",
       "unknownNetwork": "Unknown",
       "contract": "Contract",
+      "readerAddress": "Reader Address",
       "root": "Root Hash",
       "clearAndRefresh": "Clear",
       "rootHistory": "Root hash history",
@@ -452,6 +453,7 @@
     "validation": {
       "rpc": "Please enter a valid RPC URL",
       "contract": "Please enter a valid contract address (0x + 40 hex chars)",
+      "reader": "Please enter a valid reader address (0x + 40 hex chars)",
       "root": "Please enter a valid root hash (0x + 64 hex chars)",
       "chainIdInvalid": "Please enter a valid chain ID",
       "customNetwork": "Please enter network name, valid chain ID, and RPC URL",

@@ -5,12 +5,12 @@ async function fileExists(p) {
   try { await fs.access(p); return true } catch { return false }
 }
 
-async function main() {
+async function syncAbi(contractName) {
   const cwd = process.cwd() // frontend/
   const candidates = [
-    path.resolve(cwd, '../artifacts/contracts/DeepFamily.sol/DeepFamily.json'), // hardhat
-    path.resolve(cwd, '../out/DeepFamily.sol/DeepFamily.json'), // foundry flat
-    path.resolve(cwd, '../contracts/out/DeepFamily.sol/DeepFamily.json'), // alternate
+    path.resolve(cwd, `../artifacts/contracts/${contractName}.sol/${contractName}.json`), // hardhat
+    path.resolve(cwd, `../out/${contractName}.sol/${contractName}.json`), // foundry flat
+    path.resolve(cwd, `../contracts/out/${contractName}.sol/${contractName}.json`), // alternate
   ]
 
   let src = null
@@ -18,10 +18,10 @@ async function main() {
     if (await fileExists(c)) { src = c; break }
   }
 
-  const dest = path.resolve(cwd, 'src/abi/DeepFamily.json')
+  const dest = path.resolve(cwd, `src/abi/${contractName}.json`)
 
   if (!src) {
-    console.warn('[sync-abi] DeepFamily.json not found in artifacts, keeping existing ABI as fallback. Searched paths:')
+    console.warn(`[sync-abi] ${contractName}.json not found in artifacts, keeping existing ABI as fallback. Searched paths:`)
     candidates.forEach(c => console.warn('  -', c))
     return
   }
@@ -32,6 +32,11 @@ async function main() {
   console.log('[sync-abi] ABI synced ->', path.relative(cwd, dest))
 }
 
-main().catch(e => { console.error('[sync-abi] Failed:', e); process.exit(1) })
+async function main() {
+  for (const contractName of ['DeepFamily', 'DeepFamilyReader', 'DeepFamilyAttestationRegistry']) {
+    await syncAbi(contractName)
+  }
+}
 
+main().catch(e => { console.error('[sync-abi] Failed:', e); process.exit(1) })
 

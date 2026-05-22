@@ -205,7 +205,7 @@ The most common worker crash is accidentally pulling React or DOM code into the 
 
 - Contract ABIs live in `frontend/src/abi/` and are copied from Hardhat build output by `frontend/scripts/sync-abi.mjs`. The script runs automatically in `npm run dev` and `npm run build`.
 - Providers and contract instances are constructed in `frontend/src/shared/clients/`.
-- RPC URL and contract address come from `VITE_*` env vars (see below).
+- RPC URL plus the DeepFamilyReader module entry address come from `VITE_*` env vars; main and registry addresses are derived on startup.
 - If the frontend breaks after a Solidity interface change, re-run dev/build or `node frontend/scripts/sync-abi.mjs` directly.
 
 ## Configuration
@@ -216,7 +216,7 @@ The frontend reads configuration from `frontend/.env` and `frontend/.env.local` 
 
 ```bash
 VITE_RPC_URL=...
-VITE_CONTRACT_ADDRESS=...
+VITE_CONTRACT_ADDRESS=... # DeepFamilyReader address
 VITE_ROOT_PERSON_HASH=...
 VITE_ROOT_VERSION_INDEX=...
 ```
@@ -350,7 +350,7 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 
 | Symptom                         | First thing to check                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------- |
-| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS`, and that the node is reachable                     |
+| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS` (DeepFamilyReader), and that the node is reachable |
 | ABI mismatch / missing methods  | Re-run `npm run frontend:sync:abi` (or restart `frontend:dev`)                              |
 | Proof generation fails          | Confirm `/zk/*` artifacts exist and match the deployed verifier version                     |
 | Worker crashes on import        | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph    |

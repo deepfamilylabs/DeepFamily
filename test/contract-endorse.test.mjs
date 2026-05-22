@@ -53,18 +53,19 @@ describe('Endorse Tests', function () {
   this.timeout(180_000)
 
   async function deployContracts() {
-    const { deepFamily, token } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyReader, token } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const signers = await hre.ethers.getSigners()
     await setupStubVerifiers(hre.ethers, deepFamily)
-    return { deepFamily, token, signers }
+    return { deepFamily, reader: deepFamilyReader, token, signers }
   }
 
   async function createBasicPerson() {
-    const { deepFamily, token, signers } = await deployContracts()
+    const { deepFamily, reader, token, signers } = await deployContracts()
     const person = makeTestPerson('Basic Endorse Person')
     const commitment = commitmentOf(person)
     const personHash = await addPerson(hre.ethers, deepFamily, signers[0], commitment, { person, tag: 'v1' })
-    return { deepFamily, token, signers, personHash, commitment, person }
+    return { deepFamily, reader, token, signers, personHash, commitment, person }
   }
 
   async function createChildWithParents() {
@@ -299,18 +300,18 @@ describe('Endorse Tests', function () {
 
   describe('listUserEndorsements', () => {
     it('returns empty list when user has no endorsements', async () => {
-      const { deepFamily, signers } = await deployContracts()
-      const result = await deepFamily.listUserEndorsements(signers[0].address, 0, 10)
+      const { reader, signers } = await deployContracts()
+      const result = await reader.listUserEndorsements(signers[0].address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(0)
       expect(result.totalCount).to.equal(0n)
     })
 
     it('returns single endorsement after user endorses one person', async () => {
-      const { deepFamily, personHash } = await createBasicPerson()
+      const { deepFamily, reader, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
       await endorseVersion(deepFamily, endorser, personHash, 1)
 
-      const result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
+      const result = await reader.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(1)
       expect(result.personHashes[0]).to.equal(personHash)
       expect(result.versionIndices[0]).to.equal(1n)
@@ -318,7 +319,7 @@ describe('Endorse Tests', function () {
     })
 
     it('returns multiple endorsements', async () => {
-      const { deepFamily, signers } = await deployContracts()
+      const { deepFamily, reader, signers } = await deployContracts()
       const [endorser] = signers
       const hashes = []
       for (let i = 0; i < 3; i++) {
@@ -327,13 +328,13 @@ describe('Endorse Tests', function () {
         hashes.push(h)
         await endorseVersion(deepFamily, endorser, h, 1)
       }
-      const result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
+      const result = await reader.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(3)
       expect(result.totalCount).to.equal(3n)
     })
 
     it('supports pagination correctly', async () => {
-      const { deepFamily, signers } = await deployContracts()
+      const { deepFamily, reader, signers } = await deployContracts()
       const [endorser] = signers
       const persons = []
       for (let i = 0; i < 5; i++) {
@@ -343,12 +344,12 @@ describe('Endorse Tests', function () {
         await endorseVersion(deepFamily, endorser, h, 1)
       }
 
-      let result = await deepFamily.listUserEndorsements(endorser.address, 0, 2)
+      let result = await reader.listUserEndorsements(endorser.address, 0, 2)
       expect(result.personHashes).to.have.lengthOf(2)
       expect(result.hasMore).to.be.true
       expect(result.nextOffset).to.equal(2n)
 
-      result = await deepFamily.listUserEndorsements(endorser.address, 4, 2)
+      result = await reader.listUserEndorsements(endorser.address, 4, 2)
       expect(result.personHashes).to.have.lengthOf(1)
       expect(result.hasMore).to.be.false
     })
@@ -356,14 +357,14 @@ describe('Endorse Tests', function () {
 
   describe('cancelEndorsement', () => {
     it('reverts when trying to cancel non-existent endorsement', async () => {
-      const { deepFamily, personHash } = await createBasicPerson()
+      const { deepFamily, reader, personHash } = await createBasicPerson()
       await expect(
         deepFamily.cancelEndorsement(personHash)
       ).to.be.revertedWithCustomError(deepFamily, 'NotEndorsed')
     })
 
     it('successfully cancels endorsement and decrements count', async () => {
-      const { deepFamily, personHash } = await createBasicPerson()
+      const { deepFamily, reader, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
       await endorseVersion(deepFamily, endorser, personHash, 1)
 
@@ -378,16 +379,16 @@ describe('Endorse Tests', function () {
     })
 
     it('removes person from user endorsed list', async () => {
-      const { deepFamily, personHash } = await createBasicPerson()
+      const { deepFamily, reader, personHash } = await createBasicPerson()
       const [endorser] = await hre.ethers.getSigners()
       await endorseVersion(deepFamily, endorser, personHash, 1)
 
-      let result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
+      let result = await reader.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(1)
 
       await deepFamily.connect(endorser).cancelEndorsement(personHash)
 
-      result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
+      result = await reader.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(0)
     })
 
@@ -404,7 +405,7 @@ describe('Endorse Tests', function () {
     })
 
     it('correctly handles swap-and-pop when cancelling from middle of list', async () => {
-      const { deepFamily, signers } = await deployContracts()
+      const { deepFamily, reader, signers } = await deployContracts()
       const [endorser] = signers
       const hashes = []
       for (let i = 0; i < 3; i++) {
@@ -416,7 +417,7 @@ describe('Endorse Tests', function () {
 
       await deepFamily.connect(endorser).cancelEndorsement(hashes[1])
 
-      const result = await deepFamily.listUserEndorsements(endorser.address, 0, 10)
+      const result = await reader.listUserEndorsements(endorser.address, 0, 10)
       expect(result.personHashes).to.have.lengthOf(2)
       expect(result.personHashes).to.include(hashes[0])
       expect(result.personHashes).to.include(hashes[2])

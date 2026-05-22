@@ -10,7 +10,7 @@ const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
-  const { deepFamily } = await ensureIntegratedSystem(connection);
+  const { deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection);
   const deepFamilyWithSigner = deepFamily.connect(signer);
 
   const tokenId = BigInt(args.tokenid);
@@ -36,7 +36,7 @@ const action = async (args, hre) => {
   // Read metadata to validate continuity & sealed state
   let metadata;
   try {
-    metadata = await deepFamilyWithSigner.getStoryMetadata(tokenId);
+    metadata = await deepFamilyReader.getStoryMetadata(tokenId);
   } catch (e) {
     throw new Error(`Failed to read metadata (token may not exist). ${e.message || e}`);
   }

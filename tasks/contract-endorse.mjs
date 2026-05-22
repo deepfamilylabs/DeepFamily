@@ -19,7 +19,7 @@ const action = async (args, hre) => {
   }
 
   // Existence / bounds check (prevents confusing InvalidVersionIndex revert on fresh network)
-  const [, totalVersions] = await deepFamily.listPersonVersions(args.person, 0, 0);
+  const totalVersions = await deepFamily.personVersionsCount(args.person);
   if (versionIndex > totalVersions) {
     throw new Error(
       `Version index ${versionIndex} out of range (total=${totalVersions}). Did you add the person on this network / use --network localhost?`,

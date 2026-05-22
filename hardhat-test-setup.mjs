@@ -51,7 +51,7 @@ if (typeof process !== 'undefined' && process.on) {
 hre.run = async (taskName, args = {}) => {
   const { ethers } = hre;
   const [signer] = await ethers.getSigners();
-  const { deepFamily, token } = await ensureIntegratedSystem(connection);
+  const { deepFamily, deepFamilyReader, token } = await ensureIntegratedSystem(connection);
 
   switch (taskName) {
     case "add-person": {
@@ -167,7 +167,7 @@ hre.run = async (taskName, args = {}) => {
       const tokenId = BigInt(String(args.tokenid));
       const offset = Number(args.offset ?? 0);
       const limit = Number(args.limit ?? 20);
-      return deepFamily.listStoryChunks(tokenId, offset, limit);
+      return deepFamilyReader.listStoryChunks(tokenId, offset, limit);
     }
 
     case "seal-story": {

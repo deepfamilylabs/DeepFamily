@@ -796,7 +796,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       }
 
       try {
-        storyMetadata = await deepFamily.getStoryMetadata(tokenId);
+        storyMetadata = await deepFamily.storyMetadata(tokenId);
       } catch (e) {
         storyMetadata = null;
       }
@@ -882,7 +882,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
     if (!storyMetadata) {
       try {
-        storyMetadata = await deepFamily.getStoryMetadata(tokenId);
+        storyMetadata = await deepFamily.storyMetadata(tokenId);
       } catch (e) {
         storyMetadata = { totalChunks: 0, isSealed: false };
       }
