@@ -104,6 +104,7 @@ async function main() {
   const { ethers } = connection;
   const { deepFamily, deepFamilyReader, token } = await ensureIntegratedSystem(connection, {
     writeDeployments: true,
+    artifacts: hre.artifacts,
   });
 
   console.log("\nContract addresses:");

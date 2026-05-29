@@ -4,6 +4,7 @@
 
 **Location**: `contracts/DeepFamily.sol`
 **Description**: Main family tree protocol implementing multi-version person management, ZK-proof verification, community endorsement, NFT minting, and story sharding.
+**Upgradeability**: Deployed behind a UUPS (ERC-1967) proxy. State is wired via `initialize(...)` rather than a constructor; upgrades are gated by `_authorizeUpgrade` (`onlyOwner`, intended owner = `TimelockController`). See [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups).
 
 ### Critical Constants
 
@@ -289,10 +290,68 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 
 #### Security Features
 - **50+ Custom Errors**: Explicit revert reasons for all failure cases
-- **Reentrancy Guards**: Protection on all external value transfers
+- **Reentrancy Guards**: `ReentrancyGuardTransient` (EIP-1153) on all external value transfers
 - **Input Validation**: Comprehensive parameter checking with constraints
 - **ETH Rejection**: Contract rejects direct ETH transfers (receive/fallback revert)
 - **ZK Proof Validation**: Verifier registry routes person and name-disclosure proofs by proof purpose
+
+## Upgradeability & Governance (UUPS)
+
+`DeepFamily` and `DeepFamilyAttestationRegistry` are deployed as **UUPS (ERC-1967) proxies**, so
+their logic can evolve while their addresses and state persist. The other contracts are **not**
+upgradeable by design: `DeepFamilyToken` (the value contract is kept minimal/immutable),
+`DeepFamilyReader` (stateless; redeploy + point at the same proxy to change read logic), the ZK
+verifiers, the verifier adapter, and the libraries.
+
+### Proxy & Initialization
+
+- The proxy is a thin `ERC1967Proxy` wrapper (`contracts/proxy/UUPSProxy.sol`).
+- Each implementation disables initializers in its constructor (`_disableInitializers()`), so the
+  logic contract can never be initialized directly — only the proxy is, exactly once.
+- `DeepFamily.initialize(token, attestationRegistry, initialOwner)` and
+  `DeepFamilyAttestationRegistry.initialize(initialOwner)` replace constructors. Values that were
+  previously `immutable` (token / registry addresses) are now plain storage written once in
+  `initialize` with no setter (effectively immutable; `immutable` is unusable behind a proxy).
+
+### Upgrade Authorization & Governance
+
+- Upgrades are gated by `_authorizeUpgrade(newImplementation) onlyOwner` on both proxies.
+- Intended production owner is a **`TimelockController`** whose `PROPOSER`/`CANCELLER` roles are held
+  by a **multisig**: the multisig decides *who* can upgrade, the timelock enforces a public delay so
+  the community can audit/exit/cancel before an upgrade lands.
+- On live networks the deployment refuses to keep upgrade authority on an EOA: a `GOVERNANCE_OWNER`
+  (validated to behave like a timelock with a non-zero delay) is mandatory, and ownership is handed
+  over after wiring. Local/simulated networks keep the deployer as owner for test flows.
+
+### Storage-Layout Safety
+
+- All upgradeable bases use OpenZeppelin v5 **ERC-7201 namespaced storage**, so each leaf contract's
+  own variables are the only sequential storage. New state in a future implementation is added by
+  **appending variables after the existing ones** (append-only). The leaf contracts intentionally
+  carry **no `__gap`** — for a leaf with namespaced parents a gap adds no protection that the
+  append-only checker doesn't already provide.
+- `npm run storage:check` (`scripts/check-storage-layout.mjs`) diffs the current layout against the
+  committed baselines in `storage-layouts/*.json`, and additionally runs a positive mock
+  (`DeepFamilyV2Mock` must pass) and a negative mock (`UnsafeUpgradeMock` must fail) so the checker
+  cannot silently break. It is part of `npm run contracts:check`.
+- The `upgrade-schedule` / `upgrade-execute` Hardhat tasks (`tasks/upgrade-schedule.mjs`,
+  `tasks/upgrade-execute.mjs`) additionally validate the *specific* candidate implementation against
+  the proxy baseline and verify the on-chain runtime bytecode (metadata-stripped, library-linked)
+  before staging an upgrade through the timelock.
+
+### Reentrancy Guard
+
+`DeepFamily` uses OpenZeppelin's **`ReentrancyGuardTransient`** (EIP-1153 transient storage). It has
+no constructor and no persistent storage, so it is proxy-safe without an initializer, occupies no
+storage-layout slots, and is cheaper than the storage-based guard. This requires Cancun-capable
+chains (all current targets — Ethereum, Conflux eSpace ≥ v3.0, local Hardhat — support EIP-1153).
+
+### Build Requirements
+
+The upgradeable stack requires **solc 0.8.28**, **`viaIR` enabled** (without it the `DeepFamily`
+implementation exceeds the EIP-170 24,576-byte limit), and **`evmVersion: cancun`** (OpenZeppelin
+5.6 emits `MCOPY`, and `ReentrancyGuardTransient` uses `TSTORE`/`TLOAD`). The compiler also emits
+`storageLayout` so the upgrade-safety checker can diff proxy contracts.
 
 ## DeepFamilyToken.sol - DEEP ERC20 Utility Point
 
@@ -455,7 +514,8 @@ error TokenContractNotSet();
 ```
 
 ### Security Patterns
-- **Reentrancy Guards**: All external value transfers protected via OpenZeppelin's `nonReentrant`
+- **Reentrancy Guards**: External value transfers protected via OpenZeppelin `ReentrancyGuardTransient` (EIP-1153 transient storage; proxy-safe, no initializer)
+- **Upgradeability**: `DeepFamily` + `DeepFamilyAttestationRegistry` are UUPS proxies; upgrades gated by `_authorizeUpgrade` (timelock-owned) and storage-layout safety checks (see [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups))
 - **Input Validation**: Comprehensive parameter checking with custom constraints
 - **Access Control**: Role-based permissions with explicit error types
 - **Immutability Controls**: Sealed stories and initialized contracts prevent further modification

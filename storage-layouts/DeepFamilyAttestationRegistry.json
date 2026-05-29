@@ -1,0 +1,190 @@
+{
+  "storage": [
+    {
+      "astId": 13074,
+      "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+      "label": "deepFamily",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_address"
+    },
+    {
+      "astId": 13079,
+      "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+      "label": "attestationRefs",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_mapping(t_bytes32,t_struct(AttestationRef)15806_storage)"
+    },
+    {
+      "astId": 13083,
+      "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+      "label": "attestationRefExists",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_bytes32,t_bool)"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_bytes32,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
+    },
+    "t_mapping(t_bytes32,t_struct(AttestationRef)15806_storage)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => struct AttestationTypes.AttestationRef)",
+      "numberOfBytes": "32",
+      "value": "t_struct(AttestationRef)15806_storage"
+    },
+    "t_string_storage": {
+      "encoding": "bytes",
+      "label": "string",
+      "numberOfBytes": "32"
+    },
+    "t_struct(AttestationRef)15806_storage": {
+      "encoding": "inplace",
+      "label": "struct AttestationTypes.AttestationRef",
+      "members": [
+        {
+          "astId": 15781,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "attestationRefVersion",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 15783,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "subjectType",
+          "offset": 2,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 15785,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "subjectHash",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 15787,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "actionType",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 15789,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "actionDigest",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 15791,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "attestationPayloadDigest",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 15793,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "signatureSuiteId",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 15795,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "signerKeyId",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 15797,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "uri",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_string_storage"
+        },
+        {
+          "astId": 15799,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "issuedAt",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 15801,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "expiresAt",
+          "offset": 8,
+          "slot": "8",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 15803,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "revocationType",
+          "offset": 16,
+          "slot": "8",
+          "type": "t_uint8"
+        },
+        {
+          "astId": 15805,
+          "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
+          "label": "revocationRef",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_bytes32"
+        }
+      ],
+      "numberOfBytes": "320"
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint64": {
+      "encoding": "inplace",
+      "label": "uint64",
+      "numberOfBytes": "8"
+    },
+    "t_uint8": {
+      "encoding": "inplace",
+      "label": "uint8",
+      "numberOfBytes": "1"
+    }
+  }
+}
