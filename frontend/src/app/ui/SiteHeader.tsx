@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Home, Search, Network, Book, Zap, Menu } from "lucide-react";
+import { Home, Search, Network, Book, Zap, Menu, ScrollText } from "lucide-react";
 import HeaderControls from "./HeaderControls";
 import Logo from "./Logo";
 import { PageContainer } from "../../shared/ui";
@@ -110,6 +110,16 @@ const SiteHeader = memo(() => {
           >
             <Book className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.people")}</span>
+          </NavLink>
+          <NavLink
+            to="/genealogyBook"
+            className={() => getNavClasses(isPathActive("/genealogyBook"))}
+            onClick={() => handleNavClick("/genealogyBook")}
+          >
+            <ScrollText className="w-4 h-4" />
+            <span className="hidden lg:inline">
+              {t("navigation.genealogyBook", "Genealogy")}
+            </span>
           </NavLink>
           <NavLink
             to="/search"

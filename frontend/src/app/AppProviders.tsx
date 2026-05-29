@@ -1,5 +1,5 @@
 import React from "react";
-import { ConfigProvider } from "../domains/config";
+import { ConfigProvider, LocalizedRootSync } from "../domains/config";
 import { ToastProvider } from "../shared/ui";
 import { TreeViewProvider, VizOptionsProvider } from "../domains/tree";
 import { WalletProvider, NetworkSelectionLayer, WalletSelectionLayer } from "../domains/wallet";
@@ -16,6 +16,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <ConfigProvider>
+        <LocalizedRootSync />
         <ToastProvider>
           <WalletProvider>
             <SidebarProvider>

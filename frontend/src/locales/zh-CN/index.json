@@ -24,6 +24,7 @@
   "navigation": {
     "home": "首页",
     "familyTree": "族谱",
+    "genealogyBook": "谱牒",
     "search": "搜索",
     "people": "人物",
     "actions": "操作"
@@ -340,6 +341,69 @@
       "yearExceedsCurrent": "公元年份不能超过当前年份"
     },
     "offset": "偏移"
+  },
+  "genealogyBook": {
+    "title": "谱牒纸本视图",
+    "subtitle": "以传统纸质族谱风格实时预览",
+    "styleSwitchLabel": "谱牒样式",
+    "realtime": "实时预览",
+    "recordCount": "共 {{count}} 条",
+    "generationLabel": "第 {{number}} 世",
+    "volumeLabel": "卷 {{number}}",
+    "ouPageTitle": "族谱世系 --- 五世",
+    "ouSpineTitle": "族谱",
+    "ouSpineTitleWithSurname": "{{surname}}氏族谱",
+    "ouHallName": "深谱",
+    "ouRightPage": "正页",
+    "ouLeftPage": "续页",
+    "ouGenerationMark": "{{han}}世",
+    "ouFemaleMark": "女",
+    "ouMainSpread": "正图",
+    "ouContinuationPage": "续页 {{number}}",
+    "ouRecordContinued": "详见牒记",
+    "ouRecordContinuedMark": "续",
+    "ouTableRule": "五世一表，自上而下横格，由右向左竖排。",
+    "ouOverlapNote": "本表重列上一表第五世。",
+    "suPageTitle": "苏式世系 --- 五世直行",
+    "suRightPage": "右页",
+    "suLeftPage": "左页",
+    "suGenerationMark": "{{han}}世",
+    "suMainSpread": "正图",
+    "suContinuationPage": "续页 {{number}}",
+    "suTableRule": "五世一图，世群窄直栏，由右向左排。",
+    "suOverlapNote": "本图重列上一图第五世。",
+    "suRootLabel": "始祖",
+    "suFirstSon": "长子",
+    "suSecondSon": "次子",
+    "suNthSon": "{{number}}子",
+    "suFirstDaughter": "长女",
+    "suSecondDaughter": "次女",
+    "suNthDaughter": "{{number}}女",
+    "suContinuedGeneration": "续",
+    "repeatedGeneration": "重列",
+    "styles": {
+      "ou": "欧式",
+      "su": "苏式",
+      "pagoda": "宝塔式",
+      "dieji": "牒记式",
+      "modern": "现代式"
+    },
+    "fields": {
+      "tag": "标签",
+      "birth": "生",
+      "death": "卒",
+      "birthPlace": "籍贯",
+      "origin": "籍贯",
+      "deathPlace": "卒于",
+      "notes": "附记",
+      "endorsements": "背书",
+      "descendants": "子嗣"
+    },
+    "empty": {
+      "loading": "正在加载族谱数据",
+      "title": "暂无族谱根节点",
+      "description": "请先配置根节点。"
+    }
   },
   "familyTree": {
     "title": "可视化",

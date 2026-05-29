@@ -24,6 +24,7 @@
   "navigation": {
     "home": "Home",
     "familyTree": "Tree",
+    "genealogyBook": "Genealogy",
     "search": "Search",
     "people": "People",
     "actions": "Actions"
@@ -340,6 +341,69 @@
       "yearExceedsCurrent": "AD year cannot exceed current year"
     },
     "offset": "Offset"
+  },
+  "genealogyBook": {
+    "title": "Genealogy Book",
+    "subtitle": "Paper-style genealogy preview",
+    "styleSwitchLabel": "Genealogy book style",
+    "realtime": "Realtime preview",
+    "recordCount": "{{count}} records",
+    "generationLabel": "Generation {{number}}",
+    "volumeLabel": "Volume {{number}}",
+    "ouPageTitle": "Genealogy lineage --- five generations",
+    "ouSpineTitle": "Genealogy",
+    "ouSpineTitleWithSurname": "{{surname}} family genealogy",
+    "ouHallName": "DeepFamily",
+    "ouRightPage": "main page",
+    "ouLeftPage": "continuation",
+    "ouGenerationMark": "Gen {{number}}",
+    "ouFemaleMark": "女",
+    "ouMainSpread": "main chart",
+    "ouContinuationPage": "continuation {{number}}",
+    "ouRecordContinued": "full record in register",
+    "ouRecordContinuedMark": "cont.",
+    "ouTableRule": "Five generations per table, horizontal bands, vertical right-to-left text.",
+    "ouOverlapNote": "This table repeats the previous table's fifth generation.",
+    "suPageTitle": "Su-style lineage --- five vertical generations",
+    "suRightPage": "right page",
+    "suLeftPage": "left page",
+    "suGenerationMark": "Gen {{number}}",
+    "suMainSpread": "main chart",
+    "suContinuationPage": "continuation {{number}}",
+    "suTableRule": "Five generation groups with narrow vertical lanes, right-to-left.",
+    "suOverlapNote": "This chart repeats the previous chart's fifth generation.",
+    "suRootLabel": "ancestor",
+    "suFirstSon": "first son",
+    "suSecondSon": "second son",
+    "suNthSon": "{{number}} son",
+    "suFirstDaughter": "first daughter",
+    "suSecondDaughter": "second daughter",
+    "suNthDaughter": "{{number}} daughter",
+    "suContinuedGeneration": "continued",
+    "repeatedGeneration": "repeated",
+    "styles": {
+      "ou": "Ou-style",
+      "su": "Su-style",
+      "pagoda": "Pagoda",
+      "dieji": "Register",
+      "modern": "Modern"
+    },
+    "fields": {
+      "tag": "Tag",
+      "birth": "Birth",
+      "death": "Death",
+      "birthPlace": "Birthplace",
+      "origin": "Origin",
+      "deathPlace": "Death place",
+      "notes": "Notes",
+      "endorsements": "Endorsements",
+      "descendants": "Children"
+    },
+    "empty": {
+      "loading": "Loading genealogy data",
+      "title": "No genealogy root available",
+      "description": "Configure a root first."
+    }
   },
   "familyTree": {
     "title": "Visualization",

@@ -22,12 +22,13 @@ export default function Layout() {
   const isHomePage = location.pathname === "/";
   const isPeoplePage = location.pathname === "/people";
   const isTreePage = location.pathname === "/familyTree";
-  const isFullWidthPage = isHomePage || isPeoplePage || isTreePage;
+  const isGenealogyBookPage = location.pathname === "/genealogyBook";
+  const isFullWidthPage = isHomePage || isPeoplePage || isTreePage || isGenealogyBookPage;
 
   // Dynamic background based on page type
   const bgClass =
-    isPeoplePage || isTreePage
-      ? "bg-white dark:bg-black" // PeoplePage and TreePage handle their own background
+    isPeoplePage || isTreePage || isGenealogyBookPage
+      ? "bg-white dark:bg-black" // Full-width pages handle their own background
       : "bg-gradient-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900";
 
   // Desktop padding logic:
