@@ -1045,6 +1045,7 @@ async function main() {
   const [signer] = await ethers.getSigners();
   const { deepFamily, token } = await ensureIntegratedSystem(connection, {
     writeDeployments: true,
+    artifacts: hre.artifacts,
   });
   const deepFamilyWithSigner = deepFamily.connect(signer);
   const tokenWithSigner = token.connect(signer);

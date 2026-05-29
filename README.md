@@ -55,7 +55,9 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 | Contract | Purpose |
 |----------|---------|
-| **DeepFamily.sol** | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding |
+| **DeepFamily.sol** | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding. UUPS-upgradeable behind a proxy |
+| **DeepFamilyReader.sol** | Stateless aggregated/paginated read views over the core protocol |
+| **DeepFamilyAttestationRegistry.sol** | Off-chain attestation anchors for endorsements/mints/seals/verifier updates. UUPS-upgradeable behind a proxy |
 | **DeepFamilyToken.sol** | Utility token powering endorsement and incentive mechanics |
 | **PersonCommitmentVerifier.sol** | ZK verifier for person identity and parent commitment proofs |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs |
@@ -114,8 +116,8 @@ npm run check         # Run frontend checks + contract lint/build/test
 
 ### Multi-Network Deployment
 ```bash
-# Deploy to specific network
-npm run deploy:net --net=sepolia
+# Deploy to specific network (live networks require GOVERNANCE_OWNER, see below)
+GOVERNANCE_OWNER=0xTimelock... npm run deploy:net --net=sepolia
 npm run deploy:net --net=holesky
 npm run deploy:net --net=confluxTestnet
 
@@ -125,6 +127,15 @@ npm run dev:deploy
 # Verify deployed contracts
 npm run verify:net --net=sepolia
 ```
+
+### Upgradeability & Governance
+
+`DeepFamily` and `DeepFamilyAttestationRegistry` are UUPS proxies. On live networks the deployment
+requires `GOVERNANCE_OWNER` (a `TimelockController`-like address with a non-zero delay) and hands
+upgrade authority to it after wiring — it refuses to leave upgrade rights on the deployer EOA. Local
+and simulated networks keep the deployer as owner for test flows. Upgrades are staged/executed via
+the `upgrade-schedule` / `upgrade-execute` Hardhat tasks, gated by `npm run storage:check`
+(append-only storage-layout safety). See [Smart Contracts Reference](docs/contracts.md#upgradeability--governance-uups).
 
 ## Documentation
 

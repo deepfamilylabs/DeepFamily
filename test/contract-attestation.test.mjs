@@ -132,9 +132,20 @@ describe('Attestation reference anchoring', function () {
         ),
     ).to.be.revertedWithCustomError(deepFamilyAttestationRegistry, 'OnlyDeepFamily')
 
+    // A fresh, initialized registry proxy (owner = signer) to exercise bindDeepFamily validation.
     const Registry = await hre.ethers.getContractFactory('DeepFamilyAttestationRegistry')
-    const standaloneRegistry = await Registry.deploy()
-    await standaloneRegistry.waitForDeployment()
+    const standaloneImpl = await Registry.deploy()
+    await standaloneImpl.waitForDeployment()
+    const Proxy = await hre.ethers.getContractFactory('UUPSProxy')
+    const standaloneProxy = await Proxy.deploy(
+      await standaloneImpl.getAddress(),
+      Registry.interface.encodeFunctionData('initialize', [await signer.getAddress()]),
+    )
+    await standaloneProxy.waitForDeployment()
+    const standaloneRegistry = await hre.ethers.getContractAt(
+      'DeepFamilyAttestationRegistry',
+      await standaloneProxy.getAddress(),
+    )
     await expect(
       standaloneRegistry.bindDeepFamily(await signer.getAddress()),
     ).to.be.revertedWithCustomError(standaloneRegistry, 'InvalidDeepFamilyAddress')

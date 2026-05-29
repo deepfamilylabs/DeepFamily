@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {IDeepFamilyAttestationRegistry} from "./interfaces/IDeepFamilyAttestationRegistry.sol";
 import {AttestationTypes} from "./libraries/AttestationTypes.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 /**
  * @dev DeepFamily Token Contract Interface
@@ -29,7 +31,13 @@ interface IDeepFamilyToken {
  *      - Incentive Layer: DEEP token mining for complete families, endorsement fees route to NFT holders/contributors
  *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + unlimited story sharding
  */
-contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
+contract DeepFamily is
+  Initializable,
+  ERC721EnumerableUpgradeable,
+  OwnableUpgradeable,
+  ReentrancyGuardTransient,
+  UUPSUpgradeable
+{
   // ========== Custom Errors (Unified Error Handling) ==========
 
   // Input validation errors
@@ -215,7 +223,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   // ========== Statistics Mappings ==========
 
   mapping(bytes32 => mapping(uint256 => uint256)) public versionEndorsementCount;
-  uint256 public protocolEndorsementFeeBps = 500;
+  uint256 public protocolEndorsementFeeBps;
   mapping(bytes32 => mapping(uint256 => ChildRef[])) public childrenOf;
   mapping(address => bytes32[]) private userEndorsedPersons;
   mapping(address => mapping(bytes32 => uint256)) private userEndorsementIndex;
@@ -233,9 +241,14 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   uint256 private constant DOMAIN_DISCLOSURE = 1003;
   string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
 
-  address public immutable DEEP_FAMILY_TOKEN_CONTRACT;
-  IDeepFamilyAttestationRegistry public immutable ATTESTATION_REGISTRY;
+  address public DEEP_FAMILY_TOKEN_CONTRACT;
+  IDeepFamilyAttestationRegistry public ATTESTATION_REGISTRY;
   mapping(uint16 => mapping(uint8 => address)) public verifierRegistry;
+
+  // NOTE: No storage gap. This is the most-derived (leaf) upgradeable contract and every
+  // inherited base uses ERC-7201 namespaced storage, so a new implementation adds state simply
+  // by declaring variables AFTER the ones above (append-only). scripts/check-storage-layout.mjs
+  // enforces that each new layout is an append-only extension of the committed baseline.
 
   // ========== Event Definitions ==========
 
@@ -341,7 +354,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     return keccak256(abi.encodePacked(value));
   }
 
-  function _getVerifier(uint16 proofSystemId, ProofPurpose purpose) internal view returns (address) {
+  function _getVerifier(
+    uint16 proofSystemId,
+    ProofPurpose purpose
+  ) internal view returns (address) {
     address verifier = verifierRegistry[proofSystemId][uint8(purpose)];
     if (verifier == address(0)) revert VerifierRouteNotSet();
     return verifier;
@@ -356,7 +372,8 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   function _packBirthGenderField(
     PersonBasicInfo calldata basicInfo
   ) internal pure returns (uint256) {
-    return (uint256(basicInfo.birthYear) << 24) |
+    return
+      (uint256(basicInfo.birthYear) << 24) |
       (uint256(basicInfo.birthMonth) << 16) |
       (uint256(basicInfo.birthDay) << 8) |
       (uint256(basicInfo.gender) << 1) |
@@ -369,8 +386,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
   }
 
   function _computeNameField(string memory fullName) internal pure returns (uint256) {
-    uint256 fieldModulus =
-      21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256 fieldModulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     return uint256(_computeNamePrehash(fullName)) % fieldModulus;
   }
 
@@ -527,22 +543,44 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
       );
   }
 
-  // ========== Constructor ==========
+  // ========== Constructor / Initializer ==========
+
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
 
   /**
-   * @dev Constructor, initializes ERC721 contract and token contract address
+   * @dev Initializer (replaces the constructor for the upgradeable proxy pattern).
+   *      Sets up ERC721 metadata, ownership, and the immutable-by-convention wiring
+   *      to the token + attestation registry contracts.
    * @param _deepFamilyTokenContract DeepFamily token contract address
+   * @param _attestationRegistry Attestation registry contract address
+   * @param initialOwner Initial owner of the proxy, expected to become timelock/multisig governance.
    */
-  constructor(
+  function initialize(
     address _deepFamilyTokenContract,
-    address _attestationRegistry
-  ) ERC721("DeepFamily", "Family") Ownable(msg.sender) {
+    address _attestationRegistry,
+    address initialOwner
+  ) public initializer {
     if (_deepFamilyTokenContract == address(0)) revert TokenContractNotSet();
     if (_attestationRegistry == address(0)) revert InvalidAttestationRegistry();
     if (_attestationRegistry.code.length == 0) revert InvalidAttestationRegistry();
+
+    __ERC721_init("DeepFamily", "Family");
+    __ERC721Enumerable_init();
+    __Ownable_init(initialOwner);
+    // ReentrancyGuardTransient keeps its state in transient storage (EIP-1153), which resets to
+    // the unentered value at the start of every transaction, so it needs no initializer.
+
     DEEP_FAMILY_TOKEN_CONTRACT = _deepFamilyTokenContract;
     ATTESTATION_REGISTRY = IDeepFamilyAttestationRegistry(_attestationRegistry);
+    protocolEndorsementFeeBps = 500;
   }
+
+  /// @dev UUPS upgrade authorization. Restricted to the owner (intended: timelock + multisig).
+  // solhint-disable-next-line no-empty-blocks
+  function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
   // ========== Public Functions ==========
 
@@ -716,12 +754,7 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     uint256 versionIndex,
     AttestationTypes.AttestationRef calldata attestationRef
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
-    ATTESTATION_REGISTRY.anchorEndorsementRef(
-      attestationRef,
-      msg.sender,
-      personHash,
-      versionIndex
-    );
+    ATTESTATION_REGISTRY.anchorEndorsementRef(attestationRef, msg.sender, personHash, versionIndex);
     _endorseVersionInternal(personHash, versionIndex);
   }
 
@@ -981,7 +1014,10 @@ contract DeepFamily is ERC721Enumerable, Ownable, ReentrancyGuard {
     );
   }
 
-  function sealStory(uint256 tokenId, AttestationTypes.AttestationRef calldata attestationRef) external {
+  function sealStory(
+    uint256 tokenId,
+    AttestationTypes.AttestationRef calldata attestationRef
+  ) external nonReentrant {
     StoryMetadata storage metadata = storyMetadata[tokenId];
     ATTESTATION_REGISTRY.anchorStorySealRef(
       attestationRef,

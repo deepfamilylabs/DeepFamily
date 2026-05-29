@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {AttestationTypes} from "./libraries/AttestationTypes.sol";
 import {IDeepFamilyAttestationRegistry} from "./interfaces/IDeepFamilyAttestationRegistry.sol";
 
-contract DeepFamilyAttestationRegistry is Ownable, IDeepFamilyAttestationRegistry {
+contract DeepFamilyAttestationRegistry is
+  Initializable,
+  OwnableUpgradeable,
+  UUPSUpgradeable,
+  IDeepFamilyAttestationRegistry
+{
   error InvalidDeepFamilyAddress();
   error DeepFamilyAlreadyBound();
   error OnlyDeepFamily();
@@ -48,6 +55,10 @@ contract DeepFamilyAttestationRegistry is Ownable, IDeepFamilyAttestationRegistr
   mapping(bytes32 => AttestationTypes.AttestationRef) public attestationRefs;
   mapping(bytes32 => bool) public attestationRefExists;
 
+  // NOTE: No storage gap. Leaf upgradeable contract whose bases use ERC-7201 namespaced storage,
+  // so a new implementation adds state by appending variables after the ones above (append-only).
+  // scripts/check-storage-layout.mjs enforces this against the committed baseline.
+
   event DeepFamilyBound(address indexed deepFamily);
 
   event AttestationReferenceAnchored(
@@ -66,7 +77,18 @@ contract DeepFamilyAttestationRegistry is Ownable, IDeepFamilyAttestationRegistr
     bytes32 revocationRef
   );
 
-  constructor() Ownable(msg.sender) {}
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  function initialize(address initialOwner) public initializer {
+    __Ownable_init(initialOwner);
+  }
+
+  /// @dev UUPS upgrade authorization. Restricted to the owner (intended: timelock + multisig).
+  // solhint-disable-next-line no-empty-blocks
+  function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
   modifier onlyDeepFamily() {
     if (msg.sender != deepFamily) revert OnlyDeepFamily();
@@ -140,13 +162,7 @@ contract DeepFamilyAttestationRegistry is Ownable, IDeepFamilyAttestationRegistr
         SUBJECT_TYPE_VERSION,
         _computeVersionSubjectHash(personHash, versionIndex),
         ACTION_TYPE_AUTHORITATIVE_MINT,
-        _computeMintActionDigest(
-          actor,
-          personHash,
-          versionIndex,
-          tokenURIHash,
-          coreInfoDigest
-        )
+        _computeMintActionDigest(actor, personHash, versionIndex, tokenURIHash, coreInfoDigest)
       );
   }
 
@@ -384,7 +400,8 @@ contract DeepFamilyAttestationRegistry is Ownable, IDeepFamilyAttestationRegistr
       revert InvalidAttestationAction();
     }
     if (ref.attestationPayloadDigest == bytes32(0)) revert InvalidAttestationPayloadDigest();
-    if (!_isSupportedSignatureSuite(ref.signatureSuiteId)) revert InvalidAttestationSignatureSuite();
+    if (!_isSupportedSignatureSuite(ref.signatureSuiteId))
+      revert InvalidAttestationSignatureSuite();
     if (ref.signerKeyId == bytes32(0)) revert InvalidAttestationSignerKey();
     if (!_isValidAttestationUri(ref.uri)) revert InvalidAttestationURI();
 
