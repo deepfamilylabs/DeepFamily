@@ -690,12 +690,11 @@ export const ensureIntegratedSystem = async (
       };
       return connection.__deepfamilyIntegrated;
     } catch (error) {
-      // On in-process simulated networks, stale deployment files are expected after a
-      // reset — fall through and deploy a current UUPS module set. On persistent
-      // networks a validation failure means the recorded deployment is genuinely bad or
-      // the RPC is stale; redeploying would silently create a second, orphaned module
-      // set, so surface the error instead.
-      if (!isEphemeralNetwork(connection)) throw error;
+      // Local dev networks (in-process simulated or localhost:31337) commonly restart with
+      // a clean chain while deployment files remain on disk. Fall through and deploy a current
+      // UUPS module set. On live networks, surface validation failures instead of silently
+      // creating a second, orphaned module set.
+      if (!isLocalDevNetwork(connection)) throw error;
     }
   }
 

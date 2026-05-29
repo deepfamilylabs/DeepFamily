@@ -4,3 +4,9 @@ export {
   type ResolvedModuleAddresses,
   type ResolveModuleAddressesInput,
 } from "./moduleAddressResolver";
+export {
+  getKnownDefaultRootHashes,
+  getLocalizedDefaultRoot,
+  getRootLocaleSuffix,
+  shouldAutoSwitchLocalizedRoot,
+} from "./localizedRootDefaults";

@@ -54,6 +54,10 @@ function renderLayout(initialEntry: string) {
             path="/familyTree"
             element={<div data-testid="page-content">tree-content</div>}
           />
+          <Route
+            path="/genealogyBook"
+            element={<div data-testid="page-content">genealogy-content</div>}
+          />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -102,5 +106,12 @@ describe("Layout", () => {
 
     const main = container.querySelector("main");
     expect(main?.className).toContain("md:pl-16");
+  });
+
+  it("keeps genealogy book route full-width for the paper preview surface", () => {
+    renderLayout("/genealogyBook");
+
+    expect(screen.getByTestId("page-content").textContent).toBe("genealogy-content");
+    expect(screen.queryByTestId("page-container")).toBeNull();
   });
 });

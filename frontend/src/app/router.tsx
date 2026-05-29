@@ -15,6 +15,7 @@ const StoryEditorPage = lazy(() => import("../pages/StoryEditorPage"));
 const ActionsPage = lazy(() => import("../pages/ActionsPage"));
 const KeyDerivationPage = lazy(() => import("../pages/KeyDerivationPage"));
 const DecryptMetadataPage = lazy(() => import("../pages/DecryptMetadataPage"));
+const GenealogyBookPage = lazy(() => import("../pages/GenealogyBookPage"));
 
 function PageFallback() {
   return (
@@ -36,6 +37,8 @@ function TitleUpdater() {
           return `${baseName} - ${t("home.title")}`;
         case "/familyTree":
           return `${baseName} - ${t("navigation.familyTree")}`;
+        case "/genealogyBook":
+          return `${baseName} - ${t("navigation.genealogyBook", "Genealogy")}`;
         case "/search":
           return `${baseName} - ${t("navigation.search")}`;
         case "/people":
@@ -73,6 +76,7 @@ export function AppRouter() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Home />} />
               <Route path="familyTree" element={<DomainErrorBoundary domain="tree"><TreePage /></DomainErrorBoundary>} />
+              <Route path="genealogyBook" element={<DomainErrorBoundary domain="genealogy"><GenealogyBookPage /></DomainErrorBoundary>} />
               <Route path="search" element={<DomainErrorBoundary domain="search"><SearchPage /></DomainErrorBoundary>} />
               <Route path="people" element={<DomainErrorBoundary domain="people"><PeoplePage /></DomainErrorBoundary>} />
               <Route path="actions" element={<ActionsPage />} />

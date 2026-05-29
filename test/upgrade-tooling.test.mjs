@@ -1,7 +1,13 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import hre from "hardhat";
-import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import {
+  deployIntegratedSystem,
+  ensureIntegratedSystem,
+} from "../hardhat/integratedDeployment.mjs";
 import {
   assertImplementationStorageSafe,
   assertImplementationMatchesArtifact,
@@ -234,6 +240,44 @@ describe("Upgrade tooling & governance deploy path", function () {
       }
       expect(err, "expected an EOA-owner abort").to.be.an("error");
       expect(err.message).to.match(/no code|EOA/i);
+    });
+  });
+
+  describe("local dev deployment reuse", function () {
+    it("redeploys when localhost deployment files point at an empty restarted chain", async () => {
+      const originalCwd = process.cwd();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-stale-localhost-"));
+      const deploymentsDir = path.join(tmpDir, "deployments", "localhost");
+      await fs.mkdir(deploymentsDir, { recursive: true });
+
+      const staleAddress = "0x000000000000000000000000000000000000dEaD";
+      for (const contractName of [
+        "DeepFamily",
+        "DeepFamilyToken",
+        "DeepFamilyAttestationRegistry",
+        "DeepFamilyReader",
+      ]) {
+        await fs.writeFile(
+          path.join(deploymentsDir, `${contractName}.json`),
+          JSON.stringify({ address: staleAddress, abi: [] }, null, 2),
+        );
+      }
+
+      try {
+        process.chdir(tmpDir);
+        const deployed = await ensureIntegratedSystem({
+          ethers: hre.ethers,
+          networkName: "localhost",
+          networkConfig: { type: "http", chainId: 31337 },
+        });
+        const deepFamilyAddress = await deployed.deepFamily.getAddress();
+
+        expect(deepFamilyAddress).to.not.equal(staleAddress);
+        expect(await hre.ethers.provider.getCode(deepFamilyAddress)).to.not.equal("0x");
+      } finally {
+        process.chdir(originalCwd);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 });

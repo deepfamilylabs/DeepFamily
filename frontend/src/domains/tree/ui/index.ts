@@ -16,3 +16,4 @@ export {
 export { default as ViewContainer } from "./ViewContainer";
 export { default as ViewModeSwitch } from "./ViewModeSwitch";
 export type { ViewMode } from "./ViewModeSwitch";
+export * from "./paper";

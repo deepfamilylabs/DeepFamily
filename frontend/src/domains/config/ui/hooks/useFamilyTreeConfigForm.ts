@@ -3,8 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useConfig } from "../../context";
 import { NETWORK_PRESETS } from "../../../../shared/config";
 import {
-  getLocalizedRootHash,
-  getLocalizedRootVersionIndex,
   isDevMode,
   shouldShowChildrenModeToggle,
   shouldShowDeduplicateToggle,
@@ -13,9 +11,7 @@ import { useToast } from "../../../../shared/ui";
 import { useTreeMutations, useVizOptions } from "../../../tree";
 import { isAddress, isHash32, isUrl } from "../../model";
 import type { NetworkOption, NetworkSelection } from "../../model";
-import { loadCustomNetworks, saveCustomNetworks } from "../../services";
-
-const LOCALE_NEED_ZH_ROOT = new Set(["zh-cn"]);
+import { getLocalizedDefaultRoot, loadCustomNetworks, saveCustomNetworks } from "../../services";
 
 type FormErrors = {
   rpc?: string;
@@ -148,33 +144,21 @@ export function useFamilyTreeConfigForm() {
     localRootHash !== rootHash ||
     localVersion !== rootVersionIndex;
 
-  const getLocalizedDefaultRoot = useCallback(() => {
-    const activeLocale = (i18n.language || "").toLowerCase();
-    const preferZhRoot = LOCALE_NEED_ZH_ROOT.has(activeLocale);
-    const suffix = preferZhRoot ? "ZH" : "EN";
-    const localizedHash = getLocalizedRootHash(suffix);
-    const localizedVersion = getLocalizedRootVersionIndex(suffix);
-
-    const safeHash =
-      localizedHash && /^0x[a-fA-F0-9]{64}$/.test(localizedHash)
-        ? localizedHash
-        : defaults.rootHash;
-    const safeVersion =
-      Number.isFinite(localizedVersion) && localizedVersion > 0
-        ? localizedVersion
-        : defaults.rootVersionIndex;
-
-    return { hash: safeHash, version: safeVersion };
+  const getLocalizedFormDefaultRoot = useCallback(() => {
+    return getLocalizedDefaultRoot(i18n.language, {
+      rootHash: defaults.rootHash,
+      rootVersionIndex: defaults.rootVersionIndex,
+    });
   }, [i18n.language, defaults.rootHash, defaults.rootVersionIndex]);
 
   const resetToDefaults = useCallback(() => {
-    const localized = getLocalizedDefaultRoot();
+    const localized = getLocalizedFormDefaultRoot();
     setLocalRpcUrl(defaults.rpcUrl);
     setLocalChainId(defaults.chainId);
     setLocalReaderAddress(defaults.readerAddress);
     setLocalRootHash(localized.hash);
     setLocalVersion(localized.version);
-  }, [defaults, getLocalizedDefaultRoot]);
+  }, [defaults, getLocalizedFormDefaultRoot]);
 
   const applyConfigChanges = useCallback(() => {
     if (!validateAll()) return;
