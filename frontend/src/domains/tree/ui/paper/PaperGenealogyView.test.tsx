@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../shared/model";
 import { buildPaperGenerations } from "./paperData";
 import { PaperGenealogyView } from "./PaperGenealogyView";
-import { buildOuPaperBook, getOuFullRecordText, getOuRecordSlotSpan } from "./ouPagination";
-import { buildSuPaperBook, getSuFullRecordText, getSuPersonLaneKeys } from "./suPagination";
+import { buildOuPaperBook, getOuFullRecordText, getOuRecordSlotSpan } from "./layout/ouPagination";
+import { buildSuPaperBook, getSuFullRecordText, getSuPersonLaneKeys } from "./layout/suPagination";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -226,7 +226,68 @@ describe("PaperGenealogyView", () => {
     expect(childLane?.kind === "person" ? childLane.relationLabel : "unexpected").toBe("");
   });
 
-  it("projects Su-style relation labels from same-parent child order only", () => {
+  it("uses node story directly in paper records", () => {
+    const generations = buildPaperGenerations({
+      graph: {
+        nodes: [{ id: rootId, depth: 0, personHash: rootHash, versionIndex: 1 }],
+        edges: [],
+        childrenByParent: {},
+      },
+      nodesData: {
+        [rootId]: {
+          id: rootId,
+          personHash: rootHash,
+          versionIndex: 1,
+          tokenId: "1",
+          fullName: "曹操",
+          story: "这是同步后的完整 story，纸本只读这个字段。",
+          storyMetadata: {
+            totalChunks: 3,
+            fullStoryHash: "",
+            lastUpdateTime: 1,
+            isSealed: false,
+            totalLength: 0,
+          },
+          storyChunks: [
+            {
+              chunkIndex: 2,
+              chunkHash: "0x3",
+              content: "第三段。",
+              timestamp: 1,
+              editor: "0x0000000000000000000000000000000000000000",
+              chunkType: 0,
+              attachmentCID: "",
+            },
+            {
+              chunkIndex: 0,
+              chunkHash: "0x1",
+              content: "第一段。",
+              timestamp: 1,
+              editor: "0x0000000000000000000000000000000000000000",
+              chunkType: 0,
+              attachmentCID: "",
+            },
+            {
+              chunkIndex: 1,
+              chunkHash: "0x2",
+              content: "第二段。",
+              timestamp: 1,
+              editor: "0x0000000000000000000000000000000000000000",
+              chunkType: 0,
+              attachmentCID: "",
+            },
+          ],
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const record = getOuFullRecordText(generations[0].people[0]);
+    expect(record).toContain("附记这是同步后的完整 story，纸本只读这个字段。");
+    expect(record).not.toContain("第一段。第二段。第三段。");
+  });
+
+  it("projects Su-style relation labels ranked per gender within each parent", () => {
     const twoBranch = makeTwoBranchGraph();
     const generations = buildPaperGenerations({
       graph: twoBranch.graph,
@@ -273,10 +334,74 @@ describe("PaperGenealogyView", () => {
       (lane) => lane.kind === "person" && lane.person.id === twoBranch.secondChild.id,
     );
 
+    // secondParent is root's only daughter, so she is 长女 (first daughter), not 次女:
+    // sons and daughters are numbered independently.
     expect(firstParentLane?.kind === "person" ? firstParentLane.relationLabel : "").toBe("长子");
-    expect(secondParentLane?.kind === "person" ? secondParentLane.relationLabel : "").toBe("次女");
+    expect(secondParentLane?.kind === "person" ? secondParentLane.relationLabel : "").toBe("长女");
     expect(firstChildLane?.kind === "person" ? firstChildLane.relationLabel : "").toBe("长子");
     expect(secondChildLane?.kind === "person" ? secondChildLane.relationLabel : "").toBe("长女");
+  });
+
+  it("ranks every sibling and orders the generation eldest-first despite duplicate/missing birth dates", () => {
+    const rootPersonHash = makeHash(201);
+    const root = { id: makeNodeId(rootPersonHash, 1), depth: 0, personHash: rootPersonHash, versionIndex: 1 };
+    // gender, birthYear; sonB and sonC share a birth year, children are stored out of birth order.
+    const kids = [
+      { key: "sonB", hash: makeHash(202), gender: 1, birthYear: 190 },
+      { key: "daughter", hash: makeHash(203), gender: 2, birthYear: 185 },
+      { key: "sonC", hash: makeHash(204), gender: 1, birthYear: 190 },
+      { key: "sonA", hash: makeHash(205), gender: 1, birthYear: 180 },
+    ];
+    const childById = Object.fromEntries(
+      kids.map((kid) => [kid.key, { ...kid, id: makeNodeId(kid.hash, 1) }]),
+    );
+    const childNodes = kids.map((kid) => ({
+      id: childById[kid.key].id,
+      depth: 1,
+      personHash: kid.hash,
+      versionIndex: 1,
+    }));
+    const nodesDataLocal: Record<string, NodeData> = {};
+    for (const kid of kids) {
+      nodesDataLocal[childById[kid.key].id] = {
+        id: childById[kid.key].id,
+        personHash: kid.hash,
+        versionIndex: 1,
+        gender: kid.gender,
+        birthYear: kid.birthYear,
+      };
+    }
+
+    const generations = buildPaperGenerations({
+      graph: {
+        nodes: [root, ...childNodes],
+        edges: childNodes.map((node) => ({ from: root.id, to: node.id })),
+        childrenByParent: { [root.id]: childNodes.map((node) => node.id) },
+      },
+      nodesData: nodesDataLocal,
+      t: zhTranslate,
+    });
+
+    // Generation is sorted eldest-first; duplicate dates keep stored order (sonB before sonC).
+    expect(generations[1].people.map((person) => person.id)).toEqual([
+      childById.sonA.id,
+      childById.daughter.id,
+      childById.sonB.id,
+      childById.sonC.id,
+    ]);
+    expect(generations[1].people.map((person) => person.sequence)).toEqual([1, 2, 3, 4]);
+
+    const book = buildSuPaperBook({ generations, t: zhTranslate });
+    const lanes = book.charts[0].spreads.flatMap((spread) => spread.lanes);
+    const labelOf = (id: string) => {
+      const lane = lanes.find((entry) => entry.kind === "person" && entry.person.id === id);
+      return lane?.kind === "person" ? lane.relationLabel : "";
+    };
+    // Sons numbered among sons by birth (长子/次子/三子), daughter numbered among daughters.
+    expect(labelOf(childById.sonA.id)).toBe("长子");
+    expect(labelOf(childById.sonB.id)).toBe("次子");
+    expect(labelOf(childById.sonC.id)).toBe("三子");
+    expect(labelOf(childById.daughter.id)).toBe("长女");
   });
 
   it("renders the modern ledger view using projected genealogy data", () => {
@@ -323,7 +448,10 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-ou")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-table-1")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-table-2")).toBeTruthy();
-    expect(screen.getByTestId("paper-ou-spread-1-1")).toBeTruthy();
+    const spread = screen.getByTestId("paper-ou-spread-1-1");
+    expect(spread).toBeTruthy();
+    expect(spread.className).toContain("grid-cols-[1fr_72px_1fr]");
+    expect(spread.style.width).toBe("");
     expect(screen.getByTestId("paper-ou-left-1-1")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-right-1-1")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-spine-1-1").textContent).toContain("贾氏族谱");
@@ -333,7 +461,7 @@ describe("PaperGenealogyView", () => {
   });
 
   it("projects Ou-style continuation spreads when one generation exceeds page width", () => {
-    const wide = makeWideGenerationGraph(8);
+    const wide = makeWideGenerationGraph(10);
     const generations = buildPaperGenerations({
       graph: wide.graph,
       nodesData: {},
@@ -349,10 +477,10 @@ describe("PaperGenealogyView", () => {
     const secondSpreadFirstGeneration = firstChart.spreads[1].rows.find((row) => row.depth === 0);
 
     expect(firstChart.spreads.length).toBeGreaterThan(1);
-    expect(new Set(secondGenerationEntries.map((entry) => entry.person.id)).size).toBe(8);
+    expect(new Set(secondGenerationEntries.map((entry) => entry.person.id)).size).toBe(10);
     expect(
       firstSpreadSecondGeneration?.entries.filter((entry) => entry.side === "right"),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(secondGenerationEntries.every((entry) => entry.text === getOuFullRecordText(entry.person))).toBe(
       true,
     );
@@ -374,6 +502,9 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").style.direction).toBe("ltr");
     expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").className).toContain(
       "flex-row-reverse",
+    );
+    expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").className).toContain(
+      "justify-start",
     );
     expect(screen.getAllByTestId("paper-ou-generation-1").length).toBeGreaterThanOrEqual(
       firstChart.spreads.length,
@@ -412,6 +543,188 @@ describe("PaperGenealogyView", () => {
     expect(slotSpan).toBeGreaterThan(1);
     expect(renderedEntry?.text).toBe(fullRecord);
     expect(renderedEntry?.slotSpan).toBe(slotSpan);
+  });
+
+  it("keeps Cao Biao's Ou-style record complete instead of clipping the last columns", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const story =
+      "曹彪（195-251），太和六年（232年）封楚王。嘉平三年（251年）因与太尉王凌谋反事泄，被赐死";
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: {
+        [child.id]: {
+          id: child.id,
+          personHash: child.personHash,
+          versionIndex: 1,
+          tokenId: "2",
+          fullName: "曹彪",
+          birthYear: 195,
+          birthMonth: 1,
+          birthDay: 1,
+          deathYear: 251,
+          deathMonth: 1,
+          deathDay: 1,
+          birthPlace: "沛国谯县（今安徽亳州）",
+          deathPlace: "楚国",
+          story,
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const person = generations[1].people[0];
+    const fullRecord = getOuFullRecordText(person);
+
+    expect(fullRecord).toContain("因与太尉王凌谋反事泄，被赐死");
+    expect(getOuRecordSlotSpan(person)).toBeGreaterThan(1);
+
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [child.id]: {
+            id: child.id,
+            personHash: child.personHash,
+            versionIndex: 1,
+            tokenId: "2",
+            fullName: "曹彪",
+            birthYear: 195,
+            birthMonth: 1,
+            birthDay: 1,
+            deathYear: 251,
+            deathMonth: 1,
+            deathDay: 1,
+            birthPlace: "沛国谯县（今安徽亳州）",
+            deathPlace: "楚国",
+            story,
+          },
+        }}
+        hasRoot
+      />,
+    );
+
+    const detail = screen.getByTestId(`paper-ou-detail-${child.id}`);
+    expect(detail.textContent).toContain("因与太尉王凌谋反事泄，被赐死");
+    expect(detail.className).not.toContain("overflow-hidden");
+    expect(screen.getByTestId(`paper-row-${child.id}`).getAttribute("data-slot-span")).toBe("2");
+  });
+
+  it("continues oversized Ou-style records onto the left page before clipping text", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const longStory = (
+      "少承庭训，迁居江右，主持修桥置田，赈济族人，辑录旧谱，分辨昭穆，乡里称其笃行。" +
+      "又置义田三十亩，以供春秋祭祀，训诸子读书务本，凡族中婚丧贫乏者皆量力周济。" +
+      "晚年手订家乘，考订先世迁徙源流，分房列派，俾后人知所由来。"
+    ).repeat(4);
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: {
+        [child.id]: {
+          id: child.id,
+          personHash: child.personHash,
+          versionIndex: 1,
+          tokenId: "2",
+          fullName: "曹启",
+          story: longStory,
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const person = generations[1].people[0];
+    const fullRecord = getOuFullRecordText(person);
+    const book = buildOuPaperBook({ generations, t: zhTranslate });
+    const renderedEntries = book.charts[0].spreads
+      .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
+      .filter((entry) => entry.person.id === person.id);
+
+    expect(renderedEntries.length).toBeGreaterThan(1);
+    expect(renderedEntries.map((entry) => entry.text).join("")).toBe(fullRecord);
+    expect(renderedEntries[0].side).toBe("right");
+    expect(renderedEntries[1].side).toBe("left");
+    expect(renderedEntries[0].continued).toBe(false);
+    expect(renderedEntries[1].continued).toBe(true);
+
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [child.id]: {
+            id: child.id,
+            personHash: child.personHash,
+            versionIndex: 1,
+            tokenId: "2",
+            fullName: "曹启",
+            story: longStory,
+          },
+        }}
+        hasRoot
+      />,
+    );
+
+    const names = screen.getAllByTestId(`paper-ou-name-${child.id}`).map((node) => node.textContent || "");
+    expect(names.filter((name) => name.includes("曹启"))).toHaveLength(1);
+    expect(names.some((name) => name.trim() === "")).toBe(true);
+    const continuedName = screen
+      .getAllByTestId(`paper-ou-name-${child.id}`)
+      .find((node) => !(node.textContent || "").trim());
+    expect(continuedName?.parentElement?.className).toContain("w-0");
+    expect(
+      screen.getAllByTestId(`paper-ou-detail-${child.id}`).every((node) =>
+        !node.className.includes("overflow-hidden"),
+      ),
+    ).toBe(true);
+  });
+
+  it("uses the wider Ou-style left page body before creating a continuation spread", () => {
+    const wide = makeWideGenerationGraph(5);
+    const childRecords = Object.fromEntries(
+      wide.graph.nodes.slice(1).map((node, index) => [
+        node.id,
+        {
+          id: node.id,
+          personHash: node.personHash,
+          versionIndex: 1,
+          tokenId: String(index + 2),
+          fullName: `曹左${index + 1}`,
+          birthYear: 195 + index,
+          birthMonth: 1,
+          birthDay: 1,
+          deathYear: 250 + index,
+          deathMonth: 1,
+          deathDay: 1,
+          birthPlace: "沛国谯县（今安徽亳州）",
+          deathPlace: "洛阳",
+          story: "续排测试，确认左页可容三人。",
+        },
+      ]),
+    );
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: childRecords,
+      t: zhTranslate,
+    });
+
+    const book = buildOuPaperBook({ generations, t: zhTranslate });
+    const firstChart = book.charts[0];
+    const secondGenerationRows = firstChart.spreads.map((spread) =>
+      spread.rows.find((row) => row.depth === 1),
+    );
+    const firstSpreadEntries = secondGenerationRows[0]?.entries || [];
+
+    expect(firstChart.spreads).toHaveLength(1);
+    expect(firstSpreadEntries.filter((entry) => entry.side === "right")).toHaveLength(3);
+    expect(firstSpreadEntries.filter((entry) => entry.side === "left")).toHaveLength(3);
+    expect(firstSpreadEntries.some((entry) => entry.side === "left" && entry.continued)).toBe(
+      true,
+    );
+    expect(new Set(firstSpreadEntries.map((entry) => entry.person.id)).size).toBe(5);
   });
 
   it("keeps Ou-style names right-aligned inside each packed person entry", () => {
@@ -495,6 +808,10 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-su-table-1")).toBeTruthy();
     expect(screen.getByTestId("paper-su-table-2")).toBeTruthy();
     expect(screen.getByTestId("paper-su-spread-1-1")).toBeTruthy();
+    expect(screen.getByTestId("paper-su-spread-1-1").className).toContain("min-w-[1180px]");
+    expect(screen.getByTestId("paper-su-spread-1-1").className).toContain(
+      "grid-cols-[1fr_72px_1fr]",
+    );
     expect(screen.getByTestId("paper-su-left-1-1")).toBeTruthy();
     expect(screen.getByTestId("paper-su-right-1-1")).toBeTruthy();
     expect(screen.getByTestId("paper-su-spine-1-1").textContent).toContain("贾氏族谱");
@@ -511,6 +828,9 @@ describe("PaperGenealogyView", () => {
     );
     expect(screen.getByTestId(`paper-su-relation-${linear.rootId}`).textContent).toContain("ancestor");
     expect(screen.getByTestId(`paper-su-name-${linear.rootId}`).textContent).toContain("贾源");
+    const rootDetail = screen.getByTestId(`paper-su-detail-${linear.rootId}`);
+    expect(rootDetail.className).toContain("w-fit");
+    expect(rootDetail.parentElement?.className).toContain("justify-center");
     expect(screen.getByTestId(`paper-row-${linear.rootId}`).textContent).not.toContain("1.1");
   });
 
@@ -535,6 +855,9 @@ describe("PaperGenealogyView", () => {
     expect(
       new Set(secondGenerationLanes.map((lane) => (lane.kind === "person" ? lane.person.id : ""))).size,
     ).toBe(30);
+    expect(firstChart.spreads.flatMap((spread) => spread.lanes).some((lane) => lane.kind === "blank")).toBe(
+      false,
+    );
     expect(firstChart.spreads[0].rightLanes[0].kind).toBe("generation");
     expect(secondGenerationLanes.every((lane) => lane.kind === "person" && lane.text === getSuFullRecordText(lane.person))).toBe(
       true,
@@ -650,8 +973,14 @@ describe("PaperGenealogyView", () => {
     );
 
     expect(screen.getByTestId("paper-svg-pagoda")).toBeTruthy();
+    expect(screen.getByTestId("paper-pagoda")).toBeTruthy();
+    expect(screen.getByTestId("paper-pagoda-chart-1")).toBeTruthy();
+    expect(screen.getByTestId("paper-pagoda-frame-1-1").className).toContain("h-[872px]");
+    expect(screen.getByTestId("paper-pagoda-frame-1-1").className).toContain("min-w-[1180px]");
+    expect(screen.getByTestId("paper-pagoda-page-1-1")).toBeTruthy();
     expect(screen.getByTestId(`paper-node-${rootId}`)).toBeTruthy();
     expect(screen.getByTestId(`paper-node-${childId}`)).toBeTruthy();
+    expect(screen.queryByText(/Birth: 1815/)).toBeNull();
   });
 
   it("renders an empty state when no root is available", () => {

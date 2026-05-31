@@ -7,6 +7,7 @@ import {
   PaperGenealogyView,
   type PaperGenealogyStyle,
   useFamilyTreeProjection,
+  useTreeNodeAccess,
   useTreeGraphData,
   useTreeStatus,
 } from "../domains/tree";
@@ -31,6 +32,7 @@ export default function GenealogyBookPage() {
   const { t } = useTranslation();
   const { style, setStyle } = usePersistedPaperStyle();
   const projection = useFamilyTreeProjection();
+  const { getStoryData } = useTreeNodeAccess();
   const { rootExists } = useTreeGraphData();
   const { loading, progress, contractMessage, refresh } = useTreeStatus();
 
@@ -46,6 +48,21 @@ export default function GenealogyBookPage() {
   );
 
   const hasRoot = Boolean(projection.rootId && rootExists);
+
+  useEffect(() => {
+    if (!hasRoot) return;
+
+    projection.graph.nodes.forEach((node) => {
+      const nodeData = projection.nodesData[node.id];
+      const tokenId = nodeData?.tokenId;
+      const totalChunks = Number(nodeData?.storyMetadata?.totalChunks || 0);
+      const loadedChunks = Array.isArray(nodeData?.storyChunks) ? nodeData.storyChunks.length : 0;
+      if (!tokenId || totalChunks <= 0 || loadedChunks >= totalChunks) return;
+      getStoryData(tokenId, { nodeIdHint: node.id }).catch(() => {
+        /* Paper view can still render the core story fallback. */
+      });
+    });
+  }, [getStoryData, hasRoot, projection.graph.nodes, projection.nodesData]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full flex-col overflow-hidden bg-stone-100 dark:bg-slate-950">

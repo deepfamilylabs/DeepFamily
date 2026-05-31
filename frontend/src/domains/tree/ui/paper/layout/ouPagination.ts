@@ -1,4 +1,4 @@
-import type { PaperGeneration, PaperPerson, TranslateFn } from "./paperData";
+import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
 
 export type OuPageSide = "left" | "right";
 
@@ -32,6 +32,14 @@ export type OuPersonRecordEntry = {
   text: string;
   side: OuPageSide;
   slotSpan: number;
+  widthPx: number;
+  continued: boolean;
+  partIndex: number;
+};
+
+export type OuPageBodyWidths = {
+  right: number;
+  left: number;
 };
 
 export const OU_GENERATIONS_PER_CHART = 5;
@@ -40,8 +48,18 @@ export const OU_RIGHT_PAGE_CAPACITY = 3;
 export const OU_LEFT_PAGE_CAPACITY = 3;
 export const OU_SPREAD_ROW_CAPACITY = OU_RIGHT_PAGE_CAPACITY + OU_LEFT_PAGE_CAPACITY;
 export const OU_PAGE_SIDE_CAPACITY = 3;
-export const OU_RECORD_CHARS_PER_SLOT = 96;
 export const OU_PERSON_SLOT_WIDTH = 168;
+export const OU_RIGHT_PAGE_BODY_WIDTH = OU_PAGE_SIDE_CAPACITY * OU_PERSON_SLOT_WIDTH;
+export const OU_LEFT_PAGE_BODY_WIDTH = OU_RIGHT_PAGE_BODY_WIDTH + 56;
+export const OU_COLUMN_ALIGNMENT_WIDTH = 14;
+export const OU_PERSON_MIN_WIDTH = 112;
+export const OU_PERSON_BASE_WIDTH = 84;
+export const OU_RECORD_CHARS_PER_COLUMN = 14;
+export const OU_RECORD_COLUMN_WIDTH = 17;
+const DEFAULT_OU_PAGE_BODY_WIDTHS: OuPageBodyWidths = {
+  right: OU_RIGHT_PAGE_BODY_WIDTH,
+  left: OU_LEFT_PAGE_BODY_WIDTH,
+};
 
 function fallbackTranslate(
   key: string,
@@ -91,11 +109,55 @@ export function getOuFullRecordText(person: PaperPerson): string {
   return lines.map(formatOuRecordLine).join("，") || person.ui.shortHashText;
 }
 
-export function getOuRecordSlotSpan(person: PaperPerson): number {
+function getTextColumnCount(text: string): number {
+  return Math.max(1, Math.ceil(Array.from(text).length / OU_RECORD_CHARS_PER_COLUMN));
+}
+
+function alignOuWidth(widthPx: number): number {
+  return Math.ceil(widthPx / OU_COLUMN_ALIGNMENT_WIDTH) * OU_COLUMN_ALIGNMENT_WIDTH;
+}
+
+function getOuSideWidth(
+  side: OuPageSide,
+  pageBodyWidths: OuPageBodyWidths = DEFAULT_OU_PAGE_BODY_WIDTHS,
+): number {
+  return side === "right" ? pageBodyWidths.right : pageBodyWidths.left;
+}
+
+function getNaturalTextWidthPx(text: string): number {
+  return alignOuWidth(
+    Math.max(
+      OU_PERSON_MIN_WIDTH,
+      OU_PERSON_BASE_WIDTH + getTextColumnCount(text) * OU_RECORD_COLUMN_WIDTH,
+    ),
+  );
+}
+
+function getTextWidthPx(text: string, sideWidth = OU_RIGHT_PAGE_BODY_WIDTH): number {
+  return Math.min(sideWidth, getNaturalTextWidthPx(text));
+}
+
+function getTextCharCapacityForWidth(widthPx: number): number {
+  const columns = Math.max(
+    1,
+    Math.floor((widthPx - OU_PERSON_BASE_WIDTH) / OU_RECORD_COLUMN_WIDTH),
+  );
+  return columns * OU_RECORD_CHARS_PER_COLUMN;
+}
+
+function getWidthSlotSpan(widthPx: number): number {
   return Math.min(
     OU_PAGE_SIDE_CAPACITY,
-    Math.max(1, Math.ceil(Array.from(getOuFullRecordText(person)).length / OU_RECORD_CHARS_PER_SLOT)),
+    Math.max(1, Math.ceil(widthPx / OU_PERSON_SLOT_WIDTH)),
   );
+}
+
+function getOuRecordTotalSlotSpan(person: PaperPerson): number {
+  return getWidthSlotSpan(getTextWidthPx(getOuFullRecordText(person)));
+}
+
+export function getOuRecordSlotSpan(person: PaperPerson): number {
+  return Math.min(OU_PAGE_SIDE_CAPACITY, getOuRecordTotalSlotSpan(person));
 }
 
 export function splitOuRowEntries(
@@ -107,33 +169,77 @@ export function splitOuRowEntries(
     : row.entries.filter((entry) => entry.side === "left");
 }
 
-function paginateGenerationEntries(people: PaperPerson[]): OuPersonRecordEntry[][] {
+function paginateGenerationEntries(
+  people: PaperPerson[],
+  pageBodyWidths: OuPageBodyWidths = DEFAULT_OU_PAGE_BODY_WIDTHS,
+): OuPersonRecordEntry[][] {
   const spreads: OuPersonRecordEntry[][] = [[]];
   let spreadIndex = 0;
   let side: OuPageSide = "right";
-  let usedSlots = 0;
+  let usedWidth = 0;
+
+  const advanceSide = () => {
+    if (side === "right") {
+      side = "left";
+    } else {
+      spreadIndex += 1;
+      spreads[spreadIndex] = [];
+      side = "right";
+    }
+    usedWidth = 0;
+  };
+
+  const pushEntry = (
+    person: PaperPerson,
+    text: string,
+    partIndex: number,
+    availableWidth = getOuSideWidth(side, pageBodyWidths),
+  ) => {
+    const widthPx = getTextWidthPx(text, availableWidth);
+    spreads[spreadIndex].push({
+      key: `${person.id}:${spreadIndex}:${side}:${partIndex}`,
+      person,
+      text,
+      side,
+      slotSpan: getWidthSlotSpan(widthPx),
+      widthPx,
+      continued: partIndex > 0,
+      partIndex: partIndex + 1,
+    });
+    usedWidth += widthPx;
+  };
 
   for (const person of people) {
-    const slotSpan = getOuRecordSlotSpan(person);
-    if (usedSlots + slotSpan > OU_PAGE_SIDE_CAPACITY) {
-      if (side === "right") {
-        side = "left";
-      } else {
-        spreadIndex += 1;
-        spreads[spreadIndex] = [];
-        side = "right";
-      }
-      usedSlots = 0;
-    }
+    const fullText = getOuFullRecordText(person);
+    const chars = Array.from(fullText);
+    let start = 0;
+    let partIndex = 0;
 
-    spreads[spreadIndex].push({
-      key: `${person.id}:${spreadIndex}:${side}`,
-      person,
-      text: getOuFullRecordText(person),
-      side,
-      slotSpan,
-    });
-    usedSlots += slotSpan;
+    while (start < chars.length) {
+      const sideWidth = getOuSideWidth(side, pageBodyWidths);
+      const availableWidth = Math.max(0, sideWidth - usedWidth);
+      if (availableWidth < OU_PERSON_MIN_WIDTH) {
+        advanceSide();
+        continue;
+      }
+
+      const remainingText = chars.slice(start).join("");
+      const remainingWidth = getNaturalTextWidthPx(remainingText);
+      if (remainingWidth <= availableWidth) {
+        pushEntry(person, remainingText, partIndex, availableWidth);
+        break;
+      }
+
+      const chunkLength = Math.min(
+        getTextCharCapacityForWidth(availableWidth),
+        chars.length - start,
+      );
+      const text = chars.slice(start, start + chunkLength).join("");
+      pushEntry(person, text, partIndex, availableWidth);
+      start += chunkLength;
+      partIndex += 1;
+      if (start < chars.length) advanceSide();
+    }
   }
 
   return spreads;
@@ -142,16 +248,18 @@ function paginateGenerationEntries(people: PaperPerson[]): OuPersonRecordEntry[]
 export function buildOuPaperBook(params: {
   generations: PaperGeneration[];
   t?: TranslateFn;
+  pageBodyWidths?: OuPageBodyWidths;
 }): OuPaperBook {
   const { generations } = params;
   const t = params.t || fallbackTranslate;
+  const pageBodyWidths = params.pageBodyWidths || DEFAULT_OU_PAGE_BODY_WIDTHS;
   if (!generations.length) return { charts: [] };
 
   const generationsByDepth = new Map(generations.map((generation) => [generation.depth, generation]));
   const entriesByDepth = new Map(
     generations.map((generation) => [
       generation.depth,
-      paginateGenerationEntries(generation.people),
+      paginateGenerationEntries(generation.people, pageBodyWidths),
     ]),
   );
   const maxDepth = generations[generations.length - 1]?.depth || 0;

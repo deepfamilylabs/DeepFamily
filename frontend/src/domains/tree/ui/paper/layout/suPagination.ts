@@ -1,5 +1,5 @@
-import type { NodeId } from "../../../../shared/model";
-import type { PaperGeneration, PaperPerson, TranslateFn } from "./paperData";
+import type { NodeId } from "../../../../../shared/model";
+import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
 
 export type SuPageSide = "left" | "right";
 
@@ -184,21 +184,6 @@ function makePersonLanes(person: PaperPerson, label: string, t: TranslateFn): Su
   }));
 }
 
-function padLanes(lanes: SuTableLane[], targetLength: number, prefix: string): SuTableLane[] {
-  if (lanes.length >= targetLength) return lanes;
-  return [
-    ...lanes,
-    ...Array.from({ length: targetLength - lanes.length }, (_value, index) => ({
-      kind: "blank" as const,
-      key: `${prefix}:blank:${index}`,
-    })),
-  ];
-}
-
-function firstPersonLane(lanes: SuTableLane[]): Extract<SuTableLane, { kind: "person" }> | undefined {
-  return lanes.find((lane): lane is Extract<SuTableLane, { kind: "person" }> => lane.kind === "person");
-}
-
 function ensureLeadingGenerationLane(params: {
   lanes: SuTableLane[];
   generationsByDepth: Map<number, PaperGeneration>;
@@ -228,34 +213,31 @@ function splitChartLanesIntoSpreads(params: {
   t: TranslateFn;
 }): SuPageSpread[] {
   const { lanes, generationsByDepth, repeatedDepth, t } = params;
-  const rawSpreads: SuTableLane[][] = [];
+  const spreads: SuPageSpread[] = [];
+  let start = 0;
 
-  for (let start = 0; start < lanes.length; start += SU_SPREAD_LANE_CAPACITY) {
-    rawSpreads.push(lanes.slice(start, start + SU_SPREAD_LANE_CAPACITY));
-  }
-
-  if (!rawSpreads.length) rawSpreads.push([]);
-
-  return rawSpreads.map((raw, spreadOffset) => {
-    const spreadIndex = spreadOffset + 1;
+  while (start < lanes.length || spreads.length === 0) {
+    const spreadIndex = spreads.length + 1;
+    const firstLane = lanes[start];
+    const needsLeadingMark = spreadIndex > 1 && firstLane?.kind !== "generation";
+    const capacity = needsLeadingMark ? SU_SPREAD_LANE_CAPACITY - 1 : SU_SPREAD_LANE_CAPACITY;
+    const raw = lanes.slice(start, start + capacity);
     const withLeadingMark =
-      spreadIndex === 1
+      !needsLeadingMark
         ? raw
         : ensureLeadingGenerationLane({ lanes: raw, generationsByDepth, repeatedDepth, t });
-    const padded = padLanes(
-      withLeadingMark,
-      SU_SPREAD_LANE_CAPACITY,
-      `spread:${spreadIndex}`,
-    );
 
-    return {
+    spreads.push({
       index: spreadIndex,
       kind: spreadIndex === 1 ? "main" : "continuation",
-      lanes: padded,
-      rightLanes: padded.slice(0, SU_RIGHT_PAGE_LANE_CAPACITY),
-      leftLanes: padded.slice(SU_RIGHT_PAGE_LANE_CAPACITY, SU_SPREAD_LANE_CAPACITY),
-    };
-  });
+      lanes: withLeadingMark,
+      rightLanes: withLeadingMark.slice(0, SU_RIGHT_PAGE_LANE_CAPACITY),
+      leftLanes: withLeadingMark.slice(SU_RIGHT_PAGE_LANE_CAPACITY, SU_SPREAD_LANE_CAPACITY),
+    });
+    start += capacity || SU_SPREAD_LANE_CAPACITY;
+  }
+
+  return spreads;
 }
 
 export function buildSuPaperBook(params: {
