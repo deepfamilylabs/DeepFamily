@@ -1,5 +1,5 @@
 import type { NodeId, NodeData } from "../../../shared/model";
-import { makeNodeId, parseNodeId } from "../../../shared/model";
+import { makeNodeId, parseNodeId, sortNodeIdsByBirthOrder } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { unionParentKey } from "../model/treeStore";
 import type { BaseEdge, BaseNode } from "../model/familyTreeTypes";
@@ -126,8 +126,12 @@ export function getProjectedChildIds(params: {
       : edgesUnion[unionParentKey(personHash)]?.childIds || [];
 
   const filtered = raw.filter((id) => id !== parentId);
-  if (!deduplicateChildren) return filtered;
-  return projectDeduplicatedChildIds(filtered, nodesData, endorsementsReady);
+  const projected = deduplicateChildren
+    ? projectDeduplicatedChildIds(filtered, nodesData, endorsementsReady)
+    : filtered;
+  // Unified sibling ordering: every view consumes children through this function, so
+  // sorting eldest-first here means the paper book and the graph views share one source.
+  return sortNodeIdsByBirthOrder(projected, nodesData);
 }
 
 function walkTree(params: TreeWalkParams): TreeGraphData {

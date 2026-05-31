@@ -129,6 +129,52 @@ export function deathDateString(nd: Partial<NodeData> | undefined | null): strin
   return formatYMD(nd.deathYear, nd.deathMonth, nd.deathDay, nd.isDeathBC);
 }
 
+// Birth-order comparison shared by the projection layer and the paper genealogy view.
+// Returns null when no usable birth year is present so callers can treat the date as unknown.
+export function getBirthOrderKey(
+  nd: Partial<NodeData> | undefined | null,
+): [number, number, number] | null {
+  if (!nd || typeof nd.birthYear !== "number" || nd.birthYear <= 0) return null;
+  const year = nd.isBirthBC ? -nd.birthYear : nd.birthYear;
+  const month = typeof nd.birthMonth === "number" && nd.birthMonth > 0 ? nd.birthMonth : 0;
+  const day = typeof nd.birthDay === "number" && nd.birthDay > 0 ? nd.birthDay : 0;
+  return [year, month, day];
+}
+
+export function compareBirthOrderKey(
+  a: [number, number, number],
+  b: [number, number, number],
+): number {
+  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+}
+
+// Order node ids eldest-first by birth date. Nodes with a known birth date sort before
+// those without; equal or unknown dates keep their original order (stable). No id is ever
+// dropped, so younger siblings never jump ahead of older ones and partially-loaded data
+// degrades gracefully to insertion order until birth dates arrive.
+export function sortNodeIdsByBirthOrder(
+  ids: NodeId[],
+  nodesData: Record<string, NodeData>,
+): NodeId[] {
+  if (ids.length <= 1) return ids;
+  return ids
+    .map((id, index) => ({ id, index }))
+    .sort((a, b) => {
+      const keyA = getBirthOrderKey(nodesData[a.id]);
+      const keyB = getBirthOrderKey(nodesData[b.id]);
+      if (keyA && keyB) {
+        const byBirth = compareBirthOrderKey(keyA, keyB);
+        if (byBirth !== 0) return byBirth;
+      } else if (keyA) {
+        return -1;
+      } else if (keyB) {
+        return 1;
+      }
+      return a.index - b.index;
+    })
+    .map((entry) => entry.id);
+}
+
 export function genderText(
   gender: number | undefined,
   t: (key: string, def?: string) => string,

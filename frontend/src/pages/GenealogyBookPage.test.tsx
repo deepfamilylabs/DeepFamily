@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GenealogyBookPage from "./GenealogyBookPage";
 
@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     contractMessage: "ready",
     refresh: vi.fn(),
   },
+  getStoryData: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -55,6 +56,7 @@ vi.mock("../domains/tree", () => ({
     />
   ),
   useFamilyTreeProjection: () => mocks.projection,
+  useTreeNodeAccess: () => ({ getStoryData: mocks.getStoryData }),
   useTreeGraphData: () => ({ rootExists: mocks.rootExists }),
   useTreeStatus: () => mocks.status,
 }));
@@ -67,6 +69,14 @@ describe("GenealogyBookPage", () => {
     mocks.status.progress = { created: 1, depth: 1 };
     mocks.status.contractMessage = "ready";
     mocks.status.refresh.mockReset();
+    mocks.getStoryData.mockReset();
+    mocks.getStoryData.mockResolvedValue(null);
+    mocks.projection.nodesData = {};
+    mocks.projection.graph = {
+      nodes: [{ id: "0xroot-v-1", depth: 0, personHash: "0xroot", versionIndex: 1 }],
+      edges: [],
+      childrenByParent: {},
+    };
   });
 
   afterEach(() => {
@@ -106,5 +116,40 @@ describe("GenealogyBookPage", () => {
 
     expect(screen.getByTestId("paper-view").dataset.style).toBe("ou");
     expect(screen.getByTestId("paper-view").dataset.hasRoot).toBe("false");
+  });
+
+  it("preloads missing story chunks for paper records", async () => {
+    mocks.projection.nodesData = {
+      "0xroot-v-1": {
+        id: "0xroot-v-1",
+        personHash: "0xroot",
+        versionIndex: 1,
+        tokenId: "7",
+        storyMetadata: {
+          totalChunks: 2,
+          fullStoryHash: "",
+          lastUpdateTime: 1,
+          isSealed: false,
+          totalLength: 100,
+        },
+        storyChunks: [
+          {
+            chunkIndex: 0,
+            chunkHash: "0x1",
+            content: "first",
+            timestamp: 1,
+            editor: "0x0000000000000000000000000000000000000000",
+            chunkType: 0,
+            attachmentCID: "",
+          },
+        ],
+      },
+    };
+
+    render(<GenealogyBookPage />);
+
+    await waitFor(() => {
+      expect(mocks.getStoryData).toHaveBeenCalledWith("7", { nodeIdHint: "0xroot-v-1" });
+    });
   });
 });

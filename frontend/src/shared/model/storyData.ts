@@ -140,10 +140,13 @@ export function applyStoryDataToNode(
 ): Record<string, NodeData> {
   const current = nodesData[nodeId];
   if (!current) return nodesData;
+  const hasCompleteStory =
+    storyData.fullStory.trim().length > 0 && storyData.integrity.missing.length === 0;
   return {
     ...nodesData,
     [nodeId]: {
       ...current,
+      story: hasCompleteStory ? storyData.fullStory : current.story,
       storyMetadata: storyData.metadata,
       storyChunks: storyData.chunks,
       storyFetchedAt: storyData.fetchedAt,

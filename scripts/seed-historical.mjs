@@ -232,6 +232,24 @@ function truncateUtf8Bytes(str, maxBytes) {
   return res;
 }
 
+function splitUtf8Chunks(str, maxBytes) {
+  const chunks = [];
+  let current = "";
+  let currentBytes = 0;
+  for (const ch of str) {
+    const nb = utf8ByteLen(ch);
+    if (current && currentBytes + nb > maxBytes) {
+      chunks.push(current);
+      current = "";
+      currentBytes = 0;
+    }
+    current += ch;
+    currentBytes += nb;
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
 // keccak256 string hash
 function solidityStringHash(content) {
   return ethers.keccak256(ethers.toUtf8Bytes(content));
@@ -368,9 +386,10 @@ function validateFamilyData(data) {
       }
     }
 
-    // Validate storyData exists
-    if (!member.storyData || typeof member.storyData !== "object") {
-      throw new Error(`Member ${index} (${member.fullName}) missing storyData object`);
+    const hasStory = typeof member.story === "string" && member.story.trim().length > 0;
+    const hasStoryData = member.storyData && typeof member.storyData === "object";
+    if (!hasStory && !hasStoryData) {
+      throw new Error(`Member ${index} (${member.fullName}) missing story or storyData`);
     }
   });
 
@@ -380,6 +399,22 @@ function validateFamilyData(data) {
 // ========== Story Data Processing ==========
 // Story data is now stored directly in JSON as arrays of strings
 // Each array element represents one chunk of content
+
+function pushStoryContentChunks(availableChunks, { type, content, arrayIndex }) {
+  if (typeof content !== "string") return;
+  const normalized = content.trim();
+  if (!normalized) return;
+
+  const parts = splitUtf8Chunks(normalized, MAX_CHUNK_CONTENT_LENGTH);
+  parts.forEach((part, partIndex) => {
+    availableChunks.push({
+      type,
+      content: part,
+      arrayIndex,
+      partIndex,
+    });
+  });
+}
 
 // ========== Person Data Creation Helper Functions ==========
 
@@ -404,10 +439,10 @@ function createPersonDataWithPassphrase(personInfo, _familyData) {
 }
 
 function createSupplementInfo(personInfo) {
-  // story field is a brief life summary, different from storyData.summary
-  // If person has a dedicated 'story' field, use it; otherwise use empty string
-  // The detailed content is stored in story chunks (storyData)
-  const storyBrief = personInfo.story || "";
+  // The JSON story field is the canonical narrative source.
+  // Contract supplementInfo.story is capped, so it stores only a preview;
+  // the complete story is written into story chunks below.
+  const storyPreview = personInfo.story || "";
 
   return {
     deathYear: personInfo.deathYear ?? 0,
@@ -415,7 +450,7 @@ function createSupplementInfo(personInfo) {
     deathDay: personInfo.deathDay ?? 0,
     birthPlace: personInfo.birthPlace || "",
     deathPlace: personInfo.deathPlace || "",
-    story: truncateUtf8Bytes(storyBrief, MAX_LONG_TEXT_LENGTH),
+    story: truncateUtf8Bytes(storyPreview, MAX_LONG_TEXT_LENGTH),
   };
 }
 
@@ -812,72 +847,81 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       continue;
     }
 
-    // Add Story Chunks - all chunks from JSON data
-    // Collect available story data chunks from JSON
-    // Each chunk is now: { type: number, content: string, arrayIndex: number }
+    // Add Story Chunks from JSON. Prefer the canonical story field; keep storyData
+    // as a compatibility fallback for older data files that have not been migrated.
     const availableChunks = [];
-    const storyData = person.storyData || {};
+    let storyChunkSource = "";
+    const storyText = typeof person.story === "string" ? person.story.trim() : "";
 
-    // Map chunk type to storyData field
-    const chunkFieldMap = {
-      0: "summary",
-      1: "earlyLife",
-      2: "education",
-      3: "lifeEvents",
-      4: "career",
-      5: "works",
-      6: "achievements",
-      7: "philosophy",
-      8: "quotes",
-      9: "family",
-      10: "lifestyle",
-      11: "relations",
-      12: "activities",
-      13: "anecdotes",
-      14: "controversies",
-      15: "legacy",
-      16: "gallery",
-      17: "references",
-      18: "notes",
-    };
+    if (storyText) {
+      storyChunkSource = "story";
+      pushStoryContentChunks(availableChunks, {
+        type: 0,
+        content: storyText,
+        arrayIndex: 0,
+      });
+    } else {
+      storyChunkSource = "storyData";
+      const storyData = person.storyData || {};
 
-    // Check which chunks have real data in JSON
-    // Now supports both string and array of strings
-    for (let chunkType = 0; chunkType < 19; chunkType++) {
-      const fieldName = chunkFieldMap[chunkType];
-      if (!fieldName || !storyData[fieldName]) continue;
+      // Map chunk type to storyData field
+      const chunkFieldMap = {
+        0: "summary",
+        1: "earlyLife",
+        2: "education",
+        3: "lifeEvents",
+        4: "career",
+        5: "works",
+        6: "achievements",
+        7: "philosophy",
+        8: "quotes",
+        9: "family",
+        10: "lifestyle",
+        11: "relations",
+        12: "activities",
+        13: "anecdotes",
+        14: "controversies",
+        15: "legacy",
+        16: "gallery",
+        17: "references",
+        18: "notes",
+      };
 
-      const fieldData = storyData[fieldName];
+      // Check which chunks have real data in JSON.
+      // Supports both string and array-of-strings formats.
+      for (let chunkType = 0; chunkType < 19; chunkType++) {
+        const fieldName = chunkFieldMap[chunkType];
+        if (!fieldName || !storyData[fieldName]) continue;
 
-      // Support both string and array formats
-      if (Array.isArray(fieldData)) {
-        // Array format: each element is a separate chunk
-        fieldData.forEach((content, arrayIndex) => {
-          if (content && typeof content === "string" && content.trim().length > 0) {
-            availableChunks.push({
+        const fieldData = storyData[fieldName];
+
+        if (Array.isArray(fieldData)) {
+          fieldData.forEach((content, arrayIndex) => {
+            pushStoryContentChunks(availableChunks, {
               type: chunkType,
-              content: content,
-              arrayIndex: arrayIndex,
+              content,
+              arrayIndex,
             });
-          }
-        });
-      } else if (typeof fieldData === "string" && fieldData.trim().length > 0) {
-        // Legacy string format: single chunk
-        availableChunks.push({
-          type: chunkType,
-          content: fieldData,
-          arrayIndex: 0,
-        });
+          });
+        } else {
+          pushStoryContentChunks(availableChunks, {
+            type: chunkType,
+            content: fieldData,
+            arrayIndex: 0,
+          });
+        }
       }
     }
 
     if (availableChunks.length === 0) {
-      console.log(`  ⊘ No story data available in JSON, skipping chunks`);
+      console.log(`  ⊘ No story content available in JSON, skipping chunks`);
       continue;
     }
 
     const targetChunkCount = availableChunks.length;
-    console.log(`  >Story data prepared from JSON: ${targetChunkCount} chunk(s)`);
+    console.log(
+      `  >Story chunks prepared from JSON ${storyChunkSource}: ${targetChunkCount} chunk(s)`,
+    );
     expectedChunks += targetChunkCount;
 
     if (!storyMetadata) {
@@ -945,7 +989,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       const chunkIndex = existingChunks + i;
 
       console.log(
-        `    >Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex})...`,
+        `    >Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex}, part ${chunk.partIndex})...`,
       );
       const chunkStart = Date.now();
       const chunkTx = await deepFamily.addStoryChunk(

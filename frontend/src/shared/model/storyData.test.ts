@@ -176,7 +176,48 @@ describe("storyData buildStorySnapshot", () => {
     );
 
     expect(next["0xabc-v-1"]?.storyMetadata?.totalChunks).toBe(1);
+    expect(next["0xabc-v-1"]?.story).toBe("Hello");
     expect(next["0xabc-v-1"]?.storyFetchedAt).toBe(123);
     expect(next["0xabc-v-1"]?.storyChunks?.[0]?.content).toBe("Hello");
+  });
+
+  it("does not replace the node story with incomplete chunks", () => {
+    const storyData = buildStoryDataResult(
+      [
+        {
+          chunkIndex: 1,
+          chunkHash: "0x1",
+          content: "tail",
+          timestamp: 1,
+          editor: ethers.ZeroAddress,
+          chunkType: 0,
+          attachmentCID: "",
+        },
+      ],
+      {
+        totalChunks: 2,
+        totalLength: 8,
+        isSealed: false,
+        lastUpdateTime: 1,
+        fullStoryHash: "",
+      },
+      123,
+    );
+
+    const next = applyStoryDataToNode(
+      {
+        "0xabc-v-1": {
+          personHash: "0xabc",
+          versionIndex: 1,
+          id: "0xabc-v-1",
+          story: "preview",
+        },
+      },
+      "0xabc-v-1",
+      storyData,
+    );
+
+    expect(next["0xabc-v-1"]?.story).toBe("preview");
+    expect(next["0xabc-v-1"]?.storyChunks?.[0]?.content).toBe("tail");
   });
 });

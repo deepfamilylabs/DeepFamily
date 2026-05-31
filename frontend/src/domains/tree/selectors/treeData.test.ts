@@ -168,6 +168,37 @@ describe("treeData getProjectedChildIds", () => {
     });
     expect(out).toEqual([makeNodeId(childHash, 1), makeNodeId(otherHash, 1)]);
   });
+
+  it("orders children eldest-first by birth date with a stable fallback", () => {
+    const parentId = makeNodeId(parentHash, 1);
+    const younger = makeNodeId("0xyounger", 1);
+    const eldest = makeNodeId("0xeldest", 1);
+    const twin = makeNodeId("0xtwin", 1); // same birth year as `younger`
+    const undated = makeNodeId("0xundated", 1);
+    // Stored order is intentionally scrambled and includes a duplicate year + a missing date.
+    const childIds = [younger, eldest, twin, undated];
+    const edgesUnion: EdgeStoreUnion = {
+      [unionParentKey(parentHash)]: { childIds, fetchedAt: Date.now() },
+    };
+    const edgesStrict: EdgeStoreStrict = {};
+    const nodesData: Record<string, NodeData> = {
+      [younger]: { id: younger, personHash: "0xyounger", versionIndex: 1, birthYear: 1990 },
+      [eldest]: { id: eldest, personHash: "0xeldest", versionIndex: 1, birthYear: 1980 },
+      [twin]: { id: twin, personHash: "0xtwin", versionIndex: 1, birthYear: 1990 },
+      [undated]: { id: undated, personHash: "0xundated", versionIndex: 1 },
+    };
+    const out = getProjectedChildIds({
+      parentId,
+      childrenMode: "union",
+      deduplicateChildren: false,
+      endorsementsReady: true,
+      nodesData,
+      edgesUnion,
+      edgesStrict,
+    });
+    // eldest first; the 1990 twins keep stored order; the undated child sorts last.
+    expect(out).toEqual([eldest, younger, twin, undated]);
+  });
 });
 
 describe("treeData buildTreeRows", () => {
