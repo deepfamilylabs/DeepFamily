@@ -453,26 +453,6 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByText(/Birth: 1815/)).toBeTruthy();
   });
 
-  it("renders the register view on the shared paper background", () => {
-    render(
-      <PaperGenealogyView
-        style="dieji"
-        graph={graph}
-        rootId={rootId}
-        nodesData={nodesData}
-        hasRoot
-      />,
-    );
-
-    expect(screen.getByTestId("paper-dieji-chart").className).toContain("border");
-    expect(screen.getByTestId("paper-dieji-page").className).toContain("h-[872px]");
-    expect(screen.getByTestId("paper-dieji-page").className).toContain("min-w-[1180px]");
-    expect(screen.getByTestId("paper-dieji-page").style.background).toBe("var(--df-paper-sheet)");
-    expect(screen.getByText("Register").className).toContain("text-xl");
-    expect(screen.getByText("2 records").style.color).toBe("var(--df-paper-red)");
-    expect(screen.getByText(/Ada Root/)).toBeTruthy();
-  });
-
   it("renders Ou-style as five-generation tables with boundary generation repeated", () => {
     const linear = makeLinearGraph(6);
 
@@ -1253,7 +1233,7 @@ describe("PaperGenealogyView", () => {
   it("renders an empty state when no root is available", () => {
     render(
       <PaperGenealogyView
-        style="dieji"
+        style="ou"
         graph={{ nodes: [], edges: [], childrenByParent: {} }}
         rootId={null}
         nodesData={{}}
