@@ -2,7 +2,6 @@ import type { NodeData, NodeId } from "../../../../shared/model";
 import type { TreeGraphData } from "../../selectors";
 import { PaperEmptyState } from "./PaperEmptyState";
 import type { PaperGenealogyStyle } from "./paperData";
-import { DiejiBookRenderer } from "./renderers/DiejiBookRenderer";
 import { LineageBookRenderer } from "./renderers/LineageBookRenderer";
 import { ModernBookRenderer } from "./renderers/ModernBookRenderer";
 import { OuBookRenderer } from "./renderers/OuBookRenderer";
@@ -47,8 +46,6 @@ export function PaperGenealogyView(props: PaperGenealogyViewProps) {
           generations={vm.generations}
           t={vm.translate}
         />
-      ) : props.style === "dieji" ? (
-        <DiejiBookRenderer generations={vm.generations} t={vm.translate} />
       ) : props.style === "modern" ? (
         <ModernBookRenderer generations={vm.generations} t={vm.translate} />
       ) : null}
