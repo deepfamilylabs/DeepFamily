@@ -57,7 +57,7 @@ const MODERN_GENERATIONS_PER_CHART = 5;
 const MODERN_CHART_STEP = 4;
 const MODERN_PAGE_ROW_CAPACITY = 15;
 const MODERN_SPREAD_ROW_CAPACITY = MODERN_PAGE_ROW_CAPACITY * 2;
-const MODERN_RECORD_CHARS_PER_ROW = 58;
+const MODERN_RECORD_CHARS_PER_ROW = 42;
 const MODERN_SPINE_WIDTH = 72;
 const MODERN_MIN_SPREAD_WIDTH = 1180;
 const MODERN_TABLE_COLUMNS = "64px 112px minmax(0, 1fr)";
@@ -89,14 +89,15 @@ function compactUnique(lines: Array<string | undefined | null | false>): string[
 }
 
 function splitTextByLength(text: string, maxLength: number): string[] {
-  const chars = Array.from(text);
+  const chars = Array.from(text.trim());
   if (chars.length <= maxLength) return [text];
 
   const chunks: string[] = [];
   for (let start = 0; start < chars.length; start += maxLength) {
-    chunks.push(chars.slice(start, start + maxLength).join(""));
+    chunks.push(chars.slice(start, start + maxLength).join("").trim());
   }
-  return chunks;
+
+  return chunks.filter(Boolean);
 }
 
 function formatModernRecordLine(line: string): string {
@@ -159,6 +160,7 @@ function getModernRelationLabel(
   peopleById: Map<string, PaperPerson>,
   t: TranslateFn,
 ): string {
+  if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
   if (person.relation?.kind !== "child") return "";
 
   const parent = peopleById.get(person.relation.parentId);
@@ -374,11 +376,18 @@ function ModernGenerationRowView({
   );
 }
 
-function ModernPersonRowView({ row }: { row: Extract<ModernTableRow, { kind: "person" }> }) {
+function ModernPersonRowView({
+  row,
+  t,
+}: {
+  row: Extract<ModernTableRow, { kind: "person" }>;
+  t: TranslateFn;
+}) {
   const firstPartTestId =
     row.partIndex === 1
       ? `paper-modern-row-${row.person.id}`
       : `paper-modern-row-${row.person.id}-${row.partIndex}`;
+  const continuedMark = row.continued ? t("genealogyBook.ouRecordContinuedMark", "cont.") : "";
 
   return (
     <div
@@ -389,10 +398,11 @@ function ModernPersonRowView({ row }: { row: Extract<ModernTableRow, { kind: "pe
       }}
       data-testid={firstPartTestId}
       data-continued={row.continued ? "true" : "false"}
+      data-part-index={row.partIndex}
       title={row.fullRecord}
     >
       <div
-        className="flex min-w-0 items-center justify-center whitespace-pre-line border-r px-1 text-center text-[14px] font-bold leading-5"
+        className="flex h-full min-h-0 min-w-0 items-center justify-center whitespace-pre-line border-r px-1 text-center text-[14px] font-bold leading-5"
         style={{
           borderColor: "var(--df-paper-line)",
           color: "var(--df-paper-ink)",
@@ -403,23 +413,33 @@ function ModernPersonRowView({ row }: { row: Extract<ModernTableRow, { kind: "pe
         {row.relationLabel}
       </div>
       <div
-        className="flex min-w-0 items-center justify-center border-r px-2 text-center"
+        className="flex h-full min-h-0 min-w-0 items-center justify-center border-r px-2 text-center"
         style={{ borderColor: "var(--df-paper-line)" }}
       >
-        <strong
-          className="block max-w-full text-[19px] font-black leading-tight tracking-normal"
-          style={{
-            color: "var(--df-paper-ink)",
-            fontFamily: PAPER_TITLE_FONT_STACK,
-            overflowWrap: "anywhere",
-          }}
-          data-testid={row.partIndex === 1 ? `paper-modern-name-${row.person.id}` : undefined}
-        >
-          {row.name}
-        </strong>
+        {row.name ? (
+          <strong
+            className="block max-w-full text-[19px] font-black leading-tight tracking-normal"
+            style={{
+              color: "var(--df-paper-ink)",
+              fontFamily: PAPER_TITLE_FONT_STACK,
+              overflowWrap: "anywhere",
+            }}
+            data-testid={row.partIndex === 1 ? `paper-modern-name-${row.person.id}` : undefined}
+          >
+            {row.name}
+          </strong>
+        ) : continuedMark ? (
+          <span
+            className="text-[12px] font-bold tracking-normal"
+            style={{ color: "var(--df-paper-red)", fontFamily: PAPER_NOTE_FONT_STACK }}
+            data-testid={`paper-modern-continued-${row.person.id}-${row.partIndex}`}
+          >
+            {continuedMark}
+          </span>
+        ) : null}
       </div>
       <p
-        className="m-0 flex min-w-0 items-center overflow-hidden px-3 py-1.5 text-[15px] leading-[1.45]"
+        className="m-0 flex h-full min-h-0 min-w-0 items-start overflow-hidden px-3 py-1 text-[14px] leading-[1.35]"
         style={{
           color: "var(--df-paper-ink)",
           fontFamily: PAPER_NOTE_FONT_STACK,
@@ -454,7 +474,7 @@ function ModernBlankRowView({ row }: { row: Extract<ModernTableRow, { kind: "bla
 
 function ModernTableRowView({ row, t }: { row: ModernTableRow; t: TranslateFn }) {
   if (row.kind === "generation") return <ModernGenerationRowView row={row} t={t} />;
-  if (row.kind === "person") return <ModernPersonRowView row={row} />;
+  if (row.kind === "person") return <ModernPersonRowView row={row} t={t} />;
   return <ModernBlankRowView row={row} />;
 }
 

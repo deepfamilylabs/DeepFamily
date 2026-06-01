@@ -453,6 +453,40 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByText(/Birth: 1815/)).toBeTruthy();
   });
 
+  it("keeps long modern ledger biographies within compact continuation rows", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const longStory = (
+      "少承庭训，迁居江右，主持修桥置田，赈济族人，辑录旧谱，分辨昭穆，乡里称其笃行。" +
+      "又置义田三十亩，以供春秋祭祀，训诸子读书务本，凡族中婚丧贫乏者皆量力周济。"
+    ).repeat(2);
+
+    render(
+      <PaperGenealogyView
+        style="modern"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [child.id]: {
+            id: child.id,
+            personHash: child.personHash,
+            versionIndex: 1,
+            fullName: "曹启",
+            story: longStory,
+          },
+        }}
+        hasRoot
+      />,
+    );
+
+    const detailRows = screen.getAllByTestId(`paper-modern-detail-${child.id}`);
+    expect(detailRows.length).toBeGreaterThan(1);
+    expect(Array.from(detailRows[0].textContent || "")).toHaveLength(42);
+    expect(detailRows[0].className).toContain("h-full");
+    expect(detailRows[0].className).toContain("items-start");
+    expect(screen.getByTestId(`paper-modern-continued-${child.id}-2`).textContent).toBe("cont.");
+  });
+
   it("renders Ou-style as five-generation tables with boundary generation repeated", () => {
     const linear = makeLinearGraph(6);
 
