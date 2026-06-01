@@ -407,7 +407,7 @@ function ModernPersonRowView({ row }: { row: Extract<ModernTableRow, { kind: "pe
         style={{ borderColor: "var(--df-paper-line)" }}
       >
         <strong
-          className="block max-w-full text-[25px] font-black leading-tight tracking-normal"
+          className="block max-w-full text-[19px] font-black leading-tight tracking-normal"
           style={{
             color: "var(--df-paper-ink)",
             fontFamily: PAPER_TITLE_FONT_STACK,
