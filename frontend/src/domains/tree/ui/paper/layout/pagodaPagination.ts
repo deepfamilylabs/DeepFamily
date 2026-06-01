@@ -59,14 +59,14 @@ export type PagodaPaperBook = {
 
 export const PAGODA_GENERATIONS_PER_CHART = 6;
 export const PAGODA_CHART_STEP = 5;
-export const PAGODA_NODE_WIDTH = 36;
+export const PAGODA_NODE_WIDTH = 48;
 export const PAGODA_NODE_HEIGHT = 68;
 export const PAGODA_GAP_X = 24;
 export const PAGODA_GAP_Y = 118;
 export const PAGODA_PAGE_WIDTH = 1180;
 export const PAGODA_PAGE_HEIGHT = 872;
 export const PAGODA_INNER_LEFT = 72;
-export const PAGODA_INNER_RIGHT = 110;
+export const PAGODA_INNER_RIGHT = 120;
 export const PAGODA_INNER_TOP = 144;
 export const PAGODA_INNER_BOTTOM = 64;
 
@@ -97,7 +97,7 @@ function getGenerationLabel(
   );
 }
 
-function toChineseNumeral(value: number): string {
+export function toChineseNumeral(value: number): string {
   const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
   if (value <= 0 || value >= 100) return String(value);
   if (value < 10) return digits[value];
@@ -109,7 +109,7 @@ function toChineseNumeral(value: number): string {
 }
 
 export function getPagodaGenerationMark(depth: number, t: TranslateFn): string {
-  return t("genealogyBook.pagodaGenerationMark", "{{han}}世", {
+  return t("genealogyBook.suGenerationMark", "{{han}}世", {
     han: toChineseNumeral(depth + 1),
     number: depth + 1,
   });
