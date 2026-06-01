@@ -3,6 +3,7 @@ import type { TreeGraphData } from "../../selectors";
 import { PaperEmptyState } from "./PaperEmptyState";
 import type { PaperGenealogyStyle } from "./paperData";
 import { DiejiBookRenderer } from "./renderers/DiejiBookRenderer";
+import { LineageBookRenderer } from "./renderers/LineageBookRenderer";
 import { ModernBookRenderer } from "./renderers/ModernBookRenderer";
 import { OuBookRenderer } from "./renderers/OuBookRenderer";
 import { PagodaBookRenderer } from "./renderers/PagodaBookRenderer";
@@ -34,6 +35,13 @@ export function PaperGenealogyView(props: PaperGenealogyViewProps) {
         <SuBookRenderer generations={vm.generations} t={vm.translate} />
       ) : props.style === "pagoda" ? (
         <PagodaBookRenderer
+          graph={vm.graph}
+          rootId={vm.rootId}
+          generations={vm.generations}
+          t={vm.translate}
+        />
+      ) : props.style === "lineage" ? (
+        <LineageBookRenderer
           graph={vm.graph}
           rootId={vm.rootId}
           generations={vm.generations}

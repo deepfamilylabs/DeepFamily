@@ -3,12 +3,13 @@ import { birthDateString, deathDateString, sortNodeIdsByBirthOrder } from "../..
 import type { TreeGraphData } from "../../selectors";
 import { getNodeUi, type NodeUi } from "../nodeUi";
 
-export type PaperGenealogyStyle = "ou" | "su" | "pagoda" | "dieji" | "modern";
+export type PaperGenealogyStyle = "ou" | "su" | "pagoda" | "lineage" | "dieji" | "modern";
 
 export const PAPER_GENEALOGY_STYLES: PaperGenealogyStyle[] = [
   "ou",
   "su",
   "pagoda",
+  "lineage",
   "dieji",
   "modern",
 ];

@@ -265,16 +265,18 @@ function OuPage({
   );
 }
 
-function OuSpine({
+export function OuSpine({
   chartIndex,
   spread,
   title,
   t,
+  testIdPrefix = "paper-ou-spine",
 }: {
   chartIndex: number;
   spread: OuPageSpread;
   title: string;
   t: TranslateFn;
+  testIdPrefix?: string;
 }) {
   const spreadLabel =
     spread.kind === "main"
@@ -290,7 +292,7 @@ function OuSpine({
         borderColor: "var(--df-paper-line)",
         color: "var(--df-paper-ink)",
       }}
-      data-testid={`paper-ou-spine-${chartIndex}-${spread.index}`}
+      data-testid={`${testIdPrefix}-${chartIndex}-${spread.index}`}
     >
       <div
         className="text-[31px] font-black leading-none tracking-normal"

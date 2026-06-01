@@ -41,6 +41,7 @@ export default function GenealogyBookPage() {
       ou: t("genealogyBook.styles.ou", "Ou-style"),
       su: t("genealogyBook.styles.su", "Su-style"),
       pagoda: t("genealogyBook.styles.pagoda", "Pagoda"),
+      lineage: t("genealogyBook.styles.lineage", "Lineage"),
       dieji: t("genealogyBook.styles.dieji", "Register"),
       modern: t("genealogyBook.styles.modern", "Modern"),
     }),

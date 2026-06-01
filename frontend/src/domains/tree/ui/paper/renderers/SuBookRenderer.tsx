@@ -1,11 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import {
   buildSuPaperBook,
   getSuFullRecordText,
   getSuGenerationMark,
   splitSuSpreadColumns,
-  SU_GENERATION_MARK_WIDTH,
-  SU_PERSON_LANE_WIDTH,
   type SuChartWindow,
   type SuPageSide,
   type SuPageSpread,
@@ -22,6 +20,13 @@ import {
 import { clipText, getPaperSpineTitle } from "../paperText";
 
 const SU_LANE_GRID_ROWS = "64px 96px 1fr";
+const SU_EQUAL_LANE_STYLE: CSSProperties = {
+  flexBasis: 0,
+  flexGrow: 1,
+  flexShrink: 1,
+  minWidth: 0,
+  width: 0,
+};
 
 function SuPersonLane({ lane }: { lane: Extract<SuTableLane, { kind: "person" }> }) {
   const { person } = lane;
@@ -30,13 +35,11 @@ function SuPersonLane({ lane }: { lane: Extract<SuTableLane, { kind: "person" }>
 
   return (
     <article
-      className="grid h-full shrink-0 border-l last:border-l-0"
+      className="grid h-full border-l last:border-l-0"
       style={{
         borderColor: "var(--df-paper-line-soft)",
         direction: "ltr",
-        width: SU_PERSON_LANE_WIDTH,
-        flex: "1 1 0",
-        minWidth: SU_PERSON_LANE_WIDTH,
+        ...SU_EQUAL_LANE_STYLE,
         gridTemplateRows: SU_LANE_GRID_ROWS,
       }}
       data-testid={`paper-row-${person.id}`}
@@ -107,11 +110,10 @@ function SuGenerationLane({
 }) {
   return (
     <div
-      className="grid h-full shrink-0 border-l last:border-l-0"
+      className="grid h-full border-l last:border-l-0"
       style={{
         borderColor: "var(--df-paper-line)",
-        width: SU_GENERATION_MARK_WIDTH,
-        flex: `0 0 ${SU_GENERATION_MARK_WIDTH}px`,
+        ...SU_EQUAL_LANE_STYLE,
         gridTemplateRows: SU_LANE_GRID_ROWS,
       }}
       data-testid={`paper-su-generation-${lane.depth}`}
@@ -151,14 +153,20 @@ function SuGenerationLane({
 function SuBlankLane({ lane }: { lane: Extract<SuTableLane, { kind: "blank" }> }) {
   return (
     <div
-      className="h-full shrink-0 border-l last:border-l-0"
+      className="grid h-full border-l last:border-l-0"
       style={{
         borderColor: "var(--df-paper-line-soft)",
-        width: SU_PERSON_LANE_WIDTH,
+        ...SU_EQUAL_LANE_STYLE,
+        gridTemplateRows: SU_LANE_GRID_ROWS,
       }}
+      data-testid={`paper-su-blank-${lane.key}`}
       data-su-lane={lane.key}
       aria-hidden="true"
-    />
+    >
+      <div className="border-b" style={{ borderColor: "var(--df-paper-line-soft)" }} />
+      <div className="border-b" style={{ borderColor: "var(--df-paper-line-soft)" }} />
+      <div />
+    </div>
   );
 }
 

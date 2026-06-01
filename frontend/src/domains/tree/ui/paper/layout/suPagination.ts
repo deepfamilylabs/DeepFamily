@@ -50,11 +50,9 @@ export type SuPaperBook = {
 
 export const SU_GENERATIONS_PER_CHART = 5;
 export const SU_CHART_STEP = 4;
-export const SU_RIGHT_PAGE_LANE_CAPACITY = 13;
-export const SU_LEFT_PAGE_LANE_CAPACITY = 13;
+export const SU_RIGHT_PAGE_LANE_CAPACITY = 14;
+export const SU_LEFT_PAGE_LANE_CAPACITY = 14;
 export const SU_SPREAD_LANE_CAPACITY = SU_RIGHT_PAGE_LANE_CAPACITY + SU_LEFT_PAGE_LANE_CAPACITY;
-export const SU_PERSON_LANE_WIDTH = 42;
-export const SU_GENERATION_MARK_WIDTH = 34;
 export const SU_RECORD_CHARS_PER_LANE = 42;
 
 function fallbackTranslate(
@@ -114,14 +112,16 @@ function getRelationLabel(person: PaperPerson, t: TranslateFn): string {
     if (childNumber === 1) return t("genealogyBook.suFirstSon", "first son");
     if (childNumber === 2) return t("genealogyBook.suSecondSon", "second son");
     return t("genealogyBook.suNthSon", "{{number}} son", {
-      number: toChineseNumeral(childNumber),
+      han: toChineseNumeral(childNumber),
+      number: childNumber,
     });
   }
   if (gender === 2) {
     if (childNumber === 1) return t("genealogyBook.suFirstDaughter", "first daughter");
     if (childNumber === 2) return t("genealogyBook.suSecondDaughter", "second daughter");
     return t("genealogyBook.suNthDaughter", "{{number}} daughter", {
-      number: toChineseNumeral(childNumber),
+      han: toChineseNumeral(childNumber),
+      number: childNumber,
     });
   }
 
@@ -145,6 +145,39 @@ export function splitSuSpreadColumns(
   side: SuPageSide,
 ): SuTableLane[] {
   return side === "right" ? spread.rightLanes : spread.leftLanes;
+}
+
+function makeBlankLane(params: {
+  spreadIndex: number;
+  side: SuPageSide;
+  index: number;
+}): SuTableLane {
+  const { spreadIndex, side, index } = params;
+  return {
+    kind: "blank",
+    key: `blank:${spreadIndex}:${side}:${index}`,
+  };
+}
+
+function fillSuSideLanes(params: {
+  lanes: SuTableLane[];
+  capacity: number;
+  spreadIndex: number;
+  side: SuPageSide;
+}): SuTableLane[] {
+  const { lanes, capacity, spreadIndex, side } = params;
+  if (lanes.length >= capacity) return lanes;
+
+  return [
+    ...lanes,
+    ...Array.from({ length: capacity - lanes.length }, (_value, offset) =>
+      makeBlankLane({
+        spreadIndex,
+        side,
+        index: lanes.length + offset,
+      }),
+    ),
+  ];
 }
 
 function makeGenerationLane(params: {
@@ -231,8 +264,18 @@ function splitChartLanesIntoSpreads(params: {
       index: spreadIndex,
       kind: spreadIndex === 1 ? "main" : "continuation",
       lanes: withLeadingMark,
-      rightLanes: withLeadingMark.slice(0, SU_RIGHT_PAGE_LANE_CAPACITY),
-      leftLanes: withLeadingMark.slice(SU_RIGHT_PAGE_LANE_CAPACITY, SU_SPREAD_LANE_CAPACITY),
+      rightLanes: fillSuSideLanes({
+        lanes: withLeadingMark.slice(0, SU_RIGHT_PAGE_LANE_CAPACITY),
+        capacity: SU_RIGHT_PAGE_LANE_CAPACITY,
+        spreadIndex,
+        side: "right",
+      }),
+      leftLanes: fillSuSideLanes({
+        lanes: withLeadingMark.slice(SU_RIGHT_PAGE_LANE_CAPACITY, SU_SPREAD_LANE_CAPACITY),
+        capacity: SU_LEFT_PAGE_LANE_CAPACITY,
+        spreadIndex,
+        side: "left",
+      }),
     });
     start += capacity || SU_SPREAD_LANE_CAPACITY;
   }

@@ -3,7 +3,10 @@ import { makeNodeId, type NodeData } from "../../../../../shared/model";
 import { buildPaperGenerations, type TranslateFn } from "../paperData";
 import {
   buildPagodaPaperBook,
+  getPagodaGenerationMark,
+  PAGODA_BRANCH_LEAF_CAPACITY,
   PAGODA_GENERATIONS_PER_CHART,
+  PAGODA_INNER_RIGHT,
   PAGODA_PAGE_HEIGHT,
   PAGODA_PAGE_WIDTH,
 } from "./pagodaPagination";
@@ -54,6 +57,51 @@ function makeWideGenerationGraph(childCount: number) {
       edges: children.map((child) => ({ from: root.id, to: child.id })),
       childrenByParent: {
         [root.id]: children.map((child) => child.id),
+      },
+    },
+  };
+}
+
+function makeSparseThenWideBranchGraph(wideLeafCount: number) {
+  const rootPersonHash = makeHash(301);
+  const root = {
+    id: makeNodeId(rootPersonHash, 1),
+    depth: 0,
+    personHash: rootPersonHash,
+    versionIndex: 1,
+  };
+  const sparseChildren = Array.from({ length: 3 }, (_value, index) => {
+    const personHash = makeHash(index + 302);
+    return { id: makeNodeId(personHash, 1), depth: 1, personHash, versionIndex: 1 };
+  });
+  const wideParentHash = makeHash(305);
+  const wideParent = {
+    id: makeNodeId(wideParentHash, 1),
+    depth: 1,
+    personHash: wideParentHash,
+    versionIndex: 1,
+  };
+  const wideChildren = Array.from({ length: wideLeafCount }, (_value, index) => {
+    const personHash = makeHash(index + 306);
+    return { id: makeNodeId(personHash, 1), depth: 2, personHash, versionIndex: 1 };
+  });
+
+  return {
+    root,
+    sparseChildren,
+    wideParent,
+    wideChildren,
+    rootId: root.id,
+    graph: {
+      nodes: [root, ...sparseChildren, wideParent, ...wideChildren],
+      edges: [
+        ...sparseChildren.map((child) => ({ from: root.id, to: child.id })),
+        { from: root.id, to: wideParent.id },
+        ...wideChildren.map((child) => ({ from: wideParent.id, to: child.id })),
+      ],
+      childrenByParent: {
+        [root.id]: [...sparseChildren.map((child) => child.id), wideParent.id],
+        [wideParent.id]: wideChildren.map((child) => child.id),
       },
     },
   };
@@ -144,6 +192,32 @@ describe("buildPagodaPaperBook", () => {
     expect(book.charts[0].pages[0].title).toBe("一世至六世系图");
   });
 
+  it("uses localized title text and reuses the Su-style generation mark key", () => {
+    const linear = makeLinearGraph(2);
+    const generations = makeGenerations(linear.graph);
+    const englishTranslate: TranslateFn = (key, fallback, options) => {
+      if (key === "genealogyBook.pagodaChartTitle") {
+        return `Generations ${options?.start}-${options?.end} lineage chart`;
+      }
+      if (key === "genealogyBook.suGenerationMark") {
+        return `Gen ${options?.number}`;
+      }
+      return (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
+        String(options?.[name] ?? ""),
+      );
+    };
+
+    const book = buildPagodaPaperBook({
+      graph: linear.graph,
+      rootId: linear.rootId,
+      generations,
+      t: englishTranslate,
+    });
+
+    expect(book.charts[0].pages[0].title).toBe("Generations 1-6 lineage chart");
+    expect(getPagodaGenerationMark(0, englishTranslate)).toBe("Gen 1");
+  });
+
   it("centers each parent over the child group and keeps generations on fixed bands", () => {
     const branch = makeTwoBranchGraph();
     const generations = makeGenerations(branch.graph);
@@ -172,6 +246,12 @@ describe("buildPagodaPaperBook", () => {
     expect(connector?.parentCenterX).toBeCloseTo(
       ((connector?.horizontalStartX || 0) + (connector?.horizontalEndX || 0)) / 2,
     );
+    expect(Math.max(...page.nodes.map((node) => node.x + node.w))).toBeLessThanOrEqual(
+      page.width - PAGODA_INNER_RIGHT,
+    );
+    expect(Math.max(...page.connectors.map((entry) => entry.horizontalEndX))).toBeLessThanOrEqual(
+      page.width - PAGODA_INNER_RIGHT,
+    );
   });
 
   it("splits over-wide sibling groups into branch pages instead of shrinking the page", () => {
@@ -194,6 +274,28 @@ describe("buildPagodaPaperBook", () => {
       true,
     );
     expect(new Set(childIdsInPages).size).toBe(30);
+  });
+
+  it("keeps a near-capacity wide branch on the lead page instead of leaving it sparse", () => {
+    const branch = makeSparseThenWideBranchGraph(11);
+    const generations = makeGenerations(branch.graph);
+
+    const book = buildPagodaPaperBook({
+      graph: branch.graph,
+      rootId: branch.rootId,
+      generations,
+      t: translate,
+    });
+    const page = book.charts[0].pages[0];
+    const pageIds = new Set(page.nodes.map((node) => node.id));
+
+    expect(PAGODA_BRANCH_LEAF_CAPACITY).toBeGreaterThanOrEqual(14);
+    expect(pageIds.has(branch.wideParent.id)).toBe(true);
+    expect(branch.wideChildren.every((child) => pageIds.has(child.id))).toBe(true);
+    expect(page.nodes).toHaveLength(1 + branch.sparseChildren.length + 1 + branch.wideChildren.length);
+    expect(Math.max(...page.nodes.map((node) => node.x + node.w))).toBeLessThanOrEqual(
+      page.width - PAGODA_INNER_RIGHT,
+    );
   });
 
   it("uses the same fixed page size as the Ou/Su paper spread", () => {
