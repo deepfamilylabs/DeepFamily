@@ -48,7 +48,7 @@ function SuPersonLane({ lane }: { lane: Extract<SuTableLane, { kind: "person" }>
       title={fullRecord}
     >
       <div
-        className="flex items-center justify-center border-b px-1 py-1 text-[11px] font-bold"
+        className="flex items-center justify-center border-b px-1 py-1 text-[11px] font-normal"
         style={{
           borderColor: "var(--df-paper-line-soft)",
           color: "var(--df-paper-muted)",
@@ -298,22 +298,31 @@ export function SuBookRenderer({
     () => getPaperSpineTitle(generations, t),
     [generations, t],
   );
+  const spreadItems = useMemo(
+    () =>
+      book.charts.flatMap((chart) =>
+        chart.spreads.map((spread) => ({
+          chart,
+          spread,
+        })),
+      ),
+    [book],
+  );
 
   return (
     <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-su">
       <div
-        className="mx-auto flex min-h-full max-w-[1320px] flex-col gap-7"
+        className="mx-auto flex min-h-full max-w-[1320px] flex-col"
         style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
       >
-        {book.charts.map((chart) => (
+        {spreadItems.length ? (
           <section
-            key={chart.index}
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
               borderColor: "var(--df-paper-line)",
             }}
-            data-testid={`paper-su-table-${chart.index}`}
+            data-testid="paper-su-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
@@ -326,20 +335,15 @@ export function SuBookRenderer({
                 {t("genealogyBook.styles.su", "Su-style")}
               </h2>
               <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
-                {chart.repeatedDepth !== undefined
-                  ? t(
-                      "genealogyBook.suOverlapNote",
-                      "This chart repeats the previous chart's fifth generation.",
-                    )
-                  : t(
-                      "genealogyBook.suTableRule",
-                      "Five vertical generations per chart, right-to-left.",
-                    )}
+                {t(
+                  "genealogyBook.suTableRule",
+                  "Five vertical generations per chart, right-to-left.",
+                )}
               </span>
             </div>
 
             <div className="flex flex-col gap-5">
-              {chart.spreads.map((spread) => (
+              {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
                   className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
@@ -361,7 +365,7 @@ export function SuBookRenderer({
               ))}
             </div>
           </section>
-        ))}
+        ) : null}
       </div>
     </div>
   );

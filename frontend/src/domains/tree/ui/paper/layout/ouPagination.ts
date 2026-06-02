@@ -1,4 +1,10 @@
-import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
+import {
+  splitPaperRecordLines,
+  type PaperGeneration,
+  type PaperPerson,
+  type TranslateFn,
+} from "../paperData";
+import { getPaperRelationLabel, toChineseNumeral } from "../paperText";
 
 export type OuPageSide = "left" | "right";
 
@@ -82,17 +88,6 @@ function getGenerationLabel(
   );
 }
 
-function toChineseNumeral(value: number): string {
-  const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  if (value <= 0 || value >= 100) return String(value);
-  if (value < 10) return digits[value];
-  if (value === 10) return "十";
-  if (value < 20) return `十${digits[value % 10]}`;
-  const tens = Math.floor(value / 10);
-  const ones = value % 10;
-  return `${digits[tens]}十${ones ? digits[ones] : ""}`;
-}
-
 function formatOuRecordLine(line: string): string {
   return line.replace(/^([\p{Script=Han}]{1,4}):\s*/u, "$1");
 }
@@ -105,8 +100,25 @@ export function getOuGenerationMark(depth: number, t: TranslateFn): string {
 }
 
 export function getOuFullRecordText(person: PaperPerson): string {
-  const lines = person.classicalLines.length ? person.classicalLines : person.detailLines;
+  const { baseLines, childrenLine } = splitPaperRecordLines(person);
+  const lines = childrenLine ? [...baseLines, childrenLine] : baseLines;
   return lines.map(formatOuRecordLine).join("，") || person.ui.shortHashText;
+}
+
+function getOuRecordSections(person: PaperPerson, t: TranslateFn): string[] {
+  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+  const baseRecord = baseLines.map(formatOuRecordLine).join("，") || person.ui.shortHashText;
+  const childrenRecord = childrenLine ? formatOuRecordLine(childrenLine) : undefined;
+  return [baseRecord, childrenRecord].filter((line): line is string => Boolean(line));
+}
+
+// Ou has no separate relation slot, so the 行传 record opens with the parentage —
+// e.g. "曹操长子，生155，卒220…" — as classical Ou-style biographies do. This composed text
+// is what drives width measurement, column chunking, and display so they all stay in sync.
+export function getOuRecordText(person: PaperPerson, t: TranslateFn): string {
+  const label = getPaperRelationLabel(person, t, { withParentName: true });
+  const record = getOuFullRecordText(person);
+  return label ? `${label}，${record}` : record;
 }
 
 function getTextColumnCount(text: string): number {
@@ -152,12 +164,12 @@ function getWidthSlotSpan(widthPx: number): number {
   );
 }
 
-function getOuRecordTotalSlotSpan(person: PaperPerson): number {
-  return getWidthSlotSpan(getTextWidthPx(getOuFullRecordText(person)));
+function getOuRecordTotalSlotSpan(person: PaperPerson, t: TranslateFn): number {
+  return getWidthSlotSpan(getTextWidthPx(getOuRecordText(person, t)));
 }
 
-export function getOuRecordSlotSpan(person: PaperPerson): number {
-  return Math.min(OU_PAGE_SIDE_CAPACITY, getOuRecordTotalSlotSpan(person));
+export function getOuRecordSlotSpan(person: PaperPerson, t: TranslateFn): number {
+  return Math.min(OU_PAGE_SIDE_CAPACITY, getOuRecordTotalSlotSpan(person, t));
 }
 
 export function splitOuRowEntries(
@@ -171,6 +183,7 @@ export function splitOuRowEntries(
 
 function paginateGenerationEntries(
   people: PaperPerson[],
+  t: TranslateFn,
   pageBodyWidths: OuPageBodyWidths = DEFAULT_OU_PAGE_BODY_WIDTHS,
 ): OuPersonRecordEntry[][] {
   const spreads: OuPersonRecordEntry[][] = [[]];
@@ -210,35 +223,41 @@ function paginateGenerationEntries(
   };
 
   for (const person of people) {
-    const fullText = getOuFullRecordText(person);
-    const chars = Array.from(fullText);
-    let start = 0;
     let partIndex = 0;
+    const relationLabel = getPaperRelationLabel(person, t, { withParentName: true });
+    const sections = getOuRecordSections(person, t);
 
-    while (start < chars.length) {
-      const sideWidth = getOuSideWidth(side, pageBodyWidths);
-      const availableWidth = Math.max(0, sideWidth - usedWidth);
-      if (availableWidth < OU_PERSON_MIN_WIDTH) {
-        advanceSide();
-        continue;
+    for (const [sectionIndex, section] of sections.entries()) {
+      const sectionText = sectionIndex === 0 && relationLabel ? `${relationLabel}，${section}` : section;
+      const chars = Array.from(sectionText);
+      let start = 0;
+
+      while (start < chars.length) {
+        const sideWidth = getOuSideWidth(side, pageBodyWidths);
+        const availableWidth = Math.max(0, sideWidth - usedWidth);
+        if (availableWidth < OU_PERSON_MIN_WIDTH) {
+          advanceSide();
+          continue;
+        }
+
+        const remainingText = chars.slice(start).join("");
+        const remainingWidth = getNaturalTextWidthPx(remainingText);
+        if (remainingWidth <= availableWidth) {
+          pushEntry(person, remainingText, partIndex, availableWidth);
+          partIndex += 1;
+          break;
+        }
+
+        const chunkLength = Math.min(
+          getTextCharCapacityForWidth(availableWidth),
+          chars.length - start,
+        );
+        const text = chars.slice(start, start + chunkLength).join("");
+        pushEntry(person, text, partIndex, availableWidth);
+        start += chunkLength;
+        partIndex += 1;
+        if (start < chars.length) advanceSide();
       }
-
-      const remainingText = chars.slice(start).join("");
-      const remainingWidth = getNaturalTextWidthPx(remainingText);
-      if (remainingWidth <= availableWidth) {
-        pushEntry(person, remainingText, partIndex, availableWidth);
-        break;
-      }
-
-      const chunkLength = Math.min(
-        getTextCharCapacityForWidth(availableWidth),
-        chars.length - start,
-      );
-      const text = chars.slice(start, start + chunkLength).join("");
-      pushEntry(person, text, partIndex, availableWidth);
-      start += chunkLength;
-      partIndex += 1;
-      if (start < chars.length) advanceSide();
     }
   }
 
@@ -259,7 +278,7 @@ export function buildOuPaperBook(params: {
   const entriesByDepth = new Map(
     generations.map((generation) => [
       generation.depth,
-      paginateGenerationEntries(generation.people, pageBodyWidths),
+      paginateGenerationEntries(generation.people, t, pageBodyWidths),
     ]),
   );
   const maxDepth = generations[generations.length - 1]?.depth || 0;

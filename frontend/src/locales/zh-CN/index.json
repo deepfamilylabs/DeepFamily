@@ -381,7 +381,7 @@
     "modernTableRule": "五世一图，左右对页横格，按关系、姓名、行传分栏。",
     "modernOverlapNote": "本图重列上一图第五世。",
     "pagodaChartTitle": "{{startHan}}世至{{endHan}}世系图",
-    "pagodaTableRule": "六世一图，始祖居上，分支逐层下垂。",
+    "pagodaTableRule": "五世一图，始祖居上，分支逐层下垂。",
     "pagodaOverlapNote": "本图重列上一图末世承接。",
     "lineageChartTitle": "{{startHan}}世至{{endHan}}世系图",
     "lineageMainSpread": "正图",
@@ -396,6 +396,8 @@
     "suFirstDaughter": "长女",
     "suSecondDaughter": "次女",
     "suNthDaughter": "{{han}}女",
+    "suOnlySon": "之子",
+    "suOnlyDaughter": "之女",
     "suContinuedGeneration": "续",
     "repeatedGeneration": "重列",
     "styles": {
@@ -414,6 +416,7 @@
       "deathPlace": "卒于",
       "notes": "附记",
       "endorsements": "背书",
+      "children": "子女",
       "descendants": "子嗣"
     },
     "empty": {

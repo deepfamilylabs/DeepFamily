@@ -10,7 +10,6 @@ import {
   LINEAGE_PAGE_BODY_HEIGHT,
   LINEAGE_ROW_HEIGHT,
   splitLineageRowEntries,
-  toLineageChineseNumeral,
   type LineageChartWindow,
   type LineageConnector,
   type LineageEntry,
@@ -32,7 +31,7 @@ import {
   PAPER_TITLE_FONT_STACK,
   PAPER_VARS,
 } from "../paperStyles";
-import { clipText, getPaperSpineTitle } from "../paperText";
+import { clipText, getChildRankWord, getPaperSpineTitle } from "../paperText";
 
 const LINEAGE_SPINE_WIDTH = 72;
 const LINEAGE_MIN_SPREAD_WIDTH = 1180;
@@ -61,19 +60,9 @@ function getMeasuredLineagePageBodyWidths(spreadWidth: number): OuPageBodyWidths
 function getLineageRelationLabel(entry: LineageEntry, t: TranslateFn): string {
   const { person } = entry;
   if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
-  if (person.relation?.kind !== "child") return "";
-
-  const number = person.relation.siblingIndex + 1;
-  const han = toLineageChineseNumeral(number);
-  const gender = person.nodeData?.gender ?? person.ui.gender;
-  if (gender === 2) {
-    if (number === 1) return t("genealogyBook.suFirstDaughter", "长女");
-    if (number === 2) return t("genealogyBook.suSecondDaughter", "次女");
-    return t("genealogyBook.suNthDaughter", "{{han}}女", { han, number });
-  }
-  if (number === 1) return t("genealogyBook.suFirstSon", "长子");
-  if (number === 2) return t("genealogyBook.suSecondSon", "次子");
-  return t("genealogyBook.suNthSon", "{{han}}子", { han, number });
+  // The lineage chart already shows parentage via the connecting lines, so the rank word
+  // (之子/之女, 长子/次子…) is enough — no father name needed.
+  return getChildRankWord(person, t);
 }
 
 function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }) {
@@ -117,7 +106,7 @@ function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }
             fill: LINEAGE_MUTED,
             fontFamily: PAPER_NOTE_FONT_STACK,
             fontSize: LINEAGE_NODE_RELATION_FONT_SIZE,
-            fontWeight: 700,
+            fontWeight: 400,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           }}
@@ -519,6 +508,16 @@ export function LineageBookRenderer({
     [graph, rootId, generations, t, pageBodyWidths],
   );
   const spineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
+  const spreadItems = useMemo(
+    () =>
+      book.charts.flatMap((chart) =>
+        chart.spreads.map((spread) => ({
+          chart,
+          spread,
+        })),
+      ),
+    [book],
+  );
 
   useEffect(() => {
     const element = spreadsRef.current;
@@ -554,18 +553,17 @@ export function LineageBookRenderer({
   return (
     <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-lineage">
       <div
-        className="mx-auto flex min-h-full max-w-[1320px] flex-col gap-7"
+        className="mx-auto flex min-h-full max-w-[1320px] flex-col"
         style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
       >
-        {book.charts.map((chart) => (
+        {spreadItems.length ? (
           <section
-            key={chart.index}
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
               borderColor: "var(--df-paper-line)",
             }}
-            data-testid={`paper-lineage-table-${chart.index}`}
+            data-testid="paper-lineage-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
@@ -578,20 +576,15 @@ export function LineageBookRenderer({
                 {t("genealogyBook.styles.lineage", "Lineage")}
               </h2>
               <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
-                {chart.repeatedDepth !== undefined
-                  ? t(
-                      "genealogyBook.lineageOverlapNote",
-                      "This chart repeats the previous chart's fifth generation.",
-                    )
-                  : t(
-                      "genealogyBook.lineageTableRule",
-                      "Five generations per chart, using the Ou-style frame with person relationships.",
-                    )}
+                {t(
+                  "genealogyBook.lineageTableRule",
+                  "Five generations per chart, using the Ou-style frame with person relationships.",
+                )}
               </span>
             </div>
 
             <div ref={spreadsRef} className="flex flex-col gap-5">
-              {chart.spreads.map((spread) => (
+              {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
                   className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
@@ -625,7 +618,7 @@ export function LineageBookRenderer({
               ))}
             </div>
           </section>
-        ))}
+        ) : null}
       </div>
     </div>
   );

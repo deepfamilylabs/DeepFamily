@@ -381,7 +381,7 @@
     "modernTableRule": "Five generations per chart, with facing ledger pages for relation, name, and biography.",
     "modernOverlapNote": "This chart repeats the previous chart's fifth generation.",
     "pagodaChartTitle": "Generations {{start}}-{{end}} lineage chart",
-    "pagodaTableRule": "Six generations per chart, ancestor above, branches descend by level.",
+    "pagodaTableRule": "Five generations per chart, ancestor above, branches descend by level.",
     "pagodaOverlapNote": "This chart repeats the previous chart's boundary generation.",
     "lineageChartTitle": "Generations {{start}}-{{end}} lineage chart",
     "lineageMainSpread": "main chart",
@@ -396,6 +396,8 @@
     "suFirstDaughter": "first daughter",
     "suSecondDaughter": "second daughter",
     "suNthDaughter": "{{number}} daughter",
+    "suOnlySon": "son",
+    "suOnlyDaughter": "daughter",
     "suContinuedGeneration": "continued",
     "repeatedGeneration": "repeated",
     "styles": {
@@ -414,6 +416,7 @@
       "deathPlace": "Death place",
       "notes": "Notes",
       "endorsements": "Endorsements",
+      "children": "Children",
       "descendants": "Children"
     },
     "empty": {

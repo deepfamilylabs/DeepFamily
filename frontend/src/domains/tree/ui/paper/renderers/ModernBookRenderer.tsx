@@ -1,5 +1,10 @@
-import { useMemo, type CSSProperties } from "react";
-import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  splitPaperRecordLines,
+  type PaperGeneration,
+  type PaperPerson,
+  type TranslateFn,
+} from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
   PAPER_NOTE_FONT_STACK,
@@ -7,7 +12,13 @@ import {
   PAPER_TITLE_FONT_STACK,
   PAPER_VARS,
 } from "../paperStyles";
-import { clipText, getPaperSpineTitle, splitTextByVisualUnits } from "../paperText";
+import {
+  clipText,
+  getPaperRelationLabel,
+  getPaperSpineTitle,
+  splitTextByVisualUnits,
+  toChineseNumeral,
+} from "../paperText";
 import { OuSpine } from "./OuBookRenderer";
 
 type ModernTableRow =
@@ -27,6 +38,9 @@ type ModernTableRow =
       fullRecord: string;
       text: string;
       continued: boolean;
+      // True when the record spills into a later row, so this chunk's last line is mid-record and
+      // should be justified edge-to-edge rather than left ragged like a real paragraph end.
+      hasContinuation: boolean;
       partIndex: number;
     }
   | {
@@ -58,30 +72,34 @@ const MODERN_CHART_STEP = 4;
 const MODERN_PAGE_ROW_CAPACITY = 15;
 const MODERN_SPREAD_ROW_CAPACITY = MODERN_PAGE_ROW_CAPACITY * 2;
 const MODERN_SPINE_WIDTH = 72;
-// The spread uses the same elastic page frame as the other paper styles, while record chunking
-// keeps using the minimum-width page budget so rows remain safe at the narrowest supported size.
-// Biography column at a fixed 554px page ≈ 354px text (page − 64 − 112 relation/name − 24
-// padding) ≈ 50 half-em units per line at 14px (a full-width glyph ≈ 14px = 2 units, a
-// half-width ASCII/digit ≈ 7px = 1 unit). Budget ~2 lines, kept just under capacity so a
-// chunk never spills past the overflow-hidden cell and silently clips its tail. Measuring
-// in units (not raw chars) keeps digit-heavy and all-CJK cells filling the same width.
+const MODERN_REL_COL_PX = 64;
+const MODERN_NAME_COL_PX = 112;
+const MODERN_BIO_PADDING_PX = 24; // px-3 on both sides of the biography cell
+// The modern ledger is horizontal text in fixed-height rows, so a cell's capacity is set by the
+// biography column WIDTH (unlike the vertical Su/Ou styles, which are bound by the fixed page
+// height). The spread stays elastic, so the per-row character budget is computed from the measured
+// page width at render time (see ModernBookRenderer) instead of a fixed constant — this keeps each
+// cell filled to ~2 lines at any width. Units: a full-width glyph ≈ 14px = 2 units, a half-width
+// ASCII/digit ≈ 7px = 1 unit; the budget is kept just under capacity so a chunk never spills past
+// the overflow-hidden cell and silently clips its tail.
+const MODERN_UNIT_PX = 7;
+// Fallback budget (≈ 2 lines at the 1180px minimum spread) used before the width is measured.
 const MODERN_RECORD_UNITS_PER_LINE = 49;
 export const MODERN_RECORD_UNITS_PER_ROW = MODERN_RECORD_UNITS_PER_LINE * 2;
-const MODERN_TABLE_COLUMNS = "64px 112px minmax(0, 1fr)";
+const MODERN_TABLE_COLUMNS = `${MODERN_REL_COL_PX}px ${MODERN_NAME_COL_PX}px minmax(0, 1fr)`;
+
+// Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines at
+// whatever elastic width the page renders at.
+function computeModernUnitsPerRow(spreadWidth: number): number {
+  if (spreadWidth <= 0) return MODERN_RECORD_UNITS_PER_ROW;
+  const pageWidth = (spreadWidth - MODERN_SPINE_WIDTH) / 2;
+  const bioTextPx = pageWidth - MODERN_REL_COL_PX - MODERN_NAME_COL_PX - MODERN_BIO_PADDING_PX;
+  const unitsPerLine = Math.max(1, Math.floor(bioTextPx / MODERN_UNIT_PX) - 1);
+  return unitsPerLine * 2;
+}
 const MODERN_TABLE_COLUMN_STYLE: CSSProperties = {
   gridTemplateColumns: MODERN_TABLE_COLUMNS,
 };
-
-function toChineseNumeral(value: number): string {
-  const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  if (value <= 0 || value >= 100) return String(value);
-  if (value < 10) return digits[value];
-  if (value === 10) return "十";
-  if (value < 20) return `十${digits[value % 10]}`;
-  const tens = Math.floor(value / 10);
-  const ones = value % 10;
-  return `${digits[tens]}十${ones ? digits[ones] : ""}`;
-}
 
 function compactUnique(lines: Array<string | undefined | null | false>): string[] {
   const out: string[] = [];
@@ -107,61 +125,22 @@ function getModernGenerationMark(depth: number, t: TranslateFn): string {
 }
 
 function getModernFullRecordText(person: PaperPerson, t: TranslateFn): string {
-  const baseLines = person.classicalLines.length ? person.classicalLines : person.detailLines;
-  const descendantsLabel = t("genealogyBook.fields.descendants", "Children");
-  const descendantsLine =
-    person.childCount > 0
-      ? person.detailLines.find((line) =>
-          line.toLocaleLowerCase().includes(descendantsLabel.toLocaleLowerCase()),
-        ) || `${descendantsLabel}: ${person.childCount}`
-      : undefined;
-  const lines = compactUnique([...baseLines, descendantsLine]);
+  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+  const lines = compactUnique([...baseLines, childrenLine]);
 
   return lines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
 }
 
-function getChildRankLabel(person: PaperPerson, t: TranslateFn): string {
-  if (person.relation?.kind !== "child") return "";
-
-  const childNumber = person.relation.siblingIndex + 1;
-  const gender = person.nodeData?.gender ?? person.ui.gender;
-  if (gender === 1) {
-    if (childNumber === 1) return t("genealogyBook.suFirstSon", "first son");
-    if (childNumber === 2) return t("genealogyBook.suSecondSon", "second son");
-    return t("genealogyBook.suNthSon", "{{number}} son", {
-      han: toChineseNumeral(childNumber),
-      number: childNumber,
-    });
-  }
-  if (gender === 2) {
-    if (childNumber === 1) return t("genealogyBook.suFirstDaughter", "first daughter");
-    if (childNumber === 2) return t("genealogyBook.suSecondDaughter", "second daughter");
-    return t("genealogyBook.suNthDaughter", "{{number}} daughter", {
-      han: toChineseNumeral(childNumber),
-      number: childNumber,
-    });
-  }
-
-  if (childNumber === 1) return t("genealogyBook.modernFirstChild", "first child");
-  if (childNumber === 2) return t("genealogyBook.modernSecondChild", "second child");
-  return t("genealogyBook.modernNthChild", "{{number}} child", {
-    han: toChineseNumeral(childNumber),
-    number: childNumber,
-  });
+function getModernRecordSections(person: PaperPerson, t: TranslateFn): string[] {
+  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+  const baseRecord = baseLines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
+  const childrenRecord = childrenLine ? formatModernRecordLine(childrenLine) : undefined;
+  return compactUnique([baseRecord, childrenRecord]);
 }
 
-function getModernRelationLabel(
-  person: PaperPerson,
-  peopleById: Map<string, PaperPerson>,
-  t: TranslateFn,
-): string {
-  if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
-  if (person.relation?.kind !== "child") return "";
-
-  const parent = peopleById.get(person.relation.parentId);
-  const parentName = clipText(parent?.ui.fullName || parent?.ui.titleText, 4);
-  const rank = getChildRankLabel(person, t);
-  return parentName ? `${parentName}\n${rank}` : rank;
+function getModernRelationLabel(person: PaperPerson, t: TranslateFn): string {
+  // Father name above the rank word, matching the two-line relation column layout.
+  return getPaperRelationLabel(person, t, { withParentName: true, separator: "\n" });
 }
 
 function getModernPersonName(person: PaperPerson): string {
@@ -181,26 +160,36 @@ function getGenerationLabel(
 
 function makePersonRows(params: {
   person: PaperPerson;
-  peopleById: Map<string, PaperPerson>;
   t: TranslateFn;
+  unitsPerRow: number;
 }): ModernTableRow[] {
-  const { person, peopleById, t } = params;
+  const { person, t, unitsPerRow } = params;
   const fullRecord = getModernFullRecordText(person, t);
-  const chunks = splitTextByVisualUnits(fullRecord, MODERN_RECORD_UNITS_PER_ROW);
-  const relationLabel = getModernRelationLabel(person, peopleById, t);
+  const sections = getModernRecordSections(person, t);
+  const relationLabel = getModernRelationLabel(person, t);
   const name = getModernPersonName(person);
+  let rowIndex = 0;
 
-  return chunks.map((text, index) => ({
-    kind: "person",
-    key: `person:${person.id}:${index}`,
-    person,
-    relationLabel: index === 0 ? relationLabel : "",
-    name: index === 0 ? name : "",
-    fullRecord,
-    text,
-    continued: index > 0,
-    partIndex: index + 1,
-  }));
+  return sections.flatMap((section, sectionIndex) => {
+    const chunks = splitTextByVisualUnits(section, unitsPerRow);
+    return chunks.map((text, chunkIndex) => {
+      const isFirstPersonRow = rowIndex === 0;
+      const row = {
+        kind: "person" as const,
+        key: `person:${person.id}:${sectionIndex}:${chunkIndex}`,
+        person,
+        relationLabel: isFirstPersonRow ? relationLabel : "",
+        name: isFirstPersonRow ? name : "",
+        fullRecord,
+        text,
+        continued: chunkIndex > 0,
+        hasContinuation: chunkIndex < chunks.length - 1,
+        partIndex: rowIndex + 1,
+      };
+      rowIndex += 1;
+      return row;
+    });
+  });
 }
 
 function makeBlankRow(params: { spreadIndex: number; side: "left" | "right"; index: number }) {
@@ -258,15 +247,13 @@ function splitRowsIntoSpreads(rows: ModernTableRow[]): ModernPageSpread[] {
 function buildModernPaperBook(params: {
   generations: PaperGeneration[];
   t: TranslateFn;
+  unitsPerRow: number;
 }): ModernPaperBook {
-  const { generations, t } = params;
+  const { generations, t, unitsPerRow } = params;
   if (!generations.length) return { charts: [] };
 
   const generationsByDepth = new Map(
     generations.map((generation) => [generation.depth, generation]),
-  );
-  const peopleById = new Map(
-    generations.flatMap((generation) => generation.people.map((person) => [person.id, person])),
   );
   const maxDepth = generations[generations.length - 1]?.depth || 0;
   const charts: ModernChartWindow[] = [];
@@ -293,7 +280,7 @@ function buildModernPaperBook(params: {
         repeated: repeatedDepth === depth,
       });
       for (const person of generation?.people || []) {
-        rows.push(...makePersonRows({ person, peopleById, t }));
+        rows.push(...makePersonRows({ person, t, unitsPerRow }));
       }
     });
 
@@ -373,7 +360,6 @@ function ModernGenerationRowView({
 
 function ModernPersonRowView({
   row,
-  t,
 }: {
   row: Extract<ModernTableRow, { kind: "person" }>;
   t: TranslateFn;
@@ -382,7 +368,6 @@ function ModernPersonRowView({
     row.partIndex === 1
       ? `paper-modern-row-${row.person.id}`
       : `paper-modern-row-${row.person.id}-${row.partIndex}`;
-  const continuedMark = row.continued ? t("genealogyBook.ouRecordContinuedMark", "cont.") : "";
 
   return (
     <div
@@ -397,7 +382,7 @@ function ModernPersonRowView({
       title={row.fullRecord}
     >
       <div
-        className="flex h-full min-h-0 min-w-0 items-center justify-center whitespace-pre-line border-r px-1 text-center text-[14px] font-bold leading-5"
+        className="flex h-full min-h-0 min-w-0 items-center justify-center whitespace-pre-line border-r px-1 text-center text-[14px] font-normal leading-5"
         style={{
           borderColor: "var(--df-paper-line)",
           color: "var(--df-paper-ink)",
@@ -423,25 +408,23 @@ function ModernPersonRowView({
           >
             {row.name}
           </strong>
-        ) : continuedMark ? (
-          <span
-            className="text-[12px] font-bold tracking-normal"
-            style={{ color: "var(--df-paper-red)", fontFamily: PAPER_NOTE_FONT_STACK }}
-            data-testid={`paper-modern-continued-${row.person.id}-${row.partIndex}`}
-          >
-            {continuedMark}
-          </span>
         ) : null}
       </div>
       <p
-        className="m-0 flex h-full min-h-0 min-w-0 items-start overflow-hidden px-3 py-1 text-[14px] leading-[1.35]"
+        className="m-0 block h-full min-h-0 min-w-0 overflow-hidden px-3 py-1 text-[14px] leading-[1.35]"
         style={{
           color: "var(--df-paper-ink)",
           fontFamily: PAPER_NOTE_FONT_STACK,
           overflowWrap: "anywhere",
-          // break-all so digit/date runs (e.g. "220-03-15") split to fill each line
-          // edge-to-edge instead of being pushed whole to the next line.
+          // break-all so digit/date runs (e.g. "220-03-15") split to fill each line; justify
+          // then stretches every non-final line edge-to-edge so cells read as a printed block
+          // instead of a ragged right margin. text-align alone never justifies a block's LAST
+          // line, so when the record continues into a later row we also justify the last line
+          // (text-align-last) to fill the cell; the real paragraph end stays ragged/natural.
           wordBreak: "break-all",
+          textAlign: "justify",
+          textAlignLast: row.hasContinuation ? "justify" : "auto",
+          textJustify: "inter-character",
         }}
         data-testid={`paper-modern-detail-${row.person.id}`}
       >
@@ -520,29 +503,54 @@ export function ModernBookRenderer({
   generations: PaperGeneration[];
   t: TranslateFn;
 }) {
-  const book = useMemo(() => buildModernPaperBook({ generations, t }), [generations, t]);
+  // Measure the (elastic) spread width so the per-row budget fills cells to ~2 lines at any width.
+  const spreadRef = useRef<HTMLDivElement | null>(null);
+  const [spreadWidth, setSpreadWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = spreadRef.current;
+    if (!el) return;
+    const measure = () => setSpreadWidth(el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const unitsPerRow = useMemo(() => computeModernUnitsPerRow(spreadWidth), [spreadWidth]);
+  const book = useMemo(
+    () => buildModernPaperBook({ generations, t, unitsPerRow }),
+    [generations, t, unitsPerRow],
+  );
+  const spreadItems = useMemo(
+    () =>
+      book.charts.flatMap((chart) =>
+        chart.spreads.map((spread) => ({
+          chart,
+          spread,
+        })),
+      ),
+    [book],
+  );
   const spineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
 
   return (
     <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-modern">
       <div
-        className="mx-auto flex min-h-full max-w-[1320px] flex-col gap-7"
+        className="mx-auto flex min-h-full max-w-[1320px] flex-col"
         style={{
           color: "var(--df-paper-ink)",
           fontFamily: PAPER_BODY_FONT_STACK,
         }}
       >
-        {book.charts.map((chart) => (
+        {spreadItems.length ? (
           <section
-            key={chart.index}
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
               borderColor: "var(--df-paper-line)",
             }}
-            data-testid={
-              chart.index === 1 ? "paper-modern-chart" : `paper-modern-chart-${chart.index}`
-            }
+            data-testid="paper-modern-chart"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
@@ -555,22 +563,18 @@ export function ModernBookRenderer({
                 {t("genealogyBook.styles.modern", "Modern Ledger")}
               </h2>
               <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
-                {chart.repeatedDepth !== undefined
-                  ? t(
-                      "genealogyBook.modernOverlapNote",
-                      "This chart repeats the previous chart's fifth generation.",
-                    )
-                  : t(
-                      "genealogyBook.modernTableRule",
-                      "Five generations per chart, with facing ledger pages for relation, name, and biography.",
-                    )}
+                {t(
+                  "genealogyBook.modernTableRule",
+                  "Five generations per chart, with facing ledger pages for relation, name, and biography.",
+                )}
               </span>
             </div>
 
             <div className="flex flex-col gap-5">
-              {chart.spreads.map((spread) => (
+              {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
+                  ref={chart.index === 1 && spread.index === 1 ? spreadRef : undefined}
                   className="mx-auto grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
                   style={{
                     borderColor: "var(--df-paper-line)",
@@ -608,7 +612,7 @@ export function ModernBookRenderer({
               ))}
             </div>
           </section>
-        ))}
+        ) : null}
       </div>
     </div>
   );

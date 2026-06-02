@@ -1,6 +1,11 @@
 import type { NodeId } from "../../../../../shared/model";
-import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
-import { splitTextByVisualUnits } from "../paperText";
+import {
+  splitPaperRecordLines,
+  type PaperGeneration,
+  type PaperPerson,
+  type TranslateFn,
+} from "../paperData";
+import { getPaperRelationLabel, splitTextByVisualUnits, toChineseNumeral } from "../paperText";
 
 export type SuPageSide = "left" | "right";
 
@@ -82,45 +87,13 @@ function getGenerationLabel(
   );
 }
 
-function toChineseNumeral(value: number): string {
-  const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  if (value <= 0 || value >= 100) return String(value);
-  if (value < 10) return digits[value];
-  if (value === 10) return "十";
-  if (value < 20) return `十${digits[value % 10]}`;
-  const tens = Math.floor(value / 10);
-  const ones = value % 10;
-  return `${digits[tens]}十${ones ? digits[ones] : ""}`;
-}
-
 function formatSuRecordLine(line: string): string {
   return line.replace(/^([\p{Script=Han}]{1,4}):\s*/u, "$1");
 }
 
 function getRelationLabel(person: PaperPerson, t: TranslateFn): string {
-  if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
-  if (person.relation?.kind !== "child") return "";
-
-  const childNumber = person.relation.siblingIndex + 1;
-  const gender = person.nodeData?.gender ?? person.ui.gender;
-  if (gender === 1) {
-    if (childNumber === 1) return t("genealogyBook.suFirstSon", "first son");
-    if (childNumber === 2) return t("genealogyBook.suSecondSon", "second son");
-    return t("genealogyBook.suNthSon", "{{number}} son", {
-      han: toChineseNumeral(childNumber),
-      number: childNumber,
-    });
-  }
-  if (gender === 2) {
-    if (childNumber === 1) return t("genealogyBook.suFirstDaughter", "first daughter");
-    if (childNumber === 2) return t("genealogyBook.suSecondDaughter", "second daughter");
-    return t("genealogyBook.suNthDaughter", "{{number}} daughter", {
-      han: toChineseNumeral(childNumber),
-      number: childNumber,
-    });
-  }
-
-  return "";
+  // Clip the father name to 3 chars so "[父名]之子/长子" stays within the 64px relation cell.
+  return getPaperRelationLabel(person, t, { withParentName: true, parentNameMax: 3 });
 }
 
 export function getSuGenerationMark(depth: number, t: TranslateFn): string {
@@ -131,8 +104,16 @@ export function getSuGenerationMark(depth: number, t: TranslateFn): string {
 }
 
 export function getSuFullRecordText(person: PaperPerson): string {
-  const lines = person.classicalLines.length ? person.classicalLines : person.detailLines;
+  const { baseLines, childrenLine } = splitPaperRecordLines(person);
+  const lines = childrenLine ? [...baseLines, childrenLine] : baseLines;
   return lines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
+}
+
+function getSuRecordSections(person: PaperPerson, t: TranslateFn): string[] {
+  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+  const baseRecord = baseLines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
+  const childrenRecord = childrenLine ? formatSuRecordLine(childrenLine) : undefined;
+  return [baseRecord, childrenRecord].filter((line): line is string => Boolean(line));
 }
 
 export function splitSuSpreadColumns(
@@ -193,23 +174,31 @@ function makeGenerationLane(params: {
 }
 
 function makePersonLanes(person: PaperPerson, label: string, t: TranslateFn): SuTableLane[] {
-  const fullText = getSuFullRecordText(person);
-  const chunks = splitTextByVisualUnits(fullText, SU_RECORD_UNITS_PER_LANE);
+  const sections = getSuRecordSections(person, t);
   const baseName = person.ui.fullName || person.ui.titleText || person.ui.shortHashText;
   const relationLabel = getRelationLabel(person, t);
+  let laneIndex = 0;
 
-  return chunks.map((text, index) => ({
-    kind: "person",
-    key: `person:${person.id}:${index}`,
-    depth: person.depth,
-    label,
-    person,
-    relationLabel: index === 0 ? relationLabel : "",
-    name: index === 0 ? baseName : "",
-    text,
-    continued: index > 0,
-    partIndex: index + 1,
-  }));
+  return sections.flatMap((section, sectionIndex) => {
+    const chunks = splitTextByVisualUnits(section, SU_RECORD_UNITS_PER_LANE);
+    return chunks.map((text, chunkIndex) => {
+      const isFirstPersonLane = laneIndex === 0;
+      const lane = {
+        kind: "person" as const,
+        key: `person:${person.id}:${sectionIndex}:${chunkIndex}`,
+        depth: person.depth,
+        label,
+        person,
+        relationLabel: isFirstPersonLane ? relationLabel : "",
+        name: isFirstPersonLane ? baseName : "",
+        text,
+        continued: laneIndex > 0,
+        partIndex: laneIndex + 1,
+      };
+      laneIndex += 1;
+      return lane;
+    });
+  });
 }
 
 function ensureLeadingGenerationLane(params: {

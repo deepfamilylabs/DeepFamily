@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildOuPaperBook,
-  getOuFullRecordText,
+  getOuRecordText,
   getOuGenerationMark,
   OU_LEFT_PAGE_BODY_WIDTH,
   OU_RIGHT_PAGE_BODY_WIDTH,
@@ -37,7 +37,7 @@ function getMeasuredOuPageBodyWidths(spreadWidth: number): OuPageBodyWidths {
 
 function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateFn }) {
   const { person } = entry;
-  const fullRecord = getOuFullRecordText(person);
+  const fullRecord = getOuRecordText(person, t);
   const isFemale = person.ui.gender === 2 && !entry.continued;
   const title = entry.continued ? "" : clipText(person.ui.titleText || person.ui.shortHashText, 10);
   const nameLaneClassName = entry.continued
@@ -354,6 +354,16 @@ export function OuBookRenderer({
     () => getPaperSpineTitle(generations, t),
     [generations, t],
   );
+  const spreadItems = useMemo(
+    () =>
+      book.charts.flatMap((chart) =>
+        chart.spreads.map((spread) => ({
+          chart,
+          spread,
+        })),
+      ),
+    [book],
+  );
 
   useEffect(() => {
     const element = spreadsRef.current;
@@ -389,18 +399,17 @@ export function OuBookRenderer({
   return (
     <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-ou">
       <div
-        className="mx-auto flex min-h-full max-w-[1320px] flex-col gap-7"
+        className="mx-auto flex min-h-full max-w-[1320px] flex-col"
         style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
       >
-        {book.charts.map((chart) => (
+        {spreadItems.length ? (
           <section
-            key={chart.index}
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
               borderColor: "var(--df-paper-line)",
             }}
-            data-testid={`paper-ou-table-${chart.index}`}
+            data-testid="paper-ou-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
@@ -413,17 +422,12 @@ export function OuBookRenderer({
                 {t("genealogyBook.styles.ou", "Ou-style")}
               </h2>
               <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
-                {chart.repeatedDepth !== undefined
-                  ? t(
-                      "genealogyBook.ouOverlapNote",
-                      "This table repeats the previous table's fifth generation.",
-                    )
-                  : t("genealogyBook.ouTableRule", "Five generations per table.")}
+                {t("genealogyBook.ouTableRule", "Five generations per table.")}
               </span>
             </div>
 
             <div ref={spreadsRef} className="flex flex-col gap-5">
-              {chart.spreads.map((spread) => (
+              {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
                   className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
@@ -445,7 +449,7 @@ export function OuBookRenderer({
               ))}
             </div>
           </section>
-        ))}
+        ) : null}
       </div>
     </div>
   );
