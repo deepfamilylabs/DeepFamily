@@ -32,6 +32,7 @@ export type PaperPerson = {
     | {
       kind: "child";
       parentId: NodeId;
+      parentName?: string;
       siblingIndex: number;
       siblingCount: number;
       rankSource: "birthDate";
@@ -65,17 +66,38 @@ function compactUnique(lines: Array<string | undefined | null | false>): string[
   return out;
 }
 
+export function isPaperChildrenLine(
+  line: string,
+  t?: TranslateFn,
+): boolean {
+  const childrenLabel = tFallback(t, "genealogyBook.fields.children", "Children");
+  return line.trim().toLocaleLowerCase().startsWith(`${childrenLabel}:`.toLocaleLowerCase());
+}
+
+export function splitPaperRecordLines(
+  person: PaperPerson,
+  t?: TranslateFn,
+): { baseLines: string[]; childrenLine?: string } {
+  const sourceLines = person.classicalLines.length ? person.classicalLines : person.detailLines;
+  return {
+    baseLines: sourceLines.filter((line) => !isPaperChildrenLine(line, t)),
+    childrenLine: person.detailLines.find((line) => isPaperChildrenLine(line, t)),
+  };
+}
+
 function buildDetailLines(params: {
   ui: NodeUi;
   nodeData?: NodeData;
-  childCount: number;
+  childNames: string[];
   t?: TranslateFn;
 }): string[] {
-  const { ui, nodeData, childCount, t } = params;
+  const { ui, nodeData, childNames, t } = params;
   const birth = ui.birthDateText || birthDateString(nodeData);
   const death = deathDateString(nodeData);
   const birthPlace = ui.birthPlace || nodeData?.birthPlace;
   const tag = ui.tagText || nodeData?.tag;
+  const childrenLabel = tFallback(t, "genealogyBook.fields.children", "Children");
+  const childSeparator = /[\u3400-\u9fff]/u.test(childrenLabel) ? "、" : ", ";
 
   return compactUnique([
     ui.versionTextWithTotal,
@@ -90,9 +112,7 @@ function buildDetailLines(params: {
           ui.endorsementCount
         }`
       : undefined,
-    childCount > 0
-      ? `${tFallback(t, "genealogyBook.fields.descendants", "Children")}: ${childCount}`
-      : undefined,
+    childNames.length ? `${childrenLabel}: ${childNames.join(childSeparator)}` : undefined,
   ]);
 }
 
@@ -127,7 +147,13 @@ function addBirthRankRelations(params: {
   nodesData: Record<string, NodeData>;
   relationByChild: Map<
     NodeId,
-    { parentId: NodeId; siblingIndex: number; siblingCount: number; rankSource: "birthDate" }
+    {
+      parentId: NodeId;
+      parentName?: string;
+      siblingIndex: number;
+      siblingCount: number;
+      rankSource: "birthDate";
+    }
   >;
 }) {
   const { parentId, childIds, nodesData, relationByChild } = params;
@@ -141,15 +167,30 @@ function addBirthRankRelations(params: {
     if (!sameGender.length) continue;
 
     const ranked = sortNodeIdsByBirthOrder(sameGender, nodesData);
+    const parentName = nodesData[parentId]?.fullName;
     ranked.forEach((id, siblingIndex) => {
       relationByChild.set(id, {
         parentId,
+        parentName,
         siblingIndex,
         siblingCount: ranked.length,
         rankSource: "birthDate",
       });
     });
   }
+}
+
+function getChildDisplayNames(params: {
+  parentId: NodeId;
+  graph: TreeGraphData;
+  nodesData: Record<string, NodeData>;
+}): string[] {
+  const { parentId, graph, nodesData } = params;
+  const childIds = sortNodeIdsByBirthOrder(graph.childrenByParent[parentId] || [], nodesData);
+  return childIds.map((id) => {
+    const ui = getNodeUi(id, nodesData);
+    return ui.fullName || ui.titleText || ui.shortHashText;
+  });
 }
 
 // Reinforcement pass: assign a stable family-grouped display position to every node via
@@ -197,7 +238,13 @@ export function buildPaperGenerations(params: {
   const byDepth = new Map<number, PaperPerson[]>();
   const relationByChild = new Map<
     NodeId,
-    { parentId: NodeId; siblingIndex: number; siblingCount: number; rankSource: "birthDate" }
+    {
+      parentId: NodeId;
+      parentName?: string;
+      siblingIndex: number;
+      siblingCount: number;
+      rankSource: "birthDate";
+    }
   >();
 
   for (const [parentId, childIds] of Object.entries(graph.childrenByParent)) {
@@ -215,6 +262,7 @@ export function buildPaperGenerations(params: {
     const ui = getNodeUi(node.id, nodesData);
     const nodeData = nodesData[node.id];
     const childCount = graph.childrenByParent[node.id]?.length || 0;
+    const childNames = getChildDisplayNames({ parentId: node.id, graph, nodesData });
     const people = byDepth.get(node.depth) || [];
     const childRelation = relationByChild.get(node.id);
     const person: PaperPerson = {
@@ -229,7 +277,7 @@ export function buildPaperGenerations(params: {
       ui,
       nodeData,
       childCount,
-      detailLines: buildDetailLines({ ui, nodeData, childCount, t }),
+      detailLines: buildDetailLines({ ui, nodeData, childNames, t }),
       classicalLines: buildClassicalLines({ ui, nodeData, t }),
     };
     people.push(person);

@@ -172,7 +172,7 @@ function makeGenerations(graph: ReturnType<typeof makeLinearGraph>["graph"], nod
 }
 
 describe("buildPagodaPaperBook", () => {
-  it("uses six-generation windows with the boundary generation repeated", () => {
+  it("uses five-generation windows with the boundary generation repeated", () => {
     const linear = makeLinearGraph(7);
     const generations = makeGenerations(linear.graph);
 
@@ -183,13 +183,13 @@ describe("buildPagodaPaperBook", () => {
       t: translate,
     });
 
-    expect(PAGODA_GENERATIONS_PER_CHART).toBe(6);
+    expect(PAGODA_GENERATIONS_PER_CHART).toBe(5);
     expect(book.charts).toHaveLength(2);
-    expect(book.charts[0].generationDepths).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(book.charts[1].generationDepths).toEqual([5, 6, 7, 8, 9, 10]);
-    expect(book.charts[1].repeatedDepth).toBe(5);
-    expect(book.charts[1].pages[0].rootId).toBe(linear.graph.nodes[5].id);
-    expect(book.charts[0].pages[0].title).toBe("一世至六世系图");
+    expect(book.charts[0].generationDepths).toEqual([0, 1, 2, 3, 4]);
+    expect(book.charts[1].generationDepths).toEqual([4, 5, 6, 7, 8]);
+    expect(book.charts[1].repeatedDepth).toBe(4);
+    expect(book.charts[1].pages[0].rootId).toBe(linear.graph.nodes[4].id);
+    expect(book.charts[0].pages[0].title).toBe("一世至五世系图");
   });
 
   it("uses localized title text and reuses the Su-style generation mark key", () => {
@@ -214,7 +214,7 @@ describe("buildPagodaPaperBook", () => {
       t: englishTranslate,
     });
 
-    expect(book.charts[0].pages[0].title).toBe("Generations 1-6 lineage chart");
+    expect(book.charts[0].pages[0].title).toBe("Generations 1-5 lineage chart");
     expect(getPagodaGenerationMark(0, englishTranslate)).toBe("Gen 1");
   });
 

@@ -1,6 +1,7 @@
 import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
+import { clipText, toChineseNumeral } from "../paperText";
 
 export type PagodaNode = PaperPerson & {
   x: number;
@@ -57,17 +58,22 @@ export type PagodaPaperBook = {
   charts: PagodaChartWindow[];
 };
 
-export const PAGODA_GENERATIONS_PER_CHART = 6;
-export const PAGODA_CHART_STEP = 5;
+export const PAGODA_GENERATIONS_PER_CHART = 5;
+export const PAGODA_CHART_STEP = 4;
 export const PAGODA_NODE_WIDTH = 48;
-export const PAGODA_NODE_HEIGHT = 68;
+export const PAGODA_NODE_HEIGHT = 132;
+export const PAGODA_NODE_NAME_Y = 28;
+export const PAGODA_NODE_NAME_FONT_SIZE = 19;
+export const PAGODA_NODE_NAME_MAX_LENGTH = 10;
+export const PAGODA_NODE_NAME_CONNECTOR_GAP = 12;
+export const PAGODA_MIN_CONNECTOR_ANCHOR_Y = 80;
 export const PAGODA_GAP_X = 24;
-export const PAGODA_GAP_Y = 118;
+export const PAGODA_GAP_Y = 158;
 export const PAGODA_PAGE_WIDTH = 1180;
 export const PAGODA_PAGE_HEIGHT = 872;
 export const PAGODA_INNER_LEFT = 72;
 export const PAGODA_INNER_RIGHT = 120;
-export const PAGODA_INNER_TOP = 144;
+export const PAGODA_INNER_TOP = 52;
 export const PAGODA_INNER_BOTTOM = 64;
 
 const PAGODA_BODY_WIDTH = PAGODA_PAGE_WIDTH - PAGODA_INNER_LEFT - PAGODA_INNER_RIGHT;
@@ -97,22 +103,29 @@ function getGenerationLabel(
   );
 }
 
-export function toChineseNumeral(value: number): string {
-  const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  if (value <= 0 || value >= 100) return String(value);
-  if (value < 10) return digits[value];
-  if (value === 10) return "十";
-  if (value < 20) return `十${digits[value % 10]}`;
-  const tens = Math.floor(value / 10);
-  const ones = value % 10;
-  return `${digits[tens]}十${ones ? digits[ones] : ""}`;
-}
-
 export function getPagodaGenerationMark(depth: number, t: TranslateFn): string {
   return t("genealogyBook.suGenerationMark", "{{han}}世", {
     han: toChineseNumeral(depth + 1),
     number: depth + 1,
   });
+}
+
+function getPagodaVisibleName(person: PaperPerson): string {
+  return clipText(
+    person.ui.fullName || person.ui.titleText || person.ui.shortHashText,
+    PAGODA_NODE_NAME_MAX_LENGTH,
+  );
+}
+
+function getPagodaConnectorAnchorY(person: PaperPerson): number {
+  const nameLength = Array.from(getPagodaVisibleName(person)).length;
+  return Math.min(
+    PAGODA_NODE_HEIGHT,
+    Math.max(
+      PAGODA_MIN_CONNECTOR_ANCHOR_Y,
+      PAGODA_NODE_NAME_Y + nameLength * PAGODA_NODE_NAME_FONT_SIZE + PAGODA_NODE_NAME_CONNECTOR_GAP,
+    ),
+  );
 }
 
 function buildPersonMap(generations: PaperGeneration[]): Map<NodeId, PaperPerson> {
@@ -381,7 +394,7 @@ function buildPagodaBranchPage(params: {
 
     const childCenters = childNodes.map((child) => child.x + child.w / 2);
     const childTopY = Math.min(...childNodes.map((child) => child.y));
-    const parentBottomY = parent.y + parent.h;
+    const parentBottomY = parent.y + getPagodaConnectorAnchorY(parent);
     connectors.push({
       parentId,
       childIds: childNodes.map((child) => child.id),
