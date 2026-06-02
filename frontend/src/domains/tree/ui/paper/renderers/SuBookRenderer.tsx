@@ -79,7 +79,7 @@ function SuPersonLane({ lane }: { lane: Extract<SuTableLane, { kind: "person" }>
         </strong>
       </div>
       <div
-        className="relative flex min-h-0 justify-center px-1.5 py-3"
+        className="relative flex min-h-0 justify-center px-1.5 py-2"
         style={{ borderColor: "var(--df-paper-line-soft)" }}
       >
         <p
@@ -134,7 +134,7 @@ function SuGenerationLane({
       </span>
       {lane.repeated || lane.continued ? (
         <span
-          className="flex items-start justify-center pt-3 text-[11px] font-bold"
+          className="flex items-center justify-center text-[11px] font-bold"
           style={{
             color: "var(--df-paper-red)",
             fontFamily: PAPER_NOTE_FONT_STACK,

@@ -7,6 +7,8 @@ import { buildPaperGenerations } from "./paperData";
 import { PaperGenealogyView } from "./PaperGenealogyView";
 import { buildLineagePaperBook } from "./layout/lineagePagination";
 import { buildOuPaperBook, getOuFullRecordText, getOuRecordSlotSpan } from "./layout/ouPagination";
+import { measureRecordUnits } from "./paperText";
+import { MODERN_RECORD_UNITS_PER_ROW } from "./renderers/ModernBookRenderer";
 import {
   buildSuPaperBook,
   getSuFullRecordText,
@@ -481,7 +483,11 @@ describe("PaperGenealogyView", () => {
 
     const detailRows = screen.getAllByTestId(`paper-modern-detail-${child.id}`);
     expect(detailRows.length).toBeGreaterThan(1);
-    expect(Array.from(detailRows[0].textContent || "")).toHaveLength(42);
+    // The first chunk fills the cell up to the visual-width budget (within one full-width
+    // glyph of it) before a continuation row starts, regardless of script mix.
+    const firstUnits = measureRecordUnits(detailRows[0].textContent || "");
+    expect(firstUnits).toBeLessThanOrEqual(MODERN_RECORD_UNITS_PER_ROW);
+    expect(firstUnits).toBeGreaterThan(MODERN_RECORD_UNITS_PER_ROW - 2);
     expect(detailRows[0].className).toContain("h-full");
     expect(detailRows[0].className).toContain("items-start");
     expect(screen.getByTestId(`paper-modern-continued-${child.id}-2`).textContent).toBe("cont.");
@@ -1255,6 +1261,10 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId(`paper-lineage-name-${linear.rootId}`).textContent).toContain(
       "贾源",
     );
+    expect(screen.getByTestId(`paper-lineage-root-stem-${linear.rootId}`)).toBeTruthy();
+    expect(
+      screen.queryByTestId(`paper-lineage-root-stem-${linear.graph.nodes[1].id}`),
+    ).toBeNull();
     expect(screen.getByTestId(`paper-lineage-relation-${linear.rootId}`).textContent).toContain(
       "ancestor",
     );
