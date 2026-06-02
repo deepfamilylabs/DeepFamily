@@ -1,5 +1,6 @@
 import type { NodeId } from "../../../../../shared/model";
 import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
+import { splitTextByVisualUnits } from "../paperText";
 
 export type SuPageSide = "left" | "right";
 
@@ -53,7 +54,12 @@ export const SU_CHART_STEP = 4;
 export const SU_RIGHT_PAGE_LANE_CAPACITY = 14;
 export const SU_LEFT_PAGE_LANE_CAPACITY = 14;
 export const SU_SPREAD_LANE_CAPACITY = SU_RIGHT_PAGE_LANE_CAPACITY + SU_LEFT_PAGE_LANE_CAPACITY;
-export const SU_RECORD_CHARS_PER_LANE = 42;
+// Each lane's biography column is ~696px tall (page 872 − 64 relation − 96 name − 16 py-2 padding),
+// holding ~53 full-width CJK glyphs ≈ 106 half-em units of vertical text at 13px. Budget just
+// under that so a record fills the column before spilling into the next lane, and never wraps to
+// a clipped second column. The integer-unit model slightly under-weights rotated half-width
+// glyphs (dates/numbers run a touch taller than 0.5em), so the buffer keeps date-heavy lanes safe.
+export const SU_RECORD_UNITS_PER_LANE = 102;
 
 function fallbackTranslate(
   key: string,
@@ -89,17 +95,6 @@ function toChineseNumeral(value: number): string {
 
 function formatSuRecordLine(line: string): string {
   return line.replace(/^([\p{Script=Han}]{1,4}):\s*/u, "$1");
-}
-
-function splitTextByLength(text: string, maxLength: number): string[] {
-  const chars = Array.from(text);
-  if (chars.length <= maxLength) return [text];
-
-  const chunks: string[] = [];
-  for (let start = 0; start < chars.length; start += maxLength) {
-    chunks.push(chars.slice(start, start + maxLength).join(""));
-  }
-  return chunks;
 }
 
 function getRelationLabel(person: PaperPerson, t: TranslateFn): string {
@@ -199,7 +194,7 @@ function makeGenerationLane(params: {
 
 function makePersonLanes(person: PaperPerson, label: string, t: TranslateFn): SuTableLane[] {
   const fullText = getSuFullRecordText(person);
-  const chunks = splitTextByLength(fullText, SU_RECORD_CHARS_PER_LANE);
+  const chunks = splitTextByVisualUnits(fullText, SU_RECORD_UNITS_PER_LANE);
   const baseName = person.ui.fullName || person.ui.titleText || person.ui.shortHashText;
   const relationLabel = getRelationLabel(person, t);
 

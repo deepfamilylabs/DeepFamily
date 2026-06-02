@@ -7,7 +7,7 @@ import {
   PAPER_TITLE_FONT_STACK,
   PAPER_VARS,
 } from "../paperStyles";
-import { clipText, getPaperSpineTitle } from "../paperText";
+import { clipText, getPaperSpineTitle, splitTextByVisualUnits } from "../paperText";
 import { OuSpine } from "./OuBookRenderer";
 
 type ModernTableRow =
@@ -57,9 +57,16 @@ const MODERN_GENERATIONS_PER_CHART = 5;
 const MODERN_CHART_STEP = 4;
 const MODERN_PAGE_ROW_CAPACITY = 15;
 const MODERN_SPREAD_ROW_CAPACITY = MODERN_PAGE_ROW_CAPACITY * 2;
-const MODERN_RECORD_CHARS_PER_ROW = 42;
 const MODERN_SPINE_WIDTH = 72;
-const MODERN_MIN_SPREAD_WIDTH = 1180;
+// The spread uses the same elastic page frame as the other paper styles, while record chunking
+// keeps using the minimum-width page budget so rows remain safe at the narrowest supported size.
+// Biography column at a fixed 554px page ≈ 354px text (page − 64 − 112 relation/name − 24
+// padding) ≈ 50 half-em units per line at 14px (a full-width glyph ≈ 14px = 2 units, a
+// half-width ASCII/digit ≈ 7px = 1 unit). Budget ~2 lines, kept just under capacity so a
+// chunk never spills past the overflow-hidden cell and silently clips its tail. Measuring
+// in units (not raw chars) keeps digit-heavy and all-CJK cells filling the same width.
+const MODERN_RECORD_UNITS_PER_LINE = 49;
+export const MODERN_RECORD_UNITS_PER_ROW = MODERN_RECORD_UNITS_PER_LINE * 2;
 const MODERN_TABLE_COLUMNS = "64px 112px minmax(0, 1fr)";
 const MODERN_TABLE_COLUMN_STYLE: CSSProperties = {
   gridTemplateColumns: MODERN_TABLE_COLUMNS,
@@ -86,18 +93,6 @@ function compactUnique(lines: Array<string | undefined | null | false>): string[
     out.push(line);
   }
   return out;
-}
-
-function splitTextByLength(text: string, maxLength: number): string[] {
-  const chars = Array.from(text.trim());
-  if (chars.length <= maxLength) return [text];
-
-  const chunks: string[] = [];
-  for (let start = 0; start < chars.length; start += maxLength) {
-    chunks.push(chars.slice(start, start + maxLength).join("").trim());
-  }
-
-  return chunks.filter(Boolean);
 }
 
 function formatModernRecordLine(line: string): string {
@@ -191,7 +186,7 @@ function makePersonRows(params: {
 }): ModernTableRow[] {
   const { person, peopleById, t } = params;
   const fullRecord = getModernFullRecordText(person, t);
-  const chunks = splitTextByLength(fullRecord, MODERN_RECORD_CHARS_PER_ROW);
+  const chunks = splitTextByVisualUnits(fullRecord, MODERN_RECORD_UNITS_PER_ROW);
   const relationLabel = getModernRelationLabel(person, peopleById, t);
   const name = getModernPersonName(person);
 
@@ -444,7 +439,9 @@ function ModernPersonRowView({
           color: "var(--df-paper-ink)",
           fontFamily: PAPER_NOTE_FONT_STACK,
           overflowWrap: "anywhere",
-          wordBreak: "break-word",
+          // break-all so digit/date runs (e.g. "220-03-15") split to fill each line
+          // edge-to-edge instead of being pushed whole to the next line.
+          wordBreak: "break-all",
         }}
         data-testid={`paper-modern-detail-${row.person.id}`}
       >
@@ -574,12 +571,11 @@ export function ModernBookRenderer({
               {chart.spreads.map((spread) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
-                  className="grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
+                  className="mx-auto grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
                   style={{
                     borderColor: "var(--df-paper-line)",
                     background: "var(--df-paper-sheet)",
-                    gridTemplateColumns: `minmax(0, 1fr) ${MODERN_SPINE_WIDTH}px minmax(0, 1fr)`,
-                    minWidth: MODERN_MIN_SPREAD_WIDTH,
+                    gridTemplateColumns: `1fr ${MODERN_SPINE_WIDTH}px 1fr`,
                   }}
                   data-testid={
                     chart.index === 1 && spread.index === 1

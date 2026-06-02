@@ -47,6 +47,8 @@ const LINEAGE_MARK_HEIGHT = 68;
 const LINEAGE_NODE_NAME_FONT_SIZE = 20;
 const LINEAGE_NODE_RELATION_FONT_SIZE = 11;
 const LINEAGE_NODE_RELATION_GAP = 18;
+const LINEAGE_ROOT_STEM_TOP_GAP = 18;
+const LINEAGE_ROOT_STEM_BOTTOM_GAP = 14;
 
 function getMeasuredLineagePageBodyWidths(spreadWidth: number): OuPageBodyWidths {
   const pageWidth = Math.max(0, (spreadWidth - LINEAGE_SPINE_WIDTH) / 2);
@@ -77,11 +79,24 @@ function getLineageRelationLabel(entry: LineageEntry, t: TranslateFn): string {
 function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }) {
   const name = clipText(entry.person.ui.fullName || entry.person.ui.titleText || entry.person.ui.shortHashText, 10);
   const relationLabel = getLineageRelationLabel(entry, t);
+  const showRootStem = entry.person.relation?.kind === "root";
   const showCircle = entry.person.relation?.kind === "child";
 
   return (
     <g data-testid={`paper-node-${entry.person.id}`}>
       <title>{entry.person.ui.personHash}</title>
+      {showRootStem ? (
+        <line
+          x1={entry.centerX}
+          y1={entry.y + LINEAGE_ROOT_STEM_TOP_GAP}
+          x2={entry.centerX}
+          y2={entry.nameY - LINEAGE_ROOT_STEM_BOTTOM_GAP}
+          stroke={LINEAGE_LINE}
+          strokeWidth={1.15}
+          strokeLinecap="square"
+          data-testid={`paper-lineage-root-stem-${entry.person.id}`}
+        />
+      ) : null}
       {showCircle ? (
         <circle
           cx={entry.centerX}
