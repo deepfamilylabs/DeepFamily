@@ -18,6 +18,7 @@ import {
   PAPER_VARS,
 } from "../paperStyles";
 import { clipText, getPaperSpineTitle } from "../paperText";
+import { PaperSpine } from "./PaperSpine";
 
 const SU_LANE_GRID_ROWS = "64px 96px 1fr";
 const SU_EQUAL_LANE_STYLE: CSSProperties = {
@@ -28,9 +29,15 @@ const SU_EQUAL_LANE_STYLE: CSSProperties = {
   width: 0,
 };
 
-function SuPersonLane({ lane }: { lane: Extract<SuTableLane, { kind: "person" }> }) {
+function SuPersonLane({
+  lane,
+  t,
+}: {
+  lane: Extract<SuTableLane, { kind: "person" }>;
+  t: TranslateFn;
+}) {
   const { person } = lane;
-  const fullRecord = getSuFullRecordText(person);
+  const fullRecord = getSuFullRecordText(person, t);
   const title = clipText(lane.name, lane.continued ? 8 : 10);
 
   return (
@@ -48,13 +55,16 @@ function SuPersonLane({ lane }: { lane: Extract<SuTableLane, { kind: "person" }>
       title={fullRecord}
     >
       <div
-        className="flex items-center justify-center border-b px-1 py-1 text-[11px] font-normal"
+        className="flex items-center justify-center border-b px-1 py-1 text-[13px] font-normal leading-tight"
         style={{
           borderColor: "var(--df-paper-line-soft)",
           color: "var(--df-paper-muted)",
           fontFamily: PAPER_NOTE_FONT_STACK,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
+          // Father name and rank word arrive "\n"-joined; pre-line turns the break into a natural
+          // adjacent column (parent right, rank left) at normal line spacing rather than a wide gap.
+          whiteSpace: "pre-line",
         }}
         data-testid={`paper-su-relation-${person.id}`}
       >
@@ -178,7 +188,7 @@ function SuTableLaneView({
   t: TranslateFn;
 }) {
   if (lane.kind === "generation") return <SuGenerationLane lane={lane} t={t} />;
-  if (lane.kind === "person") return <SuPersonLane lane={lane} />;
+  if (lane.kind === "person") return <SuPersonLane lane={lane} t={t} />;
   return <SuBlankLane lane={lane} />;
 }
 
@@ -214,72 +224,6 @@ function SuPage({
         ))}
       </div>
     </div>
-  );
-}
-
-function SuSpine({
-  chartIndex,
-  spread,
-  title,
-  t,
-}: {
-  chartIndex: number;
-  spread: SuPageSpread;
-  title: string;
-  t: TranslateFn;
-}) {
-  const spreadLabel =
-    spread.kind === "main"
-      ? t("genealogyBook.suMainSpread", "Main chart")
-      : t("genealogyBook.suContinuationPage", "Continuation {{number}}", {
-          number: spread.index,
-        });
-
-  return (
-    <aside
-      className="relative flex h-[872px] flex-col items-center border-x bg-[#f3e8cc] px-1 py-3"
-      style={{
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-      }}
-      data-testid={`paper-su-spine-${chartIndex}-${spread.index}`}
-    >
-      <div
-        className="text-[31px] font-black leading-none tracking-normal"
-        style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {title}
-      </div>
-      <div className="my-3 h-10 w-10 bg-[#1f1a14]" aria-hidden="true" />
-      <div
-        className="grid grid-cols-2 gap-1 border-y py-2 text-[12px] font-bold"
-        style={{
-          borderColor: "var(--df-paper-line-soft)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
-        }}
-      >
-        <span style={{ writingMode: "vertical-rl" }}>
-          {t("genealogyBook.volumeLabel", "Volume {{number}}", { number: chartIndex })}
-        </span>
-        <span style={{ writingMode: "vertical-rl" }}>
-          {spreadLabel}
-        </span>
-      </div>
-      <div
-        className="mt-auto text-[30px] font-black leading-none tracking-normal"
-        style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {t("genealogyBook.ouHallName", "DeepFamily")}
-      </div>
-    </aside>
   );
 }
 
@@ -354,11 +298,13 @@ export function SuBookRenderer({
                   data-testid={`paper-su-spread-${chart.index}-${spread.index}`}
                 >
                   <SuPage side="left" chart={chart} spread={spread} t={t} />
-                  <SuSpine
+                  <PaperSpine
                     chartIndex={chart.index}
-                    spread={spread}
+                    spreadIndex={spread.index}
                     title={spineTitle}
                     t={t}
+                    testIdPrefix="paper-su-spine"
+                    pageOrder="rtl"
                   />
                   <SuPage side="right" chart={chart} spread={spread} t={t} />
                 </div>

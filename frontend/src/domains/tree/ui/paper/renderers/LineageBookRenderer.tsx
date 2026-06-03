@@ -31,7 +31,12 @@ import {
   PAPER_TITLE_FONT_STACK,
   PAPER_VARS,
 } from "../paperStyles";
-import { clipText, getChildRankWord, getPaperSpineTitle } from "../paperText";
+import {
+  clipText,
+  getChildRankWord,
+  getPaperSpineTitle,
+} from "../paperText";
+import { PaperSpine } from "./PaperSpine";
 
 const LINEAGE_SPINE_WIDTH = 72;
 const LINEAGE_MIN_SPREAD_WIDTH = 1180;
@@ -60,6 +65,7 @@ function getMeasuredLineagePageBodyWidths(spreadWidth: number): OuPageBodyWidths
 function getLineageRelationLabel(entry: LineageEntry, t: TranslateFn): string {
   const { person } = entry;
   if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
+  if (entry.rowIndex === 0) return "";
   // The lineage chart already shows parentage via the connecting lines, so the rank word
   // (之子/之女, 长子/次子…) is enough — no father name needed.
   return getChildRankWord(person, t);
@@ -69,7 +75,7 @@ function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }
   const name = clipText(entry.person.ui.fullName || entry.person.ui.titleText || entry.person.ui.shortHashText, 10);
   const relationLabel = getLineageRelationLabel(entry, t);
   const showRootStem = entry.person.relation?.kind === "root";
-  const showCircle = entry.person.relation?.kind === "child";
+  const showCircle = entry.person.relation?.kind === "child" && entry.rowIndex > 0;
 
   return (
     <g data-testid={`paper-node-${entry.person.id}`}>
@@ -421,70 +427,6 @@ function LineagePage({
   );
 }
 
-function LineageSpine({
-  chartIndex,
-  spread,
-  title,
-  t,
-}: {
-  chartIndex: number;
-  spread: LineagePageSpread;
-  title: string;
-  t: TranslateFn;
-}) {
-  const spreadLabel =
-    spread.kind === "main"
-      ? t("genealogyBook.lineageMainSpread", "Main chart")
-      : t("genealogyBook.lineageContinuationPage", "Continuation {{number}}", {
-          number: spread.index,
-        });
-
-  return (
-    <aside
-      className="relative flex h-[872px] flex-col items-center border-x bg-[#f3e8cc] px-1 py-3"
-      style={{
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-      }}
-      data-testid={`paper-lineage-spine-${chartIndex}-${spread.index}`}
-    >
-      <div
-        className="text-[31px] font-black leading-none tracking-normal"
-        style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {title}
-      </div>
-      <div className="my-3 h-10 w-10 bg-[#1f1a14]" aria-hidden="true" />
-      <div
-        className="grid grid-cols-2 gap-1 border-y py-2 text-[12px] font-bold"
-        style={{
-          borderColor: "var(--df-paper-line-soft)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
-        }}
-      >
-        <span style={{ writingMode: "vertical-rl" }}>
-          {t("genealogyBook.volumeLabel", "Volume {{number}}", { number: chartIndex })}
-        </span>
-        <span style={{ writingMode: "vertical-rl" }}>{spreadLabel}</span>
-      </div>
-      <div
-        className="mt-auto text-[30px] font-black leading-none tracking-normal"
-        style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {t("genealogyBook.ouHallName", "DeepFamily")}
-      </div>
-    </aside>
-  );
-}
-
 export function LineageBookRenderer({
   graph,
   rootId,
@@ -601,11 +543,13 @@ export function LineageBookRenderer({
                     metrics={metrics}
                     t={t}
                   />
-                  <LineageSpine
+                  <PaperSpine
                     chartIndex={chart.index}
-                    spread={spread}
+                    spreadIndex={spread.index}
                     title={spineTitle}
                     t={t}
+                    testIdPrefix="paper-lineage-spine"
+                    pageOrder="rtl"
                   />
                   <LineagePage
                     side="right"

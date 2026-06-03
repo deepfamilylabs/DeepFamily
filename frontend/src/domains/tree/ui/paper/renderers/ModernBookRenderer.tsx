@@ -19,7 +19,7 @@ import {
   splitTextByVisualUnits,
   toChineseNumeral,
 } from "../paperText";
-import { OuSpine } from "./OuBookRenderer";
+import { PaperSpine } from "./PaperSpine";
 
 type ModernTableRow =
   | {
@@ -37,9 +37,9 @@ type ModernTableRow =
       name: string;
       fullRecord: string;
       text: string;
+      lines?: string[];
       continued: boolean;
-      // True when the record spills into a later row, so this chunk's last line is mid-record and
-      // should be justified edge-to-edge rather than left ragged like a real paragraph end.
+      // True when the record spills into a later row.
       hasContinuation: boolean;
       partIndex: number;
     }
@@ -68,7 +68,7 @@ type ModernPaperBook = {
 };
 
 const MODERN_GENERATIONS_PER_CHART = 5;
-const MODERN_CHART_STEP = 4;
+const MODERN_CHART_STEP = MODERN_GENERATIONS_PER_CHART;
 const MODERN_PAGE_ROW_CAPACITY = 15;
 const MODERN_SPREAD_ROW_CAPACITY = MODERN_PAGE_ROW_CAPACITY * 2;
 const MODERN_SPINE_WIDTH = 72;
@@ -80,22 +80,59 @@ const MODERN_BIO_PADDING_PX = 24; // px-3 on both sides of the biography cell
 // height). The spread stays elastic, so the per-row character budget is computed from the measured
 // page width at render time (see ModernBookRenderer) instead of a fixed constant — this keeps each
 // cell filled to ~2 lines at any width. Units: a full-width glyph ≈ 14px = 2 units, a half-width
-// ASCII/digit ≈ 7px = 1 unit; the budget is kept just under capacity so a chunk never spills past
-// the overflow-hidden cell and silently clips its tail.
+// ASCII/digit ≈ 7px = 1 unit; text chunks are cut at the estimated two-line capacity so a
+// continuation row starts only after the current cell is full.
 const MODERN_UNIT_PX = 7;
 // Fallback budget (≈ 2 lines at the 1180px minimum spread) used before the width is measured.
-const MODERN_RECORD_UNITS_PER_LINE = 49;
+const MODERN_RECORD_UNITS_PER_LINE = 50;
 export const MODERN_RECORD_UNITS_PER_ROW = MODERN_RECORD_UNITS_PER_LINE * 2;
 const MODERN_TABLE_COLUMNS = `${MODERN_REL_COL_PX}px ${MODERN_NAME_COL_PX}px minmax(0, 1fr)`;
+const MODERN_PAGE_LOOKUP_ITERATIONS = 6;
+
+type ModernPersonPageLookup = Map<PaperPerson["id"], number>;
+type ModernRecordBudget = {
+  unitsPerRow: number;
+  maxLinePx?: number;
+  measureTextPx?: (text: string) => number;
+};
+
+type ModernRecordChunk = {
+  text: string;
+  lines?: string[];
+};
 
 // Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines at
 // whatever elastic width the page renders at.
-function computeModernUnitsPerRow(spreadWidth: number): number {
-  if (spreadWidth <= 0) return MODERN_RECORD_UNITS_PER_ROW;
+function getModernTextMeasurer(): ((text: string) => number) | undefined {
+  if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return undefined;
+  if (typeof document === "undefined") return undefined;
+
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return undefined;
+    context.font = `14px ${PAPER_NOTE_FONT_STACK}`;
+    return (text: string) => context.measureText(text).width;
+  } catch {
+    return undefined;
+  }
+}
+
+function computeModernRecordBudget(spreadWidth: number): ModernRecordBudget {
+  if (spreadWidth <= 0) {
+    return {
+      unitsPerRow: MODERN_RECORD_UNITS_PER_ROW,
+    };
+  }
+
   const pageWidth = (spreadWidth - MODERN_SPINE_WIDTH) / 2;
   const bioTextPx = pageWidth - MODERN_REL_COL_PX - MODERN_NAME_COL_PX - MODERN_BIO_PADDING_PX;
-  const unitsPerLine = Math.max(1, Math.floor(bioTextPx / MODERN_UNIT_PX) - 1);
-  return unitsPerLine * 2;
+  const unitsPerLine = Math.max(1, Math.floor(bioTextPx / MODERN_UNIT_PX));
+  return {
+    unitsPerRow: unitsPerLine * 2,
+    maxLinePx: bioTextPx,
+    measureTextPx: getModernTextMeasurer(),
+  };
 }
 const MODERN_TABLE_COLUMN_STYLE: CSSProperties = {
   gridTemplateColumns: MODERN_TABLE_COLUMNS,
@@ -117,6 +154,65 @@ function formatModernRecordLine(line: string): string {
   return line.replace(/^([\p{Script=Han}]{1,4}):\s*/u, "$1");
 }
 
+function formatModernCount(
+  key: string,
+  fallback: string,
+  count: number,
+  t: TranslateFn,
+): string {
+  return t(key, fallback, {
+    number: count,
+    han: toChineseNumeral(count),
+  });
+}
+
+function formatModernPageRef(pageNumber: number, t: TranslateFn): string {
+  return t("genealogyBook.modernPageRef", "[p. {{number}}]", {
+    number: pageNumber,
+    han: toChineseNumeral(pageNumber),
+  });
+}
+
+function getModernTransmissionSection(
+  person: PaperPerson,
+  t: TranslateFn,
+  pageLookup: ModernPersonPageLookup,
+): string | undefined {
+  if (!person.children.length) return undefined;
+
+  const sons = person.children.filter((child) => child.gender === 1);
+  const daughters = person.children.filter((child) => child.gender === 2);
+  const unknown = person.children.filter((child) => child.gender !== 1 && child.gender !== 2);
+  const counts = [
+    sons.length
+      ? formatModernCount("genealogyBook.modernSonsCount", "sons {{number}}", sons.length, t)
+      : undefined,
+    daughters.length
+      ? formatModernCount(
+          "genealogyBook.modernDaughtersCount",
+          "daughters {{number}}",
+          daughters.length,
+          t,
+        )
+      : undefined,
+    unknown.length
+      ? formatModernCount(
+          "genealogyBook.modernIssueCount",
+          "issue {{number}}",
+          unknown.length,
+          t,
+        )
+      : undefined,
+  ].filter(Boolean) as string[];
+
+  const childNames = [...sons, ...daughters, ...unknown].map((child) => {
+    const pageNumber = pageLookup.get(child.id);
+    return pageNumber ? `${child.name} ${formatModernPageRef(pageNumber, t)}` : child.name;
+  });
+
+  return [...counts, ...childNames].join(" ");
+}
+
 function getModernGenerationMark(depth: number, t: TranslateFn): string {
   return t("genealogyBook.suGenerationMark", "{{han}}世", {
     han: toChineseNumeral(depth + 1),
@@ -124,18 +220,26 @@ function getModernGenerationMark(depth: number, t: TranslateFn): string {
   });
 }
 
-function getModernFullRecordText(person: PaperPerson, t: TranslateFn): string {
-  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
-  const lines = compactUnique([...baseLines, childrenLine]);
+function getModernFullRecordText(
+  person: PaperPerson,
+  t: TranslateFn,
+  pageLookup: ModernPersonPageLookup,
+): string {
+  const { baseLines } = splitPaperRecordLines(person, t);
+  const lines = compactUnique([...baseLines, getModernTransmissionSection(person, t, pageLookup)]);
 
   return lines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
 }
 
-function getModernRecordSections(person: PaperPerson, t: TranslateFn): string[] {
-  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+function getModernRecordSections(
+  person: PaperPerson,
+  t: TranslateFn,
+  pageLookup: ModernPersonPageLookup,
+): string[] {
+  const { baseLines } = splitPaperRecordLines(person, t);
   const baseRecord = baseLines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
-  const childrenRecord = childrenLine ? formatModernRecordLine(childrenLine) : undefined;
-  return compactUnique([baseRecord, childrenRecord]);
+  const transmissionRecord = getModernTransmissionSection(person, t, pageLookup);
+  return compactUnique([baseRecord, transmissionRecord]);
 }
 
 function getModernRelationLabel(person: PaperPerson, t: TranslateFn): string {
@@ -145,6 +249,53 @@ function getModernRelationLabel(person: PaperPerson, t: TranslateFn): string {
 
 function getModernPersonName(person: PaperPerson): string {
   return clipText(person.ui.fullName || person.ui.titleText || person.ui.shortHashText, 12);
+}
+
+function splitModernRecordText(text: string, budget: ModernRecordBudget): ModernRecordChunk[] {
+  const { maxLinePx, measureTextPx } = budget;
+  if (!maxLinePx || !measureTextPx) {
+    return splitTextByVisualUnits(text, budget.unitsPerRow).map((chunk) => ({ text: chunk }));
+  }
+  if (measureTextPx(text) <= maxLinePx) return [{ text, lines: [text] }];
+
+  const takeLine = (source: string): { line: string; rest: string } => {
+    let line = "";
+    let restStart = 0;
+    const chars = Array.from(source);
+
+    for (let index = 0; index < chars.length; index += 1) {
+      const candidate = `${line}${chars[index]}`;
+      if (line && measureTextPx(candidate) > maxLinePx) {
+        restStart = index;
+        return {
+          line,
+          rest: chars.slice(restStart).join(""),
+        };
+      }
+      line = candidate;
+    }
+
+    return {
+      line,
+      rest: "",
+    };
+  };
+
+  const chunks: ModernRecordChunk[] = [];
+  let rest = text;
+
+  while (rest) {
+    const first = takeLine(rest);
+    const second = first.rest ? takeLine(first.rest) : { line: "", rest: "" };
+    const lines = second.line ? [first.line, second.line] : [first.line];
+    chunks.push({
+      text: lines.join(""),
+      lines,
+    });
+    rest = second.rest;
+  }
+
+  return chunks;
 }
 
 function getGenerationLabel(
@@ -161,18 +312,19 @@ function getGenerationLabel(
 function makePersonRows(params: {
   person: PaperPerson;
   t: TranslateFn;
-  unitsPerRow: number;
+  recordBudget: ModernRecordBudget;
+  pageLookup: ModernPersonPageLookup;
 }): ModernTableRow[] {
-  const { person, t, unitsPerRow } = params;
-  const fullRecord = getModernFullRecordText(person, t);
-  const sections = getModernRecordSections(person, t);
+  const { person, t, recordBudget, pageLookup } = params;
+  const fullRecord = getModernFullRecordText(person, t, pageLookup);
+  const sections = getModernRecordSections(person, t, pageLookup);
   const relationLabel = getModernRelationLabel(person, t);
   const name = getModernPersonName(person);
   let rowIndex = 0;
 
   return sections.flatMap((section, sectionIndex) => {
-    const chunks = splitTextByVisualUnits(section, unitsPerRow);
-    return chunks.map((text, chunkIndex) => {
+    const chunks = splitModernRecordText(section, recordBudget);
+    return chunks.map((chunk, chunkIndex) => {
       const isFirstPersonRow = rowIndex === 0;
       const row = {
         kind: "person" as const,
@@ -181,7 +333,8 @@ function makePersonRows(params: {
         relationLabel: isFirstPersonRow ? relationLabel : "",
         name: isFirstPersonRow ? name : "",
         fullRecord,
-        text,
+        text: chunk.text,
+        lines: chunk.lines,
         continued: chunkIndex > 0,
         hasContinuation: chunkIndex < chunks.length - 1,
         partIndex: rowIndex + 1,
@@ -247,9 +400,10 @@ function splitRowsIntoSpreads(rows: ModernTableRow[]): ModernPageSpread[] {
 function buildModernPaperBook(params: {
   generations: PaperGeneration[];
   t: TranslateFn;
-  unitsPerRow: number;
+  recordBudget: ModernRecordBudget;
+  pageLookup: ModernPersonPageLookup;
 }): ModernPaperBook {
-  const { generations, t, unitsPerRow } = params;
+  const { generations, t, recordBudget, pageLookup } = params;
   if (!generations.length) return { charts: [] };
 
   const generationsByDepth = new Map(
@@ -267,7 +421,7 @@ function buildModernPaperBook(params: {
       { length: MODERN_GENERATIONS_PER_CHART },
       (_value, offset) => startDepth + offset,
     );
-    const repeatedDepth = chartIndex > 1 ? startDepth : undefined;
+    const repeatedDepth: number | undefined = undefined;
     const rows: ModernTableRow[] = [];
 
     generationDepths.forEach((depth) => {
@@ -280,7 +434,7 @@ function buildModernPaperBook(params: {
         repeated: repeatedDepth === depth,
       });
       for (const person of generation?.people || []) {
-        rows.push(...makePersonRows({ person, t, unitsPerRow }));
+        rows.push(...makePersonRows({ person, t, recordBudget, pageLookup }));
       }
     });
 
@@ -293,6 +447,61 @@ function buildModernPaperBook(params: {
   }
 
   return { charts };
+}
+
+function collectModernPersonPageLookup(book: ModernPaperBook): ModernPersonPageLookup {
+  const lookup: ModernPersonPageLookup = new Map();
+  let pageNumber = 1;
+
+  for (const chart of book.charts) {
+    for (const spread of chart.spreads) {
+      for (const row of spread.leftRows) {
+        if (row.kind === "person" && row.partIndex === 1 && !lookup.has(row.person.id)) {
+          lookup.set(row.person.id, pageNumber);
+        }
+      }
+      pageNumber += 1;
+
+      for (const row of spread.rightRows) {
+        if (row.kind === "person" && row.partIndex === 1 && !lookup.has(row.person.id)) {
+          lookup.set(row.person.id, pageNumber);
+        }
+      }
+      pageNumber += 1;
+    }
+  }
+
+  return lookup;
+}
+
+function areModernPageLookupsEqual(
+  a: ModernPersonPageLookup,
+  b: ModernPersonPageLookup,
+): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, pageNumber] of a) {
+    if (b.get(id) !== pageNumber) return false;
+  }
+  return true;
+}
+
+function buildModernPaperBookWithPageRefs(params: {
+  generations: PaperGeneration[];
+  t: TranslateFn;
+  recordBudget: ModernRecordBudget;
+}): ModernPaperBook {
+  let pageLookup: ModernPersonPageLookup = new Map();
+  let book = buildModernPaperBook({ ...params, pageLookup });
+
+  for (let attempt = 0; attempt < MODERN_PAGE_LOOKUP_ITERATIONS; attempt += 1) {
+    const nextLookup = collectModernPersonPageLookup(book);
+    if (areModernPageLookupsEqual(pageLookup, nextLookup)) return book;
+
+    pageLookup = nextLookup;
+    book = buildModernPaperBook({ ...params, pageLookup });
+  }
+
+  return book;
 }
 
 function ModernTableHeader({ t }: { t: TranslateFn }) {
@@ -364,6 +573,7 @@ function ModernPersonRowView({
   row: Extract<ModernTableRow, { kind: "person" }>;
   t: TranslateFn;
 }) {
+  const measuredLines = row.lines?.length ? row.lines : undefined;
   const firstPartTestId =
     row.partIndex === 1
       ? `paper-modern-row-${row.person.id}`
@@ -415,20 +625,29 @@ function ModernPersonRowView({
         style={{
           color: "var(--df-paper-ink)",
           fontFamily: PAPER_NOTE_FONT_STACK,
-          overflowWrap: "anywhere",
-          // break-all so digit/date runs (e.g. "220-03-15") split to fill each line; justify
-          // then stretches every non-final line edge-to-edge so cells read as a printed block
-          // instead of a ragged right margin. text-align alone never justifies a block's LAST
-          // line, so when the record continues into a later row we also justify the last line
-          // (text-align-last) to fill the cell; the real paragraph end stays ragged/natural.
-          wordBreak: "break-all",
-          textAlign: "justify",
-          textAlignLast: row.hasContinuation ? "justify" : "auto",
+          overflowWrap: measuredLines ? "normal" : "anywhere",
+          // Browser line breaking can be conservative around CJK punctuation and mixed
+          // ASCII/digits. When measured lines are available, render those exact lines so a
+          // continuation row starts only after the current row's two lines are filled.
+          wordBreak: measuredLines ? "normal" : "break-all",
+          lineBreak: measuredLines ? "auto" : "anywhere",
+          textAlign: measuredLines ? "left" : "justify",
+          textAlignLast: "auto",
           textJustify: "inter-character",
         }}
         data-testid={`paper-modern-detail-${row.person.id}`}
       >
-        {row.text}
+        {measuredLines
+          ? measuredLines.map((line, index) => (
+              <span
+                key={`${row.key}-line-${index}`}
+                className="block overflow-hidden"
+                style={{ whiteSpace: "pre" }}
+              >
+                {line}
+              </span>
+            ))
+          : row.text}
       </p>
     </div>
   );
@@ -517,10 +736,10 @@ export function ModernBookRenderer({
     return () => observer.disconnect();
   }, []);
 
-  const unitsPerRow = useMemo(() => computeModernUnitsPerRow(spreadWidth), [spreadWidth]);
+  const recordBudget = useMemo(() => computeModernRecordBudget(spreadWidth), [spreadWidth]);
   const book = useMemo(
-    () => buildModernPaperBook({ generations, t, unitsPerRow }),
-    [generations, t, unitsPerRow],
+    () => buildModernPaperBookWithPageRefs({ generations, t, recordBudget }),
+    [generations, t, recordBudget],
   );
   const spreadItems = useMemo(
     () =>
@@ -594,12 +813,13 @@ export function ModernBookRenderer({
                     spreadIndex={spread.index}
                     t={t}
                   />
-                  <OuSpine
+                  <PaperSpine
                     chartIndex={chart.index}
-                    spread={{ index: spread.index, kind: spread.kind, rows: [] }}
+                    spreadIndex={spread.index}
                     title={spineTitle}
                     t={t}
                     testIdPrefix="paper-modern-spine"
+                    pageOrder="ltr"
                   />
                   <ModernPage
                     rows={spread.rightRows}

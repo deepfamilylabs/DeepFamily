@@ -101,6 +101,24 @@ function PagodaGuides({ page, t }: { page: PagodaBranchPage; t: TranslateFn }) {
             >
               {getPagodaGenerationMark(guide.depth, t)}
             </text>
+            {guide.repeated ? (
+              <text
+                x={railX - 10}
+                y={markY + 11}
+                textAnchor="start"
+                style={{
+                  fill: "var(--df-paper-red)",
+                  fontFamily: PAPER_NOTE_FONT_STACK,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  writingMode: "vertical-rl",
+                  textOrientation: "mixed",
+                }}
+                data-testid={`paper-pagoda-repeated-${guide.depth}`}
+              >
+                {t("genealogyBook.repeatedGeneration", "repeated")}
+              </text>
+            ) : null}
           </g>
         );
       })}
