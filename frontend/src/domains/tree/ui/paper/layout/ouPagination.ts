@@ -36,6 +36,9 @@ export type OuPersonRecordEntry = {
   key: string;
   person: PaperPerson;
   text: string;
+  // Parentage label (e.g. "曹操长子" / "始祖") shown above the name, Su-style. Only the first
+  // part of a person carries it; continuation parts leave it empty.
+  relationLabel: string;
   side: OuPageSide;
   slotSpan: number;
   widthPx: number;
@@ -49,7 +52,7 @@ export type OuPageBodyWidths = {
 };
 
 export const OU_GENERATIONS_PER_CHART = 5;
-export const OU_CHART_STEP = 4;
+export const OU_CHART_STEP = OU_GENERATIONS_PER_CHART - 1;
 export const OU_RIGHT_PAGE_CAPACITY = 3;
 export const OU_LEFT_PAGE_CAPACITY = 3;
 export const OU_SPREAD_ROW_CAPACITY = OU_RIGHT_PAGE_CAPACITY + OU_LEFT_PAGE_CAPACITY;
@@ -60,8 +63,11 @@ export const OU_LEFT_PAGE_BODY_WIDTH = OU_RIGHT_PAGE_BODY_WIDTH + 56;
 export const OU_COLUMN_ALIGNMENT_WIDTH = 14;
 export const OU_PERSON_MIN_WIDTH = 112;
 export const OU_PERSON_BASE_WIDTH = 84;
-export const OU_RECORD_CHARS_PER_COLUMN = 14;
-export const OU_RECORD_COLUMN_WIDTH = 17;
+// Calibrated to the 13px body text (matching the Su-style 正文): a column is ~144px tall
+// (168px row − 24px py-3 padding), fitting ~12 full-width glyphs at 13px, and each column
+// advances ceil(13px × 1.55 line-height) ≈ 21px horizontally.
+export const OU_RECORD_CHARS_PER_COLUMN = 12;
+export const OU_RECORD_COLUMN_WIDTH = 21;
 const DEFAULT_OU_PAGE_BODY_WIDTHS: OuPageBodyWidths = {
   right: OU_RIGHT_PAGE_BODY_WIDTH,
   left: OU_LEFT_PAGE_BODY_WIDTH,
@@ -99,25 +105,25 @@ export function getOuGenerationMark(depth: number, t: TranslateFn): string {
   });
 }
 
-export function getOuFullRecordText(person: PaperPerson): string {
-  const { baseLines, childrenLine } = splitPaperRecordLines(person);
-  const lines = childrenLine ? [...baseLines, childrenLine] : baseLines;
-  return lines.map(formatOuRecordLine).join("，") || person.ui.shortHashText;
+export function getOuFullRecordText(person: PaperPerson, t?: TranslateFn): string {
+  // Ou omits the 子女 (children) line — only the Modern style lists children in its body text.
+  const { baseLines } = splitPaperRecordLines(person, t);
+  return baseLines.map(formatOuRecordLine).join("，") || person.ui.shortHashText;
 }
 
 function getOuRecordSections(person: PaperPerson, t: TranslateFn): string[] {
-  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+  // Only the base biography is laid out; the 子女 line is dropped (see getOuFullRecordText).
+  const { baseLines } = splitPaperRecordLines(person, t);
   const baseRecord = baseLines.map(formatOuRecordLine).join("，") || person.ui.shortHashText;
-  const childrenRecord = childrenLine ? formatOuRecordLine(childrenLine) : undefined;
-  return [baseRecord, childrenRecord].filter((line): line is string => Boolean(line));
+  return [baseRecord];
 }
 
-// Ou has no separate relation slot, so the 行传 record opens with the parentage —
-// e.g. "曹操长子，生155，卒220…" — as classical Ou-style biographies do. This composed text
-// is what drives width measurement, column chunking, and display so they all stay in sync.
+// Full textual record for the hover title: the parentage label (e.g. "曹操长子") followed by
+// the biography. The label itself is shown above the name (see relationLabel on each entry), so
+// the laid-out biography body and its width measurement use getOuFullRecordText instead.
 export function getOuRecordText(person: PaperPerson, t: TranslateFn): string {
   const label = getPaperRelationLabel(person, t, { withParentName: true });
-  const record = getOuFullRecordText(person);
+  const record = getOuFullRecordText(person, t);
   return label ? `${label}，${record}` : record;
 }
 
@@ -165,7 +171,9 @@ function getWidthSlotSpan(widthPx: number): number {
 }
 
 function getOuRecordTotalSlotSpan(person: PaperPerson, t: TranslateFn): number {
-  return getWidthSlotSpan(getTextWidthPx(getOuRecordText(person, t)));
+  // The biography body is what occupies the flexible width; the parentage label sits in the
+  // fixed-width name lane, so width is measured from the biography alone.
+  return getWidthSlotSpan(getTextWidthPx(getOuFullRecordText(person, t)));
 }
 
 export function getOuRecordSlotSpan(person: PaperPerson, t: TranslateFn): number {
@@ -206,6 +214,7 @@ function paginateGenerationEntries(
     person: PaperPerson,
     text: string,
     partIndex: number,
+    relationLabel: string,
     availableWidth = getOuSideWidth(side, pageBodyWidths),
   ) => {
     const widthPx = getTextWidthPx(text, availableWidth);
@@ -213,6 +222,7 @@ function paginateGenerationEntries(
       key: `${person.id}:${spreadIndex}:${side}:${partIndex}`,
       person,
       text,
+      relationLabel,
       side,
       slotSpan: getWidthSlotSpan(widthPx),
       widthPx,
@@ -224,12 +234,19 @@ function paginateGenerationEntries(
 
   for (const person of people) {
     let partIndex = 0;
-    const relationLabel = getPaperRelationLabel(person, t, { withParentName: true });
+    // The parentage label rides above the name on the first part only, so the biography body is
+    // laid out unchanged — no inline "曹操长子，…" prefix. Same Su-style two-column shape: the
+    // father name and rank word are "\n"-joined so the renderer lays them out as adjacent vertical
+    // columns (father on the right, 长子/之子 on the left).
+    const relationLabel = getPaperRelationLabel(person, t, {
+      withParentName: true,
+      separator: "\n",
+      parentNameMax: 3,
+    });
     const sections = getOuRecordSections(person, t);
 
-    for (const [sectionIndex, section] of sections.entries()) {
-      const sectionText = sectionIndex === 0 && relationLabel ? `${relationLabel}，${section}` : section;
-      const chars = Array.from(sectionText);
+    for (const section of sections) {
+      const chars = Array.from(section);
       let start = 0;
 
       while (start < chars.length) {
@@ -240,10 +257,11 @@ function paginateGenerationEntries(
           continue;
         }
 
+        const entryRelationLabel = partIndex === 0 ? relationLabel : "";
         const remainingText = chars.slice(start).join("");
         const remainingWidth = getNaturalTextWidthPx(remainingText);
         if (remainingWidth <= availableWidth) {
-          pushEntry(person, remainingText, partIndex, availableWidth);
+          pushEntry(person, remainingText, partIndex, entryRelationLabel, availableWidth);
           partIndex += 1;
           break;
         }
@@ -253,7 +271,7 @@ function paginateGenerationEntries(
           chars.length - start,
         );
         const text = chars.slice(start, start + chunkLength).join("");
-        pushEntry(person, text, partIndex, availableWidth);
+        pushEntry(person, text, partIndex, entryRelationLabel, availableWidth);
         start += chunkLength;
         partIndex += 1;
         if (start < chars.length) advanceSide();

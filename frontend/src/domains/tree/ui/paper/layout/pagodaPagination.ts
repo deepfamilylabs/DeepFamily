@@ -59,7 +59,7 @@ export type PagodaPaperBook = {
 };
 
 export const PAGODA_GENERATIONS_PER_CHART = 5;
-export const PAGODA_CHART_STEP = 4;
+export const PAGODA_CHART_STEP = PAGODA_GENERATIONS_PER_CHART - 1;
 export const PAGODA_NODE_WIDTH = 48;
 export const PAGODA_NODE_HEIGHT = 132;
 export const PAGODA_NODE_NAME_Y = 28;

@@ -114,3 +114,17 @@ export function getPaperSpineTitle(generations: PaperGeneration[], t: TranslateF
     ? t("genealogyBook.ouSpineTitleWithSurname", "{{surname}}氏族谱", { surname })
     : t("genealogyBook.ouSpineTitle", "Genealogy");
 }
+
+export function getPaperSpineVolumeLabel(chartIndex: number, t: TranslateFn): string {
+  return t("genealogyBook.spineVolumeLabel", "卷{{han}}", {
+    number: chartIndex,
+    han: toChineseNumeral(chartIndex),
+  });
+}
+
+export function getPaperSpinePageLabel(pageNumber: number, t: TranslateFn): string {
+  return t("genealogyBook.spinePageNumber", "{{han}}", {
+    number: pageNumber,
+    han: toChineseNumeral(pageNumber),
+  });
+}

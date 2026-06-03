@@ -22,6 +22,7 @@ import {
   PAPER_VARS,
 } from "../paperStyles";
 import { clipText, getPaperSpineTitle } from "../paperText";
+import { PaperSpine } from "./PaperSpine";
 
 const OU_GENERATION_MARK_WIDTH = 54;
 const OU_SPINE_WIDTH = 72;
@@ -42,7 +43,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
   const title = entry.continued ? "" : clipText(person.ui.titleText || person.ui.shortHashText, 10);
   const nameLaneClassName = entry.continued
     ? "flex w-0 shrink-0 overflow-hidden p-0"
-    : "flex w-10 shrink-0 items-start justify-end border-l pl-1 pr-1";
+    : "flex w-14 shrink-0 flex-col items-center gap-1 border-l pl-1 pr-1";
 
   return (
     <article
@@ -64,6 +65,23 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
         className={nameLaneClassName}
         style={{ borderColor: "var(--df-paper-line-soft)" }}
       >
+        {entry.relationLabel ? (
+          <span
+            className="text-[11px] font-normal leading-tight"
+            style={{
+              color: "var(--df-paper-muted)",
+              fontFamily: PAPER_NOTE_FONT_STACK,
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+              // Father name and rank word arrive "\n"-joined; pre-line turns the break into an
+              // adjacent column (father right, 长子/之子 left) instead of a single merged column.
+              whiteSpace: "pre-line",
+            }}
+            data-testid={`paper-ou-relation-${person.id}`}
+          >
+            {entry.relationLabel}
+          </span>
+        ) : null}
         <strong
           className="text-[17px] font-bold leading-6 tracking-normal"
           style={{
@@ -89,7 +107,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
         </strong>
       </div>
       <p
-        className="m-0 h-full flex-1 pr-2 text-[11px] leading-[1.5]"
+        className="m-0 h-full flex-1 pr-2 text-[13px] leading-[1.55]"
         style={{
           color: "var(--df-paper-muted)",
           fontFamily: PAPER_NOTE_FONT_STACK,
@@ -265,74 +283,6 @@ function OuPage({
   );
 }
 
-export function OuSpine({
-  chartIndex,
-  spread,
-  title,
-  t,
-  testIdPrefix = "paper-ou-spine",
-}: {
-  chartIndex: number;
-  spread: OuPageSpread;
-  title: string;
-  t: TranslateFn;
-  testIdPrefix?: string;
-}) {
-  const spreadLabel =
-    spread.kind === "main"
-      ? t("genealogyBook.ouMainSpread", "Main chart")
-      : t("genealogyBook.ouContinuationPage", "Continuation {{number}}", {
-          number: spread.index,
-        });
-
-  return (
-    <aside
-      className="relative flex h-[872px] flex-col items-center border-x bg-[#f3e8cc] px-1 py-3"
-      style={{
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-      }}
-      data-testid={`${testIdPrefix}-${chartIndex}-${spread.index}`}
-    >
-      <div
-        className="text-[31px] font-black leading-none tracking-normal"
-        style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {title}
-      </div>
-      <div className="my-3 h-10 w-10 bg-[#1f1a14]" aria-hidden="true" />
-      <div
-        className="grid grid-cols-2 gap-1 border-y py-2 text-[12px] font-bold"
-        style={{
-          borderColor: "var(--df-paper-line-soft)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
-        }}
-      >
-        <span style={{ writingMode: "vertical-rl" }}>
-          {t("genealogyBook.volumeLabel", "Volume {{number}}", { number: chartIndex })}
-        </span>
-        <span style={{ writingMode: "vertical-rl" }}>
-          {spreadLabel}
-        </span>
-      </div>
-      <div
-        className="mt-auto text-[30px] font-black leading-none tracking-normal"
-        style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {t("genealogyBook.ouHallName", "DeepFamily")}
-      </div>
-    </aside>
-  );
-}
-
 export function OuBookRenderer({
   generations,
   t,
@@ -438,11 +388,13 @@ export function OuBookRenderer({
                   data-testid={`paper-ou-spread-${chart.index}-${spread.index}`}
                 >
                   <OuPage side="left" chart={chart} spread={spread} t={t} />
-                  <OuSpine
+                  <PaperSpine
                     chartIndex={chart.index}
-                    spread={spread}
+                    spreadIndex={spread.index}
                     title={spineTitle}
                     t={t}
+                    testIdPrefix="paper-ou-spine"
+                    pageOrder="rtl"
                   />
                   <OuPage side="right" chart={chart} spread={spread} t={t} />
                 </div>

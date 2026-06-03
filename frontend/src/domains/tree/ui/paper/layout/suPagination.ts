@@ -55,7 +55,7 @@ export type SuPaperBook = {
 };
 
 export const SU_GENERATIONS_PER_CHART = 5;
-export const SU_CHART_STEP = 4;
+export const SU_CHART_STEP = SU_GENERATIONS_PER_CHART - 1;
 export const SU_RIGHT_PAGE_LANE_CAPACITY = 14;
 export const SU_LEFT_PAGE_LANE_CAPACITY = 14;
 export const SU_SPREAD_LANE_CAPACITY = SU_RIGHT_PAGE_LANE_CAPACITY + SU_LEFT_PAGE_LANE_CAPACITY;
@@ -92,8 +92,14 @@ function formatSuRecordLine(line: string): string {
 }
 
 function getRelationLabel(person: PaperPerson, t: TranslateFn): string {
-  // Clip the father name to 3 chars so "[父名]之子/长子" stays within the 64px relation cell.
-  return getPaperRelationLabel(person, t, { withParentName: true, parentNameMax: 3 });
+  // Keep the father name and rank word as separate "\n"-joined segments so the renderer can lay
+  // them out as two adjacent vertical columns (e.g. "曹昌晟" beside "长女") instead of one merged
+  // column. Clip the father name to 3 chars so each column stays within the 64px relation cell.
+  return getPaperRelationLabel(person, t, {
+    withParentName: true,
+    separator: "\n",
+    parentNameMax: 3,
+  });
 }
 
 export function getSuGenerationMark(depth: number, t: TranslateFn): string {
@@ -103,17 +109,17 @@ export function getSuGenerationMark(depth: number, t: TranslateFn): string {
   });
 }
 
-export function getSuFullRecordText(person: PaperPerson): string {
-  const { baseLines, childrenLine } = splitPaperRecordLines(person);
-  const lines = childrenLine ? [...baseLines, childrenLine] : baseLines;
-  return lines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
+export function getSuFullRecordText(person: PaperPerson, t?: TranslateFn): string {
+  // Su omits the 子女 (children) line — only the Modern style lists children in its body text.
+  const { baseLines } = splitPaperRecordLines(person, t);
+  return baseLines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
 }
 
 function getSuRecordSections(person: PaperPerson, t: TranslateFn): string[] {
-  const { baseLines, childrenLine } = splitPaperRecordLines(person, t);
+  // Only the base biography is laid out; the 子女 line is dropped (see getSuFullRecordText).
+  const { baseLines } = splitPaperRecordLines(person, t);
   const baseRecord = baseLines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
-  const childrenRecord = childrenLine ? formatSuRecordLine(childrenLine) : undefined;
-  return [baseRecord, childrenRecord].filter((line): line is string => Boolean(line));
+  return [baseRecord];
 }
 
 export function splitSuSpreadColumns(

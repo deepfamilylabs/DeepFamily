@@ -23,6 +23,12 @@ export type TranslateFn = (
   options?: Record<string, unknown>,
 ) => string;
 
+export type PaperChildRef = {
+  id: NodeId;
+  name: string;
+  gender?: number;
+};
+
 export type PaperPerson = {
   id: NodeId;
   depth: number;
@@ -42,6 +48,7 @@ export type PaperPerson = {
   detailLines: string[];
   classicalLines: string[];
   childCount: number;
+  children: PaperChildRef[];
 };
 
 export type PaperGeneration = {
@@ -180,16 +187,20 @@ function addBirthRankRelations(params: {
   }
 }
 
-function getChildDisplayNames(params: {
+function getChildRefs(params: {
   parentId: NodeId;
   graph: TreeGraphData;
   nodesData: Record<string, NodeData>;
-}): string[] {
+}): PaperChildRef[] {
   const { parentId, graph, nodesData } = params;
   const childIds = sortNodeIdsByBirthOrder(graph.childrenByParent[parentId] || [], nodesData);
   return childIds.map((id) => {
     const ui = getNodeUi(id, nodesData);
-    return ui.fullName || ui.titleText || ui.shortHashText;
+    return {
+      id,
+      name: ui.fullName || ui.titleText || ui.shortHashText,
+      gender: nodesData[id]?.gender ?? ui.gender,
+    };
   });
 }
 
@@ -261,8 +272,9 @@ export function buildPaperGenerations(params: {
   graph.nodes.forEach((node) => {
     const ui = getNodeUi(node.id, nodesData);
     const nodeData = nodesData[node.id];
-    const childCount = graph.childrenByParent[node.id]?.length || 0;
-    const childNames = getChildDisplayNames({ parentId: node.id, graph, nodesData });
+    const children = getChildRefs({ parentId: node.id, graph, nodesData });
+    const childCount = children.length;
+    const childNames = children.map((child) => child.name);
     const people = byDepth.get(node.depth) || [];
     const childRelation = relationByChild.get(node.id);
     const person: PaperPerson = {
@@ -277,6 +289,7 @@ export function buildPaperGenerations(params: {
       ui,
       nodeData,
       childCount,
+      children,
       detailLines: buildDetailLines({ ui, nodeData, childNames, t }),
       classicalLines: buildClassicalLines({ ui, nodeData, t }),
     };
