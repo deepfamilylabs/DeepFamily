@@ -77,13 +77,11 @@ const MODERN_NAME_COL_PX = 112;
 const MODERN_BIO_PADDING_PX = 24; // px-3 on both sides of the biography cell
 // The modern ledger is horizontal text in fixed-height rows, so a cell's capacity is set by the
 // biography column WIDTH (unlike the vertical Su/Ou styles, which are bound by the fixed page
-// height). The spread stays elastic, so the per-row character budget is computed from the measured
-// page width at render time (see ModernBookRenderer) instead of a fixed constant — this keeps each
-// cell filled to ~2 lines at any width. Units: a full-width glyph ≈ 14px = 2 units, a half-width
-// ASCII/digit ≈ 7px = 1 unit; text chunks are cut at the estimated two-line capacity so a
-// continuation row starts only after the current cell is full.
+// height). The spread uses the same elastic paper frame as the other book renderers, so the per-row
+// character budget is computed from the measured page width at render time. Units: a full-width
+// glyph ≈ 14px = 2 units, a half-width ASCII/digit ≈ 7px = 1 unit; text chunks are cut at the
+// estimated two-line capacity so a continuation row starts only after the current cell is full.
 const MODERN_UNIT_PX = 7;
-// Fallback budget (≈ 2 lines at the 1180px minimum spread) used before the width is measured.
 const MODERN_RECORD_UNITS_PER_LINE = 50;
 export const MODERN_RECORD_UNITS_PER_ROW = MODERN_RECORD_UNITS_PER_LINE * 2;
 const MODERN_TABLE_COLUMNS = `${MODERN_REL_COL_PX}px ${MODERN_NAME_COL_PX}px minmax(0, 1fr)`;
@@ -101,8 +99,7 @@ type ModernRecordChunk = {
   lines?: string[];
 };
 
-// Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines at
-// whatever elastic width the page renders at.
+// Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines.
 function getModernTextMeasurer(): ((text: string) => number) | undefined {
   if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return undefined;
   if (typeof document === "undefined") return undefined;
@@ -722,7 +719,6 @@ export function ModernBookRenderer({
   generations: PaperGeneration[];
   t: TranslateFn;
 }) {
-  // Measure the (elastic) spread width so the per-row budget fills cells to ~2 lines at any width.
   const spreadRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState(0);
   useLayoutEffect(() => {

@@ -124,52 +124,6 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
   );
 }
 
-function OuPageHeader({
-  chartIndex,
-  spread,
-  side,
-  t,
-}: {
-  chartIndex: number;
-  spread: OuPageSpread;
-  side: OuPageSide;
-  t: TranslateFn;
-}) {
-  const spreadLabel =
-    spread.kind === "main"
-      ? t("genealogyBook.ouMainSpread", "Main chart")
-      : t("genealogyBook.ouContinuationPage", "Continuation {{number}}", {
-          number: spread.index,
-        });
-
-  return (
-    <div
-      className="flex h-8 items-center justify-center border-b px-3 text-center text-[12px] font-bold tracking-normal"
-      style={{
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-        fontFamily: PAPER_TITLE_FONT_STACK,
-      }}
-    >
-      <span>
-        {t("genealogyBook.ouPageTitle", "Genealogy lineage --- five generations")}
-        <span className="mx-2" style={{ color: "var(--df-paper-muted)" }}>
-          /
-        </span>
-        {spreadLabel}
-        <span className="mx-2" style={{ color: "var(--df-paper-muted)" }}>
-          /
-        </span>
-        {t(side === "right" ? "genealogyBook.ouRightPage" : "genealogyBook.ouLeftPage", side)}
-        <span className="mx-2" style={{ color: "var(--df-paper-muted)" }}>
-          /
-        </span>
-        {t("genealogyBook.volumeLabel", "Volume {{number}}", { number: chartIndex })}
-      </span>
-    </div>
-  );
-}
-
 function OuGenerationBand({
   row,
   side,
@@ -266,8 +220,7 @@ function OuPage({
       style={PAPER_SHEET_STYLE}
       data-testid={`paper-ou-${side}-${chart.index}-${spread.index}`}
     >
-      <OuPageHeader chartIndex={chart.index} spread={spread} side={side} t={t} />
-      <div className="grid h-[840px] grid-rows-5">
+      <div className="grid h-full grid-rows-5">
         {spread.rows.map((row) => (
           <OuGenerationBand
             key={`${side}-${chart.index}-${spread.index}-${row.depth}`}

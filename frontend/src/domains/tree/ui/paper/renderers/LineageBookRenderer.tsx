@@ -347,53 +347,6 @@ function LineagePageSvg({
   );
 }
 
-function LineagePageHeader({
-  chartIndex,
-  spread,
-  side,
-  t,
-}: {
-  chartIndex: number;
-  spread: LineagePageSpread;
-  side: LineagePageSide;
-  t: TranslateFn;
-}) {
-  const spreadLabel =
-    spread.kind === "main"
-      ? t("genealogyBook.lineageMainSpread", "Main chart")
-      : t("genealogyBook.lineageContinuationPage", "Continuation {{number}}", {
-          number: spread.index,
-        });
-
-  return (
-    <div
-      className="flex h-8 items-center justify-center border-b px-3 text-center text-[12px] font-bold tracking-normal"
-      style={{
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-        fontFamily: PAPER_TITLE_FONT_STACK,
-      }}
-      data-testid={`paper-lineage-header-${chartIndex}-${spread.index}-${side}`}
-    >
-      <span>
-        {t("genealogyBook.ouPageTitle", "Genealogy lineage --- five generations")}
-        <span className="mx-2" style={{ color: "var(--df-paper-muted)" }}>
-          /
-        </span>
-        {spreadLabel}
-        <span className="mx-2" style={{ color: "var(--df-paper-muted)" }}>
-          /
-        </span>
-        {t(side === "right" ? "genealogyBook.ouRightPage" : "genealogyBook.ouLeftPage", side)}
-        <span className="mx-2" style={{ color: "var(--df-paper-muted)" }}>
-          /
-        </span>
-        {t("genealogyBook.volumeLabel", "Volume {{number}}", { number: chartIndex })}
-      </span>
-    </div>
-  );
-}
-
 function LineagePage({
   side,
   chart,
@@ -413,8 +366,7 @@ function LineagePage({
       style={PAPER_SHEET_STYLE}
       data-testid={`paper-lineage-${side}-${chart.index}-${spread.index}`}
     >
-      <LineagePageHeader chartIndex={chart.index} spread={spread} side={side} t={t} />
-      <div className="h-[840px]">
+      <div className="h-full">
         <LineagePageSvg
           side={side}
           chartIndex={chart.index}
