@@ -7,7 +7,6 @@ import {
   getLineagePageMetrics,
   getLineagePageWidth,
   LINEAGE_GENERATION_MARK_WIDTH,
-  LINEAGE_PAGE_BODY_HEIGHT,
   LINEAGE_ROW_HEIGHT,
   splitLineageRowEntries,
   type LineageChartWindow,
@@ -26,10 +25,12 @@ import {
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
-  PAPER_NOTE_FONT_STACK,
+  PAPER_LINE,
+  PAPER_MARK_BG,
   PAPER_SHEET_STYLE,
-  PAPER_TITLE_FONT_STACK,
+  PAPER_TEXT,
   PAPER_VARS,
+  paperSvgTextStyle,
 } from "../paperStyles";
 import {
   clipText,
@@ -40,16 +41,6 @@ import { PaperSpine } from "./PaperSpine";
 
 const LINEAGE_SPINE_WIDTH = 72;
 const LINEAGE_MIN_SPREAD_WIDTH = 1180;
-const LINEAGE_INK = "var(--df-paper-ink)";
-const LINEAGE_MUTED = "var(--df-paper-muted)";
-const LINEAGE_RED = "var(--df-paper-red)";
-const LINEAGE_LINE = "var(--df-paper-line)";
-const LINEAGE_MARK_BG = "#1f1a14";
-const LINEAGE_MARK_FG = "#f7efd8";
-const LINEAGE_MARK_WIDTH = 24;
-const LINEAGE_MARK_HEIGHT = 68;
-const LINEAGE_NODE_NAME_FONT_SIZE = 20;
-const LINEAGE_NODE_RELATION_FONT_SIZE = 11;
 const LINEAGE_NODE_RELATION_GAP = 18;
 const LINEAGE_ROOT_STEM_TOP_GAP = 18;
 const LINEAGE_ROOT_STEM_BOTTOM_GAP = 14;
@@ -86,7 +77,7 @@ function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }
           y1={entry.y + LINEAGE_ROOT_STEM_TOP_GAP}
           x2={entry.centerX}
           y2={entry.nameY - LINEAGE_ROOT_STEM_BOTTOM_GAP}
-          stroke={LINEAGE_LINE}
+          stroke={PAPER_LINE.strong}
           strokeWidth={1.15}
           strokeLinecap="square"
           data-testid={`paper-lineage-root-stem-${entry.person.id}`}
@@ -98,7 +89,7 @@ function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }
           cy={entry.circleY}
           r={4}
           fill="var(--df-paper-sheet)"
-          stroke={LINEAGE_LINE}
+          stroke={PAPER_LINE.strong}
           strokeWidth={1.05}
           data-testid={`paper-lineage-circle-${entry.person.id}`}
         />
@@ -109,10 +100,7 @@ function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }
           y={entry.y + 13}
           textAnchor="start"
           style={{
-            fill: LINEAGE_MUTED,
-            fontFamily: PAPER_NOTE_FONT_STACK,
-            fontSize: LINEAGE_NODE_RELATION_FONT_SIZE,
-            fontWeight: 400,
+            ...paperSvgTextStyle("relation"),
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           }}
@@ -126,10 +114,7 @@ function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }
         y={entry.nameY}
         textAnchor="start"
         style={{
-          fill: LINEAGE_INK,
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          fontSize: LINEAGE_NODE_NAME_FONT_SIZE,
-          fontWeight: 700,
+          ...paperSvgTextStyle("name"),
           letterSpacing: 0,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
@@ -167,7 +152,7 @@ function LineageConnectorLines({
       data-connector-kind={connector.kind}
       data-connector-side={connector.side}
       fill="none"
-      stroke={LINEAGE_LINE}
+      stroke={PAPER_LINE.strong}
       strokeWidth={1.15}
       strokeLinecap="square"
     >
@@ -198,7 +183,11 @@ function LineageConnectorLines({
   );
 }
 
-function LineageGenerationMarks({
+// The 世次 column is rendered as HTML (not SVG) so its rail, cell dividers, tint and tabs are the
+// exact same CSS as the Ou-style generation column (SVG strokes can't pixel-match a CSS border
+// under non-uniform viewBox scaling). It overlays the right edge of the page; its width is the
+// generation column's fraction of the page so it lines up with the SVG body to its left.
+function LineageGenerationColumn({
   rows,
   metrics,
   t,
@@ -207,73 +196,45 @@ function LineageGenerationMarks({
   metrics: LineagePageMetrics;
   t: TranslateFn;
 }) {
-  const markX = metrics.rightBodyWidth + (metrics.generationMarkWidth - LINEAGE_MARK_WIDTH) / 2;
-  const textX = markX + 12;
+  const widthPct =
+    (metrics.generationMarkWidth / (metrics.rightBodyWidth + metrics.generationMarkWidth)) * 100;
 
   return (
-    <g pointerEvents="none">
-      <line
-        x1={metrics.rightBodyWidth}
-        y1={0}
-        x2={metrics.rightBodyWidth}
-        y2={metrics.bodyHeight}
-        stroke={LINEAGE_LINE}
-        strokeWidth={0.8}
-        data-testid="paper-lineage-generation-rail"
-      />
-      {rows.map((row, rowIndex) => {
-        const markY = rowIndex * metrics.rowHeight + (metrics.rowHeight - LINEAGE_MARK_HEIGHT) / 2;
-        return (
-          <g key={row.depth} data-testid={`paper-lineage-generation-${row.depth}`}>
-            <rect
-              x={markX}
-              y={markY}
-              width={LINEAGE_MARK_WIDTH}
-              height={LINEAGE_MARK_HEIGHT}
-              fill={LINEAGE_MARK_BG}
-              data-testid={`paper-lineage-generation-mark-bg-${row.depth}`}
-            />
-            <text
-              x={textX}
-              y={markY + 11}
-              textAnchor="start"
-              style={{
-                fill: LINEAGE_MARK_FG,
-                fontFamily: PAPER_TITLE_FONT_STACK,
-                fontSize: 15,
-                fontWeight: 700,
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-              }}
-              data-testid={`paper-lineage-generation-mark-${row.depth}`}
-            >
-              {getLineageGenerationMark(row.depth, t)}
-            </text>
-            {row.repeated ? (
-              <text
-                x={markX - 10}
-                y={markY + 14}
-                textAnchor="start"
-                style={{
-                  fill: LINEAGE_RED,
-                  fontFamily: PAPER_NOTE_FONT_STACK,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  writingMode: "vertical-rl",
-                  textOrientation: "mixed",
-                }}
-              >
-                {t("genealogyBook.repeatedGeneration", "repeated")}
-              </text>
-            ) : null}
-          </g>
-        );
-      })}
-    </g>
+    <div
+      className="absolute right-0 top-0 grid h-full grid-rows-5"
+      style={{ width: `${widthPct}%` }}
+    >
+      {rows.map((row) => (
+        <div
+          key={row.depth}
+          className="flex flex-col items-center justify-center border-b border-l px-2 last:border-b-0"
+          style={{ borderColor: PAPER_LINE.soft, background: PAPER_LINE.tint }}
+          data-testid={`paper-lineage-generation-${row.depth}`}
+        >
+          <span
+            className="flex min-h-16 w-8 items-center justify-center px-1.5 py-2 shadow-sm"
+            style={{
+              ...PAPER_TEXT.generationMark,
+              backgroundColor: PAPER_MARK_BG,
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+            }}
+            data-testid={`paper-lineage-generation-mark-${row.depth}`}
+          >
+            {getLineageGenerationMark(row.depth, t)}
+          </span>
+          {row.repeated ? (
+            <span className="mt-2" style={{ ...PAPER_TEXT.tag, writingMode: "vertical-rl" }}>
+              {t("genealogyBook.repeatedGeneration", "repeated")}
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
   );
 }
 
-function LineageRowRules({ pageWidth, metrics }: { pageWidth: number; metrics: LineagePageMetrics }) {
+function LineageRowRules({ width }: { width: number }) {
   return (
     <g pointerEvents="none">
       {Array.from({ length: 4 }, (_value, index) => {
@@ -283,10 +244,11 @@ function LineageRowRules({ pageWidth, metrics }: { pageWidth: number; metrics: L
             key={y}
             x1={0}
             y1={y}
-            x2={pageWidth}
+            x2={width}
             y2={y}
-            stroke={LINEAGE_LINE}
-            strokeWidth={0.8}
+            stroke={PAPER_LINE.soft}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
             data-testid={`paper-lineage-row-rule-${index + 1}`}
           />
         );
@@ -316,6 +278,8 @@ function LineagePageSvg({
     [entries],
   );
   const pageWidth = getLineagePageWidth(side, metrics);
+  // Row rules cover only the body; the right page's generation column is HTML (see LineagePage).
+  const bodyWidth = side === "right" ? metrics.rightBodyWidth : pageWidth;
 
   return (
     <svg
@@ -327,8 +291,7 @@ function LineagePageSvg({
       data-testid={`paper-lineage-page-${side}-${chartIndex}-${spread.index}`}
       role="img"
     >
-      <LineageRowRules pageWidth={pageWidth} metrics={metrics} />
-      {side === "right" ? <LineageGenerationMarks rows={rows} metrics={metrics} t={t} /> : null}
+      <LineageRowRules width={bodyWidth} />
       <g>
         {connectors.map((connector) => (
           <LineageConnectorLines
@@ -362,7 +325,7 @@ function LineagePage({
 }) {
   return (
     <div
-      className="h-[872px]"
+      className="relative h-[872px]"
       style={PAPER_SHEET_STYLE}
       data-testid={`paper-lineage-${side}-${chart.index}-${spread.index}`}
     >
@@ -375,6 +338,9 @@ function LineagePage({
           t={t}
         />
       </div>
+      {side === "right" ? (
+        <LineageGenerationColumn rows={spread.rows} metrics={metrics} t={t} />
+      ) : null}
     </div>
   );
 }
@@ -455,21 +421,18 @@ export function LineageBookRenderer({
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
-              borderColor: "var(--df-paper-line)",
+              borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-lineage-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: "var(--df-paper-line-soft)" }}
+              style={{ borderColor: PAPER_LINE.soft }}
             >
-              <h2
-                className="text-xl font-bold tracking-normal"
-                style={{ fontFamily: PAPER_TITLE_FONT_STACK }}
-              >
+              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
                 {t("genealogyBook.styles.lineage", "Lineage")}
               </h2>
-              <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
+              <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t(
                   "genealogyBook.lineageTableRule",
                   "Five generations per chart, using the Ou-style frame with person relationships.",
@@ -483,7 +446,7 @@ export function LineageBookRenderer({
                   key={`${chart.index}-${spread.index}`}
                   className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
-                    borderColor: "var(--df-paper-line)",
+                    borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-lineage-spread-${chart.index}-${spread.index}`}

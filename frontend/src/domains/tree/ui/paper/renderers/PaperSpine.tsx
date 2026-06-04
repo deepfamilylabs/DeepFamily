@@ -1,5 +1,5 @@
 import type { TranslateFn } from "../paperData";
-import { PAPER_NOTE_FONT_STACK, PAPER_TITLE_FONT_STACK } from "../paperStyles";
+import { PAPER_LINE, PAPER_TEXT } from "../paperStyles";
 import { getPaperSpinePageLabel, getPaperSpineVolumeLabel } from "../paperText";
 
 // Traditional woodblock 鱼尾 (fishtail) center-fold marks. A classical 版心 carries a pair:
@@ -51,15 +51,15 @@ export function PaperSpine({
     <aside
       className="relative flex h-[872px] flex-col items-center border-x bg-[#f3e8cc] px-1 py-3"
       style={{
-        borderColor: "var(--df-paper-line)",
+        borderColor: PAPER_LINE.strong,
         color: "var(--df-paper-ink)",
       }}
       data-testid={`${testIdPrefix}-${chartIndex}-${spreadIndex}`}
     >
       <div
-        className="text-[31px] font-black leading-none tracking-normal"
+        className="leading-none tracking-normal"
         style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
+          ...PAPER_TEXT.spineTitle,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
         }}
@@ -69,27 +69,24 @@ export function PaperSpine({
       <PaperSpineFishtail direction="down" className="mt-6 mb-3" />
       <div
         className="flex w-full justify-center border-y py-2"
-        style={{ borderColor: "var(--df-paper-line-soft)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
-        <div
-          className="grid grid-cols-2 gap-4 text-[13px] font-bold"
-          style={{ fontFamily: PAPER_NOTE_FONT_STACK }}
-        >
+        <div className="grid grid-cols-2 gap-4" style={{ ...PAPER_TEXT.spineLabel }}>
           <span style={{ writingMode: "vertical-rl" }}>{volumeLabel}</span>
           <span style={{ writingMode: "vertical-rl" }}>{volumeLabel}</span>
         </div>
       </div>
       <div
         className="mt-auto flex h-7 w-full items-start justify-center border-b pb-1"
-        style={{ borderColor: "var(--df-paper-line-soft)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
         aria-label={t("genealogyBook.spinePageNumbers", "page {{left}} / {{right}}", {
           left: leftPageLabel,
           right: rightPageLabel,
         })}
       >
         <div
-          className="grid grid-cols-2 gap-4 text-center text-[13px] font-bold leading-none tracking-normal"
-          style={{ fontFamily: PAPER_NOTE_FONT_STACK }}
+          className="grid grid-cols-2 gap-4 text-center leading-none tracking-normal"
+          style={{ ...PAPER_TEXT.spineLabel }}
           data-testid={`${testIdPrefix}-${chartIndex}-${spreadIndex}-pages`}
         >
           {pageLabels.map((label) => (
@@ -101,9 +98,9 @@ export function PaperSpine({
       </div>
       <PaperSpineFishtail direction="up" className="mt-3 mb-3" />
       <div
-        className="mt-3 text-[30px] font-black leading-none tracking-normal"
+        className="mt-3 leading-none tracking-normal"
         style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
+          ...PAPER_TEXT.spineHall,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
         }}

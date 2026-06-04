@@ -12,9 +12,10 @@ import {
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
-  PAPER_NOTE_FONT_STACK,
+  PAPER_LINE,
+  PAPER_MARK_BG,
   PAPER_SHEET_STYLE,
-  PAPER_TITLE_FONT_STACK,
+  PAPER_TEXT,
   PAPER_VARS,
 } from "../paperStyles";
 import { clipText, getPaperSpineTitle } from "../paperText";
@@ -44,7 +45,7 @@ function SuPersonLane({
     <article
       className="grid h-full border-l last:border-l-0"
       style={{
-        borderColor: "var(--df-paper-line-soft)",
+        borderColor: PAPER_LINE.soft,
         direction: "ltr",
         ...SU_EQUAL_LANE_STYLE,
         gridTemplateRows: SU_LANE_GRID_ROWS,
@@ -55,11 +56,10 @@ function SuPersonLane({
       title={fullRecord}
     >
       <div
-        className="flex items-center justify-center border-b px-1 py-1 text-[13px] font-normal leading-tight"
+        className="flex items-center justify-center border-b px-1 py-1 leading-tight"
         style={{
-          borderColor: "var(--df-paper-line-soft)",
-          color: "var(--df-paper-muted)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
+          ...PAPER_TEXT.relation,
+          borderColor: PAPER_LINE.soft,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
           // Father name and rank word arrive "\n"-joined; pre-line turns the break into a natural
@@ -72,13 +72,12 @@ function SuPersonLane({
       </div>
       <div
         className="flex min-h-0 items-center justify-center border-b px-1.5 py-2"
-        style={{ borderColor: "var(--df-paper-line-soft)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
         <strong
-          className="text-[19px] font-bold leading-6 tracking-normal"
+          className="leading-6 tracking-normal"
           style={{
-            color: "var(--df-paper-ink)",
-            fontFamily: PAPER_TITLE_FONT_STACK,
+            ...PAPER_TEXT.name,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
             textAlign: "right",
@@ -90,13 +89,12 @@ function SuPersonLane({
       </div>
       <div
         className="relative flex min-h-0 justify-center px-1.5 py-2"
-        style={{ borderColor: "var(--df-paper-line-soft)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
         <p
-          className="m-0 h-full w-fit max-w-full text-[13px] leading-[1.55]"
+          className="m-0 h-full w-fit max-w-full"
           style={{
-            color: "var(--df-paper-muted)",
-            fontFamily: PAPER_NOTE_FONT_STACK,
+            ...PAPER_TEXT.body,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
             overflowWrap: "anywhere",
@@ -122,7 +120,7 @@ function SuGenerationLane({
     <div
       className="grid h-full border-l last:border-l-0"
       style={{
-        borderColor: "var(--df-paper-line)",
+        borderColor: PAPER_LINE.soft,
         ...SU_EQUAL_LANE_STYLE,
         gridTemplateRows: SU_LANE_GRID_ROWS,
       }}
@@ -132,9 +130,10 @@ function SuGenerationLane({
     >
       <div aria-hidden="true" />
       <span
-        className="flex h-full w-full items-center justify-center bg-[#1f1a14] px-1.5 py-2 text-[15px] font-bold text-[#f7efd8] shadow-sm"
+        className="flex h-full w-full items-center justify-center px-1.5 py-2 shadow-sm"
         style={{
-          fontFamily: PAPER_TITLE_FONT_STACK,
+          ...PAPER_TEXT.generationMark,
+          backgroundColor: PAPER_MARK_BG,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
         }}
@@ -144,10 +143,9 @@ function SuGenerationLane({
       </span>
       {lane.repeated || lane.continued ? (
         <span
-          className="flex items-center justify-center text-[11px] font-bold"
+          className="flex items-center justify-center"
           style={{
-            color: "var(--df-paper-red)",
-            fontFamily: PAPER_NOTE_FONT_STACK,
+            ...PAPER_TEXT.tag,
             writingMode: "vertical-rl",
           }}
         >
@@ -165,7 +163,7 @@ function SuBlankLane({ lane }: { lane: Extract<SuTableLane, { kind: "blank" }> }
     <div
       className="grid h-full border-l last:border-l-0"
       style={{
-        borderColor: "var(--df-paper-line-soft)",
+        borderColor: PAPER_LINE.soft,
         ...SU_EQUAL_LANE_STYLE,
         gridTemplateRows: SU_LANE_GRID_ROWS,
       }}
@@ -173,8 +171,8 @@ function SuBlankLane({ lane }: { lane: Extract<SuTableLane, { kind: "blank" }> }
       data-su-lane={lane.key}
       aria-hidden="true"
     >
-      <div className="border-b" style={{ borderColor: "var(--df-paper-line-soft)" }} />
-      <div className="border-b" style={{ borderColor: "var(--df-paper-line-soft)" }} />
+      <div className="border-b" style={{ borderColor: PAPER_LINE.soft }} />
+      <div className="border-b" style={{ borderColor: PAPER_LINE.soft }} />
       <div />
     </div>
   );
@@ -213,7 +211,7 @@ function SuPage({
     >
       <div
         className="flex h-full flex-row-reverse justify-start overflow-hidden"
-        style={{ borderColor: "var(--df-paper-line)" }}
+        style={{ borderColor: PAPER_LINE.strong }}
       >
         {lanes.map((lane, index) => (
           <SuTableLaneView
@@ -264,21 +262,18 @@ export function SuBookRenderer({
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
-              borderColor: "var(--df-paper-line)",
+              borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-su-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: "var(--df-paper-line-soft)" }}
+              style={{ borderColor: PAPER_LINE.soft }}
             >
-              <h2
-                className="text-xl font-bold tracking-normal"
-                style={{ fontFamily: PAPER_TITLE_FONT_STACK }}
-              >
+              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
                 {t("genealogyBook.styles.su", "Su-style")}
               </h2>
-              <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
+              <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t(
                   "genealogyBook.suTableRule",
                   "Five vertical generations per chart, right-to-left.",
@@ -292,7 +287,7 @@ export function SuBookRenderer({
                   key={`${chart.index}-${spread.index}`}
                   className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
-                    borderColor: "var(--df-paper-line)",
+                    borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-su-spread-${chart.index}-${spread.index}`}

@@ -1,6 +1,7 @@
 import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
+import { PAPER_TEXT } from "../paperStyles";
 import { clipText, toChineseNumeral } from "../paperText";
 
 export type PagodaNode = PaperPerson & {
@@ -63,7 +64,9 @@ export const PAGODA_CHART_STEP = PAGODA_GENERATIONS_PER_CHART - 1;
 export const PAGODA_NODE_WIDTH = 48;
 export const PAGODA_NODE_HEIGHT = 132;
 export const PAGODA_NODE_NAME_Y = 28;
-export const PAGODA_NODE_NAME_FONT_SIZE = 19;
+// Keep the layout's reserved name height in sync with the shared name token so customizing the
+// token's font size also re-measures the pagoda node height (see node-height math below).
+export const PAGODA_NODE_NAME_FONT_SIZE = PAPER_TEXT.name.fontSize;
 export const PAGODA_NODE_NAME_MAX_LENGTH = 10;
 export const PAGODA_NODE_NAME_CONNECTOR_GAP = 12;
 export const PAGODA_MIN_CONNECTOR_ANCHOR_Y = 80;

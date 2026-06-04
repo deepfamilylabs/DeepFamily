@@ -503,7 +503,7 @@ describe("PaperGenealogyView", () => {
 
     expect(screen.getByTestId("paper-modern")).toBeTruthy();
     expect(screen.getByTestId("paper-modern-chart").className).toContain("border");
-    expect(screen.getByText("Modern Ledger").className).toContain("text-xl");
+    expect(screen.getByText("Modern Ledger").style.fontSize).toBe("20px");
     expect(
       screen.getByText(
         "Five generations per chart, with facing ledger pages for relation, name, and biography.",
@@ -1379,23 +1379,28 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-pagoda-page-1-1")).toBeTruthy();
     expect(screen.queryByTestId("paper-pagoda-outer-border")).toBeNull();
     expect(screen.queryByTestId("paper-pagoda-inner-border")).toBeNull();
-    expect(screen.queryByTestId("paper-pagoda-generation-rail")).toBeNull();
+    expect(screen.getByTestId("paper-pagoda-generation-rail").getAttribute("stroke")).toBe(
+      "var(--df-paper-line-soft)",
+    );
+    expect(screen.getByTestId("paper-pagoda-generation-band-bg").getAttribute("fill")).toBe(
+      "var(--df-paper-line-tint)",
+    );
     expect(screen.getByTestId("paper-pagoda-generation-separator-1").getAttribute("stroke")).toBe(
       "var(--df-paper-line-soft)",
     );
     expect(
       screen.getByTestId("paper-pagoda-generation-separator-1").getAttribute("stroke-width"),
-    ).toBe("0.6");
+    ).toBe("1");
     expect(
       screen.getByTestId("paper-pagoda-generation-separator-1").getAttribute("stroke-opacity"),
-    ).toBe("0.35");
+    ).toBeNull();
     expect(
       screen.getByTestId("paper-pagoda-generation-separator-1").getAttribute("stroke-dasharray"),
     ).toBeNull();
     expect(Number(screen.getByTestId("paper-pagoda-generation-separator-1").getAttribute("y1"))).toBeCloseTo(
       149.96,
     );
-    expect(screen.getByTestId("paper-pagoda-generation-mark-bg-0").getAttribute("x")).toBe("1122");
+    expect(screen.getByTestId("paper-pagoda-generation-mark-bg-0").getAttribute("x")).toBe("1137");
     expect(screen.getByTestId("paper-pagoda-generation-mark-bg-0").getAttribute("y")).toBe("36");
     expect(screen.getByTestId("paper-pagoda-generation-mark-bg-0").getAttribute("fill")).toBe(
       "#1f1a14",
@@ -1506,7 +1511,7 @@ describe("PaperGenealogyView", () => {
     );
     expect(thirdRelation.textContent).toBe("三子");
     expect(thirdRelation.textContent).not.toContain("3");
-    expect(thirdRelation.style.fontSize).toBe("11px");
+    expect(thirdRelation.style.fontSize).toBe("13px");
     expect(thirdRelation.style.fontWeight).toBe("400");
   });
 

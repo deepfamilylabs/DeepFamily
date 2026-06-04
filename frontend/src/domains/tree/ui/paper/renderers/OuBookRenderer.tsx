@@ -16,9 +16,10 @@ import {
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
-  PAPER_NOTE_FONT_STACK,
+  PAPER_LINE,
+  PAPER_MARK_BG,
   PAPER_SHEET_STYLE,
-  PAPER_TITLE_FONT_STACK,
+  PAPER_TEXT,
   PAPER_VARS,
 } from "../paperStyles";
 import { clipText, getPaperSpineTitle } from "../paperText";
@@ -49,7 +50,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
     <article
       className="relative flex h-full shrink-0 flex-row-reverse border-l px-2.5 py-3 last:border-l-0"
       style={{
-        borderColor: "var(--df-paper-line-soft)",
+        borderColor: PAPER_LINE.soft,
         direction: "ltr",
         flex: `1 0 ${entry.widthPx}px`,
         minWidth: entry.widthPx,
@@ -63,14 +64,13 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
     >
       <div
         className={nameLaneClassName}
-        style={{ borderColor: "var(--df-paper-line-soft)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
         {entry.relationLabel ? (
           <span
-            className="text-[11px] font-normal leading-tight"
+            className="leading-tight"
             style={{
-              color: "var(--df-paper-muted)",
-              fontFamily: PAPER_NOTE_FONT_STACK,
+              ...PAPER_TEXT.relation,
               writingMode: "vertical-rl",
               textOrientation: "mixed",
               // Father name and rank word arrive "\n"-joined; pre-line turns the break into an
@@ -83,10 +83,9 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
           </span>
         ) : null}
         <strong
-          className="text-[17px] font-bold leading-6 tracking-normal"
+          className="leading-6 tracking-normal"
           style={{
-            color: "var(--df-paper-ink)",
-            fontFamily: PAPER_TITLE_FONT_STACK,
+            ...PAPER_TEXT.name,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
             textAlign: "right",
@@ -96,8 +95,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
           {title}
           {isFemale ? (
             <span
-              className="text-[11px] font-normal"
-              style={{ color: "var(--df-paper-ink)" }}
+              style={{ ...PAPER_TEXT.femaleMark }}
               data-testid={`paper-ou-female-${person.id}`}
             >
               {"　"}
@@ -107,10 +105,9 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
         </strong>
       </div>
       <p
-        className="m-0 h-full flex-1 pr-2 text-[13px] leading-[1.55]"
+        className="m-0 h-full flex-1 pr-2"
         style={{
-          color: "var(--df-paper-muted)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
+          ...PAPER_TEXT.body,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
           overflowWrap: "anywhere",
@@ -146,7 +143,7 @@ function OuGenerationBand({
           ? "grid h-full grid-cols-[1fr_54px] border-b last:border-b-0"
           : "h-full border-b last:border-b-0"
       }
-      style={{ borderColor: "var(--df-paper-line)" }}
+      style={{ borderColor: PAPER_LINE.soft }}
       data-testid={
         side === "right" ? `paper-ou-generation-${row.depth}` : `paper-ou-left-generation-${row.depth}`
       }
@@ -170,14 +167,15 @@ function OuGenerationBand({
         <div
           className="flex h-full flex-col items-center justify-center border-l px-2"
           style={{
-            borderColor: "var(--df-paper-line-soft)",
-            background: "rgba(138, 106, 59, 0.07)",
+            borderColor: PAPER_LINE.soft,
+            background: PAPER_LINE.tint,
           }}
         >
           <span
-            className="flex min-h-16 w-8 items-center justify-center bg-[#1f1a14] px-1.5 py-2 text-[15px] font-bold text-[#f7efd8] shadow-sm"
+            className="flex min-h-16 w-8 items-center justify-center px-1.5 py-2 shadow-sm"
             style={{
-              fontFamily: PAPER_TITLE_FONT_STACK,
+              ...PAPER_TEXT.generationMark,
+              backgroundColor: PAPER_MARK_BG,
               writingMode: "vertical-rl",
               textOrientation: "mixed",
             }}
@@ -187,10 +185,9 @@ function OuGenerationBand({
           </span>
           {row.repeated ? (
             <span
-              className="mt-2 text-[11px] font-bold"
+              className="mt-2"
               style={{
-                color: "var(--df-paper-red)",
-                fontFamily: PAPER_NOTE_FONT_STACK,
+                ...PAPER_TEXT.tag,
                 writingMode: "vertical-rl",
               }}
             >
@@ -310,21 +307,18 @@ export function OuBookRenderer({
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
-              borderColor: "var(--df-paper-line)",
+              borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-ou-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: "var(--df-paper-line-soft)" }}
+              style={{ borderColor: PAPER_LINE.soft }}
             >
-              <h2
-                className="text-xl font-bold tracking-normal"
-                style={{ fontFamily: PAPER_TITLE_FONT_STACK }}
-              >
+              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
                 {t("genealogyBook.styles.ou", "Ou-style")}
               </h2>
-              <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
+              <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t("genealogyBook.ouTableRule", "Five generations per table.")}
               </span>
             </div>
@@ -335,7 +329,7 @@ export function OuBookRenderer({
                   key={`${chart.index}-${spread.index}`}
                   className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
-                    borderColor: "var(--df-paper-line)",
+                    borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-ou-spread-${chart.index}-${spread.index}`}

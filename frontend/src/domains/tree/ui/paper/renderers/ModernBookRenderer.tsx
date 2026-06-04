@@ -7,9 +7,10 @@ import {
 } from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
+  PAPER_LINE,
   PAPER_NOTE_FONT_STACK,
   PAPER_SHEET_STYLE,
-  PAPER_TITLE_FONT_STACK,
+  PAPER_TEXT,
   PAPER_VARS,
 } from "../paperStyles";
 import {
@@ -81,7 +82,7 @@ const MODERN_BIO_PADDING_PX = 24; // px-3 on both sides of the biography cell
 // character budget is computed from the measured page width at render time. Units: a full-width
 // glyph ≈ 14px = 2 units, a half-width ASCII/digit ≈ 7px = 1 unit; text chunks are cut at the
 // estimated two-line capacity so a continuation row starts only after the current cell is full.
-const MODERN_UNIT_PX = 7;
+const MODERN_UNIT_PX = PAPER_TEXT.body.fontSize / 2;
 const MODERN_RECORD_UNITS_PER_LINE = 50;
 export const MODERN_RECORD_UNITS_PER_ROW = MODERN_RECORD_UNITS_PER_LINE * 2;
 const MODERN_TABLE_COLUMNS = `${MODERN_REL_COL_PX}px ${MODERN_NAME_COL_PX}px minmax(0, 1fr)`;
@@ -108,7 +109,7 @@ function getModernTextMeasurer(): ((text: string) => number) | undefined {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) return undefined;
-    context.font = `14px ${PAPER_NOTE_FONT_STACK}`;
+    context.font = `${PAPER_TEXT.body.fontSize}px ${PAPER_NOTE_FONT_STACK}`;
     return (text: string) => context.measureText(text).width;
   } catch {
     return undefined;
@@ -504,23 +505,22 @@ function buildModernPaperBookWithPageRefs(params: {
 function ModernTableHeader({ t }: { t: TranslateFn }) {
   return (
     <div
-      className="grid border-b text-center text-[18px] font-black leading-none tracking-normal"
+      className="grid border-b text-center leading-none tracking-normal"
       style={{
         ...MODERN_TABLE_COLUMN_STYLE,
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-        fontFamily: PAPER_TITLE_FONT_STACK,
+        ...PAPER_TEXT.tableHeader,
+        borderColor: PAPER_LINE.soft,
       }}
     >
       <div
         className="flex min-w-0 items-center justify-center border-r px-1"
-        style={{ borderColor: "var(--df-paper-line)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
         {t("genealogyBook.modernHeaderRelation", "Relation")}
       </div>
       <div
         className="flex min-w-0 items-center justify-center border-r px-1"
-        style={{ borderColor: "var(--df-paper-line)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
         {t("genealogyBook.modernHeaderName", "Name")}
       </div>
@@ -540,11 +540,10 @@ function ModernGenerationRowView({
 }) {
   return (
     <div
-      className="relative flex min-h-0 items-center justify-center border-b px-3 text-[24px] font-black leading-none tracking-normal"
+      className="relative flex min-h-0 items-center justify-center border-b px-3 leading-none tracking-normal"
       style={{
-        borderColor: "var(--df-paper-line)",
-        color: "var(--df-paper-ink)",
-        fontFamily: PAPER_TITLE_FONT_STACK,
+        ...PAPER_TEXT.generationRow,
+        borderColor: PAPER_LINE.soft,
       }}
       data-testid={`paper-modern-generation-${row.depth}`}
       aria-label={row.label}
@@ -553,10 +552,7 @@ function ModernGenerationRowView({
         {getModernGenerationMark(row.depth, t)}
       </span>
       {row.repeated ? (
-        <span
-          className="absolute right-3 text-[11px] font-bold"
-          style={{ color: "var(--df-paper-red)", fontFamily: PAPER_NOTE_FONT_STACK }}
-        >
+        <span className="absolute right-3" style={{ ...PAPER_TEXT.tag }}>
           {t("genealogyBook.repeatedGeneration", "repeated")}
         </span>
       ) : null}
@@ -581,7 +577,7 @@ function ModernPersonRowView({
       className="grid min-h-0 border-b"
       style={{
         ...MODERN_TABLE_COLUMN_STYLE,
-        borderColor: "var(--df-paper-line)",
+        borderColor: PAPER_LINE.soft,
       }}
       data-testid={firstPartTestId}
       data-continued={row.continued ? "true" : "false"}
@@ -589,11 +585,10 @@ function ModernPersonRowView({
       title={row.fullRecord}
     >
       <div
-        className="flex h-full min-h-0 min-w-0 items-center justify-center whitespace-pre-line border-r px-1 text-center text-[14px] font-normal leading-5"
+        className="flex h-full min-h-0 min-w-0 items-center justify-center whitespace-pre-line border-r px-1 text-center leading-5"
         style={{
-          borderColor: "var(--df-paper-line)",
-          color: "var(--df-paper-ink)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
+          ...PAPER_TEXT.relation,
+          borderColor: PAPER_LINE.soft,
         }}
         data-testid={row.partIndex === 1 ? `paper-modern-relation-${row.person.id}` : undefined}
       >
@@ -601,14 +596,13 @@ function ModernPersonRowView({
       </div>
       <div
         className="flex h-full min-h-0 min-w-0 items-center justify-center border-r px-2 text-center"
-        style={{ borderColor: "var(--df-paper-line)" }}
+        style={{ borderColor: PAPER_LINE.soft }}
       >
         {row.name ? (
           <strong
-            className="block max-w-full text-[19px] font-black leading-tight tracking-normal"
+            className="block max-w-full leading-tight tracking-normal"
             style={{
-              color: "var(--df-paper-ink)",
-              fontFamily: PAPER_TITLE_FONT_STACK,
+              ...PAPER_TEXT.name,
               overflowWrap: "anywhere",
             }}
             data-testid={row.partIndex === 1 ? `paper-modern-name-${row.person.id}` : undefined}
@@ -618,10 +612,9 @@ function ModernPersonRowView({
         ) : null}
       </div>
       <p
-        className="m-0 block h-full min-h-0 min-w-0 overflow-hidden px-3 py-1 text-[14px] leading-[1.35]"
+        className="m-0 block h-full min-h-0 min-w-0 overflow-hidden px-3 py-1"
         style={{
-          color: "var(--df-paper-ink)",
-          fontFamily: PAPER_NOTE_FONT_STACK,
+          ...PAPER_TEXT.body,
           overflowWrap: measuredLines ? "normal" : "anywhere",
           // Browser line breaking can be conservative around CJK punctuation and mixed
           // ASCII/digits. When measured lines are available, render those exact lines so a
@@ -656,13 +649,13 @@ function ModernBlankRowView({ row }: { row: Extract<ModernTableRow, { kind: "bla
       className="grid min-h-0 border-b"
       style={{
         ...MODERN_TABLE_COLUMN_STYLE,
-        borderColor: "var(--df-paper-line)",
+        borderColor: PAPER_LINE.soft,
       }}
       data-testid={`paper-modern-blank-${row.key}`}
       aria-hidden="true"
     >
-      <div className="border-r" style={{ borderColor: "var(--df-paper-line)" }} />
-      <div className="border-r" style={{ borderColor: "var(--df-paper-line)" }} />
+      <div className="border-r" style={{ borderColor: PAPER_LINE.soft }} />
+      <div className="border-r" style={{ borderColor: PAPER_LINE.soft }} />
       <div />
     </div>
   );
@@ -763,21 +756,18 @@ export function ModernBookRenderer({
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
-              borderColor: "var(--df-paper-line)",
+              borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-modern-chart"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: "var(--df-paper-line-soft)" }}
+              style={{ borderColor: PAPER_LINE.soft }}
             >
-              <h2
-                className="text-xl font-bold tracking-normal"
-                style={{ fontFamily: PAPER_TITLE_FONT_STACK }}
-              >
+              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
                 {t("genealogyBook.styles.modern", "Modern Ledger")}
               </h2>
-              <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
+              <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t(
                   "genealogyBook.modernTableRule",
                   "Five generations per chart, with facing ledger pages for relation, name, and biography.",
@@ -792,7 +782,7 @@ export function ModernBookRenderer({
                   ref={chart.index === 1 && spread.index === 1 ? spreadRef : undefined}
                   className="mx-auto grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
                   style={{
-                    borderColor: "var(--df-paper-line)",
+                    borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                     gridTemplateColumns: `1fr ${MODERN_SPINE_WIDTH}px 1fr`,
                   }}
