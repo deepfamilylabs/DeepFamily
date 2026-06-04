@@ -4,7 +4,6 @@ import type { TreeGraphData } from "../../../selectors";
 import {
   buildPagodaPaperBook,
   getPagodaGenerationMark,
-  PAGODA_NODE_NAME_FONT_SIZE,
   PAGODA_NODE_NAME_MAX_LENGTH,
   PAGODA_NODE_NAME_Y,
   type PagodaBranchPage,
@@ -14,32 +13,30 @@ import {
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
-  PAPER_NOTE_FONT_STACK,
+  PAPER_LINE,
+  PAPER_MARK_BG,
   PAPER_SHEET_STYLE,
-  PAPER_TITLE_FONT_STACK,
+  PAPER_TEXT,
   PAPER_VARS,
+  paperSvgTextStyle,
 } from "../paperStyles";
 import { clipText, getChildRankWord } from "../paperText";
 
-const PAGODA_INK = "var(--df-paper-ink)";
-const PAGODA_MUTED = "var(--df-paper-muted)";
-const PAGODA_LINE = "var(--df-paper-line)";
-const PAGODA_LINE_SOFT = "var(--df-paper-line-soft)";
-const PAGODA_GENERATION_MARK_BG = "#1f1a14";
-const PAGODA_GENERATION_MARK_FG = "#f7efd8";
-const PAGODA_GENERATION_MARK_OFFSET_RIGHT = 58;
+// Right-hand generation (世次) column, matching the Ou-style generation column exactly: a tinted
+// band (54px) with a left rail and centered black 世 tabs (32x64), divided by horizontal rules.
+const PAGODA_GENERATION_BAND_WIDTH = 54;
 const PAGODA_GENERATION_MARK_OFFSET_Y = -16;
 const PAGODA_GENERATION_SEPARATOR_RATIO = 0.62;
-const PAGODA_GENERATION_MARK_WIDTH = 24;
-const PAGODA_GENERATION_MARK_HEIGHT = 68;
-const PAGODA_NODE_RELATION_FONT_SIZE = 11;
+const PAGODA_GENERATION_MARK_WIDTH = 32;
+const PAGODA_GENERATION_MARK_HEIGHT = 64;
 const PAGODA_NODE_RELATION_GAP = 12;
 const PAGODA_CHILD_STEM_NAME_GAP = 8;
 
+// One continuous horizontal rule per generation boundary, spanning the body and the generation
+// column (like the Ou band border-b), so the 世次 column reads as stacked cells.
 function PagodaGenerationSeparators({ page }: { page: PagodaBranchPage }) {
-  const railX = page.width - PAGODA_GENERATION_MARK_OFFSET_RIGHT;
   const x1 = 48;
-  const x2 = railX - 24;
+  const x2 = page.width;
   const separators = page.guides.slice(1).map((guide, index) => {
     const previous = page.guides[index];
     return {
@@ -57,9 +54,9 @@ function PagodaGenerationSeparators({ page }: { page: PagodaBranchPage }) {
           y1={separator.y}
           x2={x2}
           y2={separator.y}
-          stroke={PAGODA_LINE_SOFT}
-          strokeWidth={0.6}
-          strokeOpacity={0.35}
+          stroke={PAPER_LINE.soft}
+          strokeWidth={1}
+          vectorEffect="non-scaling-stroke"
           data-testid={`paper-pagoda-generation-separator-${separator.depth}`}
         />
       ))}
@@ -67,22 +64,49 @@ function PagodaGenerationSeparators({ page }: { page: PagodaBranchPage }) {
   );
 }
 
+// The tinted background wash for the 世次 column; rendered first so the separators above read as
+// cell dividers across it.
+function PagodaGenerationBand({ page }: { page: PagodaBranchPage }) {
+  const bandLeftX = page.width - PAGODA_GENERATION_BAND_WIDTH;
+  return (
+    <rect
+      x={bandLeftX}
+      y={0}
+      width={PAGODA_GENERATION_BAND_WIDTH}
+      height={page.height}
+      fill={PAPER_LINE.tint}
+      data-testid="paper-pagoda-generation-band-bg"
+    />
+  );
+}
+
 function PagodaGuides({ page, t }: { page: PagodaBranchPage; t: TranslateFn }) {
-  const railX = page.width - PAGODA_GENERATION_MARK_OFFSET_RIGHT;
-  const textX = railX + 12;
+  const bandLeftX = page.width - PAGODA_GENERATION_BAND_WIDTH;
+  const markX = bandLeftX + (PAGODA_GENERATION_BAND_WIDTH - PAGODA_GENERATION_MARK_WIDTH) / 2;
+  const textX = markX + PAGODA_GENERATION_MARK_WIDTH / 2;
 
   return (
     <g pointerEvents="none">
+      <line
+        x1={bandLeftX}
+        y1={0}
+        x2={bandLeftX}
+        y2={page.height}
+        stroke={PAPER_LINE.soft}
+        strokeWidth={1}
+        vectorEffect="non-scaling-stroke"
+        data-testid="paper-pagoda-generation-rail"
+      />
       {page.guides.map((guide) => {
         const markY = guide.y + PAGODA_GENERATION_MARK_OFFSET_Y;
         return (
           <g key={guide.depth} data-testid={`paper-pagoda-generation-${guide.depth}`}>
             <rect
-              x={railX}
+              x={markX}
               y={markY}
               width={PAGODA_GENERATION_MARK_WIDTH}
               height={PAGODA_GENERATION_MARK_HEIGHT}
-              fill={PAGODA_GENERATION_MARK_BG}
+              fill={PAPER_MARK_BG}
               data-testid={`paper-pagoda-generation-mark-bg-${guide.depth}`}
             />
             <text
@@ -90,10 +114,7 @@ function PagodaGuides({ page, t }: { page: PagodaBranchPage; t: TranslateFn }) {
               y={markY + 11}
               textAnchor="start"
               style={{
-                fill: PAGODA_GENERATION_MARK_FG,
-                fontFamily: PAPER_TITLE_FONT_STACK,
-                fontSize: 15,
-                fontWeight: 700,
+                ...paperSvgTextStyle("generationMark"),
                 writingMode: "vertical-rl",
                 textOrientation: "mixed",
               }}
@@ -103,14 +124,11 @@ function PagodaGuides({ page, t }: { page: PagodaBranchPage; t: TranslateFn }) {
             </text>
             {guide.repeated ? (
               <text
-                x={railX - 10}
-                y={markY + 11}
+                x={textX}
+                y={markY + PAGODA_GENERATION_MARK_HEIGHT + 4}
                 textAnchor="start"
                 style={{
-                  fill: "var(--df-paper-red)",
-                  fontFamily: PAPER_NOTE_FONT_STACK,
-                  fontSize: 11,
-                  fontWeight: 700,
+                  ...paperSvgTextStyle("tag"),
                   writingMode: "vertical-rl",
                   textOrientation: "mixed",
                 }}
@@ -141,7 +159,7 @@ function PagodaConnectorLines({
     <g
       data-testid={`paper-pagoda-connector-${connector.parentId}`}
       fill="none"
-      stroke={PAGODA_LINE}
+      stroke={PAPER_LINE.strong}
       strokeWidth={1.1}
       strokeLinecap="square"
     >
@@ -195,10 +213,7 @@ function PagodaPersonNode({ node }: { node: PagodaNode }) {
         y={PAGODA_NODE_NAME_Y}
         textAnchor="start"
         style={{
-          fill: PAGODA_INK,
-          fontFamily: PAPER_TITLE_FONT_STACK,
-          fontSize: PAGODA_NODE_NAME_FONT_SIZE,
-          fontWeight: 700,
+          ...paperSvgTextStyle("name"),
           letterSpacing: 0,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
@@ -246,10 +261,7 @@ function PagodaRelationLabels({
                 y={0}
                 textAnchor="start"
                 style={{
-                  fill: PAGODA_MUTED,
-                  fontFamily: PAPER_NOTE_FONT_STACK,
-                  fontSize: PAGODA_NODE_RELATION_FONT_SIZE,
-                  fontWeight: 400,
+                  ...paperSvgTextStyle("relation"),
                   writingMode: "vertical-rl",
                   textOrientation: "mixed",
                 }}
@@ -279,6 +291,7 @@ function PagodaPageSvg({ page, t }: { page: PagodaBranchPage; t: TranslateFn }) 
       role="img"
       aria-label={page.title}
     >
+      <PagodaGenerationBand page={page} />
       <PagodaGenerationSeparators page={page} />
       <PagodaGuides page={page} t={t} />
       <g>
@@ -336,21 +349,18 @@ export function PagodaBookRenderer({
             className="border p-3 shadow-sm md:p-5"
             style={{
               ...PAPER_SHEET_STYLE,
-              borderColor: "var(--df-paper-line)",
+              borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-pagoda-chart-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: "var(--df-paper-line-soft)" }}
+              style={{ borderColor: PAPER_LINE.soft }}
             >
-              <h2
-                className="text-xl font-bold tracking-normal"
-                style={{ fontFamily: PAPER_TITLE_FONT_STACK }}
-              >
+              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
                 {t("genealogyBook.styles.pagoda", "Pagoda")}
               </h2>
-              <span className="text-sm font-bold" style={{ color: "var(--df-paper-red)" }}>
+              <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t(
                   "genealogyBook.pagodaTableRule",
                   "Five generations per chart, ancestor above, branches descend by level.",
@@ -364,7 +374,7 @@ export function PagodaBookRenderer({
                   key={`${page.chartIndex}-${page.index}`}
                   className="h-[872px] min-w-[1180px] shrink-0 border"
                   style={{
-                    borderColor: "var(--df-paper-line)",
+                    borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-pagoda-frame-${page.chartIndex}-${page.index}`}
