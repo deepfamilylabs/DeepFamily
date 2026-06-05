@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ColorThemeProvider,
@@ -92,6 +93,7 @@ function TreeInteractionBridge({ children }: { children: ReactNode }) {
 export default function TreePage() {
   const { viewMode, setViewMode } = usePersistedViewMode();
 
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { rootId, rootExists, nodesData } = useTreeGraphData();
   const { getOwnerOf } = useTreeNodeAccess();
@@ -332,6 +334,24 @@ export default function TreePage() {
                         dag: t("familyTree.viewModes.dag"),
                         force: t("familyTree.viewModes.force"),
                         virtual: t("familyTree.viewModes.virtual"),
+                      }}
+                      extraAction={{
+                        label: t("navigation.genealogyBook", "Paper Genealogy"),
+                        icon: (
+                          <svg
+                            className="w-3.5 h-3.5 flex-shrink-0"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z" />
+                            <path d="M20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z" />
+                          </svg>
+                        ),
+                        onClick: () => navigate("/genealogyBook"),
                       }}
                     />
                   </div>
