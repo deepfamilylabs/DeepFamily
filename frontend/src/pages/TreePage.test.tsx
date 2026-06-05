@@ -43,6 +43,21 @@ const mocks = vi.hoisted(() => ({
     isTreeDebugEnabled: vi.fn(() => false),
     shouldPreferFlatTree: vi.fn(() => false),
   },
+  wallet: {
+    address: null as string | null,
+    signer: null as any,
+  },
+  readonlyProvider: {},
+  readerContract: {
+    listTrustedEndorsers: vi.fn(),
+  },
+  writeContract: {
+    addTrustedEndorser: vi.fn(),
+    removeTrustedEndorser: vi.fn(),
+  },
+  getReadonlyProvider: vi.fn(),
+  createDeepFamilyReaderContract: vi.fn(),
+  createDeepFamilyContract: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -94,6 +109,19 @@ vi.mock("../domains/config", () => ({
   useConfig: () => mocks.config,
 }));
 
+vi.mock("../domains/wallet", () => ({
+  useWallet: () => mocks.wallet,
+}));
+
+vi.mock("../shared/clients/providerRegistry", () => ({
+  getReadonlyProvider: (...args: any[]) => mocks.getReadonlyProvider(...args),
+}));
+
+vi.mock("../shared/clients/contractFactory", () => ({
+  createDeepFamilyReaderContract: (...args: any[]) => mocks.createDeepFamilyReaderContract(...args),
+  createDeepFamilyContract: (...args: any[]) => mocks.createDeepFamilyContract(...args),
+}));
+
 vi.mock("../shared/config/env", () => ({
   isForceEnvConfigSyncEnabled: mocks.env.isForceEnvConfigSyncEnabled,
   isTreeDebugEnabled: mocks.env.isTreeDebugEnabled,
@@ -136,6 +164,17 @@ describe("TreePage", () => {
     mocks.env.isTreeDebugEnabled.mockReturnValue(false);
     mocks.env.shouldPreferFlatTree.mockReset();
     mocks.env.shouldPreferFlatTree.mockReturnValue(false);
+    mocks.wallet.address = null;
+    mocks.wallet.signer = null;
+    mocks.readerContract.listTrustedEndorsers.mockReset();
+    mocks.writeContract.addTrustedEndorser.mockReset();
+    mocks.writeContract.removeTrustedEndorser.mockReset();
+    mocks.getReadonlyProvider.mockReset();
+    mocks.getReadonlyProvider.mockReturnValue(mocks.readonlyProvider);
+    mocks.createDeepFamilyReaderContract.mockReset();
+    mocks.createDeepFamilyReaderContract.mockReturnValue(mocks.readerContract);
+    mocks.createDeepFamilyContract.mockReset();
+    mocks.createDeepFamilyContract.mockReturnValue(mocks.writeContract);
     vi.unstubAllEnvs();
   });
 

@@ -2,7 +2,16 @@ import { useCallback } from "react";
 import type React from "react";
 import { deleteBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
-import { csKey, cuKey, nftKey, storyKey, tvKey, vdKey } from "../../../shared/cache/queryKeys";
+import {
+  csKey,
+  cuKey,
+  nftKey,
+  parseVdKey,
+  storyKey,
+  trustedEndorsementVisibilityPrefix,
+  tvKey,
+  vdKey,
+} from "../../../shared/cache/queryKeys";
 import {
   applyNodeDetailNftDetails,
   applyNodeDetailVersionDetails,
@@ -62,6 +71,11 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       options.queryCacheRef.current.clear("tv:");
       options.queryCacheRef.current.clear("cs:");
       options.queryCacheRef.current.clear("cu:");
+      // Trusted-source list (`te:`) and per-version visibility (`tev:`) caches gate
+      // which nodes the tree filter shows. They are tied to the current trusted-source
+      // set, so a full tree-cache clear must drop them too (e.g. after editing sources).
+      options.queryCacheRef.current.clear("te:");
+      options.queryCacheRef.current.clear("tev:");
 
       if (!includeNodeDetailKeys) return;
       const seenVersionKeys = new Set<string>();
@@ -207,6 +221,14 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       }
       for (const key of invalidation.versionDetailKeys) {
         options.queryCacheRef.current.clear(key);
+        // An endorsement/withdrawal flips this version's trusted visibility, so drop the
+        // cached `tev:` results for every trusted-source set keyed on this person+version.
+        const parsed = parseVdKey(key);
+        if (parsed) {
+          options.queryCacheRef.current.clear(
+            trustedEndorsementVisibilityPrefix(parsed.hashLower, parsed.versionIndex),
+          );
+        }
       }
       for (const key of invalidation.nftKeys) {
         options.queryCacheRef.current.clear(key);

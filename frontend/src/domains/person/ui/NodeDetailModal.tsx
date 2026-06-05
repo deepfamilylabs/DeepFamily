@@ -9,6 +9,8 @@ import {
   NodeDetailHeaderActions,
   NodeDetailHashRows,
   NodeDetailNftSection,
+  NodeDetailTrustedEndorsersSection,
+  type TrustedEndorserAccess,
 } from "./NodeDetailModalSections";
 
 interface NodeDetailModalProps {
@@ -19,6 +21,7 @@ interface NodeDetailModalProps {
   loading?: boolean;
   error?: string | null;
   getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
+  trustedEndorserAccess?: TrustedEndorserAccess;
 }
 
 export default function NodeDetailModal({
@@ -29,6 +32,7 @@ export default function NodeDetailModal({
   loading,
   error,
   getOwnerOf,
+  trustedEndorserAccess,
 }: NodeDetailModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -201,6 +205,12 @@ export default function NodeDetailModal({
             fallback={fallback}
             onCopy={onCopy}
             onDecryptCid={(cid) => navigate(`/decrypt?cid=${encodeURIComponent(cid)}`)}
+          />
+          <NodeDetailTrustedEndorsersSection
+            t={t}
+            nodeData={nodeData}
+            access={trustedEndorserAccess}
+            onCopy={onCopy}
           />
           <NodeDetailNftSection t={t} nodeData={nodeData} owner={owner} onCopy={onCopy} />
         </div>

@@ -19,6 +19,13 @@ export type TreeWalkParams = {
   nodesData: Record<string, NodeData>;
   edgesUnion: EdgeStoreUnion;
   edgesStrict: EdgeStoreStrict;
+  /**
+   * Optional whitelist of node ids the projection may render. When provided (e.g. while a
+   * trusted-source filter is active), nodes outside the set are skipped even if the shared
+   * edge stores still reference them, so hidden versions never leak into the view. When
+   * omitted, every edge-reachable node is rendered (default, filter-off behavior).
+   */
+  visibleNodeIds?: ReadonlySet<NodeId> | null;
 };
 
 function chooseBestVersion(
@@ -144,6 +151,7 @@ function walkTree(params: TreeWalkParams): TreeGraphData {
     nodesData,
     edgesUnion,
     edgesStrict,
+    visibleNodeIds,
   } = params;
 
   if (!rootId) return { nodes: [], edges: [], childrenByParent: {} };
@@ -157,6 +165,9 @@ function walkTree(params: TreeWalkParams): TreeGraphData {
   while (stack.length) {
     const current = stack.pop();
     if (!current || visited.has(current.id)) continue;
+    // Guards the root; children are pre-filtered below so neither hidden nodes nor the
+    // edges pointing at them are emitted while a trusted-source filter is active.
+    if (visibleNodeIds && !visibleNodeIds.has(current.id)) continue;
 
     visited.add(current.id);
     const parsed = parseNodeId(current.id);
@@ -181,10 +192,13 @@ function walkTree(params: TreeWalkParams): TreeGraphData {
       edgesUnion,
       edgesStrict,
     });
+    const visibleChildren = visibleNodeIds
+      ? children.filter((id) => visibleNodeIds.has(id))
+      : children;
 
-    if (children.length) childrenByParent[current.id] = children;
-    for (let i = children.length - 1; i >= 0; i--) {
-      stack.push({ id: children[i], depth: current.depth + 1, parentId: current.id });
+    if (visibleChildren.length) childrenByParent[current.id] = visibleChildren;
+    for (let i = visibleChildren.length - 1; i >= 0; i--) {
+      stack.push({ id: visibleChildren[i], depth: current.depth + 1, parentId: current.id });
     }
   }
 

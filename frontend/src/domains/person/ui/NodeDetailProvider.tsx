@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import NodeDetailModal from "./NodeDetailModal";
+import type { TrustedEndorserAccess } from "./NodeDetailModalSections";
 import {
   resolveNodeDetailTokenId,
   resolveSelectedNodeData,
@@ -28,6 +29,7 @@ export interface NodeDetailProviderProps {
   children: React.ReactNode;
   nodesData: Record<string, NodeData>;
   getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
+  trustedEndorserAccess?: TrustedEndorserAccess;
   mergeNodeDetail: (
     selected: NodeKeyMinimal,
     details: {
@@ -42,6 +44,7 @@ export function NodeDetailProvider({
   children,
   nodesData,
   getOwnerOf,
+  trustedEndorserAccess,
   mergeNodeDetail,
 }: NodeDetailProviderProps) {
   const [selected, setSelected] = useState<NodeKeyMinimal | null>(null);
@@ -97,6 +100,7 @@ export function NodeDetailProvider({
         loading={loading}
         error={error}
         getOwnerOf={getOwnerOf}
+        trustedEndorserAccess={trustedEndorserAccess}
       />
     </NodeDetailProviderContext.Provider>
   );

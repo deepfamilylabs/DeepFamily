@@ -35,10 +35,22 @@ export type FamilyTreeViewModel = {
 };
 
 export function useFamilyTreeViewModel(): FamilyTreeViewModel {
-  const { rootId, reachableNodeIds, endorsementsReady, nodesData, edgesUnion, edgesStrict } =
-    useTreeGraphData();
+  const {
+    rootId,
+    reachableNodeIds,
+    endorsementsReady,
+    trustedFilterActive,
+    nodesData,
+    edgesUnion,
+    edgesStrict,
+  } = useTreeGraphData();
   const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions();
   const { openNode, selectedNode, openEndorse, copyHash } = useTreeInteraction();
+
+  const visibleNodeIds = useMemo(
+    () => (trustedFilterActive ? new Set(reachableNodeIds) : null),
+    [trustedFilterActive, reachableNodeIds],
+  );
 
   const selectedId = useMemo(() => {
     if (!selectedNode) return null;
@@ -63,6 +75,7 @@ export function useFamilyTreeViewModel(): FamilyTreeViewModel {
       nodesData,
       edgesUnion,
       edgesStrict,
+      visibleNodeIds,
     });
   }, [
     rootId,
@@ -73,6 +86,7 @@ export function useFamilyTreeViewModel(): FamilyTreeViewModel {
     nodesData,
     edgesUnion,
     edgesStrict,
+    visibleNodeIds,
   ]);
 
   const nodeUiById = useMemo(() => {

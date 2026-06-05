@@ -196,6 +196,10 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x51d2baff": "InvalidAttestationRevocation",
   "0x7137314d": "DuplicateAttestationReference",
   "0x2872d6ce": "DuplicateVersion",
+  "0x349cbe19": "InvalidTrustedEndorser",
+  "0x25f05b56": "TrustedEndorserAlreadyAdded",
+  "0x6580f338": "TrustedEndorserNotFound",
+  "0x36e7a56e": "MustBeVersionContributor",
   "0xf0d7613e": "MustEndorseVersionFirst",
   "0x8051cbca": "VersionAlreadyMinted",
   "0xbce3d23c": "BasicInfoMismatch",
@@ -285,6 +289,10 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   InvalidAttestationRevocation: "Attestation revocation reference is invalid.",
   DuplicateAttestationReference: "This attestation reference is already anchored.",
   DuplicateVersion: "This version already exists on-chain.",
+  InvalidTrustedEndorser: "Recommended source account is invalid.",
+  TrustedEndorserAlreadyAdded: "Recommended source account has already been added.",
+  TrustedEndorserNotFound: "Recommended source account is not in this version list.",
+  MustBeVersionContributor: "Only the version contributor can manage recommended sources.",
   MustEndorseVersionFirst: "You must endorse a version before this action.",
   VersionAlreadyMinted: "Version has already been minted.",
   BasicInfoMismatch: "Basic information does not match stored version.",
@@ -558,10 +566,7 @@ export const resolveErrorReason = (error: any): string | undefined => {
     return "ERC721NonexistentToken";
   }
 
-  if (
-    codeReason === "WALLET_REQUEST_PENDING" ||
-    /request (?:is )?already pending/i.test(msg)
-  ) {
+  if (codeReason === "WALLET_REQUEST_PENDING" || /request (?:is )?already pending/i.test(msg)) {
     return "WALLET_REQUEST_PENDING";
   }
 

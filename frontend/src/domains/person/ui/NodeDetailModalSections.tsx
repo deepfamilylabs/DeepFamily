@@ -1,6 +1,6 @@
-import type React from "react";
+import React from "react";
 import type { TFunction } from "i18next";
-import { Edit2, Image, Star, BookOpen } from "lucide-react";
+import { BookOpen, Edit2, Image, Plus, ShieldCheck, Star, Trash2 } from "lucide-react";
 import { ethers } from "ethers";
 import { CopyIconButton } from "../../../shared/ui";
 import {
@@ -14,6 +14,17 @@ import {
 
 type NodeDetailT = TFunction;
 type NodeDetailRowColor = "purple" | "emerald" | "blue" | "amber" | "pink" | "slate";
+
+export interface TrustedEndorserAccess {
+  connectedAddress?: string | null;
+  loadTrustedEndorsers: (personHash: string, versionIndex: number) => Promise<string[]>;
+  addTrustedEndorser: (personHash: string, versionIndex: number, account: string) => Promise<void>;
+  removeTrustedEndorser: (
+    personHash: string,
+    versionIndex: number,
+    account: string,
+  ) => Promise<void>;
+}
 
 function SmartHash({ text }: { text?: string | null }) {
   if (!text || text === ethers.ZeroHash) return <span>-</span>;
@@ -309,6 +320,164 @@ export function NodeDetailHashRows({
         onCopy={onCopy}
       />
     </>
+  );
+}
+
+export function NodeDetailTrustedEndorsersSection({
+  t,
+  nodeData,
+  access,
+  onCopy,
+}: {
+  t: NodeDetailT;
+  nodeData?: NodeData | null;
+  access?: TrustedEndorserAccess;
+  onCopy: (text: string) => void;
+}) {
+  const [accounts, setAccounts] = React.useState<string[]>([]);
+  const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [pending, setPending] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const personHash = nodeData?.personHash;
+  const versionIndex = Number(nodeData?.versionIndex || 0);
+  const connected = access?.connectedAddress?.toLowerCase();
+  const addedBy = nodeData?.addedBy?.toLowerCase();
+  const canEdit = Boolean(access && connected && addedBy && connected === addedBy);
+
+  const reload = React.useCallback(async () => {
+    if (!access || !personHash || !versionIndex) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setAccounts(await access.loadTrustedEndorsers(personHash, versionIndex));
+    } catch {
+      setError(t("familyTree.nodeDetail.trustedLoadFailed", "Failed to load recommended sources."));
+    } finally {
+      setLoading(false);
+    }
+  }, [access, personHash, t, versionIndex]);
+
+  React.useEffect(() => {
+    setAccounts([]);
+    setInput("");
+    setError(null);
+    void reload();
+  }, [reload]);
+
+  if (!access || !personHash || !versionIndex) return null;
+
+  const copyLabel = t("search.copy", "Copy");
+  const normalizedInput = input.trim();
+  const addAccount = async () => {
+    if (!canEdit) return;
+    if (!ethers.isAddress(normalizedInput)) {
+      setError(t("familyTree.nodeDetail.invalidTrustedAddress", "Enter a valid account address."));
+      return;
+    }
+    setPending("add");
+    setError(null);
+    try {
+      await access.addTrustedEndorser(personHash, versionIndex, ethers.getAddress(normalizedInput));
+      setInput("");
+      await reload();
+    } catch {
+      setError(
+        t("familyTree.nodeDetail.trustedUpdateFailed", "Failed to update recommended sources."),
+      );
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const removeAccount = async (account: string) => {
+    if (!canEdit) return;
+    setPending(account.toLowerCase());
+    setError(null);
+    try {
+      await access.removeTrustedEndorser(personHash, versionIndex, account);
+      await reload();
+    } catch {
+      setError(
+        t("familyTree.nodeDetail.trustedUpdateFailed", "Failed to update recommended sources."),
+      );
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div className="pt-4 space-y-2.5">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 px-1">
+        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        {t("familyTree.nodeDetail.trustedEndorsers", "Recommended Sources")}
+      </h3>
+      {loading ? (
+        <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
+          {t("familyTree.nodeDetail.trustedLoading", "Loading recommended sources...")}
+        </div>
+      ) : accounts.length === 0 ? (
+        <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
+          {t("familyTree.nodeDetail.trustedEmpty", "No recommended sources. Filtering is off.")}
+        </div>
+      ) : (
+        accounts.map((account) => (
+          <NodeDetailRow
+            key={account.toLowerCase()}
+            label={t("familyTree.nodeDetail.trustedAccount", "Recommended Account")}
+            value={
+              <div className="flex items-center gap-2">
+                <SmartAddress text={account} />
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => void removeAccount(account)}
+                    disabled={pending === account.toLowerCase()}
+                    className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-white hover:bg-red-500 hover:border-red-500 disabled:opacity-50"
+                    aria-label={t(
+                      "familyTree.nodeDetail.removeTrusted",
+                      "Remove recommended source",
+                    )}
+                    title={t("familyTree.nodeDetail.removeTrusted", "Remove recommended source")}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
+            }
+            copy={account}
+            color="emerald"
+            copyLabel={copyLabel}
+            onCopy={onCopy}
+          />
+        ))
+      )}
+      {canEdit ? (
+        <div className="flex items-center gap-2 px-1">
+          <input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder={t("familyTree.nodeDetail.trustedAddressPlaceholder", "0x account")}
+            aria-label={t(
+              "familyTree.nodeDetail.trustedAddressLabel",
+              "Recommended account address",
+            )}
+            className="min-w-0 flex-1 h-9 px-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 font-mono"
+          />
+          <button
+            type="button"
+            onClick={() => void addAccount()}
+            disabled={pending === "add"}
+            className="inline-flex h-9 items-center gap-1.5 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            {t("familyTree.nodeDetail.addTrusted", "Add")}
+          </button>
+        </div>
+      ) : null}
+      {error ? <div className="text-xs text-red-500 dark:text-red-400 px-1">{error}</div> : null}
+    </div>
   );
 }
 

@@ -36,6 +36,7 @@ export default function TreeListRowRenderer(
   const { nodeId, depth, isLast, hasChildren } = row;
   const isOpen = expanded.has(nodeId);
   const ui = nodeUiById[nodeId];
+  if (!ui) return null;
   const endorse = ui.endorsementCount;
   const mintedFlag = ui.minted;
   const gender = ui.gender as number | undefined;

@@ -94,6 +94,7 @@ export function DagNodes(props: {
         const p = positions[n.id];
         const w = measuredWidths[n.id] || nodeWidth;
         const ui = nodeUiById[n.id];
+        if (!ui || !p) return null;
         const isSelected = ctxSelectedId === n.id;
         const totalVersions = deduplicateChildren ? ui.totalVersions : undefined;
         return (

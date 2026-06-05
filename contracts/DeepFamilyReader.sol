@@ -259,11 +259,53 @@ contract DeepFamilyReader {
     );
   }
 
+  function listTrustedEndorsers(
+    bytes32 personHash,
+    uint256 versionIndex,
+    uint256 offset,
+    uint256 limit
+  )
+    external
+    view
+    returns (address[] memory accounts, uint256 totalCount, bool hasMore, uint256 nextOffset)
+  {
+    _validateVersion(personHash, versionIndex);
+    totalCount = DEEP_FAMILY.trustedEndorsersCount(personHash, versionIndex);
+    PaginationResult memory page = _getPaginationParams(totalCount, offset, limit);
+    if (page.resultLength == 0) {
+      return (new address[](0), totalCount, page.hasMore, page.nextOffset);
+    }
+
+    accounts = new address[](page.resultLength);
+    for (uint256 i = 0; i < page.resultLength; i++) {
+      accounts[i] = DEEP_FAMILY.trustedEndorserAt(personHash, versionIndex, page.startIndex + i);
+    }
+    return (accounts, totalCount, page.hasMore, page.nextOffset);
+  }
+
+  function isVersionEndorsedByAny(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address[] calldata accounts
+  ) external view returns (bool) {
+    _validateVersion(personHash, versionIndex);
+    for (uint256 i = 0; i < accounts.length; i++) {
+      if (DEEP_FAMILY.endorsedVersionIndex(personHash, accounts[i]) == versionIndex) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function listTokenURIHistory(
     uint256 tokenId,
     uint256 offset,
     uint256 limit
-  ) external view returns (string[] memory uris, uint256 totalCount, bool hasMore, uint256 nextOffset) {
+  )
+    external
+    view
+    returns (string[] memory uris, uint256 totalCount, bool hasMore, uint256 nextOffset)
+  {
     _requireOwned(tokenId);
     totalCount = DEEP_FAMILY.tokenURIHistoryCount(tokenId);
     PaginationResult memory page = _getPaginationParams(totalCount, offset, limit);

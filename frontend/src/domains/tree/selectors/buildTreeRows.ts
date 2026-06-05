@@ -92,6 +92,10 @@ export function buildTreeRowsFromGraph(params: {
   const { rootId, expanded, graph } = params;
   const rows: TreeRow[] = [];
   const seen = new Set<NodeId>();
+  // Only emit rows for nodes the projection actually produced. When a trusted-source filter
+  // hides the root (or the graph is empty mid-build), `graph.nodes` is empty and we must not
+  // invent a root row — its id would be missing from `nodeUiById` and crash the row renderer.
+  const presentIds = new Set<NodeId>(graph.nodes.map((n) => n.id as NodeId));
   const stack: Array<{ id: NodeId; depth: number; isLast: boolean }> = [
     { id: rootId, depth: 0, isLast: true },
   ];
@@ -99,6 +103,7 @@ export function buildTreeRowsFromGraph(params: {
   while (stack.length) {
     const current = stack.pop();
     if (!current || seen.has(current.id)) continue;
+    if (!presentIds.has(current.id)) continue;
     seen.add(current.id);
     const children = graph.childrenByParent[current.id] || [];
     rows.push({

@@ -73,6 +73,41 @@ function NodeDetailHarness({ onClose }: { onClose: () => void }) {
   );
 }
 
+function TrustedDetailHarness({
+  connectedAddress,
+  addedBy,
+  trustedAccounts,
+}: {
+  connectedAddress: string;
+  addedBy: string;
+  trustedAccounts: string[];
+}) {
+  const access = React.useMemo(
+    () => ({
+      connectedAddress,
+      loadTrustedEndorsers: vi.fn(async () => trustedAccounts),
+      addTrustedEndorser: vi.fn(async () => undefined),
+      removeTrustedEndorser: vi.fn(async () => undefined),
+    }),
+    [connectedAddress, trustedAccounts],
+  );
+
+  return (
+    <ToastProvider>
+      <MemoryRouter>
+        <NodeDetailModal
+          open
+          onClose={vi.fn()}
+          nodeData={makePerson({ addedBy })}
+          fallback={{ hash: personHash, versionIndex: 1 }}
+          getOwnerOf={mocks.getOwnerOf}
+          trustedEndorserAccess={access}
+        />
+      </MemoryRouter>
+    </ToastProvider>
+  );
+}
+
 describe("person detail modals a11y", () => {
   beforeEach(() => {
     mocks.getOwnerOf.mockResolvedValue(undefined);
@@ -121,5 +156,35 @@ describe("person detail modals a11y", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(personHash));
     expect(screen.getByRole("status").textContent).toContain("search.copied");
+  });
+
+  it("shows trusted source management only to the version contributor", async () => {
+    const contributor = "0x00000000000000000000000000000000000000aa";
+    const source = "0x00000000000000000000000000000000000000bb";
+    const { rerender } = render(
+      <TrustedDetailHarness
+        connectedAddress={contributor}
+        addedBy={contributor}
+        trustedAccounts={[source]}
+      />,
+    );
+
+    await screen.findByText(source);
+    expect(screen.getByRole("textbox", { name: "Recommended account address" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove recommended source" })).toBeTruthy();
+
+    rerender(
+      <TrustedDetailHarness
+        connectedAddress="0x00000000000000000000000000000000000000cc"
+        addedBy={contributor}
+        trustedAccounts={[source]}
+      />,
+    );
+
+    await screen.findByText(source);
+    expect(screen.queryByRole("textbox", { name: "Recommended account address" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove recommended source" })).toBeNull();
   });
 });

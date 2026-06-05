@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildTreeRows } from "./buildTreeRows";
-import { getProjectedChildIds } from "./buildViewGraph";
+import { buildTreeRows, buildTreeRowsFromGraph } from "./buildTreeRows";
+import { getProjectedChildIds, type TreeGraphData } from "./buildViewGraph";
 import { makeNodeId, type NodeData, type NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { unionParentKey } from "../model/treeStore";
@@ -225,5 +225,31 @@ describe("treeData buildTreeRows", () => {
     expect(rows.map((r) => r.nodeId)).toEqual([rootId, child1, child2]);
     expect(rows[0].hasChildren).toBe(true);
     expect(rows[1].hasChildren).toBe(false);
+  });
+});
+
+describe("treeData buildTreeRowsFromGraph", () => {
+  const rootId = makeNodeId(parentHash, 1);
+  const childId = makeNodeId(childHash, 1);
+
+  it("emits a row for every node present in the projected graph", () => {
+    const graph: TreeGraphData = {
+      nodes: [
+        { id: rootId, depth: 0, personHash: parentHash, versionIndex: 1 },
+        { id: childId, depth: 1, personHash: childHash, versionIndex: 1 },
+      ],
+      edges: [{ from: rootId, to: childId }],
+      childrenByParent: { [rootId]: [childId] },
+    };
+    const rows = buildTreeRowsFromGraph({ rootId, expanded: new Set([rootId]), graph });
+    expect(rows.map((r) => r.nodeId)).toEqual([rootId, childId]);
+  });
+
+  it("does not invent a root row when the projected graph is empty", () => {
+    // A trusted-source filter can hide the root (or the graph is empty mid-build); the row
+    // builder must not emit a root row whose id is absent from nodeUiById and crashes the renderer.
+    const emptyGraph: TreeGraphData = { nodes: [], edges: [], childrenByParent: {} };
+    const rows = buildTreeRowsFromGraph({ rootId, expanded: new Set([rootId]), graph: emptyGraph });
+    expect(rows).toEqual([]);
   });
 });

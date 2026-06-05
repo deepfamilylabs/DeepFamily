@@ -498,7 +498,8 @@
         "ok": "OK"
       },
       "networkError": "Network request failed",
-      "rateLimited": "RPC rate limit exceeded. Please try again later."
+      "rateLimited": "RPC rate limit exceeded. Please try again later.",
+      "rootNotTrustedEndorsed": "The current root version is not endorsed by any recommended source."
     },
     "actions": {
       "refresh": "Refresh",
@@ -531,6 +532,17 @@
       "uri": "URI",
       "loading": "Loading NFT info…",
       "decrypt": "Decrypt and View",
+      "trustedEndorsers": "Recommended Sources",
+      "trustedAccount": "Recommended Account",
+      "trustedLoading": "Loading recommended sources...",
+      "trustedEmpty": "No recommended sources. Filtering is off.",
+      "trustedLoadFailed": "Failed to load recommended sources.",
+      "trustedUpdateFailed": "Failed to update recommended sources.",
+      "trustedAddressPlaceholder": "0x account",
+      "trustedAddressLabel": "Recommended account address",
+      "invalidTrustedAddress": "Enter a valid account address.",
+      "addTrusted": "Add",
+      "removeTrusted": "Remove recommended source",
       "genders": {
         "male": "Male",
         "female": "Female",
@@ -1219,6 +1231,10 @@
       "MalformedProofData": "Proof data is malformed.",
       "UnsupportedPurpose": "Proof purpose is not supported by the verifier.",
       "DuplicateVersion": "This person version already exists.",
+      "InvalidTrustedEndorser": "Recommended source account is invalid.",
+      "TrustedEndorserAlreadyAdded": "Recommended source account has already been added.",
+      "TrustedEndorserNotFound": "Recommended source account is not in this version list.",
+      "MustBeVersionContributor": "Only the version contributor can manage recommended sources.",
       "MustEndorseVersionFirst": "Please endorse a version first before this action.",
       "VersionAlreadyMinted": "This version has already been minted.",
       "BasicInfoMismatch": "Basic information does not match stored version.",

@@ -11,10 +11,10 @@ import {
   isVersionDetailsFresh,
   type NodeData,
   type NodeId,
+  parseNodeId,
   planNodeEnrichmentSlice,
 } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
-import { addPlaceholderNodes, mergeReachableNodeIds } from "../services/treeEdgeState";
 import { buildTreeFetchRunKey } from "../services/treeTraversalState";
 import {
   applyTreeBuildNodeSnapshots,
@@ -79,6 +79,7 @@ export interface TreeGraphStateResult {
   contractMessage: string;
   setContractMessage: React.Dispatch<React.SetStateAction<string>>;
   endorsementsReady: boolean;
+  trustedFilterActive: boolean;
   debugStatsRef: React.MutableRefObject<TreeDebugStats>;
   getDebugStats: () => TreeDebugStats;
 }
@@ -116,6 +117,10 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
   const [progress, setProgress] = useState<TreeProgress | undefined>(undefined);
   const [contractMessage, setContractMessage] = useState("");
   const [endorsementsReady, setEndorsementsReady] = useState(false);
+  // True when the root version exposes trusted endorsers, so the build session filters
+  // out versions not endorsed by a trusted source. The view layer reads this to restrict
+  // projection to the reachable (visible) set instead of the raw, unfiltered edge stores.
+  const [trustedFilterActive, setTrustedFilterActive] = useState(false);
 
   const fetchRunKeyRef = useRef<string | null>(null);
   const edgeRevalidateRef = useRef(new Set<string>());
@@ -320,15 +325,55 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
             stageLoggedRef.current.add("root_check");
             options.push(startup.error as any, { stage: "root_check" });
           }
+          setTrustedFilterActive(false);
         }
         setLoading(false);
         return;
       }
 
-      setRootExists(true);
+      // Mount the tree view as soon as the root is confirmed to exist — before the trusted-source
+      // lookup — so the build session's incremental commits stream in node-by-node again instead
+      // of the whole tree only appearing after every node has loaded. A trusted filter that hides
+      // the root revokes this below via setRootExists(false).
+      if (!cancelled) setRootExists(true);
 
       const runtimeCfg = getRuntimeFamilyTreeConfig();
       const hardNodeLimit = runtimeCfg.DEFAULT_HARD_NODE_LIMIT;
+      const trustedSourceAccounts = await options.api.listTrustedEndorsersAll(
+        String(options.rootHash || ""),
+        Number(options.rootVersionIndex),
+        { pageLimit: options.childrenPageLimit, checkAbort, ttlMs: options.edgeTtlMs },
+      );
+      const hasTrustedFilter = trustedSourceAccounts.length > 0;
+      if (!cancelled) setTrustedFilterActive(hasTrustedFilter);
+      const isNodeVisible = hasTrustedFilter
+        ? async (nodeId: NodeId) => {
+            const parsed = parseNodeId(nodeId);
+            return options.api.isVersionEndorsedByAny(
+              parsed.personHash,
+              parsed.versionIndex,
+              trustedSourceAccounts,
+              { ttlMs: options.versionDetailsTtlMs },
+            );
+          }
+        : undefined;
+
+      if (isNodeVisible && !(await isNodeVisible(options.rootId!))) {
+        if (!cancelled) {
+          setRootExists(false);
+          setReachableNodeIds([]);
+          setProgress({ created: 0, visited: 0, depth: 0 });
+          setContractMessage(
+            options.t(
+              "familyTree.status.rootNotTrustedEndorsed",
+              "The current root version is not endorsed by any recommended source.",
+            ),
+          );
+          fetchRunKeyRef.current = runKey;
+        }
+        setLoading(false);
+        return;
+      }
 
       const { visitedIds, progress: nextProgress } = await runTreeBuildSession({
         rootId: options.rootId!,
@@ -342,6 +387,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
         getCurrentEdgesUnion: () => edgesUnionRef.current,
         loadChildrenStrict,
         loadChildrenUnion,
+        isNodeVisible,
         checkAbort,
         onStrictCacheHit: () => {
           debugStatsRef.current.edgeCacheHits.strict += 1;
@@ -367,6 +413,16 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
         onCommitEdgesStrict: (snapshot) => {
           setEdgesStrict((prev) => applyTreeBuildStrictSnapshots(prev, snapshot));
         },
+        // With a trusted-source filter active, the projection restricts rendering to
+        // reachableNodeIds; without streaming the visited set it stays empty until the build
+        // finishes, collapsing the tree to nothing mid-build and making nodes appear all at once
+        // instead of drawing in progressively. Non-filtered builds project straight from the edge
+        // stores, so they already draw incrementally and need no early reachable updates.
+        onCommitReachable: hasTrustedFilter
+          ? (ids) => {
+              if (!cancelled) setReachableNodeIds(ids);
+            }
+          : undefined,
       });
 
       if (!cancelled) {
@@ -574,6 +630,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     contractMessage,
     setContractMessage,
     endorsementsReady,
+    trustedFilterActive,
     debugStatsRef,
     getDebugStats,
   };

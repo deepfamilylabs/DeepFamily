@@ -19,13 +19,25 @@ type FamilyTreeProjectionOptions = {
  */
 export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
   const enabled = options?.enabled !== false;
-  const { rootId, reachableNodeIds, endorsementsReady, nodesData, edgesUnion, edgesStrict } =
-    useTreeGraphData();
+  const {
+    rootId,
+    reachableNodeIds,
+    endorsementsReady,
+    trustedFilterActive,
+    nodesData,
+    edgesUnion,
+    edgesStrict,
+  } = useTreeGraphData();
   const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions();
 
   const emptyGraph = useMemo<TreeGraphData>(
     () => ({ nodes: [], edges: [], childrenByParent: {} }),
     [],
+  );
+
+  const visibleNodeIds = useMemo(
+    () => (trustedFilterActive ? new Set(reachableNodeIds) : null),
+    [trustedFilterActive, reachableNodeIds],
   );
 
   const graph = useMemo(() => {
@@ -39,6 +51,7 @@ export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
       nodesData,
       edgesUnion,
       edgesStrict,
+      visibleNodeIds,
     });
   }, [
     enabled,
@@ -51,6 +64,7 @@ export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
     nodesData,
     edgesUnion,
     edgesStrict,
+    visibleNodeIds,
   ]);
 
   return {

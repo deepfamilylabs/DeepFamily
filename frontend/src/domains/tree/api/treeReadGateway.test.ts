@@ -54,3 +54,55 @@ describe("treeReadGateway listChildrenUnionAll", () => {
     expect(contract.listChildren).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("treeReadGateway trusted endorser reads", () => {
+  it("paginates and deduplicates trusted source accounts", async () => {
+    const personHash = "0xPerson";
+    const accountA = "0xAaA";
+    const accountB = "0xBbB";
+    const contract = {
+      listTrustedEndorsers: vi.fn(),
+    };
+    const responses: any[] = [
+      [[accountB, accountA], 3, true, 2],
+      [[accountA], 3, false, 3],
+    ];
+    contract.listTrustedEndorsers.mockImplementation(async () => responses.shift());
+
+    const gateway = createTreeReadGateway(contract, new QueryCache());
+    const accounts = await gateway.listTrustedEndorsersAll(personHash, 1, { pageLimit: 2 });
+
+    expect(accounts).toEqual([accountB.toLowerCase(), accountA.toLowerCase()]);
+    expect(contract.listTrustedEndorsers).toHaveBeenCalledTimes(2);
+    expect(contract.listTrustedEndorsers).toHaveBeenNthCalledWith(1, personHash, 1, 0, 2);
+    expect(contract.listTrustedEndorsers).toHaveBeenNthCalledWith(2, personHash, 1, 2, 2);
+  });
+
+  it("normalizes trusted source account sets for visibility cache hits", async () => {
+    const personHash = "0xPerson";
+    const accountA = "0x00000000000000000000000000000000000000aA";
+    const accountB = "0x00000000000000000000000000000000000000Bb";
+    const contract = {
+      isVersionEndorsedByAny: vi.fn(async () => true),
+    };
+
+    const gateway = createTreeReadGateway(contract, new QueryCache());
+    await expect(
+      gateway.isVersionEndorsedByAny(personHash, 2, [accountB, accountA, accountA], {
+        ttlMs: 60_000,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      gateway.isVersionEndorsedByAny(personHash, 2, [accountA.toLowerCase(), accountB], {
+        ttlMs: 60_000,
+      }),
+    ).resolves.toBe(true);
+    await expect(gateway.isVersionEndorsedByAny(personHash, 2, [])).resolves.toBe(false);
+
+    expect(contract.isVersionEndorsedByAny).toHaveBeenCalledTimes(1);
+    expect(contract.isVersionEndorsedByAny).toHaveBeenCalledWith(personHash, 2, [
+      accountA.toLowerCase(),
+      accountB.toLowerCase(),
+    ]);
+  });
+});

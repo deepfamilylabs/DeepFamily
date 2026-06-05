@@ -90,6 +90,10 @@ contract DeepFamily is
   error ProtocolFeeTooHigh();
   error AlreadyEndorsed();
   error NotEndorsed();
+  error InvalidTrustedEndorser();
+  error TrustedEndorserAlreadyAdded();
+  error TrustedEndorserNotFound();
+  error MustBeVersionContributor();
 
   // Query-related errors
   error PageSizeExceedsLimit();
@@ -244,6 +248,9 @@ contract DeepFamily is
   address public DEEP_FAMILY_TOKEN_CONTRACT;
   IDeepFamilyAttestationRegistry public ATTESTATION_REGISTRY;
   mapping(uint16 => mapping(uint8 => address)) public verifierRegistry;
+  mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public trustedEndorserOf;
+  mapping(bytes32 => mapping(uint256 => address[])) private trustedEndorsers;
+  mapping(bytes32 => mapping(uint256 => mapping(address => uint256))) private trustedEndorserIndex;
 
   // NOTE: No storage gap. This is the most-derived (leaf) upgradeable contract and every
   // inherited base uses ERC-7201 namespaced storage, so a new implementation adds state simply
@@ -328,6 +335,18 @@ contract DeepFamily is
   event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
   event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
+
+  event TrustedEndorserAdded(
+    bytes32 indexed personHash,
+    uint256 indexed versionIndex,
+    address indexed account
+  );
+
+  event TrustedEndorserRemoved(
+    bytes32 indexed personHash,
+    uint256 indexed versionIndex,
+    address indexed account
+  );
 
   // ========== Function Modifiers ==========
 
@@ -613,6 +632,56 @@ contract DeepFamily is
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
   }
 
+  function _requireVersionContributor(bytes32 personHash, uint256 versionIndex) internal view {
+    if (personVersions[personHash][versionIndex - 1].addedBy != msg.sender) {
+      revert MustBeVersionContributor();
+    }
+  }
+
+  function _addTrustedEndorserInternal(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address account
+  ) internal {
+    if (account == address(0)) revert InvalidTrustedEndorser();
+    if (trustedEndorserOf[personHash][versionIndex][account]) {
+      revert TrustedEndorserAlreadyAdded();
+    }
+
+    trustedEndorserOf[personHash][versionIndex][account] = true;
+    trustedEndorserIndex[personHash][versionIndex][account] =
+      trustedEndorsers[personHash][versionIndex].length +
+      1;
+    trustedEndorsers[personHash][versionIndex].push(account);
+
+    emit TrustedEndorserAdded(personHash, versionIndex, account);
+  }
+
+  function _removeTrustedEndorserInternal(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address account
+  ) internal {
+    if (account == address(0)) revert InvalidTrustedEndorser();
+    uint256 index = trustedEndorserIndex[personHash][versionIndex][account];
+    if (index == 0) revert TrustedEndorserNotFound();
+
+    uint256 arrayIdx = index - 1;
+    uint256 lastIdx = trustedEndorsers[personHash][versionIndex].length - 1;
+
+    if (arrayIdx != lastIdx) {
+      address lastAccount = trustedEndorsers[personHash][versionIndex][lastIdx];
+      trustedEndorsers[personHash][versionIndex][arrayIdx] = lastAccount;
+      trustedEndorserIndex[personHash][versionIndex][lastAccount] = index;
+    }
+
+    trustedEndorsers[personHash][versionIndex].pop();
+    delete trustedEndorserIndex[personHash][versionIndex][account];
+    delete trustedEndorserOf[personHash][versionIndex][account];
+
+    emit TrustedEndorserRemoved(personHash, versionIndex, account);
+  }
+
   function _addPersonInternal(
     bytes32 personHash,
     bytes32 fatherHash,
@@ -652,6 +721,7 @@ contract DeepFamily is
     );
     uint256 versionIndex = personVersions[personHash].length;
     personVersions[personHash][versionIndex - 1].versionIndex = versionIndex;
+    _addTrustedEndorserInternal(personHash, versionIndex, msg.sender);
     if (fatherHash != bytes32(0)) {
       childrenOf[fatherHash][fatherVersionIndex].push(
         ChildRef({childHash: personHash, childVersionIndex: versionIndex})
@@ -866,6 +936,24 @@ contract DeepFamily is
     emit EndorsementCancelled(personHash, msg.sender, versionIndex, block.timestamp);
   }
 
+  function addTrustedEndorser(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address account
+  ) external validPersonAndVersion(personHash, versionIndex) {
+    _requireVersionContributor(personHash, versionIndex);
+    _addTrustedEndorserInternal(personHash, versionIndex, account);
+  }
+
+  function removeTrustedEndorser(
+    bytes32 personHash,
+    uint256 versionIndex,
+    address account
+  ) external validPersonAndVersion(personHash, versionIndex) {
+    _requireVersionContributor(personHash, versionIndex);
+    _removeTrustedEndorserInternal(personHash, versionIndex, account);
+  }
+
   /**
    * @notice Mint family tree NFT for a specific person version with a ZK binding proof.
    */
@@ -1074,6 +1162,21 @@ contract DeepFamily is
 
   function userEndorsedPersonAt(address user, uint256 index) external view returns (bytes32) {
     return userEndorsedPersons[user][index];
+  }
+
+  function trustedEndorsersCount(
+    bytes32 personHash,
+    uint256 versionIndex
+  ) external view returns (uint256) {
+    return trustedEndorsers[personHash][versionIndex].length;
+  }
+
+  function trustedEndorserAt(
+    bytes32 personHash,
+    uint256 versionIndex,
+    uint256 index
+  ) external view returns (address) {
+    return trustedEndorsers[personHash][versionIndex][index];
   }
 
   // ===== ETH Reception Path Protection: Reject Direct Transfers =====

@@ -28,9 +28,14 @@ export function computeTreeLayout(
   let maxDepthSeen = 0;
   const unitWidth = baseNodeWidth + gapX;
   const visited = new Set<NodeId>();
+  // Only lay out nodes the projection actually produced. When a trusted-source filter hides
+  // the root (or the graph is empty mid-build), `graph.nodes` is empty and we must not invent
+  // a positioned root — its id would be missing from `nodeUiById` and crash the renderer.
+  const presentIds = new Set<NodeId>(graph.nodes.map((n) => n.id as NodeId));
 
   function layout(id: NodeId, depth: number): { x: number; y: number } | null {
     if (visited.has(id)) return null;
+    if (!presentIds.has(id)) return null;
     visited.add(id);
     maxDepthSeen = Math.max(maxDepthSeen, depth);
     const children = graph.childrenByParent[id] || [];

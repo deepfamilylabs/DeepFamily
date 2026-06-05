@@ -36,6 +36,7 @@ export interface TreeBuildSessionOptions {
   getCurrentEdgesUnion: () => EdgeStoreUnion;
   loadChildrenStrict: (nodeId: NodeId, forceRefresh?: boolean) => Promise<EdgeStrictEntry>;
   loadChildrenUnion: (personHash: string, forceRefresh?: boolean) => Promise<EdgeUnionEntry>;
+  isNodeVisible?: (nodeId: NodeId) => Promise<boolean>;
   checkAbort: () => void;
   onStrictCacheHit?: () => void;
   onStrictCacheMiss?: () => void;
@@ -47,6 +48,9 @@ export interface TreeBuildSessionOptions {
   onCommitNodes?: (nodes: Record<string, NodeData>) => void;
   onCommitEdgesUnion?: (edges: EdgeStoreUnion) => void;
   onCommitEdgesStrict?: (edges: EdgeStoreStrict) => void;
+  /** Streams the visited (visible) node ids on each flush so a trusted-source filter can
+   * project incrementally instead of only after the whole build completes. */
+  onCommitReachable?: (visitedIds: NodeId[]) => void;
   flushIntervalMs?: number;
   flushBatchSize?: number;
   now?: () => number;
@@ -81,6 +85,9 @@ export async function runTreeBuildSession(
     if (nodeSnapshot) options.onCommitNodes?.(nodeSnapshot);
     if (unionSnapshot) options.onCommitEdgesUnion?.(unionSnapshot);
     if (strictSnapshot) options.onCommitEdgesStrict?.(strictSnapshot);
+    if (nodeSnapshot || unionSnapshot || strictSnapshot) {
+      options.onCommitReachable?.(Array.from(visited));
+    }
   };
 
   while (frontier.length && visited.size < options.hardNodeLimit) {
@@ -90,35 +97,42 @@ export async function runTreeBuildSession(
 
     const { id, depth } = next;
     if (visited.has(id)) continue;
+    if (options.isNodeVisible && !(await options.isNodeVisible(id))) continue;
     visited.add(id);
     maxDepthSeen = Math.max(maxDepthSeen, depth);
     bufferMissingNode(nodeUpserts, options.getCurrentNodes(), id);
 
-    const { childIds, strictUpserts: nextStrict, unionUpserts: nextUnion } =
-      await resolveTreeTraversalChildIds({
-        nodeId: id,
-        childrenMode: options.childrenMode,
-        strictIncludeUnversionedChildren: options.strictIncludeUnversionedChildren,
-        edgeTtlMs: options.edgeTtlMs,
-        edgesStrict: options.getCurrentEdgesStrict(),
-        edgesUnion: options.getCurrentEdgesUnion(),
-        loadChildrenStrict: options.loadChildrenStrict,
-        loadChildrenUnion: options.loadChildrenUnion,
-        onStrictCacheHit: options.onStrictCacheHit,
-        onStrictCacheMiss: options.onStrictCacheMiss,
-        onUnionCacheHit: options.onUnionCacheHit,
-        onUnionCacheMiss: options.onUnionCacheMiss,
-        onStrictStale: options.onStrictStale,
-        onUnionStale: options.onUnionStale,
-      });
+    const {
+      childIds,
+      strictUpserts: nextStrict,
+      unionUpserts: nextUnion,
+    } = await resolveTreeTraversalChildIds({
+      nodeId: id,
+      childrenMode: options.childrenMode,
+      strictIncludeUnversionedChildren: options.strictIncludeUnversionedChildren,
+      edgeTtlMs: options.edgeTtlMs,
+      edgesStrict: options.getCurrentEdgesStrict(),
+      edgesUnion: options.getCurrentEdgesUnion(),
+      loadChildrenStrict: options.loadChildrenStrict,
+      loadChildrenUnion: options.loadChildrenUnion,
+      onStrictCacheHit: options.onStrictCacheHit,
+      onStrictCacheMiss: options.onStrictCacheMiss,
+      onUnionCacheHit: options.onUnionCacheHit,
+      onUnionCacheMiss: options.onUnionCacheMiss,
+      onStrictStale: options.onStrictStale,
+      onUnionStale: options.onUnionStale,
+    });
 
     mergeEdgeUpserts(strictUpserts, nextStrict);
     mergeEdgeUpserts(unionUpserts, nextUnion);
 
+    const visibleChildIds: NodeId[] = [];
     for (const childId of childIds) {
+      if (options.isNodeVisible && !(await options.isNodeVisible(childId))) continue;
+      visibleChildIds.push(childId);
       bufferMissingNode(nodeUpserts, options.getCurrentNodes(), childId);
     }
-    pushTraversalChildren(frontier, childIds, depth + 1);
+    pushTraversalChildren(frontier, visibleChildIds, depth + 1);
 
     const currentTime = now();
     if (
