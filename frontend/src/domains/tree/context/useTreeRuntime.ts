@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfig } from "../../config";
 import { makeNodeId, type NodeId } from "../../../shared/model";
 import {
+  createDeepFamilyContract,
   createDeepFamilyInterface,
   createDeepFamilyReaderContract,
 } from "../../../shared/clients/contractFactory";
@@ -11,7 +12,8 @@ import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { createTreeReadGateway } from "../api/treeReadGateway";
 
 export function useTreeRuntime() {
-  const { rpcUrl, contractAddress, readerAddress, rootHash, rootVersionIndex, chainId } = useConfig();
+  const { rpcUrl, contractAddress, readerAddress, rootHash, rootVersionIndex, chainId } =
+    useConfig();
   const [refreshTick, setRefreshTick] = useState(1);
   const refresh = useCallback(() => setRefreshTick((tick) => tick + 1), []);
 
@@ -32,6 +34,15 @@ export function useTreeRuntime() {
       return null;
     }
   }, [provider, contractAddress, readerAddress]);
+
+  const nftContract = useMemo(() => {
+    if (!provider || !contractAddress) return null;
+    try {
+      return createDeepFamilyContract(contractAddress, provider);
+    } catch {
+      return null;
+    }
+  }, [provider, contractAddress]);
 
   const scopedQueryCache = useMemo(
     () => getScopedQueryClient({ rpcUrl, contractAddress, chainId }),
@@ -83,6 +94,7 @@ export function useTreeRuntime() {
     refresh,
     provider,
     contract,
+    nftContract,
     queryCacheRef,
     storyRevalidateRef,
     eventInterfaceRef,
