@@ -497,6 +497,11 @@
       "deduplicateChildrenTooltip": {
         "enabled": "仅显示最高背书版本",
         "disabled": "显示所有版本"
+      },
+      "trustedSourceFilter": "可信来源过滤",
+      "trustedSourceFilterTooltip": {
+        "enabled": "仅显示推荐来源背书的版本",
+        "disabled": "显示所有版本"
       }
     },
     "status": {

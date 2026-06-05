@@ -1,5 +1,6 @@
 import { HelpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import ToggleControl from "./ToggleControl";
 
 export interface ChildrenModeControlsProps {
   mode: "union" | "strict";
@@ -80,49 +81,24 @@ export default function ChildrenModeControls({
       </div>
 
       {mode === "strict" && (
-        <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-              {t("familyTree.ui.strictIncludeV0", "Include v0")}:
-            </span>
-            <button
-              type="button"
-              onClick={onToggleIncludeV0Tooltip}
-              className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
-            >
-              <HelpCircle size={14} />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => onIncludeUnversionedChange(!includeUnversioned)}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 ${
-              includeUnversioned
-                ? "bg-gradient-to-r from-orange-400 to-red-500"
-                : "bg-slate-300 dark:bg-slate-600"
-            }`}
-            aria-label={t("familyTree.ui.strictIncludeV0", "Toggle include v0")}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                includeUnversioned ? "translate-x-[18px]" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-          {includeV0TooltipOpen && (
-            <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
-              {includeUnversioned
-                ? t(
-                    "familyTree.ui.strictIncludeV0Tooltip.on",
-                    "Strict + v0: include unversioned children (parentVersionIndex=0)",
-                  )
-                : t(
-                    "familyTree.ui.strictIncludeV0Tooltip.off",
-                    "Strict only: exactly parentVersionIndex you selected",
-                  )}
-            </div>
-          )}
-        </div>
+        <ToggleControl
+          label={t("familyTree.ui.strictIncludeV0", "Include v0")}
+          value={includeUnversioned}
+          onChange={onIncludeUnversionedChange}
+          tooltipOpen={includeV0TooltipOpen}
+          onToggleTooltip={onToggleIncludeV0Tooltip}
+          tooltip={
+            includeUnversioned
+              ? t(
+                  "familyTree.ui.strictIncludeV0Tooltip.on",
+                  "Strict + v0: include unversioned children (parentVersionIndex=0)",
+                )
+              : t(
+                  "familyTree.ui.strictIncludeV0Tooltip.off",
+                  "Strict only: exactly parentVersionIndex you selected",
+                )
+          }
+        />
       )}
     </div>
   );

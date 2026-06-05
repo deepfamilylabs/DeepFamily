@@ -47,6 +47,7 @@ interface UseTreeGraphStateOptions {
   traversal: "dfs" | "bfs";
   childrenMode: "strict" | "union";
   strictIncludeUnversionedChildren: boolean;
+  trustedSourceFilterEnabled: boolean;
   edgeTtlMs: number;
   totalVersionsTtlMs: number;
   versionDetailsTtlMs: number;
@@ -239,6 +240,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       rootId: options.rootId,
       childrenMode: options.childrenMode,
       strictIncludeUnversionedChildren: options.strictIncludeUnversionedChildren,
+      trustedSourceFilterEnabled: options.trustedSourceFilterEnabled,
       traversal: options.traversal,
       refreshTick: options.refreshTick,
     });
@@ -339,12 +341,15 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
 
       const runtimeCfg = getRuntimeFamilyTreeConfig();
       const hardNodeLimit = runtimeCfg.DEFAULT_HARD_NODE_LIMIT;
-      const trustedSourceAccounts = await options.api.listTrustedEndorsersAll(
-        String(options.rootHash || ""),
-        Number(options.rootVersionIndex),
-        { pageLimit: options.childrenPageLimit, checkAbort, ttlMs: options.edgeTtlMs },
-      );
-      const hasTrustedFilter = trustedSourceAccounts.length > 0;
+      const trustedSourceAccounts = options.trustedSourceFilterEnabled
+        ? await options.api.listTrustedEndorsersAll(
+            String(options.rootHash || ""),
+            Number(options.rootVersionIndex),
+            { pageLimit: options.childrenPageLimit, checkAbort, ttlMs: options.edgeTtlMs },
+          )
+        : [];
+      const hasTrustedFilter =
+        options.trustedSourceFilterEnabled && trustedSourceAccounts.length > 0;
       if (!cancelled) setTrustedFilterActive(hasTrustedFilter);
       const isNodeVisible = hasTrustedFilter
         ? async (nodeId: NodeId) => {
@@ -462,6 +467,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     options.t,
     options.totalVersionsTtlMs,
     options.traversal,
+    options.trustedSourceFilterEnabled,
     options.versionDetailsTtlMs,
     idbHydrated,
   ]);

@@ -191,6 +191,19 @@ ViewModel  →  Layout  →  Viewport  →  Renderer
 - Tree view actions should flow through `TreeInteractionProvider`; page shells bridge those actions to person modals and transaction side effects.
 - To add a new view, implement a new Layout and/or Renderer and plug it into the pipeline. Do not duplicate ViewModel logic.
 
+### Trusted-source filtering
+
+The tree can hide person versions that aren't vouched for by a root-defined allowlist. It is gated by the `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE` env var and the in-app **Trusted Sources** switch (Family Tree config panel); the choice persists per browser.
+
+- **Trusted sources** = the `trustedEndorsers` of the _root_ version (`DeepFamilyReader.listTrustedEndorsers`), not of each node.
+- **Visibility rule**: a node `(personHash, versionIndex)` is shown only if some trusted account has endorsed exactly that version — i.e. `endorsedVersionIndex(personHash, account) == versionIndex` for some account in the list (`isVersionEndorsedByAny`).
+- **Default**: on, so a fresh user already sees the filtered view.
+- **Edge cases**:
+  - Root version has _no_ trusted endorsers → nothing to filter by, so the full tree is shown and the switch has no visible effect.
+  - The root version itself isn't trusted-endorsed → the whole tree renders empty with a "root not endorsed by any recommended source" message.
+  - Toggle hidden via env (`VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE=0`) → filtering is forced on and cannot be turned off in the UI.
+- **Where it lives**: the allowlist fetch and per-node predicate live in `domains/tree/context/useTreeGraphState.ts`; pruning runs during traversal (`domains/tree/services/treeTraversalOrchestrator.ts`) and is enforced again at projection time (`domains/tree/selectors/buildViewGraph.ts`), so hidden versions never leak into the view even from shared edge caches.
+
 ### Workers (crypto + ZK)
 
 Heavy and sensitive computation runs off the main thread:
@@ -231,6 +244,7 @@ VITE_ROOT_VERSION_INDEX=...
 | `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                       |
 | `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                         |
 | `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                 |
+| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                         | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
 | `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                   |
 
 ### Local auto-config

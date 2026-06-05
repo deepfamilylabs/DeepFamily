@@ -76,6 +76,10 @@ export function shouldShowChildrenModeToggle(): boolean {
   return getBooleanEnv("VITE_SHOW_CHILDREN_MODE_TOGGLE");
 }
 
+export function shouldShowTrustedSourceFilterToggle(): boolean {
+  return getBooleanEnv("VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE", true);
+}
+
 export function isIndexedDbCacheEnabled(): boolean {
   return getBooleanEnv("VITE_USE_INDEXEDDB_CACHE", true);
 }

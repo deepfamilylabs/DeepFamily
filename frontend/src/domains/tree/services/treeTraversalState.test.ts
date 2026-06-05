@@ -21,10 +21,11 @@ describe("treeSessionState", () => {
         rootId: "0xabc-v-1",
         childrenMode: "strict",
         strictIncludeUnversionedChildren: true,
+        trustedSourceFilterEnabled: true,
         traversal: "bfs",
         refreshTick: 2,
       }),
-    ).toBe("build-0xabc-v-1-strict-v0-bfs-2");
+    ).toBe("build-0xabc-v-1-strict-v0-trusted-bfs-2");
   });
 
   it("checks parent reachability by id or hash", () => {
@@ -107,9 +108,7 @@ describe("treeSessionState", () => {
     expect(applyEdgeUnionUpserts({}, { "0xaaa": { childIds: [], fetchedAt: 1 } })).toEqual({
       "0xaaa": { childIds: [], fetchedAt: 1 },
     });
-    expect(
-      applyEdgeStrictUpserts({}, { "0xaaa-v-1": { childIds: [], fetchedAt: 1 } }),
-    ).toEqual({
+    expect(applyEdgeStrictUpserts({}, { "0xaaa-v-1": { childIds: [], fetchedAt: 1 } })).toEqual({
       "0xaaa-v-1": { childIds: [], fetchedAt: 1 },
     });
   });

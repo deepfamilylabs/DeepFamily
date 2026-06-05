@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Globe, Database, SlidersHorizontal, HelpCircle } from "lucide-react";
+import { ChevronDown, Globe, Database, SlidersHorizontal } from "lucide-react";
 import { useFamilyTreeConfigForm } from "./hooks/useFamilyTreeConfigForm";
 import {
   ChildrenModeControls,
@@ -12,6 +12,7 @@ import {
   RootHashField,
   RootHashHistory,
   TraversalControls,
+  TrustedSourceFilterControl,
   VersionStepper,
 } from "./sections";
 
@@ -55,9 +56,7 @@ function FormSection({ title, icon: Icon, defaultOpen = false, children }: FormS
           isOpen ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"
         } ${isAnimating || !isOpen ? "overflow-hidden" : "overflow-visible"}`}
       >
-        <div className="p-4 space-y-4">
-          {children}
-        </div>
+        <div className="p-4 space-y-4">{children}</div>
       </div>
     </div>
   );
@@ -116,10 +115,17 @@ export default function FamilyTreeConfigForm() {
           <div className="flex flex-col gap-4">
             <TraversalControls {...ctrl.traversal} />
 
-            {(ctrl.showChildrenModeToggle || ctrl.showDeduplicateToggle) && (
+            {(ctrl.showTrustedSourceFilterToggle ||
+              ctrl.showChildrenModeToggle ||
+              ctrl.showDeduplicateToggle) && (
               <>
                 <div className="border-t border-slate-100 dark:border-slate-700/50" />
                 <div className="space-y-4">
+                  {ctrl.showTrustedSourceFilterToggle && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <TrustedSourceFilterControl {...ctrl.trustedSourceFilter} />
+                    </div>
+                  )}
                   {ctrl.showChildrenModeToggle && (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                       <ChildrenModeControls {...ctrl.children} />

@@ -5,10 +5,11 @@ export function buildTreeFetchRunKey(options: {
   rootId: string;
   childrenMode: string;
   strictIncludeUnversionedChildren: boolean;
+  trustedSourceFilterEnabled: boolean;
   traversal: string;
   refreshTick: number;
 }): string {
-  return `build-${options.rootId}-${options.childrenMode}-${options.strictIncludeUnversionedChildren ? "v0" : "no0"}-${options.traversal}-${options.refreshTick}`;
+  return `build-${options.rootId}-${options.childrenMode}-${options.strictIncludeUnversionedChildren ? "v0" : "no0"}-${options.trustedSourceFilterEnabled ? "trusted" : "all"}-${options.traversal}-${options.refreshTick}`;
 }
 
 export function isParentReachable(
