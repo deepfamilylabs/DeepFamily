@@ -162,6 +162,32 @@ describe("person detail modals a11y", () => {
     expect(screen.getByRole("status").textContent).toContain("search.copied");
   });
 
+  it("renders NFT information before recommended sources", async () => {
+    const contributor = "0x00000000000000000000000000000000000000aa";
+    const owner = "0x00000000000000000000000000000000000000bb";
+    const source = "0x00000000000000000000000000000000000000cc";
+
+    render(
+      <TrustedDetailHarness
+        connectedAddress={owner}
+        addedBy={contributor}
+        owner={owner}
+        tokenId="1"
+        trustedAccounts={[source]}
+      />,
+    );
+
+    await screen.findByText(source);
+
+    const nftHeading = screen.getByText("familyTree.nodeDetail.nft");
+    const trustedHeading = screen.getByText("Recommended Sources");
+    expect(
+      Boolean(
+        nftHeading.compareDocumentPosition(trustedHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+  });
+
   it("shows trusted source management to the version contributor before mint", async () => {
     const contributor = "0x00000000000000000000000000000000000000aa";
     const source = "0x00000000000000000000000000000000000000bb";
