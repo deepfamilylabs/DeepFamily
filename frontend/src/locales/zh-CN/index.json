@@ -243,6 +243,15 @@
       "metadataCID": "元数据CID",
       "unknown": "未知"
     },
+    "trustedEndorsersQuery": {
+      "title": "推荐来源查询",
+      "personHash": "人物哈希",
+      "versionIndex": "版本序号",
+      "versionPlaceholder": "≥1",
+      "placeholder": "0x1234...abcd (64位十六进制)",
+      "account": "推荐账户",
+      "totalSources": "推荐来源总数"
+    },
     "storyChunksQuery": {
       "title": "故事分片查询",
       "tokenId": "Token ID",
@@ -333,6 +342,7 @@
       "hashInvalid": "请输入有效的64位十六进制哈希值",
       "tokenIdRequired": "请输入NFT Token ID",
       "versionIndexRequired": "请输入有效的版本序号（≥0）",
+      "versionIndexRequiredOne": "请输入有效的版本序号（≥1）",
       "pageSizeRange": "每页数量需在1-{{max}}之间",
       "required": "必填",
       "monthRange": "月份必须在0-12之间",

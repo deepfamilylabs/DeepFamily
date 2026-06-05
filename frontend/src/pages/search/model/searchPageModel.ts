@@ -7,6 +7,7 @@ export const MAX_SEARCH_PAGE_SIZE = 100;
 export type SearchSectionKey =
   | "hash"
   | "versions"
+  | "trustedEndorsers"
   | "endorsement"
   | "children"
   | "storyChunks"
@@ -17,6 +18,7 @@ export type SearchOpenSections = Record<SearchSectionKey, boolean>;
 export const initialSearchOpenSections: SearchOpenSections = {
   hash: true,
   versions: false,
+  trustedEndorsers: false,
   endorsement: false,
   children: false,
   storyChunks: false,
@@ -35,6 +37,12 @@ export type TokenURIHistoryForm = {
 
 export type PersonVersionsForm = {
   personHash: string;
+  pageSize: number;
+};
+
+export type TrustedEndorsersForm = {
+  personHash: string;
+  versionIndex: number;
   pageSize: number;
 };
 
@@ -60,6 +68,10 @@ export type ChildrenPageData = {
   childVersions: number[];
 };
 
+export type TrustedEndorsersPageData = {
+  accounts: string[];
+};
+
 export const emptyEndorsementStatsData: EndorsementStatsData = {
   versionIndices: [],
   endorsementCounts: [],
@@ -69,6 +81,10 @@ export const emptyEndorsementStatsData: EndorsementStatsData = {
 export const emptyChildrenPageData: ChildrenPageData = {
   childHashes: [],
   childVersions: [],
+};
+
+export const emptyTrustedEndorsersPageData: TrustedEndorsersPageData = {
+  accounts: [],
 };
 
 export function sanitizeNumberInput(value: unknown) {

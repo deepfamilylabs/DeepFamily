@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   treeGateway: {
     listPersonVersionsPage: vi.fn(),
     listChildrenPage: vi.fn(),
+    listTrustedEndorsersPage: vi.fn(),
   },
 }));
 
@@ -26,9 +27,8 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
       if (typeof fallbackOrOptions === "string") {
-        return fallbackOrOptions.replace(
-          /{{\s*(\w+)\s*}}/g,
-          (_match, name) => String(options?.[name] ?? ""),
+        return fallbackOrOptions.replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
+          String(options?.[name] ?? ""),
         );
       }
       if (fallbackOrOptions && typeof fallbackOrOptions === "object") {
@@ -92,6 +92,7 @@ describe("SearchPage", () => {
     mocks.personGateway.listStoryChunksPage.mockReset();
     mocks.treeGateway.listPersonVersionsPage.mockReset();
     mocks.treeGateway.listChildrenPage.mockReset();
+    mocks.treeGateway.listTrustedEndorsersPage.mockReset();
     Object.defineProperty(globalThis, "ResizeObserver", {
       configurable: true,
       value: class {
@@ -211,5 +212,46 @@ describe("SearchPage", () => {
 
     await waitFor(() => expect(screen.queryByText("#101")).toBeNull());
     expect(screen.queryByText("search.totalResults: 2")).toBeNull();
+  });
+
+  it("queries trusted endorsers through treeGateway and resets the section state", async () => {
+    const sourceAccount = "0x00000000000000000000000000000000000000cc";
+    mocks.treeGateway.listTrustedEndorsersPage.mockResolvedValue({
+      accounts: [sourceAccount],
+      totalCount: 1,
+      hasMore: false,
+      nextOffset: 1,
+    });
+
+    render(<SearchPage />);
+
+    fireEvent.click(screen.getByText("search.trustedEndorsersQuery.title"));
+    const hashInput = screen.getByPlaceholderText("search.trustedEndorsersQuery.placeholder");
+    fireEvent.change(hashInput, { target: { value: personHashA } });
+
+    const form = hashInput.closest("form");
+    expect(form).toBeTruthy();
+    fireEvent.change(within(form!).getByTitle("search.trustedEndorsersQuery.versionPlaceholder"), {
+      target: { value: "1" },
+    });
+    fireEvent.submit(form!);
+
+    await waitFor(() =>
+      expect(mocks.treeGateway.listTrustedEndorsersPage).toHaveBeenCalledWith(
+        personHashA,
+        1,
+        0,
+        100,
+      ),
+    );
+    expect(await screen.findByTitle(sourceAccount)).toBeTruthy();
+    expect(screen.getByText("search.trustedEndorsersQuery.totalSources: 1")).toBeTruthy();
+
+    const section = form!.parentElement;
+    expect(section).toBeTruthy();
+    fireEvent.click(within(section!).getByText("search.reset"));
+
+    await waitFor(() => expect(screen.queryByTitle(sourceAccount)).toBeNull());
+    expect(screen.queryByText("search.trustedEndorsersQuery.totalSources: 1")).toBeNull();
   });
 });

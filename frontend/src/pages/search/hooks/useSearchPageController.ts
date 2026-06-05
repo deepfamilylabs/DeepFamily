@@ -20,6 +20,7 @@ import { useToast } from "../../../shared/ui";
 import {
   emptyChildrenPageData,
   emptyEndorsementStatsData,
+  emptyTrustedEndorsersPageData,
   formatNumericError,
   getPreviousPageOffset,
   getWatchedNumber,
@@ -34,6 +35,8 @@ import {
   type SearchSectionKey,
   type StoryChunksForm,
   type TokenURIHistoryForm,
+  type TrustedEndorsersForm,
+  type TrustedEndorsersPageData,
 } from "../model/searchPageModel";
 
 export function useSearchPageController() {
@@ -87,6 +90,23 @@ export function useSearchPageController() {
             message: t("search.validation.pageSizeRange", { max: MAX_SEARCH_PAGE_SIZE }),
           }),
       }),
+      trustedEndorsers: z.object({
+        personHash: z
+          .string()
+          .min(1, t("search.validation.hashRequired"))
+          .regex(/^0x[a-fA-F0-9]{64}$/, t("search.validation.hashInvalid")),
+        versionIndex: z
+          .number({ message: t("search.validation.versionIndexRequiredOne") })
+          .int({ message: t("search.validation.versionIndexRequiredOne") })
+          .min(1, { message: t("search.validation.versionIndexRequiredOne") }),
+        pageSize: z
+          .number()
+          .int({ message: t("search.validation.pageSizeRange", { max: MAX_SEARCH_PAGE_SIZE }) })
+          .min(1, { message: t("search.validation.pageSizeRange", { max: MAX_SEARCH_PAGE_SIZE }) })
+          .max(MAX_SEARCH_PAGE_SIZE, {
+            message: t("search.validation.pageSizeRange", { max: MAX_SEARCH_PAGE_SIZE }),
+          }),
+      }),
       storyChunks: z.object({
         tokenId: z
           .number({ message: t("search.validation.tokenIdRequired") })
@@ -130,6 +150,10 @@ export function useSearchPageController() {
     () => t("search.validation.versionIndexRequired"),
     [t],
   );
+  const versionIndexOneValidationMessage = useMemo(
+    () => t("search.validation.versionIndexRequiredOne"),
+    [t],
+  );
 
   const copyText = useCallback(async (text: string) => {
     try {
@@ -169,9 +193,8 @@ export function useSearchPageController() {
   const [endorsementOffset, setEndorsementOffset] = useState<number>(0);
   const [endorsementLoading, setEndorsementLoading] = useState<boolean>(false);
   const [endorsementError, setEndorsementError] = useState<string | null>(null);
-  const [endorsementData, setEndorsementData] = useState<EndorsementStatsData>(
-    emptyEndorsementStatsData,
-  );
+  const [endorsementData, setEndorsementData] =
+    useState<EndorsementStatsData>(emptyEndorsementStatsData);
   const [endorsementTotal, setEndorsementTotal] = useState<number>(0);
   const [endorsementHasMore, setEndorsementHasMore] = useState<boolean>(false);
   const [endorsementQueried, setEndorsementQueried] = useState<boolean>(false);
@@ -192,6 +215,16 @@ export function useSearchPageController() {
   const [versionsHasMore, setVersionsHasMore] = useState<boolean>(false);
   const [versionsQueried, setVersionsQueried] = useState<boolean>(false);
 
+  const [trustedEndorsersOffset, setTrustedEndorsersOffset] = useState<number>(0);
+  const [trustedEndorsersLoading, setTrustedEndorsersLoading] = useState<boolean>(false);
+  const [trustedEndorsersError, setTrustedEndorsersError] = useState<string | null>(null);
+  const [trustedEndorsersData, setTrustedEndorsersData] = useState<TrustedEndorsersPageData>(
+    emptyTrustedEndorsersPageData,
+  );
+  const [trustedEndorsersTotal, setTrustedEndorsersTotal] = useState<number>(0);
+  const [trustedEndorsersHasMore, setTrustedEndorsersHasMore] = useState<boolean>(false);
+  const [trustedEndorsersQueried, setTrustedEndorsersQueried] = useState<boolean>(false);
+
   const [storyChunksOffset, setStoryChunksOffset] = useState<number>(0);
   const [storyChunksLoading, setStoryChunksLoading] = useState<boolean>(false);
   const [storyChunksError, setStoryChunksError] = useState<string | null>(null);
@@ -209,8 +242,7 @@ export function useSearchPageController() {
   const [childrenQueried, setChildrenQueried] = useState<boolean>(false);
 
   const [openSections, setOpenSections] = useState(initialSearchOpenSections);
-  const [hashIdentityMode, setHashIdentityMode] =
-    useState<IdentitySaltMode>("deterministic");
+  const [hashIdentityMode, setHashIdentityMode] = useState<IdentitySaltMode>("deterministic");
   const [hashRecoverySaltHex, setHashRecoverySaltHex] = useState("");
   const [hashHasPassphrase, setHashHasPassphrase] = useState(false);
   const hashCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
@@ -231,6 +263,14 @@ export function useSearchPageController() {
     resolver: zodResolver(schemas.personVersions),
     defaultValues: { personHash: "", pageSize: MAX_SEARCH_PAGE_SIZE },
   });
+  const trustedEndorsersForm = useForm<TrustedEndorsersForm>({
+    resolver: zodResolver(schemas.trustedEndorsers),
+    defaultValues: {
+      personHash: "",
+      versionIndex: undefined as any,
+      pageSize: MAX_SEARCH_PAGE_SIZE,
+    },
+  });
   const storyChunksForm = useForm<StoryChunksForm>({
     resolver: zodResolver(schemas.storyChunks),
     defaultValues: { tokenId: undefined as any, pageSize: MAX_SEARCH_PAGE_SIZE },
@@ -247,9 +287,10 @@ export function useSearchPageController() {
   const endorsementPageSize = Number(endorsementForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
   const uriPageSize = Number(uriForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
   const versionsPageSize = Number(versionsForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
-  const storyChunksPageSize = Number(
-    storyChunksForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE,
+  const trustedEndorsersPageSize = Number(
+    trustedEndorsersForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE,
   );
+  const storyChunksPageSize = Number(storyChunksForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
   const childrenPageSize = Number(childrenForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
 
   const chunkTypeOptions = useMemo((): ChunkTypeOption[] => getChunkTypeOptions(t), [t]);
@@ -458,6 +499,89 @@ export function useSearchPageController() {
     );
   }, [onQueryPersonVersions, versionsForm, versionsOffset, versionsPageSize]);
 
+  const onQueryTrustedEndorsers = useCallback(
+    async (data: TrustedEndorsersForm, startOffset?: number) => {
+      setTrustedEndorsersQueried(true);
+      if ((startOffset ?? 0) === 0) {
+        setTrustedEndorsersData(emptyTrustedEndorsersPageData);
+        setTrustedEndorsersTotal(0);
+        setTrustedEndorsersHasMore(false);
+        setTrustedEndorsersOffset(0);
+      }
+      setTrustedEndorsersLoading(true);
+      setTrustedEndorsersError(null);
+      try {
+        if (!treeGateway) throw new Error(t("search.queryFailed"));
+        const offset = startOffset !== undefined ? startOffset : trustedEndorsersOffset;
+        const versionIndex = Number(data.versionIndex);
+        if (!Number.isFinite(versionIndex) || versionIndex < 1) {
+          throw new Error(t("search.validation.versionIndexRequiredOne"));
+        }
+        const out = await treeGateway.listTrustedEndorsersPage(
+          data.personHash,
+          versionIndex,
+          offset,
+          data.pageSize,
+        );
+        const { accounts, totalCount, hasMore, nextOffset } = out;
+        setTrustedEndorsersData({ accounts });
+        setTrustedEndorsersTotal(totalCount);
+        setTrustedEndorsersHasMore(hasMore);
+        setTrustedEndorsersOffset(nextOffset);
+      } catch (error: any) {
+        setTrustedEndorsersError(getQueryErrorMessage(error));
+      } finally {
+        setTrustedEndorsersLoading(false);
+      }
+    },
+    [getQueryErrorMessage, t, treeGateway, trustedEndorsersOffset],
+  );
+
+  const onResetTrustedEndorsersQuery = useCallback(() => {
+    setTrustedEndorsersData(emptyTrustedEndorsersPageData);
+    setTrustedEndorsersTotal(0);
+    setTrustedEndorsersHasMore(false);
+    setTrustedEndorsersOffset(0);
+    setTrustedEndorsersError(null);
+    setTrustedEndorsersQueried(false);
+  }, []);
+
+  const onTrustedEndorsersNext = useCallback(async () => {
+    const versionIndex = getWatchedNumber(trustedEndorsersForm.watch("versionIndex"));
+    if (versionIndex === undefined || versionIndex < 1) {
+      setTrustedEndorsersError(t("search.validation.versionIndexRequiredOne"));
+      return;
+    }
+    await onQueryTrustedEndorsers({
+      personHash: trustedEndorsersForm.watch("personHash") || "",
+      versionIndex,
+      pageSize: trustedEndorsersPageSize,
+    });
+  }, [onQueryTrustedEndorsers, t, trustedEndorsersForm, trustedEndorsersPageSize]);
+
+  const onTrustedEndorsersPrev = useCallback(async () => {
+    const prev = getPreviousPageOffset(trustedEndorsersOffset, trustedEndorsersPageSize);
+    const versionIndex = getWatchedNumber(trustedEndorsersForm.watch("versionIndex"));
+    if (versionIndex === undefined || versionIndex < 1) {
+      setTrustedEndorsersError(t("search.validation.versionIndexRequiredOne"));
+      return;
+    }
+    await onQueryTrustedEndorsers(
+      {
+        personHash: trustedEndorsersForm.watch("personHash") || "",
+        versionIndex,
+        pageSize: trustedEndorsersPageSize,
+      },
+      prev,
+    );
+  }, [
+    onQueryTrustedEndorsers,
+    t,
+    trustedEndorsersForm,
+    trustedEndorsersOffset,
+    trustedEndorsersPageSize,
+  ]);
+
   const onQueryStoryChunks = useCallback(
     async (data: StoryChunksForm, startOffset?: number) => {
       setStoryChunksQueried(true);
@@ -605,6 +729,7 @@ export function useSearchPageController() {
       tokenId: tokenIdValidationMessage,
       pageSize: pageSizeValidationMessage,
       versionIndex: versionIndexValidationMessage,
+      versionIndexOne: versionIndexOneValidationMessage,
     },
     onCopy,
     hash: {
@@ -655,6 +780,24 @@ export function useSearchPageController() {
         reset: onResetEndorsementQuery,
         next: onEndorsementNext,
         prev: onEndorsementPrev,
+      },
+    },
+    trustedEndorsers: {
+      form: trustedEndorsersForm,
+      state: {
+        data: trustedEndorsersData,
+        total: trustedEndorsersTotal,
+        offset: trustedEndorsersOffset,
+        loading: trustedEndorsersLoading,
+        error: trustedEndorsersError,
+        queried: trustedEndorsersQueried,
+        hasMore: trustedEndorsersHasMore,
+      },
+      actions: {
+        query: onQueryTrustedEndorsers,
+        reset: onResetTrustedEndorsersQuery,
+        next: onTrustedEndorsersNext,
+        prev: onTrustedEndorsersPrev,
       },
     },
     children: {

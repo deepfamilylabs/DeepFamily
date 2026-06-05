@@ -56,6 +56,26 @@ describe("treeReadGateway listChildrenUnionAll", () => {
 });
 
 describe("treeReadGateway trusted endorser reads", () => {
+  it("reads one trusted source page", async () => {
+    const personHash = "0xPerson";
+    const accountA = "0xAaA";
+    const accountB = "0xBbB";
+    const contract = {
+      listTrustedEndorsers: vi.fn(async () => [[accountA, accountB], 5, true, 2]),
+    };
+
+    const gateway = createTreeReadGateway(contract, new QueryCache());
+    const page = await gateway.listTrustedEndorsersPage(personHash, 3, 0, 2);
+
+    expect(page).toEqual({
+      accounts: [accountA, accountB],
+      totalCount: 5,
+      hasMore: true,
+      nextOffset: 2,
+    });
+    expect(contract.listTrustedEndorsers).toHaveBeenCalledWith(personHash, 3, 0, 2);
+  });
+
   it("paginates and deduplicates trusted source accounts", async () => {
     const personHash = "0xPerson";
     const accountA = "0xAaA";

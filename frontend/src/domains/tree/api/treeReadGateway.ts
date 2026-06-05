@@ -61,6 +61,17 @@ export interface TreeReadGateway {
     hasMore: boolean;
     nextOffset: number;
   }>;
+  listTrustedEndorsersPage: (
+    personHash: string,
+    versionIndex: number,
+    offset: number,
+    limit: number,
+  ) => Promise<{
+    accounts: string[];
+    totalCount: number;
+    hasMore: boolean;
+    nextOffset: number;
+  }>;
   listTrustedEndorsersAll: (
     personHash: string,
     versionIndex: number,
@@ -241,6 +252,26 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     };
   };
 
+  const listTrustedEndorsersPage = async (
+    personHash: string,
+    versionIndex: number,
+    offset: number,
+    limit: number,
+  ) => {
+    const out = await contract.listTrustedEndorsers(
+      personHash,
+      Number(versionIndex),
+      offset,
+      limit,
+    );
+    return {
+      accounts: Array.from(out?.[0] || []).map(String),
+      totalCount: Number(out?.[1] || 0),
+      hasMore: Boolean(out?.[2]),
+      nextOffset: Number(out?.[3] || 0),
+    };
+  };
+
   const listTrustedEndorsersAll = async (
     personHash: string,
     versionIndex: number,
@@ -314,6 +345,7 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     listChildrenUnionAll,
     listPersonVersionsPage,
     listChildrenPage,
+    listTrustedEndorsersPage,
     listTrustedEndorsersAll,
     isVersionEndorsedByAny,
   };

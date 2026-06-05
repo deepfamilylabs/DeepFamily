@@ -243,6 +243,15 @@
       "metadataCID": "Metadata CID",
       "unknown": "Unknown"
     },
+    "trustedEndorsersQuery": {
+      "title": "Recommended Sources Query",
+      "personHash": "Person Hash",
+      "versionIndex": "Version Index",
+      "versionPlaceholder": "≥1",
+      "placeholder": "0x1234...abcd (64-character hexadecimal)",
+      "account": "Recommended Account",
+      "totalSources": "Total recommended sources"
+    },
     "storyChunksQuery": {
       "title": "Story Chunks Query",
       "tokenId": "Token ID",
@@ -333,6 +342,7 @@
       "hashInvalid": "Please enter a valid 64-character hexadecimal hash",
       "tokenIdRequired": "Please enter NFT Token ID",
       "versionIndexRequired": "Please enter a valid version index (≥0)",
+      "versionIndexRequiredOne": "Please enter a valid version index (≥1)",
       "pageSizeRange": "Page size must be between 1 and {{max}}",
       "required": "Required",
       "monthRange": "Month must be between 0-12",
