@@ -1234,7 +1234,7 @@
       "InvalidTrustedEndorser": "推荐来源账户无效。",
       "TrustedEndorserAlreadyAdded": "该推荐来源账户已添加。",
       "TrustedEndorserNotFound": "该推荐来源账户不在此版本名单中。",
-      "MustBeVersionContributor": "只有版本添加者可以管理推荐来源。",
+      "MustBeTrustedEndorserManager": "只有当前推荐来源管理者可以更新推荐来源。",
       "MustEndorseVersionFirst": "请先背书一个版本再执行此操作。",
       "VersionAlreadyMinted": "该版本已被铸造。",
       "BasicInfoMismatch": "基础信息与链上版本不匹配。",

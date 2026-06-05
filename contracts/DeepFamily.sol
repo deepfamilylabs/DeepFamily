@@ -93,7 +93,7 @@ contract DeepFamily is
   error InvalidTrustedEndorser();
   error TrustedEndorserAlreadyAdded();
   error TrustedEndorserNotFound();
-  error MustBeVersionContributor();
+  error MustBeTrustedEndorserManager();
 
   // Query-related errors
   error PageSizeExceedsLimit();
@@ -632,9 +632,17 @@ contract DeepFamily is
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
   }
 
-  function _requireVersionContributor(bytes32 personHash, uint256 versionIndex) internal view {
-    if (personVersions[personHash][versionIndex - 1].addedBy != msg.sender) {
-      revert MustBeVersionContributor();
+  function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
+    uint256 tokenId = versionToTokenId[personHash][versionIndex];
+    if (tokenId == 0) {
+      if (personVersions[personHash][versionIndex - 1].addedBy != msg.sender) {
+        revert MustBeTrustedEndorserManager();
+      }
+      return;
+    }
+
+    if (_ownerOf(tokenId) != msg.sender) {
+      revert MustBeTrustedEndorserManager();
     }
   }
 
@@ -941,7 +949,7 @@ contract DeepFamily is
     uint256 versionIndex,
     address account
   ) external validPersonAndVersion(personHash, versionIndex) {
-    _requireVersionContributor(personHash, versionIndex);
+    _requireTrustedEndorserManager(personHash, versionIndex);
     _addTrustedEndorserInternal(personHash, versionIndex, account);
   }
 
@@ -950,7 +958,7 @@ contract DeepFamily is
     uint256 versionIndex,
     address account
   ) external validPersonAndVersion(personHash, versionIndex) {
-    _requireVersionContributor(personHash, versionIndex);
+    _requireTrustedEndorserManager(personHash, versionIndex);
     _removeTrustedEndorserInternal(personHash, versionIndex, account);
   }
 

@@ -7,6 +7,7 @@ import {
   computeProfileIdentityCommitment,
   makeEndorseAttestationRef,
   makeTestPerson,
+  mintPerson,
   setupStubVerifiers,
 } from "./helpers/testHelper.mjs";
 
@@ -56,7 +57,7 @@ describe("Trusted Endorser Sources", function () {
 
     await expect(
       deepFamily.connect(outsider).addTrustedEndorser(personHash, 1, sourceAddress),
-    ).to.be.revertedWithCustomError(deepFamily, "MustBeVersionContributor");
+    ).to.be.revertedWithCustomError(deepFamily, "MustBeTrustedEndorserManager");
 
     await expect(deepFamily.addTrustedEndorser(personHash, 1, sourceAddress))
       .to.emit(deepFamily, "TrustedEndorserAdded")
@@ -65,12 +66,58 @@ describe("Trusted Endorser Sources", function () {
 
     await expect(
       deepFamily.connect(outsider).removeTrustedEndorser(personHash, 1, sourceAddress),
-    ).to.be.revertedWithCustomError(deepFamily, "MustBeVersionContributor");
+    ).to.be.revertedWithCustomError(deepFamily, "MustBeTrustedEndorserManager");
 
     await expect(deepFamily.removeTrustedEndorser(personHash, 1, sourceAddress))
       .to.emit(deepFamily, "TrustedEndorserRemoved")
       .withArgs(personHash, 1, sourceAddress);
     expect(await deepFamily.trustedEndorserOf(personHash, 1, sourceAddress)).to.equal(false);
+  });
+
+  it("moves source management to the current NFT holder after mint and transfer", async () => {
+    const { deepFamily, signers } = await setupPerson();
+    const [contributor, firstHolder, secondHolder, source] = signers;
+    const contributorAddress = await contributor.getAddress();
+    const firstHolderAddress = await firstHolder.getAddress();
+    const secondHolderAddress = await secondHolder.getAddress();
+    const sourceAddress = await source.getAddress();
+    const minted = await mintPerson(
+      hre.ethers,
+      deepFamily,
+      contributor,
+      undefined,
+      "Minted Trusted Source Person",
+      { tokenURI: "ipfs://trusted-manager" },
+    );
+    const tokenId = await deepFamily.versionToTokenId(minted.personHash, 1);
+
+    await deepFamily
+      .connect(contributor)
+      .transferFrom(contributorAddress, firstHolderAddress, tokenId);
+
+    await expect(
+      deepFamily.connect(contributor).addTrustedEndorser(minted.personHash, 1, sourceAddress),
+    ).to.be.revertedWithCustomError(deepFamily, "MustBeTrustedEndorserManager");
+
+    await expect(
+      deepFamily.connect(firstHolder).addTrustedEndorser(minted.personHash, 1, sourceAddress),
+    )
+      .to.emit(deepFamily, "TrustedEndorserAdded")
+      .withArgs(minted.personHash, 1, sourceAddress);
+
+    await deepFamily
+      .connect(firstHolder)
+      .transferFrom(firstHolderAddress, secondHolderAddress, tokenId);
+
+    await expect(
+      deepFamily.connect(firstHolder).removeTrustedEndorser(minted.personHash, 1, sourceAddress),
+    ).to.be.revertedWithCustomError(deepFamily, "MustBeTrustedEndorserManager");
+
+    await expect(
+      deepFamily.connect(secondHolder).removeTrustedEndorser(minted.personHash, 1, sourceAddress),
+    )
+      .to.emit(deepFamily, "TrustedEndorserRemoved")
+      .withArgs(minted.personHash, 1, sourceAddress);
   });
 
   it("rejects zero, duplicate, and missing source updates", async () => {

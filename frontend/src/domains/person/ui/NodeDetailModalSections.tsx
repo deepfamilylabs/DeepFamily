@@ -327,11 +327,13 @@ export function NodeDetailTrustedEndorsersSection({
   t,
   nodeData,
   access,
+  owner,
   onCopy,
 }: {
   t: NodeDetailT;
   nodeData?: NodeData | null;
   access?: TrustedEndorserAccess;
+  owner?: string;
   onCopy: (text: string) => void;
 }) {
   const [accounts, setAccounts] = React.useState<string[]>([]);
@@ -344,7 +346,9 @@ export function NodeDetailTrustedEndorsersSection({
   const versionIndex = Number(nodeData?.versionIndex || 0);
   const connected = access?.connectedAddress?.toLowerCase();
   const addedBy = nodeData?.addedBy?.toLowerCase();
-  const canEdit = Boolean(access && connected && addedBy && connected === addedBy);
+  const ownerAddress = owner?.toLowerCase();
+  const managerAddress = isMinted(nodeData) ? ownerAddress : addedBy;
+  const canEdit = Boolean(access && connected && managerAddress && connected === managerAddress);
 
   const reload = React.useCallback(async () => {
     if (!access || !personHash || !versionIndex) return;

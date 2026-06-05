@@ -199,7 +199,7 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x349cbe19": "InvalidTrustedEndorser",
   "0x25f05b56": "TrustedEndorserAlreadyAdded",
   "0x6580f338": "TrustedEndorserNotFound",
-  "0x36e7a56e": "MustBeVersionContributor",
+  "0xcf3aa521": "MustBeTrustedEndorserManager",
   "0xf0d7613e": "MustEndorseVersionFirst",
   "0x8051cbca": "VersionAlreadyMinted",
   "0xbce3d23c": "BasicInfoMismatch",
@@ -292,7 +292,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   InvalidTrustedEndorser: "Recommended source account is invalid.",
   TrustedEndorserAlreadyAdded: "Recommended source account has already been added.",
   TrustedEndorserNotFound: "Recommended source account is not in this version list.",
-  MustBeVersionContributor: "Only the version contributor can manage recommended sources.",
+  MustBeTrustedEndorserManager:
+    "Only the current recommended source manager can update recommended sources.",
   MustEndorseVersionFirst: "You must endorse a version before this action.",
   VersionAlreadyMinted: "Version has already been minted.",
   BasicInfoMismatch: "Basic information does not match stored version.",
