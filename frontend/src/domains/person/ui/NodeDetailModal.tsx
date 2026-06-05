@@ -210,6 +210,7 @@ export default function NodeDetailModal({
             t={t}
             nodeData={nodeData}
             access={trustedEndorserAccess}
+            owner={owner}
             onCopy={onCopy}
           />
           <NodeDetailNftSection t={t} nodeData={nodeData} owner={owner} onCopy={onCopy} />

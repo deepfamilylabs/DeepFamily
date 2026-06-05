@@ -1234,7 +1234,7 @@
       "InvalidTrustedEndorser": "Recommended source account is invalid.",
       "TrustedEndorserAlreadyAdded": "Recommended source account has already been added.",
       "TrustedEndorserNotFound": "Recommended source account is not in this version list.",
-      "MustBeVersionContributor": "Only the version contributor can manage recommended sources.",
+      "MustBeTrustedEndorserManager": "Only the current recommended source manager can update recommended sources.",
       "MustEndorseVersionFirst": "Please endorse a version first before this action.",
       "VersionAlreadyMinted": "This version has already been minted.",
       "BasicInfoMismatch": "Basic information does not match stored version.",
