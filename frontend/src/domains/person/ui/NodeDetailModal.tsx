@@ -206,6 +206,7 @@ export default function NodeDetailModal({
             onCopy={onCopy}
             onDecryptCid={(cid) => navigate(`/decrypt?cid=${encodeURIComponent(cid)}`)}
           />
+          <NodeDetailNftSection t={t} nodeData={nodeData} owner={owner} onCopy={onCopy} />
           <NodeDetailTrustedEndorsersSection
             t={t}
             nodeData={nodeData}
@@ -213,7 +214,6 @@ export default function NodeDetailModal({
             owner={owner}
             onCopy={onCopy}
           />
-          <NodeDetailNftSection t={t} nodeData={nodeData} owner={owner} onCopy={onCopy} />
         </div>
         {/* Bottom spacer to ensure last row (e.g., URI) is visible above rounded edge / safe area */}
         <div className="h-4 sm:h-2" />
