@@ -76,6 +76,7 @@ export function TreeLayoutNodes(props: {
     <g>
       {nodes.map((pn) => {
         const ui = nodeUiById[pn.id];
+        if (!ui) return null;
         const isSel = pn.id === selectedId;
         const isHover = hoverId === pn.id;
         const tagText = ui.tagText || "";

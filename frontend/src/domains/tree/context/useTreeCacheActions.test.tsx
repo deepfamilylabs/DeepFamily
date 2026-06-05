@@ -3,6 +3,10 @@ import { act, renderHook } from "@testing-library/react";
 import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { QueryCache } from "../../../shared/cache/QueryCache";
+import {
+  trustedEndorsementVisibilityKey,
+  trustedEndorsersKey,
+} from "../../../shared/cache/queryKeys";
 import { makeNodeId, type NodeData, type NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { useTreeCacheActions } from "./useTreeCacheActions";
@@ -86,5 +90,44 @@ describe("useTreeCacheActions", () => {
       tokenId: "77",
       nftTokenURI: "ipfs://token",
     });
+  });
+
+  it("clearAllCaches drops trusted-source list and visibility caches", () => {
+    const personHash = `0x${"cd".repeat(32)}`;
+    const harness = createTreeCacheActionsHarness();
+    harness.queryCache.set(trustedEndorsersKey(personHash, 1), ["0xsource"]);
+    harness.queryCache.set(
+      trustedEndorsementVisibilityKey(personHash, 1, ["0xsource"]),
+      true,
+    );
+
+    act(() => {
+      harness.hook.result.current.clearAllCaches();
+    });
+
+    expect(harness.queryCache.get(trustedEndorsersKey(personHash, 1), 0)).toBeUndefined();
+    expect(
+      harness.queryCache.get(trustedEndorsementVisibilityKey(personHash, 1, ["0xsource"]), 0),
+    ).toBeUndefined();
+  });
+
+  it("invalidateByTx clears trusted visibility cache for an endorsed version", () => {
+    const personHash = `0x${"ef".repeat(32)}`;
+    const sources = ["0xsource"];
+    const harness = createTreeCacheActionsHarness();
+    harness.queryCache.set(trustedEndorsementVisibilityKey(personHash, 3, sources), false);
+    // A different version's visibility must survive a same-person endorsement.
+    harness.queryCache.set(trustedEndorsementVisibilityKey(personHash, 4, sources), true);
+
+    act(() => {
+      harness.hook.result.current.invalidateByTx({ hints: { personHash, versionIndex: 3 } });
+    });
+
+    expect(
+      harness.queryCache.get(trustedEndorsementVisibilityKey(personHash, 3, sources), 0),
+    ).toBeUndefined();
+    expect(
+      harness.queryCache.get(trustedEndorsementVisibilityKey(personHash, 4, sources), 0),
+    ).toBe(true);
   });
 });

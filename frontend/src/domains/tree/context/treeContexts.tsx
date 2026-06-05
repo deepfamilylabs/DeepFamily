@@ -16,6 +16,8 @@ export interface TreeGraphDataValue {
   rootExists: boolean;
   reachableNodeIds: NodeId[];
   endorsementsReady: boolean;
+  /** When true, a trusted-source filter is active and `reachableNodeIds` is the visible set. */
+  trustedFilterActive: boolean;
   nodesData: Record<string, NodeData>;
   edgesUnion: EdgeStoreUnion;
   edgesStrict: EdgeStoreStrict;

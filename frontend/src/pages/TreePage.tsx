@@ -14,16 +14,23 @@ import {
 import {
   EndorseModalProvider,
   NodeDetailProvider,
+  type TrustedEndorserAccess,
   useEndorseModal,
   useNodeDetail,
 } from "../domains/person";
 import { useConfig } from "../domains/config";
+import { useWallet } from "../domains/wallet";
 import { Activity, Layers, GitMerge } from "lucide-react";
 import {
   isForceEnvConfigSyncEnabled,
   isTreeDebugEnabled,
   shouldPreferFlatTree,
 } from "../shared/config/env";
+import {
+  createDeepFamilyContract,
+  createDeepFamilyReaderContract,
+} from "../shared/clients/contractFactory";
+import { getReadonlyProvider } from "../shared/clients/providerRegistry";
 
 /**
  * TreePage is intentionally a thin UI shell. The actual "data -> UI" pipeline is:
@@ -88,6 +95,7 @@ export default function TreePage() {
   const { t } = useTranslation();
   const { rootId, rootExists, nodesData } = useTreeGraphData();
   const { getOwnerOf } = useTreeNodeAccess();
+  const { address, signer } = useWallet();
   const { bumpEndorsementCount, invalidateByTx, mergeNodeDetail } = useTreeMutations();
   const {
     loading: loadingContract,
@@ -96,10 +104,68 @@ export default function TreePage() {
     refresh,
     clearAllCaches,
   } = useTreeStatus();
-  const { rpcUrl, chainId, readerAddress, rootHash, rootVersionIndex, defaults, update } =
-    useConfig();
+  const {
+    rpcUrl,
+    chainId,
+    contractAddress,
+    readerAddress,
+    rootHash,
+    rootVersionIndex,
+    defaults,
+    update,
+  } = useConfig();
   const forceEnvConfigSync = useMemo(() => isForceEnvConfigSyncEnabled(), []);
   const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
+  const trustedReader = useMemo(() => {
+    if (!rpcUrl || !readerAddress) return null;
+    try {
+      return createDeepFamilyReaderContract(readerAddress, getReadonlyProvider(rpcUrl, chainId));
+    } catch {
+      return null;
+    }
+  }, [chainId, readerAddress, rpcUrl]);
+
+  const trustedEndorserAccess = useMemo<TrustedEndorserAccess | undefined>(() => {
+    if (!trustedReader) return undefined;
+    const pageLimit = 200;
+    return {
+      connectedAddress: address,
+      loadTrustedEndorsers: async (personHash, versionIndex) => {
+        const accounts: string[] = [];
+        let offset = 0;
+        while (true) {
+          const out = await trustedReader.listTrustedEndorsers(
+            personHash,
+            Number(versionIndex),
+            offset,
+            pageLimit,
+          );
+          accounts.push(...Array.from(out?.[0] || []).map(String));
+          const hasMore = Boolean(out?.[2]);
+          const nextOffset = Number(out?.[3] || 0);
+          if (!hasMore || nextOffset === offset) break;
+          offset = nextOffset;
+        }
+        return accounts;
+      },
+      addTrustedEndorser: async (personHash, versionIndex, account) => {
+        if (!signer || !contractAddress) throw new Error("Wallet not connected");
+        const contract = createDeepFamilyContract(contractAddress, signer);
+        const tx = await contract.addTrustedEndorser(personHash, Number(versionIndex), account);
+        await tx.wait();
+        clearAllCaches();
+        refresh();
+      },
+      removeTrustedEndorser: async (personHash, versionIndex, account) => {
+        if (!signer || !contractAddress) throw new Error("Wallet not connected");
+        const contract = createDeepFamilyContract(contractAddress, signer);
+        const tx = await contract.removeTrustedEndorser(personHash, Number(versionIndex), account);
+        await tx.wait();
+        clearAllCaches();
+        refresh();
+      },
+    };
+  }, [address, clearAllCaches, contractAddress, refresh, signer, trustedReader]);
 
   useEffect(() => {
     if (!forceEnvConfigSync) return;
@@ -179,6 +245,7 @@ export default function TreePage() {
         <NodeDetailProvider
           nodesData={nodesData}
           getOwnerOf={getOwnerOf}
+          trustedEndorserAccess={trustedEndorserAccess}
           mergeNodeDetail={mergeNodeDetail}
         >
           <TreeInteractionBridge>

@@ -1,6 +1,12 @@
 import { makeNodeId, type NodeId } from "../../../shared/model";
 import { QueryCache } from "../../../shared/cache/QueryCache";
-import { csKey, cuKey, tvKey } from "../../../shared/cache/queryKeys";
+import {
+  csKey,
+  cuKey,
+  trustedEndorsementVisibilityKey,
+  trustedEndorsersKey,
+  tvKey,
+} from "../../../shared/cache/queryKeys";
 
 export type CheckAbort = () => void;
 export type CacheHook = () => void;
@@ -55,9 +61,33 @@ export interface TreeReadGateway {
     hasMore: boolean;
     nextOffset: number;
   }>;
+  listTrustedEndorsersAll: (
+    personHash: string,
+    versionIndex: number,
+    options: ListChildrenOptions & { ttlMs?: number },
+  ) => Promise<string[]>;
+  isVersionEndorsedByAny: (
+    personHash: string,
+    versionIndex: number,
+    accounts: string[],
+    options?: { ttlMs?: number },
+  ) => Promise<boolean>;
 }
 
 export function createTreeReadGateway(contract: any, queryCache: QueryCache): TreeReadGateway {
+  const normalizeAccounts = (accounts: string[]) =>
+    Array.from(
+      new Set(
+        accounts
+          .map((account) =>
+            String(account || "")
+              .trim()
+              .toLowerCase(),
+          )
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+
   const getTotalVersions = async (
     personHash: string,
     options: TotalVersionsOptions,
@@ -185,11 +215,7 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     }
   };
 
-  const listPersonVersionsPage = async (
-    personHash: string,
-    offset: number,
-    limit: number,
-  ) => {
+  const listPersonVersionsPage = async (personHash: string, offset: number, limit: number) => {
     const out = await contract.listPersonVersions(personHash, offset, limit);
     return {
       versions: Array.from(out?.[0] || []),
@@ -215,11 +241,80 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     };
   };
 
+  const listTrustedEndorsersAll = async (
+    personHash: string,
+    versionIndex: number,
+    options: ListChildrenOptions & { ttlMs?: number },
+  ): Promise<string[]> => {
+    const key = trustedEndorsersKey(personHash, versionIndex);
+    const ttlMs = options.ttlMs ?? 0;
+
+    return queryCache.fetchQuery(
+      key,
+      async () => {
+        const accounts: string[] = [];
+        const seen = new Set<string>();
+        let offset = 0;
+
+        while (true) {
+          options.checkAbort?.();
+          const out = await contract.listTrustedEndorsers(
+            personHash,
+            Number(versionIndex),
+            offset,
+            options.pageLimit,
+          );
+          const pageAccounts = Array.from(out?.[0] || []).map((account) =>
+            String(account).toLowerCase(),
+          );
+          for (const account of pageAccounts) {
+            if (seen.has(account)) continue;
+            seen.add(account);
+            accounts.push(account);
+          }
+          const hasMore = Boolean(out?.[2]);
+          const nextOffset = Number(out?.[3] || 0);
+          if (!hasMore || nextOffset === offset) break;
+          offset = nextOffset;
+        }
+
+        return accounts;
+      },
+      ttlMs,
+    );
+  };
+
+  const isVersionEndorsedByAny = async (
+    personHash: string,
+    versionIndex: number,
+    accounts: string[],
+    options: { ttlMs?: number } = {},
+  ): Promise<boolean> => {
+    const normalizedAccounts = normalizeAccounts(accounts);
+    if (normalizedAccounts.length === 0) return false;
+
+    const key = trustedEndorsementVisibilityKey(personHash, versionIndex, normalizedAccounts);
+    return queryCache.fetchQuery(
+      key,
+      async () =>
+        Boolean(
+          await contract.isVersionEndorsedByAny(
+            personHash,
+            Number(versionIndex),
+            normalizedAccounts,
+          ),
+        ),
+      options.ttlMs ?? 0,
+    );
+  };
+
   return {
     getTotalVersions,
     listChildrenStrictAll,
     listChildrenUnionAll,
     listPersonVersionsPage,
     listChildrenPage,
+    listTrustedEndorsersAll,
+    isVersionEndorsedByAny,
   };
 }

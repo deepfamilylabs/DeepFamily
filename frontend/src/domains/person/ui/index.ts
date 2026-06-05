@@ -1,4 +1,5 @@
 export { NodeDetailProvider, useNodeDetail, type NodeKeyMinimal } from "./NodeDetailProvider";
+export type { TrustedEndorserAccess } from "./NodeDetailModalSections";
 export {
   EndorseModalProvider,
   useEndorseModal,

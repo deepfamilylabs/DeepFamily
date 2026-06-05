@@ -12,6 +12,8 @@
  * - NFT details: `nft:${tokenId}`
  * - Story data: `story:${tokenId}`
  * - NFT owner: `owner:${tokenId}`
+ * - Trusted endorsers: `te:${hashLower}:${versionIndex}`
+ * - Trusted endorsement visibility: `tev:${hashLower}:${versionIndex}:${accountsKey}`
  * - Endorse fee: `endorseFee`
  */
 export function normalizeHashKey(hash: string): string {
@@ -51,6 +53,34 @@ export function storyKey(tokenId: string | number | bigint): string {
 /** NFT owner cache key (per tokenId). */
 export function ownerKey(tokenId: string | number | bigint): string {
   return `owner:${String(tokenId)}`;
+}
+
+/** Trusted endorser list cache key (per person hash + version index). */
+export function trustedEndorsersKey(personHash: string, versionIndex: number): string {
+  return `te:${normalizeHashKey(personHash)}:${Number(versionIndex)}`;
+}
+
+/** Visibility check key for a fixed trusted-source account set. */
+export function trustedEndorsementVisibilityKey(
+  personHash: string,
+  versionIndex: number,
+  accounts: string[],
+): string {
+  return `${trustedEndorsementVisibilityPrefix(personHash, versionIndex)}${accounts
+    .map((account) => String(account || "").toLowerCase())
+    .join(",")}`;
+}
+
+/**
+ * Prefix matching every visibility cache key for a person hash + version index,
+ * across all trusted-source account sets. Used to invalidate `tev:` entries when
+ * an endorsement changes a version's visibility.
+ */
+export function trustedEndorsementVisibilityPrefix(
+  personHash: string,
+  versionIndex: number,
+): string {
+  return `tev:${normalizeHashKey(personHash)}:${Number(versionIndex)}:`;
 }
 
 /** Endorsement fee cache key (singleton). */

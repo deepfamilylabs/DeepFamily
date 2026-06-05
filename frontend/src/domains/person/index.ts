@@ -19,7 +19,12 @@ export {
   type EndorseSuccessHandler,
   type EndorseTarget,
 } from "./ui/EndorseModalProvider";
-export { NodeDetailProvider, useNodeDetail, type NodeKeyMinimal } from "./ui/NodeDetailProvider";
+export {
+  NodeDetailProvider,
+  useNodeDetail,
+  type NodeKeyMinimal,
+  type TrustedEndorserAccess,
+} from "./ui";
 export {
   default as PersonHashCalculator,
   type HashForm,

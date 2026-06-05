@@ -498,7 +498,8 @@
         "ok": "正常"
       },
       "networkError": "网络请求失败",
-      "rateLimited": "已达到每日请求上限，请稍后再试"
+      "rateLimited": "已达到每日请求上限，请稍后再试",
+      "rootNotTrustedEndorsed": "当前根版本未被任何推荐来源背书"
     },
     "actions": {
       "refresh": "刷新",
@@ -531,6 +532,17 @@
       "uri": "URI",
       "loading": "NFT 信息加载中…",
       "decrypt": "解密查看",
+      "trustedEndorsers": "推荐来源",
+      "trustedAccount": "推荐账户",
+      "trustedLoading": "推荐来源加载中…",
+      "trustedEmpty": "暂无推荐来源，筛选已关闭。",
+      "trustedLoadFailed": "推荐来源加载失败。",
+      "trustedUpdateFailed": "推荐来源更新失败。",
+      "trustedAddressPlaceholder": "0x 账户地址",
+      "trustedAddressLabel": "推荐账户地址",
+      "invalidTrustedAddress": "请输入有效账户地址。",
+      "addTrusted": "添加",
+      "removeTrusted": "移除推荐来源",
       "genders": {
         "male": "男",
         "female": "女",
@@ -1219,6 +1231,10 @@
       "MalformedProofData": "证明数据格式错误。",
       "UnsupportedPurpose": "验证器不支持该证明用途。",
       "DuplicateVersion": "该人物版本已存在。",
+      "InvalidTrustedEndorser": "推荐来源账户无效。",
+      "TrustedEndorserAlreadyAdded": "该推荐来源账户已添加。",
+      "TrustedEndorserNotFound": "该推荐来源账户不在此版本名单中。",
+      "MustBeVersionContributor": "只有版本添加者可以管理推荐来源。",
       "MustEndorseVersionFirst": "请先背书一个版本再执行此操作。",
       "VersionAlreadyMinted": "该版本已被铸造。",
       "BasicInfoMismatch": "基础信息与链上版本不匹配。",
