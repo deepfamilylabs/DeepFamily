@@ -15,3 +15,4 @@ export { useResponsiveModalMode } from "./useResponsiveModalMode";
 export { useListboxA11y } from "./useListboxA11y";
 export type { UseListboxA11yOptions } from "./useListboxA11y";
 export { getFieldErrorA11y } from "./fieldA11y";
+export { OVERLAY_Z_INDEX } from "./overlayLayers";

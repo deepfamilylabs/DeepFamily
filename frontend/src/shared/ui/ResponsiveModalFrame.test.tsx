@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { User } from "lucide-react";
 import { ResponsiveModalFrame } from "./ResponsiveModalFrame";
+import { OVERLAY_Z_INDEX } from "./overlayLayers";
 
 afterEach(() => {
   cleanup();
@@ -52,6 +53,14 @@ describe("ResponsiveModalFrame", () => {
     const desktop = renderFrame({ isDesktop: true });
     fireEvent.click(screen.getByRole("dialog", { name: "Responsive modal" }));
     expect(desktop.onClose).not.toHaveBeenCalled();
+  });
+
+  it("uses the app modal overlay layer by default", () => {
+    renderFrame();
+
+    expect(screen.getByRole("dialog", { name: "Responsive modal" }).className).toContain(
+      OVERLAY_Z_INDEX.appModal,
+    );
   });
 
   it("does not close when clicking inside the panel", () => {

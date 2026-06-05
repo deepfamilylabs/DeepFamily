@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDialogA11y } from "./useDialogA11y";
+import { OVERLAY_Z_INDEX } from "./overlayLayers";
 
 export interface ModalShellProps {
   /** Whether the modal is visible */
@@ -10,7 +11,7 @@ export interface ModalShellProps {
   onClose: () => void;
   /** Maximum width utility class (default: "max-w-md"). Ignored when bare=true. */
   maxWidth?: string;
-  /** z-index utility class (default: "z-[1300]") */
+  /** z-index utility class (default: OVERLAY_Z_INDEX.modal) */
   zIndex?: string;
   /** Accessible label for the dialog */
   ariaLabel?: string;
@@ -51,7 +52,7 @@ export function ModalShell({
   isOpen,
   onClose,
   maxWidth = "max-w-md",
-  zIndex = "z-[1300]",
+  zIndex = OVERLAY_Z_INDEX.modal,
   ariaLabel,
   ariaLabelledBy,
   ariaDescribedBy,

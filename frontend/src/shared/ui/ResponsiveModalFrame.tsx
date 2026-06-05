@@ -1,6 +1,7 @@
 import type React from "react";
 import { X } from "lucide-react";
 import { ModalShell } from "./ModalShell";
+import { OVERLAY_Z_INDEX } from "./overlayLayers";
 import { useBottomSheetDrag } from "./useBottomSheetDrag";
 
 export type ResponsiveModalFrameProps = {
@@ -12,6 +13,7 @@ export type ResponsiveModalFrameProps = {
   title: React.ReactNode;
   description?: React.ReactNode;
   entered: boolean;
+  zIndex?: string;
   closeLabel?: string;
   children: React.ReactNode;
 };
@@ -25,6 +27,7 @@ export function ResponsiveModalFrame({
   title,
   description,
   entered,
+  zIndex = OVERLAY_Z_INDEX.appModal,
   closeLabel = "Close",
   children,
 }: ResponsiveModalFrameProps) {
@@ -36,7 +39,7 @@ export function ResponsiveModalFrame({
       isOpen={isOpen}
       onClose={onClose}
       bare
-      zIndex="z-[10020]"
+      zIndex={zIndex}
       ariaLabel={ariaLabel}
       disableBackdropClose={isDesktop}
     >
