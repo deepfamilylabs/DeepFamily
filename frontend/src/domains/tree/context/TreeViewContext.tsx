@@ -85,6 +85,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
       createTreeNodeDataAccess({
         api: runtime.api,
         contract: runtime.contract,
+        nftContract: runtime.nftContract,
         contractAddress: runtime.contractAddress,
         provider: runtime.provider,
         nodesDataRef,
@@ -95,7 +96,14 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
         storyPageLimit: STORY_PAGE_LIMIT,
         storyRevalidateRef: runtime.storyRevalidateRef,
       }),
-    [runtime.api, runtime.contract, runtime.contractAddress, runtime.provider, runtime.storageNS],
+    [
+      runtime.api,
+      runtime.contract,
+      runtime.nftContract,
+      runtime.contractAddress,
+      runtime.provider,
+      runtime.storageNS,
+    ],
   );
 
   const { getNodeByTokenId, getStoryData, preloadStoryData, getOwnerOf } = nodeDataAccess;
@@ -108,27 +116,27 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     markVersionMinted,
     mergeNodeDetail,
   } = useTreeCacheActions({
-      api: runtime.api,
-      contract: runtime.contract,
-      contractAddress: runtime.contractAddress,
-      eventInterfaceRef: runtime.eventInterfaceRef,
-      queryCacheRef: runtime.queryCacheRef,
-      nodesDataRef,
-      edgesStrictRef,
-      reachableNodeIdsRef,
-      setNodesData,
-      setEdgesUnion,
-      setEdgesStrict,
-      setReachableNodeIds,
-      setProgress,
-      refresh: runtime.refresh,
-      storageNS: runtime.storageNS,
-      edgesUnionKey: runtime.edgesUnionKey,
-      edgesStrictKey: runtime.edgesStrictKey,
-      useIndexedDbCache: USE_INDEXEDDB_CACHE,
-      childrenPageLimit: CHILDREN_PAGE_LIMIT,
-      totalVersionsTtlMs: TOTAL_VERSIONS_TTL_MS,
-    });
+    api: runtime.api,
+    contract: runtime.contract,
+    contractAddress: runtime.contractAddress,
+    eventInterfaceRef: runtime.eventInterfaceRef,
+    queryCacheRef: runtime.queryCacheRef,
+    nodesDataRef,
+    edgesStrictRef,
+    reachableNodeIdsRef,
+    setNodesData,
+    setEdgesUnion,
+    setEdgesStrict,
+    setReachableNodeIds,
+    setProgress,
+    refresh: runtime.refresh,
+    storageNS: runtime.storageNS,
+    edgesUnionKey: runtime.edgesUnionKey,
+    edgesStrictKey: runtime.edgesStrictKey,
+    useIndexedDbCache: USE_INDEXEDDB_CACHE,
+    childrenPageLimit: CHILDREN_PAGE_LIMIT,
+    totalVersionsTtlMs: TOTAL_VERSIONS_TTL_MS,
+  });
 
   const graphValue: TreeGraphDataValue = {
     rootId: runtime.rootId,
@@ -180,10 +188,4 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     </TreeProviderContexts>
   );
 }
-export {
-  useTreeDebugData,
-  useTreeGraphData,
-  useTreeMutations,
-  useTreeNodeAccess,
-  useTreeStatus,
-};
+export { useTreeDebugData, useTreeGraphData, useTreeMutations, useTreeNodeAccess, useTreeStatus };

@@ -27,6 +27,7 @@ interface TreeNodeDataAccessOptions {
     getNFTDetails: (tokenId: string, options?: { ttlMs?: number }) => Promise<ParsedNftDetails>;
   } | null;
   contract: any;
+  nftContract?: any;
   contractAddress?: string | null;
   provider: any;
   nodesDataRef: RefLike<Record<string, NodeData>>;
@@ -202,8 +203,6 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
   };
 
   const getOwnerOf = async (tokenId: string): Promise<string | null> => {
-    if (!options.contract) return null;
-
     const currentOwner = getOwnerFromTokenNode(options.nodesDataRef.current, tokenId);
     if (currentOwner) return currentOwner;
 
@@ -216,8 +215,11 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
       }
     }
 
+    const nftContract = options.nftContract ?? options.contract;
+    if (!nftContract?.ownerOf) return null;
+
     try {
-      const owner = await options.contract.ownerOf(tokenId);
+      const owner = await nftContract.ownerOf(tokenId);
       options.setNodesData((prev) => applyOwnerToTokenNode(prev, tokenId, owner));
       return owner;
     } catch {
