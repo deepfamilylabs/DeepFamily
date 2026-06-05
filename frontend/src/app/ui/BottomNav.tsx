@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Home, Network, Search, Book, ScrollText } from "lucide-react";
+import { Home, Network, Search, Book } from "lucide-react";
 import { useActivePath } from "../context";
 
 export default function BottomNav() {
@@ -94,29 +94,6 @@ export default function BottomNav() {
                   className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
                 >
                   {t("navigation.people")}
-                </span>
-              </>
-            );
-          }}
-        </NavLink>
-        <NavLink
-          to="/genealogyBook"
-          className={() => getNavItemClasses(isPathActive("/genealogyBook"))}
-          onClick={() => handleNavClick("/genealogyBook")}
-        >
-          {() => {
-            const isActive = isPathActive("/genealogyBook");
-            return (
-              <>
-                <div className={getIconContainerClass(isActive)}>
-                  <ScrollText
-                    className={`w-6 h-6 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`}
-                  />
-                </div>
-                <span
-                  className={`mt-1 text-[10px] font-semibold tracking-wide transition-all duration-300 ${isActive ? "opacity-100" : "opacity-70"}`}
-                >
-                  {t("navigation.genealogyBook", "Genealogy")}
                 </span>
               </>
             );

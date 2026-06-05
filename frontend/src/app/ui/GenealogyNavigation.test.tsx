@@ -65,7 +65,7 @@ describe("genealogy book navigation", () => {
     cleanup();
   });
 
-  it("exposes genealogy book links in the desktop header and mobile bottom nav", () => {
+  it("no longer exposes genealogy book links in the main navigation (moved to the tree view switcher)", () => {
     render(
       <MemoryRouter>
         <SiteHeader />
@@ -77,7 +77,7 @@ describe("genealogy book navigation", () => {
       .getAllByRole("link")
       .filter((link) => link.getAttribute("href") === "/genealogyBook");
 
-    expect(links).toHaveLength(2);
-    expect(screen.getAllByText("Genealogy")).toHaveLength(2);
+    expect(links).toHaveLength(0);
+    expect(screen.queryByText("Genealogy")).toBeNull();
   });
 });

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type ViewMode = "tree" | "dag" | "force" | "virtual";
 
 interface ViewModeSwitchProps {
@@ -5,11 +7,16 @@ interface ViewModeSwitchProps {
   onChange: (m: ViewMode) => void;
   labels: { tree: string; dag: string; force: string; virtual: string };
   disabled?: boolean;
+  // Optional trailing button that navigates away instead of switching the inline view.
+  // It is never part of `ViewMode`, so it never touches the persisted view state.
+  extraAction?: { label: string; icon?: ReactNode; onClick: () => void };
 }
 
-const order: ViewMode[] = ["tree", "dag", "force", "virtual"];
+// "force" is temporarily hidden from the switcher (force-directed view quality isn't good enough yet).
+// The mode stays fully wired in ViewContainer/ViewMode, so re-enabling is just adding "force" back here.
+const order: ViewMode[] = ["tree", "dag", "virtual"];
 
-export default function ViewModeSwitch({ value, onChange, labels, disabled }: ViewModeSwitchProps) {
+export default function ViewModeSwitch({ value, onChange, labels, disabled, extraAction }: ViewModeSwitchProps) {
   return (
     <div className="relative inline-flex h-9 md:h-10 select-none rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 md:p-1 gap-0.5 md:gap-1 max-w-full border border-slate-200 dark:border-slate-700">
       {order.map((m) => (
@@ -102,6 +109,18 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
           <span className="hidden md:inline whitespace-nowrap">{labels[m]}</span>
         </button>
       ))}
+      {extraAction && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={extraAction.onClick}
+          title={extraAction.label}
+          className="relative z-10 ml-0.5 md:ml-1 inline-flex items-center justify-center gap-1 md:gap-1.5 pl-2.5 md:pl-4 pr-2.5 md:pr-4 rounded-full h-full transition-colors duration-200 focus:outline-none text-xs font-medium flex-shrink min-w-0 touch-manipulation whitespace-nowrap border-l border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+        >
+          {extraAction.icon}
+          <span className="hidden md:inline whitespace-nowrap">{extraAction.label}</span>
+        </button>
+      )}
     </div>
   );
 }
