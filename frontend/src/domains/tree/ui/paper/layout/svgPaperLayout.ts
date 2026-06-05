@@ -1,7 +1,12 @@
 import type { NodeId } from "../../../../../shared/model";
 import { computeTreeLayout } from "../../layout/treeLayout";
 import type { TreeGraphData } from "../../../selectors";
-import type { PaperGeneration, PaperGenealogyStyle, PaperPerson } from "../paperData";
+import {
+  PAPER_GENEALOGY_STYLE,
+  type PaperGeneration,
+  type PaperGenealogyStyle,
+  type PaperPerson,
+} from "../paperData";
 
 export type SvgPaperNode = PaperPerson & {
   x: number;
@@ -81,6 +86,24 @@ function buildTreeBackedLayout(
   };
 }
 
+function buildEmptySvgPaperLayout(): SvgPaperLayout {
+  return { nodes: [], edges: [], guides: [], width: 0, height: 0 };
+}
+
+type SvgPaperLayoutBuilder = (
+  graph: TreeGraphData,
+  rootId: NodeId | null,
+  generations: PaperGeneration[],
+) => SvgPaperLayout;
+
+const SVG_PAPER_LAYOUT_BUILDERS = {
+  [PAPER_GENEALOGY_STYLE.OU]: buildEmptySvgPaperLayout,
+  [PAPER_GENEALOGY_STYLE.DIEJI]: buildTreeBackedLayout,
+  [PAPER_GENEALOGY_STYLE.PAGODA]: buildEmptySvgPaperLayout,
+  [PAPER_GENEALOGY_STYLE.LINEAGE]: buildEmptySvgPaperLayout,
+  [PAPER_GENEALOGY_STYLE.MODERN]: buildEmptySvgPaperLayout,
+} satisfies Record<PaperGenealogyStyle, SvgPaperLayoutBuilder>;
+
 export function buildSvgPaperLayout(params: {
   style: PaperGenealogyStyle;
   graph: TreeGraphData;
@@ -88,6 +111,5 @@ export function buildSvgPaperLayout(params: {
   generations: PaperGeneration[];
 }): SvgPaperLayout {
   const { style, graph, rootId, generations } = params;
-  if (style === "su") return buildTreeBackedLayout(graph, rootId, generations);
-  return { nodes: [], edges: [], guides: [], width: 0, height: 0 };
+  return SVG_PAPER_LAYOUT_BUILDERS[style](graph, rootId, generations);
 }

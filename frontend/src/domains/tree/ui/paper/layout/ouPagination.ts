@@ -4,7 +4,7 @@ import {
   type PaperPerson,
   type TranslateFn,
 } from "../paperData";
-import { getPaperRelationLabel, toChineseNumeral } from "../paperText";
+import { getPaperGenerationMark, getPaperRelationLabel, toChineseNumeral } from "../paperText";
 
 export type OuPageSide = "left" | "right";
 
@@ -36,8 +36,6 @@ export type OuPersonRecordEntry = {
   key: string;
   person: PaperPerson;
   text: string;
-  // Parentage label (e.g. "曹操长子" / "始祖") shown above the name, Su-style. Only the first
-  // part of a person carries it; continuation parts leave it empty.
   relationLabel: string;
   side: OuPageSide;
   slotSpan: number;
@@ -63,7 +61,7 @@ export const OU_LEFT_PAGE_BODY_WIDTH = OU_RIGHT_PAGE_BODY_WIDTH + 56;
 export const OU_COLUMN_ALIGNMENT_WIDTH = 14;
 export const OU_PERSON_MIN_WIDTH = 112;
 export const OU_PERSON_BASE_WIDTH = 84;
-// Calibrated to the 13px body text (matching the Su-style 正文): a column is ~144px tall
+// Calibrated to the 13px body text used by vertical paper records: a column is ~144px tall
 // (168px row − 24px py-3 padding), fitting ~12 full-width glyphs at 13px, and each column
 // advances ceil(13px × 1.55 line-height) ≈ 21px horizontally.
 export const OU_RECORD_CHARS_PER_COLUMN = 12;
@@ -99,10 +97,7 @@ function formatOuRecordLine(line: string): string {
 }
 
 export function getOuGenerationMark(depth: number, t: TranslateFn): string {
-  return t("genealogyBook.ouGenerationMark", "{{han}}世", {
-    han: toChineseNumeral(depth + 1),
-    number: depth + 1,
-  });
+  return getPaperGenerationMark(depth, t);
 }
 
 export function getOuFullRecordText(person: PaperPerson, t?: TranslateFn): string {
@@ -235,7 +230,7 @@ function paginateGenerationEntries(
   for (const person of people) {
     let partIndex = 0;
     // The parentage label rides above the name on the first part only, so the biography body is
-    // laid out unchanged — no inline "曹操长子，…" prefix. Same Su-style two-column shape: the
+    // laid out unchanged — no inline "曹操长子，…" prefix. Same shared two-column shape: the
     // father name and rank word are "\n"-joined so the renderer lays them out as adjacent vertical
     // columns (father on the right, 长子/之子 on the left).
     const relationLabel = getPaperRelationLabel(person, t, {

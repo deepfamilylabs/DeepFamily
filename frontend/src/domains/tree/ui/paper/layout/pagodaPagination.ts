@@ -2,7 +2,7 @@ import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
 import { PAPER_TEXT } from "../paperStyles";
-import { clipText, toChineseNumeral } from "../paperText";
+import { clipText, getPaperGenerationMark, toChineseNumeral } from "../paperText";
 
 export type PagodaNode = PaperPerson & {
   x: number;
@@ -107,10 +107,7 @@ function getGenerationLabel(
 }
 
 export function getPagodaGenerationMark(depth: number, t: TranslateFn): string {
-  return t("genealogyBook.suGenerationMark", "{{han}}世", {
-    han: toChineseNumeral(depth + 1),
-    number: depth + 1,
-  });
+  return getPaperGenerationMark(depth, t);
 }
 
 function getPagodaVisibleName(person: PaperPerson): string {

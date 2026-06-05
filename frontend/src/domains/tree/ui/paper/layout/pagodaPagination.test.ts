@@ -192,14 +192,14 @@ describe("buildPagodaPaperBook", () => {
     expect(book.charts[0].pages[0].title).toBe("一世至五世系图");
   });
 
-  it("uses localized title text and reuses the Su-style generation mark key", () => {
+  it("uses localized title text and the shared generation mark key", () => {
     const linear = makeLinearGraph(2);
     const generations = makeGenerations(linear.graph);
     const englishTranslate: TranslateFn = (key, fallback, options) => {
       if (key === "genealogyBook.pagodaChartTitle") {
         return `Generations ${options?.start}-${options?.end} lineage chart`;
       }
-      if (key === "genealogyBook.suGenerationMark") {
+      if (key === "genealogyBook.generationMark") {
         return `Gen ${options?.number}`;
       }
       return (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
@@ -298,7 +298,7 @@ describe("buildPagodaPaperBook", () => {
     );
   });
 
-  it("uses the same fixed page size as the Ou/Su paper spread", () => {
+  it("uses the same fixed page size as the facing paper spread", () => {
     const branch = makeTwoBranchGraph();
     const generations = makeGenerations(branch.graph);
 

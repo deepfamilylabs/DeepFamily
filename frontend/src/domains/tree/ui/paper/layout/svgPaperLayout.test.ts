@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../../shared/model";
-import { buildPaperGenerations, type TranslateFn } from "../paperData";
+import { buildPaperGenerations, PAPER_GENEALOGY_STYLE, type TranslateFn } from "../paperData";
 import { buildSvgPaperLayout } from "./svgPaperLayout";
 
 const translate: TranslateFn = (key, fallback, options) =>
@@ -44,11 +44,16 @@ function makeGraph() {
 }
 
 describe("buildSvgPaperLayout", () => {
-  it("uses Su-style SVG node dimensions for legacy SVG layouts", () => {
+  it("uses the tree-backed node dimensions for legacy vertical-register SVG layouts", () => {
     const { graph, rootId, nodesData } = makeGraph();
     const generations = buildPaperGenerations({ graph, nodesData, t: translate });
 
-    const layout = buildSvgPaperLayout({ style: "su", graph, rootId, generations });
+    const layout = buildSvgPaperLayout({
+      style: PAPER_GENEALOGY_STYLE.DIEJI,
+      graph,
+      rootId,
+      generations,
+    });
 
     expect(layout.nodes[0].w).toBe(122);
     expect(layout.nodes[0].h).toBe(132);

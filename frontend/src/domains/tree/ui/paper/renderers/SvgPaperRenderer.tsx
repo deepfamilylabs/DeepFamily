@@ -10,7 +10,11 @@ import {
   type SvgPaperLayout,
   type SvgPaperNode,
 } from "../layout/svgPaperLayout";
-import type { PaperGeneration, PaperGenealogyStyle } from "../paperData";
+import {
+  PAPER_GENEALOGY_STYLE,
+  type PaperGeneration,
+  type PaperGenealogyStyle,
+} from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
   PAPER_NOTE_FONT_STACK,
@@ -18,6 +22,134 @@ import {
   PAPER_VARS,
 } from "../paperStyles";
 import { clipText } from "../paperText";
+
+type SvgGuideConfig = {
+  orientation: "vertical" | "horizontal";
+  showVolumeLabel: boolean;
+};
+
+const SVG_GUIDE_CONFIG = {
+  [PAPER_GENEALOGY_STYLE.OU]: { orientation: "vertical", showVolumeLabel: true },
+  [PAPER_GENEALOGY_STYLE.DIEJI]: { orientation: "horizontal", showVolumeLabel: false },
+  [PAPER_GENEALOGY_STYLE.PAGODA]: { orientation: "horizontal", showVolumeLabel: false },
+  [PAPER_GENEALOGY_STYLE.LINEAGE]: { orientation: "horizontal", showVolumeLabel: false },
+  [PAPER_GENEALOGY_STYLE.MODERN]: { orientation: "horizontal", showVolumeLabel: false },
+} satisfies Record<PaperGenealogyStyle, SvgGuideConfig>;
+
+type SvgEdgeConfig =
+  | { route: "side" }
+  | {
+      route: "down";
+      minMidY: number;
+    };
+
+const SVG_EDGE_CONFIG = {
+  [PAPER_GENEALOGY_STYLE.OU]: { route: "side" },
+  [PAPER_GENEALOGY_STYLE.DIEJI]: { route: "down", minMidY: 24 },
+  [PAPER_GENEALOGY_STYLE.PAGODA]: { route: "down", minMidY: 18 },
+  [PAPER_GENEALOGY_STYLE.LINEAGE]: { route: "down", minMidY: 18 },
+  [PAPER_GENEALOGY_STYLE.MODERN]: { route: "down", minMidY: 18 },
+} satisfies Record<PaperGenealogyStyle, SvgEdgeConfig>;
+
+type SvgNodeConfig = {
+  titleMaxLength: number;
+  detailLineCount: number;
+  lineHeight: number;
+  titleY: number;
+  rectRx: number;
+  titleFontSize: number;
+  verticalText: boolean;
+  showTopStem: boolean;
+  detailY: number;
+  detailTextAnchor: "start" | "middle";
+  detailMaxLength: number;
+  stackDetailColumns: boolean;
+  getDetailTextX: (node: SvgPaperNode) => number;
+  getDetailLineX: (node: SvgPaperNode, index: number) => number;
+};
+
+const SVG_NODE_CONFIG = {
+  [PAPER_GENEALOGY_STYLE.OU]: {
+    titleMaxLength: 16,
+    detailLineCount: 5,
+    lineHeight: 16,
+    titleY: 24,
+    rectRx: 2,
+    titleFontSize: 16,
+    verticalText: false,
+    showTopStem: false,
+    detailY: 48,
+    detailTextAnchor: "start",
+    detailMaxLength: 22,
+    stackDetailColumns: false,
+    getDetailTextX: () => 14,
+    getDetailLineX: () => 14,
+  },
+  [PAPER_GENEALOGY_STYLE.DIEJI]: {
+    titleMaxLength: 10,
+    detailLineCount: 4,
+    lineHeight: 17,
+    titleY: 32,
+    rectRx: 10,
+    titleFontSize: 15,
+    verticalText: true,
+    showTopStem: true,
+    detailY: 58,
+    detailTextAnchor: "middle",
+    detailMaxLength: 14,
+    stackDetailColumns: true,
+    getDetailTextX: (node) => node.w / 2 + 28,
+    getDetailLineX: (node, index) => node.w / 2 + 28 - index * 15,
+  },
+  [PAPER_GENEALOGY_STYLE.PAGODA]: {
+    titleMaxLength: 16,
+    detailLineCount: 3,
+    lineHeight: 16,
+    titleY: 30,
+    rectRx: 2,
+    titleFontSize: 16,
+    verticalText: false,
+    showTopStem: false,
+    detailY: 54,
+    detailTextAnchor: "middle",
+    detailMaxLength: 14,
+    stackDetailColumns: false,
+    getDetailTextX: (node) => node.w / 2,
+    getDetailLineX: (node) => node.w / 2,
+  },
+  [PAPER_GENEALOGY_STYLE.LINEAGE]: {
+    titleMaxLength: 16,
+    detailLineCount: 5,
+    lineHeight: 16,
+    titleY: 24,
+    rectRx: 2,
+    titleFontSize: 16,
+    verticalText: false,
+    showTopStem: false,
+    detailY: 48,
+    detailTextAnchor: "middle",
+    detailMaxLength: 14,
+    stackDetailColumns: false,
+    getDetailTextX: (node) => node.w / 2,
+    getDetailLineX: (node) => node.w / 2,
+  },
+  [PAPER_GENEALOGY_STYLE.MODERN]: {
+    titleMaxLength: 16,
+    detailLineCount: 5,
+    lineHeight: 16,
+    titleY: 24,
+    rectRx: 2,
+    titleFontSize: 16,
+    verticalText: false,
+    showTopStem: false,
+    detailY: 48,
+    detailTextAnchor: "middle",
+    detailMaxLength: 14,
+    stackDetailColumns: false,
+    getDetailTextX: (node) => node.w / 2,
+    getDetailLineX: (node) => node.w / 2,
+  },
+} satisfies Record<PaperGenealogyStyle, SvgNodeConfig>;
 
 function PaperSvgGuides({
   style,
@@ -27,19 +159,20 @@ function PaperSvgGuides({
   layout: SvgPaperLayout;
 }) {
   const { t } = useTranslation();
+  const guideConfig = SVG_GUIDE_CONFIG[style];
   return (
     <g pointerEvents="none">
       {layout.guides.map((guide) => {
         const generationText = t("genealogyBook.generationLabel", "Generation {{number}}", {
           number: guide.depth + 1,
         });
-        const volumeText =
-          style === "ou" && guide.depth % 5 === 0
-            ? t("genealogyBook.volumeLabel", "Volume {{number}}", {
-                number: Math.floor(guide.depth / 5) + 1,
-              })
-            : "";
-        if (style === "ou") {
+        const isVolumeBoundary = guideConfig.showVolumeLabel && guide.depth % 5 === 0;
+        const volumeText = isVolumeBoundary
+          ? t("genealogyBook.volumeLabel", "Volume {{number}}", {
+              number: Math.floor(guide.depth / 5) + 1,
+            })
+          : "";
+        if (guideConfig.orientation === "vertical") {
           return (
             <g key={guide.depth}>
               <line
@@ -48,7 +181,7 @@ function PaperSvgGuides({
                 x2={guide.x}
                 y2={layout.height - 36}
                 stroke="var(--df-paper-line-soft)"
-                strokeDasharray={guide.depth % 5 === 0 ? "0" : "4 8"}
+                strokeDasharray={isVolumeBoundary ? "0" : "4 8"}
               />
               <text
                 x={guide.x}
@@ -120,13 +253,14 @@ function PaperSvgEdges({
   edges: SvgPaperEdge[];
 }) {
   const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const edgeConfig = SVG_EDGE_CONFIG[style];
   return (
     <g fill="none" stroke="var(--df-paper-line)" strokeWidth={1.4} strokeOpacity={0.78}>
       {edges.map((edge) => {
         const from = byId.get(edge.from);
         const to = byId.get(edge.to);
         if (!from || !to) return null;
-        if (style === "ou") {
+        if (edgeConfig.route === "side") {
           const x1 = from.x;
           const y1 = from.y + from.h / 2;
           const x2 = to.x + to.w;
@@ -143,17 +277,7 @@ function PaperSvgEdges({
         const y1 = from.y + from.h;
         const x2 = to.x + to.w / 2;
         const y2 = to.y;
-        if (style === "su") {
-          const midY = y1 + Math.max(24, (y2 - y1) / 2);
-          return (
-            <path
-              key={`${edge.from}->${edge.to}`}
-              d={`M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`}
-              strokeLinecap="square"
-            />
-          );
-        }
-        const midY = y1 + Math.max(18, (y2 - y1) / 2);
+        const midY = y1 + Math.max(edgeConfig.minMidY, (y2 - y1) / 2);
         return (
           <path
             key={`${edge.from}->${edge.to}`}
@@ -173,16 +297,14 @@ function SvgPaperPersonNode({
   node: SvgPaperNode;
   style: PaperGenealogyStyle;
 }) {
-  const title = clipText(node.ui.titleText || node.ui.shortHashText, style === "su" ? 10 : 16);
-  const details = node.classicalLines.slice(0, style === "pagoda" ? 3 : style === "su" ? 4 : 5);
-  const lineHeight = style === "su" ? 17 : 16;
-  const titleY = style === "pagoda" ? 30 : style === "su" ? 32 : 24;
-  const rectRx = style === "pagoda" ? 2 : style === "su" ? 10 : 2;
+  const nodeConfig = SVG_NODE_CONFIG[style];
+  const title = clipText(node.ui.titleText || node.ui.shortHashText, nodeConfig.titleMaxLength);
+  const details = node.classicalLines.slice(0, nodeConfig.detailLineCount);
 
   return (
     <g transform={`translate(${node.x}, ${node.y})`} data-testid={`paper-node-${node.id}`}>
       <title>{node.ui.personHash}</title>
-      {style === "su" ? (
+      {nodeConfig.showTopStem ? (
         <>
           <line
             x1={node.w / 2}
@@ -205,8 +327,8 @@ function SvgPaperPersonNode({
       <rect
         width={node.w}
         height={node.h}
-        rx={rectRx}
-        ry={rectRx}
+        rx={nodeConfig.rectRx}
+        ry={nodeConfig.rectRx}
         fill="var(--df-paper-panel)"
         stroke="var(--df-paper-line)"
         strokeWidth={1.2}
@@ -216,46 +338,46 @@ function SvgPaperPersonNode({
         y={6}
         width={node.w - 12}
         height={node.h - 12}
-        rx={Math.max(1, rectRx - 1)}
-        ry={Math.max(1, rectRx - 1)}
+        rx={Math.max(1, nodeConfig.rectRx - 1)}
+        ry={Math.max(1, nodeConfig.rectRx - 1)}
         fill="none"
         stroke="var(--df-paper-line-soft)"
         strokeWidth={0.8}
       />
       <text
         x={node.w / 2}
-        y={titleY}
+        y={nodeConfig.titleY}
         textAnchor="middle"
         style={{
           fill: "var(--df-paper-ink)",
           fontFamily: PAPER_TITLE_FONT_STACK,
-          fontSize: style === "su" ? 15 : 16,
+          fontSize: nodeConfig.titleFontSize,
           fontWeight: 700,
-          writingMode: style === "su" ? "vertical-rl" : undefined,
-          textOrientation: style === "su" ? "mixed" : undefined,
+          writingMode: nodeConfig.verticalText ? "vertical-rl" : undefined,
+          textOrientation: nodeConfig.verticalText ? "mixed" : undefined,
         }}
       >
         {title}
       </text>
       <text
-        x={style === "ou" ? 14 : style === "su" ? node.w / 2 + 28 : node.w / 2}
-        y={style === "pagoda" ? 54 : style === "su" ? 58 : 48}
-        textAnchor={style === "ou" ? "start" : "middle"}
+        x={nodeConfig.getDetailTextX(node)}
+        y={nodeConfig.detailY}
+        textAnchor={nodeConfig.detailTextAnchor}
         style={{
           fill: "var(--df-paper-muted)",
           fontFamily: PAPER_NOTE_FONT_STACK,
           fontSize: 12,
-          writingMode: style === "su" ? "vertical-rl" : undefined,
-          textOrientation: style === "su" ? "mixed" : undefined,
+          writingMode: nodeConfig.verticalText ? "vertical-rl" : undefined,
+          textOrientation: nodeConfig.verticalText ? "mixed" : undefined,
         }}
       >
         {details.map((line, index) => (
           <tspan
             key={`${line}-${index}`}
-            x={style === "ou" ? 14 : style === "su" ? node.w / 2 + 28 - index * 15 : node.w / 2}
-            dy={style === "su" || index === 0 ? 0 : lineHeight}
+            x={nodeConfig.getDetailLineX(node, index)}
+            dy={nodeConfig.stackDetailColumns || index === 0 ? 0 : nodeConfig.lineHeight}
           >
-            {clipText(line, style === "ou" ? 22 : 14)}
+            {clipText(line, nodeConfig.detailMaxLength)}
           </tspan>
         ))}
       </text>

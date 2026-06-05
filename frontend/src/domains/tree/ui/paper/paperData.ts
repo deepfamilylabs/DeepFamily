@@ -3,18 +3,27 @@ import { birthDateString, deathDateString, sortNodeIdsByBirthOrder } from "../..
 import type { TreeGraphData } from "../../selectors";
 import { getNodeUi, type NodeUi } from "../nodeUi";
 
-export type PaperGenealogyStyle = "ou" | "su" | "pagoda" | "lineage" | "modern";
+export const PAPER_GENEALOGY_STYLE = {
+  OU: "ou",
+  DIEJI: "dieji",
+  PAGODA: "pagoda",
+  LINEAGE: "lineage",
+  MODERN: "modern",
+} as const;
 
-export const PAPER_GENEALOGY_STYLES: PaperGenealogyStyle[] = [
-  "ou",
-  "su",
-  "pagoda",
-  "lineage",
-  "modern",
-];
+export type PaperGenealogyStyle =
+  (typeof PAPER_GENEALOGY_STYLE)[keyof typeof PAPER_GENEALOGY_STYLE];
+
+export const PAPER_GENEALOGY_STYLES = [
+  PAPER_GENEALOGY_STYLE.OU,
+  PAPER_GENEALOGY_STYLE.DIEJI,
+  PAPER_GENEALOGY_STYLE.PAGODA,
+  PAPER_GENEALOGY_STYLE.LINEAGE,
+  PAPER_GENEALOGY_STYLE.MODERN,
+] as const satisfies readonly PaperGenealogyStyle[];
 
 export function isPaperGenealogyStyle(value: string | null): value is PaperGenealogyStyle {
-  return PAPER_GENEALOGY_STYLES.includes(value as PaperGenealogyStyle);
+  return typeof value === "string" && (PAPER_GENEALOGY_STYLES as readonly string[]).includes(value);
 }
 
 export type TranslateFn = (

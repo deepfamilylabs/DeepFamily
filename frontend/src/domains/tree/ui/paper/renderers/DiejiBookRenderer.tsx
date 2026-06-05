@@ -1,14 +1,14 @@
 import { useMemo, type CSSProperties } from "react";
 import {
-  buildSuPaperBook,
-  getSuFullRecordText,
-  getSuGenerationMark,
-  splitSuSpreadColumns,
-  type SuChartWindow,
-  type SuPageSide,
-  type SuPageSpread,
-  type SuTableLane,
-} from "../layout/suPagination";
+  buildDiejiPaperBook,
+  getDiejiFullRecordText,
+  getDiejiGenerationMark,
+  splitDiejiSpreadColumns,
+  type DiejiChartWindow,
+  type DiejiPageSide,
+  type DiejiPageSpread,
+  type DiejiTableLane,
+} from "../layout/diejiPagination";
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
   PAPER_BODY_FONT_STACK,
@@ -21,8 +21,8 @@ import {
 import { clipText, getPaperSpineTitle } from "../paperText";
 import { PaperSpine } from "./PaperSpine";
 
-const SU_LANE_GRID_ROWS = "64px 96px 1fr";
-const SU_EQUAL_LANE_STYLE: CSSProperties = {
+const DIEJI_LANE_GRID_ROWS = "64px 96px 1fr";
+const DIEJI_EQUAL_LANE_STYLE: CSSProperties = {
   flexBasis: 0,
   flexGrow: 1,
   flexShrink: 1,
@@ -30,15 +30,15 @@ const SU_EQUAL_LANE_STYLE: CSSProperties = {
   width: 0,
 };
 
-function SuPersonLane({
+function DiejiPersonLane({
   lane,
   t,
 }: {
-  lane: Extract<SuTableLane, { kind: "person" }>;
+  lane: Extract<DiejiTableLane, { kind: "person" }>;
   t: TranslateFn;
 }) {
   const { person } = lane;
-  const fullRecord = getSuFullRecordText(person, t);
+  const fullRecord = getDiejiFullRecordText(person, t);
   const title = clipText(lane.name, lane.continued ? 8 : 10);
 
   return (
@@ -47,11 +47,11 @@ function SuPersonLane({
       style={{
         borderColor: PAPER_LINE.soft,
         direction: "ltr",
-        ...SU_EQUAL_LANE_STYLE,
-        gridTemplateRows: SU_LANE_GRID_ROWS,
+        ...DIEJI_EQUAL_LANE_STYLE,
+        gridTemplateRows: DIEJI_LANE_GRID_ROWS,
       }}
       data-testid={`paper-row-${person.id}`}
-      data-su-lane={lane.key}
+      data-dieji-lane={lane.key}
       data-continued={lane.continued ? "true" : "false"}
       title={fullRecord}
     >
@@ -66,7 +66,7 @@ function SuPersonLane({
           // adjacent column (parent right, rank left) at normal line spacing rather than a wide gap.
           whiteSpace: "pre-line",
         }}
-        data-testid={`paper-su-relation-${person.id}`}
+        data-testid={`paper-dieji-relation-${person.id}`}
       >
         {lane.relationLabel}
       </div>
@@ -82,7 +82,7 @@ function SuPersonLane({
             textOrientation: "mixed",
             textAlign: "right",
           }}
-          data-testid={`paper-su-name-${person.id}`}
+          data-testid={`paper-dieji-name-${person.id}`}
         >
           {title}
         </strong>
@@ -100,7 +100,7 @@ function SuPersonLane({
             overflowWrap: "anywhere",
             wordBreak: "break-all",
           }}
-          data-testid={`paper-su-detail-${person.id}`}
+          data-testid={`paper-dieji-detail-${person.id}`}
         >
           {lane.text}
         </p>
@@ -109,11 +109,11 @@ function SuPersonLane({
   );
 }
 
-function SuGenerationLane({
+function DiejiGenerationLane({
   lane,
   t,
 }: {
-  lane: Extract<SuTableLane, { kind: "generation" }>;
+  lane: Extract<DiejiTableLane, { kind: "generation" }>;
   t: TranslateFn;
 }) {
   return (
@@ -121,11 +121,11 @@ function SuGenerationLane({
       className="grid h-full border-l last:border-l-0"
       style={{
         borderColor: PAPER_LINE.soft,
-        ...SU_EQUAL_LANE_STYLE,
-        gridTemplateRows: SU_LANE_GRID_ROWS,
+        ...DIEJI_EQUAL_LANE_STYLE,
+        gridTemplateRows: DIEJI_LANE_GRID_ROWS,
       }}
-      data-testid={`paper-su-generation-${lane.depth}`}
-      data-su-lane={lane.key}
+      data-testid={`paper-dieji-generation-${lane.depth}`}
+      data-dieji-lane={lane.key}
       aria-label={lane.label}
     >
       <div aria-hidden="true" />
@@ -137,9 +137,9 @@ function SuGenerationLane({
           writingMode: "vertical-rl",
           textOrientation: "mixed",
         }}
-        data-testid={`paper-su-generation-mark-${lane.depth}`}
+        data-testid={`paper-dieji-generation-mark-${lane.depth}`}
       >
-        {getSuGenerationMark(lane.depth, t)}
+        {getDiejiGenerationMark(lane.depth, t)}
       </span>
       {lane.repeated || lane.continued ? (
         <span
@@ -151,24 +151,24 @@ function SuGenerationLane({
         >
           {lane.repeated
             ? t("genealogyBook.repeatedGeneration", "repeated")
-            : t("genealogyBook.suContinuedGeneration", "continued")}
+            : t("genealogyBook.diejiContinuedGeneration", "continued")}
         </span>
       ) : null}
     </div>
   );
 }
 
-function SuBlankLane({ lane }: { lane: Extract<SuTableLane, { kind: "blank" }> }) {
+function DiejiBlankLane({ lane }: { lane: Extract<DiejiTableLane, { kind: "blank" }> }) {
   return (
     <div
       className="grid h-full border-l last:border-l-0"
       style={{
         borderColor: PAPER_LINE.soft,
-        ...SU_EQUAL_LANE_STYLE,
-        gridTemplateRows: SU_LANE_GRID_ROWS,
+        ...DIEJI_EQUAL_LANE_STYLE,
+        gridTemplateRows: DIEJI_LANE_GRID_ROWS,
       }}
-      data-testid={`paper-su-blank-${lane.key}`}
-      data-su-lane={lane.key}
+      data-testid={`paper-dieji-blank-${lane.key}`}
+      data-dieji-lane={lane.key}
       aria-hidden="true"
     >
       <div className="border-b" style={{ borderColor: PAPER_LINE.soft }} />
@@ -178,43 +178,43 @@ function SuBlankLane({ lane }: { lane: Extract<SuTableLane, { kind: "blank" }> }
   );
 }
 
-function SuTableLaneView({
+function DiejiTableLaneView({
   lane,
   t,
 }: {
-  lane: SuTableLane;
+  lane: DiejiTableLane;
   t: TranslateFn;
 }) {
-  if (lane.kind === "generation") return <SuGenerationLane lane={lane} t={t} />;
-  if (lane.kind === "person") return <SuPersonLane lane={lane} t={t} />;
-  return <SuBlankLane lane={lane} />;
+  if (lane.kind === "generation") return <DiejiGenerationLane lane={lane} t={t} />;
+  if (lane.kind === "person") return <DiejiPersonLane lane={lane} t={t} />;
+  return <DiejiBlankLane lane={lane} />;
 }
 
-function SuPage({
+function DiejiPage({
   side,
   chart,
   spread,
   t,
 }: {
-  side: SuPageSide;
-  chart: SuChartWindow;
-  spread: SuPageSpread;
+  side: DiejiPageSide;
+  chart: DiejiChartWindow;
+  spread: DiejiPageSpread;
   t: TranslateFn;
 }) {
-  const lanes = splitSuSpreadColumns(spread, side);
+  const lanes = splitDiejiSpreadColumns(spread, side);
 
   return (
     <div
       className="h-[872px]"
       style={PAPER_SHEET_STYLE}
-      data-testid={`paper-su-${side}-${chart.index}-${spread.index}`}
+      data-testid={`paper-dieji-${side}-${chart.index}-${spread.index}`}
     >
       <div
         className="flex h-full flex-row-reverse justify-start overflow-hidden"
         style={{ borderColor: PAPER_LINE.strong }}
       >
         {lanes.map((lane, index) => (
-          <SuTableLaneView
+          <DiejiTableLaneView
             key={`${side}-${chart.index}-${spread.index}-${lane.key}-${index}`}
             lane={lane}
             t={t}
@@ -225,7 +225,7 @@ function SuPage({
   );
 }
 
-export function SuBookRenderer({
+export function DiejiBookRenderer({
   generations,
   t,
 }: {
@@ -233,7 +233,7 @@ export function SuBookRenderer({
   t: TranslateFn;
 }) {
   const book = useMemo(
-    () => buildSuPaperBook({ generations, t }),
+    () => buildDiejiPaperBook({ generations, t }),
     [generations, t],
   );
   const spineTitle = useMemo(
@@ -252,7 +252,7 @@ export function SuBookRenderer({
   );
 
   return (
-    <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-su">
+    <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-dieji">
       <div
         className="mx-auto flex min-h-full max-w-[1320px] flex-col"
         style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
@@ -264,18 +264,18 @@ export function SuBookRenderer({
               ...PAPER_SHEET_STYLE,
               borderColor: PAPER_LINE.strong,
             }}
-            data-testid="paper-su-table-1"
+            data-testid="paper-dieji-table-1"
           >
             <div
               className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
               style={{ borderColor: PAPER_LINE.soft }}
             >
               <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
-                {t("genealogyBook.styles.su", "Su-style")}
+                {t("genealogyBook.styles.dieji", "Dieji-style")}
               </h2>
               <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t(
-                  "genealogyBook.suTableRule",
+                  "genealogyBook.diejiTableRule",
                   "Five vertical generations per chart, right-to-left.",
                 )}
               </span>
@@ -290,18 +290,18 @@ export function SuBookRenderer({
                     borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                   }}
-                  data-testid={`paper-su-spread-${chart.index}-${spread.index}`}
+                  data-testid={`paper-dieji-spread-${chart.index}-${spread.index}`}
                 >
-                  <SuPage side="left" chart={chart} spread={spread} t={t} />
+                  <DiejiPage side="left" chart={chart} spread={spread} t={t} />
                   <PaperSpine
                     chartIndex={chart.index}
                     spreadIndex={spread.index}
                     title={spineTitle}
                     t={t}
-                    testIdPrefix="paper-su-spine"
+                    testIdPrefix="paper-dieji-spine"
                     pageOrder="rtl"
                   />
-                  <SuPage side="right" chart={chart} spread={spread} t={t} />
+                  <DiejiPage side="right" chart={chart} spread={spread} t={t} />
                 </div>
               ))}
             </div>

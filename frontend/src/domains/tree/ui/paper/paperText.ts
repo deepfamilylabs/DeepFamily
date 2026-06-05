@@ -16,6 +16,13 @@ export function toChineseNumeral(value: number): string {
   return `${digits[tens]}十${ones ? digits[ones] : ""}`;
 }
 
+export function getPaperGenerationMark(depth: number, t: TranslateFn): string {
+  return t("genealogyBook.generationMark", "{{han}}世", {
+    han: toChineseNumeral(depth + 1),
+    number: depth + 1,
+  });
+}
+
 // A person-like shape carrying just the fields needed to derive a relation label, so the
 // helpers work for PaperPerson as well as the per-style node/entry types (Pagoda, Lineage).
 type RelationSource = Pick<PaperPerson, "relation" | "nodeData" | "ui">;
@@ -32,15 +39,15 @@ export function getChildRankWord(person: RelationSource, t: TranslateFn): string
   const number = siblingIndex + 1;
   const han = toChineseNumeral(number);
   if (gender === 2) {
-    if (siblingCount === 1) return t("genealogyBook.suOnlyDaughter", "之女");
-    if (number === 1) return t("genealogyBook.suFirstDaughter", "长女");
-    if (number === 2) return t("genealogyBook.suSecondDaughter", "次女");
-    return t("genealogyBook.suNthDaughter", "{{han}}女", { han, number });
+    if (siblingCount === 1) return t("genealogyBook.onlyDaughter", "之女");
+    if (number === 1) return t("genealogyBook.firstDaughter", "长女");
+    if (number === 2) return t("genealogyBook.secondDaughter", "次女");
+    return t("genealogyBook.nthDaughter", "{{han}}女", { han, number });
   }
-  if (siblingCount === 1) return t("genealogyBook.suOnlySon", "之子");
-  if (number === 1) return t("genealogyBook.suFirstSon", "长子");
-  if (number === 2) return t("genealogyBook.suSecondSon", "次子");
-  return t("genealogyBook.suNthSon", "{{han}}子", { han, number });
+  if (siblingCount === 1) return t("genealogyBook.onlySon", "之子");
+  if (number === 1) return t("genealogyBook.firstSon", "长子");
+  if (number === 2) return t("genealogyBook.secondSon", "次子");
+  return t("genealogyBook.nthSon", "{{han}}子", { han, number });
 }
 
 // Full relation label: 始祖 for the root, otherwise the rank word optionally prefixed with the
@@ -50,7 +57,7 @@ export function getPaperRelationLabel(
   t: TranslateFn,
   opts?: { withParentName?: boolean; separator?: string; parentNameMax?: number },
 ): string {
-  if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
+  if (person.relation?.kind === "root") return t("genealogyBook.rootLabel", "ancestor");
   const rank = getChildRankWord(person, t);
   if (!rank) return "";
 

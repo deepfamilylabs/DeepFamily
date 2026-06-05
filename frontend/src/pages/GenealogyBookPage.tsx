@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { BookOpen, GitMerge, RefreshCw, ScrollText, Users } from "lucide-react";
 import {
   isPaperGenealogyStyle,
+  PAPER_GENEALOGY_STYLE,
   PAPER_GENEALOGY_STYLES,
   PaperGenealogyView,
   type PaperGenealogyStyle,
@@ -16,9 +17,9 @@ const LS_STYLE_KEY = "df:paperGenealogyStyle";
 
 function usePersistedPaperStyle() {
   const [style, setStyle] = useState<PaperGenealogyStyle>(() => {
-    if (typeof window === "undefined") return "ou";
+    if (typeof window === "undefined") return PAPER_GENEALOGY_STYLE.OU;
     const saved = localStorage.getItem(LS_STYLE_KEY);
-    return isPaperGenealogyStyle(saved) ? saved : "ou";
+    return isPaperGenealogyStyle(saved) ? saved : PAPER_GENEALOGY_STYLE.OU;
   });
 
   useEffect(() => {
@@ -37,12 +38,12 @@ export default function GenealogyBookPage() {
   const { loading, progress, contractMessage, refresh } = useTreeStatus();
 
   const styleLabels = useMemo(
-    () => ({
-      ou: t("genealogyBook.styles.ou", "Ou-style"),
-      su: t("genealogyBook.styles.su", "Su-style"),
-      pagoda: t("genealogyBook.styles.pagoda", "Pagoda"),
-      lineage: t("genealogyBook.styles.lineage", "Lineage"),
-      modern: t("genealogyBook.styles.modern", "Modern"),
+    (): Record<PaperGenealogyStyle, string> => ({
+      [PAPER_GENEALOGY_STYLE.OU]: t("genealogyBook.styles.ou", "Ou-style"),
+      [PAPER_GENEALOGY_STYLE.DIEJI]: t("genealogyBook.styles.dieji", "Dieji-style"),
+      [PAPER_GENEALOGY_STYLE.PAGODA]: t("genealogyBook.styles.pagoda", "Pagoda"),
+      [PAPER_GENEALOGY_STYLE.LINEAGE]: t("genealogyBook.styles.lineage", "Lineage"),
+      [PAPER_GENEALOGY_STYLE.MODERN]: t("genealogyBook.styles.modern", "Modern"),
     }),
     [t],
   );
