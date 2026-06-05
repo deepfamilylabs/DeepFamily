@@ -38,7 +38,10 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               {t("search.versionsQuery.personHash")}
             </label>
-            <Input placeholder={t("search.versionsQuery.placeholder")} {...register("personHash")} />
+            <Input
+              placeholder={t("search.versionsQuery.placeholder")}
+              {...register("personHash")}
+            />
             <FieldError message={errors.personHash?.message as any} />
           </div>
           <div className="w-full md:w-32">
@@ -59,7 +62,11 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
           </div>
           <div className="flex gap-3 pt-7 w-full md:w-auto">
             <ButtonPrimary type="submit" disabled={state.loading}>
-              {state.loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+              {state.loading ? (
+                <RefreshCw className="animate-spin" size={18} />
+              ) : (
+                <Search size={18} />
+              )}
               {t("search.query")}
             </ButtonPrimary>
             <ButtonSecondary type="button" onClick={actions.reset}>
@@ -176,6 +183,140 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
   );
 }
 
+export function TrustedEndorsersQuerySection({ search }: { search: SearchPageController }) {
+  const { t } = search;
+  const {
+    form: {
+      register,
+      handleSubmit,
+      formState: { errors },
+    },
+    state,
+    actions,
+  } = search.trustedEndorsers;
+
+  return (
+    <SectionCard
+      title={t("search.trustedEndorsersQuery.title")}
+      isOpen={search.openSections.trustedEndorsers}
+      onToggle={() => search.toggle("trustedEndorsers")}
+    >
+      <div className="space-y-6">
+        <form
+          onSubmit={handleSubmit((data) => actions.query(data, 0))}
+          className="flex flex-col md:flex-row gap-4 items-start"
+        >
+          <div className="flex-1 w-full">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              {t("search.trustedEndorsersQuery.personHash")}
+            </label>
+            <Input
+              placeholder={t("search.trustedEndorsersQuery.placeholder")}
+              {...register("personHash")}
+            />
+            <FieldError message={errors.personHash?.message as any} />
+          </div>
+          <div className="w-full md:w-32">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              {t("search.trustedEndorsersQuery.versionIndex")}
+            </label>
+            <Input
+              type="number"
+              placeholder={t("search.trustedEndorsersQuery.versionPlaceholder")}
+              title={t("search.trustedEndorsersQuery.versionPlaceholder")}
+              {...register("versionIndex", { setValueAs: search.sanitizeNumberInput })}
+            />
+            <FieldError
+              message={search.formatNumericError(
+                errors.versionIndex?.message,
+                search.validationMessages.versionIndexOne,
+              )}
+            />
+          </div>
+          <div className="w-full md:w-32">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              {t("search.nameQuery.pageSize")}
+            </label>
+            <Input
+              type="number"
+              placeholder={t("search.pageSizePlaceholder", { defaultValue: "≤100" })}
+              {...register("pageSize", { setValueAs: search.sanitizeNumberInput })}
+            />
+            <FieldError
+              message={search.formatNumericError(
+                errors.pageSize?.message,
+                search.validationMessages.pageSize,
+              )}
+            />
+          </div>
+          <div className="flex gap-3 pt-7 w-full md:w-auto">
+            <ButtonPrimary type="submit" disabled={state.loading}>
+              {state.loading ? (
+                <RefreshCw className="animate-spin" size={18} />
+              ) : (
+                <Search size={18} />
+              )}
+              {t("search.query")}
+            </ButtonPrimary>
+            <ButtonSecondary type="button" onClick={actions.reset}>
+              {t("search.reset")}
+            </ButtonSecondary>
+          </div>
+        </form>
+
+        {state.queried && (
+          <div className="space-y-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+              {t("search.trustedEndorsersQuery.totalSources")}: {state.total}
+            </div>
+            <div className="rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+              {state.data.accounts.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                  {state.loading ? t("search.loading") : t("search.noData")}
+                </div>
+              ) : (
+                state.data.accounts.map((account, index) => (
+                  <div
+                    key={`${account}-${index}`}
+                    className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                  >
+                    <div className="grid grid-cols-[96px_1fr] gap-2 items-center text-sm">
+                      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right">
+                        {t("search.trustedEndorsersQuery.account")}:
+                      </span>
+                      <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
+                        <HashInline
+                          value={account}
+                          className="font-mono text-xs text-gray-900 dark:text-gray-200 flex-1 min-w-0"
+                        />
+                        <CopyIconButton
+                          onClick={() => search.onCopy(account)}
+                          label={t("search.copy", "Copy") as string}
+                          size="xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <PaginationFooter
+              t={t}
+              offset={state.offset}
+              loading={state.loading}
+              hasMore={state.hasMore}
+              onPrev={actions.prev}
+              onNext={actions.next}
+            />
+            <QueryError error={state.error} />
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 function VersionParentRow({
   label,
   hash,
@@ -200,11 +341,7 @@ function VersionParentRow({
             value={hash}
             className="font-mono text-xs text-gray-900 dark:text-gray-200 min-w-0"
           />
-          <CopyIconButton
-            onClick={() => onCopy(hash)}
-            label={copyLabel}
-            size="xs"
-          />
+          <CopyIconButton onClick={() => onCopy(hash)} label={copyLabel} size="xs" />
         </div>
         <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
           (v{versionIndex})
@@ -265,7 +402,11 @@ export function EndorsementQuerySection({ search }: { search: SearchPageControll
           </div>
           <div className="flex gap-3 pt-7 w-full md:w-auto">
             <ButtonPrimary type="submit" disabled={state.loading}>
-              {state.loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+              {state.loading ? (
+                <RefreshCw className="animate-spin" size={18} />
+              ) : (
+                <Search size={18} />
+              )}
               {t("search.query")}
             </ButtonPrimary>
             <ButtonSecondary type="button" onClick={actions.reset}>
@@ -405,7 +546,11 @@ export function ChildrenQuerySection({ search }: { search: SearchPageController 
           </div>
           <div className="flex gap-3 pt-7 w-full md:w-auto">
             <ButtonPrimary type="submit" disabled={state.loading}>
-              {state.loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+              {state.loading ? (
+                <RefreshCw className="animate-spin" size={18} />
+              ) : (
+                <Search size={18} />
+              )}
               {t("search.query")}
             </ButtonPrimary>
             <ButtonSecondary type="button" onClick={actions.reset}>
@@ -537,7 +682,11 @@ export function StoryChunksQuerySection({ search }: { search: SearchPageControll
           </div>
           <div className="flex gap-3 pt-7 w-full md:w-auto">
             <ButtonPrimary type="submit" disabled={state.loading}>
-              {state.loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+              {state.loading ? (
+                <RefreshCw className="animate-spin" size={18} />
+              ) : (
+                <Search size={18} />
+              )}
               {t("search.query")}
             </ButtonPrimary>
             <ButtonSecondary type="button" onClick={actions.reset}>
@@ -704,7 +853,11 @@ export function UriHistoryQuerySection({ search }: { search: SearchPageControlle
           </div>
           <div className="flex gap-3 pt-7 w-full md:w-auto">
             <ButtonPrimary type="submit" disabled={state.loading}>
-              {state.loading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+              {state.loading ? (
+                <RefreshCw className="animate-spin" size={18} />
+              ) : (
+                <Search size={18} />
+              )}
               {t("search.query")}
             </ButtonPrimary>
             <ButtonSecondary type="button" onClick={actions.reset}>
