@@ -497,6 +497,11 @@
       "deduplicateChildrenTooltip": {
         "enabled": "Highest endorsed version only",
         "disabled": "Show all versions"
+      },
+      "trustedSourceFilter": "Trusted Sources",
+      "trustedSourceFilterTooltip": {
+        "enabled": "Only versions endorsed by recommended sources",
+        "disabled": "Show all versions"
       }
     },
     "status": {

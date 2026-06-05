@@ -36,6 +36,8 @@ const mocks = vi.hoisted(() => ({
     setStrictIncludeUnversionedChildren: vi.fn(),
     deduplicateChildren: false,
     setDeduplicateChildren: vi.fn(),
+    trustedSourceFilterEnabled: true,
+    setTrustedSourceFilterEnabled: vi.fn(),
   },
   treeMutations: {
     clearAllCaches: vi.fn(),
@@ -47,6 +49,7 @@ const mocks = vi.hoisted(() => ({
     isDev: false,
     showChildren: true,
     showDedup: true,
+    showTrusted: true,
     localizedRoot: "" as string,
     localizedVersion: 0,
   },
@@ -83,6 +86,7 @@ vi.mock("../../../../shared/config/env", () => ({
   isDevMode: () => mocks.envFlags.isDev,
   shouldShowChildrenModeToggle: () => mocks.envFlags.showChildren,
   shouldShowDeduplicateToggle: () => mocks.envFlags.showDedup,
+  shouldShowTrustedSourceFilterToggle: () => mocks.envFlags.showTrusted,
   getLocalizedRootHash: () => mocks.envFlags.localizedRoot,
   getLocalizedRootVersionIndex: () => mocks.envFlags.localizedVersion,
 }));
@@ -96,6 +100,9 @@ describe("useFamilyTreeConfigForm", () => {
     mocks.config.removeRootFromHistory.mockReset();
     mocks.config.clearRootHistory.mockReset();
     mocks.toast.success.mockReset();
+    mocks.viz.setTrustedSourceFilterEnabled.mockReset();
+    mocks.viz.trustedSourceFilterEnabled = true;
+    mocks.envFlags.showTrusted = true;
     mocks.envFlags.localizedRoot = "";
     mocks.envFlags.localizedVersion = 0;
   });
@@ -111,6 +118,19 @@ describe("useFamilyTreeConfigForm", () => {
     expect(result.current.root.value).toBe(mocks.config.rootHash);
     expect(result.current.version.value).toBe(mocks.config.rootVersionIndex);
     expect(result.current.actions.hasDiff).toBe(false);
+  });
+
+  it("exposes trusted source filter display state from viz options", () => {
+    mocks.viz.trustedSourceFilterEnabled = false;
+    mocks.envFlags.showTrusted = false;
+    const { result } = renderHook(() => useFamilyTreeConfigForm());
+    expect(result.current.showTrustedSourceFilterToggle).toBe(false);
+    expect(result.current.trustedSourceFilter.value).toBe(false);
+
+    act(() => {
+      result.current.trustedSourceFilter.onChange(true);
+    });
+    expect(mocks.viz.setTrustedSourceFilterEnabled).toHaveBeenCalledWith(true);
   });
 
   it("resolves preset selection by current rpcUrl", () => {

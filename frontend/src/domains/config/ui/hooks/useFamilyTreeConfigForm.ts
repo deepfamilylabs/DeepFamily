@@ -6,6 +6,7 @@ import {
   isDevMode,
   shouldShowChildrenModeToggle,
   shouldShowDeduplicateToggle,
+  shouldShowTrustedSourceFilterToggle,
 } from "../../../../shared/config/env";
 import { useToast } from "../../../../shared/ui";
 import { useTreeMutations, useVizOptions } from "../../../tree";
@@ -20,7 +21,12 @@ type FormErrors = {
   root?: string;
 };
 
-type TooltipKey = "traversal" | "childrenMode" | "includeV0" | "deduplicate";
+type TooltipKey =
+  | "traversal"
+  | "childrenMode"
+  | "includeV0"
+  | "deduplicate"
+  | "trustedSourceFilter";
 
 export type FamilyTreeConfigFormController = ReturnType<typeof useFamilyTreeConfigForm>;
 
@@ -48,12 +54,15 @@ export function useFamilyTreeConfigForm() {
     setStrictIncludeUnversionedChildren,
     deduplicateChildren,
     setDeduplicateChildren,
+    trustedSourceFilterEnabled,
+    setTrustedSourceFilterEnabled,
   } = useVizOptions();
   const { clearAllCaches } = useTreeMutations();
 
   const isDev = isDevMode();
   const showChildrenModeToggle = useMemo(() => shouldShowChildrenModeToggle(), []);
   const showDeduplicateToggle = useMemo(() => shouldShowDeduplicateToggle(), []);
+  const showTrustedSourceFilterToggle = useMemo(() => shouldShowTrustedSourceFilterToggle(), []);
 
   const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl);
   const [localChainId, setLocalChainId] = useState(chainId);
@@ -269,6 +278,7 @@ export function useFamilyTreeConfigForm() {
     isDev,
     showChildrenModeToggle,
     showDeduplicateToggle,
+    showTrustedSourceFilterToggle,
 
     actions: {
       reset: resetToDefaults,
@@ -352,6 +362,13 @@ export function useFamilyTreeConfigForm() {
       onChange: setDeduplicateChildren,
       tooltipOpen: activeTooltip === "deduplicate",
       onToggleTooltip: () => toggleTooltip("deduplicate"),
+    },
+
+    trustedSourceFilter: {
+      value: trustedSourceFilterEnabled,
+      onChange: setTrustedSourceFilterEnabled,
+      tooltipOpen: activeTooltip === "trustedSourceFilter",
+      onToggleTooltip: () => toggleTooltip("trustedSourceFilter"),
     },
   } as const;
 }

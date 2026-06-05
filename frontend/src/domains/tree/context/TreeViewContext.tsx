@@ -33,7 +33,8 @@ const STORY_PAGE_LIMIT = QUERY_PAGE_LIMIT;
 
 export function TreeViewProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
-  const { traversal, childrenMode, strictIncludeUnversionedChildren } = useVizOptions();
+  const { traversal, childrenMode, strictIncludeUnversionedChildren, trustedSourceFilterEnabled } =
+    useVizOptions();
   const { errors, push } = useErrorMonitor();
   const runtime = useTreeRuntime();
   const {
@@ -71,6 +72,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     traversal,
     childrenMode,
     strictIncludeUnversionedChildren,
+    trustedSourceFilterEnabled,
     edgeTtlMs: EDGE_TTL_MS,
     totalVersionsTtlMs: TOTAL_VERSIONS_TTL_MS,
     versionDetailsTtlMs: VERSION_DETAILS_TTL_MS,

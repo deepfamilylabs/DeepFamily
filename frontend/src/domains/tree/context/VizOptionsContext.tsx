@@ -1,14 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useState, useEffect, useMemo } from "react";
+import { shouldShowTrustedSourceFilterToggle } from "../../../shared/config/env";
 
 export interface VizOptionsContextValue {
   traversal: "dfs" | "bfs";
   deduplicateChildren: boolean;
   childrenMode: "union" | "strict";
   strictIncludeUnversionedChildren: boolean;
+  trustedSourceFilterEnabled: boolean;
   setTraversal: (t: "dfs" | "bfs") => void;
   setDeduplicateChildren: (value: boolean) => void;
   setChildrenMode: (value: "union" | "strict") => void;
   setStrictIncludeUnversionedChildren: (value: boolean) => void;
+  setTrustedSourceFilterEnabled: (value: boolean) => void;
 }
 
 const VizOptionsContext = createContext<VizOptionsContextValue | null>(null);
@@ -18,9 +21,12 @@ const LS_KEYS = {
   deduplicateChildren: "df:deduplicateChildren",
   childrenMode: "df:childrenMode",
   strictIncludeUnversionedChildren: "df:strictIncludeUnversionedChildren",
+  trustedSourceFilterEnabled: "df:trustedSourceFilterEnabled",
 };
 
 export function VizOptionsProvider({ children }: { children: React.ReactNode }) {
+  const trustedSourceFilterToggleVisible = shouldShowTrustedSourceFilterToggle();
+
   const [traversal, setTraversal] = useState<"dfs" | "bfs">(() => {
     if (typeof window !== "undefined") {
       const v = localStorage.getItem(LS_KEYS.traversal);
@@ -55,6 +61,28 @@ export function VizOptionsProvider({ children }: { children: React.ReactNode }) 
     },
   );
 
+  const [storedTrustedSourceFilterEnabled, setStoredTrustedSourceFilterEnabled] = useState<boolean>(
+    () => {
+      if (typeof window !== "undefined") {
+        const v = localStorage.getItem(LS_KEYS.trustedSourceFilterEnabled);
+        if (v !== null) return v === "true";
+      }
+      return true;
+    },
+  );
+
+  const trustedSourceFilterEnabled = trustedSourceFilterToggleVisible
+    ? storedTrustedSourceFilterEnabled
+    : true;
+
+  const setTrustedSourceFilterEnabled = useCallback(
+    (value: boolean) => {
+      if (!trustedSourceFilterToggleVisible) return;
+      setStoredTrustedSourceFilterEnabled(value);
+    },
+    [trustedSourceFilterToggleVisible],
+  );
+
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem(LS_KEYS.traversal, traversal);
   }, [traversal]);
@@ -72,6 +100,14 @@ export function VizOptionsProvider({ children }: { children: React.ReactNode }) 
         String(strictIncludeUnversionedChildren),
       );
   }, [strictIncludeUnversionedChildren]);
+  useEffect(() => {
+    if (!trustedSourceFilterToggleVisible) return;
+    if (typeof window !== "undefined")
+      localStorage.setItem(
+        LS_KEYS.trustedSourceFilterEnabled,
+        String(storedTrustedSourceFilterEnabled),
+      );
+  }, [storedTrustedSourceFilterEnabled, trustedSourceFilterToggleVisible]);
 
   const value = useMemo<VizOptionsContextValue>(
     () => ({
@@ -79,12 +115,21 @@ export function VizOptionsProvider({ children }: { children: React.ReactNode }) 
       deduplicateChildren,
       childrenMode,
       strictIncludeUnversionedChildren,
+      trustedSourceFilterEnabled,
       setTraversal,
       setDeduplicateChildren,
       setChildrenMode,
       setStrictIncludeUnversionedChildren,
+      setTrustedSourceFilterEnabled,
     }),
-    [traversal, deduplicateChildren, childrenMode, strictIncludeUnversionedChildren],
+    [
+      traversal,
+      deduplicateChildren,
+      childrenMode,
+      strictIncludeUnversionedChildren,
+      trustedSourceFilterEnabled,
+      setTrustedSourceFilterEnabled,
+    ],
   );
 
   return <VizOptionsContext.Provider value={value}>{children}</VizOptionsContext.Provider>;
