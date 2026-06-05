@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { CheckCircle, XCircle, Info, AlertTriangle } from "lucide-react";
+import { OVERLAY_Z_INDEX } from "./overlayLayers";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -114,7 +115,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {/* portal-like container */}
-      <div className="fixed inset-x-0 bottom-4 z-[11000] flex justify-center pointer-events-none">
+      <div
+        className={`fixed inset-x-0 bottom-4 ${OVERLAY_Z_INDEX.toast} flex justify-center pointer-events-none`}
+      >
         <div className="space-y-2">
           {toasts.map((toast) => {
             const style = TOAST_STYLES[toast.type];

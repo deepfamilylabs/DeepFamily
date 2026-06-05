@@ -8,6 +8,7 @@ import {
 } from "../../../transactions";
 import { useWallet } from "../../../wallet";
 import { ModalShell } from "../../../../shared/ui/ModalShell";
+import { OVERLAY_Z_INDEX } from "../../../../shared/ui/overlayLayers";
 
 type EndorseReceiptLike = { logs?: any[] } | null;
 
@@ -201,6 +202,7 @@ export default function EndorseCompactModal({
     <ModalShell
       isOpen={isOpen}
       onClose={onClose}
+      zIndex={OVERLAY_Z_INDEX.nestedModal}
       ariaLabel={t("endorse.quickTitle", "Endorse Version")}
       closeLabel={t("common.close", "Close")}
     >

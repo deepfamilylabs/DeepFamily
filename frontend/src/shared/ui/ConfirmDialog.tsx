@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useId } from "react";
 import { X } from "lucide-react";
 import { ModalShell } from "./ModalShell";
+import { OVERLAY_Z_INDEX } from "./overlayLayers";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -61,7 +62,7 @@ export default function ConfirmDialog({
       isOpen={open}
       onClose={onCancel}
       bare
-      zIndex="z-[1200]"
+      zIndex={OVERLAY_Z_INDEX.confirmDialog}
       ariaLabel={title ? undefined : message}
       ariaLabelledBy={title ? titleId : undefined}
       ariaDescribedBy={messageId}
@@ -71,45 +72,48 @@ export default function ConfirmDialog({
           className="relative bg-white dark:bg-gray-900 dark:border dark:border-gray-700 rounded-lg shadow-xl w-[420px] max-w-[95vw] p-6 transition-colors"
           onClick={(event) => event.stopPropagation()}
         >
-        <button
-          type="button"
-          aria-label="Close"
-          className="absolute top-3 right-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-          onClick={onCancel}
-        >
-          <X size={18} />
-        </button>
-        {title ? (
-          <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            {title}
-          </h3>
-        ) : null}
-        <div
-          id={messageId}
-          className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line mb-5 leading-relaxed"
-        >
-          {message}
-        </div>
-        <div className="flex justify-end gap-3">
           <button
             type="button"
+            aria-label="Close"
+            className="absolute top-3 right-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
             onClick={onCancel}
-            className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
-            {cancelText}
+            <X size={18} />
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className={
-              "px-4 py-2 rounded-md text-sm text-white shadow-sm focus:outline-none focus:ring-2 transition-colors " +
-              typeClasses +
-              (confirmBtnClassName ? " " + confirmBtnClassName : "")
-            }
+          {title ? (
+            <h3
+              id={titleId}
+              className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2"
+            >
+              {title}
+            </h3>
+          ) : null}
+          <div
+            id={messageId}
+            className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line mb-5 leading-relaxed"
           >
-            {confirmText}
-          </button>
-        </div>
+            {message}
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              {cancelText}
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className={
+                "px-4 py-2 rounded-md text-sm text-white shadow-sm focus:outline-none focus:ring-2 transition-colors " +
+                typeClasses +
+                (confirmBtnClassName ? " " + confirmBtnClassName : "")
+              }
+            >
+              {confirmText}
+            </button>
+          </div>
         </div>
       </div>
     </ModalShell>
