@@ -412,7 +412,7 @@
     "lineageMainSpread": "main chart",
     "lineageContinuationPage": "continuation {{number}}",
     "lineageBranchPage": "branch {{number}}",
-    "lineageTableRule": "Five generations per chart, using the Ou-style paper frame with person relationships.",
+    "lineageTableRule": "Five generations per chart, showing relationships with generation rows and connectors.",
     "lineageOverlapNote": "This chart repeats the previous chart's fifth generation.",
     "diejiContinuedGeneration": "continued",
     "repeatedGeneration": "repeated",

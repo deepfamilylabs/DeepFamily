@@ -412,7 +412,7 @@
     "lineageMainSpread": "正图",
     "lineageContinuationPage": "续页 {{number}}",
     "lineageBranchPage": "第 {{number}} 支",
-    "lineageTableRule": "五世一图，沿用欧式纸本，页内展示人物关系。",
+    "lineageTableRule": "五世一图，以世代表格和连线展示人物关系。",
     "lineageOverlapNote": "本图重列上一图第五世。",
     "diejiContinuedGeneration": "续",
     "repeatedGeneration": "重列",

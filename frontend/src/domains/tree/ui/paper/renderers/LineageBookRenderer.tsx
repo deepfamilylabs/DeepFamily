@@ -435,7 +435,7 @@ export function LineageBookRenderer({
               <span style={{ ...PAPER_TEXT.sectionRule }}>
                 {t(
                   "genealogyBook.lineageTableRule",
-                  "Five generations per chart, using the Ou-style frame with person relationships.",
+                  "Five generations per chart, showing relationships with generation rows and connectors.",
                 )}
               </span>
             </div>
