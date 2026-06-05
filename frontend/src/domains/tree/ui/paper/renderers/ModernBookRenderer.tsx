@@ -15,6 +15,7 @@ import {
 } from "../paperStyles";
 import {
   clipText,
+  getPaperGenerationMark,
   getPaperRelationLabel,
   getPaperSpineTitle,
   splitTextByVisualUnits,
@@ -77,7 +78,7 @@ const MODERN_REL_COL_PX = 64;
 const MODERN_NAME_COL_PX = 112;
 const MODERN_BIO_PADDING_PX = 24; // px-3 on both sides of the biography cell
 // The modern ledger is horizontal text in fixed-height rows, so a cell's capacity is set by the
-// biography column WIDTH (unlike the vertical Su/Ou styles, which are bound by the fixed page
+// biography column WIDTH (unlike vertical paper styles, which are bound by the fixed page
 // height). The spread uses the same elastic paper frame as the other book renderers, so the per-row
 // character budget is computed from the measured page width at render time. Units: a full-width
 // glyph ≈ 14px = 2 units, a half-width ASCII/digit ≈ 7px = 1 unit; text chunks are cut at the
@@ -212,10 +213,7 @@ function getModernTransmissionSection(
 }
 
 function getModernGenerationMark(depth: number, t: TranslateFn): string {
-  return t("genealogyBook.suGenerationMark", "{{han}}世", {
-    han: toChineseNumeral(depth + 1),
-    number: depth + 1,
-  });
+  return getPaperGenerationMark(depth, t);
 }
 
 function getModernFullRecordText(

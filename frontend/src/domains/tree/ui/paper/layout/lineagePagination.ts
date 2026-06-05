@@ -1,6 +1,6 @@
 import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
-import { toChineseNumeral } from "../paperText";
+import { getPaperGenerationMark, toChineseNumeral } from "../paperText";
 import {
   OU_CHART_STEP,
   OU_GENERATIONS_PER_CHART,
@@ -131,10 +131,7 @@ function getGenerationLabel(
 }
 
 export function getLineageGenerationMark(depth: number, t: TranslateFn): string {
-  return t("genealogyBook.ouGenerationMark", "{{han}}世", {
-    han: toChineseNumeral(depth + 1),
-    number: depth + 1,
-  });
+  return getPaperGenerationMark(depth, t);
 }
 
 export function getLineagePageMetrics(

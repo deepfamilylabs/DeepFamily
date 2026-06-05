@@ -44,7 +44,7 @@ export const PAPER_LINE = {
 export type PaperLineWeight = keyof typeof PAPER_LINE;
 
 // Single source of truth for paper-genealogy text size/weight/color/font, keyed by semantic
-// role. Every style renderer (Su/Ou/Pagoda/Lineage/Modern) and the shared spine consume these
+// role. Every paper style renderer and the shared spine consume these
 // so the look stays consistent and customizing a role's size or color is a one-line edit here.
 // Tokens carry only the customizable typography (plus body line-height); layout properties
 // (writingMode, textAlign, letterSpacing, leading-*, tracking-*) stay at each call site.

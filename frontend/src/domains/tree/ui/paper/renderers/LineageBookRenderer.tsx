@@ -55,7 +55,7 @@ function getMeasuredLineagePageBodyWidths(spreadWidth: number): OuPageBodyWidths
 
 function getLineageRelationLabel(entry: LineageEntry, t: TranslateFn): string {
   const { person } = entry;
-  if (person.relation?.kind === "root") return t("genealogyBook.suRootLabel", "ancestor");
+  if (person.relation?.kind === "root") return t("genealogyBook.rootLabel", "ancestor");
   if (entry.rowIndex === 0) return "";
   // The lineage chart already shows parentage via the connecting lines, so the rank word
   // (之子/之女, 长子/次子…) is enough — no father name needed.

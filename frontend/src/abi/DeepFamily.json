@@ -3219,7 +3219,7 @@
     }
   },
   "immutableReferences": {
-    "2623": [
+    "4269": [
       {
         "length": 32,
         "start": 15830
@@ -3231,5 +3231,5 @@
     ]
   },
   "inputSourceName": "project/contracts/DeepFamily.sol",
-  "buildInfoId": "solc-0_8_28-aa21e76e9996f5fc20fd988c21a91ed064f87a24"
+  "buildInfoId": "solc-0_8_28-ddee58f476258cf617cfd7df72eab3a907c8b792"
 }

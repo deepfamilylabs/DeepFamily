@@ -5,11 +5,11 @@ import {
   type PaperPerson,
   type TranslateFn,
 } from "../paperData";
-import { getPaperRelationLabel, splitTextByVisualUnits, toChineseNumeral } from "../paperText";
+import { getPaperGenerationMark, getPaperRelationLabel, splitTextByVisualUnits } from "../paperText";
 
-export type SuPageSide = "left" | "right";
+export type DiejiPageSide = "left" | "right";
 
-export type SuTableLane =
+export type DiejiTableLane =
   | {
       kind: "generation";
       key: string;
@@ -35,36 +35,36 @@ export type SuTableLane =
       key: string;
     };
 
-export type SuPageSpread = {
+export type DiejiPageSpread = {
   index: number;
   kind: "main" | "continuation";
-  lanes: SuTableLane[];
-  rightLanes: SuTableLane[];
-  leftLanes: SuTableLane[];
+  lanes: DiejiTableLane[];
+  rightLanes: DiejiTableLane[];
+  leftLanes: DiejiTableLane[];
 };
 
-export type SuChartWindow = {
+export type DiejiChartWindow = {
   index: number;
   generationDepths: number[];
   repeatedDepth?: number;
-  spreads: SuPageSpread[];
+  spreads: DiejiPageSpread[];
 };
 
-export type SuPaperBook = {
-  charts: SuChartWindow[];
+export type DiejiPaperBook = {
+  charts: DiejiChartWindow[];
 };
 
-export const SU_GENERATIONS_PER_CHART = 5;
-export const SU_CHART_STEP = SU_GENERATIONS_PER_CHART - 1;
-export const SU_RIGHT_PAGE_LANE_CAPACITY = 14;
-export const SU_LEFT_PAGE_LANE_CAPACITY = 14;
-export const SU_SPREAD_LANE_CAPACITY = SU_RIGHT_PAGE_LANE_CAPACITY + SU_LEFT_PAGE_LANE_CAPACITY;
+export const DIEJI_GENERATIONS_PER_CHART = 5;
+export const DIEJI_CHART_STEP = DIEJI_GENERATIONS_PER_CHART - 1;
+export const DIEJI_RIGHT_PAGE_LANE_CAPACITY = 14;
+export const DIEJI_LEFT_PAGE_LANE_CAPACITY = 14;
+export const DIEJI_SPREAD_LANE_CAPACITY = DIEJI_RIGHT_PAGE_LANE_CAPACITY + DIEJI_LEFT_PAGE_LANE_CAPACITY;
 // Each lane's biography column is ~696px tall (page 872 − 64 relation − 96 name − 16 py-2 padding),
 // holding ~53 full-width CJK glyphs ≈ 106 half-em units of vertical text at 13px. Budget just
 // under that so a record fills the column before spilling into the next lane, and never wraps to
 // a clipped second column. The integer-unit model slightly under-weights rotated half-width
 // glyphs (dates/numbers run a touch taller than 0.5em), so the buffer keeps date-heavy lanes safe.
-export const SU_RECORD_UNITS_PER_LANE = 102;
+export const DIEJI_RECORD_UNITS_PER_LANE = 102;
 
 function fallbackTranslate(
   key: string,
@@ -87,7 +87,7 @@ function getGenerationLabel(
   );
 }
 
-function formatSuRecordLine(line: string): string {
+function formatDiejiRecordLine(line: string): string {
   return line.replace(/^([\p{Script=Han}]{1,4}):\s*/u, "$1");
 }
 
@@ -102,38 +102,35 @@ function getRelationLabel(person: PaperPerson, t: TranslateFn): string {
   });
 }
 
-export function getSuGenerationMark(depth: number, t: TranslateFn): string {
-  return t("genealogyBook.suGenerationMark", "{{han}}世", {
-    han: toChineseNumeral(depth + 1),
-    number: depth + 1,
-  });
+export function getDiejiGenerationMark(depth: number, t: TranslateFn): string {
+  return getPaperGenerationMark(depth, t);
 }
 
-export function getSuFullRecordText(person: PaperPerson, t?: TranslateFn): string {
-  // Su omits the 子女 (children) line — only the Modern style lists children in its body text.
+export function getDiejiFullRecordText(person: PaperPerson, t?: TranslateFn): string {
+  // This vertical register omits the 子女 (children) line; only Modern lists children in body text.
   const { baseLines } = splitPaperRecordLines(person, t);
-  return baseLines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
+  return baseLines.map(formatDiejiRecordLine).join("，") || person.ui.shortHashText;
 }
 
-function getSuRecordSections(person: PaperPerson, t: TranslateFn): string[] {
-  // Only the base biography is laid out; the 子女 line is dropped (see getSuFullRecordText).
+function getDiejiRecordSections(person: PaperPerson, t: TranslateFn): string[] {
+  // Only the base biography is laid out; the 子女 line is dropped (see getDiejiFullRecordText).
   const { baseLines } = splitPaperRecordLines(person, t);
-  const baseRecord = baseLines.map(formatSuRecordLine).join("，") || person.ui.shortHashText;
+  const baseRecord = baseLines.map(formatDiejiRecordLine).join("，") || person.ui.shortHashText;
   return [baseRecord];
 }
 
-export function splitSuSpreadColumns(
-  spread: SuPageSpread,
-  side: SuPageSide,
-): SuTableLane[] {
+export function splitDiejiSpreadColumns(
+  spread: DiejiPageSpread,
+  side: DiejiPageSide,
+): DiejiTableLane[] {
   return side === "right" ? spread.rightLanes : spread.leftLanes;
 }
 
 function makeBlankLane(params: {
   spreadIndex: number;
-  side: SuPageSide;
+  side: DiejiPageSide;
   index: number;
-}): SuTableLane {
+}): DiejiTableLane {
   const { spreadIndex, side, index } = params;
   return {
     kind: "blank",
@@ -141,12 +138,12 @@ function makeBlankLane(params: {
   };
 }
 
-function fillSuSideLanes(params: {
-  lanes: SuTableLane[];
+function fillDiejiSideLanes(params: {
+  lanes: DiejiTableLane[];
   capacity: number;
   spreadIndex: number;
-  side: SuPageSide;
-}): SuTableLane[] {
+  side: DiejiPageSide;
+}): DiejiTableLane[] {
   const { lanes, capacity, spreadIndex, side } = params;
   if (lanes.length >= capacity) return lanes;
 
@@ -167,7 +164,7 @@ function makeGenerationLane(params: {
   label: string;
   repeated: boolean;
   continued?: boolean;
-}): SuTableLane {
+}): DiejiTableLane {
   const { depth, label, repeated, continued = false } = params;
   return {
     kind: "generation",
@@ -179,14 +176,14 @@ function makeGenerationLane(params: {
   };
 }
 
-function makePersonLanes(person: PaperPerson, label: string, t: TranslateFn): SuTableLane[] {
-  const sections = getSuRecordSections(person, t);
+function makePersonLanes(person: PaperPerson, label: string, t: TranslateFn): DiejiTableLane[] {
+  const sections = getDiejiRecordSections(person, t);
   const baseName = person.ui.fullName || person.ui.titleText || person.ui.shortHashText;
   const relationLabel = getRelationLabel(person, t);
   let laneIndex = 0;
 
   return sections.flatMap((section, sectionIndex) => {
-    const chunks = splitTextByVisualUnits(section, SU_RECORD_UNITS_PER_LANE);
+    const chunks = splitTextByVisualUnits(section, DIEJI_RECORD_UNITS_PER_LANE);
     return chunks.map((text, chunkIndex) => {
       const isFirstPersonLane = laneIndex === 0;
       const lane = {
@@ -208,11 +205,11 @@ function makePersonLanes(person: PaperPerson, label: string, t: TranslateFn): Su
 }
 
 function ensureLeadingGenerationLane(params: {
-  lanes: SuTableLane[];
+  lanes: DiejiTableLane[];
   generationsByDepth: Map<number, PaperGeneration>;
   repeatedDepth?: number;
   t: TranslateFn;
-}): SuTableLane[] {
+}): DiejiTableLane[] {
   const { lanes, generationsByDepth, repeatedDepth, t } = params;
   const first = lanes.find((lane) => lane.kind !== "blank");
   if (!first || first.kind === "generation") return lanes;
@@ -230,20 +227,20 @@ function ensureLeadingGenerationLane(params: {
 }
 
 function splitChartLanesIntoSpreads(params: {
-  lanes: SuTableLane[];
+  lanes: DiejiTableLane[];
   generationsByDepth: Map<number, PaperGeneration>;
   repeatedDepth?: number;
   t: TranslateFn;
-}): SuPageSpread[] {
+}): DiejiPageSpread[] {
   const { lanes, generationsByDepth, repeatedDepth, t } = params;
-  const spreads: SuPageSpread[] = [];
+  const spreads: DiejiPageSpread[] = [];
   let start = 0;
 
   while (start < lanes.length || spreads.length === 0) {
     const spreadIndex = spreads.length + 1;
     const firstLane = lanes[start];
     const needsLeadingMark = spreadIndex > 1 && firstLane?.kind !== "generation";
-    const capacity = needsLeadingMark ? SU_SPREAD_LANE_CAPACITY - 1 : SU_SPREAD_LANE_CAPACITY;
+    const capacity = needsLeadingMark ? DIEJI_SPREAD_LANE_CAPACITY - 1 : DIEJI_SPREAD_LANE_CAPACITY;
     const raw = lanes.slice(start, start + capacity);
     const withLeadingMark =
       !needsLeadingMark
@@ -254,48 +251,48 @@ function splitChartLanesIntoSpreads(params: {
       index: spreadIndex,
       kind: spreadIndex === 1 ? "main" : "continuation",
       lanes: withLeadingMark,
-      rightLanes: fillSuSideLanes({
-        lanes: withLeadingMark.slice(0, SU_RIGHT_PAGE_LANE_CAPACITY),
-        capacity: SU_RIGHT_PAGE_LANE_CAPACITY,
+      rightLanes: fillDiejiSideLanes({
+        lanes: withLeadingMark.slice(0, DIEJI_RIGHT_PAGE_LANE_CAPACITY),
+        capacity: DIEJI_RIGHT_PAGE_LANE_CAPACITY,
         spreadIndex,
         side: "right",
       }),
-      leftLanes: fillSuSideLanes({
-        lanes: withLeadingMark.slice(SU_RIGHT_PAGE_LANE_CAPACITY, SU_SPREAD_LANE_CAPACITY),
-        capacity: SU_LEFT_PAGE_LANE_CAPACITY,
+      leftLanes: fillDiejiSideLanes({
+        lanes: withLeadingMark.slice(DIEJI_RIGHT_PAGE_LANE_CAPACITY, DIEJI_SPREAD_LANE_CAPACITY),
+        capacity: DIEJI_LEFT_PAGE_LANE_CAPACITY,
         spreadIndex,
         side: "left",
       }),
     });
-    start += capacity || SU_SPREAD_LANE_CAPACITY;
+    start += capacity || DIEJI_SPREAD_LANE_CAPACITY;
   }
 
   return spreads;
 }
 
-export function buildSuPaperBook(params: {
+export function buildDiejiPaperBook(params: {
   generations: PaperGeneration[];
   t?: TranslateFn;
-}): SuPaperBook {
+}): DiejiPaperBook {
   const { generations } = params;
   const t = params.t || fallbackTranslate;
   if (!generations.length) return { charts: [] };
 
   const generationsByDepth = new Map(generations.map((generation) => [generation.depth, generation]));
   const maxDepth = generations[generations.length - 1]?.depth || 0;
-  const charts: SuChartWindow[] = [];
+  const charts: DiejiChartWindow[] = [];
 
   for (
     let startDepth = 0, chartIndex = 1;
     startDepth <= maxDepth;
-    startDepth += SU_CHART_STEP, chartIndex += 1
+    startDepth += DIEJI_CHART_STEP, chartIndex += 1
   ) {
     const generationDepths = Array.from(
-      { length: SU_GENERATIONS_PER_CHART },
+      { length: DIEJI_GENERATIONS_PER_CHART },
       (_value, offset) => startDepth + offset,
     );
     const repeatedDepth = chartIndex > 1 ? startDepth : undefined;
-    const lanes: SuTableLane[] = [];
+    const lanes: DiejiTableLane[] = [];
 
     generationDepths.forEach((depth) => {
       const generation = generationsByDepth.get(depth);
@@ -328,10 +325,10 @@ export function buildSuPaperBook(params: {
   return { charts };
 }
 
-export function getSuPersonLaneKeys(spreads: SuPageSpread[], personId: NodeId): string[] {
+export function getDiejiPersonLaneKeys(spreads: DiejiPageSpread[], personId: NodeId): string[] {
   return spreads
     .flatMap((spread) => spread.lanes)
-    .filter((lane): lane is Extract<SuTableLane, { kind: "person" }> =>
+    .filter((lane): lane is Extract<DiejiTableLane, { kind: "person" }> =>
       lane.kind === "person" && lane.person.id === personId,
     )
     .map((lane) => lane.key);
