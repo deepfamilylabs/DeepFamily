@@ -126,16 +126,6 @@ export const SU_COLUMN_UNIT_CAPACITY = Math.floor(SU_RECORD_HEIGHT / SU_BODY_FON
 // Columns that fit a slot, sizing the chunk budgets that drive tree placement. The name lane
 // shares the first slot; continuation slots use the whole slot. No per-column padding is subtracted
 // here: the merged block pads only its two ends, so each slot tiles cleanly at SU_BODY_COLUMN_WIDTH.
-const SU_FIRST_BODY_COLUMNS = Math.max(
-  1,
-  Math.floor((SU_PERSON_SLOT_WIDTH - SU_NAME_LANE_WIDTH) / SU_BODY_COLUMN_WIDTH),
-);
-const SU_CONTINUATION_BODY_COLUMNS = Math.max(
-  1,
-  Math.floor(SU_PERSON_SLOT_WIDTH / SU_BODY_COLUMN_WIDTH),
-);
-export const SU_RECORD_FIRST_PART_UNITS = SU_FIRST_BODY_COLUMNS * SU_COLUMN_UNIT_CAPACITY;
-export const SU_RECORD_CONTINUATION_UNITS = SU_CONTINUATION_BODY_COLUMNS * SU_COLUMN_UNIT_CAPACITY;
 export const SU_ENTRY_TOP_Y = 22;
 export const SU_NAME_TOP_Y = 25;
 export const SU_NAME_GLYPH_ADVANCE = 20;
@@ -201,18 +191,6 @@ export function getSuFullRecordText(person: PaperPerson): string {
     person.classicalLines.map(formatSuRecordLine).join("，") ||
     person.ui.shortHashText
   );
-}
-
-export function splitSuRecordText(person: PaperPerson): string[] {
-  const text = getSuFullRecordText(person);
-  const firstParts = splitTextByVisualUnits(text, SU_RECORD_FIRST_PART_UNITS);
-  if (firstParts.length === 1) return firstParts;
-
-  const [first, ...remaining] = firstParts;
-  return [
-    first,
-    ...splitTextByVisualUnits(remaining.join(""), SU_RECORD_CONTINUATION_UNITS),
-  ];
 }
 
 export function getSuPageMetrics(
@@ -290,6 +268,50 @@ function getSlotPosition(
   return { spreadIndex, side, sideSlotIndex, x, slotWidth };
 }
 
+export function splitSuRecordText(
+  person: PaperPerson,
+  startSlot = 0,
+  metrics: SuPageMetrics = getSuPageMetrics(),
+): string[] {
+  let remaining = getSuFullRecordText(person);
+  const chunks: string[] = [];
+  let slotIndex = startSlot;
+  let groupKey = "";
+  let groupSlotCount = 0;
+  let previousColumnCount = 0;
+
+  while (remaining) {
+    const position = getSlotPosition(slotIndex, metrics);
+    const nextGroupKey = `${position.spreadIndex}:${position.side}`;
+    if (nextGroupKey !== groupKey) {
+      groupKey = nextGroupKey;
+      groupSlotCount = 0;
+      previousColumnCount = 0;
+    }
+
+    groupSlotCount += 1;
+    const nameLane = slotIndex === startSlot ? SU_NAME_LANE_WIDTH : 0;
+    const availableBodyWidth = Math.max(
+      SU_BODY_COLUMN_WIDTH,
+      groupSlotCount * position.slotWidth - nameLane - SU_BODY_PADDING_X,
+    );
+    const columnCount = Math.max(
+      1,
+      Math.floor(availableBodyWidth / SU_BODY_COLUMN_WIDTH),
+    );
+    const addedColumns = Math.max(1, columnCount - previousColumnCount);
+    const budget = addedColumns * SU_COLUMN_UNIT_CAPACITY;
+    const [chunk, ...rest] = splitTextByVisualUnits(remaining, budget);
+
+    chunks.push(chunk);
+    remaining = rest.join("");
+    previousColumnCount = columnCount;
+    slotIndex += 1;
+  }
+
+  return chunks;
+}
+
 function buildPersonMap(generations: PaperGeneration[]): Map<NodeId, PaperPerson> {
   return new Map(
     generations.flatMap((generation) =>
@@ -302,8 +324,9 @@ function buildChartPlacements(params: {
   graph: TreeGraphData;
   generationDepths: number[];
   generationsByDepth: Map<number, PaperGeneration>;
+  metrics: SuPageMetrics;
 }): { placements: SuPersonPlacement[]; spreadSlotCount: number } {
-  const { graph, generationDepths, generationsByDepth } = params;
+  const { graph, generationDepths, generationsByDepth, metrics } = params;
   const startDepth = generationDepths[0];
   const endDepth = generationDepths[generationDepths.length - 1];
   const peopleByDepth = new Map(
@@ -321,17 +344,19 @@ function buildChartPlacements(params: {
     ]),
   );
   const childrenMemo = new Map<NodeId, PaperPerson[]>();
-  const chunksMemo = new Map<NodeId, string[]>();
-  const widthMemo = new Map<NodeId, number>();
+  const chunksMemo = new Map<NodeId, Map<number, string[]>>();
+  const widthMemo = new Map<NodeId, Map<number, number>>();
   const placements: SuPersonPlacement[] = [];
   const placed = new Set<NodeId>();
   let maxSlot = -1;
 
-  const getChunks = (person: PaperPerson): string[] => {
-    const memo = chunksMemo.get(person.id);
+  const getChunks = (person: PaperPerson, startSlot: number): string[] => {
+    const personMemo = chunksMemo.get(person.id) || new Map<number, string[]>();
+    const memo = personMemo.get(startSlot);
     if (memo) return memo;
-    const chunks = splitSuRecordText(person);
-    chunksMemo.set(person.id, chunks);
+    const chunks = splitSuRecordText(person, startSlot, metrics);
+    personMemo.set(startSlot, chunks);
+    chunksMemo.set(person.id, personMemo);
     return chunks;
   };
 
@@ -350,27 +375,33 @@ function buildChartPlacements(params: {
     return children;
   };
 
-  const getSubtreeWidth = (person: PaperPerson): number => {
-    const memo = widthMemo.get(person.id);
-    if (memo) return memo;
+  const getSubtreeWidth = (person: PaperPerson, startSlot: number): number => {
+    const personMemo = widthMemo.get(person.id) || new Map<number, number>();
+    const memo = personMemo.get(startSlot);
+    if (memo !== undefined) return memo;
     const children = getVisibleChildren(person);
-    const childrenWidth = children.reduce((sum, child) => sum + getSubtreeWidth(child), 0);
-    const width = Math.max(getChunks(person).length, childrenWidth, 1);
-    widthMemo.set(person.id, width);
+    let childSlot = startSlot;
+    for (const child of children) {
+      childSlot += getSubtreeWidth(child, childSlot);
+    }
+    const childrenWidth = childSlot - startSlot;
+    const width = Math.max(getChunks(person, startSlot).length, childrenWidth, 1);
+    personMemo.set(startSlot, width);
+    widthMemo.set(person.id, personMemo);
     return width;
   };
 
   const placeSubtree = (person: PaperPerson, startSlot: number) => {
     if (placed.has(person.id)) return;
     placed.add(person.id);
-    const chunks = getChunks(person);
+    const chunks = getChunks(person, startSlot);
     placements.push({ person, startSlot, chunks });
     maxSlot = Math.max(maxSlot, startSlot + chunks.length - 1);
 
     let childSlot = startSlot;
     for (const child of getVisibleChildren(person)) {
       placeSubtree(child, childSlot);
-      childSlot += getSubtreeWidth(child);
+      childSlot += getSubtreeWidth(child, childSlot);
       maxSlot = Math.max(maxSlot, childSlot - 1);
     }
   };
@@ -378,7 +409,7 @@ function buildChartPlacements(params: {
   let cursor = 0;
   for (const person of peopleByDepth.get(startDepth) || []) {
     placeSubtree(person, cursor);
-    cursor += getSubtreeWidth(person);
+    cursor += getSubtreeWidth(person, cursor);
   }
 
   for (const depth of generationDepths) {
@@ -386,7 +417,7 @@ function buildChartPlacements(params: {
       if (placed.has(person.id)) continue;
       const fallbackSlot = Math.max(cursor, maxSlot + 1);
       placeSubtree(person, fallbackSlot);
-      cursor = fallbackSlot + getSubtreeWidth(person);
+      cursor = fallbackSlot + getSubtreeWidth(person, fallbackSlot);
     }
   }
 
@@ -731,6 +762,7 @@ export function buildSuPaperBook(params: {
       graph,
       generationDepths,
       generationsByDepth,
+      metrics,
     });
     const spreadCount = Math.max(
       1,

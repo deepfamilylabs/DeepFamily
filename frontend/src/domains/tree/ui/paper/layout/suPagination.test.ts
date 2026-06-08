@@ -277,8 +277,18 @@ describe("buildSuPaperBook", () => {
       .flatMap((spread) => spread.rows[1].entries)
       .filter((entry) => entry.person.id === child.id)
       .sort((a, b) => a.partIndex - b.partIndex);
+    const firstSpreadEntries = book.charts[0].spreads[0].rows[1].entries
+      .filter((entry) => entry.person.id === child.id)
+      .sort((a, b) => a.slotIndex - b.slotIndex);
+    const rightEntries = firstSpreadEntries.filter((entry) => entry.side === "right");
+    const leftEntries = firstSpreadEntries.filter((entry) => entry.side === "left");
 
     expect(entries.length).toBeGreaterThan(8);
+    expect(rightEntries.length).toBeGreaterThan(0);
+    expect(leftEntries.length).toBeGreaterThan(0);
+    expect(Math.max(...rightEntries.map((entry) => entry.slotIndex))).toBeLessThan(
+      Math.min(...leftEntries.map((entry) => entry.slotIndex)),
+    );
     expect(entries.map((entry) => entry.text).join("")).toBe(getSuFullRecordText(person));
     expect(entries.slice(1).every((entry) => entry.continued)).toBe(true);
     expect(new Set(entries.map((entry) => entry.spreadIndex)).size).toBeGreaterThan(1);
