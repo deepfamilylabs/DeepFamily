@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../../shared/model";
 import { PaperGenealogyView } from "../PaperGenealogyView";
 import { buildPaperGenerations } from "../paperData";
-import { getSuFullRecordText } from "../layout/suPagination";
+import {
+  getSuFullRecordText,
+  SU_BODY_LINE_HEIGHT,
+} from "../layout/suPagination";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -187,6 +190,44 @@ describe("SuBookRenderer", () => {
     );
     expect(connector?.getAttribute("stroke")).toBe("var(--df-paper-line-accent)");
     expect(connector?.getAttribute("stroke-width")).toBe("1.15");
+  });
+
+  it("keeps the fixed body column spacing while pagination fills the right page first", () => {
+    const family = makeFamily();
+    const story = (
+      "少承庭训，迁居江右，主持修桥置田，赈济族人，辑录旧谱，分辨昭穆。" +
+      "又置义田三十亩，以供春秋祭祀，训诸子读书务本，婚丧贫乏者量力周济。"
+    ).repeat(9);
+    const nodesData: Record<string, NodeData> = {
+      [family.root.id]: {
+        id: family.root.id,
+        personHash: family.root.personHash,
+        versionIndex: 1,
+        fullName: "曹操",
+        story,
+      },
+    };
+
+    render(
+      <PaperGenealogyView
+        style="su"
+        graph={family.graph}
+        rootId={family.root.id}
+        nodesData={nodesData}
+        hasRoot
+      />,
+    );
+
+    const rightPage = screen.getByTestId("paper-su-right-1-1");
+    const rootRecord = Array.from(
+      rightPage.querySelectorAll<HTMLElement>("article[data-person-id]"),
+    ).find((node) => node.getAttribute("data-person-id") === family.root.id);
+    const detail = rootRecord?.querySelector<HTMLElement>(
+      `[data-testid="paper-su-detail-${family.root.id}"]`,
+    );
+
+    expect(rootRecord).toBeTruthy();
+    expect(detail?.style.lineHeight).toBe(String(SU_BODY_LINE_HEIGHT));
   });
 
   it("keeps a long biography complete while showing the name only once", () => {

@@ -234,12 +234,10 @@ type SuRenderRecord = Pick<
 // A person's biography is split into fixed-width slot chunks for tree placement, but rendering
 // each chunk as its own vertical-rl block reopens a wide aisle at every slot boundary (a slot is
 // wider than the columns it holds). Merging a person's chunks on one page side into a single
-// continuous block lets CSS wrap the columns uniformly — every inter-column gap is just the tight
-// body line-height — and sizing the block to its natural column count keeps the reclaimed slot
-// slack out of the text (it lands as ordinary spacing before the next record, not mid-biography).
+// continuous block lets CSS wrap the columns uniformly. Pagination already fills each page side
+// to its real column capacity before continuing to the next side, so line-height stays fixed.
 function mergeSuSideRecords(
   entries: SuPersonEntry[],
-  metrics: SuPageMetrics,
 ): SuRenderRecord[] {
   const byPerson = new Map<NodeId, SuPersonEntry[]>();
   for (const entry of entries) {
@@ -344,8 +342,6 @@ function SuPersonRecord({
         className="m-0 h-full min-w-0 flex-1 px-1"
         style={{
           ...PAPER_TEXT.body,
-          // In vertical-rl, line-height is the column-to-column gap; the shared 1.55 body leading
-          // leaves wide aisles between columns, so Su tightens it to keep columns close-packed.
           lineHeight: SU_BODY_LINE_HEIGHT,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
@@ -428,7 +424,7 @@ function SuPage({
   t: TranslateFn;
 }) {
   const chunkEntries = spread.rows.flatMap((row) => splitSuRowEntries(row, side));
-  const records = mergeSuSideRecords(chunkEntries, metrics);
+  const records = mergeSuSideRecords(chunkEntries);
   const pageWidth = getSuPageWidth(side, metrics);
 
   return (
