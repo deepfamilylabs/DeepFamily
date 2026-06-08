@@ -7,6 +7,7 @@ import { LineageBookRenderer } from "./renderers/LineageBookRenderer";
 import { ModernBookRenderer } from "./renderers/ModernBookRenderer";
 import { OuBookRenderer } from "./renderers/OuBookRenderer";
 import { PagodaBookRenderer } from "./renderers/PagodaBookRenderer";
+import { SuBookRenderer } from "./renderers/SuBookRenderer";
 import { DiejiBookRenderer } from "./renderers/DiejiBookRenderer";
 import { usePaperGenealogyViewModel } from "./usePaperGenealogyViewModel";
 
@@ -25,6 +26,14 @@ type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
 const PAPER_BOOK_RENDERERS = {
   [PAPER_GENEALOGY_STYLE.OU]: (vm) => (
     <OuBookRenderer generations={vm.generations} t={vm.translate} />
+  ),
+  [PAPER_GENEALOGY_STYLE.SU]: (vm) => (
+    <SuBookRenderer
+      graph={vm.graph}
+      rootId={vm.rootId}
+      generations={vm.generations}
+      t={vm.translate}
+    />
   ),
   [PAPER_GENEALOGY_STYLE.DIEJI]: (vm) => (
     <DiejiBookRenderer generations={vm.generations} t={vm.translate} />

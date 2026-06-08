@@ -77,7 +77,7 @@ export function PaperSpine({
         </div>
       </div>
       <div
-        className="mt-auto flex h-7 w-full items-start justify-center border-b pb-1"
+        className="mt-auto flex h-9 w-full items-end justify-center border-b pb-3"
         style={{ borderColor: PAPER_LINE.soft }}
         aria-label={t("genealogyBook.spinePageNumbers", "page {{left}} / {{right}}", {
           left: leftPageLabel,

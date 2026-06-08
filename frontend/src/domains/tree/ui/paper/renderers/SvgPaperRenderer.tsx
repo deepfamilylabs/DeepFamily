@@ -30,6 +30,7 @@ type SvgGuideConfig = {
 
 const SVG_GUIDE_CONFIG = {
   [PAPER_GENEALOGY_STYLE.OU]: { orientation: "vertical", showVolumeLabel: true },
+  [PAPER_GENEALOGY_STYLE.SU]: { orientation: "horizontal", showVolumeLabel: false },
   [PAPER_GENEALOGY_STYLE.DIEJI]: { orientation: "horizontal", showVolumeLabel: false },
   [PAPER_GENEALOGY_STYLE.PAGODA]: { orientation: "horizontal", showVolumeLabel: false },
   [PAPER_GENEALOGY_STYLE.LINEAGE]: { orientation: "horizontal", showVolumeLabel: false },
@@ -45,6 +46,7 @@ type SvgEdgeConfig =
 
 const SVG_EDGE_CONFIG = {
   [PAPER_GENEALOGY_STYLE.OU]: { route: "side" },
+  [PAPER_GENEALOGY_STYLE.SU]: { route: "down", minMidY: 18 },
   [PAPER_GENEALOGY_STYLE.DIEJI]: { route: "down", minMidY: 24 },
   [PAPER_GENEALOGY_STYLE.PAGODA]: { route: "down", minMidY: 18 },
   [PAPER_GENEALOGY_STYLE.LINEAGE]: { route: "down", minMidY: 18 },
@@ -84,6 +86,22 @@ const SVG_NODE_CONFIG = {
     stackDetailColumns: false,
     getDetailTextX: () => 14,
     getDetailLineX: () => 14,
+  },
+  [PAPER_GENEALOGY_STYLE.SU]: {
+    titleMaxLength: 16,
+    detailLineCount: 5,
+    lineHeight: 16,
+    titleY: 24,
+    rectRx: 2,
+    titleFontSize: 16,
+    verticalText: false,
+    showTopStem: false,
+    detailY: 48,
+    detailTextAnchor: "middle",
+    detailMaxLength: 14,
+    stackDetailColumns: false,
+    getDetailTextX: (node) => node.w / 2,
+    getDetailLineX: (node) => node.w / 2,
   },
   [PAPER_GENEALOGY_STYLE.DIEJI]: {
     titleMaxLength: 10,

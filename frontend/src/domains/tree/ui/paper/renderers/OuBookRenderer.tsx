@@ -18,6 +18,7 @@ import {
   PAPER_BODY_FONT_STACK,
   PAPER_LINE,
   PAPER_MARK_BG,
+  PAPER_RECORD_INLINE_PADDING,
   PAPER_SHEET_STYLE,
   PAPER_TEXT,
   PAPER_VARS,
@@ -48,12 +49,13 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
 
   return (
     <article
-      className="relative flex h-full shrink-0 flex-row-reverse border-l px-2.5 py-3 last:border-l-0"
+      className="relative flex h-full shrink-0 flex-row-reverse border-l py-3 last:border-l-0"
       style={{
         borderColor: PAPER_LINE.soft,
         direction: "ltr",
         flex: `1 0 ${entry.widthPx}px`,
         minWidth: entry.widthPx,
+        paddingInline: PAPER_RECORD_INLINE_PADDING,
         width: entry.widthPx,
       }}
       data-testid={`paper-row-${person.id}`}
