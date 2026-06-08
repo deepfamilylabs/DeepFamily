@@ -46,14 +46,15 @@ vi.mock("react-i18next", () => ({
 vi.mock("../domains/tree", () => ({
   PAPER_GENEALOGY_STYLE: {
     OU: "ou",
+    SU: "su",
     DIEJI: "dieji",
     PAGODA: "pagoda",
     LINEAGE: "lineage",
     MODERN: "modern",
   },
   isPaperGenealogyStyle: (value: string | null) =>
-    ["ou", "dieji", "pagoda", "lineage", "modern"].includes(String(value)),
-  PAPER_GENEALOGY_STYLES: ["ou", "dieji", "pagoda", "lineage", "modern"],
+    ["ou", "su", "dieji", "pagoda", "lineage", "modern"].includes(String(value)),
+  PAPER_GENEALOGY_STYLES: ["ou", "su", "dieji", "pagoda", "lineage", "modern"],
   PaperGenealogyView: (props: any) => (
     <div
       data-testid="paper-view"
@@ -98,6 +99,7 @@ describe("GenealogyBookPage", () => {
     expect(screen.getByTestId("paper-view").dataset.hasRoot).toBe("true");
 
     const cases = [
+      ["Su-style", "su"],
       ["Dieji-style", "dieji"],
       ["Pagoda", "pagoda"],
       ["Lineage", "lineage"],

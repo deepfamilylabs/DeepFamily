@@ -386,6 +386,8 @@
     "ouRecordContinuedMark": "续",
     "ouTableRule": "五世一表，自上而下横格，由右向左竖排。",
     "ouOverlapNote": "本表重列上一表第五世。",
+    "suTableRule": "五世一图，父子直下，兄弟横分，由右向左排列。",
+    "suOverlapNote": "本图重列上一图第五世。",
     "diejiPageTitle": "牒记式世系 --- 五世直行",
     "diejiRightPage": "右页",
     "diejiLeftPage": "左页",
@@ -418,6 +420,7 @@
     "repeatedGeneration": "重列",
     "styles": {
       "ou": "欧式",
+      "su": "苏式",
       "dieji": "牒记式",
       "pagoda": "宝塔式",
       "lineage": "世系图",

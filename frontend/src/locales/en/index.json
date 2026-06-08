@@ -386,6 +386,8 @@
     "ouRecordContinuedMark": "cont.",
     "ouTableRule": "Five generations per table, horizontal bands, vertical right-to-left text.",
     "ouOverlapNote": "This table repeats the previous table's fifth generation.",
+    "suTableRule": "Five generations per chart, fathers descend vertically and siblings branch horizontally.",
+    "suOverlapNote": "This chart repeats the previous chart's fifth generation.",
     "diejiPageTitle": "Dieji-style lineage --- five vertical generations",
     "diejiRightPage": "right page",
     "diejiLeftPage": "left page",
@@ -418,6 +420,7 @@
     "repeatedGeneration": "repeated",
     "styles": {
       "ou": "Ou-style",
+      "su": "Su-style",
       "dieji": "Dieji-style",
       "pagoda": "Pagoda",
       "lineage": "Lineage",

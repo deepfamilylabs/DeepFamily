@@ -7,6 +7,10 @@ export const PAPER_TITLE_FONT_STACK =
 export const PAPER_NOTE_FONT_STACK =
   '"FangSong", "STFangsong", "FangSong_GB2312", "Songti SC", "SimSun", serif';
 
+// Ou records use Tailwind's px-2.5 spacing. Keep the numeric value shared so absolute-layout
+// renderers can reserve the same visual distance from the spine without changing pagination.
+export const PAPER_RECORD_INLINE_PADDING = 10;
+
 export const PAPER_VARS = {
   "--df-paper-bg": "#e6d6ad",
   "--df-paper-sheet": "#f7efd8",
@@ -14,6 +18,7 @@ export const PAPER_VARS = {
   "--df-paper-line": "#8a6a3b",
   "--df-paper-line-soft": "rgba(138, 106, 59, 0.32)",
   "--df-paper-line-tint": "rgba(138, 106, 59, 0.07)",
+  "--df-paper-line-accent": "#c18070",
   "--df-paper-ink": "#332414",
   "--df-paper-muted": "#755f3c",
   "--df-paper-red": "#9b2f25",
@@ -33,12 +38,14 @@ export const PAPER_MARK_FG = "#f7efd8";
 // Single source of truth for line/divider colors, keyed by semantic weight. `strong` frames the
 // structure (outer/page frames, SVG connectors, the Modern ledger grid); `soft` is every in-page
 // divider/separator (lane & cell dividers, generation/row separators, section/spine dividers);
-// `tint` is a faint background wash (Ou generation column). Customizing a weight is a one-line
-// edit here (or its `--df-paper-line*` var in PAPER_VARS).
+// `tint` is a faint background wash (Ou generation column); `accent` is the pale-red ink used by
+// relationship lines that need visual distinction. Customizing a weight is a one-line edit here
+// (or its `--df-paper-line*` var in PAPER_VARS).
 export const PAPER_LINE = {
   strong: "var(--df-paper-line)",
   soft: "var(--df-paper-line-soft)",
   tint: "var(--df-paper-line-tint)",
+  accent: "var(--df-paper-line-accent)",
 } as const;
 
 export type PaperLineWeight = keyof typeof PAPER_LINE;

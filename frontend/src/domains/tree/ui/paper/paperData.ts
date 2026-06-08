@@ -5,6 +5,7 @@ import { getNodeUi, type NodeUi } from "../nodeUi";
 
 export const PAPER_GENEALOGY_STYLE = {
   OU: "ou",
+  SU: "su",
   DIEJI: "dieji",
   PAGODA: "pagoda",
   LINEAGE: "lineage",
@@ -16,6 +17,7 @@ export type PaperGenealogyStyle =
 
 export const PAPER_GENEALOGY_STYLES = [
   PAPER_GENEALOGY_STYLE.OU,
+  PAPER_GENEALOGY_STYLE.SU,
   PAPER_GENEALOGY_STYLE.DIEJI,
   PAPER_GENEALOGY_STYLE.PAGODA,
   PAPER_GENEALOGY_STYLE.LINEAGE,

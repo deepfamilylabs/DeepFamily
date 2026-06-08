@@ -1625,6 +1625,27 @@ describe("PaperGenealogyView", () => {
     expect(screen.queryByText(/Birth: 1815/)).toBeNull();
   });
 
+  it("merges overlapping Lineage connector segments for one parent on a page", () => {
+    const wide = makeWideGenerationGraph(16);
+
+    render(
+      <PaperGenealogyView
+        style="lineage"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{}}
+        hasRoot
+      />,
+    );
+
+    const rightPage = screen.getByTestId("paper-lineage-page-right-1-1");
+    expect(
+      rightPage.querySelectorAll(
+        `[data-testid="paper-lineage-connector-${wide.rootId}"]`,
+      ),
+    ).toHaveLength(1);
+  });
+
   it("renders an empty state when no root is available", () => {
     render(
       <PaperGenealogyView

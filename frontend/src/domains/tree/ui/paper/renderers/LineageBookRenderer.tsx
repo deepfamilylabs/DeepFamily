@@ -135,14 +135,10 @@ function LineageConnectorLines({
   connector: LineageConnector;
   entryById: Map<NodeId, LineageEntry>;
 }) {
-  const children =
-    connector.kind === "outgoing"
-      ? []
-      : (connector.childIds
-          .map((childId) => entryById.get(childId))
-          .filter(Boolean) as LineageEntry[]);
+  const children = connector.childIds
+    .map((childId) => entryById.get(childId))
+    .filter(Boolean) as LineageEntry[];
   const showParentStem =
-    connector.kind !== "incoming" &&
     connector.parentCenterX !== undefined &&
     connector.parentBottomY !== undefined;
 
@@ -181,6 +177,50 @@ function LineageConnectorLines({
       ))}
     </g>
   );
+}
+
+function mergeLineagePageConnectors(
+  connectors: LineageConnector[],
+): LineageConnector[] {
+  const merged = new Map<string, LineageConnector>();
+
+  for (const connector of connectors) {
+    const groupKey = [
+      connector.parentId,
+      connector.side,
+      connector.horizontalY.toFixed(4),
+    ].join(":");
+    const current = merged.get(groupKey);
+    if (!current) {
+      merged.set(groupKey, {
+        ...connector,
+        key: `merged:${groupKey}`,
+        childIds: Array.from(new Set(connector.childIds)),
+      });
+      continue;
+    }
+
+    current.horizontalStartX = Math.min(
+      current.horizontalStartX,
+      connector.horizontalStartX,
+    );
+    current.horizontalEndX = Math.max(
+      current.horizontalEndX,
+      connector.horizontalEndX,
+    );
+    current.childCircleY = Math.min(
+      current.childCircleY,
+      connector.childCircleY,
+    );
+    current.parentCenterX ??= connector.parentCenterX;
+    current.parentBottomY ??= connector.parentBottomY;
+    current.childIds = Array.from(
+      new Set([...current.childIds, ...connector.childIds]),
+    );
+    if (connector.kind === "local") current.kind = "local";
+  }
+
+  return Array.from(merged.values());
 }
 
 // The 世次 column is rendered as HTML (not SVG) so its rail, cell dividers, tint and tabs are the
@@ -272,7 +312,13 @@ function LineagePageSvg({
 }) {
   const rows = spread.rows;
   const entries = rows.flatMap((row) => splitLineageRowEntries(row, side));
-  const connectors = spread.connectors.filter((connector) => connector.side === side);
+  const connectors = useMemo(
+    () =>
+      mergeLineagePageConnectors(
+        spread.connectors.filter((connector) => connector.side === side),
+      ),
+    [side, spread.connectors],
+  );
   const entryById = useMemo(
     () => new Map(entries.map((entry) => [entry.person.id, entry])),
     [entries],
