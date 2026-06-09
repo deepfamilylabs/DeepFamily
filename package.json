@@ -1,12 +1,18 @@
 {
   "name": "deepfamily",
   "version": "1.0.0",
+  "private": true,
   "description": "DeepFamily - Decentralized Digital Family Tree Protocol",
   "main": "index.js",
   "type": "module",
+  "workspaces": [
+    "frontend",
+    "packages/proof-core"
+  ],
   "scripts": {
-    "setup": "npm install && npm --prefix frontend install",
+    "setup": "npm install",
     "build": "hardhat --config hardhat.config.mjs compile",
+    "pages:build": "npm ci --workspace deepfamily-frontend --workspace @deepfamily/proof-core --include-workspace-root=false --no-audit --no-fund && npm run build --workspace deepfamily-frontend",
     "test": "hardhat --config hardhat.config.mjs test mocha",
     "test:gas": "node -e \"console.error('test:gas is not available after Hardhat 3 migration (hardhat-gas-reporter is Hardhat 2-only).'); process.exit(1)\"",
     "test:coverage": "node -e \"console.error('test:coverage is not available after Hardhat 3 migration (solidity-coverage is Hardhat 2-only).'); process.exit(1)\"",
@@ -21,28 +27,28 @@
     "lint": "solhint 'contracts/**/*.sol'",
     "lint:fix": "solhint 'contracts/**/*.sol' --fix",
     "contracts:check": "npm run lint && npm run build && npm run size && npm run storage:check && npm test",
-    "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.{js,mjs}' 'hardhat/**/*.{js,mjs}' 'tasks/**/*.{js,mjs}' 'circuits/**/*.js' 'frontend/src/**/*.{ts,tsx,js,jsx,css,md,json}'",
-    "prepare": "husky",
-    "frontend:config": "npm run config:local --prefix frontend",
-    "frontend:sync:abi": "npm run sync:abi --prefix frontend",
-    "frontend:dev": "npm run dev --prefix frontend",
-    "frontend:build": "npm run build --prefix frontend",
-    "frontend:preview": "npm run preview --prefix frontend",
-    "frontend:lint": "npm run lint --prefix frontend",
-    "frontend:legacy-entrypoints": "npm run legacy-entrypoints:check --prefix frontend",
+    "format": "prettier --write 'contracts/**/*.sol' 'scripts/**/*.{js,mjs}' 'hardhat/**/*.{js,mjs}' 'tasks/**/*.{js,mjs}' 'circuits/**/*.js' 'packages/**/*.{js,mjs,ts,json}' 'frontend/src/**/*.{ts,tsx,js,jsx,css,md,json}'",
+    "prepare": "node scripts/prepare.mjs",
+    "frontend:config": "npm run config:local --workspace deepfamily-frontend",
+    "frontend:sync:abi": "npm run sync:abi --workspace deepfamily-frontend",
+    "frontend:dev": "npm run dev --workspace deepfamily-frontend",
+    "frontend:build": "npm run build --workspace deepfamily-frontend",
+    "frontend:preview": "npm run preview --workspace deepfamily-frontend",
+    "frontend:lint": "npm run lint --workspace deepfamily-frontend",
+    "frontend:legacy-entrypoints": "npm run legacy-entrypoints:check --workspace deepfamily-frontend",
     "frontend:typecheck": "tsc --noEmit -p frontend/tsconfig.json",
-    "frontend:test": "npm run test --prefix frontend",
+    "frontend:test": "npm run test --workspace deepfamily-frontend",
     "frontend:check": "npm run frontend:lint && npm run frontend:legacy-entrypoints && npm run frontend:typecheck && npm run frontend:build && npm run frontend:test",
     "check": "npm run frontend:check && npm run contracts:check",
-    "frontend:locales:compare": "npm run locales:compare --prefix frontend",
-    "frontend:locales:usage": "npm run locales:usage --prefix frontend",
-    "frontend:locales:check": "npm run locales:check --prefix frontend",
-    "security:audit": "npm audit --omit=dev && npm audit --omit=dev --prefix frontend",
+    "frontend:locales:compare": "npm run locales:compare --workspace deepfamily-frontend",
+    "frontend:locales:usage": "npm run locales:usage --workspace deepfamily-frontend",
+    "frontend:locales:check": "npm run locales:check --workspace deepfamily-frontend",
+    "security:audit": "npm audit --omit=dev",
     "security:xss-scan": "rg -n \"dangerouslySetInnerHTML|innerHTML\\s*=|insertAdjacentHTML|document\\.write\\(|new Function\\(|eval\\(\" frontend/src && exit 1 || exit 0",
     "dev:node": "fuser -k 8545/tcp 2>/dev/null; hardhat --config hardhat.config.mjs node --hostname 127.0.0.1 --port 8545",
     "dev:deploy": "hardhat --config hardhat.config.mjs run scripts/deploy-integrated.mjs --network localhost",
     "dev:fund": "hardhat --config hardhat.config.mjs run scripts/fund-wallet.mjs --network localhost",
-    "dev:frontend": "npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173",
+    "dev:frontend": "npm run dev --workspace deepfamily-frontend -- --host 0.0.0.0 --port 5173",
     "dev:contract": "npm run dev:deploy && npm run dev:fund && npm run dev:seed",
     "dev:all": "concurrently -k -n node,web -c blue,green \"npm run dev:node\" \"wait-on tcp:127.0.0.1:8545 && npm run dev:contract && npm run frontend:config && npm run dev:frontend\"",
     "dev:seed": "hardhat --config hardhat.config.mjs run scripts/seed-historical.mjs --network localhost",
@@ -116,6 +122,9 @@
     ],
     "{deploy,scripts,test,tasks}/**/*.{js,mjs}": [
       "prettier --write"
+    ],
+    "packages/**/*.{js,mjs,ts,json}": [
+      "prettier --write"
     ]
   },
   "overrides": {
@@ -131,6 +140,7 @@
     }
   },
   "dependencies": {
+    "@deepfamily/proof-core": "0.1.0",
     "@noble/hashes": "^1.8.0",
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.6.1",

@@ -7,12 +7,25 @@ import {
   getProofDescriptor,
   getProofDescriptorByPurpose,
 } from "../lib/proofDescriptors.js";
+import {
+  DISCLOSURE_BINDING_PROOF_DEFINITION,
+  PERSON_COMMITMENT_PROOF_DEFINITION,
+  getProofDefinitionByPurpose,
+} from "@deepfamily/proof-core";
 import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 describe("proof descriptors", function () {
+  it("keeps shared proof definitions free of environment-specific artifact paths", function () {
+    expect(PERSON_COMMITMENT_PROOF_DEFINITION).not.to.have.property("files");
+    expect(DISCLOSURE_BINDING_PROOF_DEFINITION).not.to.have.property("files");
+    expect(getProofDefinitionByPurpose("PersonCommitment")).to.equal(
+      PERSON_COMMITMENT_PROOF_DEFINITION,
+    );
+  });
+
   it("exports the active person and disclosure descriptors", function () {
     expect(PERSON_COMMITMENT_PROOF_DESCRIPTOR).to.include({
       key: "person-commitment-groth16-bn254-v1",
@@ -35,6 +48,7 @@ describe("proof descriptors", function () {
       proverDriver: "snarkjs-groth16",
       proofPacker: "abi-groth16-abc",
     });
+    expect(PERSON_COMMITMENT_PROOF_DESCRIPTOR.files).not.to.have.property("browser");
   });
 
   it("resolves descriptors by key and purpose", function () {

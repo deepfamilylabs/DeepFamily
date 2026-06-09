@@ -20,7 +20,8 @@
     "locales:check": "npm run locales:compare && npm run locales:usage"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.2.1",
+    "@deepfamily/proof-core": "0.1.0",
+    "@hookform/resolvers": "5.2.1",
     "@noble/hashes": "^1.8.0",
     "d3": "^7.9.0",
     "ethers": "^6.11.1",
@@ -38,7 +39,7 @@
     "react-window": "^1.8.11",
     "scrypt-js": "^3.0.1",
     "snarkjs": "^0.7.5",
-    "zod": "^4.0.17"
+    "zod": "4.0.17"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -7,15 +7,13 @@ import {
   DEFAULT_PROOF_SYSTEM_ID,
   PROOF_ENCODING_ID_ABI_GROTH16_ABC,
   PROOF_SYSTEM_ID_GROTH16_BN254_V1,
-} from '../lib/proofEnvelopeCodec.js'
+  DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
+  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
+} from '@deepfamily/proof-core'
 import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
   PERSON_COMMITMENT_PROOF_DESCRIPTOR,
 } from '../lib/proofDescriptors.js'
-import {
-  DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
-  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
-} from '../lib/publicSignalSpecs.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

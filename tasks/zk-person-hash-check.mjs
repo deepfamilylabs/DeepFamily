@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { poseidon4 } from "poseidon-lite";
 import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
 import { PERSON_COMMITMENT_PROOF_DESCRIPTOR } from "../lib/proofDescriptors.js";
-import { PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC } from "../lib/publicSignalSpecs.js";
+import { PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC } from "@deepfamily/proof-core";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

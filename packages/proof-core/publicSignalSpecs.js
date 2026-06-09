@@ -36,8 +36,7 @@ export const PUBLIC_SIGNAL_SPECS = Object.freeze({
 
 export const PUBLIC_SIGNAL_SPECS_BY_PURPOSE = Object.freeze({
   [PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.purpose]: PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
-  [DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC.purpose]:
-    DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
+  [DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC.purpose]: DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
 });
 
 function resolveSpecLabel(spec, label) {
@@ -60,11 +59,7 @@ export function normalizePublicSignalsForSpec(publicSignals, spec, { label } = {
   return publicSignals.map((value) => BigInt(value));
 }
 
-export function decodePublicSignals(
-  publicSignals,
-  spec,
-  { fieldTransforms = {}, label } = {},
-) {
+export function decodePublicSignals(publicSignals, spec, { fieldTransforms = {}, label } = {}) {
   const normalizedSignals = normalizePublicSignalsForSpec(publicSignals, spec, { label });
   return Object.fromEntries(
     spec.fieldOrder.map((fieldName, index) => {
