@@ -24,7 +24,7 @@ export function getPaperGenerationMark(depth: number, t: TranslateFn): string {
 }
 
 // A person-like shape carrying just the fields needed to derive a relation label, so the
-// helpers work for PaperPerson as well as the per-style node/entry types (Pagoda, Lineage).
+// Helpers work for PaperPerson as well as the per-style node/entry types.
 type RelationSource = Pick<PaperPerson, "relation" | "nodeData" | "ui">;
 
 // Birth-rank word following the traditional rule: a sole same-gender child is 之子/之女, while

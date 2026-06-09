@@ -6,7 +6,6 @@ import { PAPER_GENEALOGY_STYLE, type PaperGenealogyStyle } from "./paperData";
 import { LineageBookRenderer } from "./renderers/LineageBookRenderer";
 import { ModernBookRenderer } from "./renderers/ModernBookRenderer";
 import { OuBookRenderer } from "./renderers/OuBookRenderer";
-import { PagodaBookRenderer } from "./renderers/PagodaBookRenderer";
 import { SuBookRenderer } from "./renderers/SuBookRenderer";
 import { DiejiBookRenderer } from "./renderers/DiejiBookRenderer";
 import { usePaperGenealogyViewModel } from "./usePaperGenealogyViewModel";
@@ -37,14 +36,6 @@ const PAPER_BOOK_RENDERERS = {
   ),
   [PAPER_GENEALOGY_STYLE.DIEJI]: (vm) => (
     <DiejiBookRenderer generations={vm.generations} t={vm.translate} />
-  ),
-  [PAPER_GENEALOGY_STYLE.PAGODA]: (vm) => (
-    <PagodaBookRenderer
-      graph={vm.graph}
-      rootId={vm.rootId}
-      generations={vm.generations}
-      t={vm.translate}
-    />
   ),
   [PAPER_GENEALOGY_STYLE.LINEAGE]: (vm) => (
     <LineageBookRenderer

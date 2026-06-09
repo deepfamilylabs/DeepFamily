@@ -100,7 +100,6 @@ const SVG_PAPER_LAYOUT_BUILDERS = {
   [PAPER_GENEALOGY_STYLE.OU]: buildEmptySvgPaperLayout,
   [PAPER_GENEALOGY_STYLE.SU]: buildEmptySvgPaperLayout,
   [PAPER_GENEALOGY_STYLE.DIEJI]: buildTreeBackedLayout,
-  [PAPER_GENEALOGY_STYLE.PAGODA]: buildEmptySvgPaperLayout,
   [PAPER_GENEALOGY_STYLE.LINEAGE]: buildEmptySvgPaperLayout,
   [PAPER_GENEALOGY_STYLE.MODERN]: buildEmptySvgPaperLayout,
 } satisfies Record<PaperGenealogyStyle, SvgPaperLayoutBuilder>;
