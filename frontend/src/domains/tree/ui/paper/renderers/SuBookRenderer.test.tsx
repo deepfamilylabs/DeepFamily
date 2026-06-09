@@ -284,5 +284,10 @@ describe("SuBookRenderer", () => {
     expect(details.map((entry) => entry.text).join("")).toBe(fullRecord);
     expect(screen.getAllByTestId(`paper-su-name-${family.son.id}`)).toHaveLength(1);
     expect(screen.queryByTestId(`paper-su-relation-${family.son.id}`)).toBeNull();
+    expect(
+      screen
+        .getAllByTestId(`paper-su-detail-${family.son.id}`)
+        .every((detail) => detail.parentElement?.getAttribute("title") === fullRecord),
+    ).toBe(true);
   });
 });

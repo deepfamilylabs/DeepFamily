@@ -3,6 +3,7 @@ import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import {
   buildSuPaperBook,
+  getSuFullRecordText,
   getSuGenerationMark,
   getSuPageMetrics,
   getSuPageWidth,
@@ -286,6 +287,7 @@ function SuPersonRecord({
   t: TranslateFn;
 }) {
   const person = entry.person;
+  const fullRecord = getSuFullRecordText(person);
   const name = entry.continued
     ? ""
     : clipText(
@@ -309,6 +311,7 @@ function SuPersonRecord({
       data-person-id={person.id}
       data-continued={entry.continued ? "true" : "false"}
       data-part-index={entry.partIndex}
+      title={fullRecord}
     >
       {entry.continued ? null : (
         <div
