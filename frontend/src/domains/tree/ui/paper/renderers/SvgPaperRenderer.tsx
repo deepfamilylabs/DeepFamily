@@ -32,7 +32,6 @@ const SVG_GUIDE_CONFIG = {
   [PAPER_GENEALOGY_STYLE.OU]: { orientation: "vertical", showVolumeLabel: true },
   [PAPER_GENEALOGY_STYLE.SU]: { orientation: "horizontal", showVolumeLabel: false },
   [PAPER_GENEALOGY_STYLE.DIEJI]: { orientation: "horizontal", showVolumeLabel: false },
-  [PAPER_GENEALOGY_STYLE.PAGODA]: { orientation: "horizontal", showVolumeLabel: false },
   [PAPER_GENEALOGY_STYLE.LINEAGE]: { orientation: "horizontal", showVolumeLabel: false },
   [PAPER_GENEALOGY_STYLE.MODERN]: { orientation: "horizontal", showVolumeLabel: false },
 } satisfies Record<PaperGenealogyStyle, SvgGuideConfig>;
@@ -48,7 +47,6 @@ const SVG_EDGE_CONFIG = {
   [PAPER_GENEALOGY_STYLE.OU]: { route: "side" },
   [PAPER_GENEALOGY_STYLE.SU]: { route: "down", minMidY: 18 },
   [PAPER_GENEALOGY_STYLE.DIEJI]: { route: "down", minMidY: 24 },
-  [PAPER_GENEALOGY_STYLE.PAGODA]: { route: "down", minMidY: 18 },
   [PAPER_GENEALOGY_STYLE.LINEAGE]: { route: "down", minMidY: 18 },
   [PAPER_GENEALOGY_STYLE.MODERN]: { route: "down", minMidY: 18 },
 } satisfies Record<PaperGenealogyStyle, SvgEdgeConfig>;
@@ -118,22 +116,6 @@ const SVG_NODE_CONFIG = {
     stackDetailColumns: true,
     getDetailTextX: (node) => node.w / 2 + 28,
     getDetailLineX: (node, index) => node.w / 2 + 28 - index * 15,
-  },
-  [PAPER_GENEALOGY_STYLE.PAGODA]: {
-    titleMaxLength: 16,
-    detailLineCount: 3,
-    lineHeight: 16,
-    titleY: 30,
-    rectRx: 2,
-    titleFontSize: 16,
-    verticalText: false,
-    showTopStem: false,
-    detailY: 54,
-    detailTextAnchor: "middle",
-    detailMaxLength: 14,
-    stackDetailColumns: false,
-    getDetailTextX: (node) => node.w / 2,
-    getDetailLineX: (node) => node.w / 2,
   },
   [PAPER_GENEALOGY_STYLE.LINEAGE]: {
     titleMaxLength: 16,

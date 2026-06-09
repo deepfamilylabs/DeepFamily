@@ -407,9 +407,6 @@
     "modernPageRef": "[见{{han}}页]",
     "modernTableRule": "五世一图，左右对页横格，按关系、姓名、行传分栏。",
     "modernOverlapNote": "本图重列上一图第五世。",
-    "pagodaChartTitle": "{{startHan}}世至{{endHan}}世系图",
-    "pagodaTableRule": "五世一图，始祖居上，分支逐层下垂。",
-    "pagodaOverlapNote": "本图重列上一图末世承接。",
     "lineageChartTitle": "{{startHan}}世至{{endHan}}世系图",
     "lineageMainSpread": "正图",
     "lineageContinuationPage": "续页 {{number}}",
@@ -422,7 +419,6 @@
       "ou": "欧式",
       "su": "苏式",
       "dieji": "牒记式",
-      "pagoda": "宝塔式",
       "lineage": "世系图",
       "modern": "现代式"
     },

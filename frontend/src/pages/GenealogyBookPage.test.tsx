@@ -48,13 +48,12 @@ vi.mock("../domains/tree", () => ({
     OU: "ou",
     SU: "su",
     DIEJI: "dieji",
-    PAGODA: "pagoda",
     LINEAGE: "lineage",
     MODERN: "modern",
   },
   isPaperGenealogyStyle: (value: string | null) =>
-    ["ou", "su", "dieji", "pagoda", "lineage", "modern"].includes(String(value)),
-  PAPER_GENEALOGY_STYLES: ["ou", "su", "dieji", "pagoda", "lineage", "modern"],
+    ["ou", "su", "dieji", "lineage", "modern"].includes(String(value)),
+  PAPER_GENEALOGY_STYLES: ["ou", "su", "dieji", "lineage", "modern"],
   PaperGenealogyView: (props: any) => (
     <div
       data-testid="paper-view"
@@ -101,7 +100,6 @@ describe("GenealogyBookPage", () => {
     const cases = [
       ["Su-style", "su"],
       ["Dieji-style", "dieji"],
-      ["Pagoda", "pagoda"],
       ["Lineage", "lineage"],
       ["Modern", "modern"],
       ["Ou-style", "ou"],
