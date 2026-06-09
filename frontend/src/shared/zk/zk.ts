@@ -13,7 +13,7 @@ import {
   DEFAULT_PROOF_ENCODING_ID as CODEC_DEFAULT_PROOF_ENCODING_ID,
   packGroth16ProofEnvelope,
   type ProofEnvelope as CodecProofEnvelope,
-} from "../../../../lib/proofEnvelopeCodec.js";
+} from "@deepfamily/proof-core";
 
 export type Groth16Proof = {
   pi_a: [string | bigint, string | bigint, string | bigint];

@@ -133,7 +133,7 @@ const main = async () => {
   } catch (err) {
     if (err && typeof err === 'object' && err.code === 'ERR_MODULE_NOT_FOUND') {
       console.error('[csp-scan] missing dependency: playwright-core')
-      console.error('[csp-scan] run: cd frontend && npm install')
+      console.error('[csp-scan] run: npm install from the repository root')
       process.exit(1)
     }
     throw err

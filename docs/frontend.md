@@ -74,6 +74,11 @@ app  →  pages  →  domains  →  shared  →  (workers / abi / i18n / assets)
 - `pages/` compose domains; they should not contain reusable logic — extract to the relevant domain instead.
 - Code imported by a worker (`workers/*.worker.ts`) must stay worker-safe: no React, no DOM, no `window`. Put such code under `shared/crypto/`, `shared/zk/`, or `shared/lib/`.
 
+Cross-runtime ZK protocol definitions live in the private `@deepfamily/proof-core` workspace.
+That package must remain browser- and Node-neutral: no filesystem access, `snarkjs`, artifact
+paths, or browser URLs. Node artifact candidates belong in `lib/proofDescriptors.js`; browser
+artifact URLs belong in `frontend/src/shared/zk/proofDescriptors.ts`.
+
 `frontend:legacy-entrypoints` enforces that retired entrypoints stay removed; re-run it after large refactors.
 
 ### React page and transaction UI structure
@@ -279,6 +284,8 @@ npm run dev:all
 This starts a Hardhat node, deploys the integrated system, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:seed`, `frontend:config`, `dev:frontend` individually.
 
 ### Inside `frontend/`
+
+Install dependencies once from the repository root before running workspace-local commands.
 
 ```bash
 npm run dev

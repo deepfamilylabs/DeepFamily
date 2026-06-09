@@ -12,15 +12,28 @@ npm run frontend:dev
 npm run frontend:build
 npm run frontend:check
 
-# Or from frontend/
-cd frontend/
-npm install
+# After installing once from the repository root, commands may also run from frontend/
 npm run dev
 npm run build
 npm run test
 ```
 
-`npm run dev` and `npm run build` automatically sync the contract ABI into `src/abi/DeepFamily.json` before starting Vite.
+Run `npm install` from the repository root. `npm run dev` and `npm run build` automatically sync
+the contract ABI into `src/abi/DeepFamily.json` before starting Vite. The frontend consumes the
+private `@deepfamily/proof-core` workspace through the root lockfile.
+
+## Cloudflare Pages
+
+Configure the Pages project as a monorepo build:
+
+- Root directory: repository root
+- Build command: `npm run pages:build`
+- Build output directory: `frontend/dist`
+- Environment variable: `SKIP_DEPENDENCY_INSTALL=1`
+- Build watch paths: `frontend/*`, `packages/proof-core/*`, `package.json`, `package-lock.json`
+
+`pages:build` performs a clean filtered workspace install for only `deepfamily-frontend` and
+`@deepfamily/proof-core`, so Cloudflare does not install the Hardhat toolchain.
 
 ## Configuration
 

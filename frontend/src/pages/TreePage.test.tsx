@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TreePage from "./TreePage";
 
@@ -63,6 +64,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (_key: string, fallback?: string) => fallback ?? _key,
+    i18n: { language: "en" },
   }),
 }));
 
@@ -128,6 +130,14 @@ vi.mock("../shared/config/env", () => ({
   shouldPreferFlatTree: mocks.env.shouldPreferFlatTree,
 }));
 
+function renderTreePage() {
+  return render(
+    <MemoryRouter>
+      <TreePage />
+    </MemoryRouter>,
+  );
+}
+
 describe("TreePage", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -187,7 +197,7 @@ describe("TreePage", () => {
   it("renders toolbar stats, wires refresh/clear actions, and persists the selected view mode", async () => {
     localStorage.setItem("df:viewMode", "tree");
 
-    render(<TreePage />);
+    renderTreePage();
 
     expect(screen.getByText("Family Tree")).toBeTruthy();
     expect(screen.getAllByText(/familyTree\.ui\.nodesLabelFull/)[0].textContent).toContain("12");
@@ -223,7 +233,7 @@ describe("TreePage", () => {
       rootVersionIndex: 2,
     };
 
-    render(<TreePage />);
+    renderTreePage();
 
     await waitFor(() =>
       expect(mocks.config.update).toHaveBeenCalledWith({

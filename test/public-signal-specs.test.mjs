@@ -7,7 +7,7 @@ import {
   getPublicSignalSpec,
   getPublicSignalSpecByPurpose,
   normalizePublicSignalsForSpec,
-} from "../lib/publicSignalSpecs.js";
+} from "@deepfamily/proof-core";
 
 describe("public signal specs", function () {
   it("exports the active person and disclosure specs", function () {

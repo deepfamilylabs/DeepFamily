@@ -3,8 +3,10 @@ import { ArgumentType } from "hardhat/types/arguments";
 import fs from "node:fs";
 import path from "node:path";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
-import { packGroth16ProofEnvelope } from "../lib/proofEnvelopeCodec.js";
-import { PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC } from "../lib/publicSignalSpecs.js";
+import {
+  packGroth16ProofEnvelope,
+  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
+} from "@deepfamily/proof-core";
 
 // Usage:
 // npx hardhat add-person-version --proof ./proof.json --public ./public.json \
