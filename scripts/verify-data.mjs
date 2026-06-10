@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dataFile = process.argv[2] || "en-family.json";
+const dataFile = process.argv[2] || "en-kennedy-family.json";
 const dataPath = dataFile.includes("/")
   ? dataFile
   : path.join(__dirname, "..", "data", "persons", dataFile);

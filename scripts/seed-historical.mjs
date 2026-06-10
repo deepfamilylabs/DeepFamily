@@ -13,9 +13,9 @@
  *   HISTORICAL_DATA_FILES must be provided (comma-separated list of JSON files in data/persons/)
  *
  * Usage (env: HISTORICAL_DATA_FILES is required):
- *   HISTORICAL_DATA_FILES=en-family.json npm run dev:seed     # runs against localhost
- *   HISTORICAL_DATA_FILES=en-family.json npm run seed:net --net <network>   # target another network
- *   HISTORICAL_DATA_FILES=en-family.json,zh-family.json npm run dev:seed   # multiple files
+ *   HISTORICAL_DATA_FILES=en-kennedy-family.json npm run dev:seed     # runs against localhost
+ *   HISTORICAL_DATA_FILES=en-kennedy-family.json npm run seed:net --net <network>   # target another network
+ *   HISTORICAL_DATA_FILES=en-kennedy-family.json,zh-cao-family.json npm run dev:seed   # multiple files
  *
  * Optional for quick testing:
  *   HISTORICAL_SEED_LIMIT=5 npm run dev:seed   # only process first N members per file
@@ -204,7 +204,7 @@ const DATA_FILES = process.env.HISTORICAL_DATA_FILES
       .filter(Boolean)
   : [];
 if (DATA_FILES.length === 0) {
-  throw new Error("HISTORICAL_DATA_FILES is required (comma-separated list, e.g., en-family.json)");
+  throw new Error("HISTORICAL_DATA_FILES is required (comma-separated list, e.g., en-kennedy-family.json)");
 }
 // HISTORICAL_SEED_LIMIT limits how many members to process per file (for quick testing); <=0 or unset means no limit
 const RAW_SEED_MEMBER_LIMIT = process.env.HISTORICAL_SEED_LIMIT;
