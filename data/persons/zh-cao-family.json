@@ -1,0 +1,6542 @@
+{
+  "familyName": "曹操家族（正史考据版）",
+  "description": "依据《三国志》正文、裴松之注、《后汉书》及《晋书》整理的曹操后代、配偶和已知生母资料；未知信息不作推测。",
+  "source": "核心依据：《三国志》卷1、3、4、5、8、9、10、19、20、46；补充依据：《后汉书·皇后纪下》《晋书》卷49、89及《太平御览》所引《魏末传》。",
+  "note": "字段与zh-family.json保持一致。0表示年份或月日不详；空字符串表示地点不详；null表示父母未能可靠确定。fatherName/motherName原则上记录生物学父母，曹芳、曹询因生父不明而例外记录养父曹叡，并在notes明确说明。宗室过继关系写入storyData.family和notes，不伪装为血缘。文件另收录已知配偶及配偶一侧子孙作为关系线索；只有父母字段明确连接者才表示已证实的直系关系。同名人物优先使用史籍封号消歧。",
+  "members": [
+    {
+      "fullName": "曹操",
+      "birthYear": 155,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 220,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "沛国谯县",
+      "deathPlace": "洛阳",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹操（155—220），字孟德，沛国谯县人。东汉末年先后任兖州牧、司空、丞相，封魏公、魏王，是曹魏政权的奠基者。",
+          "他在汉末战争中击败吕布、袁绍、袁氏诸子、乌桓及关中诸部，控制中国北方；同时迎汉献帝至许，推行屯田并重建军政秩序。",
+          "曹操也是建安文学代表作者，传世作品包括《短歌行》《蒿里行》《步出夏门行》及《让县自明本志令》，并有《孙子略解》。曹丕称帝后追尊其为武皇帝，庙号太祖。"
+        ],
+        "earlyLife": [
+          "曹操生于沛国谯县。其父曹嵩是宦官曹腾的养子，官至太尉；曹嵩的生家在陈寿正文中被明确记为“莫能审其生出本末”。",
+          "《三国志》正文称曹操少年“机警，有权数”，又任侠放荡、不治行业，当时只有桥玄、何颙等少数人物认为他有非常之才。",
+          "曹操二十岁举孝廉为郎，继任洛阳北部尉、顿丘令，后征拜议郎。按其卒年与享年逆推，举孝廉约在174年。",
+          "黄巾起义后，曹操任骑都尉讨颍川黄巾，迁济南相，奏免多名贪污县令，禁止地方淫祀；其后辞去东郡太守任命，称疾归乡。",
+          "中平六年（189年），董卓欲授曹操骁骑校尉，曹操未接受，变易姓名离开洛阳，回到陈留散家财、合义兵。"
+        ],
+        "education": [
+          "正史没有记载曹操接受过何种固定师承或完整经学课程，因此不宜据后世想象为他设置明确的儒学教育经历。",
+          "裴松之注引《异同杂语》称曹操“博览群书，特好兵法”，并称其抄集诸家兵法为《接要》、注孙武十三篇。",
+          "裴注引《魏书》记其早年退居乡里时读书、射猎；又记其执政和统军期间“手不舍书”，白日讲武策、夜间思经传。",
+          "曹操的诗、令和兵书显示其知识结构兼及历史、政治、军事与乐府传统，但具体学习过程多不可考。"
+        ],
+        "lifeEvents": [
+          "155年：按建安二十五年去世时“年六十六”逆推，曹操约生于汉桓帝永寿元年；具体月日不详。",
+          "约174年：二十岁举孝廉为郎，随后历任洛阳北部尉、顿丘令和议郎。",
+          "184年：黄巾起义爆发后任骑都尉，参加颍川作战，随后出任济南相。",
+          "189年：拒绝董卓授官，离开洛阳，在陈留起兵讨董卓。",
+          "190年：参加关东联军，行奋武将军；因诸军迟疑不进，独自西进，在荥阳汴水为徐荣所败并负伤。",
+          "191年：击破东郡一带黑山军，被袁绍表为东郡太守。",
+          "192年：兖州刺史刘岱战死后，曹操领兖州牧；击降青州黄巾，收其精锐为青州兵。",
+          "193年至195年：两度攻徐州；其间陈宫等迎吕布入兖州，曹操经长期作战重新控制兖州。徐州战争中的大规模杀戮见于正史，是其生涯的重要争议。",
+          "196年：迎汉献帝至许县，任司空、行车骑将军事；同年采纳枣祗、韩浩等建议兴办屯田。",
+          "197年：张绣先降后叛，曹操在宛城战败，长子曹昂、侄曹安民和将领典韦战死。",
+          "198年：攻破下邳，俘杀吕布，进一步控制徐州。",
+          "200年：迅速击败据徐州反叛的刘备；同年与袁绍决战官渡，焚毁乌巢粮储并击退袁军。",
+          "202年至207年：袁绍死后继续平定袁谭、袁尚、袁熙势力；204年入邺，207年北征乌桓，在白狼山获胜。",
+          "208年：废三公官、自任丞相；刘琮以荆州降。曹军随后在赤壁失利并遭遇疫病，退回北方。",
+          "211年：西征关中，击败马超、韩遂等联军，重新控制关中局势。",
+          "213年：受封魏公、加九锡，以冀州十郡建立魏国；216年进一步进爵魏王。",
+          "215年：攻取汉中，张鲁投降；219年在刘备压力下退出汉中。",
+          "219年：关羽围樊城并俘于禁，曹操遣徐晃救援；孙权同时袭取荆州，樊城之围解除。",
+          "220年：正月病逝洛阳，年六十六，谥武王，葬高陵；曹丕称帝后追尊为武皇帝。"
+        ],
+        "career": [
+          "东汉地方官时期：历任洛阳北部尉、顿丘令、济南相，以整饬吏治和禁止淫祀见载于《武帝纪》。",
+          "军事集团形成期：从陈留起兵，经东郡太守、兖州牧等阶段取得兖州，并吸收青州黄巾降众。",
+          "控制汉廷时期：196年迎汉献帝至许，任司空、行车骑将军事，此后以朝廷名义任命官员和征讨各地割据势力。",
+          "统一北方时期：官渡之后逐步夺取冀、青、并、幽等地，并通过北征乌桓结束袁氏残余势力。",
+          "丞相时期：208年恢复丞相制度并自任丞相，统摄汉廷军政，同时继续对荆州、关中、汉中和江淮用兵。",
+          "魏公时期：213年建立魏国官制和封国结构，其政治中心主要在邺。",
+          "魏王时期：216年进爵魏王，名义上仍为汉臣，实际已建立可由曹氏继承的军政体系。",
+          "身后地位：220年曹丕代汉称帝，追尊曹操为武皇帝，庙号太祖。"
+        ],
+        "works": [
+          "《孙子略解》：曹操对《孙子》十三篇所作注释，现存文本保存了其对军制、地形、用间和战术原则的解释。",
+          "《兵书接要》：裴松之注引早期材料称曹操曾抄集诸家兵法成书，今已散佚。",
+          "《短歌行》二首：其中第一首以人生、求贤和天下归心为主题，文本在《乐府诗集》等文献中传世。",
+          "《步出夏门行》：包括《观沧海》《冬十月》《土不同》《龟虽寿》等篇章，涉及北征见闻与生命意识。",
+          "《蒿里行》《薤露行》：书写汉末政治崩坏和战争灾难，是理解建安时代的重要诗篇。",
+          "《度关山》《对酒》：集中表达其对君臣秩序、刑政、节俭和理想社会的思考。",
+          "《让县自明本志令》：建安十五年发布，回顾自身政治经历，并解释不交还军政权力的理由。",
+          "《求贤令》《举贤勿拘品行令》《敕有司取士勿废偏短令》：反映其在战乱环境下重视实际才能的选人原则。",
+          "《终令》与临终《遗令》：规定寿陵、薄葬和丧后军政安排，体现其反对厚葬及维持军事秩序的考虑。",
+          "曹操诗文原集早已散佚，今本《魏武帝集》《曹操集》主要由后人从史书、类书和文学总集中辑佚而成。"
+        ],
+        "achievements": [
+          "在长期战争中消灭或击败吕布、袁绍集团及北方多支割据力量，至207年前后基本控制黄河流域和北方州郡。",
+          "迎奉汉献帝并重建中央行政体系，使其集团取得制度和任官方面的优势，但也由此形成对汉廷权力的实际控制。",
+          "推行屯田，组织流民和军队恢复农业生产，为持续战争和北方经济恢复提供粮食与组织基础。",
+          "以实际能力选拔和使用人才，重用于禁、乐进、张辽、徐晃等不同出身的将领，并吸纳大量地方士人参与治理。",
+          "形成兼用奇谋、后勤、情报和军纪的统军体系；陈寿评价其“运筹演谋”，裴注引《魏书》称其临事亲授节度。",
+          "建立魏公国、魏王国的官制和继承基础，为曹丕于220年代汉建立曹魏提供了直接制度条件。",
+          "推动建安文学发展，其乐府诗把政治理想、战争经验和民生灾难写入文学传统。"
+        ],
+        "philosophy": [
+          "用人方面强调在乱世主动搜求人才。《求贤令》提出“唯才是举”，其重点是能力与现实功用，并非完全否定品行。",
+          "政治上强调秩序和执行力。陈寿以“揽申、商之法术”概括其一部分治理风格，但曹操的实践同时包含汉代官僚制度、军政权宜和个人裁断。",
+          "军事上重视先计、察敌、地形、军令和因势变化；《孙子略解》及其战事记录比后世概括性格言更能反映其军事思想。",
+          "经济上把粮食和人口组织视为战争与政权存续的基础，屯田是这一务实取向的主要制度表现。",
+          "在《度关山》和多篇政令中提倡节俭、反对奢侈；《终令》《遗令》又把薄葬原则落实到自身丧葬安排。",
+          "《让县自明本志令》既是个人政治自述，也是为继续掌握军政权力所作的公开辩护，阅读时应同时注意文本目的与实际权力结构。"
+        ],
+        "quotes": [
+          "“唯才是举，吾得而用之。”——《求贤令》",
+          "“设使国家无有孤，不知当几人称帝，几人称王。”——《让县自明本志令》",
+          "“老骥伏枥，志在千里；烈士暮年，壮心不已。”——《龟虽寿》",
+          "“山不厌高，海不厌深；周公吐哺，天下归心。”——《短歌行》",
+          "“白骨露于野，千里无鸡鸣。”——《蒿里行》",
+          "“天下尚未安定，未得遵古也。”——临终《遗令》，见《三国志·武帝纪》"
+        ],
+        "family": [
+          "父亲曹嵩是曹腾养子，官至太尉；陈寿称曹嵩生家不可确考。裴注所引“本夏侯氏”说法来源较晚且相互牵连，本数据不据此建立夏侯氏血缘。",
+          "丁夫人是曹操早期正室，无可靠亲生子女记载；她抚养刘夫人所生的曹昂，曹昂战死后与曹操决绝。",
+          "卞氏后来成为继室和魏王后，生曹丕、曹彰、曹植、曹熊，并曾抚养曹操其他失母诸子。",
+          "《三国志·武文世王公传》明确列出曹操二十五子及各自生母，是本家族数据建立母子关系的主要依据。",
+          "可由史文确认的女儿包括清河公主、安阳公主、金乡公主、曹宪、曹节、曹华等；部分女儿的生母没有可靠记载。",
+          "长子曹昂早卒；曹丕继承魏王位并于220年代汉；曹彰、曹植等诸子分别形成宗室支系。",
+          "曹操通过子女婚姻与汉献帝、夏侯氏、荀氏、张绣和孙氏等政治或军事集团建立姻亲关系。"
+        ],
+        "lifestyle": [
+          "裴注引《魏书》称曹操长期亲自读书和处理军务，“手不舍书”，白日讲武、夜间思考经传。",
+          "同一材料称他擅长射猎，能够手射飞鸟、亲自捕获猛兽；这些细节属于裴注引书，而非陈寿正文。",
+          "曹操喜好音乐和诗歌，所作新诗能够配入管弦成为乐章；其乐府作品也由后世音乐和文学文献保存。",
+          "《魏书》称其日常服饰和宫中器用较为节俭，帷帐损坏后修补，所得华美物品多赏给有功者。",
+          "建安二十三年预定寿陵时要求“因高为基，不封不树”；临终又命以时服入殓、不藏金玉珍宝。",
+          "有关曹操诙谐、轻佻或严酷的生活细节，多见于立场复杂的《曹瞒传》等裴注材料，不宜全部视为无争议事实。"
+        ],
+        "relations": [
+          "与汉献帝：曹操在196年迎献帝至许，借汉廷制度整合政令；献帝保留名义君主地位，而军政实权逐步集中于曹操。",
+          "与袁绍：两人早期同属讨董联盟，此后成为北方最主要的竞争者；官渡之战及其后续战争以曹操胜出告终。",
+          "与吕布：吕布一度乘兖州内乱夺取曹操根据地，曹操在195年恢复兖州，198年攻破下邳并处死吕布。",
+          "与刘备：双方曾共同对付吕布，后转为长期对手；刘备在徐州、荆州和汉中先后与曹操争夺地盘。",
+          "与孙权：208年双方在赤壁交战；219年孙权进攻关羽后方，与曹军在解除樊城危机上形成短期利益一致。",
+          "与荀彧、郭嘉等谋臣：曹操依靠一批士人参与战略、选官和行政；不同人物对其扩大封爵和建立魏国的态度并不完全一致。",
+          "与诸将：曹操从旧部、降将和行伍中选拔夏侯惇、曹仁、于禁、乐进、张辽、徐晃等人，形成多来源的军事核心。",
+          "与曹丕、曹植：晚年储位竞争最终以曹丕被立为魏太子结束，曹丕在曹操死后继承魏王位。"
+        ],
+        "activities": [
+          "军事行动遍及兖州、徐州、河北、乌桓、荆州、关中、汉中和淮南，是其三十余年政治生涯的主轴。",
+          "主持屯田、州郡任官、军队编制和魏国官制建设，将战时军事集团逐步转化为较稳定的政权。",
+          "多次发布选贤政令，要求属吏发现和举荐在治理、谋略或用兵方面有实际能力的人。",
+          "亲自撰写大量军令、政令和政治自述，用文本说明政策、整顿军纪并回应外界对其权力扩张的质疑。",
+          "创作乐府诗并参与音乐活动，把战争、民生、求贤、政治理想和个人生命感受写入诗歌。",
+          "研读和注释兵法，把经典兵学解释与自身作战经验结合。"
+        ],
+        "anecdotes": [
+          "桥玄识才：陈寿正文记桥玄认为天下将乱，能够安定局势者可能是曹操；这一记载早于后世“奸雄”故事的广泛流传。",
+          "荥阳让马：190年曹操在汴水战败负伤、坐骑受创，曹洪把自己的马让给曹操，使其得以夜间撤退；此事见《武帝纪》正文。",
+          "五色棒执法：裴注引《曹瞒传》称曹操任洛阳北部尉时设置五色棒，并处死违禁夜行的蹇硕叔父。该书对曹操多持批判立场，应标明来源。",
+          "吕伯奢事件：裴注同时保存《魏书》《世语》《孙盛杂记》三种不同叙述，死亡原因、人数和曹操言语均不一致，不能把小说化版本当作确定史实。",
+          "“鸡肋”故事：裴注引《九州春秋》称汉中撤军前曹操以“鸡肋”为令，杨修据此判断其将退兵；这是注引材料，并非《武帝纪》正文。",
+          "割发自刑：裴注引《曹瞒传》称曹操坐骑踏麦后割发代刑。该故事常用于说明军纪，也因来源立场与叙事性质而需谨慎使用。"
+        ],
+        "controversies": [
+          "徐州战争：陈寿记曹操征陶谦时“所过多所残戮”，造成严重平民伤亡。这是正史明确记载，不能仅以为父报仇或军事需要淡化。",
+          "汉魏权力关系：曹操以汉臣身份任司空、丞相，又逐步进爵魏公、魏王并建立独立封国。其行为究竟属于匡扶汉室、权臣政治还是代汉准备，历来评价分歧。",
+          "赤壁失利：《武帝纪》强调交战不利和疫病后撤，《周瑜传》则详载黄盖火攻。不同纪传的叙事重点需要合并阅读。",
+          "严刑与政治处决：曹操维持军政秩序时使用严厉刑罚，也处死过多名反对者或涉案士人；具体个案应分别依据本传核实，不能全部归因于单一性格。",
+          "曹嵩出身：陈寿正文明确说无法考知；裴注又保存曹嵩本夏侯氏的说法。现有史料不足以把曹操与夏侯氏设为确定血缘关系。",
+          "轶事史料偏差：《曹瞒传》《世语》《魏书》等材料立场不同，同一事件常有冲突；本数据仅把它们作为注明来源的补充，而不与正文等量齐观。",
+          "文学形象与历史人物：后世小说、戏曲强化了曹操“奸雄”形象，其中割须弃袍、梦中杀人等情节不能直接写入历史生平。"
+        ],
+        "legacy": [
+          "曹操建立的军政与封国体系由曹丕继承，直接转化为220年建立的曹魏政权。",
+          "陈寿评价曹操能够因材授官、运筹用兵，称其为“非常之人，超世之杰”；这一评价同时承认其权术与法术色彩。",
+          "官渡、河北和乌桓等战事长期被视为汉末战略与后勤组织的重要案例，《孙子略解》则使其军事思想以文本形式流传。",
+          "屯田及相关人口、粮食管理措施增强了北方政权的战争供给能力，并影响曹魏的经济组织。",
+          "《短歌行》《蒿里行》《步出夏门行》等作品确立了曹操在建安文学中的地位，与曹丕、曹植合称“三曹”。",
+          "其求贤政令成为研究汉末人才政策的重要文本，但实际选官仍同时受政治忠诚、地方关系和行政需求影响。",
+          "其薄葬命令、军政自述和大量政令为研究汉魏制度转型提供了第一人称材料。",
+          "正史、裴注、笔记和后世文学共同塑造了多个曹操形象；可靠研究必须区分材料年代、作者立场和文本性质。"
+        ],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书一·武帝纪》：https://zh.wikisource.org/wiki/三國志/卷01",
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·吴书九·周瑜鲁肃吕蒙传》：https://zh.wikisource.org/wiki/三國志/卷54",
+          "曹操《让县自明本志令》：https://zh.wikisource.org/wiki/讓縣自明本志令",
+          "曹操《求贤令》：https://zh.wikisource.org/wiki/求賢令",
+          "曹操《举贤勿拘品行令》：https://zh.wikisource.org/wiki/舉賢勿拘品行令",
+          "曹操《孙子略解》：https://zh.wikisource.org/wiki/孫子略解",
+          "曹操《短歌行》：https://zh.wikisource.org/wiki/短歌行_(曹操)",
+          "曹操《步出夏门行》：https://zh.wikisource.org/wiki/步出夏門行_(曹操)",
+          "《乐府诗集·卷二十七》：https://zh.wikisource.org/wiki/樂府詩集/027卷"
+        ],
+        "notes": [
+          "155年是根据220年去世时虚岁六十六逆推；正史未载出生月日，因此birthMonth和birthDay保持0。",
+          "“阿瞒”“吉利”等名号见裴注引《曹瞒传》，不属于陈寿正文，故不放入核心摘要。",
+          "史料优先级为陈寿正文、曹操本人传世诗文，其次为裴松之注所引早期文献；注引材料均在具体条目中注明。",
+          "曹操父亲曹嵩的生家不可确考，数据不采用“曹氏本夏侯氏”作为确定关系。",
+          "时间线中的年份依《武帝纪》年号换算；无法落实到具体月份的事件不补造月日。",
+          "赤壁之战同时参考《武帝纪》和《周瑜传》，避免只采用曹魏或孙吴一方的叙述。",
+          "诗文题名与文本以传世总集、类书及辑佚本为依据；《兵书接要》等作品已经散佚。",
+          "不采用《三国演义》中的割须弃袍、梦中杀人等小说情节；裴注轶事也不自动视为正文事实。",
+          "曹操生前最高爵位为魏王，谥武王；“武皇帝”“太祖”是曹丕称帝后的追尊。"
+        ]
+      },
+      "story": "曹操（155—220），字孟德，沛国谯县人，曹魏奠基者。东汉末起兵，196年迎汉献帝至许，200年官渡之战击败袁绍后统一北方，官至丞相，进爵魏王。亦为建安文学代表作者，传世《短歌行》《蒿里行》等。220年病逝于洛阳，谥武王；曹丕称帝后追尊为武皇帝，庙号太祖。"
+    },
+    {
+      "fullName": "丁夫人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "丁夫人是曹操早期正室，抚养刘夫人所生的曹昂；曹昂死后与曹操决绝。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操之妻；抚养曹昂，但不是曹昂生母。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": [
+          "无亲生子女的可靠记载。"
+        ]
+      },
+      "story": "丁夫人是曹操早期正室，抚养刘夫人所生的曹昂；曹昂死后与曹操决绝。"
+    },
+    {
+      "fullName": "卞氏",
+      "birthYear": 160,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 230,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "琅邪郡开阳县",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "卞氏是曹操继室，曹丕、曹彰、曹植、曹熊的生母，曹魏建立后尊为皇太后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操继室；生曹丕、曹彰、曹植、曹熊，并抚养曹操其他失母诸子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "出生年份据裴松之注引《魏书》所载延熹三年。"
+        ]
+      },
+      "story": "卞氏是曹操继室，曹丕、曹彰、曹植、曹熊的生母，曹魏建立后尊为皇太后。"
+    },
+    {
+      "fullName": "刘夫人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "刘夫人是曹操妾室，生曹昂、曹铄及清河公主，早卒。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹昂、曹铄、清河公主。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "刘夫人是曹操妾室，生曹昂、曹铄及清河公主，早卒。"
+    },
+    {
+      "fullName": "环夫人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "环夫人是曹操妾室，生曹冲、曹据、曹宇。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹冲、曹据、曹宇。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "环夫人是曹操妾室，生曹冲、曹据、曹宇。"
+    },
+    {
+      "fullName": "杜夫人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "杜夫人是曹操妾室，生曹林、曹衮。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹林、曹衮。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "金乡公主是否为杜夫人所生，传世材料存在矛盾，本数据不据此建立母女关系。"
+        ]
+      },
+      "story": "杜夫人是曹操妾室，生曹林、曹衮。"
+    },
+    {
+      "fullName": "秦夫人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "秦夫人是曹操妾室，生曹玹、曹峻。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹玹、曹峻。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "秦夫人是曹操妾室，生曹玹、曹峻。"
+    },
+    {
+      "fullName": "尹夫人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "尹夫人是曹操妾室，生曹矩；其前夫之子何晏也由曹操抚养。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹矩。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "尹夫人是曹操妾室，生曹矩；其前夫之子何晏也由曹操抚养。"
+    },
+    {
+      "fullName": "王昭仪",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "王昭仪是《三国志》正文所载曹干生母。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹干。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "裴松之注引《魏略》另称曹干为陈妾所生；本数据从陈寿正文。"
+        ]
+      },
+      "story": "王昭仪是《三国志》正文所载曹干生母。"
+    },
+    {
+      "fullName": "孙姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "孙姬是曹操妾室，生曹上、曹彪、曹勤。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹上、曹彪、曹勤。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "孙姬是曹操妾室，生曹上、曹彪、曹勤。"
+    },
+    {
+      "fullName": "李姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "李姬是曹操妾室，生曹乘、曹整、曹京。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹乘、曹整、曹京。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "李姬是曹操妾室，生曹乘、曹整、曹京。"
+    },
+    {
+      "fullName": "周姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "周姬是曹操妾室，生曹均。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹均。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "周姬是曹操妾室，生曹均。"
+    },
+    {
+      "fullName": "刘姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "刘姬是曹操妾室，生曹棘。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹棘。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "刘姬是曹操妾室，生曹棘。"
+    },
+    {
+      "fullName": "武帝宋姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "宋姬是曹操妾室，生曹徽。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生曹徽。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "宋姬是曹操妾室，生曹徽。"
+    },
+    {
+      "fullName": "赵姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "赵姬是曹操妾室，生曹茂。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹操妾室；生乐陵王曹茂。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "赵姬是曹操妾室，生曹茂。"
+    },
+    {
+      "fullName": "刘协",
+      "birthYear": 181,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 234,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "汉献帝刘协先后纳曹操之女曹宪、曹节、曹华，曹节后来成为皇后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹宪、曹节、曹华的配偶。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《后汉书·皇后纪下·献穆曹皇后》：https://zh.wikisource.org/wiki/後漢書/卷10下"
+        ],
+        "notes": []
+      },
+      "story": "汉献帝刘协先后纳曹操之女曹宪、曹节、曹华，曹节后来成为皇后。"
+    },
+    {
+      "fullName": "夏侯楙",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "夏侯楙，字子林，夏侯惇之子，娶曹操之女清河公主。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "清河公主的丈夫。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书九·诸夏侯曹传》：https://zh.wikisource.org/wiki/三國志/卷09"
+        ],
+        "notes": []
+      },
+      "story": "夏侯楙，字子林，夏侯惇之子，娶曹操之女清河公主。"
+    },
+    {
+      "fullName": "荀恽",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀恽是荀彧长子，娶曹操之女安阳公主。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "安阳公主的丈夫；史载有子荀甝、荀霬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀恽是荀彧长子，娶曹操之女安阳公主。"
+    },
+    {
+      "fullName": "何晏",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 249,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "何晏，字平叔，曹操养育于宫中，娶曹操之女金乡公主。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "金乡公主的丈夫；二人有一子，姓名不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《太平御览·卷一百五十二》引《魏末传》：https://zh.wikisource.org/wiki/太平御覽/0152"
+        ],
+        "notes": []
+      },
+      "story": "何晏，字平叔，曹操养育于宫中，娶曹操之女金乡公主。"
+    },
+    {
+      "fullName": "甄氏亡女",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹冲死后，曹操为他聘甄氏亡女合葬。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹冲的冥婚配偶。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "姓名、生卒年及父母不详。"
+        ]
+      },
+      "story": "曹冲死后，曹操为他聘甄氏亡女合葬。"
+    },
+    {
+      "fullName": "张绣之女",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "张绣归降曹操后，曹操为其子曹均娶张绣之女。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹均的妻子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书八·二公孙陶四张传》：https://zh.wikisource.org/wiki/三國志/卷08"
+        ],
+        "notes": [
+          "史书未载姓名。"
+        ]
+      },
+      "story": "张绣归降曹操后，曹操为其子曹均娶张绣之女。"
+    },
+    {
+      "fullName": "孙贲之女",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹操与孙氏结亲，为曹彰娶孙贲之女。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹彰的妻子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·吴书一·孙破虏讨逆传》：https://zh.wikisource.org/wiki/三國志/卷46"
+        ],
+        "notes": [
+          "史书未载姓名，也未明确其是否为曹楷生母。"
+        ]
+      },
+      "story": "曹操与孙氏结亲，为曹彰娶孙贲之女。"
+    },
+    {
+      "fullName": "曹志生母",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "《志别传》记曹志曾为母服丧，可确认其生母存在，但未载姓名与妻妾身份。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹植的配偶；曹志生母。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19"
+        ],
+        "notes": [
+          "史书未载姓名与妻妾身份，不能与后世材料所称崔氏直接等同。"
+        ]
+      },
+      "story": "《志别传》记曹志曾为母服丧，可确认其生母存在，但未载姓名与妻妾身份。"
+    },
+    {
+      "fullName": "任氏",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "任氏是曹丕早期妻妾，后因性情不合被遣。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕的早期配偶；无已知子女。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "任氏是曹丕早期妻妾，后因性情不合被遣。"
+    },
+    {
+      "fullName": "甄氏",
+      "birthYear": 183,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 221,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "中山郡无极县",
+      "deathPlace": "邺",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "甄氏是曹丕妻，生曹叡和东乡公主，曹叡即位后追谥文昭皇后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕配偶；生曹叡、东乡公主。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "《魏书》载生于汉光和五年十二月丁酉，折合公历为183年。"
+        ]
+      },
+      "story": "甄氏是曹丕妻，生曹叡和东乡公主，曹叡即位后追谥文昭皇后。"
+    },
+    {
+      "fullName": "文德郭皇后",
+      "birthYear": 184,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 235,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "安平郡广宗县",
+      "deathPlace": "许昌",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "郭女王是曹丕皇后，无亲生子，曾奉诏养育曹叡。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕配偶；无亲生子，养育曹叡。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "郭女王是曹丕皇后，无亲生子，曾奉诏养育曹叡。"
+    },
+    {
+      "fullName": "李贵人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "李贵人是曹丕妃嫔，生曹协。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹协。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "李贵人是曹丕妃嫔，生曹协。"
+    },
+    {
+      "fullName": "潘淑媛",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "潘淑媛是曹丕妃嫔，生曹蕤。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹蕤。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "潘淑媛是曹丕妃嫔，生曹蕤。"
+    },
+    {
+      "fullName": "朱淑媛",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "朱淑媛是曹丕妃嫔，生曹鉴。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹鉴。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "朱淑媛是曹丕妃嫔，生曹鉴。"
+    },
+    {
+      "fullName": "仇昭仪",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "仇昭仪是曹丕妃嫔，生曹霖。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹霖。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "仇昭仪是曹丕妃嫔，生曹霖。"
+    },
+    {
+      "fullName": "徐姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "徐姬是曹丕妃嫔，生曹礼。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹礼。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "徐姬是曹丕妃嫔，生曹礼。"
+    },
+    {
+      "fullName": "苏姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "苏姬是曹丕妃嫔，生曹邕。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹邕。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "苏姬是曹丕妃嫔，生曹邕。"
+    },
+    {
+      "fullName": "张姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "张姬是曹丕妃嫔，生曹贡。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹贡。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "张姬是曹丕妃嫔，生曹贡。"
+    },
+    {
+      "fullName": "文帝宋姬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "宋姬是曹丕妃嫔，生曹俨。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；生曹俨。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "宋姬是曹丕妃嫔，生曹俨。"
+    },
+    {
+      "fullName": "阴贵人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "阴贵人是曹丕妃嫔，《三国志·后妃传》记载其受宠。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；未见可靠子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "阴贵人是曹丕妃嫔，《三国志·后妃传》记载其受宠。"
+    },
+    {
+      "fullName": "柴贵人",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "柴贵人是曹丕妃嫔，《三国志·后妃传》记载其受宠。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹丕妃嫔；未见可靠子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "柴贵人是曹丕妃嫔，《三国志·后妃传》记载其受宠。"
+    },
+    {
+      "fullName": "虞氏",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "虞氏是曹叡为平原王时所纳元妃，曹叡即位后未立为皇后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹叡早期配偶；未见可靠子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "虞氏是曹叡为平原王时所纳元妃，曹叡即位后未立为皇后。"
+    },
+    {
+      "fullName": "明悼毛皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 237,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "河内郡",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "毛氏是曹叡皇后，景初元年被赐死，谥悼皇后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹叡配偶；未见可靠子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "毛氏是曹叡皇后，景初元年被赐死，谥悼皇后。"
+    },
+    {
+      "fullName": "明元郭皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 263,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "西平郡",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "郭氏是曹叡皇后，曹芳即位后尊为皇太后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹叡配偶；未见可靠子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "郭氏是曹叡皇后，曹芳即位后尊为皇太后。"
+    },
+    {
+      "fullName": "怀甄皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 251,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "甄氏是曹芳第一任皇后，正始四年立，嘉平三年去世。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹芳配偶；未见子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "甄氏是曹芳第一任皇后，正始四年立，嘉平三年去世。"
+    },
+    {
+      "fullName": "张皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "张氏是曹芳第二任皇后，嘉平四年立，嘉平六年被废。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹芳配偶；未见子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "张氏是曹芳第二任皇后，嘉平四年立，嘉平六年被废。"
+    },
+    {
+      "fullName": "王皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "王氏是曹芳第三任皇后，正元元年立。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹芳配偶；未见子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "王氏是曹芳第三任皇后，正元元年立。"
+    },
+    {
+      "fullName": "高贵乡公卞皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "卞氏是高贵乡公曹髦的皇后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹髦配偶；未见子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04",
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "卞氏是高贵乡公曹髦的皇后。"
+    },
+    {
+      "fullName": "魏元帝卞皇后",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "卞氏是陈留王曹奐的皇后，景元四年立。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹奐配偶；未见子女记载。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04",
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "卞氏是陈留王曹奐的皇后，景元四年立。"
+    },
+    {
+      "fullName": "甄黄",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹淑早卒后，曹叡取甄氏已故从孙甄黄与她合葬，并追封甄黄为列侯。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹淑的冥婚配偶。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": [
+          "甄黄在合葬前已经去世，生卒年不详。"
+        ]
+      },
+      "story": "曹淑早卒后，曹叡取甄氏已故从孙甄黄与她合葬，并追封甄黄为列侯。"
+    },
+    {
+      "fullName": "曹丕",
+      "birthYear": 187,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 226,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "谯县",
+      "deathPlace": "洛阳嘉福殿",
+      "fatherName": "曹操",
+      "motherName": "卞氏",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹丕（187—226），字子桓，曹操与卞氏之子。220年接受汉献帝禅让，建立曹魏，是魏文帝，在位至226年。",
+          "他在曹操晚年储位竞争中胜出，217年被立为魏太子；曹操去世后继承丞相、魏王，随后完成汉魏政权更替。",
+          "曹丕同时是建安文学代表作者和早期文学批评家，与曹操、曹植合称“三曹”。《典论·论文》《燕歌行》等作品对后世文学史影响较大。"
+        ],
+        "earlyLife": [
+          "《三国志·文帝纪》记曹丕生于汉灵帝中平四年冬，地点为谯县。其父曹操当时尚未形成后来控制北方的军政集团。",
+          "裴松之注引《魏书》称曹丕八岁能属文，广泛阅读经传和诸子百家；这是注引材料，不是陈寿正文。",
+          "曹丕在《典论·自叙》中自称五岁学射、六岁能射、八岁学骑射，又从史阿学习剑术。该材料属于本人回忆，带有自我塑造性质。",
+          "197年张绣在宛城反叛时，十岁的曹丕乘马逃脱；其兄曹昂、堂兄曹安民和典韦在战斗中死亡。",
+          "曹丕成长于长期战争与邺城政治、文学环境之中，既参与骑射和征行，也与建安文士往来。"
+        ],
+        "education": [
+          "曹丕本人称自己幼年即受骑射训练，稍长又学习剑术；这与汉末军政家庭的生活环境相符。",
+          "裴注引《魏书》称其八岁能属文，并阅读古今经传和诸子百家，但史料没有提供一套可完整复原的固定师承。",
+          "《典论·论文》显示他熟悉辞赋、书论、铭诔等文体，并能对建安作家分别评论。",
+          "曹丕与王粲、陈琳、徐干、刘桢、应玚、阮瑀、孔融等建安文人有直接或间接交往，文学活动也是其知识形成的重要部分。",
+          "有关某一名士长期担任曹丕专门教师的说法证据不足，本数据不据后世推测设置明确师承。"
+        ],
+        "lifeEvents": [
+          "187年：中平四年冬生于谯县。",
+          "197年：张绣在宛城反叛，曹丕乘马逃出；曹昂等人在此役中死亡。",
+          "204年：曹操攻取邺城后，曹丕纳袁熙之妻甄氏，甄氏后来生曹叡和东乡公主。",
+          "211年：任五官中郎将、副丞相。这一任命使他进入曹操政权核心，但此时尚未被立为魏太子。",
+          "217年：曹操立曹丕为魏太子，曹丕在与曹植等人的储位竞争中正式取得继承地位。",
+          "220年正月：曹操去世，曹丕继任丞相、魏王和冀州牧，承接曹操建立的军政体系。",
+          "220年十月：汉献帝禅位。曹丕受禅称帝，改元黄初，国号魏，并追尊曹操为武皇帝。",
+          "221年：甄氏死于邺；同年封孔羡为宗圣侯，命鲁郡修孔庙，并在庙外扩建供学者居住的屋舍。",
+          "222年：立郭氏为皇后；同年前后曹魏与孙吴的名义臣属关系破裂，曹丕开始大规模对吴用兵。",
+          "222年至223年：魏军分路攻吴，曹丕亲至广陵一带，战事未能迫使孙权屈服。",
+          "223年：任城王曹彰在洛阳去世；曹丕继续东巡，并处理前一年征吴后的军政与封赏。",
+          "224年：正式设立太学，制定五经课试之法并设置《春秋谷梁》博士；同年训练水军、巡至寿春和广陵。",
+          "225年：到达广陵，因严寒、江面结冰及吴军防备而撤回，成为其最后一次大规模南征。",
+          "226年五月：病重，在嘉福殿托孤于曹真、陈群、司马懿等人，立曹叡为皇太子。",
+          "226年：曹丕死于洛阳嘉福殿，时年四十；曹叡继位。曹丕谥文皇帝，庙号高祖，葬首阳陵。"
+        ],
+        "career": [
+          "五官中郎将、副丞相：211年获得这一职位，参与曹操政权中枢事务，并成为储位的主要竞争者。",
+          "魏太子：217年正式确立为曹操继承人。将其立太子的年份写成211年，会混淆官职任命和储位确立。",
+          "魏王：220年曹操去世后继承魏王爵位、丞相职权和魏国机构。",
+          "魏皇帝：220年接受汉献帝禅让建立曹魏，在位期间使用黄初年号。",
+          "曹丕调整汉末以来的中央官制和封爵体系，继续依靠陈群、曹真、司马懿等文武官员维持新政权。",
+          "黄初年间实施九品官人法的制度化过程与陈群密切相关。它形成于曹丕执政时期，但不宜简化为曹丕一人独创。",
+          "对孙吴的多次军事行动是其皇帝生涯的重要部分，但未能渡江取得决定性突破。"
+        ],
+        "works": [
+          "《典论》：曹丕撰写的综合性论著，原书大部散佚，部分篇章由类书和总集保存。",
+          "《典论·论文》：讨论文章价值、文体差异、作者才性和建安作家得失，是中国早期重要文学批评文本。",
+          "《燕歌行》二首：以游子思妇等题材写秋夜离情，其中一首通篇七言，被文学史研究经常视为现存较早的完整七言诗。",
+          "《与吴质书》：追忆与建安文士宴游交往，也记录王粲、陈琳、刘桢、徐干等人的死亡与文学活动。",
+          "《杂诗》《善哉行》《芙蓉池作》等诗篇反映宴游、征行、离别和生命感慨。",
+          "曹丕曾撰写诏令、书信、诗赋和论说，今存文本多由《文选》《艺文类聚》等后世文献辑录。",
+          "《典论·自叙》保存其对骑射、剑术、读书和征战经历的自述，是研究其个人形象的重要材料。",
+          "曹丕著作存在散佚、异文和后人辑佚问题，具体篇目应以版本校勘结果为准。"
+        ],
+        "achievements": [
+          "继承曹操建立的魏国军政体系，并在220年完成由汉到魏的政权更替。",
+          "建立曹魏皇帝制度，确定宗庙、礼仪、官僚和继承秩序，使曹氏政权由诸侯王国转为帝国。",
+          "继续维持北方主要州郡的行政和军事控制，使曹魏在三国格局形成初期保持较强国力。",
+          "在位期间整顿选官和官僚制度，九品官人法在这一时期正式实施，对魏晋选官影响深远。",
+          "重视文学写作和评论，《典论·论文》把文章提升到“经国之大业，不朽之盛事”的地位。",
+          "《燕歌行》等作品推动了七言诗的发展；其诗文与曹操、曹植共同构成建安文学的重要部分。"
+        ],
+        "philosophy": [
+          "曹丕在《典论·论文》中强调文学具有超越个人寿命的公共价值，不只是政治文书或娱乐。",
+          "他提出“文以气为主”，认为作者才性形成作品的基本风格，并承认不同文体各有适宜标准。",
+          "政治上重视新王朝的中央权威与制度秩序，对宗室、外戚和宦官的权力设置较多限制。",
+          "其诏令中既有减免租税、抚恤灾民和恢复学校等措施，也有维护政权安全的严格控制。",
+          "曹丕临终前制定薄葬性质的《终制》，反对依山营造宏大陵寝和厚葬珍宝。",
+          "其实际生活又包含狩猎、宴游和南征等活动，不能仅凭部分诏令把他概括为始终节俭克制。"
+        ],
+        "quotes": [
+          "“文章，经国之大业，不朽之盛事。”——《典论·论文》",
+          "“文以气为主，气之清浊有体，不可力强而致。”——《典论·论文》",
+          "“夫人善于自见，而文非一体，鲜能备善。”——《典论·论文》",
+          "“秋风萧瑟天气凉，草木摇落露为霜。”——《燕歌行》",
+          "“明月皎皎照我床，星汉西流夜未央。”——《燕歌行》"
+        ],
+        "family": [
+          "父亲曹操是曹魏奠基者；母亲卞氏生曹丕、曹彰、曹植、曹熊，曹丕是四兄弟中最终取得继承权者。",
+          "甄氏是曹丕重要配偶，生曹叡和东乡公主。曹叡后来成为魏明帝。",
+          "郭氏于222年被立为皇后，没有史籍明确记载的亲生子女；曹叡曾由郭氏抚养或礼事。",
+          "《三国志·武文世王公传》记曹丕九子：曹叡、曹协、曹蕤、曹鉴、曹霖、曹礼、曹邕、曹贡、曹俨。",
+          "九子的生母分别见于本传：甄氏、李贵人、潘淑媛、朱淑媛、仇昭仪、徐姬、苏姬、张姬、宋姬。",
+          "现有正史还明确记录东乡公主为甄氏之女；曹丕是否另有女儿及其母亲，材料不足时不作补造。",
+          "曹丕与曹植既是同母兄弟，也是曹操晚年储位竞争的主要相关者；称帝后曹丕对宗室实施迁封和监督。"
+        ],
+        "lifestyle": [
+          "曹丕自述幼年喜爱骑射、击剑，成年后仍参与狩猎和军事巡行。",
+          "他与建安文士有宴饮、游园、书信唱和等活动，《与吴质书》保存了对此类生活的追忆。",
+          "曹丕长期写作诗赋、书论与诏令，文学并非其称帝后的偶然爱好。",
+          "黄初年间多次南巡和征吴，皇帝个人行程与前线军事行动紧密相连。",
+          "其《终制》要求依首阳山东面为陵、不起坟冢、不藏金银铜铁，体现对厚葬的明确反对。"
+        ],
+        "relations": [
+          "与曹操：曹丕长期在父亲设置的继承竞争中接受考察，217年被正式立为魏太子。",
+          "与曹植：两人同母且都有文学才能，但在储位问题上形成竞争；曹丕称帝后对曹植迁封、监督。",
+          "与汉献帝：220年经过多次劝进和禅让程序，曹丕接受帝位，汉献帝降为山阳公。",
+          "与甄氏：甄氏生曹叡，221年死于邺；《后妃传》将其死亡与失宠、怨言及郭氏受宠联系起来。",
+          "与郭氏：郭氏参与曹丕后宫生活并于222年立后，曹丕临终前曹叡已成为继承人。",
+          "与孙权：孙权一度向魏称臣并受吴王封号，双方随后因人质和战略利益破裂，转入持续战争。",
+          "与陈群、曹真、司马懿：三人均是曹魏中枢重要官员，曹丕临终时参与辅佐曹叡。",
+          "与建安文士：曹丕评论并交往王粲、徐干、陈琳、刘桢等人，其书信是研究建安文学群体的重要材料。"
+        ],
+        "activities": [
+          "作为魏太子参与曹操政权的中枢事务，并经营自身文武僚属关系。",
+          "继承魏王后处理曹操丧葬、官爵承接和军政稳定，随后组织受禅程序。",
+          "称帝后发布诏令、调整官制、封爵宗室并处理州郡灾害和赋役。",
+          "多次部署并亲自参与对孙吴的战争，活动范围涉及谯、许昌、洛阳、邺和广陵等地。",
+          "主持或推动太学、孔子祭祀及经典文化秩序的恢复。",
+          "持续进行诗、赋、论、书信和诏令写作，并评价同时代文学作者。"
+        ],
+        "anecdotes": [
+          "宛城脱险：曹丕在《典论·自叙》中称自己十岁随曹操至宛，张绣反叛后乘马逃脱；这一经历与曹昂之死形成鲜明对照。",
+          "学习剑术：曹丕自称从史阿学剑，并曾与奋威将军邓展较技。细节出自其自叙，宜视为本人叙事。",
+          "葡萄之爱：曹丕书信中曾称赞凉州葡萄，常被用来观察汉魏时期物产与宫廷趣味；具体文本传承依赖后世类书。",
+          "七步成诗：曹丕逼曹植七步作诗的故事最早见于后出的《世说新语》等材料，《三国志》没有记载，不能作为确定史实。"
+        ],
+        "controversies": [
+          "汉魏禅让：曹魏官方以禅让礼仪说明合法性，但曹丕继承的是曹操已经控制汉廷的权力结构，后世常以“篡汉”评价。",
+          "甄氏之死：《三国志·后妃传》记甄氏失宠、出怨言后被赐死；裴注又保存不同细节。可以确认死亡与后宫政治相关，但不宜把小说化情节当作事实。",
+          "对曹植等宗室的约束：迁封、监国谒者监督和相关案件反映曹丕对宗室安全的高度警惕，具体个案仍需分别判断。",
+          "对吴战争：黄初年间多次大规模出兵，耗费人力却未取得跨江决定性成果，是评价其军事能力时的主要争议。",
+          "选官制度：九品官人法在其统治时期施行并由陈群参与制定，后世影响复杂；不能简单归为曹丕个人创制或当时即完全门阀化。",
+          "文学评价与政治身份：曹丕对建安作家的批评兼具文学判断和作者自我定位，阅读时需注意其皇帝、太子和作家多重身份。",
+          "史料立场：《文帝纪》的官方纪年、《后妃传》及裴注材料关注点不同，涉及宫廷冲突时尤其需要交叉阅读。"
+        ],
+        "legacy": [
+          "曹丕建立曹魏，使曹操形成的魏王国正式成为三国之一的帝国政权。",
+          "汉魏禅让程序成为后来魏晋南北朝政权更替反复借鉴的政治模式。",
+          "曹魏中央官制和九品官人法对魏晋政治、选官方式及士族发展产生长期影响。",
+          "《典论·论文》将文学创作提升到治国与不朽事业的高度，是中国文学批评史的基础文献之一。",
+          "《燕歌行》在七言诗发展史上占有重要位置，但“最早”一类表述应限定为现存完整作品和通常文学史判断。",
+          "曹丕与曹操、曹植并称“三曹”，其风格常被概括为清丽、哀婉，与曹操和曹植各有区别。",
+          "正史、诗文自叙和后世故事共同塑造了曹丕形象；研究其生平需要把政治评价与文本证据分开。"
+        ],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二·文帝纪》：https://zh.wikisource.org/wiki/三國志/卷02",
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "曹丕《典论·论文》：https://zh.wikisource.org/wiki/典論/論文",
+          "曹丕《燕歌行》：https://zh.wikisource.org/wiki/燕歌行_(曹丕)",
+          "《文选·魏文帝与吴质书》：https://zh.wikisource.org/wiki/與吳質書",
+          "维基文库曹丕作者页：https://zh.wikisource.org/wiki/Author:曹丕"
+        ],
+        "notes": [
+          "187年出生于谯县见《文帝纪》；出生月日不详，因此birthMonth和birthDay保持0。",
+          "226年死于嘉福殿见《文帝纪》；数据将地点写作洛阳嘉福殿，具体月日字段仍保持0以避免历法换算误差。",
+          "211年是任五官中郎将、副丞相的年份；正式立为魏太子在217年，两者不可混写。",
+          "曹丕生前是曹魏开国皇帝；“文皇帝”为谥号，“高祖”为庙号。",
+          "九品官人法与陈群建议、曹丕批准及当时制度环境共同相关，本数据不写成曹丕个人凭空创制。",
+          "“现存最早完整七言诗”采用审慎表述为文学史上的通常评价，不排除更早七言材料和体式争议。",
+          "甄氏死亡只按《后妃传》可确认内容表述，不采用电视剧、小说中的具体宫斗情节。",
+          "“七步诗”故事不见《三国志》，仅列为后世轶事，不用于证明曹丕曾以死亡直接威胁曹植。",
+          "裴注引《魏书》和曹丕自叙中的童年、武艺细节均注明材料性质，不与陈寿正文混同。"
+        ]
+      },
+      "story": "曹丕（187—226），字子桓，曹操与卞氏之子。217年被立为魏太子，220年接受汉献帝禅让建立曹魏，是为魏文帝。建安文学代表作者，著有《典论·论文》《燕歌行》，与曹操、曹植合称“三曹”。226年病逝于洛阳嘉福殿，年四十，曹叡继位。"
+    },
+    {
+      "fullName": "曹彰",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 223,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "卞氏",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹彰，字子文，曹操与卞氏之子，封任城王，谥威。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生母卞氏；妻为孙贲之女；子曹楷。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·吴书一·孙破虏讨逆传》：https://zh.wikisource.org/wiki/三國志/卷46"
+        ],
+        "notes": []
+      },
+      "story": "曹彰，字子文，曹操与卞氏之子，封任城王，谥威。"
+    },
+    {
+      "fullName": "曹植",
+      "birthYear": 192,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 232,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "卞氏",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹植（192—232），字子建，曹操与卞氏之子，曹丕同母弟。晚年封陈王，死后谥思，通常称陈思王。",
+          "他少年以文才受到曹操重视，一度成为储位竞争的重要人物；曹丕被立为太子后，曹植因自身行为、政治竞争和宗室控制逐渐失去实际政治机会。",
+          "曹植是建安文学最重要的诗人之一，代表作包括《洛神赋》《白马篇》《赠白马王彪》《求自试表》等。明帝时整理其赋颂诗铭杂论一百余篇。"
+        ],
+        "earlyLife": [
+          "曹植生于192年，具体出生地点和月日不见可靠正史，数据因此保持空值和0。",
+          "《三国志》称他十余岁时已经能诵读《诗经》、论著和辞赋数十万言，并善于作文。",
+          "曹操曾当面检验其文章是否请人代作，曹植回答自己能够出口成章、下笔成文；铜雀台建成后又奉命作赋。",
+          "曹植性格被陈寿概括为简易、不治威仪，车马服饰不尚华丽，这种表现一度更受曹操注意。",
+          "少年才名使曹植卷入继承问题，但正史并未记曹操正式立他为太子；应区分“受到宠爱、几欲立之”和正式储位。"
+        ],
+        "education": [
+          "曹植早年大量诵读诗、论和辞赋，说明其文学训练建立在经典、论说和汉赋传统之上。",
+          "他能够在铜雀台等场合当场作赋，显示其接受过熟练的辞赋和章表写作训练。",
+          "正史没有记载曹植固定拜某人为师，因此不宜把某位文士设置为已证实的专门教师。",
+          "曹植生活在邺下文学群体中，与王粲、刘桢等建安文人共享创作环境，但具体交往需按各篇诗文和史传分别核实。",
+          "其诗赋、表章兼用乐府、五言诗、辞赋和骈偶文体，反映汉末到魏初文学转型中的综合训练。"
+        ],
+        "lifeEvents": [
+          "192年：曹植出生，父亲曹操、母亲卞氏。",
+          "铜雀台建成后：曹操命诸子登台作赋，曹植援笔立成，因文才得到重视；具体表述见《陈思王传》。",
+          "211年：封平原侯。",
+          "214年：改封临淄侯。",
+          "217年前后：曹操在曹丕、曹植之间考虑继承问题，最终立曹丕为魏太子。",
+          "曹丕立太子前后：曹植曾乘车行驰道、开司马门出行，触犯宫禁，曹操因此加重对诸侯的约束。",
+          "219年：曹仁被关羽围困时，曹操任曹植为南中郎将、行征虏将军，准备派其救援；曹植醉酒不能受命，任命未能落实。",
+          "220年：曹丕继魏王并称帝后，诛杀丁仪、丁廙等曹植旧党，曹植与其他诸侯被遣往封国。",
+          "221年：监国谒者灌均奏曹植醉酒悖慢、胁迫使者，有司请治罪；曹丕因卞太后关系从轻，贬为安乡侯，后改鄄城侯。",
+          "222年：进封鄄城王。",
+          "223年：改封雍丘王。",
+          "226年：曹丕去世、曹叡即位，曹植继续请求参与国政和军事，但没有获得实际重用。",
+          "227年：改封浚仪王。",
+          "228年：复封雍丘王。",
+          "229年：改封东阿王。",
+          "232年：改封陈王，同年去世，年四十一，谥思。"
+        ],
+        "career": [
+          "曹植先后受封平原侯、临淄侯、安乡侯、鄄城侯，并在魏国建立后进爵为王。",
+          "219年曾被授南中郎将、行征虏将军，原拟率军救曹仁，但因醉酒不能受命，未形成实际军事履历。",
+          "曹丕称帝后，曹植主要作为受监督的宗室诸侯生活在封国，封地多次变动。",
+          "曹叡在位时，曹植通过《求自试表》等反复请求承担军事或政治任务，未获实质任用。",
+          "其政治生涯的主要文本不是任官政绩，而是围绕宗室处境、报国愿望和兄弟关系所写的表章。",
+          "232年封陈王，因此后世称陈王、陈思王；“思”是死后谥号。"
+        ],
+        "works": [
+          "《洛神赋》：以人神相遇与分离为中心的辞赋名篇，原题与写作背景存在文本流传问题；将洛神直接等同甄氏属于后世解释。",
+          "《白马篇》：塑造边城游侠捐躯赴难的形象，“捐躯赴国难，视死忽如归”成为其报国主题的代表。",
+          "《赠白马王彪》：在宗室受命归国的旅途中书写兄弟离别、哀悼曹彰和政治压抑。",
+          "《求自试表》：向魏明帝陈述报国、立功愿望，请求给予军事或政治任务。",
+          "《求通亲亲表》：请求改善宗室之间被隔绝、难以相见的处境，是研究曹魏宗室政策的重要文本。",
+          "《七哀诗》：以思妇、离居等传统意象表达忧思，具体题旨有多种解释。",
+          "《野田黄雀行》：通过罗网和利剑等意象书写救助困厄者的愿望，常与其政治处境联系解读。",
+          "《梁甫行》：描写海边贫民生活与自然灾害，体现对社会苦难的关注。",
+          "《名都篇》《美女篇》《杂诗》等作品展示游宴、理想人格、征行和失意等多种主题。",
+          "魏明帝下诏收集曹植作品，史载得赋、颂、诗、铭、杂论共一百余篇；今存篇目和文字经过长期辑佚校勘。"
+        ],
+        "achievements": [
+          "在五言诗发展中取得高度成就，将乐府传统、文人抒情和精练对偶结合起来。",
+          "辞赋、诗歌和表章兼长，《洛神赋》《白马篇》等成为建安文学代表作品。",
+          "把个人政治处境、宗室关系和报国理想转化为具有普遍感染力的文学主题。",
+          "《求自试表》《求通亲亲表》等文章保存了曹魏初年宗室制度和诸王处境的第一人称材料。",
+          "其作品语言华美而有骨力，后世常以“骨气奇高、词采华茂”概括其文学特征。",
+          "魏明帝组织收集其百余篇作品，说明曹植在当时已被视为需要系统保存的重要作者。"
+        ],
+        "philosophy": [
+          "曹植反复表达建功报国的愿望，认为宗室子弟应在国家危难时承担实际责任，而不应只在封国空享爵位。",
+          "《求通亲亲表》强调宗亲之间应有正常交往，反对因政治猜疑而长期隔绝。",
+          "其诗文经常讨论生命短暂、功名不立和亲友离散，体现汉末战争与魏初政治环境造成的强烈时间意识。",
+          "《白马篇》等作品推崇勇武、忠诚和舍身赴难，但这是一种文学理想，不等同于曹植本人实际军事经历。",
+          "曹植作品中有游仙、神女和超越尘世的想象，既继承辞赋传统，也与现实失意相关，不宜简单归为固定宗教信仰。",
+          "其后期表章在忠于魏廷的同时申诉个人处境，体现宗室身份、政治自保和建功愿望之间的张力。"
+        ],
+        "quotes": [
+          "“捐躯赴国难，视死忽如归。”——《白马篇》",
+          "“翩若惊鸿，婉若游龙。”——《洛神赋》",
+          "“丈夫志四海，万里犹比邻。”——《赠白马王彪》",
+          "“忧国忘家，捐躯济难，忠臣之志也。”——《求自试表》",
+          "“本是同根生，相煎何太急”是后世流传的《七步诗》版本名句，不见《三国志》，不作为曹植生平的核心证据。"
+        ],
+        "family": [
+          "父亲曹操，母亲卞氏；曹丕、曹彰、曹熊是其同母兄弟。",
+          "曹植与曹丕在曹操晚年形成储位竞争。曹丕正式被立为太子后，曹植及其支持者逐渐失势。",
+          "曹彰于223年去世，《赠白马王彪》与曹植、曹彪返国及哀悼曹彰的背景相关。",
+          "正史明确记载曹植有子曹志，曹志后来承袭爵位；曹志生母姓名没有可靠记载。",
+          "现有核心正史没有可靠记载曹植妻子的姓名，本数据不把崔氏、谢氏等后世说法写成确定配偶。",
+          "旧数据中出现的“曹苗”等子女缺少本次采用的可靠史料支持，因此不建立父子关系。",
+          "曹植在表章中多次请求与宗亲正常往来，说明曹魏诸王受到迁封、入朝和相互交往方面的限制。"
+        ],
+        "lifestyle": [
+          "陈寿称曹植“性简易，不治威仪”，车马服饰不尚华丽；这是其早年受到曹操注意的原因之一。",
+          "曹植好饮酒，正史至少记载两次饮酒直接影响政治处境：一次导致不能受救援曹仁之命，一次成为灌均奏劾内容。",
+          "他长期在不同封国之间迁徙，后期生活受到监国谒者和宗室制度约束。",
+          "大量诗赋和表章写作构成其主要活动，特别是通过上表争取任用、改善宗室关系。",
+          "文学中的宴游、游侠、神女和游仙场景不能全部直接还原为曹植个人日常经历。"
+        ],
+        "relations": [
+          "与曹操：曹操欣赏其文才和简朴表现，一度在继承问题上倾向曹植，但也因司马门事件和醉酒失职而失望。",
+          "与曹丕：两人既是同母兄弟和文学作者，又是储位竞争者；曹丕即位后，曹植受到迁封、监督和案件审查。",
+          "与曹叡：曹植多次向魏明帝上表请求任用和宗亲交往，曹叡收集其作品，但没有赋予其期待的军政职权。",
+          "与丁仪、丁廙：二人被视为曹植的支持者，曹丕继位后遭诛杀；具体政治活动需依各传材料判断。",
+          "与曹彰、曹彪：三人同为曹魏宗室，《赠白马王彪》集中呈现曹彰之死和曹植与曹彪被迫分别的情绪。",
+          "与建安文士：曹植属于邺下文学环境的重要作者，但后世常见的具体交游故事未必都有同等可靠的史料。",
+          "与监国谒者：曹魏在诸侯国设置监督力量，灌均对曹植的奏劾直接导致其221年的政治危机。"
+        ],
+        "activities": [
+          "少年时期诵读诗论辞赋并进行高强度文章训练，在铜雀台等场合作赋。",
+          "以侯、王身份居住于平原、临淄、鄄城、雍丘、浚仪、东阿、陈等封地或封国。",
+          "持续创作诗、赋、颂、铭、杂论和表章，现存作品主题广泛。",
+          "曾短暂受命准备率军救援曹仁，但因醉酒未能执行。",
+          "向曹丕、曹叡朝廷上表申诉、谢恩、求任和请求宗亲交往。",
+          "通过文学书写战争、贫困、离别、理想武士、神女和个人失意。"
+        ],
+        "anecdotes": [
+          "铜雀台作赋：曹操命诸子登台作赋，曹植提笔即成，正史以此说明其文才。",
+          "出口成章：曹操怀疑曹植文章是否请人代作，曹植回答“言出为论，下笔成章”，并请父亲当面检验；故事见本传正文。",
+          "七步成诗：曹丕命曹植七步作诗的故事见《世说新语》等后出材料，不见《三国志》；流传诗句还有不同版本。",
+          "洛神与甄氏：把《洛神赋》解释成曹植爱慕甄氏的故事形成较晚，既非赋文本身明确陈述，也缺少正史证据。",
+          "才高八斗：谢灵运赞曹植“独占八斗”的说法见较晚文献，是后世文学评价，不是曹植同时代称号。"
+        ],
+        "controversies": [
+          "储位竞争：曹操确曾在曹丕、曹植之间犹豫，但曹植从未正式成为太子，后世不宜把倾向或党争写成已经废立。",
+          "司马门事件：正史记曹植擅开司马门、驰行禁道，事件削弱曹操对其信任；具体动机没有可靠记载。",
+          "醉酒失职：219年不能受军事任命及221年遭奏劾均与饮酒相关，是正史明确记载，但灌均奏劾是否夹杂政治目的无法简单断定。",
+          "曹丕迫害：曹植在曹丕统治下确受监督、贬爵和迁封；把所有处境都归结为私人嫉妒，会忽略曹魏普遍的宗室控制政策。",
+          "七步诗真伪：故事不见陈寿《三国志》，现存文本又有六句、四句等差异，只能列为后世著名传说。",
+          "配偶与子女：崔氏、谢氏及曹苗等说法未获本次核心史料支持，不应为了丰富家谱而建立不可靠关系。",
+          "《洛神赋》题旨：洛神等同甄氏、赋为爱情纪实等说法缺乏同时代直接证据，应与文学阐释区分。",
+          "作品归属：曹植集早已散佚，今存作品依赖总集、类书和辑本，个别篇目的作者、题名和文字存在争议。"
+        ],
+        "legacy": [
+          "曹植与曹操、曹丕并称“三曹”，被视为建安文学成就最高的代表作者之一。",
+          "其五言诗在汉乐府向成熟文人诗发展的过程中具有关键地位，影响两晋、南北朝和唐代诗歌。",
+          "《洛神赋》持续影响文学、书法和绘画，顾恺之系统传名的《洛神赋图》即以此为题材。",
+          "《白马篇》所塑造的报国游侠形象成为后世咏侠、边塞和忠勇主题的重要范型。",
+          "《赠白马王彪》和后期表章使其成为中国文学中宗室失意、怀才不遇形象的代表。",
+          "钟嵘《诗品》等后世批评高度评价曹植，但具体评语属于后代接受史，不能替代同时代史料。",
+          "《七步诗》与甄氏传说扩大了曹植的通俗影响，也最容易使文学传说混入历史数据。"
+        ],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "曹植《洛神赋》：https://zh.wikisource.org/wiki/洛神賦",
+          "曹植《白马篇》：https://zh.wikisource.org/wiki/白馬篇_(曹植)",
+          "曹植《赠白马王彪》：https://zh.wikisource.org/wiki/贈白馬王彪",
+          "曹植《求自试表》：https://zh.wikisource.org/wiki/求自試表",
+          "曹植《求通亲亲表》：https://zh.wikisource.org/wiki/求通親親表",
+          "维基文库曹植作者页：https://zh.wikisource.org/wiki/Author:曹植",
+          "《七步诗》文本与来源说明：https://zh.wikisource.org/wiki/七步詩"
+        ],
+        "notes": [
+          "192年出生、232年去世及享年四十一依《陈思王传》；出生和死亡具体地点、月日不详，相关字段保持空值或0。",
+          "曹植先后为侯、王，232年封陈王，死后谥思；“陈思王”是封号与谥号的合称。",
+          "217年曹丕被正式立为魏太子；曹植只是一度受到曹操倾向，没有正式太子身份。",
+          "正史明确记载的儿子为曹志，曹志生母不详；本数据不收录证据不足的曹苗。",
+          "本次采用的核心史料不能可靠确认曹植妻子姓名，因此不建立崔氏、谢氏等配偶关系。",
+          "《七步诗》故事不见《三国志》，且文本有不同版本，只放在轶事、争议和注释中。",
+          "“才高八斗”是后世谢灵运相关传说中的评价，不是曹植生前官爵、字号或正史事实。",
+          "《洛神赋》与甄氏的爱情解释属于后世接受史，本数据不把它写成曹植与甄氏的真实关系。",
+          "作品引用优先采用可核查文本；个别篇目仍可能存在辑佚、异文和归属争议。"
+        ]
+      },
+      "story": "曹植（192—232），字子建，曹操与卞氏之子、曹丕同母弟，建安文学代表作者。早年以才学受曹操重视，储位之争后渐失信任，曹丕、曹叡两朝屡遭贬爵迁封。传世《洛神赋》《白马篇》《赠白马王彪》等。232年改封陈王，同年去世，年四十一，谥思。"
+    },
+    {
+      "fullName": "曹熊",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "卞氏",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹熊是曹操与卞氏之子，早卒，后追封萧怀王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生母卞氏；子曹炳。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹熊是曹操与卞氏之子，早卒，后追封萧怀王。"
+    },
+    {
+      "fullName": "曹昂",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 197,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "刘夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹昂，字子脩，曹操长子，建安二年随征张绣时战死。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生母刘夫人，由丁夫人抚养；无亲生子，后以曹琬奉后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹昂，字子脩，曹操长子，建安二年随征张绣时战死。"
+    },
+    {
+      "fullName": "曹铄",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "刘夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹铄是曹操与刘夫人之子，早卒，追封相殇王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生母刘夫人；子曹潜，孙曹偃。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹铄是曹操与刘夫人之子，早卒，追封相殇王。"
+    },
+    {
+      "fullName": "曹冲",
+      "birthYear": 196,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 208,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "环夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹冲（约196—208），字仓舒，曹操与环夫人之子。正史记其幼年聪察，十三岁病逝。",
+          "“曹冲称象”和以鼠咬鞍具为官吏解罪的故事都见于《三国志·邓哀王冲传》正文，不只是后世启蒙故事。",
+          "曹操曾表现出让曹冲继承的意向，但曹冲生前没有被正式立为太子。曹丕、曹叡先后追封，最终为邓哀王。"
+        ],
+        "earlyLife": [
+          "《三国志》记曹冲去世时十三岁，据此逆推约生于196年；出生月日和地点不详。",
+          "曹冲是曹操与环夫人之子，与曹据、曹宇为同母兄弟。",
+          "本传称曹冲“少聪察岐嶷”，五六岁时智意已像成年人。",
+          "曹冲的著名事迹集中于儿童时期，没有形成成年后的官职、封国治理或军事经历。",
+          "正史没有记载其系统教育和固定师承，不能根据聪慧故事补造教师或课程。"
+        ],
+        "education": [
+          "史籍未记曹冲接受何种正式教育，只以五六岁时的观察、推理和应对能力说明其早慧。",
+          "称象故事显示其能把无法直接称量的问题拆分为船体吃水、石块替代和分批称量。",
+          "鼠咬鞍具故事显示其理解曹操的心理和事件证据，先以自己的衣物制造类似痕迹，再为库吏解释偶发损坏。",
+          "裴注引《魏书》还称曹冲考察刑狱中的冤枉案件，并依常理为之辨析；该信息属于注引材料。"
+        ],
+        "lifeEvents": [
+          "约196年：依据208年去世时年十三逆推出生，具体日期不详。",
+          "五六岁时：本传称其智意已如成人。",
+          "童年时期：孙权送来大象，曹冲提出让大象登船、刻记水痕，再用石块替代并分别称量的方法。",
+          "童年时期：库中马鞍被鼠咬，管理者担心获罪；曹冲设计证明此类损坏可偶然发生，使曹操不再追究。",
+          "童年时期：本传称曹冲多次辨察应受刑罚者是否有冤情，并为勤劳官吏的小过失求情，前后获救数十人。",
+          "曹冲在世时：曹操数次向群臣称赞其才，并表现出欲以其为继承人的意向，但没有正式册立。",
+          "208年：曹冲患病，曹操亲自为其祈请，曹冲不久去世，时年十三。",
+          "曹冲死后：曹操为其聘甄氏一名早亡女子合葬，并命曹据之子曹琮奉曹冲之后。",
+          "217年：曹琮被封为邓侯，承奉曹冲一支。",
+          "221年：曹丕追赠曹冲为邓哀侯，后又追加为公。",
+          "231年：魏明帝曹叡加曹冲号为邓哀王。"
+        ],
+        "career": [
+          "曹冲十三岁去世，没有成年后的正式官职履历，也没有治理封国或领兵记录。",
+          "曹操曾流露让其继承的意向，这是父亲的政治考虑，并不等于曹冲已被正式立为世子或太子。",
+          "曹冲生前没有封王；邓哀侯、公、邓哀王均是曹丕和曹叡在其死后的追赠或加号。",
+          "其历史地位主要来自早慧、仁恕事迹和曹操的特殊喜爱，而非实际政治任职。"
+        ],
+        "works": [
+          "没有可靠史料记载曹冲留下诗文、奏表、著作或发明说明书。",
+          "称象方法由《三国志》叙述保存，并非曹冲本人撰写的技术文本。",
+          "后世以曹冲为主角创作的蒙学故事、戏剧和文学作品，不能列为曹冲本人的作品。"
+        ],
+        "achievements": [
+          "提出利用船体排水变化和等效替代称量大象的方法，展示了具体、可执行的问题解决思路。",
+          "通过鼠咬鞍具事件为担责官吏免除处罚，体现对证据、心理和偶然性的理解。",
+          "本传记其多次辨察刑罚中的冤情，并为小过失者求情，使数十人获得宽免。",
+          "其行为使曹操高度评价其才智，并一度考虑改变继承安排。",
+          "曹冲短暂生平被正史单独立传，说明其事迹在曹魏宗室记忆中具有特殊地位。"
+        ],
+        "philosophy": [
+          "曹冲十三岁早卒，没有形成可由本人著作证明的完整政治或哲学思想。",
+          "称象事迹反映的是实践推理：把整体重量转化为可测量的替代物总和。",
+          "为官吏和受刑者求情的记载显示其行为倾向于审察证据、减轻不必要的惩罚。",
+          "不能仅凭儿童轶事推断其成年后必然会实行某种政治路线或成为理想君主。"
+        ],
+        "quotes": [
+          "称象方法的核心是：“置象大船之上，而刻其水痕所至，称物以载之，则校可知矣。”——《三国志·邓哀王冲传》",
+          "“此我之不幸，而汝曹之幸也。”是曹操在曹冲死后对曹丕等人的话，不是曹冲本人言论。"
+        ],
+        "family": [
+          "父亲曹操，母亲环夫人；同母兄弟为曹据、曹宇。",
+          "曹冲没有可靠记载的亲生子女。",
+          "曹冲死后，曹操为其聘甄氏一名早亡女子合葬；女子本名不见可靠记载，本数据称“甄氏亡女”。",
+          "曹操命曹据之子曹琮承奉曹冲之后，这是宗室过继关系，不是曹冲的生物学父子关系。",
+          "曹琮后来封邓侯，延续曹冲的祭祀和封爵支系。",
+          "曹操在曹冲死后对曹丕等子说这是自己的不幸、他们的幸运，反映曹冲之死对继承竞争的影响，但不证明存在谋害。"
+        ],
+        "lifestyle": [
+          "曹冲的生活记录全部集中在儿童时期，主要场景是曹操宫府、仓库和进献大象等事件。",
+          "本传描述其外表姿貌和仁爱识达都与常童不同，但没有日常衣食、居所或爱好的具体记录。",
+          "曹冲患病后，曹操曾亲自为其祈请；疾病名称、疗治过程和死亡地点均不详。",
+          "后世儿童读物对称象过程常有改写，不能用来补充其真实生活细节。"
+        ],
+        "relations": [
+          "与曹操：曹操特别欣赏曹冲的才智与仁心，公开称述其能力，并一度有传位意向。",
+          "与环夫人：环夫人是曹冲生母，正史未详细记录母子相处。",
+          "与曹丕：曹冲死后，曹操的话暗示曹丕等继承竞争者因此受益；曹丕称帝后又追赠曹冲。",
+          "与曹据、曹宇：二人为曹冲同母兄弟；曹据之子曹琮被过继承奉曹冲之后。",
+          "与库吏及受刑者：本传以多个宽免故事突出曹冲对处境危险者的同情和辨察。",
+          "与孙权：孙权进献大象提供了称象故事的背景，但史籍未记曹冲与孙权本人有直接往来。"
+        ],
+        "activities": [
+          "观察大象登船造成的吃水变化，并提出等效称量方案。",
+          "通过人为制造衣物鼠咬痕迹，说明仓库马鞍损坏并非管理者故意或必然失职。",
+          "审察刑罚案件和官吏过失，向曹操陈说可疑或可宽免之处。",
+          "作为曹操之子生活于军政集团核心环境，但因早卒未参与正式军政活动。"
+        ],
+        "anecdotes": [
+          "曹冲称象：孙权送来大象，众人不能称量，曹冲提出船、刻痕和石块替代法；故事见《三国志》正文。",
+          "鼠咬马鞍：库吏担忧死罪，曹冲先割破自己的衣服伪作鼠咬，并表现忧愁，随后说明马鞍也可能被鼠偶然咬坏；曹操因此不追究。",
+          "宽免数十人：本传称曹冲辨察刑狱冤枉和官吏小过失，依理向曹操申诉，获救者前后数十人。",
+          "曹操祈命：曹冲病重时曹操为其祈请，曹冲死后曹操又明确表达悲痛。"
+        ],
+        "controversies": [
+          "出生年份：正史只记208年去世时十三岁，196年是按传统年龄逆推的约数，不是精确生日记录。",
+          "称象地点与时间：《三国志》只交代孙权送象和曹冲提出方法，没有提供后世故事常见的完整场景、参与名单和日期。",
+          "方法来源：现有正史将方案归于曹冲；关于方法是否此前已有先例的讨论，不能反向否定史书记载，也不能凭空确认传播路径。",
+          "继承人身份：曹操“有欲传后意”只说明意向，曹冲从未正式成为太子或魏王世子。",
+          "死亡原因：正史只记患病去世，没有曹丕、曹植或其他人谋害曹冲的证据。",
+          "成人能力推测：曹冲早慧并获曹操喜爱，不足以证明若成年必定胜任皇帝或改变三国历史。",
+          "冥婚与过继：甄氏亡女合葬和曹琮奉后属于当时丧葬、宗法安排，不表示曹冲有正常婚姻生活或亲生后代。"
+        ],
+        "legacy": [
+          "曹冲称象成为中国历史上最广为流传的儿童智慧故事之一。",
+          "船体吃水与替代称量方法常被用于数学、科学和工程启蒙，但教学解释应与原始史文区分。",
+          "曹冲为受罚者辨冤、宽免小过的事迹使其形象不仅是“聪明儿童”，也包含仁恕特征。",
+          "曹操对其继承意向及死后悲痛，使曹冲成为讨论曹操晚年诸子关系时的重要人物。",
+          "曹丕、曹叡持续追封，最终形成“邓哀王”的宗室纪念身份。",
+          "后世小说、影视和网络推测常把其早死解释为宫廷阴谋，可靠史料并不支持这一结论。"
+        ],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·邓哀王冲传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": [
+          "196年是根据208年去世时虚岁十三逆推的约数；具体出生月日不详。",
+          "死亡年份和年龄见《邓哀王冲传》，死亡地点、疾病名称和月日均不详。",
+          "“邓哀王”是魏明帝时期追加的身后封号，曹冲生前没有正式封王。",
+          "称象、鼠咬鞍具和宽免数十人的故事均见《三国志》正文；裴注材料只作为补充注明。",
+          "曹操曾有传位意向，不等于曹冲被正式册立为世子或太子。",
+          "史料没有任何曹冲被谋杀的可靠记载，本数据不采用储位阴谋推测。",
+          "甄氏亡女姓名不详；与曹冲合葬属于冥婚安排，不写成有共同生活的普通配偶。",
+          "曹琮是曹据之子、曹冲的过继嗣子；fatherName仍应指向生父曹据，不改成曹冲。",
+          "曹冲没有传世著作，称象方法是史家记录，不是其本人留下的论文或发明文书。"
+        ]
+      },
+      "story": "曹冲（约196—208），字仓舒，曹操与环夫人之子，以“称象”闻名的早慧之童。曹操多次向群臣称赞并曾有传位意向，但从未正式立储。208年患病去世，年十三；后经曹丕、曹叡逐步追封，加号邓哀王。"
+    },
+    {
+      "fullName": "曹据",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "环夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹据是曹操与环夫人之子，封彭城王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "史载子曹琮、曹范、曹阐，分别涉及宗室过继。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹据是曹操与环夫人之子，封彭城王。"
+    },
+    {
+      "fullName": "曹宇",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "环夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹宇，字彭祖，曹操与环夫人之子，封燕王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "子曹奐后来入继大宗，成为曹魏末代皇帝。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "曹宇，字彭祖，曹操与环夫人之子，封燕王。"
+    },
+    {
+      "fullName": "曹林",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "杜夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹林是曹操与杜夫人之子，封沛王，谥穆。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "史载子曹纬、曹赞、曹壹，并有一女嫁嵇康。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹林是曹操与杜夫人之子，封沛王，谥穆。"
+    },
+    {
+      "fullName": "曹衮",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 235,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "杜夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹衮是曹操与杜夫人之子，封中山王，谥恭。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "子曹孚。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹衮是曹操与杜夫人之子，封中山王，谥恭。"
+    },
+    {
+      "fullName": "曹玹",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "秦夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹玹是曹操与秦夫人之子，早卒，追封济阳怀王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无亲生子，先后由曹林之子曹赞、曹壹承嗣。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹玹是曹操与秦夫人之子，早卒，追封济阳怀王。"
+    },
+    {
+      "fullName": "曹峻",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 259,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "秦夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹峻，字子安，曹操与秦夫人之子，封陈留王，谥恭。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "子曹澳。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹峻，字子安，曹操与秦夫人之子，封陈留王，谥恭。"
+    },
+    {
+      "fullName": "曹矩",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "尹夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹矩是曹操与尹夫人之子，早卒，追封范阳闵王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无亲生子，以曹均之子曹敏奉后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹矩是曹操与尹夫人之子，早卒，追封范阳闵王。"
+    },
+    {
+      "fullName": "曹干",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 261,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "王昭仪",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹干一名良，曹操之子，封赵王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "《三国志》正文记生母王昭仪；裴注引《魏略》另称陈妾。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "曹干一名良，曹操之子，封赵王。"
+    },
+    {
+      "fullName": "曹上",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "孙姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹上是曹操与孙姬之子，早卒，追封临邑殇公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹上是曹操与孙姬之子，早卒，追封临邑殇公。"
+    },
+    {
+      "fullName": "曹彪",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 251,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "孙姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹彪，字朱虎，曹操与孙姬之子，封楚王，嘉平三年被赐死。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "世子曹嘉后来封常山真定王。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "曹彪，字朱虎，曹操与孙姬之子，封楚王，嘉平三年被赐死。"
+    },
+    {
+      "fullName": "曹勤",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "孙姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹勤是曹操与孙姬之子，早卒，追封刚殇公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹勤是曹操与孙姬之子，早卒，追封刚殇公。"
+    },
+    {
+      "fullName": "曹乘",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "李姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹乘是曹操与李姬之子，早卒，追封谷城殇公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹乘是曹操与李姬之子，早卒，追封谷城殇公。"
+    },
+    {
+      "fullName": "曹整",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 218,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "李姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹整是曹操与李姬之子，封郿侯，后追封郿戴公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无亲生子，先后以曹据之子曹范、曹阐奉后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹整是曹操与李姬之子，封郿侯，后追封郿戴公。"
+    },
+    {
+      "fullName": "曹京",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "李姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹京是曹操与李姬之子，早卒，追封灵殇公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹京是曹操与李姬之子，早卒，追封灵殇公。"
+    },
+    {
+      "fullName": "曹均",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 219,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "周姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹均是曹操与周姬之子，封樊侯，后追封樊安公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "娶张绣之女；史载子曹抗，并有曹琬、曹敏分别奉他支之后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书八·二公孙陶四张传》：https://zh.wikisource.org/wiki/三國志/卷08",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹均是曹操与周姬之子，封樊侯，后追封樊安公。"
+    },
+    {
+      "fullName": "曹棘",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "刘姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹棘是曹操与刘姬之子，早卒，追封广宗殇公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹棘是曹操与刘姬之子，早卒，追封广宗殇公。"
+    },
+    {
+      "fullName": "曹徽",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 242,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "武帝宋姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹徽是曹操与宋姬之子，封东平王，谥灵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "子曹翕。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "曹徽是曹操与宋姬之子，封东平王，谥灵。"
+    },
+    {
+      "fullName": "曹茂",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "赵姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹茂是曹操与赵姬之子，后封乐陵王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "诸子中史书明确提及曹竦被过继给曹铄。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹茂是曹操与赵姬之子，后封乐陵王。"
+    },
+    {
+      "fullName": "清河公主",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": "刘夫人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "清河公主是曹操与刘夫人之女，嫁夏侯惇之子夏侯楙。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生母刘夫人；丈夫夏侯楙。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书九·诸夏侯曹传》：https://zh.wikisource.org/wiki/三國志/卷09"
+        ],
+        "notes": [
+          "《三国志·夏侯惇传》正文称“清河公主”，裴注引《魏略》称“清河长公主”。"
+        ]
+      },
+      "story": "清河公主是曹操与刘夫人之女，嫁夏侯惇之子夏侯楙。"
+    },
+    {
+      "fullName": "安阳公主",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "安阳公主是曹操之女，嫁荀彧长子荀恽。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "丈夫荀恽；史载荀恽有子荀甝、荀霬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": [
+          "生母不详。"
+        ]
+      },
+      "story": "安阳公主是曹操之女，嫁荀彧长子荀恽。"
+    },
+    {
+      "fullName": "金乡公主",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "金乡公主是曹操之女，嫁何晏，史载二人有一子。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "丈夫何晏；有一子，姓名不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《太平御览·卷一百五十二》引《魏末传》：https://zh.wikisource.org/wiki/太平御覽/0152"
+        ],
+        "notes": [
+          "《魏末传》转引材料对其生母身份存在内部矛盾，本数据不填写motherName。",
+          "该条证据层级低于《三国志》正文，使用时应保留审慎。"
+        ]
+      },
+      "story": "金乡公主是曹操之女，嫁何晏，史载二人有一子。"
+    },
+    {
+      "fullName": "曹宪",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹宪是曹操之女，建安十八年与曹节、曹华一同入汉献帝后宫。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "配偶为汉献帝刘协；生母和子女不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《后汉书·皇后纪下·献穆曹皇后》：https://zh.wikisource.org/wiki/後漢書/卷10下"
+        ],
+        "notes": []
+      },
+      "story": "曹宪是曹操之女，建安十八年与曹节、曹华一同入汉献帝后宫。"
+    },
+    {
+      "fullName": "曹节",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 260,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹节是曹操之女，汉献帝皇后，魏景元元年去世后追谥献穆皇后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "配偶为汉献帝刘协；生母和子女不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《后汉书·皇后纪下·献穆曹皇后》：https://zh.wikisource.org/wiki/後漢書/卷10下",
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": []
+      },
+      "story": "曹节是曹操之女，汉献帝皇后，魏景元元年去世后追谥献穆皇后。"
+    },
+    {
+      "fullName": "曹华",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹操",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹华是曹操之女，建安十八年与曹宪、曹节一同入汉献帝后宫。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "配偶为汉献帝刘协；生母和子女不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《后汉书·皇后纪下·献穆曹皇后》：https://zh.wikisource.org/wiki/後漢書/卷10下"
+        ],
+        "notes": []
+      },
+      "story": "曹华是曹操之女，建安十八年与曹宪、曹节一同入汉献帝后宫。"
+    },
+    {
+      "fullName": "曹琬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹均",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹琬是曹均之子，过继曹昂，后来袭封丰王，谥恭。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹均；法律与祭祀关系上奉曹昂之后；子曹廉。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹琬是曹均之子，过继曹昂，后来袭封丰王，谥恭。"
+    },
+    {
+      "fullName": "曹潜",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 233,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹铄",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹潜是曹铄之子，青龙元年继相王爵，同年去世。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹铄；子曹偃。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹潜是曹铄之子，青龙元年继相王爵，同年去世。"
+    },
+    {
+      "fullName": "曹琮",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹据",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹琮是曹据之子，被指定奉曹冲之后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹据；过继曹冲，先后封邓侯、己氏公等。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹琮是曹据之子，被指定奉曹冲之后。"
+    },
+    {
+      "fullName": "曹范",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹据",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹范是曹据之子，被指定奉曹整之后，后谥悼公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹据；过继曹整；无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹范是曹据之子，被指定奉曹整之后，后谥悼公。"
+    },
+    {
+      "fullName": "曹阐",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹据",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹阐是曹据之子，在曹范无后后奉曹整之后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹据；曹范之弟；过继曹整。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹阐是曹据之子，在曹范无后后奉曹整之后。"
+    },
+    {
+      "fullName": "曹奐",
+      "birthYear": 246,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 302,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹宇",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹奐，字景明，曹宇之子，入继曹叡大宗，为曹魏末代皇帝，后封陈留王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹宇；入继曹叡宗统；配偶为卞皇后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "生年据其咸熙二年二十岁及《魏世谱》卒年推定。"
+        ]
+      },
+      "story": "曹奐，字景明，曹宇之子，入继曹叡大宗，为曹魏末代皇帝，后封陈留王。"
+    },
+    {
+      "fullName": "曹纬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹林",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹纬是沛王曹林之子，继承其爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹林。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹纬是沛王曹林之子，继承其爵。"
+    },
+    {
+      "fullName": "西乡哀侯曹赞",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹林",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹赞是沛王曹林之子，被指定承继曹玹之后，早卒无子。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹林；过继曹玹；无后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "使用史籍封号“西乡哀侯”与另一位曹赞消歧。"
+        ]
+      },
+      "story": "曹赞是沛王曹林之子，被指定承继曹玹之后，早卒无子。"
+    },
+    {
+      "fullName": "曹壹",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹林",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹壹是沛王曹林之子，在曹赞死后承继曹玹之后，谥悼公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹林；过继曹玹；子曹恒。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹壹是沛王曹林之子，在曹赞死后承继曹玹之后，谥悼公。"
+    },
+    {
+      "fullName": "曹林之女",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹林",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹林有一女嫁嵇康，姓名不详。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹林；丈夫嵇康。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《晋书·卷四十九·嵇康传》：https://zh.wikisource.org/wiki/晉書/卷049"
+        ],
+        "notes": [
+          "史书只称曹林之女，未载姓名。"
+        ]
+      },
+      "story": "曹林有一女嫁嵇康，姓名不详。"
+    },
+    {
+      "fullName": "曹孚",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹衮",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹孚是中山恭王曹衮之子，继承其爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹衮。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹孚是中山恭王曹衮之子，继承其爵。"
+    },
+    {
+      "fullName": "曹澳",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹峻",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹澳是陈留恭王曹峻之子，继承其爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹峻。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹澳是陈留恭王曹峻之子，继承其爵。"
+    },
+    {
+      "fullName": "曹嘉",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹彪",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹嘉是楚王曹彪世子，曹彪死后获封常山真定王，入晋后封高邑公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹彪。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹嘉是楚王曹彪世子，曹彪死后获封常山真定王，入晋后封高邑公。"
+    },
+    {
+      "fullName": "曹抗",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 237,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹均",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹抗是樊安公曹均之子，继承其爵，景初元年去世，谥定公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹均；子曹谌。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹抗是樊安公曹均之子，继承其爵，景初元年去世，谥定公。"
+    },
+    {
+      "fullName": "曹敏",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹均",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹敏是曹均之子，被指定奉曹矩之后，后封琅邪王，谥原王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹均；过继曹矩；史载子曹焜、曹赞。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹敏是曹均之子，被指定奉曹矩之后，后封琅邪王，谥原王。"
+    },
+    {
+      "fullName": "曹翕",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹徽",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹翕是东平灵王曹徽之子，继承其爵，入晋后封廪丘公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹徽；子曹琨。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹翕是东平灵王曹徽之子，继承其爵，入晋后封廪丘公。"
+    },
+    {
+      "fullName": "曹竦",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹茂",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹竦是乐陵王曹茂之子，后被指定承继曹铄之后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹茂；过继曹铄。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹竦是乐陵王曹茂之子，后被指定承继曹铄之后。"
+    },
+    {
+      "fullName": "曹楷",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹彰",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹楷是任城威王曹彰之子，继承其爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹彰；史载子曹悌、曹温分别承继曹礼、曹邕之后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹楷是任城威王曹彰之子，继承其爵。"
+    },
+    {
+      "fullName": "曹志",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 288,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹植",
+      "motherName": "曹志生母",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹志，字允恭，曹植之子，继承陈王爵，入晋后改封鄄城公。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹植；生母姓名不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19"
+        ],
+        "notes": []
+      },
+      "story": "曹志，字允恭，曹植之子，继承陈王爵，入晋后改封鄄城公。"
+    },
+    {
+      "fullName": "曹炳",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹熊",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹炳是萧怀王曹熊之子，青龙二年继爵，后早卒无子。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹熊；无子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十九·任城陈萧王传》：https://zh.wikisource.org/wiki/三國志/卷19"
+        ],
+        "notes": []
+      },
+      "story": "曹炳是萧怀王曹熊之子，青龙二年继爵，后早卒无子。"
+    },
+    {
+      "fullName": "曹叡",
+      "birthYear": 204,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 239,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "甄氏",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹叡，字元仲，曹丕与甄氏之子，曹魏第二位皇帝。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生母甄氏；三名亲生儿子皆早卒，另收养曹芳、曹询。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03",
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "生年按裴松之对享年记载的考辨取204年。"
+        ]
+      },
+      "story": "曹叡，字元仲，曹丕与甄氏之子，曹魏第二位皇帝。"
+    },
+    {
+      "fullName": "曹协",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "李贵人",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹协是曹丕与李贵人之子，早卒，追封赞哀王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "子曹寻。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹协是曹丕与李贵人之子，早卒，追封赞哀王。"
+    },
+    {
+      "fullName": "曹蕤",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 233,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "潘淑媛",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹蕤是曹丕与潘淑媛之子，封北海王，谥悼。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无亲生后嗣，后以曹敏之子曹赞奉后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹蕤是曹丕与潘淑媛之子，封北海王，谥悼。"
+    },
+    {
+      "fullName": "曹鉴",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 225,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "朱淑媛",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹鉴是曹丕与朱淑媛之子，封东武阳王，谥怀。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹鉴是曹丕与朱淑媛之子，封东武阳王，谥怀。"
+    },
+    {
+      "fullName": "曹霖",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 249,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "仇昭仪",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹霖是曹丕与仇昭仪之子，封东海王，谥定。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "子曹启、曹髦。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹霖是曹丕与仇昭仪之子，封东海王，谥定。"
+    },
+    {
+      "fullName": "曹礼",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 229,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "徐姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹礼是曹丕与徐姬之子，封元城王，谥哀。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无亲生后嗣，后以曹楷之子曹悌奉后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹礼是曹丕与徐姬之子，封元城王，谥哀。"
+    },
+    {
+      "fullName": "曹邕",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 229,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "苏姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹邕是曹丕与苏姬之子，封邯郸王，谥怀。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无亲生后嗣，后以曹楷之子曹温奉后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹邕是曹丕与苏姬之子，封邯郸王，谥怀。"
+    },
+    {
+      "fullName": "曹贡",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 223,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "张姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹贡是曹丕与张姬之子，封清河王，谥悼。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹贡是曹丕与张姬之子，封清河王，谥悼。"
+    },
+    {
+      "fullName": "曹俨",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 223,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "文帝宋姬",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹俨是曹丕与宋姬之子，封广平王，谥哀。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "无子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹俨是曹丕与宋姬之子，封广平王，谥哀。"
+    },
+    {
+      "fullName": "东乡公主",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹丕",
+      "motherName": "甄氏",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "东乡公主是曹丕与甄氏之女，曹叡的同母姐妹。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹丕，母甄氏；丈夫和子女不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "东乡公主是曹丕与甄氏之女，曹叡的同母姐妹。"
+    },
+    {
+      "fullName": "荀甝",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀恽",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀甝是荀恽之子，继承广阳乡侯爵，三十岁去世。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀恽；生母不详；子荀頵。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": [
+          "荀恽娶安阳公主，但《三国志》未明确荀甝生母，故motherName留空。"
+        ]
+      },
+      "story": "荀甝是荀恽之子，继承广阳乡侯爵，三十岁去世。"
+    },
+    {
+      "fullName": "荀霬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀恽",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀霬是荀恽之子，官至中领军，追赠骠骑将军。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀恽；生母不详；子荀恺、荀憺、荀悝。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": [
+          "荀恽娶安阳公主，但《三国志》未明确荀霬生母，故motherName留空。"
+        ]
+      },
+      "story": "荀霬是荀恽之子，官至中领军，追赠骠骑将军。"
+    },
+    {
+      "fullName": "何晏之子",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "何晏",
+      "motherName": "金乡公主",
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "何晏与金乡公主有一子，何晏被诛时年约五六岁，姓名不详。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父何晏，母金乡公主。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《太平御览·卷一百五十二》引《魏末传》：https://zh.wikisource.org/wiki/太平御覽/0152"
+        ],
+        "notes": [
+          "史书未载姓名，fullName使用关系性描述。"
+        ]
+      },
+      "story": "何晏与金乡公主有一子，何晏被诛时年约五六岁，姓名不详。"
+    },
+    {
+      "fullName": "嵇康",
+      "birthYear": 223,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 262,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "嵇康，字叔夜，与魏宗室婚；《三国志》裴注记其妻为曹林之女。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "曹林之女的丈夫；子嵇绍。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20",
+          "《晋书·卷四十九·嵇康传》：https://zh.wikisource.org/wiki/晉書/卷049"
+        ],
+        "notes": []
+      },
+      "story": "嵇康，字叔夜，与魏宗室婚；《三国志》裴注记其妻为曹林之女。"
+    },
+    {
+      "fullName": "曹冏",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 226,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹冏是曹叡亲生子，黄初七年立为清河王，同年早卒。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹叡；生母不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03"
+        ],
+        "notes": []
+      },
+      "story": "曹冏是曹叡亲生子，黄初七年立为清河王，同年早卒。"
+    },
+    {
+      "fullName": "曹穆",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 229,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹穆是曹叡亲生子，太和二年立为繁阳王，次年早卒。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹叡；生母不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03"
+        ],
+        "notes": []
+      },
+      "story": "曹穆是曹叡亲生子，太和二年立为繁阳王，次年早卒。"
+    },
+    {
+      "fullName": "曹殷",
+      "birthYear": 231,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 232,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹殷是曹叡亲生子，太和五年出生，次年早卒，追封安平哀王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹叡；生母不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03"
+        ],
+        "notes": []
+      },
+      "story": "曹殷是曹叡亲生子，太和五年出生，次年早卒，追封安平哀王。"
+    },
+    {
+      "fullName": "曹淑",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 232,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹淑是曹叡爱女，太和六年早卒，追封平原懿公主。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹叡；生母不详；死后与甄黄冥婚合葬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书五·后妃传》：https://zh.wikisource.org/wiki/三國志/卷05"
+        ],
+        "notes": []
+      },
+      "story": "曹淑是曹叡爱女，太和六年早卒，追封平原懿公主。"
+    },
+    {
+      "fullName": "曹芳",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹芳，字兰卿，曹叡养子，后继位为帝；其生父母在宫中被严格保密。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "养父曹叡；与曹叡不是已证实的生父子关系。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": [
+          "fatherName在此表示收养关系，不表示生物学父子。",
+          "裴注引《魏氏春秋》仅称“或云任城王楷子”，不能作为确定生父。"
+        ]
+      },
+      "story": "曹芳，字兰卿，曹叡养子，后继位为帝；其生父母在宫中被严格保密。"
+    },
+    {
+      "fullName": "曹询",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 244,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹询是曹叡养子，封秦王，正始五年去世。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "养父曹叡；生父母不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书三·明帝纪》：https://zh.wikisource.org/wiki/三國志/卷03",
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04"
+        ],
+        "notes": [
+          "fatherName在此表示收养关系，不表示生物学父子。"
+        ]
+      },
+      "story": "曹询是曹叡养子，封秦王，正始五年去世。"
+    },
+    {
+      "fullName": "齐长公主",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 2,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹叡",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "齐长公主是曹叡之女，嫁李韬。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹叡；丈夫李韬；史载有三子，但姓名未载于相关传文。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书九·诸夏侯曹传》：https://zh.wikisource.org/wiki/三國志/卷09"
+        ],
+        "notes": [
+          "生母不详。"
+        ]
+      },
+      "story": "齐长公主是曹叡之女，嫁李韬。"
+    },
+    {
+      "fullName": "李韬",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 254,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": null,
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "李韬是李丰之子，娶曹叡之女齐长公主，嘉平六年因李丰案被赐死。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "齐长公主的丈夫；有三子，姓名不详。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书九·诸夏侯曹传》：https://zh.wikisource.org/wiki/三國志/卷09"
+        ],
+        "notes": []
+      },
+      "story": "李韬是李丰之子，娶曹叡之女齐长公主，嘉平六年因李丰案被赐死。"
+    },
+    {
+      "fullName": "曹廉",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹琬",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹廉是曹琬之子，继承丰王爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹琬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹廉是曹琬之子，继承丰王爵。"
+    },
+    {
+      "fullName": "曹偃",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 236,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹潜",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹偃是曹潜之子，继承相王爵，青龙四年去世，无子。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹潜；无子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹偃是曹潜之子，继承相王爵，青龙四年去世，无子。"
+    },
+    {
+      "fullName": "曹恒",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹壹",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹恒是曹壹之子，继承济阳一支爵位。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹壹。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹恒是曹壹之子，继承济阳一支爵位。"
+    },
+    {
+      "fullName": "曹谌",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹抗",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹谌是曹抗之子，继承屯留公爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹抗。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹谌是曹抗之子，继承屯留公爵。"
+    },
+    {
+      "fullName": "曹焜",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹敏",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹焜是琅邪原王曹敏之子，继承其爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹敏。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹焜是琅邪原王曹敏之子，继承其爵。"
+    },
+    {
+      "fullName": "文安王曹赞",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹敏",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹赞是琅邪王曹敏之子，被指定奉曹蕤之后。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹敏；过继曹蕤。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": [
+          "使用其后期封号“文安王”与另一位曹赞消歧。"
+        ]
+      },
+      "story": "曹赞是琅邪王曹敏之子，被指定奉曹蕤之后。"
+    },
+    {
+      "fullName": "曹琨",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹翕",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹琨是曹翕世子，泰始二年代表父亲入晋朝见。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹翕。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹琨是曹翕世子，泰始二年代表父亲入晋朝见。"
+    },
+    {
+      "fullName": "曹悌",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹楷",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹悌是曹楷之子，被指定承继曹礼之后，后改封梁王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹楷；过继曹礼。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹悌是曹楷之子，被指定承继曹礼之后，后改封梁王。"
+    },
+    {
+      "fullName": "曹温",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹楷",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹温是曹楷之子，被指定承继曹邕之后，后改封鲁阳王。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹楷；过继曹邕。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹温是曹楷之子，被指定承继曹邕之后，后改封鲁阳王。"
+    },
+    {
+      "fullName": "曹寻",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 248,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹协",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹寻是曹协之子，继承赞王爵，正始九年去世，无子。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹协；无子。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹寻是曹协之子，继承赞王爵，正始九年去世，无子。"
+    },
+    {
+      "fullName": "曹启",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹霖",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹启是东海定王曹霖之子，继承东海王爵。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父曹霖。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹启是东海定王曹霖之子，继承东海王爵。"
+    },
+    {
+      "fullName": "曹髦",
+      "birthYear": 241,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 260,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "曹霖",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "曹髦，字彦士，曹霖之子，入继曹叡大宗，后即皇帝位，甘露五年遇害。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "生父曹霖；入继曹叡宗统；配偶为卞皇后。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书四·三少帝纪》：https://zh.wikisource.org/wiki/三國志/卷04",
+          "《三国志·魏书二十·武文世王公传》：https://zh.wikisource.org/wiki/三國志/卷20"
+        ],
+        "notes": []
+      },
+      "story": "曹髦，字彦士，曹霖之子，入继曹叡大宗，后即皇帝位，甘露五年遇害。"
+    },
+    {
+      "fullName": "荀頵",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀甝",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀頵，字温伯，荀甝之子，曾任羽林右监，早卒。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀甝；子荀崧。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀頵，字温伯，荀甝之子，曾任羽林右监，早卒。"
+    },
+    {
+      "fullName": "荀恺",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀霬",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀恺是荀霬之子，入晋后官至征西大将军。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀霬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀恺是荀霬之子，入晋后官至征西大将军。"
+    },
+    {
+      "fullName": "荀憺",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀霬",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀憺是荀霬之子，官至少府。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀霬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀憺是荀霬之子，官至少府。"
+    },
+    {
+      "fullName": "荀悝",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀霬",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀悝是荀霬之子，官至护军将军，追赠车骑大将军。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀霬。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀悝是荀霬之子，官至护军将军，追赠车骑大将军。"
+    },
+    {
+      "fullName": "嵇绍",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 304,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "嵇康",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "嵇绍，字延祖，嵇康之子，晋惠帝时护驾遇害，谥忠穆。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父嵇康；生母不详；子嵇眕。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《晋书·卷四十九·嵇康传》：https://zh.wikisource.org/wiki/晉書/卷049",
+          "《晋书·卷八十九·嵇绍传》：https://zh.wikisource.org/wiki/晉書/卷089"
+        ],
+        "notes": [
+          "嵇康娶曹林之女，但史文未明确她是嵇绍生母，故motherName留空。"
+        ]
+      },
+      "story": "嵇绍，字延祖，嵇康之子，晋惠帝时护驾遇害，谥忠穆。"
+    },
+    {
+      "fullName": "荀崧",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀頵",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀崧，字景猷，荀頵之子，东晋时官至左右光禄大夫、开府仪同三司。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀頵；子荀羡。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀崧，字景猷，荀頵之子，东晋时官至左右光禄大夫、开府仪同三司。"
+    },
+    {
+      "fullName": "嵇眕",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "嵇绍",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "嵇眕是嵇绍长子，有父风，早卒。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父嵇绍。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《晋书·卷八十九·嵇绍传》：https://zh.wikisource.org/wiki/晉書/卷089"
+        ],
+        "notes": []
+      },
+      "story": "嵇眕是嵇绍长子，有父风，早卒。"
+    },
+    {
+      "fullName": "荀羡",
+      "birthYear": 0,
+      "birthMonth": 0,
+      "birthDay": 0,
+      "deathYear": 0,
+      "deathMonth": 0,
+      "deathDay": 0,
+      "gender": 1,
+      "birthPlace": "",
+      "deathPlace": "",
+      "fatherName": "荀崧",
+      "motherName": null,
+      "mintNFT": true,
+      "storyData": {
+        "summary": [
+          "荀羡，字令则，荀崧之子，东晋时任北中郎将并督徐兖青三州军事。"
+        ],
+        "earlyLife": [],
+        "education": [],
+        "lifeEvents": [],
+        "career": [],
+        "works": [],
+        "achievements": [],
+        "philosophy": [],
+        "quotes": [],
+        "family": [
+          "父荀崧。"
+        ],
+        "lifestyle": [],
+        "relations": [],
+        "activities": [],
+        "anecdotes": [],
+        "controversies": [],
+        "legacy": [],
+        "gallery": [],
+        "references": [
+          "《三国志·魏书十·荀彧荀攸贾诩传》：https://zh.wikisource.org/wiki/三國志/卷10"
+        ],
+        "notes": []
+      },
+      "story": "荀羡，字令则，荀崧之子，东晋时任北中郎将并督徐兖青三州军事。"
+    }
+  ]
+}
