@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { readBooleanEnv, readListEnv, readNumberEnv, readPositiveNumberEnv } from "./env";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  readBooleanEnv,
+  readListEnv,
+  readNumberEnv,
+  readPositiveNumberEnv,
+  shouldShowNodeModeToggle,
+} from "./env";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("readBooleanEnv", () => {
   it("treats explicit true-like values as enabled", () => {
@@ -41,10 +51,16 @@ describe("number env readers", () => {
 
 describe("readListEnv", () => {
   it("splits comma and whitespace separated values", () => {
-    expect(readListEnv("https://a.example/ipfs/, https://b.example/ipfs/ https://c.example/ipfs/")).toEqual([
-      "https://a.example/ipfs/",
-      "https://b.example/ipfs/",
-      "https://c.example/ipfs/",
-    ]);
+    expect(
+      readListEnv("https://a.example/ipfs/, https://b.example/ipfs/ https://c.example/ipfs/"),
+    ).toEqual(["https://a.example/ipfs/", "https://b.example/ipfs/", "https://c.example/ipfs/"]);
+  });
+});
+
+describe("shouldShowNodeModeToggle", () => {
+  it("reads the node-mode env flag", () => {
+    vi.stubEnv("VITE_SHOW_NODE_MODE_TOGGLE", "1");
+
+    expect(shouldShowNodeModeToggle()).toBe(true);
   });
 });

@@ -4,8 +4,8 @@ import { useConfig } from "../../context";
 import { NETWORK_PRESETS } from "../../../../shared/config";
 import {
   isDevMode,
-  shouldShowChildrenModeToggle,
   shouldShowDeduplicateToggle,
+  shouldShowNodeModeToggle,
   shouldShowTrustedSourceFilterToggle,
 } from "../../../../shared/config/env";
 import { useToast } from "../../../../shared/ui";
@@ -60,7 +60,7 @@ export function useFamilyTreeConfigForm() {
   const { clearAllCaches } = useTreeMutations();
 
   const isDev = isDevMode();
-  const showChildrenModeToggle = useMemo(() => shouldShowChildrenModeToggle(), []);
+  const showNodeModeToggle = useMemo(() => shouldShowNodeModeToggle(), []);
   const showDeduplicateToggle = useMemo(() => shouldShowDeduplicateToggle(), []);
   const showTrustedSourceFilterToggle = useMemo(() => shouldShowTrustedSourceFilterToggle(), []);
 
@@ -276,7 +276,7 @@ export function useFamilyTreeConfigForm() {
 
   return {
     isDev,
-    showChildrenModeToggle,
+    showNodeModeToggle,
     showDeduplicateToggle,
     showTrustedSourceFilterToggle,
 

@@ -474,33 +474,35 @@
     "ui": {
       "versionNumber": "Version Index",
       "contractModeConfig": "Config",
-      "traversalDFS": "DFS - Depth-First (deeper nodes earlier)",
-      "traversalBFS": "BFS - Breadth-First (level order)",
+      "traversalDFS": "DFS: load down one branch first, then return to sibling branches",
+      "traversalBFS": "BFS: load the current generation first, then continue to the next",
       "traversal": "Traversal Mode",
       "nodesLabelFull": "Nodes",
       "depthLabelFull": "Depth",
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel",
-      "childrenMode": "Children Mode",
+      "childrenMode": "Node Mode",
+      "childrenModeUnion": "Merge",
+      "childrenModeStrict": "Exact",
       "childrenModeTooltip": {
-        "strict": "Strict: only children attached to this parent version",
-        "union": "Union: merge children across all parent versions"
+        "strict": "Exact: at every generation, query children linked to the current person version; unspecified parent versions are controlled separately",
+        "union": "Merge: at every generation, combine children linked to all known versions of the current person, including unspecified parent-version references"
       },
-      "strictIncludeV0": "Include v0",
+      "strictIncludeV0": "Unspecified Version",
       "strictIncludeV0Tooltip": {
-        "on": "Strict + v0: include unversioned children (parentVersionIndex=0)",
-        "off": "Strict only: exactly parentVersionIndex you selected"
+        "on": "Also show children linked to this parent person without a specific parent version (parentVersionIndex = 0)",
+        "off": "Use only children attached to the exact current parent version"
       },
       "deduplicateChildren": "Deduplicate Children",
       "deduplicateChildrenTooltip": {
-        "enabled": "Highest endorsed version only",
-        "disabled": "Show all versions"
+        "enabled": "Keep one child version per person under each parent; before details load, choose the lower version, then prefer the highest endorsement count with lower version as the tie-breaker",
+        "disabled": "Keep every child version returned for the current parent"
       },
       "trustedSourceFilter": "Trusted Sources",
       "trustedSourceFilterTooltip": {
-        "enabled": "Only versions endorsed by recommended sources",
-        "disabled": "Show all versions"
+        "enabled": "Use trusted sources configured on the exact root version and keep node versions endorsed by any source; no root sources means no filtering",
+        "disabled": "Do not filter by root trusted sources; children mode and version deduplication still apply"
       }
     },
     "status": {

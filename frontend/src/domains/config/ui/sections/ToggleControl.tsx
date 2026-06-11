@@ -55,7 +55,7 @@ export default function ToggleControl({
         />
       </button>
       {tooltipOpen && (
-        <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute bottom-full left-0 z-[9999] mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
           {tooltip}
         </div>
       )}

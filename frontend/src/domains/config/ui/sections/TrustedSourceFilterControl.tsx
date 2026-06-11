@@ -26,9 +26,12 @@ export default function TrustedSourceFilterControl({
         value
           ? t(
               "familyTree.ui.trustedSourceFilterTooltip.enabled",
-              "Only versions endorsed by recommended sources",
+              "Use trusted sources configured on the exact root version and keep node versions endorsed by any source; no root sources means no filtering",
             )
-          : t("familyTree.ui.trustedSourceFilterTooltip.disabled", "Show all versions")
+          : t(
+              "familyTree.ui.trustedSourceFilterTooltip.disabled",
+              "Do not filter by root trusted sources; children mode and version deduplication still apply",
+            )
       }
     />
   );
