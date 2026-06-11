@@ -60,10 +60,16 @@ export default function TraversalControls({
           <div className="absolute bottom-full left-0 mb-2 z-[9999] rounded-xl bg-slate-900/95 dark:bg-slate-950/95 text-slate-200 border border-slate-700/50 p-3 text-[11px] shadow-xl animate-in fade-in zoom-in-95 duration-200 w-56 whitespace-normal leading-relaxed">
             <div className="flex flex-col gap-2">
               <div className={value === "dfs" ? "text-white" : "text-slate-500"}>
-                {t("familyTree.ui.traversalDFS", "DFS Depth First Search")}
+                {t(
+                  "familyTree.ui.traversalDFS",
+                  "DFS: load down one branch first, then return to sibling branches",
+                )}
               </div>
               <div className={value === "bfs" ? "text-white" : "text-slate-500"}>
-                {t("familyTree.ui.traversalBFS", "BFS Breadth First Search")}
+                {t(
+                  "familyTree.ui.traversalBFS",
+                  "BFS: load the current generation first, then continue to the next",
+                )}
               </div>
             </div>
           </div>

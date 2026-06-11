@@ -113,20 +113,12 @@ export default function FamilyTreeConfigForm() {
           defaultOpen={true}
         >
           <div className="flex flex-col gap-4">
-            <TraversalControls {...ctrl.traversal} />
-
             {(ctrl.showTrustedSourceFilterToggle ||
-              ctrl.showChildrenModeToggle ||
+              ctrl.showNodeModeToggle ||
               ctrl.showDeduplicateToggle) && (
               <>
-                <div className="border-t border-slate-100 dark:border-slate-700/50" />
                 <div className="space-y-4">
-                  {ctrl.showTrustedSourceFilterToggle && (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                      <TrustedSourceFilterControl {...ctrl.trustedSourceFilter} />
-                    </div>
-                  )}
-                  {ctrl.showChildrenModeToggle && (
+                  {ctrl.showNodeModeToggle && (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                       <ChildrenModeControls {...ctrl.children} />
                     </div>
@@ -136,9 +128,17 @@ export default function FamilyTreeConfigForm() {
                       <DeduplicateControl {...ctrl.deduplicate} />
                     </div>
                   )}
+                  {ctrl.showTrustedSourceFilterToggle && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <TrustedSourceFilterControl {...ctrl.trustedSourceFilter} />
+                    </div>
+                  )}
                 </div>
+                <div className="border-t border-slate-100 dark:border-slate-700/50" />
               </>
             )}
+
+            <TraversalControls {...ctrl.traversal} />
           </div>
         </FormSection>
       </div>

@@ -72,8 +72,8 @@ export function shouldShowDeduplicateToggle(): boolean {
   return getBooleanEnv("VITE_SHOW_DEDUPLICATE_TOGGLE");
 }
 
-export function shouldShowChildrenModeToggle(): boolean {
-  return getBooleanEnv("VITE_SHOW_CHILDREN_MODE_TOGGLE");
+export function shouldShowNodeModeToggle(): boolean {
+  return getBooleanEnv("VITE_SHOW_NODE_MODE_TOGGLE");
 }
 
 export function shouldShowTrustedSourceFilterToggle(): boolean {

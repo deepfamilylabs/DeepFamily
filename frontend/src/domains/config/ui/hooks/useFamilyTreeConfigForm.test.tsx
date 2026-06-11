@@ -84,8 +84,8 @@ vi.mock("../../../../shared/config", () => ({
 
 vi.mock("../../../../shared/config/env", () => ({
   isDevMode: () => mocks.envFlags.isDev,
-  shouldShowChildrenModeToggle: () => mocks.envFlags.showChildren,
   shouldShowDeduplicateToggle: () => mocks.envFlags.showDedup,
+  shouldShowNodeModeToggle: () => mocks.envFlags.showChildren,
   shouldShowTrustedSourceFilterToggle: () => mocks.envFlags.showTrusted,
   getLocalizedRootHash: () => mocks.envFlags.localizedRoot,
   getLocalizedRootVersionIndex: () => mocks.envFlags.localizedVersion,

@@ -35,7 +35,7 @@ export default function ChildrenModeControls({
       <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-            {t("familyTree.ui.childrenMode", "Children Mode")}:
+            {t("familyTree.ui.childrenMode", "Node Mode")}:
           </span>
           <button
             type="button"
@@ -48,33 +48,39 @@ export default function ChildrenModeControls({
         <div className="inline-flex rounded-2xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
           <button
             type="button"
-            aria-label="Union children mode"
+            aria-label={`${t("familyTree.ui.childrenMode", "Node Mode")}: ${t(
+              "familyTree.ui.childrenModeUnion",
+              "Merge",
+            )}`}
             onClick={() => onModeChange("union")}
             className={`${buttonBase} ${mode === "union" ? active : idle}`}
           >
-            Union
+            {t("familyTree.ui.childrenModeUnion", "Merge")}
           </button>
           <div className="relative group border-l border-slate-300 dark:border-slate-600">
             <button
               type="button"
-              aria-label="Strict children mode"
+              aria-label={`${t("familyTree.ui.childrenMode", "Node Mode")}: ${t(
+                "familyTree.ui.childrenModeStrict",
+                "Exact",
+              )}`}
               onClick={() => onModeChange("strict")}
               className={`${buttonBase} ${mode === "strict" ? active : idle}`}
             >
-              Strict
+              {t("familyTree.ui.childrenModeStrict", "Exact")}
             </button>
           </div>
         </div>
         {modeTooltipOpen && (
-          <div className="absolute -top-8 left-0 z-[9999] whitespace-nowrap rounded bg-slate-900/90 dark:bg-slate-950/90 text-white px-2 py-1 text-[10px] shadow-lg animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute bottom-full left-0 z-[9999] mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
             {mode === "strict"
               ? t(
                   "familyTree.ui.childrenModeTooltip.strict",
-                  "Strict: only children attached to this parent version",
+                  "Exact: at every generation, query children linked to the current person version; unspecified parent versions are controlled separately",
                 )
               : t(
                   "familyTree.ui.childrenModeTooltip.union",
-                  "Union: merge children across all parent versions",
+                  "Merge: at every generation, combine children linked to all known versions of the current person, including unspecified parent-version references",
                 )}
           </div>
         )}
@@ -82,7 +88,7 @@ export default function ChildrenModeControls({
 
       {mode === "strict" && (
         <ToggleControl
-          label={t("familyTree.ui.strictIncludeV0", "Include v0")}
+          label={t("familyTree.ui.strictIncludeV0", "Unspecified Version")}
           value={includeUnversioned}
           onChange={onIncludeUnversionedChange}
           tooltipOpen={includeV0TooltipOpen}
@@ -91,11 +97,11 @@ export default function ChildrenModeControls({
             includeUnversioned
               ? t(
                   "familyTree.ui.strictIncludeV0Tooltip.on",
-                  "Strict + v0: include unversioned children (parentVersionIndex=0)",
+                  "Also show children linked to this parent person without a specific parent version (parentVersionIndex = 0)",
                 )
               : t(
                   "familyTree.ui.strictIncludeV0Tooltip.off",
-                  "Strict only: exactly parentVersionIndex you selected",
+                  "Use only children attached to the exact current parent version",
                 )
           }
         />
