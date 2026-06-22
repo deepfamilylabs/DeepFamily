@@ -108,13 +108,13 @@ export function getDiejiGenerationMark(depth: number, t: TranslateFn): string {
 
 export function getDiejiFullRecordText(person: PaperPerson, t?: TranslateFn): string {
   // This vertical register omits the 子女 (children) line; only Modern lists children in body text.
-  const { baseLines } = splitPaperRecordLines(person, t);
+  const { baseLines } = splitPaperRecordLines(person, t, "classical");
   return baseLines.map(formatDiejiRecordLine).join("，") || person.ui.shortHashText;
 }
 
 function getDiejiRecordSections(person: PaperPerson, t: TranslateFn): string[] {
   // Only the base biography is laid out; the 子女 line is dropped (see getDiejiFullRecordText).
-  const { baseLines } = splitPaperRecordLines(person, t);
+  const { baseLines } = splitPaperRecordLines(person, t, "classical");
   const baseRecord = baseLines.map(formatDiejiRecordLine).join("，") || person.ui.shortHashText;
   return [baseRecord];
 }

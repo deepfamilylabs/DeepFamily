@@ -432,7 +432,10 @@
       "notes": "附记",
       "endorsements": "背书",
       "children": "子女",
-      "descendants": "子嗣"
+      "descendants": "子嗣",
+      "spouse": "配偶",
+      "spouseWife": "配",
+      "spouseHusband": "適"
     },
     "empty": {
       "loading": "正在加载族谱数据",

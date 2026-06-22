@@ -15,6 +15,7 @@ export interface PaperGenealogyViewProps {
   graph: TreeGraphData;
   rootId: NodeId | null;
   nodesData: Record<string, NodeData>;
+  spouseLinks?: Map<NodeId, NodeId[]>;
   hasRoot: boolean;
   loading?: boolean;
   contractMessage?: string;

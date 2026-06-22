@@ -432,7 +432,10 @@
       "notes": "Notes",
       "endorsements": "Endorsements",
       "children": "Children",
-      "descendants": "Children"
+      "descendants": "Children",
+      "spouse": "Spouse",
+      "spouseWife": "Wife",
+      "spouseHusband": "Husband"
     },
     "empty": {
       "loading": "Loading genealogy data",

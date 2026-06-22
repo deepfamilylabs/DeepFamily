@@ -8,6 +8,7 @@ export interface UsePaperGenealogyViewModelParams {
   graph: TreeGraphData;
   rootId: NodeId | null;
   nodesData: Record<string, NodeData>;
+  spouseLinks?: Map<NodeId, NodeId[]>;
   hasRoot: boolean;
   loading?: boolean;
   contractMessage?: string;
@@ -26,7 +27,7 @@ export interface PaperGenealogyViewModel {
 export function usePaperGenealogyViewModel(
   params: UsePaperGenealogyViewModelParams,
 ): PaperGenealogyViewModel {
-  const { graph, rootId, nodesData, hasRoot, loading, contractMessage } = params;
+  const { graph, rootId, nodesData, spouseLinks, hasRoot, loading, contractMessage } = params;
   const { t } = useTranslation();
   const translate = useCallback<TranslateFn>(
     (key, fallback, options) =>
@@ -37,8 +38,8 @@ export function usePaperGenealogyViewModel(
     [t],
   );
   const generations = useMemo(
-    () => buildPaperGenerations({ graph, nodesData, t: translate }),
-    [graph, nodesData, translate],
+    () => buildPaperGenerations({ graph, nodesData, spouseLinks, t: translate }),
+    [graph, nodesData, spouseLinks, translate],
   );
 
   return {

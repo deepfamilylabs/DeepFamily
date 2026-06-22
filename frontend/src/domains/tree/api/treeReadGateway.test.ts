@@ -27,6 +27,33 @@ describe("treeReadGateway listChildrenStrictAll", () => {
   });
 });
 
+describe("treeReadGateway listVersionEndorsementsAll", () => {
+  it("paginates and flattens version endorsements (index, count, tokenId)", async () => {
+    const personHash = "0xPerson";
+    const contract = {
+      listVersionEndorsements: vi.fn(),
+    };
+    const responses: any[] = [
+      // versionIndices, endorsementCounts, tokenIds, totalVersions, hasMore, nextOffset
+      [[1, 2], [5, 3], ["10", "0"], 3, true, 2],
+      [[3], [9], ["0"], 3, false, 2],
+    ];
+    contract.listVersionEndorsements.mockImplementation(async () => responses.shift());
+
+    const gateway = createTreeReadGateway(contract, new QueryCache());
+    const result = await gateway.listVersionEndorsementsAll(personHash, { pageLimit: 2 });
+
+    expect(result).toEqual([
+      { versionIndex: 1, endorsementCount: 5, tokenId: "10" },
+      { versionIndex: 2, endorsementCount: 3, tokenId: "0" },
+      { versionIndex: 3, endorsementCount: 9, tokenId: "0" },
+    ]);
+    expect(contract.listVersionEndorsements).toHaveBeenCalledTimes(2);
+    expect(contract.listVersionEndorsements).toHaveBeenNthCalledWith(1, personHash, 0, 2);
+    expect(contract.listVersionEndorsements).toHaveBeenNthCalledWith(2, personHash, 2, 2);
+  });
+});
+
 describe("treeReadGateway listChildrenUnionAll", () => {
   it("merges children across versions and pages with dedup", async () => {
     const parentHash = "0xparent";

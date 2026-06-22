@@ -18,6 +18,8 @@ export interface TreeGraphDataValue {
   endorsementsReady: boolean;
   /** When true, a trusted-source filter is active and `reachableNodeIds` is the visible set. */
   trustedFilterActive: boolean;
+  /** hashLower → resolved version for unversioned (v0) co-parent refs; lets views map v0 → version. */
+  spouseVersionResolution: Map<string, number>;
   nodesData: Record<string, NodeData>;
   edgesUnion: EdgeStoreUnion;
   edgesStrict: EdgeStoreStrict;

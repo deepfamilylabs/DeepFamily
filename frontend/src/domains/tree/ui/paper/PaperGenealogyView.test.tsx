@@ -3,7 +3,7 @@ import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../shared/model";
-import { buildPaperGenerations } from "./paperData";
+import { buildPaperGenerations, splitPaperRecordLines } from "./paperData";
 import { PaperGenealogyView } from "./PaperGenealogyView";
 import { buildLineagePaperBook } from "./layout/lineagePagination";
 import { buildOuPaperBook, getOuFullRecordText, getOuRecordSlotSpan } from "./layout/ouPagination";
@@ -52,6 +52,9 @@ const zhTranslate = (key: string, fallback?: string, options?: Record<string, un
     "genealogyBook.fields.deathPlace": "卒于",
     "genealogyBook.fields.notes": "附记",
     "genealogyBook.fields.children": "子女",
+    "genealogyBook.fields.spouse": "配偶",
+    "genealogyBook.fields.spouseWife": "配",
+    "genealogyBook.fields.spouseHusband": "適",
     "genealogyBook.generationLabel": "第 {{number}} 世",
     "genealogyBook.rootLabel": "始祖",
     "genealogyBook.firstSon": "长子",
@@ -1481,5 +1484,86 @@ describe("PaperGenealogyView", () => {
 
     expect(screen.getByTestId("paper-genealogy-empty")).toBeTruthy();
     expect(screen.getByText("Select a root")).toBeTruthy();
+  });
+});
+
+describe("paper spouse rendering", () => {
+  const makeHash = (n: number) => `0x${n.toString(16).padStart(64, "0")}`;
+  const husbandHash = makeHash(401);
+  const wifeHash = makeHash(402);
+  const childHash401 = makeHash(403);
+  const husbandId = makeNodeId(husbandHash, 1);
+  const wifeId = makeNodeId(wifeHash, 1);
+  const child401Id = makeNodeId(childHash401, 1);
+
+  const spouseGraph = {
+    nodes: [
+      { id: husbandId, depth: 0, personHash: husbandHash, versionIndex: 1 },
+      { id: child401Id, depth: 1, personHash: childHash401, versionIndex: 1 },
+    ],
+    edges: [{ from: husbandId, to: child401Id }],
+    childrenByParent: { [husbandId]: [child401Id] },
+  };
+  const spouseNodesData: Record<string, NodeData> = {
+    [husbandId]: { id: husbandId, personHash: husbandHash, versionIndex: 1, gender: 1, fullName: "李三" },
+    [wifeId]: { id: wifeId, personHash: wifeHash, versionIndex: 1, gender: 2, fullName: "王氏" },
+    [child401Id]: { id: child401Id, personHash: childHash401, versionIndex: 1 },
+  };
+
+  it("derives spouses from spouseLinks but keeps them out of the data-layer lines", () => {
+    const generations = buildPaperGenerations({
+      graph: spouseGraph,
+      nodesData: spouseNodesData,
+      spouseLinks: new Map([[husbandId, [wifeId]]]),
+      t: zhTranslate,
+    });
+    const husband = generations[0].people[0];
+    expect(husband.spouses.map((spouse) => spouse.name)).toEqual(["王氏"]);
+    expect(husband.classicalLines.join(" ")).not.toContain("王氏");
+    expect(husband.detailLines.join(" ")).not.toContain("王氏");
+  });
+
+  it("shows 配王氏 in Dieji and 配偶: 王氏 in Modern; Ou omits spouses", () => {
+    const generations = buildPaperGenerations({
+      graph: spouseGraph,
+      nodesData: spouseNodesData,
+      spouseLinks: new Map([[husbandId, [wifeId]]]),
+      t: zhTranslate,
+    });
+    const husband = generations[0].people[0];
+    expect(getDiejiFullRecordText(husband, zhTranslate)).toContain("配王氏");
+    expect(splitPaperRecordLines(husband, zhTranslate, "labeled").baseLines.join(" ")).toContain(
+      "配偶: 王氏",
+    );
+    expect(getOuFullRecordText(husband, zhTranslate)).not.toContain("王氏");
+  });
+
+  it("uses 適 for a woman's record (keyed on her gender)", () => {
+    const generations = buildPaperGenerations({
+      graph: {
+        nodes: [
+          { id: wifeId, depth: 0, personHash: wifeHash, versionIndex: 1 },
+          { id: child401Id, depth: 1, personHash: childHash401, versionIndex: 1 },
+        ],
+        edges: [{ from: wifeId, to: child401Id }],
+        childrenByParent: { [wifeId]: [child401Id] },
+      },
+      nodesData: spouseNodesData,
+      spouseLinks: new Map([[wifeId, [husbandId]]]),
+      t: zhTranslate,
+    });
+    const wife = generations[0].people[0];
+    expect(getDiejiFullRecordText(wife, zhTranslate)).toContain("適李三");
+  });
+
+  it("omits the spouse line when no spouseLinks entry is provided", () => {
+    const generations = buildPaperGenerations({
+      graph: spouseGraph,
+      nodesData: spouseNodesData,
+      t: zhTranslate,
+    });
+    const husband = generations[0].people[0];
+    expect(husband.spouses).toHaveLength(0);
+    expect(getDiejiFullRecordText(husband, zhTranslate)).not.toContain("配");
   });
 });

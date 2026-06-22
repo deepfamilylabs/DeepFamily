@@ -38,6 +38,12 @@ export type PaperChildRef = {
   gender?: number;
 };
 
+export type PaperSpouseRef = {
+  id: NodeId;
+  name: string;
+  gender?: number;
+};
+
 export type PaperPerson = {
   id: NodeId;
   depth: number;
@@ -58,6 +64,7 @@ export type PaperPerson = {
   classicalLines: string[];
   childCount: number;
   children: PaperChildRef[];
+  spouses: PaperSpouseRef[];
 };
 
 export type PaperGeneration = {
@@ -90,13 +97,54 @@ export function isPaperChildrenLine(
   return line.trim().toLocaleLowerCase().startsWith(`${childrenLabel}:`.toLocaleLowerCase());
 }
 
+export type PaperSpouseRenderMode = "classical" | "labeled";
+
+// Spouse(s) formatted for the laid-out record. The "classical" form keys the marker on THIS
+// person's gender — a man's spouse is 配 (wife), a woman's is 適 (married-out to husband), unknown
+// gender falls back to the neutral 配偶; the "labeled" form is the modern "配偶: X" field used by
+// the Modern style. Returns undefined when no spouse name is resolvable. Styles opt in via mode
+// (Dieji "classical", Modern "labeled"); an absent mode injects nothing (Ou/Su/Lineage omit it).
+function buildSpouseRecordLine(
+  person: PaperPerson,
+  t?: TranslateFn,
+  mode?: PaperSpouseRenderMode,
+): string | undefined {
+  if (!mode) return undefined;
+  const names = person.spouses.map((spouse) => spouse.name).filter(Boolean);
+  if (!names.length) return undefined;
+
+  if (mode === "labeled") {
+    const label = tFallback(t, "genealogyBook.fields.spouse", "Spouse");
+    const sep = /[㐀-鿿]/u.test(label) ? "、" : ", ";
+    return `${label}: ${names.join(sep)}`;
+  }
+
+  const selfGender = person.nodeData?.gender ?? person.ui.gender;
+  const marker =
+    selfGender === 1
+      ? tFallback(t, "genealogyBook.fields.spouseWife", "Wife")
+      : selfGender === 2
+        ? tFallback(t, "genealogyBook.fields.spouseHusband", "Husband")
+        : tFallback(t, "genealogyBook.fields.spouse", "Spouse");
+  const isCjkMarker = /[㐀-鿿]/u.test(marker);
+  const nameSep = isCjkMarker ? "、" : ", ";
+  // CJK markers (配/適) read as "配王氏" with no separator; latin markers need a space ("Wife 王氏").
+  const markerSep = isCjkMarker ? "" : " ";
+  return `${marker}${markerSep}${names.join(nameSep)}`;
+}
+
 export function splitPaperRecordLines(
   person: PaperPerson,
   t?: TranslateFn,
+  spouseMode?: PaperSpouseRenderMode,
 ): { baseLines: string[]; childrenLine?: string } {
   const sourceLines = person.classicalLines.length ? person.classicalLines : person.detailLines;
+  const baseLines = sourceLines.filter((line) => !isPaperChildrenLine(line, t));
+  // Spouses live on person.spouses (kept out of the data-layer lines); only styles that opt in via
+  // spouseMode surface them in the laid-out record between the biography and the children line.
+  const spouseLine = buildSpouseRecordLine(person, t, spouseMode);
   return {
-    baseLines: sourceLines.filter((line) => !isPaperChildrenLine(line, t)),
+    baseLines: spouseLine ? [...baseLines, spouseLine] : baseLines,
     childrenLine: person.detailLines.find((line) => isPaperChildrenLine(line, t)),
   };
 }
@@ -213,6 +261,25 @@ function getChildRefs(params: {
   });
 }
 
+// Co-parents (spouses) for this person, resolved from the data layer's spouseLinks (personId →
+// co-parent node ids). Names/genders come from nodesData — the spouse's details are fetched by the
+// runtime spouse enrichment, so married-in people resolve to real names (short-hash until then).
+function getSpouseRefs(params: {
+  personId: NodeId;
+  spouseLinks: Map<NodeId, NodeId[]>;
+  nodesData: Record<string, NodeData>;
+}): PaperSpouseRef[] {
+  const { personId, spouseLinks, nodesData } = params;
+  return (spouseLinks.get(personId) || []).map((id) => {
+    const ui = getNodeUi(id, nodesData);
+    return {
+      id,
+      name: ui.fullName || ui.titleText || ui.shortHashText,
+      gender: nodesData[id]?.gender ?? ui.gender,
+    };
+  });
+}
+
 // Reinforcement pass: assign a stable family-grouped display position to every node via
 // a depth-first walk from the root that visits each parent's children eldest-first.
 // Sibling ordering is already applied at the data layer (getProjectedChildIds), so this
@@ -252,9 +319,10 @@ function computeDisplayOrder(params: {
 export function buildPaperGenerations(params: {
   graph: TreeGraphData;
   nodesData: Record<string, NodeData>;
+  spouseLinks?: Map<NodeId, NodeId[]>;
   t?: TranslateFn;
 }): PaperGeneration[] {
-  const { graph, nodesData, t } = params;
+  const { graph, nodesData, spouseLinks, t } = params;
   const byDepth = new Map<number, PaperPerson[]>();
   const relationByChild = new Map<
     NodeId,
@@ -284,6 +352,9 @@ export function buildPaperGenerations(params: {
     const children = getChildRefs({ parentId: node.id, graph, nodesData });
     const childCount = children.length;
     const childNames = children.map((child) => child.name);
+    const spouses = spouseLinks
+      ? getSpouseRefs({ personId: node.id, spouseLinks, nodesData })
+      : [];
     const people = byDepth.get(node.depth) || [];
     const childRelation = relationByChild.get(node.id);
     const person: PaperPerson = {
@@ -299,6 +370,7 @@ export function buildPaperGenerations(params: {
       nodeData,
       childCount,
       children,
+      spouses,
       detailLines: buildDetailLines({ ui, nodeData, childNames, t }),
       classicalLines: buildClassicalLines({ ui, nodeData, t }),
     };
