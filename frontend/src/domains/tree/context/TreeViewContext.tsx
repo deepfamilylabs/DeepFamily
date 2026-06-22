@@ -56,6 +56,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     contractMessage,
     endorsementsReady,
     trustedFilterActive,
+    spouseVersionResolution,
     getDebugStats,
   } = useTreeGraphState({
     rootId: runtime.rootId,
@@ -146,6 +147,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     reachableNodeIds,
     endorsementsReady,
     trustedFilterActive,
+    spouseVersionResolution,
     nodesData,
     edgesUnion,
     edgesStrict,

@@ -28,8 +28,18 @@ export interface ListUnionOptions extends ListChildrenOptions {
   onTotalVersions?: (totalVersions: number) => void;
 }
 
+export interface VersionEndorsement {
+  versionIndex: number;
+  endorsementCount: number;
+  tokenId: string;
+}
+
 export interface TreeReadGateway {
   getTotalVersions: (personHash: string, options: TotalVersionsOptions) => Promise<number>;
+  listVersionEndorsementsAll: (
+    personHash: string,
+    options: ListChildrenOptions,
+  ) => Promise<VersionEndorsement[]>;
   listChildrenStrictAll: (
     parentHash: string,
     parentVersionIndex: number,
@@ -236,6 +246,49 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
     };
   };
 
+  // Lists every version of a person with its endorsement count + tokenId (paginated, deduped via
+  // inflight). Feeds resolveBestVersion: an unversioned (v0) co-parent reference is resolved to the
+  // highest-endorsed version so its name can be fetched.
+  const listVersionEndorsementsAll = async (
+    personHash: string,
+    options: ListChildrenOptions,
+  ): Promise<VersionEndorsement[]> => {
+    const inflightKey = `ve:${personHash.toLowerCase()}`;
+    const inflight = queryCache.getInflight<VersionEndorsement[]>(inflightKey);
+    if (inflight) return inflight;
+
+    const p = (async () => {
+      const out: VersionEndorsement[] = [];
+      let offset = 0;
+      while (true) {
+        options.checkAbort?.();
+        const resp = await contract.listVersionEndorsements(personHash, offset, options.pageLimit);
+        const versionIndices = Array.from(resp?.[0] || []).map(Number);
+        const endorsementCounts = Array.from(resp?.[1] || []).map(Number);
+        const tokenIds = Array.from(resp?.[2] || []).map((value: any) => String(value));
+        for (let i = 0; i < versionIndices.length; i++) {
+          out.push({
+            versionIndex: versionIndices[i],
+            endorsementCount: endorsementCounts[i],
+            tokenId: tokenIds[i],
+          });
+        }
+        const hasMore = Boolean(resp?.[4]);
+        const nextOffset = Number(resp?.[5] || 0);
+        if (!hasMore || nextOffset === offset) break;
+        offset = nextOffset;
+      }
+      return out;
+    })();
+
+    queryCache.setInflight(inflightKey, p);
+    try {
+      return await p;
+    } finally {
+      queryCache.deleteInflight(inflightKey);
+    }
+  };
+
   const listChildrenPage = async (
     parentHash: string,
     parentVersionIndex: number,
@@ -341,6 +394,7 @@ export function createTreeReadGateway(contract: any, queryCache: QueryCache): Tr
 
   return {
     getTotalVersions,
+    listVersionEndorsementsAll,
     listChildrenStrictAll,
     listChildrenUnionAll,
     listPersonVersionsPage,

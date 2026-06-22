@@ -136,6 +136,7 @@ export default function GenealogyBookPage() {
           graph={projection.graph}
           rootId={projection.rootId}
           nodesData={projection.nodesData}
+          spouseLinks={projection.spouseLinks}
           hasRoot={hasRoot}
           loading={loading}
           contractMessage={contractMessage}

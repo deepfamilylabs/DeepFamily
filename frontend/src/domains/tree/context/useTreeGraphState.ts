@@ -9,6 +9,7 @@ import {
   applyNodeEnrichmentPatches,
   fetchNodeEnrichmentBatch,
   isVersionDetailsFresh,
+  makeNodeId,
   type NodeData,
   type NodeId,
   parseNodeId,
@@ -28,6 +29,11 @@ import {
 } from "../services/treeSessionEdges";
 import { applyTotalVersionsToNodes, parseTotalVersionsResult } from "../selectors/treeTotals";
 import { verifyTreeSessionStartup } from "../services/treeSessionStartup";
+import {
+  collectParentRefs,
+  resolveBestSpouseVersion,
+  runSpouseEnrichment,
+} from "../services/spouseEnrichment";
 import type { TreeDebugStats, TreeProgress } from "./types";
 
 const USE_INDEXEDDB_CACHE = isIndexedDbCacheEnabled();
@@ -81,6 +87,7 @@ export interface TreeGraphStateResult {
   setContractMessage: React.Dispatch<React.SetStateAction<string>>;
   endorsementsReady: boolean;
   trustedFilterActive: boolean;
+  spouseVersionResolution: Map<string, number>;
   debugStatsRef: React.MutableRefObject<TreeDebugStats>;
   getDebugStats: () => TreeDebugStats;
 }
@@ -123,6 +130,19 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
   // projection to the reachable (visible) set instead of the raw, unfiltered edge stores.
   const [trustedFilterActive, setTrustedFilterActive] = useState(false);
 
+  // Resolution cache for spouse (co-parent) enrichment: hashLower → resolved version, so an
+  // unversioned (v0) co-parent reference maps to a concrete version once resolved. The view layer
+  // reads this to align spouse node ids; the refs avoid re-resolving / re-fetching across re-runs.
+  const [spouseVersionResolution, setSpouseVersionResolution] = useState<Map<string, number>>(
+    () => new Map(),
+  );
+  const spouseVersionResolutionRef = useRef(spouseVersionResolution);
+  useEffect(() => {
+    spouseVersionResolutionRef.current = spouseVersionResolution;
+  }, [spouseVersionResolution]);
+  const spouseUnresolvableRef = useRef<Set<string>>(new Set());
+  const spouseEnrichInflightRef = useRef<Set<string>>(new Set());
+
   const fetchRunKeyRef = useRef<string | null>(null);
   const edgeRevalidateRef = useRef(new Set<string>());
   const stageLoggedRef = useRef<Set<string>>(new Set());
@@ -147,6 +167,11 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     setNodesData({});
     setEdgesUnion({});
     setEdgesStrict({});
+    // Spouse caches are keyed by person hash only, so drop them too: a v0 spouse resolution
+    // (or "unresolvable" mark) from the previous chain/contract must not leak into the new scope.
+    setSpouseVersionResolution(new Map());
+    spouseUnresolvableRef.current = new Set();
+    spouseEnrichInflightRef.current = new Set();
   }, [options.storageNS]);
 
   useEffect(() => {
@@ -613,6 +638,80 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     };
   }, [options.contract, options.rootHash, options.rootId, options.rootVersionIndex]);
 
+  // Spouse (co-parent) enrichment: once descendants are loaded, fetch the names of people referenced
+  // as a child's other parent but never traversed (married-in spouses). Reuses the same batch fetch
+  // as descendants; an unversioned (v0) reference is resolved to a best version, cached so the view
+  // layer can map v0 → version. Scans only reachable descendants (one layer), so fetched spouses
+  // don't recurse into their own ancestors and re-runs settle once every co-parent is fetched.
+  useEffect(() => {
+    if (loading || !endorsementsReady || !options.contract || !options.api) return;
+    let cancelled = false;
+    void runSpouseEnrichment({
+      parentRefs: collectParentRefs(nodesDataRef.current, reachableNodeIdsRef.current),
+      isFetched: (h, v) =>
+        isVersionDetailsFresh(nodesDataRef.current[makeNodeId(h, v)], options.versionDetailsTtlMs),
+      resolution: spouseVersionResolutionRef.current,
+      unresolvable: spouseUnresolvableRef.current,
+      inflight: spouseEnrichInflightRef.current,
+      resolveBestVersion: (h) =>
+        resolveBestSpouseVersion(h, (hash) =>
+          options.api.listVersionEndorsementsAll(hash, { pageLimit: options.childrenPageLimit }),
+        ),
+      fetchBatch: async (slice) => {
+        const { patches } = await fetchNodeEnrichmentBatch({
+          targets: slice.map((ref) => ({ h: ref.personHash, v: ref.versionIndex })),
+          api: options.api,
+          versionDetailsTtlMs: options.versionDetailsTtlMs,
+          nftDetailsTtlMs: options.nftDetailsTtlMs,
+          getVersionDetailsFetchedAt: () => Date.now(),
+          getCurrentNode: (id) => nodesDataRef.current[id],
+          readStoryMetadata: async (tokenId) => {
+            const metadata = await options.contract.getStoryMetadata(tokenId);
+            return {
+              totalChunks: Number(metadata.totalChunks),
+              totalLength: Number(metadata.totalLength),
+              isSealed: Boolean(metadata.isSealed),
+              lastUpdateTime: Number(metadata.lastUpdateTime),
+              fullStoryHash: metadata.fullStoryHash,
+            };
+          },
+        });
+        return patches;
+      },
+      applyResolutions: (newResolutions) => {
+        setSpouseVersionResolution((prev) => {
+          const next = new Map(prev);
+          for (const [hashLower, version] of newResolutions) next.set(hashLower, version);
+          return next;
+        });
+      },
+      applyPatches: (patches) => {
+        setNodesData((prev) => applyNodeEnrichmentPatches(prev, patches));
+      },
+      reportError: (error, stage) => {
+        if (!stageLoggedRef.current.has(stage)) {
+          stageLoggedRef.current.add(stage);
+          options.push(error as any, { stage });
+        }
+      },
+      isCancelled: () => cancelled,
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    loading,
+    endorsementsReady,
+    nodesData,
+    reachableNodeIds,
+    options.api,
+    options.contract,
+    options.childrenPageLimit,
+    options.nftDetailsTtlMs,
+    options.push,
+    options.versionDetailsTtlMs,
+  ]);
+
   return {
     idbHydrated,
     nodesData,
@@ -637,6 +736,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     setContractMessage,
     endorsementsReady,
     trustedFilterActive,
+    spouseVersionResolution,
     debugStatsRef,
     getDebugStats,
   };

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useVizOptions } from "./VizOptionsContext";
-import { buildViewGraphData, type TreeGraphData } from "../selectors";
+import { buildSpouseLinks, buildViewGraphData, type TreeGraphData } from "../selectors";
+import type { NodeId } from "../../../shared/model";
 import { useTreeGraphData } from "./TreeViewContext";
 
 type FamilyTreeProjectionOptions = {
@@ -27,6 +28,7 @@ export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
     nodesData,
     edgesUnion,
     edgesStrict,
+    spouseVersionResolution,
   } = useTreeGraphData();
   const { deduplicateChildren, childrenMode, strictIncludeUnversionedChildren } = useVizOptions();
 
@@ -67,6 +69,21 @@ export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
     visibleNodeIds,
   ]);
 
+  // Per-person co-parent (spouse) node ids for views. Unversioned (v0) references are mapped to the
+  // resolved best version from the data layer's resolution cache; until resolution lands they stay
+  // at v0 (the view falls back to a short-hash label).
+  const spouseLinks = useMemo(() => {
+    if (!enabled) return new Map<NodeId, NodeId[]>();
+    return buildSpouseLinks({
+      graph,
+      nodesData,
+      resolveVersion: (personHash, rawVersion) =>
+        rawVersion > 0
+          ? rawVersion
+          : (spouseVersionResolution.get(personHash.toLowerCase()) ?? rawVersion),
+    });
+  }, [enabled, graph, nodesData, spouseVersionResolution]);
+
   return {
     rootId,
     reachableNodeIds,
@@ -78,5 +95,6 @@ export function useFamilyTreeProjection(options?: FamilyTreeProjectionOptions) {
     childrenMode,
     strictIncludeUnversionedChildren,
     graph,
+    spouseLinks,
   };
 }

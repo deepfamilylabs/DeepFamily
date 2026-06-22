@@ -221,7 +221,7 @@ function getModernFullRecordText(
   t: TranslateFn,
   pageLookup: ModernPersonPageLookup,
 ): string {
-  const { baseLines } = splitPaperRecordLines(person, t);
+  const { baseLines } = splitPaperRecordLines(person, t, "labeled");
   const lines = compactUnique([...baseLines, getModernTransmissionSection(person, t, pageLookup)]);
 
   return lines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
@@ -232,7 +232,7 @@ function getModernRecordSections(
   t: TranslateFn,
   pageLookup: ModernPersonPageLookup,
 ): string[] {
-  const { baseLines } = splitPaperRecordLines(person, t);
+  const { baseLines } = splitPaperRecordLines(person, t, "labeled");
   const baseRecord = baseLines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
   const transmissionRecord = getModernTransmissionSection(person, t, pageLookup);
   return compactUnique([baseRecord, transmissionRecord]);
