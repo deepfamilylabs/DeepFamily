@@ -277,11 +277,17 @@ describe("SuBookRenderer", () => {
       .map((node) => ({
         part: Number(node.parentElement?.getAttribute("data-part-index") || 0),
         text: node.textContent || "",
+        continuesAfter: node.parentElement?.getAttribute("data-continues-after"),
+        textAlignLast: node.style.textAlignLast,
       }))
       .sort((a, b) => a.part - b.part);
 
     expect(details.length).toBeGreaterThan(1);
     expect(details.map((entry) => entry.text).join("")).toBe(fullRecord);
+    expect(details.slice(0, -1).every((entry) => entry.continuesAfter === "true")).toBe(true);
+    expect(details.slice(0, -1).every((entry) => entry.textAlignLast === "justify")).toBe(true);
+    expect(details[details.length - 1].continuesAfter).toBe("false");
+    expect(details[details.length - 1].textAlignLast).toBe("auto");
     expect(screen.getAllByTestId(`paper-su-name-${family.son.id}`)).toHaveLength(1);
     expect(screen.queryByTestId(`paper-su-relation-${family.son.id}`)).toBeNull();
     expect(

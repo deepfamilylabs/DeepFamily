@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../../shared/model";
-import { buildPaperGenerations, type TranslateFn } from "../paperData";
+import { buildPaperGenerations, type PaperPerson, type TranslateFn } from "../paperData";
 import {
   buildSuPaperBook,
   getSuFullRecordText,
   getSuPageMetrics,
+  splitSuRecordText,
+  SU_BODY_COLUMN_WIDTH,
+  SU_BODY_PADDING_X,
+  SU_COLUMN_UNIT_CAPACITY,
   SU_GENERATIONS_PER_CHART,
   SU_NAME_LANE_WIDTH,
   SU_SPINE_CONTENT_GAP,
   type SuPersonEntry,
 } from "./suPagination";
+import { measureRecordUnits } from "../paperText";
 
 const translate: TranslateFn = (key, fallback, options) =>
   (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
@@ -240,6 +245,48 @@ describe("buildSuPaperBook", () => {
     ).toBeCloseTo(metrics.leftBodyWidth - SU_SPINE_CONTENT_GAP);
   });
 
+  it("keeps the first Su name lane reserved while a left-page record grows across slots", () => {
+    const personHash = makeHash(901);
+    const personId = makeNodeId(personHash, 1);
+    const person: PaperPerson = {
+      id: personId,
+      depth: 1,
+      sequence: 1,
+      ui: {
+        id: personId,
+        personHash,
+        versionIndex: 1,
+        minted: true,
+        shortHashText: "曹测",
+        titleText: "曹测",
+        versionText: "v1",
+        versionTextWithTotal: "v1",
+        fullName: "曹测",
+        gender: 1,
+      },
+      detailLines: [],
+      classicalLines: ["谱".repeat(98)],
+      childCount: 0,
+      children: [],
+      spouses: [],
+    };
+    const metrics = getSuPageMetrics({ right: 540, left: 594 });
+    const rightCapacity = Math.floor(metrics.rightBodyWidth / metrics.slotWidth);
+    const leftCapacity = Math.floor(metrics.leftBodyWidth / metrics.slotWidth);
+    const leftSlotWidth = (metrics.leftBodyWidth - SU_SPINE_CONTENT_GAP) / leftCapacity;
+
+    const chunks = splitSuRecordText(person, rightCapacity, metrics);
+    const firstThreeChunks = chunks.slice(0, 3).join("");
+    const firstThreeColumns = Math.ceil(
+      measureRecordUnits(firstThreeChunks) / SU_COLUMN_UNIT_CAPACITY,
+    );
+
+    expect(chunks).toHaveLength(4);
+    expect(
+      firstThreeColumns * SU_BODY_COLUMN_WIDTH + SU_NAME_LANE_WIDTH + SU_BODY_PADDING_X,
+    ).toBeLessThanOrEqual(3 * leftSlotWidth);
+  });
+
   it("preserves long records across continuation columns and pages without repeating labels", () => {
     const wide = makeWideGraph(1);
     const child = wide.children[0];
@@ -296,6 +343,7 @@ describe("buildSuPaperBook", () => {
 
   it("creates local, cross-spine, and cross-spread connector segments", () => {
     const wide = makeWideGraph(20);
+    const metrics = getSuPageMetrics();
     const book = buildSuPaperBook({
       graph: wide.graph,
       rootId: wide.rootId,
@@ -329,8 +377,8 @@ describe("buildSuPaperBook", () => {
     const nextSpreadRightIncoming = book.charts[0].spreads[1].connectors.find(
       (connector) => connector.kind === "incoming" && connector.side === "right",
     );
-    expect(nextSpreadRightIncoming?.horizontalStartX).toBe(0);
-    expect(nextSpreadRightIncoming?.horizontalEndX).toBeGreaterThan(0);
+    expect(nextSpreadRightIncoming?.horizontalStartX).toBeGreaterThan(0);
+    expect(nextSpreadRightIncoming?.horizontalEndX).toBe(metrics.rightBodyWidth);
     const nextSpreadLeftIncoming = book.charts[0].spreads
       .slice(1)
       .flatMap((spread) => spread.connectors)
@@ -349,6 +397,105 @@ describe("buildSuPaperBook", () => {
       expect(bridge?.horizontalStartX).toBe(0);
       expect(bridge?.horizontalEndX).toBeGreaterThan(0);
     }
+  });
+
+  it("does not run a right-page continuation connector through an unrelated child", () => {
+    const root = {
+      id: makeNodeId(makeHash(701), 1),
+      depth: 0,
+      personHash: makeHash(701),
+      versionIndex: 1,
+    };
+    const firstParent = {
+      id: makeNodeId(makeHash(702), 1),
+      depth: 1,
+      personHash: makeHash(702),
+      versionIndex: 1,
+    };
+    const secondParent = {
+      id: makeNodeId(makeHash(703), 1),
+      depth: 1,
+      personHash: makeHash(703),
+      versionIndex: 1,
+    };
+    const firstChildren = Array.from({ length: 17 }, (_value, index) => ({
+      id: makeNodeId(makeHash(710 + index), 1),
+      depth: 2,
+      personHash: makeHash(710 + index),
+      versionIndex: 1,
+    }));
+    const secondChild = {
+      id: makeNodeId(makeHash(750), 1),
+      depth: 2,
+      personHash: makeHash(750),
+      versionIndex: 1,
+    };
+    const nodes = [root, firstParent, secondParent, ...firstChildren, secondChild];
+    const nameByNodeId = new Map([
+      [root.id, "祖"],
+      [firstParent.id, "父甲"],
+      [secondParent.id, "父乙"],
+      [secondChild.id, "乙子"],
+    ]);
+    const graph = {
+      nodes,
+      edges: [
+        { from: root.id, to: firstParent.id },
+        { from: root.id, to: secondParent.id },
+        ...firstChildren.map((child) => ({ from: firstParent.id, to: child.id })),
+        { from: secondParent.id, to: secondChild.id },
+      ],
+      childrenByParent: {
+        [root.id]: [firstParent.id, secondParent.id],
+        [firstParent.id]: firstChildren.map((child) => child.id),
+        [secondParent.id]: [secondChild.id],
+      },
+    };
+    const nodesData: Record<string, NodeData> = Object.fromEntries(
+      nodes.map((node, index) => [
+        node.id,
+        {
+          id: node.id,
+          personHash: node.personHash,
+          versionIndex: 1,
+          tokenId: String(index + 1),
+          fullName: nameByNodeId.get(node.id) || `甲子${index}`,
+        },
+      ]),
+    );
+    const metrics = getSuPageMetrics({ right: 525, left: 579 });
+    const book = buildSuPaperBook({
+      graph,
+      rootId: root.id,
+      generations: makeGenerations(graph, nodesData),
+      t: translate,
+      pageBodyWidths: { right: metrics.rightBodyWidth, left: metrics.leftBodyWidth },
+    });
+    const continuationSpread = book.charts[0].spreads[1];
+    const firstIncoming = continuationSpread.connectors.find(
+      (connector) =>
+        connector.parentId === firstParent.id &&
+        connector.kind === "incoming" &&
+        connector.side === "right",
+    );
+    const secondLocal = continuationSpread.connectors.find(
+      (connector) =>
+        connector.parentId === secondParent.id &&
+        connector.kind === "local" &&
+        connector.side === "right",
+    );
+    const secondChildEntry = continuationSpread.rows
+      .flatMap((row) => row.entries)
+      .find((entry) => entry.person.id === secondChild.id && !entry.continued);
+
+    expect(firstIncoming?.childIds).toEqual([
+      firstChildren[15].id,
+      firstChildren[16].id,
+    ]);
+    expect(secondLocal?.childIds).toEqual([secondChild.id]);
+    expect(firstIncoming?.horizontalY).toBe(secondLocal?.horizontalY);
+    expect(firstIncoming?.horizontalStartX).toBeGreaterThan(secondChildEntry?.centerX || 0);
+    expect(firstIncoming?.horizontalEndX).toBe(metrics.rightBodyWidth);
   });
 
   it("extends the current left-page sibling line when descendants continue later", () => {

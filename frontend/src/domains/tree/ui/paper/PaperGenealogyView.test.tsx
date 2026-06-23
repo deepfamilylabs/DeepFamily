@@ -6,7 +6,17 @@ import { makeNodeId, type NodeData } from "../../../../shared/model";
 import { buildPaperGenerations, splitPaperRecordLines } from "./paperData";
 import { PaperGenealogyView } from "./PaperGenealogyView";
 import { buildLineagePaperBook } from "./layout/lineagePagination";
-import { buildOuPaperBook, getOuFullRecordText, getOuRecordSlotSpan } from "./layout/ouPagination";
+import {
+  buildOuPaperBook,
+  getOuFullRecordText,
+  getOuRecordSlotSpan,
+  OU_PAGE_EDGE_PADDING,
+  OU_PERSON_CONTINUATION_BASE_WIDTH,
+  OU_PERSON_BASE_WIDTH,
+  OU_RECORD_COLUMN_WIDTH,
+  OU_RECORD_UNITS_PER_COLUMN,
+  OU_SHORT_PAGE_START_WORD_UNITS,
+} from "./layout/ouPagination";
 import { measureRecordUnits } from "./paperText";
 import { ModernBookRenderer, MODERN_RECORD_UNITS_PER_ROW } from "./renderers/ModernBookRenderer";
 import {
@@ -769,6 +779,12 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-ou-spread-1-2")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-right-1-2")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").style.direction).toBe("ltr");
+    expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").style.paddingLeft).toBe(
+      `${OU_PAGE_EDGE_PADDING}px`,
+    );
+    expect(screen.getByTestId("paper-ou-entry-lane-1-1-left-1").style.paddingLeft).toBe(
+      `${OU_PAGE_EDGE_PADDING}px`,
+    );
     expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").className).toContain(
       "flex-row-reverse",
     );
@@ -951,6 +967,156 @@ describe("PaperGenealogyView", () => {
         .getAllByTestId(`paper-ou-detail-${child.id}`)
         .every((node) => !node.className.includes("overflow-hidden")),
     ).toBe(true);
+    const renderedParts = screen
+      .getAllByTestId(`paper-row-${child.id}`)
+      .sort(
+        (a, b) =>
+          Number(a.getAttribute("data-part-index")) - Number(b.getAttribute("data-part-index")),
+      );
+    const renderedDetails = screen
+      .getAllByTestId(`paper-ou-detail-${child.id}`)
+      .sort(
+        (a, b) =>
+          Number(a.parentElement?.getAttribute("data-part-index")) -
+          Number(b.parentElement?.getAttribute("data-part-index")),
+      );
+    expect(renderedParts[0].getAttribute("data-continues-after")).toBe("true");
+    expect(renderedParts[renderedParts.length - 1].getAttribute("data-continues-after")).toBe(
+      "false",
+    );
+    expect(renderedDetails[0].style.textAlignLast).toBe("auto");
+    expect(renderedDetails[renderedDetails.length - 1].style.textAlignLast).toBe("auto");
+  });
+
+  it("fills digit-heavy Ou-style chunks by visual width before splitting", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const digitHeavyStory = "A1234567890,".repeat(140);
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: {
+        [child.id]: {
+          id: child.id,
+          personHash: child.personHash,
+          versionIndex: 1,
+          tokenId: "2",
+          fullName: "曹数",
+          story: digitHeavyStory,
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const person = generations[1].people[0];
+    const book = buildOuPaperBook({ generations, t: zhTranslate });
+    const renderedEntries = book.charts[0].spreads
+      .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
+      .filter((entry) => entry.person.id === person.id);
+    const firstEntry = renderedEntries[0];
+    const firstContinuedEntry = renderedEntries.find(
+      (entry) => entry.continued && entry.partIndex < entry.totalPartCount,
+    );
+    expect(firstEntry).toBeTruthy();
+    if (!firstEntry) throw new Error("missing first Ou continuation chunk");
+    expect(firstContinuedEntry).toBeTruthy();
+    if (!firstContinuedEntry) throw new Error("missing continued Ou continuation chunk");
+    const firstChunkCapacity =
+      Math.floor((firstEntry.widthPx - OU_PERSON_BASE_WIDTH) / OU_RECORD_COLUMN_WIDTH) *
+      OU_RECORD_UNITS_PER_COLUMN;
+    const firstChunkUnits = measureRecordUnits(firstEntry.text);
+    const continuedChunkCapacity =
+      Math.floor(
+        (firstContinuedEntry.widthPx - OU_PERSON_CONTINUATION_BASE_WIDTH) /
+          OU_RECORD_COLUMN_WIDTH,
+      ) * OU_RECORD_UNITS_PER_COLUMN;
+    const continuedCapacityWithNameLane =
+      Math.floor((firstContinuedEntry.widthPx - OU_PERSON_BASE_WIDTH) / OU_RECORD_COLUMN_WIDTH) *
+      OU_RECORD_UNITS_PER_COLUMN;
+    const continuedChunkUnits = measureRecordUnits(firstContinuedEntry.text);
+
+    expect(renderedEntries.length).toBeGreaterThan(1);
+    expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
+    expect(firstChunkUnits).toBeLessThanOrEqual(firstChunkCapacity);
+    expect(firstChunkUnits).toBeGreaterThan(
+      firstChunkCapacity - OU_SHORT_PAGE_START_WORD_UNITS,
+    );
+    expect(Array.from(firstEntry.text).length).toBeGreaterThan(firstChunkCapacity / 2);
+    expect(continuedChunkCapacity).toBeGreaterThan(continuedCapacityWithNameLane);
+    expect(continuedChunkUnits).toBeLessThanOrEqual(continuedChunkCapacity);
+    expect(continuedChunkUnits).toBeGreaterThan(
+      continuedChunkCapacity - OU_SHORT_PAGE_START_WORD_UNITS,
+    );
+  });
+
+  it("moves one-character Ou-style suffix orphans to the continuation page", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: {
+        [child.id]: {
+          id: child.id,
+          personHash: child.personHash,
+          versionIndex: 1,
+          tokenId: "2",
+          fullName: "曹询",
+          deathYear: 244,
+          story: "曹询是曹叡养子，封秦王，正始五年去世。",
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const person = generations[1].people[0];
+    const book = buildOuPaperBook({
+      generations,
+      t: zhTranslate,
+      pageBodyWidths: { right: 112, left: 112 },
+    });
+    const renderedEntries = book.charts[0].spreads
+      .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
+      .filter((entry) => entry.person.id === person.id);
+
+    expect(renderedEntries.length).toBeGreaterThan(1);
+    expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
+    expect(renderedEntries[0].text).toContain("曹叡");
+    expect(renderedEntries[0].text.endsWith("养")).toBe(false);
+    expect(renderedEntries[1].text.startsWith("养子")).toBe(true);
+  });
+
+  it("keeps Ou-style 之子 and 之女 relation phrases with the preceding name", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: {
+        [child.id]: {
+          id: child.id,
+          personHash: child.personHash,
+          versionIndex: 1,
+          tokenId: "2",
+          fullName: "东乡公主",
+          gender: 2,
+          story: "东乡公主是曹丕与甄氏之女，曹叡的同母姐妹。",
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const person = generations[1].people[0];
+    const book = buildOuPaperBook({
+      generations,
+      t: zhTranslate,
+      pageBodyWidths: { right: 112, left: 112 },
+    });
+    const renderedEntries = book.charts[0].spreads
+      .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
+      .filter((entry) => entry.person.id === person.id);
+
+    expect(renderedEntries.length).toBeGreaterThan(1);
+    expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
+    expect(renderedEntries[0].text.endsWith("甄氏")).toBe(false);
+    expect(renderedEntries[1].text.startsWith("甄氏之女")).toBe(true);
   });
 
   it("uses the wider Ou-style left page body before creating a continuation spread", () => {
@@ -972,7 +1138,7 @@ describe("PaperGenealogyView", () => {
           deathDay: 1,
           birthPlace: "沛国谯县（今安徽亳州）",
           deathPlace: "洛阳",
-          story: "续排测试，确认左页可容三人。",
+          story: "续排测试，确认左页会继续承接。",
         },
       ]),
     );
@@ -988,11 +1154,12 @@ describe("PaperGenealogyView", () => {
       spread.rows.find((row) => row.depth === 1),
     );
     const firstSpreadEntries = secondGenerationRows[0]?.entries || [];
+    const leftEntries = firstSpreadEntries.filter((entry) => entry.side === "left");
 
     expect(firstChart.spreads).toHaveLength(1);
     expect(firstSpreadEntries.filter((entry) => entry.side === "right")).toHaveLength(3);
-    expect(firstSpreadEntries.filter((entry) => entry.side === "left")).toHaveLength(3);
-    expect(firstSpreadEntries.some((entry) => entry.side === "left" && entry.continued)).toBe(true);
+    expect(leftEntries.length).toBeGreaterThan(0);
+    expect(leftEntries.some((entry) => entry.continued)).toBe(true);
     expect(new Set(firstSpreadEntries.map((entry) => entry.person.id)).size).toBe(5);
   });
 

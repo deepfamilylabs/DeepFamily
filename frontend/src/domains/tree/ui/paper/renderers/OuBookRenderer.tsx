@@ -3,8 +3,9 @@ import {
   buildOuPaperBook,
   getOuRecordText,
   getOuGenerationMark,
-  OU_LEFT_PAGE_BODY_WIDTH,
-  OU_RIGHT_PAGE_BODY_WIDTH,
+  OU_PAGE_EDGE_PADDING,
+  OU_PERSON_MIN_WIDTH,
+  OU_RECORD_DETAIL_END_PADDING,
   splitOuRowEntries,
   type OuChartWindow,
   type OuGenerationRow,
@@ -33,8 +34,11 @@ const OU_MIN_SPREAD_WIDTH = 1180;
 function getMeasuredOuPageBodyWidths(spreadWidth: number): OuPageBodyWidths {
   const pageWidth = Math.max(0, (spreadWidth - OU_SPINE_WIDTH) / 2);
   return {
-    right: Math.max(OU_RIGHT_PAGE_BODY_WIDTH, pageWidth - OU_GENERATION_MARK_WIDTH),
-    left: Math.max(OU_LEFT_PAGE_BODY_WIDTH, pageWidth),
+    right: Math.max(
+      OU_PERSON_MIN_WIDTH,
+      pageWidth - OU_GENERATION_MARK_WIDTH - OU_PAGE_EDGE_PADDING,
+    ),
+    left: Math.max(OU_PERSON_MIN_WIDTH, pageWidth - OU_PAGE_EDGE_PADDING),
   };
 }
 
@@ -42,6 +46,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
   const { person } = entry;
   const fullRecord = getOuRecordText(person, t);
   const isFemale = person.ui.gender === 2 && !entry.continued;
+  const continuesAfter = entry.partIndex < entry.totalPartCount;
   const title = entry.continued ? "" : clipText(person.ui.titleText || person.ui.shortHashText, 10);
   const nameLaneClassName = entry.continued
     ? "flex w-0 shrink-0 overflow-hidden p-0"
@@ -61,6 +66,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
       data-testid={`paper-row-${person.id}`}
       data-slot-span={entry.slotSpan}
       data-continued={entry.continued ? "true" : "false"}
+      data-continues-after={continuesAfter ? "true" : "false"}
       data-part-index={entry.partIndex}
       title={fullRecord}
     >
@@ -107,7 +113,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
         </strong>
       </div>
       <p
-        className="m-0 h-full flex-1 pr-2"
+        className="m-0 h-full flex-1"
         style={{
           ...PAPER_TEXT.body,
           writingMode: "vertical-rl",
@@ -117,8 +123,10 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
           // (uniform spacing within the column). The final/partial column is left to
           // flow naturally — stretching a 2-char tail to full height looks wrong.
           textAlign: "justify",
+          textAlignLast: "auto",
           textJustify: "inter-character",
           overflowWrap: "anywhere",
+          paddingRight: OU_RECORD_DETAIL_END_PADDING,
           wordBreak: "break-all",
         }}
         data-testid={`paper-ou-detail-${person.id}`}
@@ -160,7 +168,7 @@ function OuGenerationBand({
     >
       <div
         className="flex h-full flex-row-reverse justify-start overflow-hidden"
-        style={{ direction: "ltr" }}
+        style={{ direction: "ltr", paddingLeft: OU_PAGE_EDGE_PADDING }}
         data-testid={`paper-ou-entry-lane-${chartIndex}-${spreadIndex}-${side}-${row.depth}`}
       >
         {entries.map((entry) => (

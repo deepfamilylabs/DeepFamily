@@ -230,7 +230,9 @@ function SuPageSvg({
 type SuRenderRecord = Pick<
   SuPersonEntry,
   "key" | "person" | "text" | "x" | "y" | "widthPx" | "continued" | "partIndex"
->;
+> & {
+  continuesAfter: boolean;
+};
 
 // A person's biography is split into fixed-width slot chunks for tree placement, but rendering
 // each chunk as its own vertical-rl block reopens a wide aisle at every slot boundary (a slot is
@@ -251,6 +253,7 @@ function mergeSuSideRecords(
   for (const group of byPerson.values()) {
     group.sort((a, b) => a.slotIndex - b.slotIndex);
     const head = group[0];
+    const tail = group[group.length - 1];
     const continued = group.every((entry) => entry.continued);
     const text = group.map((entry) => entry.text).join("");
     const allottedWidth = group.reduce((sum, entry) => sum + entry.slotWidth, 0);
@@ -269,6 +272,7 @@ function mergeSuSideRecords(
       y: head.y,
       widthPx,
       continued,
+      continuesAfter: tail.partIndex < tail.totalPartCount,
       partIndex: head.partIndex,
     });
   }
@@ -310,6 +314,7 @@ function SuPersonRecord({
       data-testid={`paper-su-entry-${entry.key}`}
       data-person-id={person.id}
       data-continued={entry.continued ? "true" : "false"}
+      data-continues-after={entry.continuesAfter ? "true" : "false"}
       data-part-index={entry.partIndex}
       title={fullRecord}
     >
@@ -349,9 +354,11 @@ function SuPersonRecord({
           writingMode: "vertical-rl",
           textOrientation: "mixed",
           // Justify each filled column top-to-bottom along the inline (vertical) axis,
-          // slack spread evenly between characters; the final/partial column flows
-          // naturally so a short tail is not stretched to full height.
+          // slack spread evenly between characters. If this page-side block continues on
+          // another side/page, justify its final visible column too; only the true record
+          // tail flows naturally.
           textAlign: "justify",
+          textAlignLast: entry.continuesAfter ? "justify" : "auto",
           textJustify: "inter-character",
           overflowWrap: "anywhere",
           wordBreak: "break-all",
