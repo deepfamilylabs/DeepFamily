@@ -4,7 +4,14 @@ import {
   type PaperPerson,
   type TranslateFn,
 } from "../paperData";
-import { getPaperGenerationMark, getPaperRelationLabel, toChineseNumeral } from "../paperText";
+import {
+  getPaperGenerationMark,
+  getPaperRelationLabel,
+  measureRecordUnits,
+  splitTextByVisualUnits,
+  toChineseNumeral,
+} from "../paperText";
+import { PAPER_RECORD_INLINE_PADDING } from "../paperStyles";
 
 export type OuPageSide = "left" | "right";
 
@@ -42,6 +49,7 @@ export type OuPersonRecordEntry = {
   widthPx: number;
   continued: boolean;
   partIndex: number;
+  totalPartCount: number;
 };
 
 export type OuPageBodyWidths = {
@@ -60,12 +68,20 @@ export const OU_RIGHT_PAGE_BODY_WIDTH = OU_PAGE_SIDE_CAPACITY * OU_PERSON_SLOT_W
 export const OU_LEFT_PAGE_BODY_WIDTH = OU_RIGHT_PAGE_BODY_WIDTH + 56;
 export const OU_COLUMN_ALIGNMENT_WIDTH = 14;
 export const OU_PERSON_MIN_WIDTH = 112;
-export const OU_PERSON_BASE_WIDTH = 84;
+export const OU_NAME_LANE_WIDTH = 56;
+export const OU_RECORD_DETAIL_END_PADDING = 8;
+export const OU_PERSON_BASE_WIDTH =
+  OU_NAME_LANE_WIDTH + PAPER_RECORD_INLINE_PADDING * 2 + OU_RECORD_DETAIL_END_PADDING;
+export const OU_PERSON_CONTINUATION_BASE_WIDTH =
+  PAPER_RECORD_INLINE_PADDING * 2 + OU_RECORD_DETAIL_END_PADDING;
 // Calibrated to the 13px body text used by vertical paper records: a column is ~144px tall
 // (168px row − 24px py-3 padding), fitting ~12 full-width glyphs at 13px, and each column
 // advances ceil(13px × 1.55 line-height) ≈ 21px horizontally.
 export const OU_RECORD_CHARS_PER_COLUMN = 12;
+export const OU_RECORD_UNITS_PER_COLUMN = OU_RECORD_CHARS_PER_COLUMN * 2;
 export const OU_RECORD_COLUMN_WIDTH = 21;
+export const OU_PAGE_EDGE_PADDING = 18;
+export const OU_SHORT_PAGE_START_WORD_UNITS = 4;
 const DEFAULT_OU_PAGE_BODY_WIDTHS: OuPageBodyWidths = {
   right: OU_RIGHT_PAGE_BODY_WIDTH,
   left: OU_LEFT_PAGE_BODY_WIDTH,
@@ -123,7 +139,7 @@ export function getOuRecordText(person: PaperPerson, t: TranslateFn): string {
 }
 
 function getTextColumnCount(text: string): number {
-  return Math.max(1, Math.ceil(Array.from(text).length / OU_RECORD_CHARS_PER_COLUMN));
+  return Math.max(1, Math.ceil(measureRecordUnits(text) / OU_RECORD_UNITS_PER_COLUMN));
 }
 
 function alignOuWidth(widthPx: number): number {
@@ -138,24 +154,79 @@ function getOuSideWidth(
 }
 
 function getNaturalTextWidthPx(text: string): number {
+  return getNaturalTextWidthPxForBase(text, OU_PERSON_BASE_WIDTH);
+}
+
+function getNaturalTextWidthPxForBase(text: string, baseWidth: number): number {
   return alignOuWidth(
     Math.max(
       OU_PERSON_MIN_WIDTH,
-      OU_PERSON_BASE_WIDTH + getTextColumnCount(text) * OU_RECORD_COLUMN_WIDTH,
+      baseWidth + getTextColumnCount(text) * OU_RECORD_COLUMN_WIDTH,
     ),
   );
 }
 
-function getTextWidthPx(text: string, sideWidth = OU_RIGHT_PAGE_BODY_WIDTH): number {
-  return Math.min(sideWidth, getNaturalTextWidthPx(text));
+function getTextWidthPx(
+  text: string,
+  sideWidth = OU_RIGHT_PAGE_BODY_WIDTH,
+  baseWidth = OU_PERSON_BASE_WIDTH,
+): number {
+  return Math.min(sideWidth, getNaturalTextWidthPxForBase(text, baseWidth));
 }
 
-function getTextCharCapacityForWidth(widthPx: number): number {
+function getTextUnitCapacityForWidth(widthPx: number, baseWidth = OU_PERSON_BASE_WIDTH): number {
   const columns = Math.max(
     1,
-    Math.floor((widthPx - OU_PERSON_BASE_WIDTH) / OU_RECORD_COLUMN_WIDTH),
+    Math.floor((widthPx - baseWidth) / OU_RECORD_COLUMN_WIDTH),
   );
-  return columns * OU_RECORD_CHARS_PER_COLUMN;
+  return columns * OU_RECORD_UNITS_PER_COLUMN;
+}
+
+function getOuEntryBaseWidth(partIndex: number): number {
+  return partIndex === 0 ? OU_PERSON_BASE_WIDTH : OU_PERSON_CONTINUATION_BASE_WIDTH;
+}
+
+function isRecordWordChar(char: string | undefined): boolean {
+  return !!char && /[\p{Letter}\p{Number}\p{Mark}]/u.test(char);
+}
+
+function avoidDanglingOuChunkEnd(text: string, nextText: string): string {
+  const chars = Array.from(text);
+  const dropCount = getOuChunkRebalanceDropCount(chars, nextText);
+  return dropCount ? chars.slice(0, -dropCount).join("") : text;
+}
+
+function getOuChunkRebalanceDropCount(chars: string[], nextText: string): number {
+  if (chars.length <= 1) return 0;
+
+  const nextChars = Array.from(nextText);
+  const leadingWordChars: string[] = [];
+  for (const char of nextChars) {
+    if (!isRecordWordChar(char)) break;
+    leadingWordChars.push(char);
+  }
+  const afterLeadingWord = nextChars[leadingWordChars.length];
+  const leadingUnits = measureRecordUnits(leadingWordChars.join(""));
+  if (
+    !leadingWordChars.length ||
+    !afterLeadingWord ||
+    isRecordWordChar(afterLeadingWord) ||
+    leadingUnits > OU_SHORT_PAGE_START_WORD_UNITS
+  ) {
+    return 0;
+  }
+
+  let carryCount = 0;
+  let carryUnits = 0;
+  for (let offset = 0; offset < chars.length - 1; offset += 1) {
+    const char = chars[chars.length - 1 - offset];
+    if (!isRecordWordChar(char)) break;
+    carryCount += 1;
+    carryUnits += measureRecordUnits(char);
+    if (carryUnits >= leadingUnits) break;
+  }
+
+  return carryCount;
 }
 
 function getWidthSlotSpan(widthPx: number): number {
@@ -210,10 +281,11 @@ function paginateGenerationEntries(
     text: string,
     partIndex: number,
     relationLabel: string,
+    personEntries: OuPersonRecordEntry[],
     availableWidth = getOuSideWidth(side, pageBodyWidths),
   ) => {
-    const widthPx = getTextWidthPx(text, availableWidth);
-    spreads[spreadIndex].push({
+    const widthPx = getTextWidthPx(text, availableWidth, getOuEntryBaseWidth(partIndex));
+    const entry: OuPersonRecordEntry = {
       key: `${person.id}:${spreadIndex}:${side}:${partIndex}`,
       person,
       text,
@@ -223,12 +295,16 @@ function paginateGenerationEntries(
       widthPx,
       continued: partIndex > 0,
       partIndex: partIndex + 1,
-    });
+      totalPartCount: 0,
+    };
+    spreads[spreadIndex].push(entry);
+    personEntries.push(entry);
     usedWidth += widthPx;
   };
 
   for (const person of people) {
     let partIndex = 0;
+    const personEntries: OuPersonRecordEntry[] = [];
     // The parentage label rides above the name on the first part only, so the biography body is
     // laid out unchanged — no inline "曹操长子，…" prefix. Same shared two-column shape: the
     // father name and rank word are "\n"-joined so the renderer lays them out as adjacent vertical
@@ -254,23 +330,37 @@ function paginateGenerationEntries(
 
         const entryRelationLabel = partIndex === 0 ? relationLabel : "";
         const remainingText = chars.slice(start).join("");
-        const remainingWidth = getNaturalTextWidthPx(remainingText);
+        const baseWidth = getOuEntryBaseWidth(partIndex);
+        const remainingWidth = getNaturalTextWidthPxForBase(remainingText, baseWidth);
         if (remainingWidth <= availableWidth) {
-          pushEntry(person, remainingText, partIndex, entryRelationLabel, availableWidth);
+          pushEntry(
+            person,
+            remainingText,
+            partIndex,
+            entryRelationLabel,
+            personEntries,
+            availableWidth,
+          );
           partIndex += 1;
           break;
         }
 
-        const chunkLength = Math.min(
-          getTextCharCapacityForWidth(availableWidth),
-          chars.length - start,
+        const [text] = splitTextByVisualUnits(
+          remainingText,
+          getTextUnitCapacityForWidth(availableWidth, baseWidth),
         );
-        const text = chars.slice(start, start + chunkLength).join("");
-        pushEntry(person, text, partIndex, entryRelationLabel, availableWidth);
-        start += chunkLength;
+        const textLength = Array.from(text).length;
+        const nextText = chars.slice(start + textLength).join("");
+        const balancedText = avoidDanglingOuChunkEnd(text, nextText);
+        pushEntry(person, balancedText, partIndex, entryRelationLabel, personEntries, availableWidth);
+        start += Array.from(balancedText).length;
         partIndex += 1;
         if (start < chars.length) advanceSide();
       }
+    }
+
+    for (const entry of personEntries) {
+      entry.totalPartCount = partIndex;
     }
   }
 

@@ -26,6 +26,7 @@ export type SuPersonEntry = {
   side: SuPageSide;
   slotIndex: number;
   partIndex: number;
+  totalPartCount: number;
   continued: boolean;
   depth: number;
   rowIndex: number;
@@ -278,6 +279,7 @@ export function splitSuRecordText(
   let slotIndex = startSlot;
   let groupKey = "";
   let groupSlotCount = 0;
+  let groupHasNameLane = false;
   let previousColumnCount = 0;
 
   while (remaining) {
@@ -286,11 +288,12 @@ export function splitSuRecordText(
     if (nextGroupKey !== groupKey) {
       groupKey = nextGroupKey;
       groupSlotCount = 0;
+      groupHasNameLane = slotIndex === startSlot;
       previousColumnCount = 0;
     }
 
     groupSlotCount += 1;
-    const nameLane = slotIndex === startSlot ? SU_NAME_LANE_WIDTH : 0;
+    const nameLane = groupHasNameLane ? SU_NAME_LANE_WIDTH : 0;
     const availableBodyWidth = Math.max(
       SU_BODY_COLUMN_WIDTH,
       groupSlotCount * position.slotWidth - nameLane - SU_BODY_PADDING_X,
@@ -446,6 +449,7 @@ function buildEntry(params: {
     side: position.side,
     slotIndex,
     partIndex: partIndex + 1,
+    totalPartCount: placement.chunks.length,
     continued,
     depth: placement.person.depth,
     rowIndex,
@@ -717,7 +721,7 @@ function buildConnectors(params: {
               childSide === "left" && continuesAfterChildSpread
                 ? 0
                 : getSpreadEntryBoundaryX(childSide, metrics),
-            includeSpineBoundary: true,
+            includeSpineBoundary: childSide === "left",
           }),
         );
       }
