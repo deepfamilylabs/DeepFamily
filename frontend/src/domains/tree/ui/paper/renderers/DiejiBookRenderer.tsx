@@ -4,6 +4,7 @@ import {
   getDiejiFullRecordText,
   getDiejiGenerationMark,
   splitDiejiSpreadColumns,
+  DIEJI_RECORD_UNITS_PER_LANE,
   type DiejiChartWindow,
   type DiejiPageSide,
   type DiejiPageSpread,
@@ -18,10 +19,35 @@ import {
   PAPER_TEXT,
   PAPER_VARS,
 } from "../paperStyles";
-import { clipText, getPaperSpineTitle } from "../paperText";
+import { clipText, getPaperSpineTitle, measureRecordUnits } from "../paperText";
 import { PaperSpine } from "./PaperSpine";
 
-const DIEJI_LANE_GRID_ROWS = "64px 96px 1fr";
+const DIEJI_RELATION_ROW_PX = 64;
+const DIEJI_NAME_ROW_PX = 96;
+const DIEJI_LANE_GRID_ROWS = `${DIEJI_RELATION_ROW_PX}px ${DIEJI_NAME_ROW_PX}px 1fr`;
+// A long title/name (e.g. "西乡哀侯曹赞") in vertical-rl overflows the fixed name-row height and wraps
+// into a ragged second column, breaking the lane grid. Scale the font down so the name always fits
+// a single column — short names keep the full prominent size; the floor stays at the body size so a
+// name never reads smaller than its own biography.
+const DIEJI_NAME_CELL_USABLE_PX = DIEJI_NAME_ROW_PX - 16 - 2; // − py-2 (16px) − glyph-advance safety
+const DIEJI_NAME_MIN_FONT_PX = PAPER_TEXT.body.fontSize;
+
+function getDiejiNameFontSize(nameLength: number): number {
+  const fit = Math.floor(DIEJI_NAME_CELL_USABLE_PX / Math.max(1, nameLength));
+  return Math.min(PAPER_TEXT.name.fontSize, Math.max(DIEJI_NAME_MIN_FONT_PX, fit));
+}
+// Each lane biography is a single vertical column (long records spill into continuation lanes,
+// never a 2nd column), so plain `text-align: justify` — which never touches the last/only line —
+// leaves the column ragged. Justify the last line too *only* when the column is substantially
+// filled, so a near-full bio reaches the bottom edge while a short tail (e.g. "早卒，谥X。") is
+// left to flow naturally instead of being stretched into sparse, oversized character gaps.
+//
+// This threshold is the single dial of an unavoidable trade-off: a fixed column height + uniform
+// character pitch is only bottom-aligned when every column holds the same character count, which
+// distinct-length bios never do. Lower it → more columns reach the bottom but pitch varies more;
+// raise it → pitch stays uniform but more short columns end ragged. 0.82 caps the justified
+// stretch at ~1/0.82 ≈ 1.22×, small enough that the spacing difference is barely perceptible.
+const DIEJI_BODY_FILL_JUSTIFY_THRESHOLD = 0.82;
 const DIEJI_EQUAL_LANE_STYLE: CSSProperties = {
   flexBasis: 0,
   flexGrow: 1,
@@ -40,6 +66,9 @@ function DiejiPersonLane({
   const { person } = lane;
   const fullRecord = getDiejiFullRecordText(person, t);
   const title = clipText(lane.name, lane.continued ? 8 : 10);
+  const nameFontSize = getDiejiNameFontSize(title.length);
+  const bodyFillsColumn =
+    measureRecordUnits(lane.text) >= DIEJI_RECORD_UNITS_PER_LANE * DIEJI_BODY_FILL_JUSTIFY_THRESHOLD;
 
   return (
     <article
@@ -78,6 +107,7 @@ function DiejiPersonLane({
           className="leading-6 tracking-normal"
           style={{
             ...PAPER_TEXT.name,
+            fontSize: nameFontSize,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
             textAlign: "right",
@@ -97,6 +127,12 @@ function DiejiPersonLane({
             ...PAPER_TEXT.body,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
+            // Justify along the inline (vertical) axis so characters spread evenly top-to-bottom.
+            // A Dieji bio is a single column, so the bottom only reaches the edge when the last
+            // line is justified too — gated on `bodyFillsColumn` to avoid stretching short tails.
+            textAlign: "justify",
+            textAlignLast: bodyFillsColumn ? "justify" : "auto",
+            textJustify: "inter-character",
             overflowWrap: "anywhere",
             wordBreak: "break-all",
           }}

@@ -113,12 +113,9 @@ function buildSpouseRecordLine(
   const names = person.spouses.map((spouse) => spouse.name).filter(Boolean);
   if (!names.length) return undefined;
 
-  if (mode === "labeled") {
-    const label = tFallback(t, "genealogyBook.fields.spouse", "Spouse");
-    const sep = /[㐀-鿿]/u.test(label) ? "、" : ", ";
-    return `${label}: ${names.join(sep)}`;
-  }
-
+  // The marker keys on THIS person's gender — a man's spouse is 配 (wife), a woman's is 適 (married
+  // out to husband), unknown gender falls back to the neutral 配偶. Both the classical and labeled
+  // forms share this gendered marker; they differ only in how the name is joined to it.
   const selfGender = person.nodeData?.gender ?? person.ui.gender;
   const marker =
     selfGender === 1
@@ -128,6 +125,11 @@ function buildSpouseRecordLine(
         : tFallback(t, "genealogyBook.fields.spouse", "Spouse");
   const isCjkMarker = /[㐀-鿿]/u.test(marker);
   const nameSep = isCjkMarker ? "、" : ", ";
+
+  if (mode === "labeled") {
+    return `${marker}: ${names.join(nameSep)}`;
+  }
+
   // CJK markers (配/適) read as "配王氏" with no separator; latin markers need a space ("Wife 王氏").
   const markerSep = isCjkMarker ? "" : " ";
   return `${marker}${markerSep}${names.join(nameSep)}`;
@@ -137,14 +139,17 @@ export function splitPaperRecordLines(
   person: PaperPerson,
   t?: TranslateFn,
   spouseMode?: PaperSpouseRenderMode,
-): { baseLines: string[]; childrenLine?: string } {
+): { baseLines: string[]; spouseLine?: string; childrenLine?: string } {
   const sourceLines = person.classicalLines.length ? person.classicalLines : person.detailLines;
   const baseLines = sourceLines.filter((line) => !isPaperChildrenLine(line, t));
   // Spouses live on person.spouses (kept out of the data-layer lines); only styles that opt in via
   // spouseMode surface them in the laid-out record between the biography and the children line.
+  // `baseLines` keeps the spouse appended (inline styles like Dieji/Ou read it there); `spouseLine`
+  // is also returned on its own so a style can lift it into a standalone section/row if desired.
   const spouseLine = buildSpouseRecordLine(person, t, spouseMode);
   return {
     baseLines: spouseLine ? [...baseLines, spouseLine] : baseLines,
+    spouseLine,
     childrenLine: person.detailLines.find((line) => isPaperChildrenLine(line, t)),
   };
 }
