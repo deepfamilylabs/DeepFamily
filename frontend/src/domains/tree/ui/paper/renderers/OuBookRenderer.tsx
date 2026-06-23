@@ -112,6 +112,12 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
           ...PAPER_TEXT.body,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
+          // Justify along the inline (vertical) axis so every *filled* column is
+          // stretched top-to-bottom with the slack spread evenly between characters
+          // (uniform spacing within the column). The final/partial column is left to
+          // flow naturally — stretching a 2-char tail to full height looks wrong.
+          textAlign: "justify",
+          textJustify: "inter-character",
           overflowWrap: "anywhere",
           wordBreak: "break-all",
         }}

@@ -348,6 +348,11 @@ function SuPersonRecord({
           lineHeight: SU_BODY_LINE_HEIGHT,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
+          // Justify each filled column top-to-bottom along the inline (vertical) axis,
+          // slack spread evenly between characters; the final/partial column flows
+          // naturally so a short tail is not stretched to full height.
+          textAlign: "justify",
+          textJustify: "inter-character",
           overflowWrap: "anywhere",
           wordBreak: "break-all",
         }}

@@ -77,6 +77,10 @@ const MODERN_SPINE_WIDTH = 72;
 const MODERN_REL_COL_PX = 64;
 const MODERN_NAME_COL_PX = 112;
 const MODERN_BIO_PADDING_PX = 24; // px-3 on both sides of the biography cell
+// Break full lines a few px short of the cell width so justify can stretch them flush to the right
+// edge without the rendered line ever exceeding the box (which would wrap and break the 2-line
+// layout the measured-line model guarantees). The stretch is well under 0.5px per character.
+const MODERN_LINE_JUSTIFY_SLACK_PX = 4;
 // The modern ledger is horizontal text in fixed-height rows, so a cell's capacity is set by the
 // biography column WIDTH (unlike vertical paper styles, which are bound by the fixed page
 // height). The spread uses the same elastic paper frame as the other book renderers, so the per-row
@@ -129,7 +133,8 @@ function computeModernRecordBudget(spreadWidth: number): ModernRecordBudget {
   const unitsPerLine = Math.max(1, Math.floor(bioTextPx / MODERN_UNIT_PX));
   return {
     unitsPerRow: unitsPerLine * 2,
-    maxLinePx: bioTextPx,
+    // Reserve a small slack so justify fills the line to the box edge instead of risking a wrap.
+    maxLinePx: Math.max(1, bioTextPx - MODERN_LINE_JUSTIFY_SLACK_PX),
     measureTextPx: getModernTextMeasurer(),
   };
 }
@@ -232,10 +237,14 @@ function getModernRecordSections(
   t: TranslateFn,
   pageLookup: ModernPersonPageLookup,
 ): string[] {
-  const { baseLines } = splitPaperRecordLines(person, t, "labeled");
-  const baseRecord = baseLines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
+  const { baseLines, spouseLine } = splitPaperRecordLines(person, t, "labeled");
+  // Lift the spouse out of the biography so it stands on its own row between the life record and
+  // the transmission (children) row — mirroring how 传子/传女 already gets a dedicated row.
+  const bioLines = spouseLine ? baseLines.filter((line) => line !== spouseLine) : baseLines;
+  const baseRecord = bioLines.map(formatModernRecordLine).join("，") || person.ui.shortHashText;
+  const spouseRecord = spouseLine ? formatModernRecordLine(spouseLine) : undefined;
   const transmissionRecord = getModernTransmissionSection(person, t, pageLookup);
-  return compactUnique([baseRecord, transmissionRecord]);
+  return compactUnique([baseRecord, spouseRecord, transmissionRecord]);
 }
 
 function getModernRelationLabel(person: PaperPerson, t: TranslateFn): string {
@@ -619,22 +628,32 @@ function ModernPersonRowView({
           // continuation row starts only after the current row's two lines are filled.
           wordBreak: measuredLines ? "normal" : "break-all",
           lineBreak: measuredLines ? "auto" : "anywhere",
-          textAlign: measuredLines ? "left" : "justify",
+          textAlign: "justify",
           textAlignLast: "auto",
           textJustify: "inter-character",
         }}
         data-testid={`paper-modern-detail-${row.person.id}`}
       >
         {measuredLines
-          ? measuredLines.map((line, index) => (
-              <span
-                key={`${row.key}-line-${index}`}
-                className="block overflow-hidden"
-                style={{ whiteSpace: "pre" }}
-              >
-                {line}
-              </span>
-            ))
+          ? measuredLines.map((line, index) => {
+              // Justify every filled line flush to the right edge; leave the biography's final
+              // line (this section's last line, with no continuation row) ragged so a short tail
+              // is not stretched into sparse gaps. pre-wrap keeps spaces while allowing justify;
+              // the break-time slack guarantees these measured lines never wrap here.
+              const isSectionTail = index === measuredLines.length - 1 && !row.hasContinuation;
+              return (
+                <span
+                  key={`${row.key}-line-${index}`}
+                  className="block overflow-hidden"
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    textAlignLast: isSectionTail ? "auto" : "justify",
+                  }}
+                >
+                  {line}
+                </span>
+              );
+            })
           : row.text}
       </p>
     </div>
@@ -778,7 +797,7 @@ export function ModernBookRenderer({
                 <div
                   key={`${chart.index}-${spread.index}`}
                   ref={chart.index === 1 && spread.index === 1 ? spreadRef : undefined}
-                  className="mx-auto grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
+                  className="grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
                   style={{
                     borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
