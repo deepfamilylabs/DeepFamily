@@ -3,6 +3,7 @@ import {
   buildOuPaperBook,
   getOuRecordText,
   getOuGenerationMark,
+  OU_NAME_LANE_WIDTH,
   OU_PAGE_EDGE_PADDING,
   OU_PERSON_MIN_WIDTH,
   OU_RECORD_DETAIL_END_PADDING,
@@ -34,12 +35,48 @@ const OU_MIN_SPREAD_WIDTH = 1180;
 function getMeasuredOuPageBodyWidths(spreadWidth: number): OuPageBodyWidths {
   const pageWidth = Math.max(0, (spreadWidth - OU_SPINE_WIDTH) / 2);
   return {
-    right: Math.max(
-      OU_PERSON_MIN_WIDTH,
-      pageWidth - OU_GENERATION_MARK_WIDTH - OU_PAGE_EDGE_PADDING,
-    ),
+    right: Math.max(OU_PERSON_MIN_WIDTH, pageWidth - OU_GENERATION_MARK_WIDTH),
     left: Math.max(OU_PERSON_MIN_WIDTH, pageWidth - OU_PAGE_EDGE_PADDING),
   };
+}
+
+function OuRelationLabel({
+  label,
+  testId,
+}: {
+  label: string;
+  testId: string;
+}) {
+  const columns = label.split("\n").filter(Boolean);
+
+  return (
+    <span
+      className="leading-tight"
+      style={{
+        ...PAPER_TEXT.relation,
+        columnGap: 0,
+        display: "inline-flex",
+        flexDirection: "row-reverse",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 1,
+      }}
+      data-testid={testId}
+    >
+      {columns.map((column, index) => (
+        <span
+          key={`${column}-${index}`}
+          style={{
+            lineHeight: 1,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+        >
+          {column}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateFn }) {
@@ -50,15 +87,15 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
   const title = entry.continued ? "" : clipText(person.ui.titleText || person.ui.shortHashText, 10);
   const nameLaneClassName = entry.continued
     ? "flex w-0 shrink-0 overflow-hidden p-0"
-    : "flex w-14 shrink-0 flex-col items-center gap-1 border-l pl-1 pr-1";
+    : "flex shrink-0 flex-col items-center gap-1 px-0.5";
 
   return (
     <article
-      className="relative flex h-full shrink-0 flex-row-reverse border-l py-3 last:border-l-0"
+      className="relative flex h-full shrink-0 flex-row-reverse py-3"
       style={{
         borderColor: PAPER_LINE.soft,
         direction: "ltr",
-        flex: `1 0 ${entry.widthPx}px`,
+        flex: `0 0 ${entry.widthPx}px`,
         minWidth: entry.widthPx,
         paddingInline: PAPER_RECORD_INLINE_PADDING,
         width: entry.widthPx,
@@ -72,23 +109,16 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
     >
       <div
         className={nameLaneClassName}
-        style={{ borderColor: PAPER_LINE.soft }}
+        style={{
+          borderColor: PAPER_LINE.soft,
+          width: entry.continued ? undefined : OU_NAME_LANE_WIDTH,
+        }}
       >
         {entry.relationLabel ? (
-          <span
-            className="leading-tight"
-            style={{
-              ...PAPER_TEXT.relation,
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-              // Father name and rank word arrive "\n"-joined; pre-line turns the break into an
-              // adjacent column (father right, 长子/之子 left) instead of a single merged column.
-              whiteSpace: "pre-line",
-            }}
-            data-testid={`paper-ou-relation-${person.id}`}
-          >
-            {entry.relationLabel}
-          </span>
+          <OuRelationLabel
+            label={entry.relationLabel}
+            testId={`paper-ou-relation-${person.id}`}
+          />
         ) : null}
         <strong
           className="leading-6 tracking-normal"
@@ -118,12 +148,11 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
           ...PAPER_TEXT.body,
           writingMode: "vertical-rl",
           textOrientation: "mixed",
-          // Justify along the inline (vertical) axis so every *filled* column is
-          // stretched top-to-bottom with the slack spread evenly between characters
-          // (uniform spacing within the column). The final/partial column is left to
-          // flow naturally — stretching a 2-char tail to full height looks wrong.
+          // Justify along the inline (vertical) axis so every filled column stretches
+          // top-to-bottom. If this entry continues across the spine, its last visible
+          // column is not the true record tail and should be filled like Su records.
           textAlign: "justify",
-          textAlignLast: "auto",
+          textAlignLast: continuesAfter ? "justify" : "auto",
           textJustify: "inter-character",
           overflowWrap: "anywhere",
           paddingRight: OU_RECORD_DETAIL_END_PADDING,
@@ -135,6 +164,27 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
       </p>
     </article>
   );
+}
+
+function mergeOuSideEntries(entries: OuPersonRecordEntry[]): OuPersonRecordEntry[] {
+  const merged: OuPersonRecordEntry[] = [];
+
+  for (const entry of entries) {
+    const previous = merged[merged.length - 1];
+    if (!previous || previous.person.id !== entry.person.id) {
+      merged.push({ ...entry });
+      continue;
+    }
+
+    previous.key = `${previous.key}+${entry.key}`;
+    previous.text += entry.text;
+    previous.widthPx += entry.widthPx;
+    previous.slotSpan = Math.max(previous.slotSpan, entry.slotSpan);
+    previous.partIndex = entry.partIndex;
+    previous.totalPartCount = entry.totalPartCount;
+  }
+
+  return merged;
 }
 
 function OuGenerationBand({
@@ -150,7 +200,11 @@ function OuGenerationBand({
   spreadIndex: number;
   t: TranslateFn;
 }) {
-  const entries = splitOuRowEntries(row, side);
+  const entries = mergeOuSideEntries(splitOuRowEntries(row, side));
+  const entryLaneStyle =
+    side === "left"
+      ? { direction: "ltr" as const, paddingLeft: OU_PAGE_EDGE_PADDING }
+      : { direction: "ltr" as const };
 
   return (
     <div
@@ -168,7 +222,7 @@ function OuGenerationBand({
     >
       <div
         className="flex h-full flex-row-reverse justify-start overflow-hidden"
-        style={{ direction: "ltr", paddingLeft: OU_PAGE_EDGE_PADDING }}
+        style={entryLaneStyle}
         data-testid={`paper-ou-entry-lane-${chartIndex}-${spreadIndex}-${side}-${row.depth}`}
       >
         {entries.map((entry) => (

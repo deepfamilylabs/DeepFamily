@@ -19,23 +19,77 @@ import {
   PAPER_TEXT,
   PAPER_VARS,
 } from "../paperStyles";
-import { clipText, getPaperSpineTitle, measureRecordUnits } from "../paperText";
+import { getPaperSpineTitle, measureRecordUnits } from "../paperText";
 import { PaperSpine } from "./PaperSpine";
 
 const DIEJI_RELATION_ROW_PX = 64;
 const DIEJI_NAME_ROW_PX = 96;
 const DIEJI_LANE_GRID_ROWS = `${DIEJI_RELATION_ROW_PX}px ${DIEJI_NAME_ROW_PX}px 1fr`;
-// A long title/name (e.g. "西乡哀侯曹赞") in vertical-rl overflows the fixed name-row height and wraps
-// into a ragged second column, breaking the lane grid. Scale the font down so the name always fits
-// a single column — short names keep the full prominent size; the floor stays at the body size so a
-// name never reads smaller than its own biography.
+const DIEJI_RELATION_COLUMN_UNIT_CAPACITY = 10;
+// A long title/name (e.g. "西乡哀侯曹赞奉车都尉郎") in vertical-rl can overflow the fixed
+// name-row height and wrap into a ragged second column, breaking the lane grid. Show the full
+// name, but scale the font down so long names remain in one column.
 const DIEJI_NAME_CELL_USABLE_PX = DIEJI_NAME_ROW_PX - 16 - 2; // − py-2 (16px) − glyph-advance safety
-const DIEJI_NAME_MIN_FONT_PX = PAPER_TEXT.body.fontSize;
+const DIEJI_NAME_MIN_FONT_PX = 8;
 
 function getDiejiNameFontSize(nameLength: number): number {
   const fit = Math.floor(DIEJI_NAME_CELL_USABLE_PX / Math.max(1, nameLength));
   return Math.min(PAPER_TEXT.name.fontSize, Math.max(DIEJI_NAME_MIN_FONT_PX, fit));
 }
+
+function DiejiRelationLabel({ label }: { label: string }) {
+  const columns = label.split("\n").filter(Boolean);
+  const shouldWrapAsPhrase = columns.some(
+    (column) => measureRecordUnits(column) > DIEJI_RELATION_COLUMN_UNIT_CAPACITY,
+  );
+
+  if (shouldWrapAsPhrase) {
+    return (
+      <span
+        style={{
+          display: "inline-block",
+          height: "100%",
+          lineHeight: 1,
+          maxHeight: "100%",
+          overflowWrap: "anywhere",
+          textOrientation: "mixed",
+          whiteSpace: "normal",
+          wordBreak: "break-all",
+          writingMode: "vertical-rl",
+        }}
+      >
+        {columns.join("")}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        columnGap: 0,
+        display: "inline-flex",
+        flexDirection: "row-reverse",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 1,
+      }}
+    >
+      {columns.map((column, index) => (
+        <span
+          key={`${column}-${index}`}
+          style={{
+            lineHeight: 1,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+        >
+          {column}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // Each lane biography is a single vertical column (long records spill into continuation lanes,
 // never a 2nd column), so plain `text-align: justify` — which never touches the last/only line —
 // leaves the column ragged. Justify the last line too *only* when the column is substantially
@@ -65,8 +119,8 @@ function DiejiPersonLane({
 }) {
   const { person } = lane;
   const fullRecord = getDiejiFullRecordText(person, t);
-  const title = clipText(lane.name, lane.continued ? 8 : 10);
-  const nameFontSize = getDiejiNameFontSize(title.length);
+  const title = lane.name;
+  const nameFontSize = getDiejiNameFontSize(Array.from(title).length);
   const bodyFillsColumn =
     measureRecordUnits(lane.text) >= DIEJI_RECORD_UNITS_PER_LANE * DIEJI_BODY_FILL_JUSTIFY_THRESHOLD;
 
@@ -89,15 +143,10 @@ function DiejiPersonLane({
         style={{
           ...PAPER_TEXT.relation,
           borderColor: PAPER_LINE.soft,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-          // Father name and rank word arrive "\n"-joined; pre-line turns the break into a natural
-          // adjacent column (parent right, rank left) at normal line spacing rather than a wide gap.
-          whiteSpace: "pre-line",
         }}
         data-testid={`paper-dieji-relation-${person.id}`}
       >
-        {lane.relationLabel}
+        <DiejiRelationLabel label={lane.relationLabel} />
       </div>
       <div
         className="flex min-h-0 items-center justify-center border-b px-1.5 py-2"

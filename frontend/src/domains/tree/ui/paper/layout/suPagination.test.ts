@@ -10,8 +10,8 @@ import {
   SU_BODY_PADDING_X,
   SU_COLUMN_UNIT_CAPACITY,
   SU_GENERATIONS_PER_CHART,
+  SU_LEFT_SPINE_CONTENT_GAP,
   SU_NAME_LANE_WIDTH,
-  SU_SPINE_CONTENT_GAP,
   type SuPersonEntry,
 } from "./suPagination";
 import { measureRecordUnits } from "../paperText";
@@ -222,7 +222,7 @@ describe("buildSuPaperBook", () => {
     expect(secondParent?.slotIndex).toBeGreaterThan(firstBranchChildren[1].slotIndex);
   });
 
-  it("keeps Ou-style content spacing on both sides of the spine", () => {
+  it("keeps Su-style left page content inset from the spine", () => {
     const wide = makeWideGraph(14);
     const metrics = getSuPageMetrics();
     const spread = buildSuPaperBook({
@@ -237,12 +237,10 @@ describe("buildSuPaperBook", () => {
 
     expect(rightEntries).toHaveLength(7);
     expect(leftEntries).toHaveLength(7);
-    expect(Math.min(...rightEntries.map((entry) => entry.x))).toBeCloseTo(
-      SU_SPINE_CONTENT_GAP,
-    );
+    expect(Math.min(...rightEntries.map((entry) => entry.x))).toBeCloseTo(0);
     expect(
       Math.max(...leftEntries.map((entry) => entry.x + entry.slotWidth)),
-    ).toBeCloseTo(metrics.leftBodyWidth - SU_SPINE_CONTENT_GAP);
+    ).toBeCloseTo(metrics.leftBodyWidth - SU_LEFT_SPINE_CONTENT_GAP);
   });
 
   it("keeps the first Su name lane reserved while a left-page record grows across slots", () => {
@@ -273,7 +271,7 @@ describe("buildSuPaperBook", () => {
     const metrics = getSuPageMetrics({ right: 540, left: 594 });
     const rightCapacity = Math.floor(metrics.rightBodyWidth / metrics.slotWidth);
     const leftCapacity = Math.floor(metrics.leftBodyWidth / metrics.slotWidth);
-    const leftSlotWidth = (metrics.leftBodyWidth - SU_SPINE_CONTENT_GAP) / leftCapacity;
+    const leftSlotWidth = (metrics.leftBodyWidth - SU_LEFT_SPINE_CONTENT_GAP) / leftCapacity;
 
     const chunks = splitSuRecordText(person, rightCapacity, metrics);
     const firstThreeChunks = chunks.slice(0, 3).join("");
