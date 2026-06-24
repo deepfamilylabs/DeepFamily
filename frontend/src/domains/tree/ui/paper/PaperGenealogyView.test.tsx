@@ -10,12 +10,15 @@ import {
   buildOuPaperBook,
   getOuFullRecordText,
   getOuRecordSlotSpan,
+  OU_NAME_LANE_WIDTH,
   OU_PAGE_EDGE_PADDING,
   OU_PERSON_CONTINUATION_BASE_WIDTH,
+  OU_PERSON_CONTINUATION_MIN_WIDTH,
   OU_PERSON_BASE_WIDTH,
+  OU_PERSON_MIN_WIDTH,
   OU_RECORD_COLUMN_WIDTH,
+  OU_RECORD_SPLIT_UNIT_TOLERANCE,
   OU_RECORD_UNITS_PER_COLUMN,
-  OU_SHORT_PAGE_START_WORD_UNITS,
 } from "./layout/ouPagination";
 import { measureRecordUnits } from "./paperText";
 import { ModernBookRenderer, MODERN_RECORD_UNITS_PER_ROW } from "./renderers/ModernBookRenderer";
@@ -779,9 +782,7 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-ou-spread-1-2")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-right-1-2")).toBeTruthy();
     expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").style.direction).toBe("ltr");
-    expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").style.paddingLeft).toBe(
-      `${OU_PAGE_EDGE_PADDING}px`,
-    );
+    expect(screen.getByTestId("paper-ou-entry-lane-1-1-right-1").style.paddingLeft).toBe("");
     expect(screen.getByTestId("paper-ou-entry-lane-1-1-left-1").style.paddingLeft).toBe(
       `${OU_PAGE_EDGE_PADDING}px`,
     );
@@ -984,7 +985,7 @@ describe("PaperGenealogyView", () => {
     expect(renderedParts[renderedParts.length - 1].getAttribute("data-continues-after")).toBe(
       "false",
     );
-    expect(renderedDetails[0].style.textAlignLast).toBe("auto");
+    expect(renderedDetails[0].style.textAlignLast).toBe("justify");
     expect(renderedDetails[renderedDetails.length - 1].style.textAlignLast).toBe("auto");
   });
 
@@ -1038,19 +1039,22 @@ describe("PaperGenealogyView", () => {
     expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
     expect(firstChunkUnits).toBeLessThanOrEqual(firstChunkCapacity);
     expect(firstChunkUnits).toBeGreaterThan(
-      firstChunkCapacity - OU_SHORT_PAGE_START_WORD_UNITS,
+      firstChunkCapacity - OU_RECORD_SPLIT_UNIT_TOLERANCE,
     );
     expect(Array.from(firstEntry.text).length).toBeGreaterThan(firstChunkCapacity / 2);
     expect(continuedChunkCapacity).toBeGreaterThan(continuedCapacityWithNameLane);
     expect(continuedChunkUnits).toBeLessThanOrEqual(continuedChunkCapacity);
     expect(continuedChunkUnits).toBeGreaterThan(
-      continuedChunkCapacity - OU_SHORT_PAGE_START_WORD_UNITS,
+      continuedChunkCapacity - OU_RECORD_SPLIT_UNIT_TOLERANCE,
     );
   });
 
-  it("moves one-character Ou-style suffix orphans to the continuation page", () => {
+  it("sizes short Ou-style continuation fragments to their visible columns", () => {
     const wide = makeWideGenerationGraph(1);
     const child = wide.graph.nodes[1];
+    const rightColumnCount = 2;
+    const tailChars = 5;
+    const story = "才".repeat((OU_RECORD_UNITS_PER_COLUMN / 2) * rightColumnCount + tailChars);
     const generations = buildPaperGenerations({
       graph: wide.graph,
       nodesData: {
@@ -1059,32 +1063,38 @@ describe("PaperGenealogyView", () => {
           personHash: child.personHash,
           versionIndex: 1,
           tokenId: "2",
-          fullName: "曹询",
-          deathYear: 244,
-          story: "曹询是曹叡养子，封秦王，正始五年去世。",
+          fullName: "曹续",
+          story,
         },
       },
       t: zhTranslate,
     });
-
+    const rightWidth = OU_PERSON_BASE_WIDTH + OU_RECORD_COLUMN_WIDTH * rightColumnCount;
     const person = generations[1].people[0];
     const book = buildOuPaperBook({
       generations,
       t: zhTranslate,
-      pageBodyWidths: { right: 112, left: 112 },
+      pageBodyWidths: {
+        right: rightWidth,
+        left: 280,
+      },
     });
     const renderedEntries = book.charts[0].spreads
       .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
       .filter((entry) => entry.person.id === person.id);
+    const continuation = renderedEntries.find((entry) => entry.continued);
 
-    expect(renderedEntries.length).toBeGreaterThan(1);
+    expect(renderedEntries).toHaveLength(2);
     expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
-    expect(renderedEntries[0].text).toContain("曹叡");
-    expect(renderedEntries[0].text.endsWith("养")).toBe(false);
-    expect(renderedEntries[1].text.startsWith("养子")).toBe(true);
+    expect(renderedEntries[0].widthPx).toBe(rightWidth);
+    expect(measureRecordUnits(continuation?.text || "")).toBeLessThanOrEqual(
+      OU_RECORD_UNITS_PER_COLUMN,
+    );
+    expect(continuation?.widthPx).toBe(OU_PERSON_CONTINUATION_MIN_WIDTH);
+    expect(continuation?.widthPx).toBeLessThan(OU_PERSON_MIN_WIDTH);
   });
 
-  it("keeps Ou-style 之子 and 之女 relation phrases with the preceding name", () => {
+  it("fills the Ou-style right page spine column before crossing the spine", () => {
     const wide = makeWideGenerationGraph(1);
     const child = wide.graph.nodes[1];
     const generations = buildPaperGenerations({
@@ -1095,28 +1105,92 @@ describe("PaperGenealogyView", () => {
           personHash: child.personHash,
           versionIndex: 1,
           tokenId: "2",
-          fullName: "东乡公主",
-          gender: 2,
-          story: "东乡公主是曹丕与甄氏之女，曹叡的同母姐妹。",
+          fullName: "曹植",
+          story: "才高辞丽文采风流宗族修谱传承有序".repeat(10),
         },
       },
       t: zhTranslate,
     });
-
+    const rightColumnCount = 3;
+    const renderedCjkCharsPerColumn = 11;
+    const rightWidth = OU_PERSON_BASE_WIDTH + OU_RECORD_COLUMN_WIDTH * rightColumnCount;
     const person = generations[1].people[0];
     const book = buildOuPaperBook({
       generations,
       t: zhTranslate,
-      pageBodyWidths: { right: 112, left: 112 },
+      pageBodyWidths: {
+        right: rightWidth,
+        left: 280,
+      },
     });
     const renderedEntries = book.charts[0].spreads
       .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
       .filter((entry) => entry.person.id === person.id);
+    const firstEntry = renderedEntries[0];
+    const leftContinuation = renderedEntries.find((entry) => entry.side === "left");
 
-    expect(renderedEntries.length).toBeGreaterThan(1);
+    expect(firstEntry).toBeTruthy();
+    if (!firstEntry) throw new Error("missing first Ou split chunk");
+    expect(leftContinuation).toBeTruthy();
     expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
-    expect(renderedEntries[0].text.endsWith("甄氏")).toBe(false);
-    expect(renderedEntries[1].text.startsWith("甄氏之女")).toBe(true);
+    expect(firstEntry.side).toBe("right");
+    expect(firstEntry.widthPx).toBe(rightWidth);
+    expect(Array.from(firstEntry.text)).toHaveLength(
+      rightColumnCount * renderedCjkCharsPerColumn,
+    );
+    expect(measureRecordUnits(firstEntry.text)).toBe(
+      rightColumnCount * renderedCjkCharsPerColumn * 2,
+    );
+  });
+
+  it("does not use the old overfull Ou-style split point beside the spine", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const generations = buildPaperGenerations({
+      graph: wide.graph,
+      nodesData: {
+        [child.id]: {
+          id: child.id,
+          personHash: child.personHash,
+          versionIndex: 1,
+          tokenId: "2",
+          fullName: "曹植",
+          birthYear: 192,
+          deathYear: 232,
+          story:
+            "曹植（192—232），字子建，曹操与卞氏之子、曹丕同母弟，建安文学代表作者。" +
+            "早年以才学受曹操重视，储位之争后渐失信任，曹丕、曹叡两朝屡遭贬爵迁封。",
+        },
+      },
+      t: zhTranslate,
+    });
+    const rightColumnCount = 5;
+    const rightWidth = OU_PERSON_BASE_WIDTH + OU_RECORD_COLUMN_WIDTH * rightColumnCount;
+    const person = generations[1].people[0];
+    const book = buildOuPaperBook({
+      generations,
+      t: zhTranslate,
+      pageBodyWidths: {
+        right: rightWidth,
+        left: 280,
+      },
+    });
+    const renderedEntries = book.charts[0].spreads
+      .flatMap((spread) => spread.rows.find((row) => row.depth === 1)?.entries || [])
+      .filter((entry) => entry.person.id === person.id);
+    const firstEntry = renderedEntries[0];
+
+    expect(firstEntry).toBeTruthy();
+    if (!firstEntry) throw new Error("missing Cao Zhi Ou split chunk");
+    expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
+    expect(firstEntry.side).toBe("right");
+    expect(firstEntry.text.endsWith("视，储位之争")).toBe(false);
+    expect(measureRecordUnits(firstEntry.text)).toBeGreaterThan(
+      rightColumnCount * OU_RECORD_UNITS_PER_COLUMN - OU_RECORD_SPLIT_UNIT_TOLERANCE,
+    );
+    expect(measureRecordUnits(firstEntry.text)).toBeLessThanOrEqual(
+      rightColumnCount * OU_RECORD_UNITS_PER_COLUMN,
+    );
   });
 
   it("uses the wider Ou-style left page body before creating a continuation spread", () => {
@@ -1178,9 +1252,14 @@ describe("PaperGenealogyView", () => {
 
     const firstChildName = screen.getByTestId(`paper-ou-name-${wide.graph.nodes[1].id}`);
     const firstChildEntry = screen.getByTestId(`paper-row-${wide.graph.nodes[1].id}`);
+    const firstChildNameLane = firstChildName.parentElement;
 
     expect(firstChildName.style.textAlign).toBe("right");
     expect(firstChildName.style.writingMode).toBe("vertical-rl");
+    expect(firstChildNameLane?.style.width).toBe(`${OU_NAME_LANE_WIDTH}px`);
+    expect(firstChildNameLane?.className).not.toContain("border-l");
+    expect(firstChildEntry.className).not.toContain("border-l");
+    expect(firstChildEntry.style.flexGrow).toBe("0");
     expect(firstChildEntry.getAttribute("data-slot-span")).toBe("1");
   });
 
@@ -1251,23 +1330,149 @@ describe("PaperGenealogyView", () => {
       />,
     );
 
-    // Parentage sits in the name lane, above the name, as two shared vertical columns: the
-    // father name on the right and the rank word on the left ("\n"-joined, rendered pre-line).
+    // Parentage sits in the name lane, above the name, as two centered vertical columns: the
+    // father name on the right and the rank word on the left.
     const firstRelation = screen.getByTestId(`paper-ou-relation-${firstSon.id}`);
-    expect(firstRelation.textContent).toBe("曹操\n长子");
-    expect(firstRelation.style.writingMode).toBe("vertical-rl");
-    expect(firstRelation.style.whiteSpace).toBe("pre-line");
+    expect(firstRelation.textContent).toBe("曹操长子");
+    expect(firstRelation.style.display).toBe("inline-flex");
+    expect(firstRelation.style.flexDirection).toBe("row-reverse");
+    expect(firstRelation.style.alignItems).toBe("center");
+    const firstRelationColumns = Array.from(firstRelation.children) as HTMLElement[];
+    expect(firstRelationColumns.map((column) => column.textContent)).toEqual(["曹操", "长子"]);
+    expect(firstRelationColumns[0]?.style.writingMode).toBe("vertical-rl");
     const nameLane = screen.getByTestId(`paper-ou-name-${firstSon.id}`).parentElement;
     expect(nameLane?.firstElementChild).toBe(firstRelation);
     // Relation and name are centered in the lane, so the single-column 始祖 is centered.
     expect(nameLane?.className).toContain("items-center");
-    expect(screen.getByTestId(`paper-ou-relation-${secondSon.id}`).textContent).toBe("曹操\n次子");
+    expect(screen.getByTestId(`paper-ou-relation-${secondSon.id}`).textContent).toBe("曹操次子");
     // The root keeps the shared 始祖 relation label.
     expect(screen.getByTestId(`paper-ou-relation-${root.id}`).textContent).toContain("ancestor");
     // The label is no longer duplicated inline at the head of the biography body.
     expect(screen.getByTestId(`paper-ou-detail-${firstSon.id}`).textContent).not.toContain(
       "曹操长子",
     );
+  });
+
+  it("center-aligns uneven Ou-style father and birth-rank relation columns", () => {
+    const wide = makeWideGenerationGraph(27);
+    const [root, ...children] = wide.graph.nodes;
+    const target = children[26];
+
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [root.id]: {
+            id: root.id,
+            personHash: root.personHash,
+            versionIndex: 1,
+            fullName: "曹操",
+          },
+          ...Object.fromEntries(
+            children.map((child) => [
+              child.id,
+              {
+                id: child.id,
+                personHash: child.personHash,
+                versionIndex: 1,
+                gender: 1,
+              },
+            ]),
+          ),
+        }}
+        hasRoot
+      />,
+    );
+
+    const relation = screen.getByTestId(`paper-ou-relation-${target.id}`);
+    const columns = Array.from(relation.children) as HTMLElement[];
+
+    expect(relation.style.display).toBe("inline-flex");
+    expect(relation.style.flexDirection).toBe("row-reverse");
+    expect(relation.style.alignItems).toBe("center");
+    expect(relation.style.columnGap).toBe("0px");
+    expect(relation.style.lineHeight).toBe("1");
+    expect(columns.map((column) => column.textContent)).toEqual(["曹操", "二十七子"]);
+    expect(columns.every((column) => column.style.writingMode === "vertical-rl")).toBe(true);
+    expect(columns.every((column) => column.style.lineHeight === "1")).toBe(true);
+  });
+
+  it("keeps five-character Ou-style parent names in relation columns", () => {
+    const wide = makeWideGenerationGraph(25);
+    const [root, ...children] = wide.graph.nodes;
+    const target = children[24];
+
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [root.id]: {
+            id: root.id,
+            personHash: root.personHash,
+            versionIndex: 1,
+            fullName: "西乡哀侯曹",
+          },
+          ...Object.fromEntries(
+            children.map((child) => [
+              child.id,
+              {
+                id: child.id,
+                personHash: child.personHash,
+                versionIndex: 1,
+                gender: 1,
+              },
+            ]),
+          ),
+        }}
+        hasRoot
+      />,
+    );
+
+    const relation = screen.getByTestId(`paper-ou-relation-${target.id}`);
+    const columns = Array.from(relation.children) as HTMLElement[];
+
+    expect(relation.textContent).toBe("西乡哀侯曹二十五子");
+    expect(columns.map((column) => column.textContent)).toEqual(["西乡哀侯曹", "二十五子"]);
+  });
+
+  it("keeps overlong Ou-style parent names in relation columns", () => {
+    const wide = makeWideGenerationGraph(1);
+    const [root, child] = wide.graph.nodes;
+
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [root.id]: {
+            id: root.id,
+            personHash: root.personHash,
+            versionIndex: 1,
+            fullName: "西乡哀侯曹赞",
+          },
+          [child.id]: {
+            id: child.id,
+            personHash: child.personHash,
+            versionIndex: 1,
+            gender: 1,
+          },
+        }}
+        hasRoot
+      />,
+    );
+
+    const relation = screen.getByTestId(`paper-ou-relation-${child.id}`);
+    const columns = Array.from(relation.children) as HTMLElement[];
+
+    expect(relation.textContent).toBe("西乡哀侯曹赞之子");
+    expect(relation.textContent).not.toContain("…");
+    expect(columns.map((column) => column.textContent)).toEqual(["西乡哀侯曹赞", "之子"]);
+    expect(columns.every((column) => column.style.writingMode === "vertical-rl")).toBe(true);
   });
 
   it("renders Dieji-style as five-generation vertical charts with the boundary generation repeated", () => {
@@ -1368,6 +1573,161 @@ describe("PaperGenealogyView", () => {
     expect(rootDetail.className).toContain("w-fit");
     expect(rootDetail.parentElement?.className).toContain("justify-center");
     expect(rootRows[0].textContent).not.toContain("1.1");
+  });
+
+  it("center-aligns uneven Dieji-style father and birth-rank relation columns", () => {
+    const wide = makeWideGenerationGraph(23);
+    const [root, ...children] = wide.graph.nodes;
+    const target = children[22];
+
+    render(
+      <PaperGenealogyView
+        style="dieji"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [root.id]: {
+            id: root.id,
+            personHash: root.personHash,
+            versionIndex: 1,
+            fullName: "曹操",
+          },
+          ...Object.fromEntries(
+            children.map((child) => [
+              child.id,
+              {
+                id: child.id,
+                personHash: child.personHash,
+                versionIndex: 1,
+                gender: 1,
+              },
+            ]),
+          ),
+        }}
+        hasRoot
+      />,
+    );
+
+    const relationCell = screen.getByTestId(`paper-dieji-relation-${target.id}`);
+    const relation = relationCell.firstElementChild as HTMLElement | null;
+    const columns = Array.from(relation?.children || []) as HTMLElement[];
+
+    expect(relationCell.textContent).toBe("曹操二十三子");
+    expect(relation?.style.display).toBe("inline-flex");
+    expect(relation?.style.flexDirection).toBe("row-reverse");
+    expect(relation?.style.alignItems).toBe("center");
+    expect(relation?.style.columnGap).toBe("0px");
+    expect(relation?.style.lineHeight).toBe("1");
+    expect(columns.map((column) => column.textContent)).toEqual(["曹操", "二十三子"]);
+    expect(columns.every((column) => column.style.writingMode === "vertical-rl")).toBe(true);
+    expect(columns.every((column) => column.style.lineHeight === "1")).toBe(true);
+  });
+
+  it("keeps five-character Dieji-style parent names in relation columns", () => {
+    const wide = makeWideGenerationGraph(25);
+    const [root, ...children] = wide.graph.nodes;
+    const target = children[24];
+
+    render(
+      <PaperGenealogyView
+        style="dieji"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [root.id]: {
+            id: root.id,
+            personHash: root.personHash,
+            versionIndex: 1,
+            fullName: "西乡哀侯曹",
+          },
+          ...Object.fromEntries(
+            children.map((child) => [
+              child.id,
+              {
+                id: child.id,
+                personHash: child.personHash,
+                versionIndex: 1,
+                gender: 1,
+              },
+            ]),
+          ),
+        }}
+        hasRoot
+      />,
+    );
+
+    const relationCell = screen.getByTestId(`paper-dieji-relation-${target.id}`);
+    const relation = relationCell.firstElementChild as HTMLElement | null;
+    const columns = Array.from(relation?.children || []) as HTMLElement[];
+
+    expect(relationCell.textContent).toBe("西乡哀侯曹二十五子");
+    expect(columns.map((column) => column.textContent)).toEqual(["西乡哀侯曹", "二十五子"]);
+  });
+
+  it("wraps overlong Dieji-style relation labels as one full phrase", () => {
+    const wide = makeWideGenerationGraph(1);
+    const [root, child] = wide.graph.nodes;
+
+    render(
+      <PaperGenealogyView
+        style="dieji"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [root.id]: {
+            id: root.id,
+            personHash: root.personHash,
+            versionIndex: 1,
+            fullName: "西乡哀侯曹赞",
+          },
+          [child.id]: {
+            id: child.id,
+            personHash: child.personHash,
+            versionIndex: 1,
+            gender: 1,
+          },
+        }}
+        hasRoot
+      />,
+    );
+
+    const relationCell = screen.getByTestId(`paper-dieji-relation-${child.id}`);
+    const relation = relationCell.firstElementChild as HTMLElement | null;
+
+    expect(relationCell.textContent).toBe("西乡哀侯曹赞之子");
+    expect(relationCell.textContent).not.toContain("…");
+    expect(relation?.children).toHaveLength(0);
+    expect(relation?.style.writingMode).toBe("vertical-rl");
+    expect(relation?.style.height).toBe("100%");
+    expect(relation?.style.wordBreak).toBe("break-all");
+  });
+
+  it("renders full Dieji-style names instead of clipping long titles", () => {
+    const wide = makeWideGenerationGraph(1);
+    const child = wide.graph.nodes[1];
+    const fullName = "西乡哀侯曹赞奉车都尉郎";
+
+    render(
+      <PaperGenealogyView
+        style="dieji"
+        graph={wide.graph}
+        rootId={wide.rootId}
+        nodesData={{
+          [child.id]: {
+            id: child.id,
+            personHash: child.personHash,
+            versionIndex: 1,
+            fullName,
+          },
+        }}
+        hasRoot
+      />,
+    );
+
+    const name = screen.getByTestId(`paper-dieji-name-${child.id}`);
+
+    expect(name.textContent).toBe(fullName);
+    expect(name.textContent).not.toContain("…");
   });
 
   it("projects Dieji-style continuation spreads when the right-to-left lane stream exceeds one spread", () => {

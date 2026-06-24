@@ -33,8 +33,8 @@ export type SuPersonEntry = {
   x: number;
   y: number;
   widthPx: number;
-  // Per-entry slot advance. It is adjusted slightly per page side so the original slot count is
-  // preserved while the content edge keeps the same inset from the spine as Ou records.
+  // Per-entry slot advance. It is adjusted per measured page side so slots tile across the full
+  // available body width without opening an extra aisle beside the spine.
   slotWidth: number;
   heightPx: number;
   centerX: number;
@@ -102,7 +102,7 @@ export const SU_CHART_STEP = OU_CHART_STEP;
 export const SU_PAGE_HEIGHT = 872;
 export const SU_GENERATION_MARK_WIDTH = 54;
 export const SU_PERSON_SLOT_WIDTH = 72;
-export const SU_SPINE_CONTENT_GAP = PAPER_RECORD_INLINE_PADDING;
+export const SU_LEFT_SPINE_CONTENT_GAP = PAPER_RECORD_INLINE_PADDING;
 export const SU_NAME_LANE_WIDTH = 32;
 export const SU_NAME_MAX_LENGTH = 10;
 export const SU_RECORD_TOP_PADDING = 25;
@@ -228,11 +228,15 @@ function getSideSlotCapacity(side: SuPageSide, metrics: SuPageMetrics): number {
   return Math.max(1, Math.floor(getSideBodyWidth(side, metrics) / metrics.slotWidth));
 }
 
+function getSideSpineContentGap(side: SuPageSide): number {
+  return side === "left" ? SU_LEFT_SPINE_CONTENT_GAP : 0;
+}
+
 function getSideSlotWidth(side: SuPageSide, metrics: SuPageMetrics): number {
   const capacity = getSideSlotCapacity(side, metrics);
   return Math.max(
     1,
-    (getSideBodyWidth(side, metrics) - SU_SPINE_CONTENT_GAP) / capacity,
+    (getSideBodyWidth(side, metrics) - getSideSpineContentGap(side)) / capacity,
   );
 }
 
@@ -258,13 +262,8 @@ function getSlotPosition(
   const sideSlotIndex = side === "right" ? localSlotIndex : localSlotIndex - rightCapacity;
   const bodyWidth = getSideBodyWidth(side, metrics);
   const slotWidth = getSideSlotWidth(side, metrics);
-  const contentStartX = side === "right" ? SU_SPINE_CONTENT_GAP : 0;
-  const contentEndX =
-    side === "right" ? bodyWidth : bodyWidth - SU_SPINE_CONTENT_GAP;
-  const x = Math.max(
-    contentStartX,
-    contentEndX - (sideSlotIndex + 1) * slotWidth,
-  );
+  const contentEndX = bodyWidth - getSideSpineContentGap(side);
+  const x = Math.max(0, contentEndX - (sideSlotIndex + 1) * slotWidth);
 
   return { spreadIndex, side, sideSlotIndex, x, slotWidth };
 }

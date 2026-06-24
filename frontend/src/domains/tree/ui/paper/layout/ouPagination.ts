@@ -11,7 +11,7 @@ import {
   splitTextByVisualUnits,
   toChineseNumeral,
 } from "../paperText";
-import { PAPER_RECORD_INLINE_PADDING } from "../paperStyles";
+import { PAPER_NOTE_FONT_STACK, PAPER_RECORD_INLINE_PADDING } from "../paperStyles";
 
 export type OuPageSide = "left" | "right";
 
@@ -68,20 +68,30 @@ export const OU_RIGHT_PAGE_BODY_WIDTH = OU_PAGE_SIDE_CAPACITY * OU_PERSON_SLOT_W
 export const OU_LEFT_PAGE_BODY_WIDTH = OU_RIGHT_PAGE_BODY_WIDTH + 56;
 export const OU_COLUMN_ALIGNMENT_WIDTH = 14;
 export const OU_PERSON_MIN_WIDTH = 112;
-export const OU_NAME_LANE_WIDTH = 56;
+export const OU_NAME_LANE_WIDTH = 42;
 export const OU_RECORD_DETAIL_END_PADDING = 8;
 export const OU_PERSON_BASE_WIDTH =
   OU_NAME_LANE_WIDTH + PAPER_RECORD_INLINE_PADDING * 2 + OU_RECORD_DETAIL_END_PADDING;
 export const OU_PERSON_CONTINUATION_BASE_WIDTH =
   PAPER_RECORD_INLINE_PADDING * 2 + OU_RECORD_DETAIL_END_PADDING;
-// Calibrated to the 13px body text used by vertical paper records: a column is ~144px tall
-// (168px row − 24px py-3 padding), fitting ~12 full-width glyphs at 13px, and each column
-// advances ceil(13px × 1.55 line-height) ≈ 21px horizontally.
-export const OU_RECORD_CHARS_PER_COLUMN = 12;
+export const OU_PAGE_HEIGHT = 872;
+export const OU_RECORD_VERTICAL_PADDING = 24;
+export const OU_RECORD_BODY_HEIGHT =
+  OU_PAGE_HEIGHT / OU_GENERATIONS_PER_CHART - OU_RECORD_VERTICAL_PADDING;
+// Calibrated to the rendered Ou row: 872px / 5 rows minus py-3 leaves ~150px of vertical text
+// space. At 13px body text this reliably holds 11 full-width glyphs before the browser creates
+// the next vertical column. Using 12 makes the spine-adjacent column look half-empty before the
+// record continues on the other side of the spine.
+export const OU_RECORD_CHARS_PER_COLUMN = 11;
 export const OU_RECORD_UNITS_PER_COLUMN = OU_RECORD_CHARS_PER_COLUMN * 2;
 export const OU_RECORD_COLUMN_WIDTH = 21;
+export const OU_PERSON_CONTINUATION_MIN_WIDTH =
+  Math.ceil(
+    (OU_PERSON_CONTINUATION_BASE_WIDTH + OU_RECORD_COLUMN_WIDTH) / OU_COLUMN_ALIGNMENT_WIDTH,
+  ) * OU_COLUMN_ALIGNMENT_WIDTH;
 export const OU_PAGE_EDGE_PADDING = 18;
-export const OU_SHORT_PAGE_START_WORD_UNITS = 4;
+export const OU_RECORD_SPLIT_UNIT_TOLERANCE = 2;
+const ouMeasuredColumnCountCache = new Map<string, number>();
 const DEFAULT_OU_PAGE_BODY_WIDTHS: OuPageBodyWidths = {
   right: OU_RIGHT_PAGE_BODY_WIDTH,
   left: OU_LEFT_PAGE_BODY_WIDTH,
@@ -133,13 +143,60 @@ function getOuRecordSections(person: PaperPerson, t: TranslateFn): string[] {
 // the biography. The label itself is shown above the name (see relationLabel on each entry), so
 // the laid-out biography body and its width measurement use getOuFullRecordText instead.
 export function getOuRecordText(person: PaperPerson, t: TranslateFn): string {
-  const label = getPaperRelationLabel(person, t, { withParentName: true });
+  const label = getPaperRelationLabel(person, t, {
+    withParentName: true,
+    parentNameMax: Number.POSITIVE_INFINITY,
+  });
   const record = getOuFullRecordText(person, t);
   return label ? `${label}，${record}` : record;
 }
 
+function getMeasuredOuTextColumnCount(text: string): number | null {
+  if (typeof document === "undefined" || !document.body) return null;
+
+  const cached = ouMeasuredColumnCountCache.get(text);
+  if (cached !== undefined) return cached;
+
+  const element = document.createElement("p");
+  element.textContent = text;
+  Object.assign(element.style, {
+    boxSizing: "border-box",
+    display: "inline-block",
+    fontFamily: PAPER_NOTE_FONT_STACK,
+    fontSize: "13px",
+    fontWeight: "400",
+    height: `${OU_RECORD_BODY_HEIGHT}px`,
+    lineHeight: "1.55",
+    margin: "0",
+    overflowWrap: "anywhere",
+    paddingRight: `${OU_RECORD_DETAIL_END_PADDING}px`,
+    position: "absolute",
+    textAlign: "justify",
+    textJustify: "inter-character",
+    textOrientation: "mixed",
+    visibility: "hidden",
+    whiteSpace: "normal",
+    wordBreak: "break-all",
+    writingMode: "vertical-rl",
+  });
+  document.body.appendChild(element);
+  const width = element.getBoundingClientRect().width;
+  element.remove();
+
+  if (!width) return null;
+  const columns = Math.max(
+    1,
+    Math.ceil((width - OU_RECORD_DETAIL_END_PADDING) / OU_RECORD_COLUMN_WIDTH),
+  );
+  ouMeasuredColumnCountCache.set(text, columns);
+  return columns;
+}
+
 function getTextColumnCount(text: string): number {
-  return Math.max(1, Math.ceil(measureRecordUnits(text) / OU_RECORD_UNITS_PER_COLUMN));
+  return (
+    getMeasuredOuTextColumnCount(text) ||
+    Math.max(1, Math.ceil(measureRecordUnits(text) / OU_RECORD_UNITS_PER_COLUMN))
+  );
 }
 
 function alignOuWidth(widthPx: number): number {
@@ -157,10 +214,16 @@ function getNaturalTextWidthPx(text: string): number {
   return getNaturalTextWidthPxForBase(text, OU_PERSON_BASE_WIDTH);
 }
 
+function getMinTextWidthPxForBase(baseWidth: number): number {
+  return baseWidth === OU_PERSON_CONTINUATION_BASE_WIDTH
+    ? OU_PERSON_CONTINUATION_MIN_WIDTH
+    : OU_PERSON_MIN_WIDTH;
+}
+
 function getNaturalTextWidthPxForBase(text: string, baseWidth: number): number {
   return alignOuWidth(
     Math.max(
-      OU_PERSON_MIN_WIDTH,
+      getMinTextWidthPxForBase(baseWidth),
       baseWidth + getTextColumnCount(text) * OU_RECORD_COLUMN_WIDTH,
     ),
   );
@@ -174,59 +237,26 @@ function getTextWidthPx(
   return Math.min(sideWidth, getNaturalTextWidthPxForBase(text, baseWidth));
 }
 
-function getTextUnitCapacityForWidth(widthPx: number, baseWidth = OU_PERSON_BASE_WIDTH): number {
-  const columns = Math.max(
-    1,
-    Math.floor((widthPx - baseWidth) / OU_RECORD_COLUMN_WIDTH),
-  );
-  return columns * OU_RECORD_UNITS_PER_COLUMN;
-}
-
 function getOuEntryBaseWidth(partIndex: number): number {
   return partIndex === 0 ? OU_PERSON_BASE_WIDTH : OU_PERSON_CONTINUATION_BASE_WIDTH;
 }
 
-function isRecordWordChar(char: string | undefined): boolean {
-  return !!char && /[\p{Letter}\p{Number}\p{Mark}]/u.test(char);
+function getTextColumnCapacityForWidth(
+  widthPx: number,
+  baseWidth = OU_PERSON_BASE_WIDTH,
+): number {
+  return Math.max(
+    1,
+    Math.floor((widthPx - baseWidth) / OU_RECORD_COLUMN_WIDTH),
+  );
 }
 
-function avoidDanglingOuChunkEnd(text: string, nextText: string): string {
-  const chars = Array.from(text);
-  const dropCount = getOuChunkRebalanceDropCount(chars, nextText);
-  return dropCount ? chars.slice(0, -dropCount).join("") : text;
-}
-
-function getOuChunkRebalanceDropCount(chars: string[], nextText: string): number {
-  if (chars.length <= 1) return 0;
-
-  const nextChars = Array.from(nextText);
-  const leadingWordChars: string[] = [];
-  for (const char of nextChars) {
-    if (!isRecordWordChar(char)) break;
-    leadingWordChars.push(char);
+function fitOuChunkToColumnBudget(text: string, columnBudget: number): string {
+  let chars = Array.from(text);
+  while (chars.length > 1 && getTextColumnCount(chars.join("")) > columnBudget) {
+    chars = chars.slice(0, -1);
   }
-  const afterLeadingWord = nextChars[leadingWordChars.length];
-  const leadingUnits = measureRecordUnits(leadingWordChars.join(""));
-  if (
-    !leadingWordChars.length ||
-    !afterLeadingWord ||
-    isRecordWordChar(afterLeadingWord) ||
-    leadingUnits > OU_SHORT_PAGE_START_WORD_UNITS
-  ) {
-    return 0;
-  }
-
-  let carryCount = 0;
-  let carryUnits = 0;
-  for (let offset = 0; offset < chars.length - 1; offset += 1) {
-    const char = chars[chars.length - 1 - offset];
-    if (!isRecordWordChar(char)) break;
-    carryCount += 1;
-    carryUnits += measureRecordUnits(char);
-    if (carryUnits >= leadingUnits) break;
-  }
-
-  return carryCount;
+  return chars.join("");
 }
 
 function getWidthSlotSpan(widthPx: number): number {
@@ -312,7 +342,7 @@ function paginateGenerationEntries(
     const relationLabel = getPaperRelationLabel(person, t, {
       withParentName: true,
       separator: "\n",
-      parentNameMax: 3,
+      parentNameMax: Number.POSITIVE_INFINITY,
     });
     const sections = getOuRecordSections(person, t);
 
@@ -323,14 +353,14 @@ function paginateGenerationEntries(
       while (start < chars.length) {
         const sideWidth = getOuSideWidth(side, pageBodyWidths);
         const availableWidth = Math.max(0, sideWidth - usedWidth);
-        if (availableWidth < OU_PERSON_MIN_WIDTH) {
+        const baseWidth = getOuEntryBaseWidth(partIndex);
+        if (availableWidth < getMinTextWidthPxForBase(baseWidth)) {
           advanceSide();
           continue;
         }
 
         const entryRelationLabel = partIndex === 0 ? relationLabel : "";
         const remainingText = chars.slice(start).join("");
-        const baseWidth = getOuEntryBaseWidth(partIndex);
         const remainingWidth = getNaturalTextWidthPxForBase(remainingText, baseWidth);
         if (remainingWidth <= availableWidth) {
           pushEntry(
@@ -345,17 +375,22 @@ function paginateGenerationEntries(
           break;
         }
 
+        const columnBudget = getTextColumnCapacityForWidth(availableWidth, baseWidth);
         const [text] = splitTextByVisualUnits(
           remainingText,
-          getTextUnitCapacityForWidth(availableWidth, baseWidth),
+          columnBudget * OU_RECORD_UNITS_PER_COLUMN,
         );
-        const textLength = Array.from(text).length;
-        const nextText = chars.slice(start + textLength).join("");
-        const balancedText = avoidDanglingOuChunkEnd(text, nextText);
-        pushEntry(person, balancedText, partIndex, entryRelationLabel, personEntries, availableWidth);
-        start += Array.from(balancedText).length;
+        const fittedText = fitOuChunkToColumnBudget(text, columnBudget);
+        pushEntry(
+          person,
+          fittedText,
+          partIndex,
+          entryRelationLabel,
+          personEntries,
+          availableWidth,
+        );
+        start += Array.from(fittedText).length;
         partIndex += 1;
-        if (start < chars.length) advanceSide();
       }
     }
 

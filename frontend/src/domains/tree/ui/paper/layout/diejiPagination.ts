@@ -94,11 +94,11 @@ function formatDiejiRecordLine(line: string): string {
 function getRelationLabel(person: PaperPerson, t: TranslateFn): string {
   // Keep the father name and rank word as separate "\n"-joined segments so the renderer can lay
   // them out as two adjacent vertical columns (e.g. "曹昌晟" beside "长女") instead of one merged
-  // column. Clip the father name to 3 chars so each column stays within the 64px relation cell.
+  // column. If either column is too tall, the renderer falls back to one continuous wrapped phrase.
   return getPaperRelationLabel(person, t, {
     withParentName: true,
     separator: "\n",
-    parentNameMax: 3,
+    parentNameMax: Number.POSITIVE_INFINITY,
   });
 }
 
