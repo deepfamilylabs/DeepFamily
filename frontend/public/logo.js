@@ -1,154 +1,135 @@
-const getNumberValue = (id) => {
-  const value = document.getElementById(id)?.value ?? "0";
-  return Number.parseInt(String(value), 10);
+// Refined DeepFamily mark — three converging strokes forming a forward arrow.
+// Geometry mirrors public/logo.svg and the Logo React component (viewBox 0 0 128 128).
+const GRAD_FROM = "#F8843E";
+const GRAD_TO = "#F04E33";
+const INK = "#1C1916";
+const HAIR = "#ECE4DB"; // paper tile hairline border
+const PREVIEW_SIZE = 256; // fixed crisp preview resolution, independent of export size
+const RADIUS_RATIO = 0.225; // rounded-square corner radius / size
+const MARK_RATIO = 0.62; // mark size / tile size on a filled icon
+const MARK_RATIO_BARE = 0.86; // mark size / canvas on the transparent variant
+
+const STYLE_LABEL = {
+  grad: "white-on-gradient",
+  paper: "gradient-on-paper",
+  ink: "gradient-on-ink",
+  transparent: "mark",
 };
 
-const render = () => {
-  const size = getNumberValue("sizeSelect");
-  const bgShape = document.getElementById("bgShape")?.value ?? "none";
-  const bgColor = document.getElementById("bgColor")?.value ?? "#ffffff";
-  const logoScale = getNumberValue("logoScale");
-  const panX = getNumberValue("panX");
-  const panY = getNumberValue("panY");
-  const swapColors = Boolean(document.getElementById("swapColors")?.checked);
+const markSvg = (stroke) => {
+  const strokeAttr = stroke === "gradient" ? "url(#g)" : stroke;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="14" y1="14" x2="114" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="${GRAD_FROM}"/>
+      <stop offset="1" stop-color="${GRAD_TO}"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="${strokeAttr}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 64 H116"/>
+    <path d="M16 24 H66 Q88 24 102 58"/>
+    <path d="M16 104 H66 Q88 104 102 70"/>
+  </g>
+</svg>`;
+};
 
-  const scaleValue = document.getElementById("scaleValue");
-  if (scaleValue) {
-    scaleValue.innerText = `${logoScale}%`;
-  }
+const loadImage = (svg) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  });
 
-  const hasBackground = bgShape !== "none";
-  const setDisplay = (id, display) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.style.display = display;
-    }
-  };
-
-  setDisplay("bgColorGroup", hasBackground ? "flex" : "none");
-  setDisplay("swapGroup", hasBackground ? "flex" : "none");
-  setDisplay("scaleGroup", hasBackground ? "flex" : "none");
-  setDisplay("panGroupX", hasBackground ? "flex" : "none");
-  setDisplay("panGroupY", hasBackground ? "flex" : "none");
-
-  const colorLabel = document.getElementById("colorLabel");
-  if (colorLabel) {
-    colorLabel.innerText = swapColors ? "Logo Color:" : "BG Color:";
-  }
-
-  const canvas = document.getElementById("canvas");
-  const svgElement = document.getElementById("source-svg");
-  if (!canvas || !svgElement || !canvas.getContext) {
+const roundRectPath = (ctx, size, radius, inset = 0) => {
+  const min = inset;
+  const span = size - inset * 2;
+  const r = Math.max(0, radius - inset);
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(min, min, span, span, r);
     return;
   }
+  const max = min + span;
+  ctx.moveTo(min + r, min);
+  ctx.lineTo(max - r, min);
+  ctx.quadraticCurveTo(max, min, max, min + r);
+  ctx.lineTo(max, max - r);
+  ctx.quadraticCurveTo(max, max, max - r, max);
+  ctx.lineTo(min + r, max);
+  ctx.quadraticCurveTo(min, max, min, max - r);
+  ctx.lineTo(min, min + r);
+  ctx.quadraticCurveTo(min, min, min + r, min);
+  ctx.closePath();
+};
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return;
-  }
+const getSize = () => Number.parseInt(document.getElementById("sizeSelect")?.value ?? "180", 10);
+
+const renderStyle = async (canvas, style, size) => {
+  const ctx = canvas?.getContext?.("2d");
+  if (!ctx) return;
 
   canvas.width = size;
   canvas.height = size;
   ctx.clearRect(0, 0, size, size);
 
-  if (hasBackground) {
-    if (swapColors) {
+  if (style !== "transparent") {
+    roundRectPath(ctx, size, size * RADIUS_RATIO);
+    if (style === "grad") {
       const grad = ctx.createLinearGradient(0, 0, size, size);
-      grad.addColorStop(0, "#fb923c");
-      grad.addColorStop(1, "#ef4444");
+      grad.addColorStop(0, GRAD_FROM);
+      grad.addColorStop(1, GRAD_TO);
       ctx.fillStyle = grad;
+    } else if (style === "paper") {
+      ctx.fillStyle = "#FFFFFF";
     } else {
-      ctx.fillStyle = bgColor;
-    }
-
-    ctx.beginPath();
-    if (bgShape === "circle") {
-      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-    } else if (bgShape === "square") {
-      const radius = size * 0.2;
-      if (ctx.roundRect) {
-        ctx.roundRect(0, 0, size, size, radius);
-      } else {
-        const max = size - radius;
-        ctx.moveTo(radius, 0);
-        ctx.lineTo(max, 0);
-        ctx.quadraticCurveTo(size, 0, size, radius);
-        ctx.lineTo(size, max);
-        ctx.quadraticCurveTo(size, size, max, size);
-        ctx.lineTo(radius, size);
-        ctx.quadraticCurveTo(0, size, 0, max);
-        ctx.lineTo(0, radius);
-        ctx.quadraticCurveTo(0, 0, radius, 0);
-        ctx.closePath();
-      }
+      ctx.fillStyle = INK;
     }
     ctx.fill();
-  }
 
-  let svgData = new XMLSerializer().serializeToString(svgElement);
-  if (hasBackground && swapColors) {
-    svgData = svgData.replace(
-      /fill="none" stroke="url\(#brand-gradient\)"/g,
-      `fill="none" stroke="${bgColor}"`
-    );
-    svgData = svgData.replace(/stroke="url\(#brand-gradient\)"/g, `stroke="${bgColor}"`);
-  }
-
-  const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-
-  const img = new Image();
-  img.onload = () => {
-    let drawSize = size;
-    if (hasBackground) {
-      drawSize = size * (logoScale / 100);
+    if (style === "paper") {
+      // Hairline border so the white tile reads against a white page.
+      // Inset by half the line width so the stroke stays inside the canvas.
+      const lineWidth = Math.max(1, size / 120);
+      const inset = lineWidth / 2;
+      roundRectPath(ctx, size, size * RADIUS_RATIO, inset);
+      ctx.lineWidth = lineWidth;
+      ctx.strokeStyle = HAIR;
+      ctx.stroke();
     }
+  }
 
-    const baseOffset = (size - drawSize) / 2;
-    const offsetX = baseOffset + size * (panX / 100);
-    const offsetY = baseOffset + size * (panY / 100);
-
-    ctx.drawImage(img, offsetX, offsetY, drawSize, drawSize);
-    URL.revokeObjectURL(url);
-  };
-  img.src = url;
+  const stroke = style === "grad" ? "#FFFFFF" : "gradient";
+  const img = await loadImage(markSvg(stroke));
+  const ratio = style === "transparent" ? MARK_RATIO_BARE : MARK_RATIO;
+  const drawSize = size * ratio;
+  const offset = (size - drawSize) / 2;
+  ctx.drawImage(img, offset, offset, drawSize, drawSize);
 };
 
-const downloadPNG = () => {
-  const canvas = document.getElementById("canvas");
-  if (!canvas || !canvas.toDataURL) {
-    return;
-  }
+// Previews always render at PREVIEW_SIZE so they stay crisp; the size selector
+// only controls the resolution of the downloaded PNG.
+const renderPreviews = () => {
+  document.querySelectorAll("canvas[data-style]").forEach((canvas) => {
+    renderStyle(canvas, canvas.dataset.style, PREVIEW_SIZE);
+  });
+};
 
+const download = async (style) => {
+  const size = getSize();
+  const canvas = document.createElement("canvas");
+  await renderStyle(canvas, style, size);
+  if (!canvas.toDataURL) return;
   const link = document.createElement("a");
-  link.download = `deepfamily-logo-${canvas.width}x${canvas.height}.png`;
+  link.download = `deepfamily-${STYLE_LABEL[style]}-${size}x${size}.png`;
   link.href = canvas.toDataURL("image/png");
   link.click();
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  const renderIds = [
-    "sizeSelect",
-    "bgShape",
-    "bgColor",
-    "logoScale",
-    "panX",
-    "panY",
-    "swapColors",
-  ];
-
-  renderIds.forEach((id) => {
-    const element = document.getElementById(id);
-    if (!element) return;
-
-    element.addEventListener("change", render);
-    element.addEventListener("input", render);
+  document.querySelectorAll("button[data-download]").forEach((button) => {
+    button.addEventListener("click", () => download(button.dataset.download));
   });
 
-  const downloadButton = document.getElementById("downloadButton");
-  if (downloadButton) {
-    downloadButton.addEventListener("click", downloadPNG);
-  }
-
-  render();
+  renderPreviews();
 });

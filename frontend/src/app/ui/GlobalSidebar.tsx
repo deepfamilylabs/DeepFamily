@@ -110,10 +110,10 @@ export default function GlobalSidebar() {
         path: "/decrypt",
       },
       {
-        id: "logo-converter",
+        id: "logo",
         icon: Image,
-        label: t("logo.converter", "Logo Converter"),
-        onClick: () => window.open("/logo-converter.html", "_blank"),
+        label: t("logo.label", "Logo"),
+        onClick: () => window.open("/logo.html", "_blank"),
       },
     ],
     [t, i18n.language, isDark],
