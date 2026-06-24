@@ -1171,7 +1171,7 @@
     }
   },
   "logo": {
-    "converter": "Logo 转换器"
+    "label": "Logo"
   },
   "decryptMetadata": {
     "title": "解密元数据",

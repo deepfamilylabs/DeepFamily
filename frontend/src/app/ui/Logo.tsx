@@ -16,39 +16,33 @@ export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
       className={className}
       width={width}
       height={height}
-      viewBox="4 2 32 28"
+      viewBox="0 0 128 128"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
         <linearGradient
           id="brand-gradient"
-          x1="4"
-          y1="2"
-          x2="32"
-          y2="28"
+          x1="14"
+          y1="14"
+          x2="114"
+          y2="114"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stopColor="#fb923c" />
-          <stop offset="100%" stopColor="#ef4444" />
+          <stop offset="0" stopColor="#F8843E" />
+          <stop offset="1" stopColor="#F04E33" />
         </linearGradient>
       </defs>
       <g
         fill="none"
         stroke="url(#brand-gradient)"
-        strokeWidth="3.5"
+        strokeWidth="14"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path
-          d="M 8 6
-             L 20 6
-             C 24 6, 28 10, 28 16
-             C 28 22, 24 26, 20 26
-             L 8 26"
-        />
-
-        <line x1="8" y1="16" x2="32" y2="16" />
+        <path d="M16 64 H116" />
+        <path d="M16 24 H66 Q88 24 102 58" />
+        <path d="M16 104 H66 Q88 104 102 70" />
       </g>
     </svg>
   );

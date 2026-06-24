@@ -1171,7 +1171,7 @@
     }
   },
   "logo": {
-    "converter": "Logo Converter"
+    "label": "Logo"
   },
   "decryptMetadata": {
     "title": "Decrypt Metadata",
