@@ -339,7 +339,7 @@ export function DiejiBookRenderer({
   return (
     <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-dieji">
       <div
-        className="mx-auto flex min-h-full max-w-[1320px] flex-col"
+        className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
         style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
       >
         {spreadItems.length ? (
