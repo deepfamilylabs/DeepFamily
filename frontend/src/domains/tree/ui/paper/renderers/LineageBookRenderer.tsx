@@ -396,11 +396,13 @@ export function LineageBookRenderer({
   rootId,
   generations,
   t,
+  spineTitleOverride,
 }: {
   graph: TreeGraphData;
   rootId: NodeId | null;
   generations: PaperGeneration[];
   t: TranslateFn;
+  spineTitleOverride?: string;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -413,7 +415,8 @@ export function LineageBookRenderer({
     () => buildLineagePaperBook({ graph, rootId, generations, t, pageBodyWidths }),
     [graph, rootId, generations, t, pageBodyWidths],
   );
-  const spineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
+  const autoSpineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
+  const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
   const spreadItems = useMemo(
     () =>
       book.charts.flatMap((chart) =>

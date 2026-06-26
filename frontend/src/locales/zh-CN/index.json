@@ -419,6 +419,11 @@
     "lineageOverlapNote": "本图重列上一图第五世。",
     "diejiContinuedGeneration": "续",
     "repeatedGeneration": "重列",
+    "settings": {
+      "title": "显示设置",
+      "spineTitleLabel": "书脊标题",
+      "spineTitleHint": "留空则使用自动生成的标题"
+    },
     "styles": {
       "ou": "欧式",
       "su": "苏式",

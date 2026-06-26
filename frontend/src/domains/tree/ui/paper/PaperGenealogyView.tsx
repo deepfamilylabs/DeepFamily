@@ -19,13 +19,19 @@ export interface PaperGenealogyViewProps {
   hasRoot: boolean;
   loading?: boolean;
   contractMessage?: string;
+  // User-provided spine title; when blank, each renderer falls back to its auto-generated title.
+  spineTitleOverride?: string;
 }
 
 type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
 
 const PAPER_BOOK_RENDERERS = {
   [PAPER_GENEALOGY_STYLE.OU]: (vm) => (
-    <OuBookRenderer generations={vm.generations} t={vm.translate} />
+    <OuBookRenderer
+      generations={vm.generations}
+      t={vm.translate}
+      spineTitleOverride={vm.spineTitleOverride}
+    />
   ),
   [PAPER_GENEALOGY_STYLE.SU]: (vm) => (
     <SuBookRenderer
@@ -33,10 +39,15 @@ const PAPER_BOOK_RENDERERS = {
       rootId={vm.rootId}
       generations={vm.generations}
       t={vm.translate}
+      spineTitleOverride={vm.spineTitleOverride}
     />
   ),
   [PAPER_GENEALOGY_STYLE.DIEJI]: (vm) => (
-    <DiejiBookRenderer generations={vm.generations} t={vm.translate} />
+    <DiejiBookRenderer
+      generations={vm.generations}
+      t={vm.translate}
+      spineTitleOverride={vm.spineTitleOverride}
+    />
   ),
   [PAPER_GENEALOGY_STYLE.LINEAGE]: (vm) => (
     <LineageBookRenderer
@@ -44,10 +55,15 @@ const PAPER_BOOK_RENDERERS = {
       rootId={vm.rootId}
       generations={vm.generations}
       t={vm.translate}
+      spineTitleOverride={vm.spineTitleOverride}
     />
   ),
   [PAPER_GENEALOGY_STYLE.MODERN]: (vm) => (
-    <ModernBookRenderer generations={vm.generations} t={vm.translate} />
+    <ModernBookRenderer
+      generations={vm.generations}
+      t={vm.translate}
+      spineTitleOverride={vm.spineTitleOverride}
+    />
   ),
 } satisfies Record<PaperGenealogyStyle, (vm: PaperGenealogyViewModel) => ReactElement>;
 

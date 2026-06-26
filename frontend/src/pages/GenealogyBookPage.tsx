@@ -1,18 +1,33 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BookOpen, FileDown, GitMerge, Loader2, RefreshCw, ScrollText, Users } from "lucide-react";
 import {
+  BookOpen,
+  FileDown,
+  GitMerge,
+  Loader2,
+  RefreshCw,
+  ScrollText,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
+import {
+  buildPaperGenerations,
+  getPaperSpineTitle,
   isPaperGenealogyStyle,
+  loadPaperSpineTitleOverride,
   PAPER_GENEALOGY_STYLE,
   PAPER_GENEALOGY_STYLES,
   PaperGenealogyView,
+  savePaperSpineTitleOverride,
   type PaperGenealogyStyle,
+  type TranslateFn,
   useFamilyTreeProjection,
   usePaperPdfExport,
   useTreeNodeAccess,
   useTreeGraphData,
   useTreeStatus,
 } from "../domains/tree";
+import type { NodeId } from "../shared/model";
 
 const LS_STYLE_KEY = "df:paperGenealogyStyle";
 
@@ -30,6 +45,27 @@ function usePersistedPaperStyle() {
   return { style, setStyle };
 }
 
+// Manual spine-title override persisted per rootId. `stored === null` means "no override" (the view
+// uses the auto-generated title); an empty saved value is cleared on write, so it never lingers.
+function usePersistedSpineTitle(rootId: NodeId | null) {
+  const [stored, setStored] = useState<string | null>(() => loadPaperSpineTitleOverride(rootId));
+
+  // Re-hydrate when the active genealogy changes so each root shows its own saved title.
+  useEffect(() => {
+    setStored(loadPaperSpineTitleOverride(rootId));
+  }, [rootId]);
+
+  const setSpineTitle = useCallback(
+    (value: string) => {
+      setStored(value);
+      savePaperSpineTitleOverride(rootId, value);
+    },
+    [rootId],
+  );
+
+  return { stored, setSpineTitle };
+}
+
 export default function GenealogyBookPage() {
   const { t } = useTranslation();
   const { style, setStyle } = usePersistedPaperStyle();
@@ -38,6 +74,7 @@ export default function GenealogyBookPage() {
   const { rootExists } = useTreeGraphData();
   const { loading, progress, contractMessage, refresh } = useTreeStatus();
   const { exporting, exportPdf } = usePaperPdfExport();
+  const { stored: spineTitleStored, setSpineTitle } = usePersistedSpineTitle(projection.rootId);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const styleLabels = useMemo(
@@ -52,6 +89,27 @@ export default function GenealogyBookPage() {
   );
 
   const hasRoot = Boolean(projection.rootId && rootExists);
+
+  // Mirror the view model's translate wrapper so the page derives the same auto spine title that
+  // the renderers fall back to when the override is blank.
+  const translateForPaper = useCallback<TranslateFn>(
+    (key, fallback, options) => t(key, { defaultValue: fallback, ...(options || {}) }),
+    [t],
+  );
+  const autoSpineTitle = useMemo(() => {
+    const generations = buildPaperGenerations({
+      graph: projection.graph,
+      nodesData: projection.nodesData,
+      spouseLinks: projection.spouseLinks,
+      t: translateForPaper,
+    });
+    return getPaperSpineTitle(generations, translateForPaper);
+  }, [projection.graph, projection.nodesData, projection.spouseLinks, translateForPaper]);
+
+  // Prefill the input with the auto title when there is no saved override; pass the override (blank
+  // when the user cleared it) to the view so all renderers stay in sync with the input.
+  const spineTitleInputValue = spineTitleStored ?? autoSpineTitle;
+  const spineTitleOverride = spineTitleStored ?? undefined;
 
   useEffect(() => {
     if (!hasRoot) return;
@@ -148,17 +206,52 @@ export default function GenealogyBookPage() {
         </div>
       </div>
 
-      <div ref={exportRef} className="min-h-0 flex-1">
-        <PaperGenealogyView
-          style={style}
-          graph={projection.graph}
-          rootId={projection.rootId}
-          nodesData={projection.nodesData}
-          spouseLinks={projection.spouseLinks}
-          hasRoot={hasRoot}
-          loading={loading}
-          contractMessage={contractMessage}
-        />
+      <div className="flex min-h-0 flex-1">
+        <aside
+          className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-stone-200 bg-white p-4 dark:border-slate-800 dark:bg-black md:w-64"
+          aria-label={t("genealogyBook.settings.title", "Display settings")}
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <SlidersHorizontal className="h-4 w-4 text-stone-500 dark:text-slate-400" />
+            <span>{t("genealogyBook.settings.title", "Display settings")}</span>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {t("genealogyBook.settings.spineTitleLabel", "Spine title")}
+            </span>
+            <input
+              type="text"
+              value={spineTitleInputValue}
+              onChange={(event) => setSpineTitle(event.target.value)}
+              disabled={!hasRoot}
+              placeholder={autoSpineTitle}
+              aria-label={t("genealogyBook.settings.spineTitleLabel", "Spine title")}
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-orange-400 dark:focus:ring-orange-400/30"
+              data-testid="paper-spine-title-input"
+            />
+            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+              {t(
+                "genealogyBook.settings.spineTitleHint",
+                "Leave blank to use the auto-generated title",
+              )}
+            </span>
+          </label>
+        </aside>
+
+        <div ref={exportRef} className="min-h-0 flex-1">
+          <PaperGenealogyView
+            style={style}
+            graph={projection.graph}
+            rootId={projection.rootId}
+            nodesData={projection.nodesData}
+            spouseLinks={projection.spouseLinks}
+            hasRoot={hasRoot}
+            loading={loading}
+            contractMessage={contractMessage}
+            spineTitleOverride={spineTitleOverride}
+          />
+        </div>
       </div>
     </div>
   );

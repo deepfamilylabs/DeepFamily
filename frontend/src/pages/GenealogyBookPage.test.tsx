@@ -55,12 +55,25 @@ vi.mock("../domains/tree", () => ({
   isPaperGenealogyStyle: (value: string | null) =>
     ["ou", "su", "dieji", "lineage", "modern"].includes(String(value)),
   PAPER_GENEALOGY_STYLES: ["ou", "su", "dieji", "lineage", "modern"],
+  // The page derives the auto spine title via these; a fixed value keeps the input prefill stable.
+  buildPaperGenerations: () => [],
+  getPaperSpineTitle: () => "自动族谱",
+  // Mirror the real per-root localStorage helpers so the page test exercises real persistence.
+  loadPaperSpineTitleOverride: (rootId: string | null) =>
+    rootId ? localStorage.getItem(`df:paperSpineTitle:${rootId}`) : null,
+  savePaperSpineTitleOverride: (rootId: string | null, title: string) => {
+    if (!rootId) return;
+    const key = `df:paperSpineTitle:${rootId}`;
+    if (title.trim() === "") localStorage.removeItem(key);
+    else localStorage.setItem(key, title);
+  },
   PaperGenealogyView: (props: any) => (
     <div
       data-testid="paper-view"
       data-style={props.style}
       data-has-root={String(props.hasRoot)}
       data-node-count={String(props.graph.nodes.length)}
+      data-spine-title-override={props.spineTitleOverride ?? ""}
     />
   ),
   useFamilyTreeProjection: () => mocks.projection,
@@ -80,6 +93,7 @@ describe("GenealogyBookPage", () => {
     mocks.status.refresh.mockReset();
     mocks.getStoryData.mockReset();
     mocks.getStoryData.mockResolvedValue(null);
+    mocks.projection.rootId = "0xroot-v-1";
     mocks.projection.nodesData = {};
     mocks.projection.graph = {
       nodes: [{ id: "0xroot-v-1", depth: 0, personHash: "0xroot", versionIndex: 1 }],
@@ -125,6 +139,66 @@ describe("GenealogyBookPage", () => {
 
     expect(screen.getByTestId("paper-view").dataset.style).toBe("ou");
     expect(screen.getByTestId("paper-view").dataset.hasRoot).toBe("false");
+  });
+
+  it("prefills the spine title input with the auto title and persists overrides per root", () => {
+    render(<GenealogyBookPage />);
+
+    const input = screen.getByTestId("paper-spine-title-input") as HTMLInputElement;
+    // Default: prefilled with the auto title, and no override is forwarded to the view.
+    expect(input.value).toBe("自动族谱");
+    expect(screen.getByTestId("paper-view").getAttribute("data-spine-title-override")).toBe("");
+
+    // Editing persists under the rootId key and flows to the view.
+    fireEvent.change(input, { target: { value: "曹氏宗谱" } });
+    expect((screen.getByTestId("paper-spine-title-input") as HTMLInputElement).value).toBe(
+      "曹氏宗谱",
+    );
+    expect(localStorage.getItem("df:paperSpineTitle:0xroot-v-1")).toBe("曹氏宗谱");
+    expect(screen.getByTestId("paper-view").getAttribute("data-spine-title-override")).toBe(
+      "曹氏宗谱",
+    );
+
+    // Clearing reverts to the auto title and removes the saved override.
+    fireEvent.change(screen.getByTestId("paper-spine-title-input"), { target: { value: "" } });
+    expect(localStorage.getItem("df:paperSpineTitle:0xroot-v-1")).toBeNull();
+    expect(screen.getByTestId("paper-view").getAttribute("data-spine-title-override")).toBe("");
+  });
+
+  it("loads a previously saved override for the active root", () => {
+    localStorage.setItem("df:paperSpineTitle:0xroot-v-1", "曹氏宗谱");
+
+    render(<GenealogyBookPage />);
+
+    expect((screen.getByTestId("paper-spine-title-input") as HTMLInputElement).value).toBe(
+      "曹氏宗谱",
+    );
+    expect(screen.getByTestId("paper-view").getAttribute("data-spine-title-override")).toBe(
+      "曹氏宗谱",
+    );
+  });
+
+  it("keeps spine title overrides isolated between different roots", () => {
+    mocks.projection.rootId = "0xrootA-v-1";
+    const { unmount } = render(<GenealogyBookPage />);
+    fireEvent.change(screen.getByTestId("paper-spine-title-input"), {
+      target: { value: "曹氏宗谱" },
+    });
+    expect(localStorage.getItem("df:paperSpineTitle:0xrootA-v-1")).toBe("曹氏宗谱");
+    unmount();
+    cleanup();
+
+    // A different root starts from the auto title, unaffected by the other root's override.
+    mocks.projection.rootId = "0xrootB-v-1";
+    render(<GenealogyBookPage />);
+    const inputB = screen.getByTestId("paper-spine-title-input") as HTMLInputElement;
+    expect(inputB.value).toBe("自动族谱");
+    expect(screen.getByTestId("paper-view").getAttribute("data-spine-title-override")).toBe("");
+
+    fireEvent.change(inputB, { target: { value: "孙氏族谱" } });
+    expect(localStorage.getItem("df:paperSpineTitle:0xrootB-v-1")).toBe("孙氏族谱");
+    // The first root's override is preserved separately.
+    expect(localStorage.getItem("df:paperSpineTitle:0xrootA-v-1")).toBe("曹氏宗谱");
   });
 
   it("preloads missing story chunks for paper records", async () => {
