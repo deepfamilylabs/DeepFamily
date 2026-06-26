@@ -13,12 +13,16 @@ import {
 import {
   buildPaperGenerations,
   buildPaperVars,
+  DEFAULT_PAPER_APPEARANCE,
   getPaperColorThemeSwatch,
   getPaperSpineTitle,
   isPaperGenealogyStyle,
   loadPaperAppearance,
   loadPaperSpineTitleOverride,
   PAPER_COLOR_THEME_IDS,
+  PAPER_EXPORT_MARGIN_MAX,
+  PAPER_EXPORT_MARGIN_MIN,
+  PAPER_EXPORT_MARGIN_STEP,
   PAPER_FONT_PRESET_IDS,
   PAPER_FONT_SCALE_MAX,
   PAPER_FONT_SCALE_MIN,
@@ -71,7 +75,7 @@ function usePersistedSpineTitle(rootId: NodeId | null) {
 
   const setSpineTitle = useCallback(
     (value: string) => {
-      setStored(value);
+      setStored(value.trim() ? value : null);
       savePaperSpineTitleOverride(rootId, value);
     },
     [rootId],
@@ -93,7 +97,24 @@ function usePersistedPaperAppearance() {
     });
   }, []);
 
-  return { appearance, updateAppearance };
+  const resetAppearance = useCallback(() => {
+    const next = { ...DEFAULT_PAPER_APPEARANCE };
+    setAppearance(next);
+    savePaperAppearance(next);
+  }, []);
+
+  return { appearance, updateAppearance, resetAppearance };
+}
+
+function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
+  return (
+    appearance.colorThemeId === DEFAULT_PAPER_APPEARANCE.colorThemeId &&
+    appearance.fontPresetId === DEFAULT_PAPER_APPEARANCE.fontPresetId &&
+    appearance.textureId === DEFAULT_PAPER_APPEARANCE.textureId &&
+    appearance.hallName === DEFAULT_PAPER_APPEARANCE.hallName &&
+    appearance.fontScale === DEFAULT_PAPER_APPEARANCE.fontScale &&
+    appearance.exportMarginPx === DEFAULT_PAPER_APPEARANCE.exportMarginPx
+  );
 }
 
 export default function GenealogyBookPage() {
@@ -105,7 +126,7 @@ export default function GenealogyBookPage() {
   const { loading, progress, contractMessage, refresh } = useTreeStatus();
   const { exporting, exportPdf } = usePaperPdfExport();
   const { stored: spineTitleStored, setSpineTitle } = usePersistedSpineTitle(projection.rootId);
-  const { appearance, updateAppearance } = usePersistedPaperAppearance();
+  const { appearance, updateAppearance, resetAppearance } = usePersistedPaperAppearance();
   const exportRef = useRef<HTMLDivElement>(null);
 
   const styleLabels = useMemo(
@@ -179,6 +200,11 @@ export default function GenealogyBookPage() {
   // when the user cleared it) to the view so all renderers stay in sync with the input.
   const spineTitleInputValue = spineTitleStored ?? autoSpineTitle;
   const spineTitleOverride = spineTitleStored ?? undefined;
+  const hasCustomDisplaySettings = spineTitleStored !== null || !isDefaultPaperAppearance(appearance);
+  const resetDisplaySettings = useCallback(() => {
+    setSpineTitle("");
+    resetAppearance();
+  }, [resetAppearance, setSpineTitle]);
 
   useEffect(() => {
     if (!hasRoot) return;
@@ -237,7 +263,7 @@ export default function GenealogyBookPage() {
 
           <button
             type="button"
-            onClick={() => exportPdf(exportRef.current, style, paperVars)}
+            onClick={() => exportPdf(exportRef.current, style, paperVars, appearance.exportMarginPx)}
             disabled={!hasRoot || loading || exporting}
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             title={t("genealogyBook.exportPdf", "Export PDF")}
@@ -280,9 +306,21 @@ export default function GenealogyBookPage() {
           className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-stone-200 bg-white p-4 dark:border-slate-800 dark:bg-black md:w-64"
           aria-label={t("genealogyBook.settings.title", "Display settings")}
         >
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-            <SlidersHorizontal className="h-4 w-4 text-stone-500 dark:text-slate-400" />
-            <span>{t("genealogyBook.settings.title", "Display settings")}</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <SlidersHorizontal className="h-4 w-4 shrink-0 text-stone-500 dark:text-slate-400" />
+              <span className="truncate">{t("genealogyBook.settings.title", "Display settings")}</span>
+            </div>
+            <button
+              type="button"
+              onClick={resetDisplaySettings}
+              disabled={!hasCustomDisplaySettings}
+              className="shrink-0 text-xs font-medium text-stone-600 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:text-orange-200"
+              title={t("genealogyBook.settings.resetDefault", "Reset defaults")}
+              data-testid="paper-reset-display-settings"
+            >
+              {t("genealogyBook.settings.resetDefault", "Reset defaults")}
+            </button>
           </div>
 
           <label className="flex flex-col gap-1.5">
@@ -454,6 +492,36 @@ export default function GenealogyBookPage() {
               )}
             </span>
           </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t("genealogyBook.settings.exportMarginLabel", "Page margin")}
+              </span>
+              <span className="text-[11px] tabular-nums text-stone-500 dark:text-slate-400">
+                {appearance.exportMarginPx}px
+              </span>
+            </div>
+            <input
+              type="range"
+              min={PAPER_EXPORT_MARGIN_MIN}
+              max={PAPER_EXPORT_MARGIN_MAX}
+              step={PAPER_EXPORT_MARGIN_STEP}
+              value={appearance.exportMarginPx}
+              onChange={(event) =>
+                updateAppearance({ exportMarginPx: Number(event.target.value) })
+              }
+              aria-label={t("genealogyBook.settings.exportMarginLabel", "PDF margin")}
+              className="w-full accent-orange-500"
+              data-testid="paper-export-margin-input"
+            />
+            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+              {t(
+                "genealogyBook.settings.exportMarginHint",
+                "Blank book edge around each leaf, shown in the preview and the exported PDF",
+              )}
+            </span>
+          </div>
         </aside>
 
         <div ref={exportRef} className="min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -470,6 +538,7 @@ export default function GenealogyBookPage() {
             paperVars={paperVars}
             hallName={appearance.hallName ?? undefined}
             fontScale={appearance.fontScale}
+            exportMarginPx={appearance.exportMarginPx}
           />
         </div>
       </div>

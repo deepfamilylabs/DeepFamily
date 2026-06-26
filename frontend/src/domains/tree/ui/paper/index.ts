@@ -18,8 +18,13 @@ export {
 } from "./paperSpineTitleStorage";
 export {
   buildPaperVars,
+  clampPaperExportMargin,
   clampPaperFontScale,
   DEFAULT_PAPER_APPEARANCE,
+  PAPER_EXPORT_MARGIN_DEFAULT,
+  PAPER_EXPORT_MARGIN_MAX,
+  PAPER_EXPORT_MARGIN_MIN,
+  PAPER_EXPORT_MARGIN_STEP,
   getPaperColorThemeSwatch,
   loadPaperAppearance,
   PAPER_APPEARANCE_STORAGE_KEY,

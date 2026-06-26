@@ -10,6 +10,10 @@ import { PAPER_VARS } from "../paperStyles";
 // getting a transparent background if the CSS variable fails to resolve on the cloned node.
 const PAPER_SHEET_COLOR_FALLBACK = "#f7efd8";
 const DEFAULT_PIXEL_RATIO = 2;
+// Uniform book-edge margin (天头地脚/书边) around the printed leaf, in spread px units. Keeps the
+// version-frame (版框) off the physical paper edge so printers don't clip it and the page reads like
+// a real genealogy leaf. ~48px ≈ 0.5in at 96dpi.
+const DEFAULT_MARGIN_PX = 48;
 
 // The `--df-paper-*` custom properties are defined on the scroll-container ancestor, outside the
 // captured spread. html-to-image clones only the spread subtree and does NOT carry CSS custom
@@ -51,6 +55,10 @@ export interface ExportPaperGenealogyPdfOptions {
   pixelRatio?: number;
   /** Active appearance vars to inline during capture; defaults to PAPER_VARS (default theme). */
   cssVars?: CSSProperties;
+  /** Book-edge margin around each leaf, in spread px units. Defaults to 48; pass 0 for edge-to-edge. */
+  marginPx?: number;
+  /** Fill color of the margin band. Defaults to the active paper-sheet color (seamless book edge). */
+  marginColor?: string;
 }
 
 export class NoPaperSpreadsError extends Error {
@@ -68,10 +76,13 @@ export async function exportPaperGenealogyPdf(
     fileName,
     pixelRatio = DEFAULT_PIXEL_RATIO,
     cssVars = PAPER_VARS,
+    marginPx = DEFAULT_MARGIN_PX,
   } = options;
   const varEntries = toPaperVarEntries(cssVars);
   const sheetColor =
     (cssVars as Record<string, string>)["--df-paper-sheet"] || PAPER_SHEET_COLOR_FALLBACK;
+  const margin = Math.max(0, marginPx);
+  const marginColor = options.marginColor ?? sheetColor;
   const spreads = Array.from(root.querySelectorAll<HTMLElement>("[data-paper-spread]"));
   if (!spreads.length) throw new NoPaperSpreadsError();
 
@@ -83,18 +94,18 @@ export async function exportPaperGenealogyPdf(
 
   const capture = async () => {
     const firstSize = getSpreadPageSize(spreads[0]);
-    const pageWidth = firstSize.width;
-    const pageHeight = firstSize.height;
 
     const pdf = new jsPDF({
       orientation: "landscape",
       unit: "px",
-      format: [pageWidth, pageHeight],
+      format: [firstSize.width + margin * 2, firstSize.height + margin * 2],
     });
 
     for (let index = 0; index < spreads.length; index += 1) {
       const spread = spreads[index];
       const { width, height } = getSpreadPageSize(spread);
+      const pageWidth = width + margin * 2;
+      const pageHeight = height + margin * 2;
       // Sequential (not concurrent) to keep peak memory bounded on large books.
       const dataUrl = await withInlinePaperVars(spread, varEntries, () =>
         toPng(spread, {
@@ -109,8 +120,14 @@ export async function exportPaperGenealogyPdf(
         }),
       );
 
-      if (index > 0) pdf.addPage([width, height], "landscape");
-      pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
+      if (index > 0) pdf.addPage([pageWidth, pageHeight], "landscape");
+      // Paint the book-edge margin so the version-frame sits inset on a full paper leaf instead of
+      // touching the page edge; the image (cream to its own border) seams invisibly into the band.
+      if (margin > 0) {
+        pdf.setFillColor(marginColor);
+        pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      }
+      pdf.addImage(dataUrl, "PNG", margin, margin, width, height);
     }
 
     pdf.save(fileName);

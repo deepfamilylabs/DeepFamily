@@ -28,6 +28,11 @@ export interface PaperGenealogyViewProps {
   hallName?: string;
   // Whole-sheet preview zoom multiplier; applied on each renderer's content layer. Omitted → 1.
   fontScale?: number;
+  // Book-edge margin (in spread px) shown around each leaf in the preview AND added to the exported
+  // PDF, so the setting is WYSIWYG. Published as a CSS var that a [data-paper-spread] rule consumes,
+  // which keeps it out of each spread's offset size (export measures that) and out of the raster
+  // (html-to-image ignores element margins); the exporter re-adds the same margin in the PDF.
+  exportMarginPx?: number;
 }
 
 type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
@@ -107,6 +112,7 @@ export function PaperGenealogyView(props: PaperGenealogyViewProps) {
       className="h-full min-h-0 min-w-0 w-full"
       data-testid="paper-genealogy-view"
       data-style={props.style}
+      style={{ "--df-paper-leaf-margin": `${props.exportMarginPx ?? 0}px` } as CSSProperties}
     >
       {PAPER_BOOK_RENDERERS[props.style](vm)}
     </div>

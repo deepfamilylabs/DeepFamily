@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const toPng = vi.fn(async (_el: HTMLElement, _options?: unknown) => "data:image/png;base64,AAAA");
 const addPage = vi.fn();
 const addImage = vi.fn();
+const setFillColor = vi.fn();
+const rect = vi.fn();
 const save = vi.fn();
 const jsPDF = vi.fn(function jsPDFMock() {
-  return { addPage, addImage, save };
+  return { addPage, addImage, setFillColor, rect, save };
 });
 
 vi.mock("html-to-image", () => ({ toPng }));
@@ -45,6 +47,27 @@ describe("exportPaperGenealogyPdf", () => {
     expect(addPage).toHaveBeenCalledTimes(2); // first spread reuses the initial page
     expect(save).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith("genealogy-modern.pdf");
+  });
+
+  it("insets each leaf by the book-edge margin and fills the margin band", async () => {
+    const root = buildRoot(1);
+
+    // jsdom reports 0 offset dimensions, so the page is just the margin band on both axes.
+    await exportPaperGenealogyPdf({ root, fileName: "su.pdf", marginPx: 48, marginColor: "#f7efd8" });
+
+    expect(setFillColor).toHaveBeenCalledWith("#f7efd8");
+    expect(rect).toHaveBeenCalledWith(0, 0, 96, 96, "F");
+    // Image is inset by the margin, not pinned to the page edge.
+    expect(addImage).toHaveBeenCalledWith("data:image/png;base64,AAAA", "PNG", 48, 48, 0, 0);
+  });
+
+  it("skips the margin band when marginPx is 0", async () => {
+    const root = buildRoot(1);
+
+    await exportPaperGenealogyPdf({ root, fileName: "su.pdf", marginPx: 0 });
+
+    expect(rect).not.toHaveBeenCalled();
+    expect(addImage).toHaveBeenCalledWith("data:image/png;base64,AAAA", "PNG", 0, 0, 0, 0);
   });
 
   it("inlines paper CSS vars on the spread during capture and cleans them up after", async () => {

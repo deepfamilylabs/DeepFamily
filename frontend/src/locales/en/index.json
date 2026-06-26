@@ -421,6 +421,7 @@
     "repeatedGeneration": "repeated",
     "settings": {
       "title": "Display settings",
+      "resetDefault": "Reset defaults",
       "spineTitleLabel": "Spine title",
       "spineTitleHint": "Leave blank to use the auto-generated title",
       "hallNameLabel": "Hall name",
@@ -430,6 +431,8 @@
       "textureLabel": "Paper texture",
       "fontScaleLabel": "Font scale",
       "fontScaleHint": "Scales the whole sheet in the preview only",
+      "exportMarginLabel": "Page margin",
+      "exportMarginHint": "Blank book edge around each leaf, shown in the preview and the exported PDF",
       "themes": {
         "xuan": "Rice paper",
         "plain": "Plain white",

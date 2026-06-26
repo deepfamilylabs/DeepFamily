@@ -55,6 +55,14 @@ vi.mock("../domains/tree", () => ({
   isPaperGenealogyStyle: (value: string | null) =>
     ["ou", "su", "dieji", "lineage", "modern"].includes(String(value)),
   PAPER_GENEALOGY_STYLES: ["ou", "su", "dieji", "lineage", "modern"],
+  DEFAULT_PAPER_APPEARANCE: {
+    colorThemeId: "xuan",
+    fontPresetId: "classic",
+    textureId: "subtle",
+    hallName: null,
+    fontScale: 1,
+    exportMarginPx: 48,
+  },
   // The page derives the auto spine title via these; a fixed value keeps the input prefill stable.
   buildPaperGenerations: () => [],
   getPaperSpineTitle: () => "自动族谱",
@@ -82,6 +90,9 @@ vi.mock("../domains/tree", () => ({
   PAPER_FONT_SCALE_MIN: 0.8,
   PAPER_FONT_SCALE_MAX: 1.6,
   PAPER_FONT_SCALE_STEP: 0.1,
+  PAPER_EXPORT_MARGIN_MIN: 0,
+  PAPER_EXPORT_MARGIN_MAX: 120,
+  PAPER_EXPORT_MARGIN_STEP: 4,
   loadPaperAppearance: () => {
     const raw = localStorage.getItem("df:paperAppearance");
     const base = {
@@ -90,6 +101,7 @@ vi.mock("../domains/tree", () => ({
       textureId: "subtle",
       hallName: null,
       fontScale: 1,
+      exportMarginPx: 48,
     };
     if (!raw) return base;
     try {
@@ -277,6 +289,50 @@ describe("GenealogyBookPage", () => {
     expect(saved.textureId).toBe("strong");
   });
 
+  it("restores the sidebar display settings to their defaults", () => {
+    render(<GenealogyBookPage />);
+
+    const resetButton = screen.getByTestId("paper-reset-display-settings") as HTMLButtonElement;
+    expect(resetButton.disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId("paper-spine-title-input"), {
+      target: { value: "曹氏宗谱" },
+    });
+    fireEvent.change(screen.getByTestId("paper-hall-name-input"), { target: { value: "忠义堂" } });
+    fireEvent.click(screen.getByTestId("paper-color-theme-bamboo"));
+    fireEvent.click(screen.getByTestId("paper-font-preset-song"));
+    fireEvent.click(screen.getByTestId("paper-texture-strong"));
+    fireEvent.change(screen.getByTestId("paper-font-scale-input"), { target: { value: "1.3" } });
+    fireEvent.change(screen.getByTestId("paper-export-margin-input"), { target: { value: "72" } });
+    expect(resetButton.disabled).toBe(false);
+
+    fireEvent.click(resetButton);
+
+    expect(localStorage.getItem("df:paperSpineTitle:0xroot-v-1")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}")).toEqual({
+      colorThemeId: "xuan",
+      fontPresetId: "classic",
+      textureId: "subtle",
+      hallName: null,
+      fontScale: 1,
+      exportMarginPx: 48,
+    });
+    expect((screen.getByTestId("paper-spine-title-input") as HTMLInputElement).value).toBe(
+      "自动族谱",
+    );
+    expect((screen.getByTestId("paper-hall-name-input") as HTMLInputElement).value).toBe(
+      "DeepFamily",
+    );
+    expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1");
+    expect((screen.getByTestId("paper-export-margin-input") as HTMLInputElement).value).toBe("48");
+    expect(resetButton.disabled).toBe(true);
+  });
+
   it("loads a previously saved appearance", () => {
     localStorage.setItem(
       "df:paperAppearance",
@@ -314,7 +370,7 @@ describe("GenealogyBookPage", () => {
     expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").fontScale).toBe(1.3);
   });
 
-  it("passes css vars to export", () => {
+  it("passes css vars and the export margin to export", () => {
     render(<GenealogyBookPage />);
     fireEvent.click(screen.getByTitle("Export PDF"));
 
@@ -324,6 +380,22 @@ describe("GenealogyBookPage", () => {
       expect.objectContaining({
         "--df-paper-test-font": "classic",
       }),
+      48,
+    );
+  });
+
+  it("adjusts and persists the export margin, forwarding it to export", () => {
+    render(<GenealogyBookPage />);
+
+    fireEvent.change(screen.getByTestId("paper-export-margin-input"), { target: { value: "72" } });
+    expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").exportMarginPx).toBe(72);
+
+    fireEvent.click(screen.getByTitle("Export PDF"));
+    expect(mocks.exportPdf).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      "ou",
+      expect.anything(),
+      72,
     );
   });
 

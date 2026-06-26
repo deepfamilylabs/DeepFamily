@@ -421,6 +421,7 @@
     "repeatedGeneration": "重列",
     "settings": {
       "title": "显示设置",
+      "resetDefault": "恢复默认",
       "spineTitleLabel": "书脊标题",
       "spineTitleHint": "留空则使用自动生成的标题",
       "hallNameLabel": "堂号",
@@ -430,6 +431,8 @@
       "textureLabel": "纸张纹理",
       "fontScaleLabel": "字体倍数",
       "fontScaleHint": "仅缩放屏幕预览，不影响 PDF 打印尺寸",
+      "exportMarginLabel": "页边距",
+      "exportMarginHint": "每页四周的书边留白，预览与导出 PDF 同步显示",
       "themes": {
         "xuan": "宣纸",
         "plain": "素白",
