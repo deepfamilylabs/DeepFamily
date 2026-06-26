@@ -166,6 +166,25 @@ export function clampPaperFontScale(value: unknown): number {
   return Math.round(clamped * 100) / 100;
 }
 
+// ---- Export margin (book-edge 留白 in the exported PDF) ----------------------------------------
+
+// Export-only: the paper margin (天头地脚/书边) painted around each printed leaf so the version
+// frame (版框) sits inset instead of touching the page edge (which printers clip). Measured in
+// spread px units; it does NOT affect the on-screen preview — only the generated PDF. The default
+// mirrors the exporter's own DEFAULT_MARGIN_PX (48px ≈ 0.5in at 96dpi).
+export const PAPER_EXPORT_MARGIN_MIN = 0;
+export const PAPER_EXPORT_MARGIN_MAX = 120;
+export const PAPER_EXPORT_MARGIN_STEP = 4;
+export const PAPER_EXPORT_MARGIN_DEFAULT = 48;
+
+// Clamp a raw margin into the supported range; non-number/non-finite inputs fall back to the
+// default. Rounded to an integer so persisted values stay whole pixels.
+export function clampPaperExportMargin(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return PAPER_EXPORT_MARGIN_DEFAULT;
+  const clamped = Math.min(PAPER_EXPORT_MARGIN_MAX, Math.max(PAPER_EXPORT_MARGIN_MIN, value));
+  return Math.round(clamped);
+}
+
 // ---- Appearance value + variable composition --------------------------------------------------
 
 export interface PaperAppearance {
@@ -176,6 +195,8 @@ export interface PaperAppearance {
   hallName: string | null;
   // Whole-sheet preview zoom multiplier (see PAPER_FONT_SCALE_* above).
   fontScale: number;
+  // Book-edge margin (in spread px) applied only when exporting to PDF (see PAPER_EXPORT_MARGIN_*).
+  exportMarginPx: number;
 }
 
 export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
@@ -184,6 +205,7 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   textureId: PAPER_TEXTURE.SUBTLE,
   hallName: null,
   fontScale: PAPER_FONT_SCALE_DEFAULT,
+  exportMarginPx: PAPER_EXPORT_MARGIN_DEFAULT,
 };
 
 // Compose the full --df-paper-* variable set for a given appearance. Starts from PAPER_VARS so any
@@ -235,6 +257,7 @@ export function loadPaperAppearance(): PaperAppearance {
         : DEFAULT_PAPER_APPEARANCE.textureId,
       hallName,
       fontScale: clampPaperFontScale(parsed.fontScale),
+      exportMarginPx: clampPaperExportMargin(parsed.exportMarginPx),
     };
   } catch {
     return { ...DEFAULT_PAPER_APPEARANCE };
@@ -248,6 +271,7 @@ export function savePaperAppearance(appearance: PaperAppearance): void {
     ...appearance,
     hallName: appearance.hallName && appearance.hallName.trim() ? appearance.hallName : null,
     fontScale: clampPaperFontScale(appearance.fontScale),
+    exportMarginPx: clampPaperExportMargin(appearance.exportMarginPx),
   };
   try {
     window.localStorage.setItem(PAPER_APPEARANCE_STORAGE_KEY, JSON.stringify(normalized));

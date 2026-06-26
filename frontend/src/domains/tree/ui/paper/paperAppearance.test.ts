@@ -10,6 +10,8 @@ import {
   PAPER_COLOR_THEME_IDS,
   PAPER_FONT_PRESETS,
   PAPER_FONT_PRESET_IDS,
+  PAPER_EXPORT_MARGIN_MAX,
+  PAPER_EXPORT_MARGIN_MIN,
   PAPER_FONT_SCALE_MAX,
   PAPER_FONT_SCALE_MIN,
   PAPER_TEXTURE_PRESETS,
@@ -84,6 +86,7 @@ describe("paperAppearance storage", () => {
       textureId: "strong",
       hallName: "忠义堂",
       fontScale: 1.2,
+      exportMarginPx: 64,
     };
     savePaperAppearance(next);
     expect(localStorage.getItem(PAPER_APPEARANCE_STORAGE_KEY)).toBeTruthy();
@@ -99,6 +102,17 @@ describe("paperAppearance storage", () => {
       JSON.stringify({ ...DEFAULT_PAPER_APPEARANCE, fontScale: 0.1 }),
     );
     expect(loadPaperAppearance().fontScale).toBe(PAPER_FONT_SCALE_MIN);
+  });
+
+  it("clamps an out-of-range export margin on save and load", () => {
+    savePaperAppearance({ ...DEFAULT_PAPER_APPEARANCE, exportMarginPx: 999 });
+    expect(loadPaperAppearance().exportMarginPx).toBe(PAPER_EXPORT_MARGIN_MAX);
+
+    localStorage.setItem(
+      PAPER_APPEARANCE_STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_PAPER_APPEARANCE, exportMarginPx: -40 }),
+    );
+    expect(loadPaperAppearance().exportMarginPx).toBe(PAPER_EXPORT_MARGIN_MIN);
   });
 
   it("normalizes a blank hall name to null on save", () => {

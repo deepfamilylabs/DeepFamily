@@ -23,6 +23,7 @@ export function usePaperPdfExport() {
       root: HTMLElement | null,
       style: PaperGenealogyStyle,
       cssVars?: CSSProperties,
+      marginPx?: number,
     ) => {
       if (exporting) return;
       if (!root) {
@@ -36,6 +37,7 @@ export function usePaperPdfExport() {
           root,
           fileName: buildFileName(style),
           cssVars,
+          marginPx,
         });
         toast.success(t("genealogyBook.exportPdfSuccess", "PDF exported"));
       } catch (error) {
