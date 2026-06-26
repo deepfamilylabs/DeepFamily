@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BookOpen, GitMerge, RefreshCw, ScrollText, Users } from "lucide-react";
+import { BookOpen, FileDown, GitMerge, Loader2, RefreshCw, ScrollText, Users } from "lucide-react";
 import {
   isPaperGenealogyStyle,
   PAPER_GENEALOGY_STYLE,
@@ -8,6 +8,7 @@ import {
   PaperGenealogyView,
   type PaperGenealogyStyle,
   useFamilyTreeProjection,
+  usePaperPdfExport,
   useTreeNodeAccess,
   useTreeGraphData,
   useTreeStatus,
@@ -36,6 +37,8 @@ export default function GenealogyBookPage() {
   const { getStoryData } = useTreeNodeAccess();
   const { rootExists } = useTreeGraphData();
   const { loading, progress, contractMessage, refresh } = useTreeStatus();
+  const { exporting, exportPdf } = usePaperPdfExport();
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const styleLabels = useMemo(
     (): Record<PaperGenealogyStyle, string> => ({
@@ -105,6 +108,21 @@ export default function GenealogyBookPage() {
             <span className="hidden sm:inline">{t("familyTree.actions.refresh", "Refresh")}</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => exportPdf(exportRef.current, style)}
+            disabled={!hasRoot || loading || exporting}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            title={t("genealogyBook.exportPdf", "Export PDF")}
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <FileDown className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">{t("genealogyBook.exportPdf", "Export PDF")}</span>
+          </button>
+
           <div
             className="inline-flex max-w-full items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900"
             aria-label={t("genealogyBook.styleSwitchLabel", "Genealogy book style")}
@@ -130,7 +148,7 @@ export default function GenealogyBookPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div ref={exportRef} className="min-h-0 flex-1">
         <PaperGenealogyView
           style={style}
           graph={projection.graph}

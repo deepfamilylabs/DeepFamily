@@ -496,6 +496,7 @@ export function LineageBookRenderer({
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-lineage-spread-${chart.index}-${spread.index}`}
+                  data-paper-spread=""
                 >
                   <LineagePage
                     side="left"

@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     refresh: vi.fn(),
   },
   getStoryData: vi.fn().mockResolvedValue(null),
+  exportPdf: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -63,6 +64,7 @@ vi.mock("../domains/tree", () => ({
     />
   ),
   useFamilyTreeProjection: () => mocks.projection,
+  usePaperPdfExport: () => ({ exporting: false, exportPdf: mocks.exportPdf }),
   useTreeNodeAccess: () => ({ getStoryData: mocks.getStoryData }),
   useTreeGraphData: () => ({ rootExists: mocks.rootExists }),
   useTreeStatus: () => mocks.status,
