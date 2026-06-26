@@ -12,14 +12,25 @@ import {
 } from "lucide-react";
 import {
   buildPaperGenerations,
+  buildPaperVars,
+  getPaperColorThemeSwatch,
   getPaperSpineTitle,
   isPaperGenealogyStyle,
+  loadPaperAppearance,
   loadPaperSpineTitleOverride,
+  PAPER_COLOR_THEME_IDS,
+  PAPER_FONT_PRESET_IDS,
   PAPER_GENEALOGY_STYLE,
   PAPER_GENEALOGY_STYLES,
+  PAPER_TEXTURE_IDS,
   PaperGenealogyView,
+  savePaperAppearance,
   savePaperSpineTitleOverride,
+  type PaperAppearance,
+  type PaperColorThemeId,
+  type PaperFontPresetId,
   type PaperGenealogyStyle,
+  type PaperTextureId,
   type TranslateFn,
   useFamilyTreeProjection,
   usePaperPdfExport,
@@ -66,6 +77,22 @@ function usePersistedSpineTitle(rootId: NodeId | null) {
   return { stored, setSpineTitle };
 }
 
+// Paper appearance (color theme / font / texture / hall name) persisted globally — shared by every
+// genealogy, unlike the per-root spine title.
+function usePersistedPaperAppearance() {
+  const [appearance, setAppearance] = useState<PaperAppearance>(() => loadPaperAppearance());
+
+  const updateAppearance = useCallback((patch: Partial<PaperAppearance>) => {
+    setAppearance((prev) => {
+      const next = { ...prev, ...patch };
+      savePaperAppearance(next);
+      return next;
+    });
+  }, []);
+
+  return { appearance, updateAppearance };
+}
+
 export default function GenealogyBookPage() {
   const { t } = useTranslation();
   const { style, setStyle } = usePersistedPaperStyle();
@@ -75,6 +102,7 @@ export default function GenealogyBookPage() {
   const { loading, progress, contractMessage, refresh } = useTreeStatus();
   const { exporting, exportPdf } = usePaperPdfExport();
   const { stored: spineTitleStored, setSpineTitle } = usePersistedSpineTitle(projection.rootId);
+  const { appearance, updateAppearance } = usePersistedPaperAppearance();
   const exportRef = useRef<HTMLDivElement>(null);
 
   const styleLabels = useMemo(
@@ -88,7 +116,46 @@ export default function GenealogyBookPage() {
     [t],
   );
 
+  const colorThemeLabels = useMemo(
+    (): Record<PaperColorThemeId, string> => ({
+      xuan: t("genealogyBook.settings.themes.xuan", "Rice paper"),
+      plain: t("genealogyBook.settings.themes.plain", "Plain white"),
+      bamboo: t("genealogyBook.settings.themes.bamboo", "Bamboo green"),
+      azure: t("genealogyBook.settings.themes.azure", "Porcelain blue"),
+    }),
+    [t],
+  );
+  const fontPresetLabels = useMemo(
+    (): Record<PaperFontPresetId, string> => ({
+      classic: t("genealogyBook.settings.fonts.classic", "Classical"),
+      song: t("genealogyBook.settings.fonts.song", "Song"),
+      sans: t("genealogyBook.settings.fonts.sans", "Sans"),
+    }),
+    [t],
+  );
+  const textureLabels = useMemo(
+    (): Record<PaperTextureId, string> => ({
+      subtle: t("genealogyBook.settings.textures.subtle", "Subtle"),
+      strong: t("genealogyBook.settings.textures.strong", "Strong"),
+      plain: t("genealogyBook.settings.textures.plain", "None"),
+    }),
+    [t],
+  );
+
+  const paperVars = useMemo(() => buildPaperVars(appearance), [appearance]);
   const hasRoot = Boolean(projection.rootId && rootExists);
+  const defaultHallName = t("genealogyBook.ouHallName", "DeepFamily");
+  const hallNameInputValue = appearance.hallName ?? defaultHallName;
+  const fieldInputClassName =
+    "h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-orange-400 dark:focus:ring-orange-400/30";
+  const segmentGroupClassName =
+    "inline-flex w-full items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900";
+  const segmentButtonClassName = (selected: boolean) =>
+    `h-7 flex-1 rounded px-1 text-xs font-medium transition-colors ${
+      selected
+        ? "bg-white text-red-700 shadow-sm ring-1 ring-black/5 dark:bg-slate-700 dark:text-orange-200 dark:ring-white/10"
+        : "text-stone-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800"
+    }`;
 
   // Mirror the view model's translate wrapper so the page derives the same auto spine title that
   // the renderers fall back to when the override is blank.
@@ -168,7 +235,7 @@ export default function GenealogyBookPage() {
 
           <button
             type="button"
-            onClick={() => exportPdf(exportRef.current, style)}
+            onClick={() => exportPdf(exportRef.current, style, paperVars)}
             disabled={!hasRoot || loading || exporting}
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             title={t("genealogyBook.exportPdf", "Export PDF")}
@@ -227,7 +294,7 @@ export default function GenealogyBookPage() {
               disabled={!hasRoot}
               placeholder={autoSpineTitle}
               aria-label={t("genealogyBook.settings.spineTitleLabel", "Spine title")}
-              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-orange-400 dark:focus:ring-orange-400/30"
+              className={fieldInputClassName}
               data-testid="paper-spine-title-input"
             />
             <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
@@ -237,6 +304,126 @@ export default function GenealogyBookPage() {
               )}
             </span>
           </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {t("genealogyBook.settings.hallNameLabel", "Hall name")}
+            </span>
+            <input
+              type="text"
+              value={hallNameInputValue}
+              onChange={(event) => updateAppearance({ hallName: event.target.value })}
+              placeholder={defaultHallName}
+              aria-label={t("genealogyBook.settings.hallNameLabel", "Hall name")}
+              className={fieldInputClassName}
+              data-testid="paper-hall-name-input"
+            />
+            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+              {t(
+                "genealogyBook.settings.hallNameHint",
+                "Leave blank to use the default hall name",
+              )}
+            </span>
+          </label>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {t("genealogyBook.settings.colorThemeLabel", "Color theme")}
+            </span>
+            <div
+              className="grid grid-cols-2 gap-2"
+              role="group"
+              aria-label={t("genealogyBook.settings.colorThemeLabel", "Color theme")}
+            >
+              {PAPER_COLOR_THEME_IDS.map((id) => {
+                const [sheet, line, accent] = getPaperColorThemeSwatch(id);
+                const selected = appearance.colorThemeId === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => updateAppearance({ colorThemeId: id })}
+                    aria-pressed={selected}
+                    title={colorThemeLabels[id]}
+                    className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                      selected
+                        ? "border-orange-500 ring-1 ring-orange-500/30 dark:border-orange-400"
+                        : "border-stone-200 hover:border-stone-300 dark:border-slate-700 dark:hover:border-slate-600"
+                    }`}
+                    data-testid={`paper-color-theme-${id}`}
+                  >
+                    <span
+                      className="flex h-5 w-5 shrink-0 overflow-hidden rounded-sm border border-black/10"
+                      aria-hidden="true"
+                    >
+                      <span className="h-full w-1/3" style={{ backgroundColor: sheet }} />
+                      <span className="h-full w-1/3" style={{ backgroundColor: line }} />
+                      <span className="h-full w-1/3" style={{ backgroundColor: accent }} />
+                    </span>
+                    <span className="min-w-0 truncate text-xs text-slate-700 dark:text-slate-200">
+                      {colorThemeLabels[id]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {t("genealogyBook.settings.fontLabel", "Font")}
+            </span>
+            <div
+              className={segmentGroupClassName}
+              role="group"
+              aria-label={t("genealogyBook.settings.fontLabel", "Font")}
+            >
+              {PAPER_FONT_PRESET_IDS.map((id) => {
+                const selected = appearance.fontPresetId === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => updateAppearance({ fontPresetId: id })}
+                    aria-pressed={selected}
+                    title={fontPresetLabels[id]}
+                    className={segmentButtonClassName(selected)}
+                    data-testid={`paper-font-preset-${id}`}
+                  >
+                    {fontPresetLabels[id]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {t("genealogyBook.settings.textureLabel", "Paper texture")}
+            </span>
+            <div
+              className={segmentGroupClassName}
+              role="group"
+              aria-label={t("genealogyBook.settings.textureLabel", "Paper texture")}
+            >
+              {PAPER_TEXTURE_IDS.map((id) => {
+                const selected = appearance.textureId === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => updateAppearance({ textureId: id })}
+                    aria-pressed={selected}
+                    title={textureLabels[id]}
+                    className={segmentButtonClassName(selected)}
+                    data-testid={`paper-texture-${id}`}
+                  >
+                    {textureLabels[id]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </aside>
 
         <div ref={exportRef} className="min-h-0 flex-1">
@@ -250,6 +437,8 @@ export default function GenealogyBookPage() {
             loading={loading}
             contractMessage={contractMessage}
             spineTitleOverride={spineTitleOverride}
+            paperVars={paperVars}
+            hallName={appearance.hallName ?? undefined}
           />
         </div>
       </div>

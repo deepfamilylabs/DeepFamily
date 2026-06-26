@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import {
@@ -32,7 +33,6 @@ import {
 } from "../layout/ouPagination";
 import type { PaperGeneration, PaperPerson, TranslateFn } from "../paperData";
 import {
-  PAPER_BODY_FONT_STACK,
   PAPER_LINE,
   PAPER_MARK_BG,
   PAPER_SHEET_STYLE,
@@ -471,12 +471,16 @@ export function SuBookRenderer({
   generations,
   t,
   spineTitleOverride,
+  paperVars,
+  hallName,
 }: {
   graph: TreeGraphData;
   rootId: NodeId | null;
   generations: PaperGeneration[];
   t: TranslateFn;
   spineTitleOverride?: string;
+  paperVars?: CSSProperties;
+  hallName?: string;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -534,10 +538,14 @@ export function SuBookRenderer({
   }, []);
 
   return (
-    <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-su">
+    <div
+      className="h-full overflow-auto p-4 md:p-6"
+      style={paperVars ?? PAPER_VARS}
+      data-testid="paper-su"
+    >
       <div
         className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
-        style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
+        style={{ color: "var(--df-paper-ink)", fontFamily: "var(--df-paper-font-body)" }}
       >
         {spreadItems.length ? (
           <section
@@ -580,6 +588,7 @@ export function SuBookRenderer({
                     chartIndex={chart.index}
                     spreadIndex={spread.index}
                     title={spineTitle}
+                    hallName={hallName}
                     t={t}
                     testIdPrefix="paper-su-spine"
                     pageOrder="rtl"

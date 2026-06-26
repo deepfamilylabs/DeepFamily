@@ -1,5 +1,5 @@
 import type { TranslateFn } from "../paperData";
-import { PAPER_LINE, PAPER_TEXT } from "../paperStyles";
+import { PAPER_LINE, PAPER_MARK_BG, PAPER_TEXT } from "../paperStyles";
 import { getPaperSpinePageLabel, getPaperSpineVolumeLabel } from "../paperText";
 
 // Traditional woodblock 鱼尾 (fishtail) center-fold marks. A classical 版心 carries a pair:
@@ -20,7 +20,8 @@ function PaperSpineFishtail({
       : "[clip-path:polygon(0%_100%,100%_100%,100%_0%,50%_50%,0%_0%)]";
   return (
     <div
-      className={`-mx-1 h-12 self-stretch bg-[#1f1a14] ${clip} ${className ?? ""}`}
+      className={`-mx-1 h-12 self-stretch ${clip} ${className ?? ""}`}
+      style={{ backgroundColor: PAPER_MARK_BG }}
       aria-hidden="true"
     />
   );
@@ -30,6 +31,7 @@ export function PaperSpine({
   chartIndex,
   spreadIndex,
   title,
+  hallName,
   t,
   testIdPrefix,
   pageOrder,
@@ -37,10 +39,13 @@ export function PaperSpine({
   chartIndex: number;
   spreadIndex: number;
   title: string;
+  // User-provided hall name (堂号); when blank, falls back to the default i18n hall name.
+  hallName?: string;
   t: TranslateFn;
   testIdPrefix: string;
   pageOrder: "ltr" | "rtl";
 }) {
+  const hallText = hallName?.trim() || t("genealogyBook.ouHallName", "DeepFamily");
   const leftPageLabel = getPaperSpinePageLabel((spreadIndex - 1) * 2 + 1, t);
   const rightPageLabel = getPaperSpinePageLabel((spreadIndex - 1) * 2 + 2, t);
   const volumeLabel = getPaperSpineVolumeLabel(chartIndex, t);
@@ -49,8 +54,9 @@ export function PaperSpine({
 
   return (
     <aside
-      className="relative flex h-[872px] flex-col items-center border-x bg-[#f3e8cc] px-1 py-3"
+      className="relative flex h-[872px] flex-col items-center border-x px-1 py-3"
       style={{
+        backgroundColor: "var(--df-paper-spine)",
         borderColor: PAPER_LINE.strong,
         color: "var(--df-paper-ink)",
       }}
@@ -104,8 +110,9 @@ export function PaperSpine({
           writingMode: "vertical-rl",
           textOrientation: "mixed",
         }}
+        data-testid={`${testIdPrefix}-${chartIndex}-${spreadIndex}-hall`}
       >
-        {t("genealogyBook.ouHallName", "DeepFamily")}
+        {hallText}
       </div>
     </aside>
   );

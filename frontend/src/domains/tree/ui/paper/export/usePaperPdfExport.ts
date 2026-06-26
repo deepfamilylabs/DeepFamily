@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../../../../../shared/ui/ToastProvider";
 import type { PaperGenealogyStyle } from "../paperData";
@@ -18,7 +19,7 @@ export function usePaperPdfExport() {
   const [exporting, setExporting] = useState(false);
 
   const exportPdf = useCallback(
-    async (root: HTMLElement | null, style: PaperGenealogyStyle) => {
+    async (root: HTMLElement | null, style: PaperGenealogyStyle, cssVars?: CSSProperties) => {
       if (exporting) return;
       if (!root) {
         toast.error(t("genealogyBook.exportPdfEmpty", "Nothing to export"));
@@ -27,7 +28,7 @@ export function usePaperPdfExport() {
 
       setExporting(true);
       try {
-        await exportPaperGenealogyPdf({ root, fileName: buildFileName(style) });
+        await exportPaperGenealogyPdf({ root, fileName: buildFileName(style), cssVars });
         toast.success(t("genealogyBook.exportPdfSuccess", "PDF exported"));
       } catch (error) {
         if (error instanceof NoPaperSpreadsError) {

@@ -2190,3 +2190,85 @@ describe("paper spine title override", () => {
     }
   });
 });
+
+describe("paper hall name and appearance vars", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  function makeLinear() {
+    return makeLinearGraph(2);
+  }
+
+  it("shows the default hall name when no override is provided", () => {
+    const linear = makeLinear();
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={{}}
+        hasRoot
+      />,
+    );
+    expect(screen.getByTestId("paper-ou-spine-1-1-hall").textContent).toBe("DeepFamily");
+  });
+
+  it("uses the hall name override across every paper style", () => {
+    const styleSpines = [
+      ["ou", "paper-ou-spine-1-1-hall"],
+      ["su", "paper-su-spine-1-1-hall"],
+      ["dieji", "paper-dieji-spine-1-1-hall"],
+      ["lineage", "paper-lineage-spine-1-1-hall"],
+      ["modern", "paper-modern-spine-1-1-hall"],
+    ] as const;
+
+    for (const [style, hallTestId] of styleSpines) {
+      const linear = makeLinear();
+      render(
+        <PaperGenealogyView
+          style={style}
+          graph={linear.graph}
+          rootId={linear.rootId}
+          nodesData={{}}
+          hasRoot
+          hallName="忠义堂"
+        />,
+      );
+      expect(screen.getByTestId(hallTestId).textContent).toBe("忠义堂");
+      cleanup();
+    }
+  });
+
+  it("falls back to the default hall name when the override is blank/whitespace", () => {
+    const linear = makeLinear();
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={{}}
+        hasRoot
+        hallName="   "
+      />,
+    );
+    expect(screen.getByTestId("paper-ou-spine-1-1-hall").textContent).toBe("DeepFamily");
+  });
+
+  it("applies the provided paperVars to the renderer root container", () => {
+    const linear = makeLinear();
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={{}}
+        hasRoot
+        paperVars={{ "--df-paper-bg": "#010203" } as React.CSSProperties}
+      />,
+    );
+    const root = screen.getByTestId("paper-ou");
+    expect(root.getAttribute("style")).toContain("--df-paper-bg");
+    expect(root.style.getPropertyValue("--df-paper-bg")).toBe("#010203");
+  });
+});

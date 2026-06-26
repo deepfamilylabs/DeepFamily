@@ -6,7 +6,6 @@ import {
   type TranslateFn,
 } from "../paperData";
 import {
-  PAPER_BODY_FONT_STACK,
   PAPER_LINE,
   PAPER_NOTE_FONT_STACK,
   PAPER_SHEET_STYLE,
@@ -726,10 +725,14 @@ export function ModernBookRenderer({
   generations,
   t,
   spineTitleOverride,
+  paperVars,
+  hallName,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
   spineTitleOverride?: string;
+  paperVars?: CSSProperties;
+  hallName?: string;
 }) {
   const spreadRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState(0);
@@ -763,12 +766,16 @@ export function ModernBookRenderer({
   const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
 
   return (
-    <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-modern">
+    <div
+      className="h-full overflow-auto p-4 md:p-6"
+      style={paperVars ?? PAPER_VARS}
+      data-testid="paper-modern"
+    >
       <div
         className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
         style={{
           color: "var(--df-paper-ink)",
-          fontFamily: PAPER_BODY_FONT_STACK,
+          fontFamily: "var(--df-paper-font-body)",
         }}
       >
         {spreadItems.length ? (
@@ -824,6 +831,7 @@ export function ModernBookRenderer({
                     chartIndex={chart.index}
                     spreadIndex={spread.index}
                     title={spineTitle}
+                    hallName={hallName}
                     t={t}
                     testIdPrefix="paper-modern-spine"
                     pageOrder="ltr"

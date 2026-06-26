@@ -422,7 +422,28 @@
     "settings": {
       "title": "Display settings",
       "spineTitleLabel": "Spine title",
-      "spineTitleHint": "Leave blank to use the auto-generated title"
+      "spineTitleHint": "Leave blank to use the auto-generated title",
+      "hallNameLabel": "Hall name",
+      "hallNameHint": "Leave blank to use the default hall name",
+      "colorThemeLabel": "Color theme",
+      "fontLabel": "Font",
+      "textureLabel": "Paper texture",
+      "themes": {
+        "xuan": "Rice paper",
+        "plain": "Plain white",
+        "bamboo": "Bamboo green",
+        "azure": "Porcelain blue"
+      },
+      "fonts": {
+        "classic": "Kaiti",
+        "song": "Song",
+        "sans": "Sans"
+      },
+      "textures": {
+        "subtle": "Subtle",
+        "strong": "Strong",
+        "plain": "None"
+      }
     },
     "styles": {
       "ou": "Ou-style",
