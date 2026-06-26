@@ -570,6 +570,7 @@ export function SuBookRenderer({
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-su-spread-${chart.index}-${spread.index}`}
+                  data-paper-spread=""
                 >
                   <SuPage side="left" chart={chart} spread={spread} metrics={metrics} t={t} />
                   <PaperSpine

@@ -402,6 +402,7 @@ export function OuBookRenderer({
                     borderColor: PAPER_LINE.strong,
                     background: "var(--df-paper-sheet)",
                   }}
+                  data-paper-spread=""
                   data-testid={`paper-ou-spread-${chart.index}-${spread.index}`}
                 >
                   <OuPage side="left" chart={chart} spread={spread} t={t} />

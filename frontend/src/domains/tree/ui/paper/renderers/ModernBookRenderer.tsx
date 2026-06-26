@@ -808,6 +808,7 @@ export function ModernBookRenderer({
                       ? "paper-modern-page"
                       : `paper-modern-spread-${chart.index}-${spread.index}`
                   }
+                  data-paper-spread=""
                 >
                   <ModernPage
                     rows={spread.leftRows}

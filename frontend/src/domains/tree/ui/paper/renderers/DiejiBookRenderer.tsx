@@ -376,6 +376,7 @@ export function DiejiBookRenderer({
                     background: "var(--df-paper-sheet)",
                   }}
                   data-testid={`paper-dieji-spread-${chart.index}-${spread.index}`}
+                  data-paper-spread=""
                 >
                   <DiejiPage side="left" chart={chart} spread={spread} t={t} />
                   <PaperSpine

@@ -1,4 +1,5 @@
 export { default, PaperGenealogyView } from "./PaperGenealogyView";
+export { usePaperPdfExport } from "./export/usePaperPdfExport";
 export {
   buildPaperGenerations,
   isPaperGenealogyStyle,
