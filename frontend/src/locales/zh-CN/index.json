@@ -422,7 +422,28 @@
     "settings": {
       "title": "显示设置",
       "spineTitleLabel": "书脊标题",
-      "spineTitleHint": "留空则使用自动生成的标题"
+      "spineTitleHint": "留空则使用自动生成的标题",
+      "hallNameLabel": "堂号",
+      "hallNameHint": "留空则使用默认堂号",
+      "colorThemeLabel": "配色主题",
+      "fontLabel": "字体",
+      "textureLabel": "纸张纹理",
+      "themes": {
+        "xuan": "宣纸",
+        "plain": "素白",
+        "bamboo": "竹青",
+        "azure": "瓷青"
+      },
+      "fonts": {
+        "classic": "楷书",
+        "song": "宋体",
+        "sans": "黑体"
+      },
+      "textures": {
+        "subtle": "淡纹",
+        "strong": "浓纹",
+        "plain": "无纹"
+      }
     },
     "styles": {
       "ou": "欧式",

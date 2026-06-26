@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { NodeData, NodeId } from "../../../../shared/model";
 import type { TreeGraphData } from "../../selectors";
@@ -13,6 +14,8 @@ export interface UsePaperGenealogyViewModelParams {
   loading?: boolean;
   contractMessage?: string;
   spineTitleOverride?: string;
+  paperVars?: CSSProperties;
+  hallName?: string;
 }
 
 export interface PaperGenealogyViewModel {
@@ -24,13 +27,25 @@ export interface PaperGenealogyViewModel {
   loading?: boolean;
   contractMessage?: string;
   spineTitleOverride?: string;
+  paperVars?: CSSProperties;
+  hallName?: string;
 }
 
 export function usePaperGenealogyViewModel(
   params: UsePaperGenealogyViewModelParams,
 ): PaperGenealogyViewModel {
-  const { graph, rootId, nodesData, spouseLinks, hasRoot, loading, contractMessage, spineTitleOverride } =
-    params;
+  const {
+    graph,
+    rootId,
+    nodesData,
+    spouseLinks,
+    hasRoot,
+    loading,
+    contractMessage,
+    spineTitleOverride,
+    paperVars,
+    hallName,
+  } = params;
   const { t } = useTranslation();
   const translate = useCallback<TranslateFn>(
     (key, fallback, options) =>
@@ -54,5 +69,7 @@ export function usePaperGenealogyViewModel(
     loading,
     contractMessage,
     spineTitleOverride,
+    paperVars,
+    hallName,
   };
 }

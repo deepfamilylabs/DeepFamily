@@ -1,21 +1,21 @@
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  PAPER_BODY_FONT_STACK,
-  PAPER_VARS,
-} from "./paperStyles";
+import { PAPER_VARS } from "./paperStyles";
 
 export function PaperEmptyState({
   loading,
   contractMessage,
+  paperVars,
 }: {
   loading?: boolean;
   contractMessage?: string;
+  paperVars?: CSSProperties;
 }) {
   const { t } = useTranslation();
   return (
     <div
       className="flex h-full min-h-[520px] items-center justify-center p-6"
-      style={PAPER_VARS}
+      style={paperVars ?? PAPER_VARS}
       data-testid="paper-genealogy-empty"
     >
       <div
@@ -24,7 +24,7 @@ export function PaperEmptyState({
           background: "var(--df-paper-sheet)",
           borderColor: "var(--df-paper-line-soft)",
           color: "var(--df-paper-ink)",
-          fontFamily: PAPER_BODY_FONT_STACK,
+          fontFamily: "var(--df-paper-font-body)",
         }}
       >
         <div className="text-lg font-semibold">

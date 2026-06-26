@@ -67,6 +67,35 @@ vi.mock("../domains/tree", () => ({
     if (title.trim() === "") localStorage.removeItem(key);
     else localStorage.setItem(key, title);
   },
+  // Appearance preset ids + swatch + a buildPaperVars stub that echoes the active appearance so the
+  // view mock can assert which theme/font/texture is applied.
+  PAPER_COLOR_THEME_IDS: ["xuan", "plain", "bamboo", "azure"],
+  PAPER_FONT_PRESET_IDS: ["classic", "song", "sans"],
+  PAPER_TEXTURE_IDS: ["subtle", "strong", "plain"],
+  getPaperColorThemeSwatch: () => ["#f7efd8", "#8a6a3b", "#c18070"],
+  buildPaperVars: (appearance: any) => ({
+    "--df-paper-test-theme": appearance.colorThemeId,
+    "--df-paper-test-font": appearance.fontPresetId,
+    "--df-paper-test-texture": appearance.textureId,
+  }),
+  // Mirror the real global appearance persistence (single JSON key) so the test exercises it.
+  loadPaperAppearance: () => {
+    const raw = localStorage.getItem("df:paperAppearance");
+    const base = { colorThemeId: "xuan", fontPresetId: "classic", textureId: "subtle", hallName: null };
+    if (!raw) return base;
+    try {
+      return { ...base, ...JSON.parse(raw) };
+    } catch {
+      return base;
+    }
+  },
+  savePaperAppearance: (appearance: any) => {
+    const normalized = {
+      ...appearance,
+      hallName: appearance.hallName && appearance.hallName.trim() ? appearance.hallName : null,
+    };
+    localStorage.setItem("df:paperAppearance", JSON.stringify(normalized));
+  },
   PaperGenealogyView: (props: any) => (
     <div
       data-testid="paper-view"
@@ -74,6 +103,10 @@ vi.mock("../domains/tree", () => ({
       data-has-root={String(props.hasRoot)}
       data-node-count={String(props.graph.nodes.length)}
       data-spine-title-override={props.spineTitleOverride ?? ""}
+      data-hall-name={props.hallName ?? ""}
+      data-color-theme={props.paperVars?.["--df-paper-test-theme"] ?? ""}
+      data-font={props.paperVars?.["--df-paper-test-font"] ?? ""}
+      data-texture={props.paperVars?.["--df-paper-test-texture"] ?? ""}
     />
   ),
   useFamilyTreeProjection: () => mocks.projection,
@@ -199,6 +232,77 @@ describe("GenealogyBookPage", () => {
     expect(localStorage.getItem("df:paperSpineTitle:0xrootB-v-1")).toBe("孙氏族谱");
     // The first root's override is preserved separately.
     expect(localStorage.getItem("df:paperSpineTitle:0xrootA-v-1")).toBe("曹氏宗谱");
+  });
+
+  it("applies the default appearance and forwards it to the view", () => {
+    render(<GenealogyBookPage />);
+
+    expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
+
+    const view = screen.getByTestId("paper-view");
+    expect(view.getAttribute("data-color-theme")).toBe("xuan");
+    expect(view.getAttribute("data-font")).toBe("classic");
+    expect(view.getAttribute("data-texture")).toBe("subtle");
+  });
+
+  it("persists color theme, font and texture changes globally and forwards them to the view", () => {
+    render(<GenealogyBookPage />);
+
+    fireEvent.click(screen.getByTestId("paper-color-theme-bamboo"));
+    fireEvent.click(screen.getByTestId("paper-font-preset-song"));
+    fireEvent.click(screen.getByTestId("paper-texture-strong"));
+
+    const view = screen.getByTestId("paper-view");
+    expect(view.getAttribute("data-color-theme")).toBe("bamboo");
+    expect(view.getAttribute("data-font")).toBe("song");
+    expect(view.getAttribute("data-texture")).toBe("strong");
+
+    const saved = JSON.parse(localStorage.getItem("df:paperAppearance") || "{}");
+    expect(saved.colorThemeId).toBe("bamboo");
+    expect(saved.fontPresetId).toBe("song");
+    expect(saved.textureId).toBe("strong");
+  });
+
+  it("loads a previously saved appearance", () => {
+    localStorage.setItem(
+      "df:paperAppearance",
+      JSON.stringify({
+        colorThemeId: "azure",
+        fontPresetId: "sans",
+        textureId: "plain",
+        hallName: "忠义堂",
+      }),
+    );
+
+    render(<GenealogyBookPage />);
+
+    expect(screen.getByTestId("paper-color-theme-azure").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-font-preset-sans").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-texture-plain").getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByTestId("paper-hall-name-input") as HTMLInputElement).value).toBe("忠义堂");
+    expect(screen.getByTestId("paper-view").getAttribute("data-hall-name")).toBe("忠义堂");
+  });
+
+  it("prefills the hall name with the default and persists overrides globally", () => {
+    render(<GenealogyBookPage />);
+
+    const input = screen.getByTestId("paper-hall-name-input") as HTMLInputElement;
+    // Default: prefilled with the i18n hall name; no override forwarded to the view.
+    expect(input.value).toBe("DeepFamily");
+    expect(screen.getByTestId("paper-view").getAttribute("data-hall-name")).toBe("");
+
+    fireEvent.change(input, { target: { value: "忠义堂" } });
+    expect(screen.getByTestId("paper-view").getAttribute("data-hall-name")).toBe("忠义堂");
+    expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").hallName).toBe("忠义堂");
+
+    // Clearing falls back to the default hall name (override removed from storage).
+    fireEvent.change(input, { target: { value: "" } });
+    expect(screen.getByTestId("paper-view").getAttribute("data-hall-name")).toBe("");
+    expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").hallName).toBeNull();
   });
 
   it("preloads missing story chunks for paper records", async () => {

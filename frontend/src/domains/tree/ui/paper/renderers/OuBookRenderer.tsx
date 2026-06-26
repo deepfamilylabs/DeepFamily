@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   buildOuPaperBook,
   getOuRecordText,
@@ -17,7 +18,6 @@ import {
 } from "../layout/ouPagination";
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
-  PAPER_BODY_FONT_STACK,
   PAPER_LINE,
   PAPER_MARK_BG,
   PAPER_RECORD_INLINE_PADDING,
@@ -307,10 +307,14 @@ export function OuBookRenderer({
   generations,
   t,
   spineTitleOverride,
+  paperVars,
+  hallName,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
   spineTitleOverride?: string;
+  paperVars?: CSSProperties;
+  hallName?: string;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -370,10 +374,14 @@ export function OuBookRenderer({
   }, []);
 
   return (
-    <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-ou">
+    <div
+      className="h-full overflow-auto p-4 md:p-6"
+      style={paperVars ?? PAPER_VARS}
+      data-testid="paper-ou"
+    >
       <div
         className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
-        style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
+        style={{ color: "var(--df-paper-ink)", fontFamily: "var(--df-paper-font-body)" }}
       >
         {spreadItems.length ? (
           <section
@@ -413,6 +421,7 @@ export function OuBookRenderer({
                     chartIndex={chart.index}
                     spreadIndex={spread.index}
                     title={spineTitle}
+                    hallName={hallName}
                     t={t}
                     testIdPrefix="paper-ou-spine"
                     pageOrder="rtl"

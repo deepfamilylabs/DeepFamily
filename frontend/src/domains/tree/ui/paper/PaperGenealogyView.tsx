@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import type { NodeData, NodeId } from "../../../../shared/model";
 import type { TreeGraphData } from "../../selectors";
 import { PaperEmptyState } from "./PaperEmptyState";
@@ -21,6 +21,11 @@ export interface PaperGenealogyViewProps {
   contractMessage?: string;
   // User-provided spine title; when blank, each renderer falls back to its auto-generated title.
   spineTitleOverride?: string;
+  // Composed --df-paper-* variables for the active appearance (color theme / font / texture). When
+  // omitted, renderers fall back to the default PAPER_VARS.
+  paperVars?: CSSProperties;
+  // User-provided hall name (堂号); when blank, the spine uses the default i18n hall name.
+  hallName?: string;
 }
 
 type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
@@ -31,6 +36,8 @@ const PAPER_BOOK_RENDERERS = {
       generations={vm.generations}
       t={vm.translate}
       spineTitleOverride={vm.spineTitleOverride}
+      paperVars={vm.paperVars}
+      hallName={vm.hallName}
     />
   ),
   [PAPER_GENEALOGY_STYLE.SU]: (vm) => (
@@ -40,6 +47,8 @@ const PAPER_BOOK_RENDERERS = {
       generations={vm.generations}
       t={vm.translate}
       spineTitleOverride={vm.spineTitleOverride}
+      paperVars={vm.paperVars}
+      hallName={vm.hallName}
     />
   ),
   [PAPER_GENEALOGY_STYLE.DIEJI]: (vm) => (
@@ -47,6 +56,8 @@ const PAPER_BOOK_RENDERERS = {
       generations={vm.generations}
       t={vm.translate}
       spineTitleOverride={vm.spineTitleOverride}
+      paperVars={vm.paperVars}
+      hallName={vm.hallName}
     />
   ),
   [PAPER_GENEALOGY_STYLE.LINEAGE]: (vm) => (
@@ -56,6 +67,8 @@ const PAPER_BOOK_RENDERERS = {
       generations={vm.generations}
       t={vm.translate}
       spineTitleOverride={vm.spineTitleOverride}
+      paperVars={vm.paperVars}
+      hallName={vm.hallName}
     />
   ),
   [PAPER_GENEALOGY_STYLE.MODERN]: (vm) => (
@@ -63,6 +76,8 @@ const PAPER_BOOK_RENDERERS = {
       generations={vm.generations}
       t={vm.translate}
       spineTitleOverride={vm.spineTitleOverride}
+      paperVars={vm.paperVars}
+      hallName={vm.hallName}
     />
   ),
 } satisfies Record<PaperGenealogyStyle, (vm: PaperGenealogyViewModel) => ReactElement>;
@@ -71,7 +86,13 @@ export function PaperGenealogyView(props: PaperGenealogyViewProps) {
   const vm = usePaperGenealogyViewModel(props);
 
   if (vm.isEmpty) {
-    return <PaperEmptyState loading={vm.loading} contractMessage={vm.contractMessage} />;
+    return (
+      <PaperEmptyState
+        loading={vm.loading}
+        contractMessage={vm.contractMessage}
+        paperVars={vm.paperVars}
+      />
+    );
   }
 
   return (

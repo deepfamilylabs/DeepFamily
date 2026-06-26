@@ -3,28 +3,33 @@
 // (~1180×872), so a spread maps cleanly to a single PDF page. CJK glyphs are rendered by the
 // browser using system fonts and baked into the raster, so the resulting PDF is portable.
 
+import type { CSSProperties } from "react";
 import { PAPER_VARS } from "../paperStyles";
 
-// Paper sheet color (PAPER_VARS["--df-paper-sheet"]); passed explicitly so the raster never gets a
-// transparent background if the CSS variable fails to resolve on the cloned node.
-const PAPER_SHEET_COLOR = "#f7efd8";
+// Fallback paper sheet color when the active vars omit --df-paper-sheet; keeps the raster from
+// getting a transparent background if the CSS variable fails to resolve on the cloned node.
+const PAPER_SHEET_COLOR_FALLBACK = "#f7efd8";
 const DEFAULT_PIXEL_RATIO = 2;
 
-// PAPER_VARS (the `--df-paper-*` custom properties) are defined on the scroll-container ancestor,
-// outside the captured spread. html-to-image clones only the spread subtree and does NOT carry
-// CSS custom properties used in SVG presentation attributes (e.g. stroke="var(--df-paper-line-accent)"),
-// so the Su/Lineage connector lines render with an invalid stroke and vanish. Setting the variables
-// inline on the captured element makes the clone inherit them so those `var(...)` strokes resolve.
-const PAPER_VAR_ENTRIES = Object.entries(PAPER_VARS as Record<string, string>).filter(([name]) =>
-  name.startsWith("--"),
-);
+// The `--df-paper-*` custom properties are defined on the scroll-container ancestor, outside the
+// captured spread. html-to-image clones only the spread subtree and does NOT carry CSS custom
+// properties used in SVG presentation attributes (e.g. stroke="var(--df-paper-line-accent)") or
+// var()-based fonts, so connector lines/fonts render invalid and vanish. Setting the active vars
+// inline on the captured element makes the clone inherit them so those `var(...)` references resolve.
+function toPaperVarEntries(vars: CSSProperties): Array<[string, string]> {
+  return Object.entries(vars as Record<string, string>).filter(([name]) => name.startsWith("--"));
+}
 
-async function withInlinePaperVars<T>(el: HTMLElement, run: () => Promise<T>): Promise<T> {
-  for (const [name, value] of PAPER_VAR_ENTRIES) el.style.setProperty(name, value);
+async function withInlinePaperVars<T>(
+  el: HTMLElement,
+  entries: Array<[string, string]>,
+  run: () => Promise<T>,
+): Promise<T> {
+  for (const [name, value] of entries) el.style.setProperty(name, value);
   try {
     return await run();
   } finally {
-    for (const [name] of PAPER_VAR_ENTRIES) el.style.removeProperty(name);
+    for (const [name] of entries) el.style.removeProperty(name);
   }
 }
 
@@ -34,6 +39,8 @@ export interface ExportPaperGenealogyPdfOptions {
   fileName: string;
   /** Raster scale; higher = crisper text but larger file. Defaults to 2. */
   pixelRatio?: number;
+  /** Active appearance vars to inline during capture; defaults to PAPER_VARS (default theme). */
+  cssVars?: CSSProperties;
 }
 
 export class NoPaperSpreadsError extends Error {
@@ -46,7 +53,10 @@ export class NoPaperSpreadsError extends Error {
 export async function exportPaperGenealogyPdf(
   options: ExportPaperGenealogyPdfOptions,
 ): Promise<{ pageCount: number }> {
-  const { root, fileName, pixelRatio = DEFAULT_PIXEL_RATIO } = options;
+  const { root, fileName, pixelRatio = DEFAULT_PIXEL_RATIO, cssVars = PAPER_VARS } = options;
+  const varEntries = toPaperVarEntries(cssVars);
+  const sheetColor =
+    (cssVars as Record<string, string>)["--df-paper-sheet"] || PAPER_SHEET_COLOR_FALLBACK;
 
   const spreads = Array.from(root.querySelectorAll<HTMLElement>("[data-paper-spread]"));
   if (!spreads.length) throw new NoPaperSpreadsError();
@@ -70,10 +80,10 @@ export async function exportPaperGenealogyPdf(
   for (let index = 0; index < spreads.length; index += 1) {
     const spread = spreads[index];
     // Sequential (not concurrent) to keep peak memory bounded on large books.
-    const dataUrl = await withInlinePaperVars(spread, () =>
+    const dataUrl = await withInlinePaperVars(spread, varEntries, () =>
       toPng(spread, {
         pixelRatio,
-        backgroundColor: PAPER_SHEET_COLOR,
+        backgroundColor: sheetColor,
         cacheBust: true,
       }),
     );

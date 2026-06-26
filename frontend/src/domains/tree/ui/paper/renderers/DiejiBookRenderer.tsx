@@ -12,7 +12,6 @@ import {
 } from "../layout/diejiPagination";
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
-  PAPER_BODY_FONT_STACK,
   PAPER_LINE,
   PAPER_MARK_BG,
   PAPER_SHEET_STYLE,
@@ -314,10 +313,14 @@ export function DiejiBookRenderer({
   generations,
   t,
   spineTitleOverride,
+  paperVars,
+  hallName,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
   spineTitleOverride?: string;
+  paperVars?: CSSProperties;
+  hallName?: string;
 }) {
   const book = useMemo(
     () => buildDiejiPaperBook({ generations, t }),
@@ -340,10 +343,14 @@ export function DiejiBookRenderer({
   );
 
   return (
-    <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-dieji">
+    <div
+      className="h-full overflow-auto p-4 md:p-6"
+      style={paperVars ?? PAPER_VARS}
+      data-testid="paper-dieji"
+    >
       <div
         className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
-        style={{ color: "var(--df-paper-ink)", fontFamily: PAPER_BODY_FONT_STACK }}
+        style={{ color: "var(--df-paper-ink)", fontFamily: "var(--df-paper-font-body)" }}
       >
         {spreadItems.length ? (
           <section
@@ -386,6 +393,7 @@ export function DiejiBookRenderer({
                     chartIndex={chart.index}
                     spreadIndex={spread.index}
                     title={spineTitle}
+                    hallName={hallName}
                     t={t}
                     testIdPrefix="paper-dieji-spine"
                     pageOrder="rtl"
