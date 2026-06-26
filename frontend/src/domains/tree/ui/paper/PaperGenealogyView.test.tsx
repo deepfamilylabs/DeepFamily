@@ -2271,4 +2271,42 @@ describe("paper hall name and appearance vars", () => {
     expect(root.getAttribute("style")).toContain("--df-paper-bg");
     expect(root.style.getPropertyValue("--df-paper-bg")).toBe("#010203");
   });
+
+  it("wraps the rendered sheets in a zoomable content layer scaled by fontScale", () => {
+    const linear = makeLinear();
+    const { container } = render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={{}}
+        hasRoot
+        fontScale={1.25}
+      />,
+    );
+    const zoomLayer = container.querySelector("[data-paper-zoom]") as HTMLElement | null;
+    expect(zoomLayer).toBeTruthy();
+    // The zoom layer must wrap the paper spreads so enlarging it scales the whole sheet, keeping
+    // the JS-computed slot layout and the rendered glyphs in sync.
+    expect(zoomLayer?.querySelector("[data-paper-spread]")).toBeTruthy();
+    expect(zoomLayer?.style.transform).toBe("scale(1.25)");
+    const spacer = container.querySelector("[data-paper-zoom-spacer]") as HTMLElement | null;
+    expect(spacer).toBeTruthy();
+  });
+
+  it("defaults the content-layer zoom to 1 when no fontScale is provided", () => {
+    const linear = makeLinear();
+    const { container } = render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={{}}
+        hasRoot
+      />,
+    );
+    const zoomLayer = container.querySelector("[data-paper-zoom]") as HTMLElement | null;
+    expect(zoomLayer).toBeTruthy();
+    expect(zoomLayer?.style.transform).toBe("");
+  });
 });

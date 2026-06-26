@@ -428,6 +428,8 @@
       "colorThemeLabel": "Color theme",
       "fontLabel": "Font",
       "textureLabel": "Paper texture",
+      "fontScaleLabel": "Font scale",
+      "fontScaleHint": "Scales the whole sheet in the preview only",
       "themes": {
         "xuan": "Rice paper",
         "plain": "Plain white",

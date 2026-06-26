@@ -10,6 +10,8 @@ import {
   PAPER_COLOR_THEME_IDS,
   PAPER_FONT_PRESETS,
   PAPER_FONT_PRESET_IDS,
+  PAPER_FONT_SCALE_MAX,
+  PAPER_FONT_SCALE_MIN,
   PAPER_TEXTURE_PRESETS,
   PAPER_TEXTURE_IDS,
   savePaperAppearance,
@@ -81,10 +83,22 @@ describe("paperAppearance storage", () => {
       fontPresetId: "song",
       textureId: "strong",
       hallName: "忠义堂",
+      fontScale: 1.2,
     };
     savePaperAppearance(next);
     expect(localStorage.getItem(PAPER_APPEARANCE_STORAGE_KEY)).toBeTruthy();
     expect(loadPaperAppearance()).toEqual(next);
+  });
+
+  it("clamps an out-of-range font scale on save and load", () => {
+    savePaperAppearance({ ...DEFAULT_PAPER_APPEARANCE, fontScale: 5 });
+    expect(loadPaperAppearance().fontScale).toBe(PAPER_FONT_SCALE_MAX);
+
+    localStorage.setItem(
+      PAPER_APPEARANCE_STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_PAPER_APPEARANCE, fontScale: 0.1 }),
+    );
+    expect(loadPaperAppearance().fontScale).toBe(PAPER_FONT_SCALE_MIN);
   });
 
   it("normalizes a blank hall name to null on save", () => {
@@ -108,6 +122,8 @@ describe("paperAppearance storage", () => {
     expect(loaded.textureId).toBe(DEFAULT_PAPER_APPEARANCE.textureId);
     // A valid hall name survives even when the ids are invalid.
     expect(loaded.hallName).toBe("忠义堂");
+    // A missing font scale falls back to the default.
+    expect(loaded.fontScale).toBe(DEFAULT_PAPER_APPEARANCE.fontScale);
   });
 
   it("falls back to defaults when the stored payload is corrupt", () => {

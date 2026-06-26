@@ -20,6 +20,9 @@ import {
   loadPaperSpineTitleOverride,
   PAPER_COLOR_THEME_IDS,
   PAPER_FONT_PRESET_IDS,
+  PAPER_FONT_SCALE_MAX,
+  PAPER_FONT_SCALE_MIN,
+  PAPER_FONT_SCALE_STEP,
   PAPER_GENEALOGY_STYLE,
   PAPER_GENEALOGY_STYLES,
   PAPER_TEXTURE_IDS,
@@ -141,7 +144,6 @@ export default function GenealogyBookPage() {
     }),
     [t],
   );
-
   const paperVars = useMemo(() => buildPaperVars(appearance), [appearance]);
   const hasRoot = Boolean(projection.rootId && rootExists);
   const defaultHallName = t("genealogyBook.ouHallName", "DeepFamily");
@@ -424,9 +426,37 @@ export default function GenealogyBookPage() {
               })}
             </div>
           </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t("genealogyBook.settings.fontScaleLabel", "Font scale")}
+              </span>
+              <span className="text-[11px] tabular-nums text-stone-500 dark:text-slate-400">
+                {Math.round(appearance.fontScale * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={PAPER_FONT_SCALE_MIN}
+              max={PAPER_FONT_SCALE_MAX}
+              step={PAPER_FONT_SCALE_STEP}
+              value={appearance.fontScale}
+              onChange={(event) => updateAppearance({ fontScale: Number(event.target.value) })}
+              aria-label={t("genealogyBook.settings.fontScaleLabel", "Font scale")}
+              className="w-full accent-orange-500"
+              data-testid="paper-font-scale-input"
+            />
+            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+              {t(
+                "genealogyBook.settings.fontScaleHint",
+                "Scales the whole sheet in the preview only",
+              )}
+            </span>
+          </div>
         </aside>
 
-        <div ref={exportRef} className="min-h-0 flex-1">
+        <div ref={exportRef} className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <PaperGenealogyView
             style={style}
             graph={projection.graph}
@@ -439,6 +469,7 @@ export default function GenealogyBookPage() {
             spineTitleOverride={spineTitleOverride}
             paperVars={paperVars}
             hallName={appearance.hallName ?? undefined}
+            fontScale={appearance.fontScale}
           />
         </div>
       </div>

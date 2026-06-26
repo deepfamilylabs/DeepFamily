@@ -16,6 +16,7 @@ export interface UsePaperGenealogyViewModelParams {
   spineTitleOverride?: string;
   paperVars?: CSSProperties;
   hallName?: string;
+  fontScale?: number;
 }
 
 export interface PaperGenealogyViewModel {
@@ -29,6 +30,7 @@ export interface PaperGenealogyViewModel {
   spineTitleOverride?: string;
   paperVars?: CSSProperties;
   hallName?: string;
+  fontScale?: number;
 }
 
 export function usePaperGenealogyViewModel(
@@ -45,6 +47,7 @@ export function usePaperGenealogyViewModel(
     spineTitleOverride,
     paperVars,
     hallName,
+    fontScale,
   } = params;
   const { t } = useTranslation();
   const translate = useCallback<TranslateFn>(
@@ -71,5 +74,6 @@ export function usePaperGenealogyViewModel(
     spineTitleOverride,
     paperVars,
     hallName,
+    fontScale,
   };
 }

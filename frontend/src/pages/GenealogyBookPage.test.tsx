@@ -79,9 +79,18 @@ vi.mock("../domains/tree", () => ({
     "--df-paper-test-texture": appearance.textureId,
   }),
   // Mirror the real global appearance persistence (single JSON key) so the test exercises it.
+  PAPER_FONT_SCALE_MIN: 0.8,
+  PAPER_FONT_SCALE_MAX: 1.6,
+  PAPER_FONT_SCALE_STEP: 0.1,
   loadPaperAppearance: () => {
     const raw = localStorage.getItem("df:paperAppearance");
-    const base = { colorThemeId: "xuan", fontPresetId: "classic", textureId: "subtle", hallName: null };
+    const base = {
+      colorThemeId: "xuan",
+      fontPresetId: "classic",
+      textureId: "subtle",
+      hallName: null,
+      fontScale: 1,
+    };
     if (!raw) return base;
     try {
       return { ...base, ...JSON.parse(raw) };
@@ -107,6 +116,7 @@ vi.mock("../domains/tree", () => ({
       data-color-theme={props.paperVars?.["--df-paper-test-theme"] ?? ""}
       data-font={props.paperVars?.["--df-paper-test-font"] ?? ""}
       data-texture={props.paperVars?.["--df-paper-test-texture"] ?? ""}
+      data-font-scale={String(props.fontScale ?? "")}
     />
   ),
   useFamilyTreeProjection: () => mocks.projection,
@@ -285,6 +295,54 @@ describe("GenealogyBookPage", () => {
     expect(screen.getByTestId("paper-texture-plain").getAttribute("aria-pressed")).toBe("true");
     expect((screen.getByTestId("paper-hall-name-input") as HTMLInputElement).value).toBe("忠义堂");
     expect(screen.getByTestId("paper-view").getAttribute("data-hall-name")).toBe("忠义堂");
+  });
+
+  it("applies the default font scale and forwards it to the view", () => {
+    render(<GenealogyBookPage />);
+
+    const slider = screen.getByTestId("paper-font-scale-input") as HTMLInputElement;
+    expect(slider.value).toBe("1");
+    expect(screen.getByTestId("paper-view").getAttribute("data-font-scale")).toBe("1");
+  });
+
+  it("persists font scale changes globally and forwards them to the view", () => {
+    render(<GenealogyBookPage />);
+
+    fireEvent.change(screen.getByTestId("paper-font-scale-input"), { target: { value: "1.3" } });
+
+    expect(screen.getByTestId("paper-view").getAttribute("data-font-scale")).toBe("1.3");
+    expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").fontScale).toBe(1.3);
+  });
+
+  it("passes css vars to export", () => {
+    render(<GenealogyBookPage />);
+    fireEvent.click(screen.getByTitle("Export PDF"));
+
+    expect(mocks.exportPdf).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      "ou",
+      expect.objectContaining({
+        "--df-paper-test-font": "classic",
+      }),
+    );
+  });
+
+  it("loads a previously saved font scale", () => {
+    localStorage.setItem(
+      "df:paperAppearance",
+      JSON.stringify({
+        colorThemeId: "xuan",
+        fontPresetId: "classic",
+        textureId: "subtle",
+        hallName: null,
+        fontScale: 1.4,
+      }),
+    );
+
+    render(<GenealogyBookPage />);
+
+    expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1.4");
+    expect(screen.getByTestId("paper-view").getAttribute("data-font-scale")).toBe("1.4");
   });
 
   it("prefills the hall name with the default and persists overrides globally", () => {
