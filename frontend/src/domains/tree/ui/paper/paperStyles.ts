@@ -11,7 +11,6 @@ export const PAPER_TITLE_FONT_STACK =
   '"STKaiti", "KaiTi", "Kaiti SC", "Kaiti TC", "BiauKai", "DFKai-SB", "标楷体", "楷体", "楷体_GB2312", "KaiTi_GB2312", "TW-Kai", "AR PL UKai CN", "AR PL UKai TW", "AR PL UKai HK", "AR PL KaitiM GB", "LXGW WenKai", "霞鹜文楷", "Noto Serif CJK SC", serif';
 export const PAPER_NOTE_FONT_STACK =
   '"FangSong", "STFangsong", "FangSong_GB2312", "仿宋", "仿宋_GB2312", "Songti SC", "SimSun", "AR PL UMing CN", "Noto Serif CJK SC", serif';
-
 // Ou records use Tailwind's px-2.5 spacing. Keep the numeric value shared so absolute-layout
 // renderers can reserve the same visual distance from the spine without changing pagination.
 export const PAPER_RECORD_INLINE_PADDING = 10;
@@ -189,3 +188,8 @@ export function paperSvgTextStyle(role: PaperTextRole): CSSProperties {
   const { color, ...rest } = PAPER_TEXT[role];
   return { ...rest, fill: color };
 }
+
+// ---- Preview font scale (whole-sheet zoom) ------------------------------------------------------
+// Matches the renderer content column `max-w-[1320px]`. Spreads inside are min-w-[1180px].
+
+export const PAPER_PREVIEW_MAX_WIDTH_PX = 1320;

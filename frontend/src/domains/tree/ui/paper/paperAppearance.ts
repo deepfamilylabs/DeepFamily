@@ -146,6 +146,26 @@ export const PAPER_TEXTURE_PRESETS: Record<PaperTextureId, Record<string, string
 
 export const PAPER_TEXTURE_IDS = Object.keys(PAPER_TEXTURE_PRESETS) as PaperTextureId[];
 
+// ---- Font scale (whole-sheet zoom) ------------------------------------------------------------
+
+// Global preview multiplier. It is applied as a proportional zoom on each renderer's content layer
+// (NOT a CSS var / font-size), because every paper style uses a fixed sheet size + JS-computed slot
+// coordinates: scaling only the glyphs would desync text from the layout (overlapping/clipped
+// columns), so the whole sheet scales together. Pagination is still computed at the base size, so
+// the page break-up never changes — only the rendered scale does.
+export const PAPER_FONT_SCALE_MIN = 0.8;
+export const PAPER_FONT_SCALE_MAX = 1.6;
+export const PAPER_FONT_SCALE_STEP = 0.1;
+export const PAPER_FONT_SCALE_DEFAULT = 1;
+
+// Clamp a raw scale into the supported range; non-number/non-finite inputs fall back to the default.
+// Rounded to 2 decimals so slider float drift never persists as a long fraction.
+export function clampPaperFontScale(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return PAPER_FONT_SCALE_DEFAULT;
+  const clamped = Math.min(PAPER_FONT_SCALE_MAX, Math.max(PAPER_FONT_SCALE_MIN, value));
+  return Math.round(clamped * 100) / 100;
+}
+
 // ---- Appearance value + variable composition --------------------------------------------------
 
 export interface PaperAppearance {
@@ -154,6 +174,8 @@ export interface PaperAppearance {
   textureId: PaperTextureId;
   // Hall name (堂号) override; null/empty means use the default i18n hall name.
   hallName: string | null;
+  // Whole-sheet preview zoom multiplier (see PAPER_FONT_SCALE_* above).
+  fontScale: number;
 }
 
 export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
@@ -161,6 +183,7 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   fontPresetId: PAPER_FONT_PRESET.CLASSIC,
   textureId: PAPER_TEXTURE.SUBTLE,
   hallName: null,
+  fontScale: PAPER_FONT_SCALE_DEFAULT,
 };
 
 // Compose the full --df-paper-* variable set for a given appearance. Starts from PAPER_VARS so any
@@ -211,6 +234,7 @@ export function loadPaperAppearance(): PaperAppearance {
         ? parsed.textureId
         : DEFAULT_PAPER_APPEARANCE.textureId,
       hallName,
+      fontScale: clampPaperFontScale(parsed.fontScale),
     };
   } catch {
     return { ...DEFAULT_PAPER_APPEARANCE };
@@ -223,6 +247,7 @@ export function savePaperAppearance(appearance: PaperAppearance): void {
   const normalized: PaperAppearance = {
     ...appearance,
     hallName: appearance.hallName && appearance.hallName.trim() ? appearance.hallName : null,
+    fontScale: clampPaperFontScale(appearance.fontScale),
   };
   try {
     window.localStorage.setItem(PAPER_APPEARANCE_STORAGE_KEY, JSON.stringify(normalized));

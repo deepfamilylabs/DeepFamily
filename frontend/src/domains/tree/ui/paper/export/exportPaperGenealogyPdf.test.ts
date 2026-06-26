@@ -37,6 +37,10 @@ describe("exportPaperGenealogyPdf", () => {
 
     expect(result.pageCount).toBe(3);
     expect(toPng).toHaveBeenCalledTimes(3);
+    expect(toPng).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ skipFonts: true }),
+    );
     expect(addImage).toHaveBeenCalledTimes(3);
     expect(addPage).toHaveBeenCalledTimes(2); // first spread reuses the initial page
     expect(save).toHaveBeenCalledTimes(1);
@@ -60,6 +64,30 @@ describe("exportPaperGenealogyPdf", () => {
     expect(accentDuringCapture).toBe("#c18070");
     // Restored afterwards so the live DOM is left untouched.
     expect(spread.style.getPropertyValue("--df-paper-line-accent")).toBe("");
+  });
+
+  it("does not change the visible preview scale during capture", async () => {
+    const root = document.createElement("div");
+    const zoomLayer = document.createElement("div");
+    zoomLayer.setAttribute("data-paper-zoom", "");
+    zoomLayer.style.transform = "scale(1.4)";
+    const spread = document.createElement("div");
+    spread.setAttribute("data-paper-spread", "");
+    zoomLayer.appendChild(spread);
+    root.appendChild(zoomLayer);
+
+    // The spread itself is captured at its fixed offset dimensions. Its zoomed ancestor must stay
+    // untouched so the preview does not visibly shrink and grow while the export runs.
+    let transformDuringCapture: string | undefined;
+    toPng.mockImplementationOnce(async () => {
+      transformDuringCapture = zoomLayer.style.transform;
+      return "data:image/png;base64,AAAA";
+    });
+
+    await exportPaperGenealogyPdf({ root, fileName: "zoomed.pdf" });
+
+    expect(transformDuringCapture).toBe("scale(1.4)");
+    expect(zoomLayer.style.transform).toBe("scale(1.4)");
   });
 
   it("throws NoPaperSpreadsError when there are no spreads", async () => {

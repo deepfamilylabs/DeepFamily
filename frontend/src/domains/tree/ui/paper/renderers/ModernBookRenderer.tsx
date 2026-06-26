@@ -12,6 +12,7 @@ import {
   PAPER_TEXT,
   PAPER_VARS,
 } from "../paperStyles";
+import { PaperZoomViewport } from "../PaperZoomViewport";
 import {
   clipText,
   getPaperGenerationMark,
@@ -727,12 +728,14 @@ export function ModernBookRenderer({
   spineTitleOverride,
   paperVars,
   hallName,
+  fontScale,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
   spineTitleOverride?: string;
   paperVars?: CSSProperties;
   hallName?: string;
+  fontScale?: number;
 }) {
   const spreadRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState(0);
@@ -767,12 +770,13 @@ export function ModernBookRenderer({
 
   return (
     <div
-      className="h-full overflow-auto p-4 md:p-6"
+      className="h-full min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4 md:p-6"
       style={paperVars ?? PAPER_VARS}
       data-testid="paper-modern"
     >
-      <div
-        className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
+      <PaperZoomViewport
+        fontScale={fontScale}
+        className="flex min-h-full min-w-min flex-col"
         style={{
           color: "var(--df-paper-ink)",
           fontFamily: "var(--df-paper-font-body)",
@@ -848,7 +852,7 @@ export function ModernBookRenderer({
             </div>
           </section>
         ) : null}
-      </div>
+      </PaperZoomViewport>
     </div>
   );
 }

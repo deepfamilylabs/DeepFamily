@@ -18,6 +18,7 @@ export {
 } from "./paperSpineTitleStorage";
 export {
   buildPaperVars,
+  clampPaperFontScale,
   DEFAULT_PAPER_APPEARANCE,
   getPaperColorThemeSwatch,
   loadPaperAppearance,
@@ -26,6 +27,10 @@ export {
   PAPER_COLOR_THEME_IDS,
   PAPER_FONT_PRESET,
   PAPER_FONT_PRESET_IDS,
+  PAPER_FONT_SCALE_DEFAULT,
+  PAPER_FONT_SCALE_MAX,
+  PAPER_FONT_SCALE_MIN,
+  PAPER_FONT_SCALE_STEP,
   PAPER_TEXTURE,
   PAPER_TEXTURE_IDS,
   savePaperAppearance,

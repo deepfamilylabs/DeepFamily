@@ -19,7 +19,11 @@ export function usePaperPdfExport() {
   const [exporting, setExporting] = useState(false);
 
   const exportPdf = useCallback(
-    async (root: HTMLElement | null, style: PaperGenealogyStyle, cssVars?: CSSProperties) => {
+    async (
+      root: HTMLElement | null,
+      style: PaperGenealogyStyle,
+      cssVars?: CSSProperties,
+    ) => {
       if (exporting) return;
       if (!root) {
         toast.error(t("genealogyBook.exportPdfEmpty", "Nothing to export"));
@@ -28,7 +32,11 @@ export function usePaperPdfExport() {
 
       setExporting(true);
       try {
-        await exportPaperGenealogyPdf({ root, fileName: buildFileName(style), cssVars });
+        await exportPaperGenealogyPdf({
+          root,
+          fileName: buildFileName(style),
+          cssVars,
+        });
         toast.success(t("genealogyBook.exportPdfSuccess", "PDF exported"));
       } catch (error) {
         if (error instanceof NoPaperSpreadsError) {

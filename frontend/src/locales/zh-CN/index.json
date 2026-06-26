@@ -428,6 +428,8 @@
       "colorThemeLabel": "配色主题",
       "fontLabel": "字体",
       "textureLabel": "纸张纹理",
+      "fontScaleLabel": "字体倍数",
+      "fontScaleHint": "仅缩放屏幕预览，不影响 PDF 打印尺寸",
       "themes": {
         "xuan": "宣纸",
         "plain": "素白",

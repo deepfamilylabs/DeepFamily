@@ -26,6 +26,8 @@ export interface PaperGenealogyViewProps {
   paperVars?: CSSProperties;
   // User-provided hall name (堂号); when blank, the spine uses the default i18n hall name.
   hallName?: string;
+  // Whole-sheet preview zoom multiplier; applied on each renderer's content layer. Omitted → 1.
+  fontScale?: number;
 }
 
 type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
@@ -38,6 +40,7 @@ const PAPER_BOOK_RENDERERS = {
       spineTitleOverride={vm.spineTitleOverride}
       paperVars={vm.paperVars}
       hallName={vm.hallName}
+      fontScale={vm.fontScale}
     />
   ),
   [PAPER_GENEALOGY_STYLE.SU]: (vm) => (
@@ -49,6 +52,7 @@ const PAPER_BOOK_RENDERERS = {
       spineTitleOverride={vm.spineTitleOverride}
       paperVars={vm.paperVars}
       hallName={vm.hallName}
+      fontScale={vm.fontScale}
     />
   ),
   [PAPER_GENEALOGY_STYLE.DIEJI]: (vm) => (
@@ -58,6 +62,7 @@ const PAPER_BOOK_RENDERERS = {
       spineTitleOverride={vm.spineTitleOverride}
       paperVars={vm.paperVars}
       hallName={vm.hallName}
+      fontScale={vm.fontScale}
     />
   ),
   [PAPER_GENEALOGY_STYLE.LINEAGE]: (vm) => (
@@ -69,6 +74,7 @@ const PAPER_BOOK_RENDERERS = {
       spineTitleOverride={vm.spineTitleOverride}
       paperVars={vm.paperVars}
       hallName={vm.hallName}
+      fontScale={vm.fontScale}
     />
   ),
   [PAPER_GENEALOGY_STYLE.MODERN]: (vm) => (
@@ -78,6 +84,7 @@ const PAPER_BOOK_RENDERERS = {
       spineTitleOverride={vm.spineTitleOverride}
       paperVars={vm.paperVars}
       hallName={vm.hallName}
+      fontScale={vm.fontScale}
     />
   ),
 } satisfies Record<PaperGenealogyStyle, (vm: PaperGenealogyViewModel) => ReactElement>;
@@ -96,7 +103,11 @@ export function PaperGenealogyView(props: PaperGenealogyViewProps) {
   }
 
   return (
-    <div className="h-full w-full" data-testid="paper-genealogy-view" data-style={props.style}>
+    <div
+      className="h-full min-h-0 min-w-0 w-full"
+      data-testid="paper-genealogy-view"
+      data-style={props.style}
+    >
       {PAPER_BOOK_RENDERERS[props.style](vm)}
     </div>
   );

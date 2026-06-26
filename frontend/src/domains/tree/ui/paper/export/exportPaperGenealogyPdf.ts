@@ -33,6 +33,16 @@ async function withInlinePaperVars<T>(
   }
 }
 
+function getSpreadPageSize(spread: HTMLElement): {
+  width: number;
+  height: number;
+} {
+  return {
+    width: spread.offsetWidth,
+    height: spread.offsetHeight,
+  };
+}
+
 export interface ExportPaperGenealogyPdfOptions {
   /** The paper-genealogy-view container holding the rendered spreads. */
   root: HTMLElement;
@@ -53,11 +63,15 @@ export class NoPaperSpreadsError extends Error {
 export async function exportPaperGenealogyPdf(
   options: ExportPaperGenealogyPdfOptions,
 ): Promise<{ pageCount: number }> {
-  const { root, fileName, pixelRatio = DEFAULT_PIXEL_RATIO, cssVars = PAPER_VARS } = options;
+  const {
+    root,
+    fileName,
+    pixelRatio = DEFAULT_PIXEL_RATIO,
+    cssVars = PAPER_VARS,
+  } = options;
   const varEntries = toPaperVarEntries(cssVars);
   const sheetColor =
     (cssVars as Record<string, string>)["--df-paper-sheet"] || PAPER_SHEET_COLOR_FALLBACK;
-
   const spreads = Array.from(root.querySelectorAll<HTMLElement>("[data-paper-spread]"));
   if (!spreads.length) throw new NoPaperSpreadsError();
 
@@ -67,33 +81,44 @@ export async function exportPaperGenealogyPdf(
     import("jspdf"),
   ]);
 
-  // All spreads in a single style share one size; use the first as the page format.
-  const pageWidth = spreads[0].offsetWidth;
-  const pageHeight = spreads[0].offsetHeight;
+  const capture = async () => {
+    const firstSize = getSpreadPageSize(spreads[0]);
+    const pageWidth = firstSize.width;
+    const pageHeight = firstSize.height;
 
-  const pdf = new jsPDF({
-    orientation: "landscape",
-    unit: "px",
-    format: [pageWidth, pageHeight],
-  });
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "px",
+      format: [pageWidth, pageHeight],
+    });
 
-  for (let index = 0; index < spreads.length; index += 1) {
-    const spread = spreads[index];
-    // Sequential (not concurrent) to keep peak memory bounded on large books.
-    const dataUrl = await withInlinePaperVars(spread, varEntries, () =>
-      toPng(spread, {
-        pixelRatio,
-        backgroundColor: sheetColor,
-        cacheBust: true,
-      }),
-    );
+    for (let index = 0; index < spreads.length; index += 1) {
+      const spread = spreads[index];
+      const { width, height } = getSpreadPageSize(spread);
+      // Sequential (not concurrent) to keep peak memory bounded on large books.
+      const dataUrl = await withInlinePaperVars(spread, varEntries, () =>
+        toPng(spread, {
+          pixelRatio,
+          backgroundColor: sheetColor,
+          cacheBust: true,
+          // The app's global Google Fonts stylesheets are cross-origin, so reading their cssRules
+          // throws a SecurityError inside html-to-image. Paper spreads deliberately use system CJK
+          // font stacks, which remain available to the browser while rasterizing, so no web-font
+          // embedding is required (or desirable) for this export.
+          skipFonts: true,
+        }),
+      );
 
-    const width = spread.offsetWidth || pageWidth;
-    const height = spread.offsetHeight || pageHeight;
-    if (index > 0) pdf.addPage([width, height], "landscape");
-    pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
-  }
+      if (index > 0) pdf.addPage([width, height], "landscape");
+      pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
+    }
 
-  pdf.save(fileName);
-  return { pageCount: spreads.length };
+    pdf.save(fileName);
+    return { pageCount: spreads.length };
+  };
+
+  // `toPng` clones the spread, not its zoomed ancestor. offsetWidth/offsetHeight are likewise
+  // unaffected by an ancestor transform, so this keeps the PDF at its fixed print size without
+  // mutating the visible preview while the asynchronous rasterization is in progress.
+  return capture();
 }

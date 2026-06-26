@@ -32,6 +32,7 @@ import {
   PAPER_VARS,
   paperSvgTextStyle,
 } from "../paperStyles";
+import { PaperZoomViewport } from "../PaperZoomViewport";
 import {
   clipText,
   getChildRankWord,
@@ -399,6 +400,7 @@ export function LineageBookRenderer({
   spineTitleOverride,
   paperVars,
   hallName,
+  fontScale,
 }: {
   graph: TreeGraphData;
   rootId: NodeId | null;
@@ -407,6 +409,7 @@ export function LineageBookRenderer({
   spineTitleOverride?: string;
   paperVars?: CSSProperties;
   hallName?: string;
+  fontScale?: number;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -438,7 +441,12 @@ export function LineageBookRenderer({
 
     let frame = 0;
     const updateSpreadWidth = () => {
-      const nextWidth = Math.max(LINEAGE_MIN_SPREAD_WIDTH, element.getBoundingClientRect().width);
+      // getBoundingClientRect includes the content-layer `zoom` (unlike client*/offset*), but
+      // pagination runs on the base (unzoomed) layout, so divide the zoom back out here.
+      const nextWidth = Math.max(
+        LINEAGE_MIN_SPREAD_WIDTH,
+        element.getBoundingClientRect().width / (fontScale ?? 1),
+      );
       setSpreadWidth((currentWidth) =>
         currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1
           ? currentWidth
@@ -461,17 +469,21 @@ export function LineageBookRenderer({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", scheduleUpdate);
     };
-  }, []);
+  }, [fontScale]);
 
   return (
     <div
-      className="h-full overflow-auto p-4 md:p-6"
+      className="h-full min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4 md:p-6"
       style={paperVars ?? PAPER_VARS}
       data-testid="paper-lineage"
     >
-      <div
-        className="mx-auto flex min-h-full w-full min-w-min max-w-[1320px] flex-col"
-        style={{ color: "var(--df-paper-ink)", fontFamily: "var(--df-paper-font-body)" }}
+      <PaperZoomViewport
+        fontScale={fontScale}
+        className="flex min-h-full min-w-min flex-col"
+        style={{
+          color: "var(--df-paper-ink)",
+          fontFamily: "var(--df-paper-font-body)",
+        }}
       >
         {spreadItems.length ? (
           <section
@@ -537,7 +549,7 @@ export function LineageBookRenderer({
             </div>
           </section>
         ) : null}
-      </div>
+      </PaperZoomViewport>
     </div>
   );
 }
