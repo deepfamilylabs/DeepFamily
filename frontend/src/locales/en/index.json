@@ -419,6 +419,11 @@
     "lineageOverlapNote": "This chart repeats the previous chart's fifth generation.",
     "diejiContinuedGeneration": "continued",
     "repeatedGeneration": "repeated",
+    "settings": {
+      "title": "Display settings",
+      "spineTitleLabel": "Spine title",
+      "spineTitleHint": "Leave blank to use the auto-generated title"
+    },
     "styles": {
       "ou": "Ou-style",
       "su": "Su-style",

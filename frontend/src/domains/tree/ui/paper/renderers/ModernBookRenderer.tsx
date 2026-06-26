@@ -725,9 +725,11 @@ function ModernPage({
 export function ModernBookRenderer({
   generations,
   t,
+  spineTitleOverride,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
+  spineTitleOverride?: string;
 }) {
   const spreadRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState(0);
@@ -757,7 +759,8 @@ export function ModernBookRenderer({
       ),
     [book],
   );
-  const spineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
+  const autoSpineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
+  const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
 
   return (
     <div className="h-full overflow-auto p-4 md:p-6" style={PAPER_VARS} data-testid="paper-modern">

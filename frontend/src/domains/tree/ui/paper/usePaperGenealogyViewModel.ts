@@ -12,6 +12,7 @@ export interface UsePaperGenealogyViewModelParams {
   hasRoot: boolean;
   loading?: boolean;
   contractMessage?: string;
+  spineTitleOverride?: string;
 }
 
 export interface PaperGenealogyViewModel {
@@ -22,12 +23,14 @@ export interface PaperGenealogyViewModel {
   isEmpty: boolean;
   loading?: boolean;
   contractMessage?: string;
+  spineTitleOverride?: string;
 }
 
 export function usePaperGenealogyViewModel(
   params: UsePaperGenealogyViewModelParams,
 ): PaperGenealogyViewModel {
-  const { graph, rootId, nodesData, spouseLinks, hasRoot, loading, contractMessage } = params;
+  const { graph, rootId, nodesData, spouseLinks, hasRoot, loading, contractMessage, spineTitleOverride } =
+    params;
   const { t } = useTranslation();
   const translate = useCallback<TranslateFn>(
     (key, fallback, options) =>
@@ -50,5 +53,6 @@ export function usePaperGenealogyViewModel(
     isEmpty: !hasRoot || generations.length === 0,
     loading,
     contractMessage,
+    spineTitleOverride,
   };
 }

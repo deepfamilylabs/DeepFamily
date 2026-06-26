@@ -306,9 +306,11 @@ function OuPage({
 export function OuBookRenderer({
   generations,
   t,
+  spineTitleOverride,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
+  spineTitleOverride?: string;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -320,10 +322,11 @@ export function OuBookRenderer({
     () => buildOuPaperBook({ generations, t, pageBodyWidths }),
     [generations, pageBodyWidths, t],
   );
-  const spineTitle = useMemo(
+  const autoSpineTitle = useMemo(
     () => getPaperSpineTitle(generations, t),
     [generations, t],
   );
+  const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
   const spreadItems = useMemo(
     () =>
       book.charts.flatMap((chart) =>

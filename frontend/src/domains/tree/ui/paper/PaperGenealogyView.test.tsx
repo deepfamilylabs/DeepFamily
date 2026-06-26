@@ -2050,7 +2050,7 @@ describe("paper spouse rendering", () => {
     expect(husband.detailLines.join(" ")).not.toContain("王氏");
   });
 
-  it("shows 配王氏 in Dieji and 配偶: 王氏 in Modern; Ou omits spouses", () => {
+  it("shows 配王氏 in Dieji and 配: 王氏 in Modern; Ou omits spouses", () => {
     const generations = buildPaperGenerations({
       graph: spouseGraph,
       nodesData: spouseNodesData,
@@ -2058,9 +2058,10 @@ describe("paper spouse rendering", () => {
       t: zhTranslate,
     });
     const husband = generations[0].people[0];
+    // A man's spouse keys on his gender → 配 (wife): classical "配王氏", labeled field "配: 王氏".
     expect(getDiejiFullRecordText(husband, zhTranslate)).toContain("配王氏");
     expect(splitPaperRecordLines(husband, zhTranslate, "labeled").baseLines.join(" ")).toContain(
-      "配偶: 王氏",
+      "配: 王氏",
     );
     expect(getOuFullRecordText(husband, zhTranslate)).not.toContain("王氏");
   });
@@ -2092,5 +2093,100 @@ describe("paper spouse rendering", () => {
     const husband = generations[0].people[0];
     expect(husband.spouses).toHaveLength(0);
     expect(getDiejiFullRecordText(husband, zhTranslate)).not.toContain("配");
+  });
+});
+
+describe("paper spine title override", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  // A two-generation lineage whose root is "贾源" → auto spine title "贾氏族谱".
+  function makeNamedLinear() {
+    const linear = makeLinearGraph(2);
+    const nodesDataLocal: Record<string, NodeData> = linear.rootId
+      ? {
+          [linear.rootId]: {
+            id: linear.rootId,
+            personHash: linear.graph.nodes[0].personHash,
+            versionIndex: 1,
+            fullName: "贾源",
+          },
+        }
+      : {};
+    return { ...linear, nodesData: nodesDataLocal };
+  }
+
+  it("shows the auto-generated spine title when no override is provided", () => {
+    const linear = makeNamedLinear();
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={linear.nodesData}
+        hasRoot
+      />,
+    );
+    expect(screen.getByTestId("paper-ou-spine-1-1").textContent).toContain("贾氏族谱");
+  });
+
+  it("uses the override spine title when provided", () => {
+    const linear = makeNamedLinear();
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={linear.nodesData}
+        hasRoot
+        spineTitleOverride="曹氏宗谱"
+      />,
+    );
+    const spine = screen.getByTestId("paper-ou-spine-1-1");
+    expect(spine.textContent).toContain("曹氏宗谱");
+    expect(spine.textContent).not.toContain("贾氏族谱");
+  });
+
+  it("falls back to the auto title when the override is blank/whitespace", () => {
+    const linear = makeNamedLinear();
+    render(
+      <PaperGenealogyView
+        style="ou"
+        graph={linear.graph}
+        rootId={linear.rootId}
+        nodesData={linear.nodesData}
+        hasRoot
+        spineTitleOverride="   "
+      />,
+    );
+    expect(screen.getByTestId("paper-ou-spine-1-1").textContent).toContain("贾氏族谱");
+  });
+
+  it("applies the override across every paper style", () => {
+    const styleSpines = [
+      ["ou", "paper-ou-spine-1-1"],
+      ["su", "paper-su-spine-1-1"],
+      ["dieji", "paper-dieji-spine-1-1"],
+      ["lineage", "paper-lineage-spine-1-1"],
+      ["modern", "paper-modern-spine-1-1"],
+    ] as const;
+
+    for (const [style, spineTestId] of styleSpines) {
+      const linear = makeNamedLinear();
+      render(
+        <PaperGenealogyView
+          style={style}
+          graph={linear.graph}
+          rootId={linear.rootId}
+          nodesData={linear.nodesData}
+          hasRoot
+          spineTitleOverride="曹氏宗谱"
+        />,
+      );
+      expect(screen.getByTestId(spineTestId).textContent).toContain("曹氏宗谱");
+      expect(screen.getByTestId(spineTestId).textContent).not.toContain("贾氏族谱");
+      cleanup();
+    }
   });
 });

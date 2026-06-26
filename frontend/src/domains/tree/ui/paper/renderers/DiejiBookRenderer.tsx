@@ -313,18 +313,21 @@ function DiejiPage({
 export function DiejiBookRenderer({
   generations,
   t,
+  spineTitleOverride,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
+  spineTitleOverride?: string;
 }) {
   const book = useMemo(
     () => buildDiejiPaperBook({ generations, t }),
     [generations, t],
   );
-  const spineTitle = useMemo(
+  const autoSpineTitle = useMemo(
     () => getPaperSpineTitle(generations, t),
     [generations, t],
   );
+  const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
   const spreadItems = useMemo(
     () =>
       book.charts.flatMap((chart) =>

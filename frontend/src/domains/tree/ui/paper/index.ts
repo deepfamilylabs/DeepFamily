@@ -8,4 +8,11 @@ export {
   type PaperGeneration,
   type PaperGenealogyStyle,
   type PaperPerson,
+  type TranslateFn,
 } from "./paperData";
+export { getPaperSpineTitle } from "./paperText";
+export {
+  getPaperSpineTitleStorageKey,
+  loadPaperSpineTitleOverride,
+  savePaperSpineTitleOverride,
+} from "./paperSpineTitleStorage";
