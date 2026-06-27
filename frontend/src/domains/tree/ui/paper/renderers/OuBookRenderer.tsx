@@ -18,6 +18,7 @@ import {
 } from "../layout/ouPagination";
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import {
+  PAPER_LEAF_STYLE,
   PAPER_LINE,
   PAPER_MARK_BG,
   PAPER_RECORD_INLINE_PADDING,
@@ -385,7 +386,7 @@ export function OuBookRenderer({
           <section
             className="border p-[var(--df-paper-leaf-margin)] shadow-sm"
             style={{
-              ...PAPER_SHEET_STYLE,
+              ...PAPER_LEAF_STYLE,
               borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-ou-table-1"

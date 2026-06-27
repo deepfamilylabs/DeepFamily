@@ -96,6 +96,14 @@ export const PAPER_SHEET_STYLE: CSSProperties = {
   backgroundSize: "var(--df-paper-sheet-size)",
 };
 
+// The whole-leaf (整叶) background: paper color ONLY, no 界格 grid image. The grid belongs inside the
+// 版框 text area (PAPER_SHEET_STYLE on each page), so the book-edge margin (天头地脚/书边) the leaf
+// reserves around the frame stays blank paper. Most visible on dark themes (碑拓/磁青), where a grid
+// bleeding into the margin would otherwise show as lines outside the frame.
+export const PAPER_LEAF_STYLE: CSSProperties = {
+  backgroundColor: "var(--df-paper-sheet)",
+};
+
 export const PAPER_MARK_BG = "var(--df-paper-mark-bg)";
 export const PAPER_MARK_FG = "var(--df-paper-mark-fg)";
 

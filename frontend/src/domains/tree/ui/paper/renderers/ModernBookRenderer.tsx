@@ -6,6 +6,7 @@ import {
   type TranslateFn,
 } from "../paperData";
 import {
+  PAPER_LEAF_STYLE,
   PAPER_LINE,
   PAPER_NOTE_FONT_STACK,
   PAPER_SHEET_STYLE,
@@ -774,7 +775,7 @@ export function ModernBookRenderer({
           <section
             className="border p-[var(--df-paper-leaf-margin)] shadow-sm"
             style={{
-              ...PAPER_SHEET_STYLE,
+              ...PAPER_LEAF_STYLE,
               borderColor: PAPER_LINE.strong,
             }}
             data-testid="paper-modern-chart"
