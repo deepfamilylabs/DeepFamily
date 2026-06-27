@@ -545,21 +545,6 @@ export function SuBookRenderer({
             }}
             data-testid="paper-su-table-1"
           >
-            <div
-              className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: PAPER_LINE.soft }}
-            >
-              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
-                {t("genealogyBook.styles.su", "Su-style")}
-              </h2>
-              <span style={{ ...PAPER_TEXT.sectionRule }}>
-                {t(
-                  "genealogyBook.suTableRule",
-                  "Five generations per chart, fathers descend vertically and siblings branch horizontally.",
-                )}
-              </span>
-            </div>
-
             <div ref={spreadsRef} className="flex flex-col gap-5">
               {spreadItems.map(({ chart, spread }) => (
                 <div

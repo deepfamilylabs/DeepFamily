@@ -779,21 +779,6 @@ export function ModernBookRenderer({
             }}
             data-testid="paper-modern-chart"
           >
-            <div
-              className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: PAPER_LINE.soft }}
-            >
-              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
-                {t("genealogyBook.styles.modern", "Modern Ledger")}
-              </h2>
-              <span style={{ ...PAPER_TEXT.sectionRule }}>
-                {t(
-                  "genealogyBook.modernTableRule",
-                  "Five generations per chart, with facing ledger pages for relation, name, and biography.",
-                )}
-              </span>
-            </div>
-
             <div className="flex flex-col gap-5">
               {spreadItems.map(({ chart, spread }) => (
                 <div

@@ -492,14 +492,16 @@ describe("PaperGenealogyView", () => {
     expect(rootDetails).not.toContain("子女: 4");
 
     // Only the Modern style lists children in its body text; vertical paper records omit the 子女 line.
-    const diejiRootLanes = buildDiejiPaperBook({ generations, t: zhTranslate }).charts[0].spreads
-      .flatMap((spread) => spread.lanes)
+    const diejiRootLanes = buildDiejiPaperBook({ generations, t: zhTranslate })
+      .charts[0].spreads.flatMap((spread) => spread.lanes)
       .filter((lane) => lane.kind === "person" && lane.person.id === root.id);
     expect(diejiRootLanes).toHaveLength(1);
-    expect(diejiRootLanes[0]?.kind === "person" ? diejiRootLanes[0].text : "").not.toContain("子女");
+    expect(diejiRootLanes[0]?.kind === "person" ? diejiRootLanes[0].text : "").not.toContain(
+      "子女",
+    );
 
-    const ouRootEntries = buildOuPaperBook({ generations, t: zhTranslate }).charts[0].spreads
-      .flatMap((spread) => spread.rows)
+    const ouRootEntries = buildOuPaperBook({ generations, t: zhTranslate })
+      .charts[0].spreads.flatMap((spread) => spread.rows)
       .flatMap((row) => row.entries)
       .filter((entry) => entry.person.id === root.id);
     expect(ouRootEntries).toHaveLength(1);
@@ -519,19 +521,15 @@ describe("PaperGenealogyView", () => {
 
     expect(screen.getByTestId("paper-modern")).toBeTruthy();
     expect(screen.getByTestId("paper-modern-chart").className).toContain("border");
-    expect(screen.getByText("Modern Ledger").style.fontSize).toBe("20px");
-    expect(
-      screen.getByText(
-        "Five generations per chart, with facing ledger pages for relation, name, and biography.",
-      ).style.color,
-    ).toBe("var(--df-paper-red)");
     expect(screen.getByTestId("paper-modern-page").className).toContain("h-[872px]");
     expect(screen.getByTestId("paper-modern-page").className).toContain("min-w-[1180px]");
     expect(screen.getByTestId("paper-modern-page").className).toContain("overflow-hidden");
     expect(screen.getByTestId("paper-modern-page").style.background).toBe("var(--df-paper-sheet)");
     // Two ledger pages + the spine, plus the (absolutely-positioned) version-frame overlay.
     expect(screen.getByTestId("paper-modern-page").childElementCount).toBe(4);
-    expect(screen.getByTestId("paper-modern-page").querySelector("[data-testid='paper-frame-overlay']")).toBeTruthy();
+    expect(
+      screen.getByTestId("paper-modern-page").querySelector("[data-testid='paper-frame-overlay']"),
+    ).toBeTruthy();
     expect(screen.getByTestId("paper-modern-page").style.gridTemplateColumns).toContain("72px");
     expect(screen.getByTestId("paper-modern-left-1-1")).toBeTruthy();
     expect(screen.getByTestId("paper-modern-right-1-1")).toBeTruthy();
@@ -1029,8 +1027,7 @@ describe("PaperGenealogyView", () => {
     const firstChunkUnits = measureRecordUnits(firstEntry.text);
     const continuedChunkCapacity =
       Math.floor(
-        (firstContinuedEntry.widthPx - OU_PERSON_CONTINUATION_BASE_WIDTH) /
-          OU_RECORD_COLUMN_WIDTH,
+        (firstContinuedEntry.widthPx - OU_PERSON_CONTINUATION_BASE_WIDTH) / OU_RECORD_COLUMN_WIDTH,
       ) * OU_RECORD_UNITS_PER_COLUMN;
     const continuedCapacityWithNameLane =
       Math.floor((firstContinuedEntry.widthPx - OU_PERSON_BASE_WIDTH) / OU_RECORD_COLUMN_WIDTH) *
@@ -1040,9 +1037,7 @@ describe("PaperGenealogyView", () => {
     expect(renderedEntries.length).toBeGreaterThan(1);
     expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
     expect(firstChunkUnits).toBeLessThanOrEqual(firstChunkCapacity);
-    expect(firstChunkUnits).toBeGreaterThan(
-      firstChunkCapacity - OU_RECORD_SPLIT_UNIT_TOLERANCE,
-    );
+    expect(firstChunkUnits).toBeGreaterThan(firstChunkCapacity - OU_RECORD_SPLIT_UNIT_TOLERANCE);
     expect(Array.from(firstEntry.text).length).toBeGreaterThan(firstChunkCapacity / 2);
     expect(continuedChunkCapacity).toBeGreaterThan(continuedCapacityWithNameLane);
     expect(continuedChunkUnits).toBeLessThanOrEqual(continuedChunkCapacity);
@@ -1137,9 +1132,7 @@ describe("PaperGenealogyView", () => {
     expect(renderedEntries.map((entry) => entry.text).join("")).toBe(getOuFullRecordText(person));
     expect(firstEntry.side).toBe("right");
     expect(firstEntry.widthPx).toBe(rightWidth);
-    expect(Array.from(firstEntry.text)).toHaveLength(
-      rightColumnCount * renderedCjkCharsPerColumn,
-    );
+    expect(Array.from(firstEntry.text)).toHaveLength(rightColumnCount * renderedCjkCharsPerColumn);
     expect(measureRecordUnits(firstEntry.text)).toBe(
       rightColumnCount * renderedCjkCharsPerColumn * 2,
     );
@@ -1565,9 +1558,9 @@ describe("PaperGenealogyView", () => {
     expect(screen.getAllByTestId(`paper-dieji-relation-${linear.rootId}`)[0].textContent).toContain(
       "ancestor",
     );
-    expect(screen.getAllByTestId(`paper-dieji-relation-${linear.rootId}`)[0].className).not.toContain(
-      "font-bold",
-    );
+    expect(
+      screen.getAllByTestId(`paper-dieji-relation-${linear.rootId}`)[0].className,
+    ).not.toContain("font-bold");
     expect(screen.getAllByTestId(`paper-dieji-name-${linear.rootId}`)[0].textContent).toContain(
       "贾源",
     );
@@ -1959,19 +1952,15 @@ describe("PaperGenealogyView", () => {
     expect(
       screen.getByTestId(`paper-lineage-connector-${linear.rootId}`).getAttribute("stroke"),
     ).toBe("var(--df-paper-line)");
-    expect(screen.getByTestId(`paper-lineage-name-${linear.rootId}`).textContent).toContain(
-      "贾源",
-    );
+    expect(screen.getByTestId(`paper-lineage-name-${linear.rootId}`).textContent).toContain("贾源");
     expect(screen.getByTestId(`paper-lineage-root-stem-${linear.rootId}`)).toBeTruthy();
-    expect(
-      screen.queryByTestId(`paper-lineage-root-stem-${linear.graph.nodes[1].id}`),
-    ).toBeNull();
+    expect(screen.queryByTestId(`paper-lineage-root-stem-${linear.graph.nodes[1].id}`)).toBeNull();
     expect(screen.getByTestId(`paper-lineage-relation-${linear.rootId}`).textContent).toContain(
       "ancestor",
     );
-    expect(screen.getByTestId(`paper-lineage-relation-${linear.graph.nodes[1].id}`).textContent).toBe(
-      "之子",
-    );
+    expect(
+      screen.getByTestId(`paper-lineage-relation-${linear.graph.nodes[1].id}`).textContent,
+    ).toBe("之子");
     expect(screen.getByTestId(`paper-lineage-circle-${linear.graph.nodes[1].id}`)).toBeTruthy();
     expect(screen.queryByTestId(`paper-lineage-relation-${linear.graph.nodes[4].id}`)).toBeNull();
     expect(screen.queryByTestId(`paper-lineage-circle-${linear.graph.nodes[4].id}`)).toBeNull();
@@ -1993,9 +1982,7 @@ describe("PaperGenealogyView", () => {
 
     const rightPage = screen.getByTestId("paper-lineage-page-right-1-1");
     expect(
-      rightPage.querySelectorAll(
-        `[data-testid="paper-lineage-connector-${wide.rootId}"]`,
-      ),
+      rightPage.querySelectorAll(`[data-testid="paper-lineage-connector-${wide.rootId}"]`),
     ).toHaveLength(1);
   });
 
@@ -2034,7 +2021,13 @@ describe("paper spouse rendering", () => {
     childrenByParent: { [husbandId]: [child401Id] },
   };
   const spouseNodesData: Record<string, NodeData> = {
-    [husbandId]: { id: husbandId, personHash: husbandHash, versionIndex: 1, gender: 1, fullName: "李三" },
+    [husbandId]: {
+      id: husbandId,
+      personHash: husbandHash,
+      versionIndex: 1,
+      gender: 1,
+      fullName: "李三",
+    },
     [wifeId]: { id: wifeId, personHash: wifeHash, versionIndex: 1, gender: 2, fullName: "王氏" },
     [child401Id]: { id: child401Id, personHash: childHash401, versionIndex: 1 },
   };

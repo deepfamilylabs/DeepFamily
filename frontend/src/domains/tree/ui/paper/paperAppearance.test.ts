@@ -53,12 +53,20 @@ describe("buildPaperVars", () => {
   });
 
   it("keeps the inner frame line off and reserves no gap for the single border style", () => {
-    const vars = buildPaperVars(DEFAULT_PAPER_APPEARANCE) as Vars;
+    const vars = buildPaperVars({ ...DEFAULT_PAPER_APPEARANCE, borderStyleId: "single" }) as Vars;
     expect(vars["--df-paper-frame-outer"]).toBe("1px");
     expect(vars["--df-paper-frame-inner-tb"]).toBe("0px");
     expect(vars["--df-paper-frame-inner-lr"]).toBe("0px");
     expect(vars["--df-paper-frame-pad-tb"]).toBe("0px");
     expect(vars["--df-paper-frame-pad-lr"]).toBe("0px");
+  });
+
+  it("defaults to the 文武 (wenwu) frame: a thick outer line plus a thin inner line", () => {
+    const vars = buildPaperVars(DEFAULT_PAPER_APPEARANCE) as Vars;
+    expect(DEFAULT_PAPER_APPEARANCE.borderStyleId).toBe("wenwu");
+    expect(vars["--df-paper-frame-outer"]).toBe("3px");
+    expect(vars["--df-paper-frame-inner-tb"]).toBe("1px");
+    expect(vars["--df-paper-frame-inner-lr"]).toBe("1px");
   });
 
   it("reserves the frame gap on the axes that carry an inner line so it closes with content", () => {

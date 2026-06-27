@@ -390,18 +390,6 @@ export function OuBookRenderer({
             }}
             data-testid="paper-ou-table-1"
           >
-            <div
-              className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: PAPER_LINE.soft }}
-            >
-              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
-                {t("genealogyBook.styles.ou", "Ou-style")}
-              </h2>
-              <span style={{ ...PAPER_TEXT.sectionRule }}>
-                {t("genealogyBook.ouTableRule", "Five generations per table.")}
-              </span>
-            </div>
-
             <div ref={spreadsRef} className="flex flex-col gap-5">
               {spreadItems.map(({ chart, spread }) => (
                 <div
