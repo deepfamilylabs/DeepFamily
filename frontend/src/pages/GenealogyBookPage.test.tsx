@@ -59,6 +59,7 @@ vi.mock("../domains/tree", () => ({
     colorThemeId: "xuan",
     fontPresetId: "classic",
     textureId: "subtle",
+    borderStyleId: "single",
     hallName: null,
     fontScale: 1,
     exportMarginPx: 48,
@@ -80,11 +81,20 @@ vi.mock("../domains/tree", () => ({
   PAPER_COLOR_THEME_IDS: ["xuan", "plain", "bamboo", "azure"],
   PAPER_FONT_PRESET_IDS: ["classic", "song", "sans"],
   PAPER_TEXTURE_IDS: ["subtle", "strong", "plain"],
+  PAPER_BORDER_STYLE_IDS: ["single", "double", "sides", "wenwu"],
   getPaperColorThemeSwatch: () => ["#f7efd8", "#8a6a3b", "#c18070"],
+  getPaperBorderStyleVars: () => ({
+    "--df-paper-frame-outer": "1px",
+    "--df-paper-frame-inner-tb": "1px",
+    "--df-paper-frame-inner-lr": "1px",
+    "--df-paper-frame-pad-tb": "4px",
+    "--df-paper-frame-pad-lr": "4px",
+  }),
   buildPaperVars: (appearance: any) => ({
     "--df-paper-test-theme": appearance.colorThemeId,
     "--df-paper-test-font": appearance.fontPresetId,
     "--df-paper-test-texture": appearance.textureId,
+    "--df-paper-test-border": appearance.borderStyleId,
   }),
   // Mirror the real global appearance persistence (single JSON key) so the test exercises it.
   PAPER_FONT_SCALE_MIN: 0.8,
@@ -99,6 +109,7 @@ vi.mock("../domains/tree", () => ({
       colorThemeId: "xuan",
       fontPresetId: "classic",
       textureId: "subtle",
+      borderStyleId: "single",
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
@@ -302,6 +313,7 @@ describe("GenealogyBookPage", () => {
     fireEvent.click(screen.getByTestId("paper-color-theme-bamboo"));
     fireEvent.click(screen.getByTestId("paper-font-preset-song"));
     fireEvent.click(screen.getByTestId("paper-texture-strong"));
+    fireEvent.click(screen.getByTestId("paper-border-style-double"));
     fireEvent.change(screen.getByTestId("paper-font-scale-input"), { target: { value: "1.3" } });
     fireEvent.change(screen.getByTestId("paper-export-margin-input"), { target: { value: "72" } });
     expect(resetButton.disabled).toBe(false);
@@ -313,6 +325,7 @@ describe("GenealogyBookPage", () => {
       colorThemeId: "xuan",
       fontPresetId: "classic",
       textureId: "subtle",
+      borderStyleId: "single",
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
@@ -328,6 +341,9 @@ describe("GenealogyBookPage", () => {
       "true",
     );
     expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-border-style-single").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
     expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1");
     expect((screen.getByTestId("paper-export-margin-input") as HTMLInputElement).value).toBe("48");
     expect(resetButton.disabled).toBe(true);

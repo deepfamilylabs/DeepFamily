@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import {
   PAPER_BODY_FONT_STACK,
   PAPER_COLOR_VARS_XUAN,
+  PAPER_FRAME_VARS_DEFAULT,
   PAPER_TEXTURE_VARS_DEFAULT,
   PAPER_TITLE_FONT_STACK,
   PAPER_VARS,
@@ -146,6 +147,60 @@ export const PAPER_TEXTURE_PRESETS: Record<PaperTextureId, Record<string, string
 
 export const PAPER_TEXTURE_IDS = Object.keys(PAPER_TEXTURE_PRESETS) as PaperTextureId[];
 
+// ---- Border (版框) styles ----------------------------------------------------------------------
+
+export const PAPER_BORDER_STYLE = {
+  // 四周单边: a single thin rule (the historical default and most plain look).
+  SINGLE: "single",
+  // 四周双边: a thin outer + thin inner line on all four sides (the most common 家谱 frame).
+  DOUBLE: "double",
+  // 左右双边: double line on the left/right edges only, single top/bottom (classic Ming/Qing books).
+  SIDES: "sides",
+  // 文武边: a thick outer line (武) paired with a thin inner line (文) on all four sides.
+  WENWU: "wenwu",
+} as const;
+
+export type PaperBorderStyleId = (typeof PAPER_BORDER_STYLE)[keyof typeof PAPER_BORDER_STYLE];
+
+// Each style is purely the --df-paper-frame-* geometry. The outer line is the leaf's own border
+// (--df-paper-frame-outer). --df-paper-frame-pad-* both reserves the gap between the two lines and
+// positions the inner line: the leaf pads its content by that amount and PaperFrameOverlay draws the
+// inner line at the same offset, so the inner line lands on the content edge (closing with the page
+// dividers) and the blank gap ends up between the inner and outer lines. The pad/inner widths are
+// per-axis, so `sides` reserves the gap on the left/right only and its verticals span full height to
+// meet the single top/bottom line. Switching a style is a single var swap on every leaf.
+export const PAPER_BORDER_STYLES: Record<PaperBorderStyleId, Record<string, string>> = {
+  single: PAPER_FRAME_VARS_DEFAULT,
+  double: {
+    "--df-paper-frame-outer": "1px",
+    "--df-paper-frame-inner-tb": "1px",
+    "--df-paper-frame-inner-lr": "1px",
+    "--df-paper-frame-pad-tb": "4px",
+    "--df-paper-frame-pad-lr": "4px",
+  },
+  sides: {
+    "--df-paper-frame-outer": "1px",
+    "--df-paper-frame-inner-tb": "0px",
+    "--df-paper-frame-inner-lr": "1px",
+    "--df-paper-frame-pad-tb": "0px",
+    "--df-paper-frame-pad-lr": "4px",
+  },
+  wenwu: {
+    "--df-paper-frame-outer": "3px",
+    "--df-paper-frame-inner-tb": "1px",
+    "--df-paper-frame-inner-lr": "1px",
+    "--df-paper-frame-pad-tb": "6px",
+    "--df-paper-frame-pad-lr": "6px",
+  },
+};
+
+export const PAPER_BORDER_STYLE_IDS = Object.keys(PAPER_BORDER_STYLES) as PaperBorderStyleId[];
+
+// The four frame-geometry vars for a style, used to render a miniature frame preview in the UI.
+export function getPaperBorderStyleVars(id: PaperBorderStyleId): Record<string, string> {
+  return PAPER_BORDER_STYLES[id];
+}
+
 // ---- Font scale (whole-sheet zoom) ------------------------------------------------------------
 
 // Global preview multiplier. It is applied as a proportional zoom on each renderer's content layer
@@ -191,6 +246,8 @@ export interface PaperAppearance {
   colorThemeId: PaperColorThemeId;
   fontPresetId: PaperFontPresetId;
   textureId: PaperTextureId;
+  // Version-frame (版框) style: single / double / sided / 文武 (see PAPER_BORDER_STYLES).
+  borderStyleId: PaperBorderStyleId;
   // Hall name (堂号) override; null/empty means use the default i18n hall name.
   hallName: string | null;
   // Whole-sheet preview zoom multiplier (see PAPER_FONT_SCALE_* above).
@@ -203,6 +260,7 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   colorThemeId: PAPER_COLOR_THEME.XUAN,
   fontPresetId: PAPER_FONT_PRESET.CLASSIC,
   textureId: PAPER_TEXTURE.SUBTLE,
+  borderStyleId: PAPER_BORDER_STYLE.SINGLE,
   hallName: null,
   fontScale: PAPER_FONT_SCALE_DEFAULT,
   exportMarginPx: PAPER_EXPORT_MARGIN_DEFAULT,
@@ -216,6 +274,7 @@ export function buildPaperVars(appearance: PaperAppearance): CSSProperties {
     ...PAPER_COLOR_THEMES[appearance.colorThemeId],
     ...PAPER_FONT_PRESETS[appearance.fontPresetId],
     ...PAPER_TEXTURE_PRESETS[appearance.textureId],
+    ...PAPER_BORDER_STYLES[appearance.borderStyleId],
   } as CSSProperties;
 }
 
@@ -233,6 +292,10 @@ function isFontPresetId(value: unknown): value is PaperFontPresetId {
 
 function isTextureId(value: unknown): value is PaperTextureId {
   return typeof value === "string" && value in PAPER_TEXTURE_PRESETS;
+}
+
+function isBorderStyleId(value: unknown): value is PaperBorderStyleId {
+  return typeof value === "string" && value in PAPER_BORDER_STYLES;
 }
 
 // Read the saved appearance, falling back field-by-field to defaults so a partial/corrupt payload
@@ -255,6 +318,9 @@ export function loadPaperAppearance(): PaperAppearance {
       textureId: isTextureId(parsed.textureId)
         ? parsed.textureId
         : DEFAULT_PAPER_APPEARANCE.textureId,
+      borderStyleId: isBorderStyleId(parsed.borderStyleId)
+        ? parsed.borderStyleId
+        : DEFAULT_PAPER_APPEARANCE.borderStyleId,
       hallName,
       fontScale: clampPaperFontScale(parsed.fontScale),
       exportMarginPx: clampPaperExportMargin(parsed.exportMarginPx),

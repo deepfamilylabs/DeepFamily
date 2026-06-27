@@ -16,6 +16,8 @@ import {
   PAPER_FONT_SCALE_MIN,
   PAPER_TEXTURE_PRESETS,
   PAPER_TEXTURE_IDS,
+  PAPER_BORDER_STYLES,
+  PAPER_BORDER_STYLE_IDS,
   savePaperAppearance,
   type PaperAppearance,
 } from "./paperAppearance";
@@ -50,10 +52,60 @@ describe("buildPaperVars", () => {
     expect(vars["--df-paper-sheet-image"]).toBe("none");
   });
 
+  it("keeps the inner frame line off and reserves no gap for the single border style", () => {
+    const vars = buildPaperVars(DEFAULT_PAPER_APPEARANCE) as Vars;
+    expect(vars["--df-paper-frame-outer"]).toBe("1px");
+    expect(vars["--df-paper-frame-inner-tb"]).toBe("0px");
+    expect(vars["--df-paper-frame-inner-lr"]).toBe("0px");
+    expect(vars["--df-paper-frame-pad-tb"]).toBe("0px");
+    expect(vars["--df-paper-frame-pad-lr"]).toBe("0px");
+  });
+
+  it("reserves the frame gap on the axes that carry an inner line so it closes with content", () => {
+    // double: gap reserved on both axes (inner line on all four sides).
+    const doubleVars = buildPaperVars({
+      ...DEFAULT_PAPER_APPEARANCE,
+      borderStyleId: "double",
+    }) as Vars;
+    expect(doubleVars["--df-paper-frame-pad-tb"]).not.toBe("0px");
+    expect(doubleVars["--df-paper-frame-pad-lr"]).not.toBe("0px");
+
+    // sides: gap reserved on the left/right only; top/bottom stay flush (single line).
+    const sidesVars = buildPaperVars({
+      ...DEFAULT_PAPER_APPEARANCE,
+      borderStyleId: "sides",
+    }) as Vars;
+    expect(sidesVars["--df-paper-frame-pad-tb"]).toBe("0px");
+    expect(sidesVars["--df-paper-frame-pad-lr"]).not.toBe("0px");
+  });
+
+  it("enables the inner frame line when a non-single border style is selected", () => {
+    const doubleVars = buildPaperVars({
+      ...DEFAULT_PAPER_APPEARANCE,
+      borderStyleId: "double",
+    }) as Vars;
+    expect(doubleVars["--df-paper-frame-inner-tb"]).toBe("1px");
+    expect(doubleVars["--df-paper-frame-inner-lr"]).toBe("1px");
+
+    const sidesVars = buildPaperVars({
+      ...DEFAULT_PAPER_APPEARANCE,
+      borderStyleId: "sides",
+    }) as Vars;
+    expect(sidesVars["--df-paper-frame-inner-tb"]).toBe("0px");
+    expect(sidesVars["--df-paper-frame-inner-lr"]).toBe("1px");
+
+    const wenwuVars = buildPaperVars({
+      ...DEFAULT_PAPER_APPEARANCE,
+      borderStyleId: "wenwu",
+    }) as Vars;
+    expect(wenwuVars["--df-paper-frame-outer"]).toBe("3px");
+  });
+
   it("keeps every preset list non-empty and in sync with its table", () => {
     expect(PAPER_COLOR_THEME_IDS.length).toBe(Object.keys(PAPER_COLOR_THEMES).length);
     expect(PAPER_FONT_PRESET_IDS.length).toBe(Object.keys(PAPER_FONT_PRESETS).length);
     expect(PAPER_TEXTURE_IDS.length).toBe(Object.keys(PAPER_TEXTURE_PRESETS).length);
+    expect(PAPER_BORDER_STYLE_IDS.length).toBe(Object.keys(PAPER_BORDER_STYLES).length);
   });
 });
 
@@ -84,6 +136,7 @@ describe("paperAppearance storage", () => {
       colorThemeId: "azure",
       fontPresetId: "song",
       textureId: "strong",
+      borderStyleId: "double",
       hallName: "忠义堂",
       fontScale: 1.2,
       exportMarginPx: 64,

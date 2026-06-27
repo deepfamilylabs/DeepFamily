@@ -41,6 +41,7 @@ import {
 } from "../paperStyles";
 import { PaperZoomViewport } from "../PaperZoomViewport";
 import { clipText, getPaperSpineTitle, measureRecordUnits } from "../paperText";
+import { PaperFrameOverlay } from "./PaperFrameOverlay";
 import { PaperSpine } from "./PaperSpine";
 
 const SU_SPINE_WIDTH = 72;
@@ -54,13 +55,7 @@ function getMeasuredSuPageBodyWidths(spreadWidth: number): OuPageBodyWidths {
   };
 }
 
-function SuRowRules({
-  side,
-  metrics,
-}: {
-  side: SuPageSide;
-  metrics: SuPageMetrics;
-}) {
+function SuRowRules({ side, metrics }: { side: SuPageSide; metrics: SuPageMetrics }) {
   const width = side === "right" ? metrics.rightBodyWidth : metrics.leftBodyWidth;
   return (
     <g pointerEvents="none">
@@ -144,11 +139,9 @@ function mergeSuPageConnectors(connectors: SuConnector[]): SuConnector[] {
   const merged = new Map<string, SuConnector>();
 
   for (const connector of connectors) {
-    const groupKey = [
-      connector.parentId,
-      connector.side,
-      connector.horizontalY.toFixed(4),
-    ].join(":");
+    const groupKey = [connector.parentId, connector.side, connector.horizontalY.toFixed(4)].join(
+      ":",
+    );
     const current = merged.get(groupKey);
     if (!current) {
       merged.set(groupKey, {
@@ -159,10 +152,7 @@ function mergeSuPageConnectors(connectors: SuConnector[]): SuConnector[] {
       continue;
     }
 
-    current.horizontalStartX = Math.min(
-      current.horizontalStartX,
-      connector.horizontalStartX,
-    );
+    current.horizontalStartX = Math.min(current.horizontalStartX, connector.horizontalStartX);
     current.horizontalEndX = Math.max(current.horizontalEndX, connector.horizontalEndX);
     current.childTopY = Math.min(current.childTopY, connector.childTopY);
     current.parentCenterX ??= connector.parentCenterX;
@@ -187,10 +177,7 @@ function SuPageSvg({
   const rows = spread.rows;
   const entries = rows.flatMap((row) => splitSuRowEntries(row, side));
   const connectors = useMemo(
-    () =>
-      mergeSuPageConnectors(
-        spread.connectors.filter((connector) => connector.side === side),
-      ),
+    () => mergeSuPageConnectors(spread.connectors.filter((connector) => connector.side === side)),
     [side, spread.connectors],
   );
   const entryById = useMemo(
@@ -217,11 +204,7 @@ function SuPageSvg({
       <SuRowRules side={side} metrics={metrics} />
       <g>
         {connectors.map((connector) => (
-          <SuConnectorLines
-            key={connector.key}
-            connector={connector}
-            entryById={entryById}
-          />
+          <SuConnectorLines key={connector.key} connector={connector} entryById={entryById} />
         ))}
       </g>
     </svg>
@@ -240,9 +223,7 @@ type SuRenderRecord = Pick<
 // wider than the columns it holds). Merging a person's chunks on one page side into a single
 // continuous block lets CSS wrap the columns uniformly. Pagination already fills each page side
 // to its real column capacity before continuing to the next side, so line-height stays fixed.
-function mergeSuSideRecords(
-  entries: SuPersonEntry[],
-): SuRenderRecord[] {
+function mergeSuSideRecords(entries: SuPersonEntry[]): SuRenderRecord[] {
   const byPerson = new Map<NodeId, SuPersonEntry[]>();
   for (const entry of entries) {
     const group = byPerson.get(entry.person.id);
@@ -459,9 +440,7 @@ function SuPage({
           t={t}
         />
       ))}
-      {side === "right" ? (
-        <SuGenerationColumn rows={spread.rows} metrics={metrics} t={t} />
-      ) : null}
+      {side === "right" ? <SuGenerationColumn rows={spread.rows} metrics={metrics} t={t} /> : null}
     </div>
   );
 }
@@ -522,9 +501,7 @@ export function SuBookRenderer({
         element.getBoundingClientRect().width / (fontScale ?? 1),
       );
       setSpreadWidth((currentWidth) =>
-        currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1
-          ? currentWidth
-          : nextWidth,
+        currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1 ? currentWidth : nextWidth,
       );
     };
 
@@ -587,14 +564,18 @@ export function SuBookRenderer({
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
-                  className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
+                  className="relative grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
                     borderColor: PAPER_LINE.strong,
+                    borderWidth: "var(--df-paper-frame-outer)",
                     background: "var(--df-paper-sheet)",
+                    paddingBlock: "var(--df-paper-frame-pad-tb)",
+                    paddingInline: "var(--df-paper-frame-pad-lr)",
                   }}
                   data-testid={`paper-su-spread-${chart.index}-${spread.index}`}
                   data-paper-spread=""
                 >
+                  <PaperFrameOverlay />
                   <SuPage side="left" chart={chart} spread={spread} metrics={metrics} t={t} />
                   <PaperSpine
                     chartIndex={chart.index}
