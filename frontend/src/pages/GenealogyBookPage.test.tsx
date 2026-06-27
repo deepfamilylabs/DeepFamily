@@ -59,7 +59,7 @@ vi.mock("../domains/tree", () => ({
     colorThemeId: "xuan",
     fontPresetId: "classic",
     textureId: "subtle",
-    borderStyleId: "single",
+    borderStyleId: "wenwu",
     hallName: null,
     fontScale: 1,
     exportMarginPx: 48,
@@ -81,7 +81,7 @@ vi.mock("../domains/tree", () => ({
   PAPER_COLOR_THEME_IDS: ["xuan", "plain", "bamboo", "azure"],
   PAPER_FONT_PRESET_IDS: ["classic", "song", "sans"],
   PAPER_TEXTURE_IDS: ["subtle", "strong", "plain"],
-  PAPER_BORDER_STYLE_IDS: ["single", "double", "sides", "wenwu"],
+  PAPER_BORDER_STYLE_IDS: ["wenwu", "single", "double", "sides"],
   getPaperColorThemeSwatch: () => ["#f7efd8", "#8a6a3b", "#c18070"],
   getPaperBorderStyleVars: () => ({
     "--df-paper-frame-outer": "1px",
@@ -109,7 +109,7 @@ vi.mock("../domains/tree", () => ({
       colorThemeId: "xuan",
       fontPresetId: "classic",
       textureId: "subtle",
-      borderStyleId: "single",
+      borderStyleId: "wenwu",
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
@@ -325,7 +325,7 @@ describe("GenealogyBookPage", () => {
       colorThemeId: "xuan",
       fontPresetId: "classic",
       textureId: "subtle",
-      borderStyleId: "single",
+      borderStyleId: "wenwu",
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
@@ -341,7 +341,7 @@ describe("GenealogyBookPage", () => {
       "true",
     );
     expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("paper-border-style-single").getAttribute("aria-pressed")).toBe(
+    expect(screen.getByTestId("paper-border-style-wenwu").getAttribute("aria-pressed")).toBe(
       "true",
     );
     expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1");

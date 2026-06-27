@@ -168,8 +168,16 @@ export type PaperBorderStyleId = (typeof PAPER_BORDER_STYLE)[keyof typeof PAPER_
 // inner line at the same offset, so the inner line lands on the content edge (closing with the page
 // dividers) and the blank gap ends up between the inner and outer lines. The pad/inner widths are
 // per-axis, so `sides` reserves the gap on the left/right only and its verticals span full height to
-// meet the single top/bottom line. Switching a style is a single var swap on every leaf.
+// meet the single top/bottom line. Switching a style is a single var swap on every leaf. Key order
+// is the order the picker renders, and 文武边 (the default) is listed first.
 export const PAPER_BORDER_STYLES: Record<PaperBorderStyleId, Record<string, string>> = {
+  wenwu: {
+    "--df-paper-frame-outer": "3px",
+    "--df-paper-frame-inner-tb": "1px",
+    "--df-paper-frame-inner-lr": "1px",
+    "--df-paper-frame-pad-tb": "6px",
+    "--df-paper-frame-pad-lr": "6px",
+  },
   single: PAPER_FRAME_VARS_DEFAULT,
   double: {
     "--df-paper-frame-outer": "1px",
@@ -184,13 +192,6 @@ export const PAPER_BORDER_STYLES: Record<PaperBorderStyleId, Record<string, stri
     "--df-paper-frame-inner-lr": "1px",
     "--df-paper-frame-pad-tb": "0px",
     "--df-paper-frame-pad-lr": "4px",
-  },
-  wenwu: {
-    "--df-paper-frame-outer": "3px",
-    "--df-paper-frame-inner-tb": "1px",
-    "--df-paper-frame-inner-lr": "1px",
-    "--df-paper-frame-pad-tb": "6px",
-    "--df-paper-frame-pad-lr": "6px",
   },
 };
 
@@ -260,7 +261,7 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   colorThemeId: PAPER_COLOR_THEME.XUAN,
   fontPresetId: PAPER_FONT_PRESET.CLASSIC,
   textureId: PAPER_TEXTURE.SUBTLE,
-  borderStyleId: PAPER_BORDER_STYLE.SINGLE,
+  borderStyleId: PAPER_BORDER_STYLE.WENWU,
   hallName: null,
   fontScale: PAPER_FONT_SCALE_DEFAULT,
   exportMarginPx: PAPER_EXPORT_MARGIN_DEFAULT,

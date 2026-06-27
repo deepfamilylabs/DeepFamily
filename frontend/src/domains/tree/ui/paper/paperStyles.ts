@@ -164,19 +164,6 @@ export const PAPER_TEXT = {
     color: "var(--df-paper-ink)",
     fontFamily: "var(--df-paper-font-title)",
   },
-  // Section header shared by every style
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: "var(--df-paper-ink)",
-    fontFamily: "var(--df-paper-font-title)",
-  },
-  sectionRule: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: "var(--df-paper-red)",
-    fontFamily: "var(--df-paper-font-body)",
-  },
   // Spine (PaperSpine, shared)
   spineTitle: {
     fontSize: 31,

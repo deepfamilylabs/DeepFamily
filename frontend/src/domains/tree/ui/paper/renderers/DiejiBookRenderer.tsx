@@ -358,21 +358,6 @@ export function DiejiBookRenderer({
             }}
             data-testid="paper-dieji-table-1"
           >
-            <div
-              className="mb-3 flex items-center justify-between gap-4 border-b pb-3"
-              style={{ borderColor: PAPER_LINE.soft }}
-            >
-              <h2 className="tracking-normal" style={{ ...PAPER_TEXT.sectionTitle }}>
-                {t("genealogyBook.styles.dieji", "Dieji-style")}
-              </h2>
-              <span style={{ ...PAPER_TEXT.sectionRule }}>
-                {t(
-                  "genealogyBook.diejiTableRule",
-                  "Five vertical generations per chart, right-to-left.",
-                )}
-              </span>
-            </div>
-
             <div className="flex flex-col gap-5">
               {spreadItems.map(({ chart, spread }) => (
                 <div
