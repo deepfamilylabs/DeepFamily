@@ -78,7 +78,18 @@ vi.mock("../domains/tree", () => ({
   },
   // Appearance preset ids + swatch + a buildPaperVars stub that echoes the active appearance so the
   // view mock can assert which theme/font/texture is applied.
-  PAPER_COLOR_THEME_IDS: ["xuan", "plain", "bamboo", "azure"],
+  PAPER_COLOR_THEME_IDS: [
+    "xuan",
+    "plain",
+    "bamboo",
+    "azure",
+    "vermilion",
+    "ochre",
+    "indigo",
+    "sumi",
+    "rubbing",
+    "imperial",
+  ],
   PAPER_FONT_PRESET_IDS: ["classic", "song", "sans"],
   PAPER_TEXTURE_IDS: ["subtle", "strong", "plain"],
   PAPER_BORDER_STYLE_IDS: ["wenwu", "single", "double", "sides"],

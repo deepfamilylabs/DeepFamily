@@ -73,8 +73,18 @@ export const PAPER_FRAME_VARS_DEFAULT: Record<string, string> = {
 // Full default variable set (xuan colors + classical fonts + subtle texture). Every paper renderer
 // roots its subtree with these vars; paperAppearance.buildPaperVars produces theme-swapped variants
 // with the same shape. Kept exported so non-themed call sites (export fallback) stay correct.
+// Generation-mark tab colors: a black woodblock tab with light ink. The values resolve through
+// --df-paper-mark-* so a color theme can re-point the tab (e.g. the dark 磁青 theme inverts it to a
+// gold tab with dark ink). PAPER_MARK_VARS_DEFAULT holds the base (light-theme) tab and is folded
+// into PAPER_VARS; themes override only when they need a different tab.
+export const PAPER_MARK_VARS_DEFAULT: Record<string, string> = {
+  "--df-paper-mark-bg": "#1f1a14",
+  "--df-paper-mark-fg": "#f7efd8",
+};
+
 export const PAPER_VARS = {
   ...PAPER_COLOR_VARS_XUAN,
+  ...PAPER_MARK_VARS_DEFAULT,
   ...PAPER_FONT_VARS_DEFAULT,
   ...PAPER_TEXTURE_VARS_DEFAULT,
   ...PAPER_FRAME_VARS_DEFAULT,
@@ -86,9 +96,8 @@ export const PAPER_SHEET_STYLE: CSSProperties = {
   backgroundSize: "var(--df-paper-sheet-size)",
 };
 
-// Generation-mark tab colors: a black woodblock tab with light ink, shared by every style/theme.
-export const PAPER_MARK_BG = "#1f1a14";
-export const PAPER_MARK_FG = "#f7efd8";
+export const PAPER_MARK_BG = "var(--df-paper-mark-bg)";
+export const PAPER_MARK_FG = "var(--df-paper-mark-fg)";
 
 // Single source of truth for line/divider colors, keyed by semantic weight. `strong` frames the
 // structure (outer/page frames, SVG connectors, the Modern ledger grid); `soft` is every in-page

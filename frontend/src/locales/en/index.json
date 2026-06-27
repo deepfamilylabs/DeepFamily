@@ -433,7 +433,13 @@
         "xuan": "Rice paper",
         "plain": "Plain white",
         "bamboo": "Bamboo green",
-        "azure": "Porcelain blue"
+        "azure": "Porcelain blue",
+        "vermilion": "Vermilion rules",
+        "ochre": "Aged tea",
+        "indigo": "Indigo & gold",
+        "sumi": "Ink rules",
+        "rubbing": "Stone rubbing",
+        "imperial": "Imperial yellow"
       },
       "fonts": {
         "classic": "Kaiti",
