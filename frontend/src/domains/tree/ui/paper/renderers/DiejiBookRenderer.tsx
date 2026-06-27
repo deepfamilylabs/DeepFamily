@@ -20,6 +20,7 @@ import {
 } from "../paperStyles";
 import { PaperZoomViewport } from "../PaperZoomViewport";
 import { getPaperSpineTitle, measureRecordUnits } from "../paperText";
+import { PaperFrameOverlay } from "./PaperFrameOverlay";
 import { PaperSpine } from "./PaperSpine";
 
 const DIEJI_RELATION_ROW_PX = 64;
@@ -122,7 +123,8 @@ function DiejiPersonLane({
   const title = lane.name;
   const nameFontSize = getDiejiNameFontSize(Array.from(title).length);
   const bodyFillsColumn =
-    measureRecordUnits(lane.text) >= DIEJI_RECORD_UNITS_PER_LANE * DIEJI_BODY_FILL_JUSTIFY_THRESHOLD;
+    measureRecordUnits(lane.text) >=
+    DIEJI_RECORD_UNITS_PER_LANE * DIEJI_BODY_FILL_JUSTIFY_THRESHOLD;
 
   return (
     <article
@@ -263,13 +265,7 @@ function DiejiBlankLane({ lane }: { lane: Extract<DiejiTableLane, { kind: "blank
   );
 }
 
-function DiejiTableLaneView({
-  lane,
-  t,
-}: {
-  lane: DiejiTableLane;
-  t: TranslateFn;
-}) {
+function DiejiTableLaneView({ lane, t }: { lane: DiejiTableLane; t: TranslateFn }) {
   if (lane.kind === "generation") return <DiejiGenerationLane lane={lane} t={t} />;
   if (lane.kind === "person") return <DiejiPersonLane lane={lane} t={t} />;
   return <DiejiBlankLane lane={lane} />;
@@ -325,14 +321,8 @@ export function DiejiBookRenderer({
   hallName?: string;
   fontScale?: number;
 }) {
-  const book = useMemo(
-    () => buildDiejiPaperBook({ generations, t }),
-    [generations, t],
-  );
-  const autoSpineTitle = useMemo(
-    () => getPaperSpineTitle(generations, t),
-    [generations, t],
-  );
+  const book = useMemo(() => buildDiejiPaperBook({ generations, t }), [generations, t]);
+  const autoSpineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
   const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
   const spreadItems = useMemo(
     () =>
@@ -387,14 +377,18 @@ export function DiejiBookRenderer({
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
-                  className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
+                  className="relative grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
                     borderColor: PAPER_LINE.strong,
+                    borderWidth: "var(--df-paper-frame-outer)",
                     background: "var(--df-paper-sheet)",
+                    paddingBlock: "var(--df-paper-frame-pad-tb)",
+                    paddingInline: "var(--df-paper-frame-pad-lr)",
                   }}
                   data-testid={`paper-dieji-spread-${chart.index}-${spread.index}`}
                   data-paper-spread=""
                 >
+                  <PaperFrameOverlay />
                   <DiejiPage side="left" chart={chart} spread={spread} t={t} />
                   <PaperSpine
                     chartIndex={chart.index}

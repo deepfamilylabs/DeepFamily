@@ -429,6 +429,7 @@
       "colorThemeLabel": "配色主题",
       "fontLabel": "字体",
       "textureLabel": "纸张纹理",
+      "borderStyleLabel": "版框",
       "fontScaleLabel": "字体倍数",
       "fontScaleHint": "仅缩放屏幕预览，不影响 PDF 打印尺寸",
       "exportMarginLabel": "页边距",
@@ -448,6 +449,12 @@
         "subtle": "淡纹",
         "strong": "浓纹",
         "plain": "无纹"
+      },
+      "borders": {
+        "single": "四周单边",
+        "double": "四周双边",
+        "sides": "左右双边",
+        "wenwu": "文武边"
       }
     },
     "styles": {

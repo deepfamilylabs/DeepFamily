@@ -21,6 +21,7 @@ import {
   splitTextByVisualUnits,
   toChineseNumeral,
 } from "../paperText";
+import { PaperFrameOverlay } from "./PaperFrameOverlay";
 import { PaperSpine } from "./PaperSpine";
 
 type ModernTableRow =
@@ -158,12 +159,7 @@ function formatModernRecordLine(line: string): string {
   return line.replace(/^([\p{Script=Han}]{1,4}):\s*/u, "$1");
 }
 
-function formatModernCount(
-  key: string,
-  fallback: string,
-  count: number,
-  t: TranslateFn,
-): string {
+function formatModernCount(key: string, fallback: string, count: number, t: TranslateFn): string {
   return t(key, fallback, {
     number: count,
     han: toChineseNumeral(count),
@@ -200,12 +196,7 @@ function getModernTransmissionSection(
         )
       : undefined,
     unknown.length
-      ? formatModernCount(
-          "genealogyBook.modernIssueCount",
-          "issue {{number}}",
-          unknown.length,
-          t,
-        )
+      ? formatModernCount("genealogyBook.modernIssueCount", "issue {{number}}", unknown.length, t)
       : undefined,
   ].filter(Boolean) as string[];
 
@@ -479,10 +470,7 @@ function collectModernPersonPageLookup(book: ModernPaperBook): ModernPersonPageL
   return lookup;
 }
 
-function areModernPageLookupsEqual(
-  a: ModernPersonPageLookup,
-  b: ModernPersonPageLookup,
-): boolean {
+function areModernPageLookupsEqual(a: ModernPersonPageLookup, b: ModernPersonPageLookup): boolean {
   if (a.size !== b.size) return false;
   for (const [id, pageNumber] of a) {
     if (b.get(id) !== pageNumber) return false;
@@ -811,10 +799,13 @@ export function ModernBookRenderer({
                 <div
                   key={`${chart.index}-${spread.index}`}
                   ref={chart.index === 1 && spread.index === 1 ? spreadRef : undefined}
-                  className="grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
+                  className="relative grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
                   style={{
                     borderColor: PAPER_LINE.strong,
+                    borderWidth: "var(--df-paper-frame-outer)",
                     background: "var(--df-paper-sheet)",
+                    paddingBlock: "var(--df-paper-frame-pad-tb)",
+                    paddingInline: "var(--df-paper-frame-pad-lr)",
                     gridTemplateColumns: `1fr ${MODERN_SPINE_WIDTH}px 1fr`,
                   }}
                   data-testid={
@@ -824,6 +815,7 @@ export function ModernBookRenderer({
                   }
                   data-paper-spread=""
                 >
+                  <PaperFrameOverlay />
                   <ModernPage
                     rows={spread.leftRows}
                     side="left"

@@ -529,7 +529,9 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId("paper-modern-page").className).toContain("min-w-[1180px]");
     expect(screen.getByTestId("paper-modern-page").className).toContain("overflow-hidden");
     expect(screen.getByTestId("paper-modern-page").style.background).toBe("var(--df-paper-sheet)");
-    expect(screen.getByTestId("paper-modern-page").childElementCount).toBe(3);
+    // Two ledger pages + the spine, plus the (absolutely-positioned) version-frame overlay.
+    expect(screen.getByTestId("paper-modern-page").childElementCount).toBe(4);
+    expect(screen.getByTestId("paper-modern-page").querySelector("[data-testid='paper-frame-overlay']")).toBeTruthy();
     expect(screen.getByTestId("paper-modern-page").style.gridTemplateColumns).toContain("72px");
     expect(screen.getByTestId("paper-modern-left-1-1")).toBeTruthy();
     expect(screen.getByTestId("paper-modern-right-1-1")).toBeTruthy();

@@ -33,11 +33,8 @@ import {
   paperSvgTextStyle,
 } from "../paperStyles";
 import { PaperZoomViewport } from "../PaperZoomViewport";
-import {
-  clipText,
-  getChildRankWord,
-  getPaperSpineTitle,
-} from "../paperText";
+import { clipText, getChildRankWord, getPaperSpineTitle } from "../paperText";
+import { PaperFrameOverlay } from "./PaperFrameOverlay";
 import { PaperSpine } from "./PaperSpine";
 
 const LINEAGE_SPINE_WIDTH = 72;
@@ -64,7 +61,10 @@ function getLineageRelationLabel(entry: LineageEntry, t: TranslateFn): string {
 }
 
 function LineagePersonMark({ entry, t }: { entry: LineageEntry; t: TranslateFn }) {
-  const name = clipText(entry.person.ui.fullName || entry.person.ui.titleText || entry.person.ui.shortHashText, 10);
+  const name = clipText(
+    entry.person.ui.fullName || entry.person.ui.titleText || entry.person.ui.shortHashText,
+    10,
+  );
   const relationLabel = getLineageRelationLabel(entry, t);
   const showRootStem = entry.person.relation?.kind === "root";
   const showCircle = entry.person.relation?.kind === "child" && entry.rowIndex > 0;
@@ -140,8 +140,7 @@ function LineageConnectorLines({
     .map((childId) => entryById.get(childId))
     .filter(Boolean) as LineageEntry[];
   const showParentStem =
-    connector.parentCenterX !== undefined &&
-    connector.parentBottomY !== undefined;
+    connector.parentCenterX !== undefined && connector.parentBottomY !== undefined;
 
   return (
     <g
@@ -180,17 +179,13 @@ function LineageConnectorLines({
   );
 }
 
-function mergeLineagePageConnectors(
-  connectors: LineageConnector[],
-): LineageConnector[] {
+function mergeLineagePageConnectors(connectors: LineageConnector[]): LineageConnector[] {
   const merged = new Map<string, LineageConnector>();
 
   for (const connector of connectors) {
-    const groupKey = [
-      connector.parentId,
-      connector.side,
-      connector.horizontalY.toFixed(4),
-    ].join(":");
+    const groupKey = [connector.parentId, connector.side, connector.horizontalY.toFixed(4)].join(
+      ":",
+    );
     const current = merged.get(groupKey);
     if (!current) {
       merged.set(groupKey, {
@@ -201,23 +196,12 @@ function mergeLineagePageConnectors(
       continue;
     }
 
-    current.horizontalStartX = Math.min(
-      current.horizontalStartX,
-      connector.horizontalStartX,
-    );
-    current.horizontalEndX = Math.max(
-      current.horizontalEndX,
-      connector.horizontalEndX,
-    );
-    current.childCircleY = Math.min(
-      current.childCircleY,
-      connector.childCircleY,
-    );
+    current.horizontalStartX = Math.min(current.horizontalStartX, connector.horizontalStartX);
+    current.horizontalEndX = Math.max(current.horizontalEndX, connector.horizontalEndX);
+    current.childCircleY = Math.min(current.childCircleY, connector.childCircleY);
     current.parentCenterX ??= connector.parentCenterX;
     current.parentBottomY ??= connector.parentBottomY;
-    current.childIds = Array.from(
-      new Set([...current.childIds, ...connector.childIds]),
-    );
+    current.childIds = Array.from(new Set([...current.childIds, ...connector.childIds]));
     if (connector.kind === "local") current.kind = "local";
   }
 
@@ -315,9 +299,7 @@ function LineagePageSvg({
   const entries = rows.flatMap((row) => splitLineageRowEntries(row, side));
   const connectors = useMemo(
     () =>
-      mergeLineagePageConnectors(
-        spread.connectors.filter((connector) => connector.side === side),
-      ),
+      mergeLineagePageConnectors(spread.connectors.filter((connector) => connector.side === side)),
     [side, spread.connectors],
   );
   const entryById = useMemo(
@@ -341,11 +323,7 @@ function LineagePageSvg({
       <LineageRowRules width={bodyWidth} />
       <g>
         {connectors.map((connector) => (
-          <LineageConnectorLines
-            key={connector.key}
-            connector={connector}
-            entryById={entryById}
-          />
+          <LineageConnectorLines key={connector.key} connector={connector} entryById={entryById} />
         ))}
       </g>
       <g>
@@ -448,9 +426,7 @@ export function LineageBookRenderer({
         element.getBoundingClientRect().width / (fontScale ?? 1),
       );
       setSpreadWidth((currentWidth) =>
-        currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1
-          ? currentWidth
-          : nextWidth,
+        currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1 ? currentWidth : nextWidth,
       );
     };
 
@@ -513,21 +489,19 @@ export function LineageBookRenderer({
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
-                  className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
+                  className="relative grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
                     borderColor: PAPER_LINE.strong,
+                    borderWidth: "var(--df-paper-frame-outer)",
                     background: "var(--df-paper-sheet)",
+                    paddingBlock: "var(--df-paper-frame-pad-tb)",
+                    paddingInline: "var(--df-paper-frame-pad-lr)",
                   }}
                   data-testid={`paper-lineage-spread-${chart.index}-${spread.index}`}
                   data-paper-spread=""
                 >
-                  <LineagePage
-                    side="left"
-                    chart={chart}
-                    spread={spread}
-                    metrics={metrics}
-                    t={t}
-                  />
+                  <PaperFrameOverlay />
+                  <LineagePage side="left" chart={chart} spread={spread} metrics={metrics} t={t} />
                   <PaperSpine
                     chartIndex={chart.index}
                     spreadIndex={spread.index}
@@ -537,13 +511,7 @@ export function LineageBookRenderer({
                     testIdPrefix="paper-lineage-spine"
                     pageOrder="rtl"
                   />
-                  <LineagePage
-                    side="right"
-                    chart={chart}
-                    spread={spread}
-                    metrics={metrics}
-                    t={t}
-                  />
+                  <LineagePage side="right" chart={chart} spread={spread} metrics={metrics} t={t} />
                 </div>
               ))}
             </div>

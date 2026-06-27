@@ -54,6 +54,22 @@ export const PAPER_TEXTURE_VARS_DEFAULT: Record<string, string> = {
   "--df-paper-sheet-size": "28px 28px",
 };
 
+// Default version-frame (版框) geometry: a single thin rule. The OUTER line is each leaf's own
+// border (width = --df-paper-frame-outer). A multi-line frame reserves a blank gap INSIDE the leaf
+// via --df-paper-frame-pad-* (applied as the spread's padding); the optional INNER line is drawn by
+// PaperFrameOverlay at exactly that padding offset, so it lands on the content edge and closes with
+// the page's own dividers while the reserved gap sits between the inner and outer lines. The inner
+// widths are per-axis so a preset can enable the second line on all four sides (四周双边/文武边) or
+// left/right only (左右双边). Border-style presets in paperAppearance override these; the default
+// keeps the inner line off and reserves no gap (a plain single frame, identical to the original).
+export const PAPER_FRAME_VARS_DEFAULT: Record<string, string> = {
+  "--df-paper-frame-outer": "1px",
+  "--df-paper-frame-inner-tb": "0px",
+  "--df-paper-frame-inner-lr": "0px",
+  "--df-paper-frame-pad-tb": "0px",
+  "--df-paper-frame-pad-lr": "0px",
+};
+
 // Full default variable set (xuan colors + classical fonts + subtle texture). Every paper renderer
 // roots its subtree with these vars; paperAppearance.buildPaperVars produces theme-swapped variants
 // with the same shape. Kept exported so non-themed call sites (export fallback) stay correct.
@@ -61,6 +77,7 @@ export const PAPER_VARS = {
   ...PAPER_COLOR_VARS_XUAN,
   ...PAPER_FONT_VARS_DEFAULT,
   ...PAPER_TEXTURE_VARS_DEFAULT,
+  ...PAPER_FRAME_VARS_DEFAULT,
 } as CSSProperties;
 
 export const PAPER_SHEET_STYLE: CSSProperties = {

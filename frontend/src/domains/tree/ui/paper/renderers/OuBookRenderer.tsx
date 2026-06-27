@@ -27,6 +27,7 @@ import {
 } from "../paperStyles";
 import { PaperZoomViewport } from "../PaperZoomViewport";
 import { clipText, getPaperSpineTitle } from "../paperText";
+import { PaperFrameOverlay } from "./PaperFrameOverlay";
 import { PaperSpine } from "./PaperSpine";
 
 const OU_GENERATION_MARK_WIDTH = 54;
@@ -41,13 +42,7 @@ function getMeasuredOuPageBodyWidths(spreadWidth: number): OuPageBodyWidths {
   };
 }
 
-function OuRelationLabel({
-  label,
-  testId,
-}: {
-  label: string;
-  testId: string;
-}) {
+function OuRelationLabel({ label, testId }: { label: string; testId: string }) {
   const columns = label.split("\n").filter(Boolean);
 
   return (
@@ -116,10 +111,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
         }}
       >
         {entry.relationLabel ? (
-          <OuRelationLabel
-            label={entry.relationLabel}
-            testId={`paper-ou-relation-${person.id}`}
-          />
+          <OuRelationLabel label={entry.relationLabel} testId={`paper-ou-relation-${person.id}`} />
         ) : null}
         <strong
           className="leading-6 tracking-normal"
@@ -133,10 +125,7 @@ function OuPersonEntry({ entry, t }: { entry: OuPersonRecordEntry; t: TranslateF
         >
           {title}
           {isFemale ? (
-            <span
-              style={{ ...PAPER_TEXT.femaleMark }}
-              data-testid={`paper-ou-female-${person.id}`}
-            >
+            <span style={{ ...PAPER_TEXT.femaleMark }} data-testid={`paper-ou-female-${person.id}`}>
               {"　"}
               {t("genealogyBook.ouFemaleMark", "女")}
             </span>
@@ -216,7 +205,9 @@ function OuGenerationBand({
       }
       style={{ borderColor: PAPER_LINE.soft }}
       data-testid={
-        side === "right" ? `paper-ou-generation-${row.depth}` : `paper-ou-left-generation-${row.depth}`
+        side === "right"
+          ? `paper-ou-generation-${row.depth}`
+          : `paper-ou-left-generation-${row.depth}`
       }
       data-ou-row={`paper-ou-row-${chartIndex}-${spreadIndex}-${side}-${row.depth}`}
       aria-label={row.label}
@@ -329,10 +320,7 @@ export function OuBookRenderer({
     () => buildOuPaperBook({ generations, t, pageBodyWidths }),
     [generations, pageBodyWidths, t],
   );
-  const autoSpineTitle = useMemo(
-    () => getPaperSpineTitle(generations, t),
-    [generations, t],
-  );
+  const autoSpineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
   const spineTitle = spineTitleOverride?.trim() || autoSpineTitle;
   const spreadItems = useMemo(
     () =>
@@ -358,9 +346,7 @@ export function OuBookRenderer({
         element.getBoundingClientRect().width / (fontScale ?? 1),
       );
       setSpreadWidth((currentWidth) =>
-        currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1
-          ? currentWidth
-          : nextWidth,
+        currentWidth !== null && Math.abs(currentWidth - nextWidth) < 1 ? currentWidth : nextWidth,
       );
     };
 
@@ -420,14 +406,18 @@ export function OuBookRenderer({
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}
-                  className="grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
+                  className="relative grid min-w-[1180px] grid-cols-[1fr_72px_1fr] border"
                   style={{
                     borderColor: PAPER_LINE.strong,
+                    borderWidth: "var(--df-paper-frame-outer)",
                     background: "var(--df-paper-sheet)",
+                    paddingBlock: "var(--df-paper-frame-pad-tb)",
+                    paddingInline: "var(--df-paper-frame-pad-lr)",
                   }}
                   data-paper-spread=""
                   data-testid={`paper-ou-spread-${chart.index}-${spread.index}`}
                 >
+                  <PaperFrameOverlay />
                   <OuPage side="left" chart={chart} spread={spread} t={t} />
                   <PaperSpine
                     chartIndex={chart.index}

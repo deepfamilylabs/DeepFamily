@@ -14,11 +14,13 @@ import {
   buildPaperGenerations,
   buildPaperVars,
   DEFAULT_PAPER_APPEARANCE,
+  getPaperBorderStyleVars,
   getPaperColorThemeSwatch,
   getPaperSpineTitle,
   isPaperGenealogyStyle,
   loadPaperAppearance,
   loadPaperSpineTitleOverride,
+  PAPER_BORDER_STYLE_IDS,
   PAPER_COLOR_THEME_IDS,
   PAPER_EXPORT_MARGIN_MAX,
   PAPER_EXPORT_MARGIN_MIN,
@@ -34,6 +36,7 @@ import {
   savePaperAppearance,
   savePaperSpineTitleOverride,
   type PaperAppearance,
+  type PaperBorderStyleId,
   type PaperColorThemeId,
   type PaperFontPresetId,
   type PaperGenealogyStyle,
@@ -111,6 +114,7 @@ function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
     appearance.colorThemeId === DEFAULT_PAPER_APPEARANCE.colorThemeId &&
     appearance.fontPresetId === DEFAULT_PAPER_APPEARANCE.fontPresetId &&
     appearance.textureId === DEFAULT_PAPER_APPEARANCE.textureId &&
+    appearance.borderStyleId === DEFAULT_PAPER_APPEARANCE.borderStyleId &&
     appearance.hallName === DEFAULT_PAPER_APPEARANCE.hallName &&
     appearance.fontScale === DEFAULT_PAPER_APPEARANCE.fontScale &&
     appearance.exportMarginPx === DEFAULT_PAPER_APPEARANCE.exportMarginPx
@@ -165,6 +169,15 @@ export default function GenealogyBookPage() {
     }),
     [t],
   );
+  const borderStyleLabels = useMemo(
+    (): Record<PaperBorderStyleId, string> => ({
+      single: t("genealogyBook.settings.borders.single", "Single rule"),
+      double: t("genealogyBook.settings.borders.double", "Double rule"),
+      sides: t("genealogyBook.settings.borders.sides", "Side double"),
+      wenwu: t("genealogyBook.settings.borders.wenwu", "Thick-thin"),
+    }),
+    [t],
+  );
   const paperVars = useMemo(() => buildPaperVars(appearance), [appearance]);
   const hasRoot = Boolean(projection.rootId && rootExists);
   const defaultHallName = t("genealogyBook.ouHallName", "DeepFamily");
@@ -200,7 +213,8 @@ export default function GenealogyBookPage() {
   // when the user cleared it) to the view so all renderers stay in sync with the input.
   const spineTitleInputValue = spineTitleStored ?? autoSpineTitle;
   const spineTitleOverride = spineTitleStored ?? undefined;
-  const hasCustomDisplaySettings = spineTitleStored !== null || !isDefaultPaperAppearance(appearance);
+  const hasCustomDisplaySettings =
+    spineTitleStored !== null || !isDefaultPaperAppearance(appearance);
   const resetDisplaySettings = useCallback(() => {
     setSpineTitle("");
     resetAppearance();
@@ -263,7 +277,9 @@ export default function GenealogyBookPage() {
 
           <button
             type="button"
-            onClick={() => exportPdf(exportRef.current, style, paperVars, appearance.exportMarginPx)}
+            onClick={() =>
+              exportPdf(exportRef.current, style, paperVars, appearance.exportMarginPx)
+            }
             disabled={!hasRoot || loading || exporting}
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             title={t("genealogyBook.exportPdf", "Export PDF")}
@@ -309,7 +325,9 @@ export default function GenealogyBookPage() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
               <SlidersHorizontal className="h-4 w-4 shrink-0 text-stone-500 dark:text-slate-400" />
-              <span className="truncate">{t("genealogyBook.settings.title", "Display settings")}</span>
+              <span className="truncate">
+                {t("genealogyBook.settings.title", "Display settings")}
+              </span>
             </div>
             <button
               type="button"
@@ -359,10 +377,7 @@ export default function GenealogyBookPage() {
               data-testid="paper-hall-name-input"
             />
             <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-              {t(
-                "genealogyBook.settings.hallNameHint",
-                "Leave blank to use the default hall name",
-              )}
+              {t("genealogyBook.settings.hallNameHint", "Leave blank to use the default hall name")}
             </span>
           </label>
 
@@ -466,6 +481,66 @@ export default function GenealogyBookPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {t("genealogyBook.settings.borderStyleLabel", "Page frame")}
+            </span>
+            <div
+              className="grid grid-cols-2 gap-2"
+              role="group"
+              aria-label={t("genealogyBook.settings.borderStyleLabel", "Page frame")}
+            >
+              {PAPER_BORDER_STYLE_IDS.map((id) => {
+                const vars = getPaperBorderStyleVars(id);
+                const selected = appearance.borderStyleId === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => updateAppearance({ borderStyleId: id })}
+                    aria-pressed={selected}
+                    title={borderStyleLabels[id]}
+                    className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                      selected
+                        ? "border-orange-500 ring-1 ring-orange-500/30 dark:border-orange-400"
+                        : "border-stone-200 hover:border-stone-300 dark:border-slate-700 dark:hover:border-slate-600"
+                    }`}
+                    data-testid={`paper-border-style-${id}`}
+                  >
+                    <span
+                      className="relative block h-5 w-6 shrink-0 text-stone-500 dark:text-slate-300"
+                      style={{
+                        borderStyle: "solid",
+                        borderColor: "currentColor",
+                        borderWidth: vars["--df-paper-frame-outer"],
+                      }}
+                      aria-hidden="true"
+                    >
+                      <span
+                        className="absolute"
+                        style={{
+                          top: vars["--df-paper-frame-pad-tb"],
+                          bottom: vars["--df-paper-frame-pad-tb"],
+                          left: vars["--df-paper-frame-pad-lr"],
+                          right: vars["--df-paper-frame-pad-lr"],
+                          borderStyle: "solid",
+                          borderColor: "currentColor",
+                          borderTopWidth: vars["--df-paper-frame-inner-tb"],
+                          borderBottomWidth: vars["--df-paper-frame-inner-tb"],
+                          borderLeftWidth: vars["--df-paper-frame-inner-lr"],
+                          borderRightWidth: vars["--df-paper-frame-inner-lr"],
+                        }}
+                      />
+                    </span>
+                    <span className="min-w-0 truncate text-xs text-slate-700 dark:text-slate-200">
+                      {borderStyleLabels[id]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
                 {t("genealogyBook.settings.fontScaleLabel", "Font scale")}
@@ -508,9 +583,7 @@ export default function GenealogyBookPage() {
               max={PAPER_EXPORT_MARGIN_MAX}
               step={PAPER_EXPORT_MARGIN_STEP}
               value={appearance.exportMarginPx}
-              onChange={(event) =>
-                updateAppearance({ exportMarginPx: Number(event.target.value) })
-              }
+              onChange={(event) => updateAppearance({ exportMarginPx: Number(event.target.value) })}
               aria-label={t("genealogyBook.settings.exportMarginLabel", "PDF margin")}
               className="w-full accent-orange-500"
               data-testid="paper-export-margin-input"

@@ -429,6 +429,7 @@
       "colorThemeLabel": "Color theme",
       "fontLabel": "Font",
       "textureLabel": "Paper texture",
+      "borderStyleLabel": "Page frame",
       "fontScaleLabel": "Font scale",
       "fontScaleHint": "Scales the whole sheet in the preview only",
       "exportMarginLabel": "Page margin",
@@ -448,6 +449,12 @@
         "subtle": "Subtle",
         "strong": "Strong",
         "plain": "None"
+      },
+      "borders": {
+        "single": "Single rule",
+        "double": "Double rule",
+        "sides": "Side double",
+        "wenwu": "Thick-thin"
       }
     },
     "styles": {
