@@ -433,7 +433,13 @@
         "xuan": "宣纸",
         "plain": "素白",
         "bamboo": "竹青",
-        "azure": "瓷青"
+        "azure": "瓷青",
+        "vermilion": "朱丝栏",
+        "ochre": "茶褐",
+        "indigo": "磁青描金",
+        "sumi": "乌丝栏",
+        "rubbing": "碑拓",
+        "imperial": "明黄"
       },
       "fonts": {
         "classic": "楷书",

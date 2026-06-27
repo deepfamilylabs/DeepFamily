@@ -150,6 +150,12 @@ export default function GenealogyBookPage() {
       plain: t("genealogyBook.settings.themes.plain", "Plain white"),
       bamboo: t("genealogyBook.settings.themes.bamboo", "Bamboo green"),
       azure: t("genealogyBook.settings.themes.azure", "Porcelain blue"),
+      vermilion: t("genealogyBook.settings.themes.vermilion", "Vermilion rules"),
+      ochre: t("genealogyBook.settings.themes.ochre", "Aged tea"),
+      indigo: t("genealogyBook.settings.themes.indigo", "Indigo & gold"),
+      sumi: t("genealogyBook.settings.themes.sumi", "Ink rules"),
+      rubbing: t("genealogyBook.settings.themes.rubbing", "Stone rubbing"),
+      imperial: t("genealogyBook.settings.themes.imperial", "Imperial yellow"),
     }),
     [t],
   );
