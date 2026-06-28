@@ -6,9 +6,9 @@ import {
   type TranslateFn,
 } from "../paperData";
 import {
+  PAPER_BODY_FONT_STACK,
   PAPER_LEAF_STYLE,
   PAPER_LINE,
-  PAPER_NOTE_FONT_STACK,
   PAPER_SHEET_STYLE,
   PAPER_TEXT,
   PAPER_VARS,
@@ -107,8 +107,12 @@ type ModernRecordChunk = {
   lines?: string[];
 };
 
-// Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines.
-function getModernTextMeasurer(): ((text: string) => number) | undefined {
+// Build a canvas text measurer for the line-break model. It MUST measure with the same font the
+// biography cell actually renders in (the active preset's --df-paper-font-body), otherwise the
+// computed line widths diverge from the real ones — e.g. the lishu (Baoli) and sans presets have
+// different advance widths than song, so a measured line overflows the cell, soft-wraps, and the
+// wrapped remainder gets stretched into sparse gaps by text-align-last: justify.
+function getModernTextMeasurer(fontFamily: string): ((text: string) => number) | undefined {
   if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return undefined;
   if (typeof document === "undefined") return undefined;
 
@@ -116,14 +120,15 @@ function getModernTextMeasurer(): ((text: string) => number) | undefined {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) return undefined;
-    context.font = `${PAPER_TEXT.body.fontSize}px ${PAPER_NOTE_FONT_STACK}`;
+    context.font = `${PAPER_TEXT.body.fontSize}px ${fontFamily}`;
     return (text: string) => context.measureText(text).width;
   } catch {
     return undefined;
   }
 }
 
-function computeModernRecordBudget(spreadWidth: number): ModernRecordBudget {
+// Derive the per-row visual-unit budget from the measured spread width so cells fill ~2 lines.
+function computeModernRecordBudget(spreadWidth: number, bodyFontFamily: string): ModernRecordBudget {
   if (spreadWidth <= 0) {
     return {
       unitsPerRow: MODERN_RECORD_UNITS_PER_ROW,
@@ -137,7 +142,7 @@ function computeModernRecordBudget(spreadWidth: number): ModernRecordBudget {
     unitsPerRow: unitsPerLine * 2,
     // Reserve a small slack so justify fills the line to the box edge instead of risking a wrap.
     maxLinePx: Math.max(1, bioTextPx - MODERN_LINE_JUSTIFY_SLACK_PX),
-    measureTextPx: getModernTextMeasurer(),
+    measureTextPx: getModernTextMeasurer(bodyFontFamily),
   };
 }
 const MODERN_TABLE_COLUMN_STYLE: CSSProperties = {
@@ -627,15 +632,19 @@ function ModernPersonRowView({
           ? measuredLines.map((line, index) => {
               // Justify every filled line flush to the right edge; leave the biography's final
               // line (this section's last line, with no continuation row) ragged so a short tail
-              // is not stretched into sparse gaps. pre-wrap keeps spaces while allowing justify;
-              // the break-time slack guarantees these measured lines never wrap here.
+              // is not stretched into sparse gaps. `nowrap` forces each measured line onto exactly
+              // one visual line (overflow is clipped, not wrapped): this is what makes the artifact
+              // impossible — without it a line the canvas measured as "full" could still be a hair
+              // too wide for the real cell, soft-wrap, and the 1–2 char remainder would then be
+              // stretched edge-to-edge by text-align-last: justify (the sparse-gap bug). Spacing is
+              // distributed between characters (text-justify: inter-character on the parent).
               const isSectionTail = index === measuredLines.length - 1 && !row.hasContinuation;
               return (
                 <span
                   key={`${row.key}-line-${index}`}
                   className="block overflow-hidden"
                   style={{
-                    whiteSpace: "pre-wrap",
+                    whiteSpace: "nowrap",
                     textAlignLast: isSectionTail ? "auto" : "justify",
                   }}
                 >
@@ -739,7 +748,14 @@ export function ModernBookRenderer({
     return () => observer.disconnect();
   }, []);
 
-  const recordBudget = useMemo(() => computeModernRecordBudget(spreadWidth), [spreadWidth]);
+  // Measure line breaks with the active preset's body font so they match the rendered cell.
+  const bodyFontFamily =
+    (paperVars as Record<string, string> | undefined)?.["--df-paper-font-body"] ||
+    PAPER_BODY_FONT_STACK;
+  const recordBudget = useMemo(
+    () => computeModernRecordBudget(spreadWidth, bodyFontFamily),
+    [spreadWidth, bodyFontFamily],
+  );
   const book = useMemo(
     () => buildModernPaperBookWithPageRefs({ generations, t, recordBudget }),
     [generations, t, recordBudget],
