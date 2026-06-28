@@ -90,7 +90,7 @@ vi.mock("../domains/tree", () => ({
     "rubbing",
     "imperial",
   ],
-  PAPER_FONT_PRESET_IDS: ["classic", "song", "sans"],
+  PAPER_FONT_PRESET_IDS: ["classic", "song", "lishu", "sans"],
   PAPER_TEXTURE_IDS: ["subtle", "strong", "plain"],
   PAPER_BORDER_STYLE_IDS: ["wenwu", "single", "double", "sides"],
   getPaperColorThemeSwatch: () => ["#f7efd8", "#8a6a3b", "#c18070"],
@@ -297,17 +297,17 @@ describe("GenealogyBookPage", () => {
     render(<GenealogyBookPage />);
 
     fireEvent.click(screen.getByTestId("paper-color-theme-bamboo"));
-    fireEvent.click(screen.getByTestId("paper-font-preset-song"));
+    fireEvent.click(screen.getByTestId("paper-font-preset-lishu"));
     fireEvent.click(screen.getByTestId("paper-texture-strong"));
 
     const view = screen.getByTestId("paper-view");
     expect(view.getAttribute("data-color-theme")).toBe("bamboo");
-    expect(view.getAttribute("data-font")).toBe("song");
+    expect(view.getAttribute("data-font")).toBe("lishu");
     expect(view.getAttribute("data-texture")).toBe("strong");
 
     const saved = JSON.parse(localStorage.getItem("df:paperAppearance") || "{}");
     expect(saved.colorThemeId).toBe("bamboo");
-    expect(saved.fontPresetId).toBe("song");
+    expect(saved.fontPresetId).toBe("lishu");
     expect(saved.textureId).toBe("strong");
   });
 

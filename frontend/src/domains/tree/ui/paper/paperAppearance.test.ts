@@ -21,6 +21,7 @@ import {
   savePaperAppearance,
   type PaperAppearance,
 } from "./paperAppearance";
+import { PAPER_TEXT } from "./paperStyles";
 
 type Vars = Record<string, string>;
 
@@ -45,6 +46,16 @@ describe("buildPaperVars", () => {
     const vars = buildPaperVars({ ...DEFAULT_PAPER_APPEARANCE, fontPresetId: "sans" }) as Vars;
     expect(vars["--df-paper-font-title"]).toBe(PAPER_FONT_PRESETS.sans["--df-paper-font-title"]);
     expect(vars["--df-paper-font-body"]).toBe(PAPER_FONT_PRESETS.sans["--df-paper-font-body"]);
+  });
+
+  it("drives every role (title/body/note) through the lishu stack", () => {
+    const vars = buildPaperVars({ ...DEFAULT_PAPER_APPEARANCE, fontPresetId: "lishu" }) as Vars;
+    // Names, biographies and relationship/tag annotations all share the one lishu stack.
+    expect(vars["--df-paper-font-title"]).toBe(PAPER_FONT_PRESETS.lishu["--df-paper-font-title"]);
+    expect(vars["--df-paper-font-body"]).toBe(PAPER_FONT_PRESETS.lishu["--df-paper-font-title"]);
+    expect(vars["--df-paper-font-note"]).toBe(PAPER_FONT_PRESETS.lishu["--df-paper-font-title"]);
+    // Distinct from the song preset so the clerical face actually applies.
+    expect(vars["--df-paper-font-body"]).not.toBe(PAPER_FONT_PRESETS.song["--df-paper-font-body"]);
   });
 
   it("removes the sheet grid image for the plain texture", () => {
@@ -117,6 +128,13 @@ describe("buildPaperVars", () => {
   });
 });
 
+describe("paper text roles", () => {
+  it("keeps body copy on the body font and annotations on the note font", () => {
+    expect(PAPER_TEXT.body.fontFamily).toBe("var(--df-paper-font-body)");
+    expect(PAPER_TEXT.relation.fontFamily).toBe("var(--df-paper-font-note)");
+  });
+});
+
 describe("getPaperColorThemeSwatch", () => {
   it("returns the sheet/line/accent triple for a theme", () => {
     const [sheet, line, accent] = getPaperColorThemeSwatch("xuan");
@@ -142,7 +160,7 @@ describe("paperAppearance storage", () => {
   it("persists and reloads an appearance under the global key", () => {
     const next: PaperAppearance = {
       colorThemeId: "azure",
-      fontPresetId: "song",
+      fontPresetId: "lishu",
       textureId: "strong",
       borderStyleId: "double",
       hallName: "忠义堂",

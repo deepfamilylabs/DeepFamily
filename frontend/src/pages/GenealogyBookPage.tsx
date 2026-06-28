@@ -163,6 +163,7 @@ export default function GenealogyBookPage() {
     (): Record<PaperFontPresetId, string> => ({
       classic: t("genealogyBook.settings.fonts.classic", "Classical"),
       song: t("genealogyBook.settings.fonts.song", "Song"),
+      lishu: t("genealogyBook.settings.fonts.lishu", "Lishu"),
       sans: t("genealogyBook.settings.fonts.sans", "Sans"),
     }),
     [t],

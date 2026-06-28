@@ -444,6 +444,7 @@
       "fonts": {
         "classic": "楷书",
         "song": "宋体",
+        "lishu": "隶书",
         "sans": "黑体"
       },
       "textures": {
