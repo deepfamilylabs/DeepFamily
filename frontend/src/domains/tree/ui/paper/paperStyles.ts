@@ -11,6 +11,16 @@ export const PAPER_TITLE_FONT_STACK =
   '"STKaiti", "KaiTi", "Kaiti SC", "Kaiti TC", "BiauKai", "DFKai-SB", "标楷体", "楷体", "楷体_GB2312", "KaiTi_GB2312", "TW-Kai", "AR PL UKai CN", "AR PL UKai TW", "AR PL UKai HK", "AR PL KaitiM GB", "LXGW WenKai", "霞鹜文楷", "Noto Serif CJK SC", serif';
 export const PAPER_NOTE_FONT_STACK =
   '"FangSong", "STFangsong", "FangSong_GB2312", "仿宋", "仿宋_GB2312", "Songti SC", "SimSun", "AR PL UMing CN", "Noto Serif CJK SC", serif';
+// Lishu is the display face the paper presets use for names and (in the lishu preset) biographies.
+// There is no cleanly-licensed, full-simplified-coverage 隶书 webfont to bundle, so the stack relies
+// entirely on the device's own 隶书 fonts and ships no webfont of its own:
+//   1. System simplified 隶书 families come FIRST (macOS 报隶/Baoli, 华文隶书/STLiti; Windows 隶书/LiSu;
+//      common 方正/FZLiShu aliases) so a device that HAS one renders ALL CJK text — simplified
+//      included — in a single consistent 隶书.
+//   2. Glyphs no system 隶书 covers fall back to the body serif (song): on a device with no 隶书 font
+//      the 隶书 preset simply reads as song — the accepted trade-off for not bundling a face.
+export const PAPER_LISHU_FONT_STACK =
+  `"Baoli SC", "Baoli TC", "STLiti", "华文隶书", "LiSu", "隶书", "隸書", "FZLiShu-S01", "FZLiShu II S", "方正隶书简体", "DFLiSong-W5", ${PAPER_BODY_FONT_STACK}`;
 // Ou records use Tailwind's px-2.5 spacing. Keep the numeric value shared so absolute-layout
 // renderers can reserve the same visual distance from the spine without changing pagination.
 export const PAPER_RECORD_INLINE_PADDING = 10;
@@ -146,7 +156,7 @@ export const PAPER_TEXT = {
     fontSize: 13,
     fontWeight: 400,
     color: "var(--df-paper-muted)",
-    fontFamily: "var(--df-paper-font-note)",
+    fontFamily: "var(--df-paper-font-body)",
     lineHeight: 1.55,
   },
   femaleMark: {

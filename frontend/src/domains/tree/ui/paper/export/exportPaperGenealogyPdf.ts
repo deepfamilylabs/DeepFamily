@@ -1,7 +1,7 @@
 // Rasterizes each fixed-size paper "spread" (a left/spine/right double page) into a PNG and lays
 // one spread per landscape PDF page. The paper view renders spreads at exact pixel dimensions
 // (~1180×872), so a spread maps cleanly to a single PDF page. CJK glyphs are rendered by the
-// browser using system fonts and baked into the raster, so the resulting PDF is portable.
+// browser and baked into the raster, so the resulting PDF is portable.
 
 import type { CSSProperties } from "react";
 import { PAPER_VARS } from "../paperStyles";
@@ -112,10 +112,9 @@ export async function exportPaperGenealogyPdf(
           pixelRatio,
           backgroundColor: sheetColor,
           cacheBust: true,
-          // The app's global Google Fonts stylesheets are cross-origin, so reading their cssRules
-          // throws a SecurityError inside html-to-image. Paper spreads deliberately use system CJK
-          // font stacks, which remain available to the browser while rasterizing, so no web-font
-          // embedding is required (or desirable) for this export.
+          // The paper view renders entirely in system fonts, so skip html-to-image's font inlining
+          // (which would otherwise scan the app's cross-origin Google Fonts stylesheets). The browser
+          // rasterizes the system fonts directly into the PNG.
           skipFonts: true,
         }),
       );

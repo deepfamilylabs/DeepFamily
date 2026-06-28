@@ -3,6 +3,7 @@ import {
   PAPER_BODY_FONT_STACK,
   PAPER_COLOR_VARS_XUAN,
   PAPER_FRAME_VARS_DEFAULT,
+  PAPER_LISHU_FONT_STACK,
   PAPER_TEXTURE_VARS_DEFAULT,
   PAPER_TITLE_FONT_STACK,
   PAPER_VARS,
@@ -222,15 +223,16 @@ export function getPaperColorThemeSwatch(id: PaperColorThemeId): [string, string
 export const PAPER_FONT_PRESET = {
   CLASSIC: "classic",
   SONG: "song",
+  LISHU: "lishu",
   SANS: "sans",
 } as const;
 
 export type PaperFontPresetId = (typeof PAPER_FONT_PRESET)[keyof typeof PAPER_FONT_PRESET];
 
-// Each preset unifies ALL three font roles (title/body/note) on one family so switching a preset
-// restyles the whole page (names, body records AND notes), not just titles: "classic" = kaiti
-// everywhere, "song" = serif everywhere, "sans" = a CJK sans family. Keeping every preset
-// single-family also makes the switch visibly consistent regardless of which roles a renderer uses.
+// Each preset unifies all three font roles (title/body/note) on one family so switching a preset
+// restyles the whole page — names, biographies AND relationship/tag annotations. The lishu preset
+// points every role at the lishu stack (PAPER_LISHU_FONT_STACK), which renders clerical wherever a
+// 隶书 font is available and falls back to song only for glyphs no 隶书 covers.
 export const PAPER_FONT_PRESETS: Record<PaperFontPresetId, Record<string, string>> = {
   classic: {
     "--df-paper-font-title": PAPER_TITLE_FONT_STACK,
@@ -241,6 +243,11 @@ export const PAPER_FONT_PRESETS: Record<PaperFontPresetId, Record<string, string
     "--df-paper-font-title": PAPER_BODY_FONT_STACK,
     "--df-paper-font-body": PAPER_BODY_FONT_STACK,
     "--df-paper-font-note": PAPER_BODY_FONT_STACK,
+  },
+  lishu: {
+    "--df-paper-font-title": PAPER_LISHU_FONT_STACK,
+    "--df-paper-font-body": PAPER_LISHU_FONT_STACK,
+    "--df-paper-font-note": PAPER_LISHU_FONT_STACK,
   },
   sans: {
     "--df-paper-font-title": PAPER_SANS_FONT_STACK,

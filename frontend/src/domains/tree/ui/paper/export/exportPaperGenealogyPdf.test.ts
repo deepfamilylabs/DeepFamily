@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toPng = vi.fn(async (_el: HTMLElement, _options?: unknown) => "data:image/png;base64,AAAA");
 const addPage = vi.fn();
@@ -15,6 +15,7 @@ vi.mock("html-to-image", () => ({ toPng }));
 vi.mock("jspdf", () => ({ jsPDF }));
 
 import { exportPaperGenealogyPdf, NoPaperSpreadsError } from "./exportPaperGenealogyPdf";
+import { PAPER_FONT_PRESETS } from "../paperAppearance";
 
 function buildRoot(spreadCount: number): HTMLElement {
   const root = document.createElement("div");
@@ -32,6 +33,10 @@ describe("exportPaperGenealogyPdf", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders one image per spread, adds N-1 pages, and saves once", async () => {
     const root = buildRoot(3);
 
@@ -47,6 +52,28 @@ describe("exportPaperGenealogyPdf", () => {
     expect(addPage).toHaveBeenCalledTimes(2); // first spread reuses the initial page
     expect(save).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith("genealogy-modern.pdf");
+  });
+
+  it("rasterizes the lishu preset with system fonts and embeds no webfont", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await exportPaperGenealogyPdf({
+      root: buildRoot(1),
+      fileName: "lishu.pdf",
+      cssVars: PAPER_FONT_PRESETS.lishu,
+    });
+
+    // The lishu preset now resolves to the device's own 隶书, so the exporter skips font inlining
+    // and never fetches/embeds a bundled face — it relies on the browser rasterizing system fonts.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(toPng).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ skipFonts: true }),
+    );
+    const calls = toPng.mock.calls;
+    const options = (calls[calls.length - 1]?.[1] ?? {}) as Record<string, unknown>;
+    expect(options).not.toHaveProperty("fontEmbedCSS");
   });
 
   it("insets each leaf by the book-edge margin and fills the margin band", async () => {
