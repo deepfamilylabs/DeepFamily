@@ -63,6 +63,11 @@ vi.mock("../domains/tree", () => ({
     hallName: null,
     fontScale: 1,
     exportMarginPx: 48,
+    coverEnabled: true,
+    coverInscription: null,
+    coverStyleId: "traditional-slip",
+    backCoverMode: "matched",
+    showCoverSpine: true,
   },
   // The page derives the auto spine title via these; a fixed value keeps the input prefill stable.
   buildPaperGenerations: () => [],
@@ -93,6 +98,13 @@ vi.mock("../domains/tree", () => ({
   PAPER_FONT_PRESET_IDS: ["classic", "song", "lishu", "sans"],
   PAPER_TEXTURE_IDS: ["subtle", "strong", "plain"],
   PAPER_BORDER_STYLE_IDS: ["wenwu", "single", "double", "sides"],
+  PAPER_COVER_STYLE_IDS: [
+    "traditional-slip",
+    "centered-classic",
+    "minimal-thread",
+    "archive-frame",
+  ],
+  PAPER_BACK_COVER_MODES: ["matched", "blank"],
   getPaperColorThemeSwatch: () => ["#f7efd8", "#8a6a3b", "#c18070"],
   getPaperBorderStyleVars: () => ({
     "--df-paper-frame-outer": "1px",
@@ -124,6 +136,11 @@ vi.mock("../domains/tree", () => ({
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
+      coverEnabled: true,
+      coverInscription: null,
+      coverStyleId: "traditional-slip",
+      backCoverMode: "matched",
+      showCoverSpine: true,
     };
     if (!raw) return base;
     try {
@@ -151,6 +168,9 @@ vi.mock("../domains/tree", () => ({
       data-font={props.paperVars?.["--df-paper-test-font"] ?? ""}
       data-texture={props.paperVars?.["--df-paper-test-texture"] ?? ""}
       data-font-scale={String(props.fontScale ?? "")}
+      data-cover-style={props.coverStyleId ?? ""}
+      data-back-cover-mode={props.backCoverMode ?? ""}
+      data-show-cover-spine={String(props.showCoverSpine ?? "")}
     />
   ),
   useFamilyTreeProjection: () => mocks.projection,
@@ -286,6 +306,12 @@ describe("GenealogyBookPage", () => {
       "true",
     );
     expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen.getByTestId("paper-cover-style-traditional-slip").getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen.getByTestId("paper-back-cover-mode-matched").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
 
     const view = screen.getByTestId("paper-view");
     expect(view.getAttribute("data-color-theme")).toBe("xuan");
@@ -309,6 +335,24 @@ describe("GenealogyBookPage", () => {
     expect(saved.colorThemeId).toBe("bamboo");
     expect(saved.fontPresetId).toBe("lishu");
     expect(saved.textureId).toBe("strong");
+  });
+
+  it("persists the paired cover layout, back-cover mode and spine visibility", () => {
+    render(<GenealogyBookPage />);
+
+    fireEvent.click(screen.getByTestId("paper-cover-style-archive-frame"));
+    fireEvent.click(screen.getByTestId("paper-back-cover-mode-blank"));
+    fireEvent.click(screen.getByTestId("paper-cover-spine-input"));
+
+    const view = screen.getByTestId("paper-view");
+    expect(view.getAttribute("data-cover-style")).toBe("archive-frame");
+    expect(view.getAttribute("data-back-cover-mode")).toBe("blank");
+    expect(view.getAttribute("data-show-cover-spine")).toBe("false");
+
+    const saved = JSON.parse(localStorage.getItem("df:paperAppearance") || "{}");
+    expect(saved.coverStyleId).toBe("archive-frame");
+    expect(saved.backCoverMode).toBe("blank");
+    expect(saved.showCoverSpine).toBe(false);
   });
 
   it("restores the sidebar display settings to their defaults", () => {
@@ -340,6 +384,11 @@ describe("GenealogyBookPage", () => {
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
+      coverEnabled: true,
+      coverInscription: null,
+      coverStyleId: "traditional-slip",
+      backCoverMode: "matched",
+      showCoverSpine: true,
     });
     expect((screen.getByTestId("paper-spine-title-input") as HTMLInputElement).value).toBe(
       "自动族谱",

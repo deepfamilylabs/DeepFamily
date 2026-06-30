@@ -580,6 +580,7 @@ describe("PaperGenealogyView", () => {
     expect(spread.className).toContain("min-w-[1180px]");
 
     // Cover page: title, hall, volume and optional inscription share one traditional title slip.
+    expect(screen.getByTestId("paper-cover-layout-traditional-slip")).toBeTruthy();
     expect(screen.getByTestId("paper-cover-title-slip")).toBeTruthy();
     expect(screen.getByTestId("paper-cover-title").textContent).toContain("Genealogy");
     expect(screen.getByTestId("paper-cover-volume").textContent).toContain("Volumes");
@@ -595,9 +596,51 @@ describe("PaperGenealogyView", () => {
     expect(screen.queryByTestId("paper-back-cover-end")).toBeNull();
     const colophon = screen.getByTestId("paper-back-cover-colophon").textContent || "";
     expect(colophon).toContain("DeepFamily");
-    expect(colophon).toContain("Published by");
+    expect(colophon).toContain("Revised by");
     expect(colophon).not.toContain("Volumes");
-    expect(colophon).toContain(`Compiled in ${new Date().getFullYear()}`);
+    expect(colophon).toContain(String(new Date().getFullYear()));
+  });
+
+  it("renders paired cover layouts, blank backs and an optional blank spine", () => {
+    const cases = [
+      ["centered-classic", "paper-cover-layout-centered-classic", true],
+      ["minimal-thread", "paper-cover-layout-minimal-thread", false],
+      ["archive-frame", "paper-cover-layout-archive-frame", true],
+    ] as const;
+
+    for (const [coverStyleId, layoutTestId, hasMatchedBack] of cases) {
+      const { unmount } = render(
+        <PaperGenealogyView
+          style="modern"
+          graph={graph}
+          rootId={rootId}
+          nodesData={nodesData}
+          hasRoot
+          coverEnabled
+          coverStyleId={coverStyleId}
+        />,
+      );
+      expect(screen.getByTestId(layoutTestId)).toBeTruthy();
+      expect(Boolean(screen.queryByTestId("paper-back-cover-colophon"))).toBe(hasMatchedBack);
+      unmount();
+    }
+
+    render(
+      <PaperGenealogyView
+        style="modern"
+        graph={graph}
+        rootId={rootId}
+        nodesData={nodesData}
+        hasRoot
+        coverEnabled
+        coverStyleId="centered-classic"
+        backCoverMode="blank"
+        showCoverSpine={false}
+      />,
+    );
+    expect(screen.getByTestId("paper-back-cover").textContent).toBe("");
+    expect(screen.getByTestId("paper-cover-spine").textContent).toBe("");
+    expect(screen.getByTestId("paper-cover-spine").getAttribute("data-visible")).toBe("false");
   });
 
   it("formats cover years as upright Chinese digits", () => {

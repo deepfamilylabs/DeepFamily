@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { NodeData, NodeId } from "../../../../shared/model";
 import type { TreeGraphData } from "../../selectors";
 import { buildPaperGenerations, type PaperGeneration, type TranslateFn } from "./paperData";
+import type { PaperBackCoverMode, PaperCoverStyleId } from "./paperAppearance";
 
 export interface UsePaperGenealogyViewModelParams {
   graph: TreeGraphData;
@@ -19,6 +20,9 @@ export interface UsePaperGenealogyViewModelParams {
   fontScale?: number;
   coverEnabled?: boolean;
   coverInscription?: string;
+  coverStyleId?: PaperCoverStyleId;
+  backCoverMode?: PaperBackCoverMode;
+  showCoverSpine?: boolean;
 }
 
 export interface PaperGenealogyViewModel {
@@ -35,6 +39,9 @@ export interface PaperGenealogyViewModel {
   fontScale?: number;
   coverEnabled?: boolean;
   coverInscription?: string;
+  coverStyleId?: PaperCoverStyleId;
+  backCoverMode?: PaperBackCoverMode;
+  showCoverSpine?: boolean;
 }
 
 export function usePaperGenealogyViewModel(
@@ -54,6 +61,9 @@ export function usePaperGenealogyViewModel(
     fontScale,
     coverEnabled,
     coverInscription,
+    coverStyleId,
+    backCoverMode,
+    showCoverSpine,
   } = params;
   const { t } = useTranslation();
   const translate = useCallback<TranslateFn>(
@@ -83,5 +93,8 @@ export function usePaperGenealogyViewModel(
     fontScale,
     coverEnabled,
     coverInscription,
+    coverStyleId,
+    backCoverMode,
+    showCoverSpine,
   };
 }

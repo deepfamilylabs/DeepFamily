@@ -1,4 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
+import {
+  PAPER_BACK_COVER_MODE,
+  PAPER_COVER_STYLE,
+  type PaperBackCoverMode,
+  type PaperCoverStyleId,
+} from "../paperAppearance";
 import type { PaperGeneration, TranslateFn } from "../paperData";
 import { PAPER_LINE, PAPER_SHEET_STYLE, PAPER_TEXT } from "../paperStyles";
 import { getPaperSpineTitle, toChineseDigitString, toChineseNumeral } from "../paperText";
@@ -12,6 +18,9 @@ import { PaperFrameOverlay } from "./PaperFrameOverlay";
 // DOM order) emits it as page one.
 const COVER_PAGE_HEIGHT = 872;
 const COVER_SPINE_WIDTH = 72;
+const COVER_SLIP_BG = "var(--df-paper-cover-slip-bg, var(--df-paper-panel))";
+const COVER_SLIP_BORDER = "var(--df-paper-cover-slip-border, var(--df-paper-line))";
+const COVER_SLIP_INK = "var(--df-paper-cover-slip-ink, var(--df-paper-ink))";
 
 // A single full-height cover/back sheet. Its contents choose their own traditional placement.
 function CoverPage({ children, testId }: { children: ReactNode; testId: string }) {
@@ -77,6 +86,23 @@ function CoverSpine({
   );
 }
 
+function BlankCoverSpine() {
+  return (
+    <aside
+      className="border-x"
+      style={{
+        height: COVER_PAGE_HEIGHT,
+        width: COVER_SPINE_WIDTH,
+        background: "var(--df-paper-spine)",
+        borderColor: PAPER_LINE.strong,
+      }}
+      data-testid="paper-cover-spine"
+      data-visible="false"
+      aria-hidden="true"
+    />
+  );
+}
+
 // Traditional thread-bound books carry their identity on one pasted vertical title slip rather
 // than scattering a large title, seal and date across the cover. The slip sits toward the fore edge
 // (opposite the binding) and contains the title plus smaller hall, volume and optional inscription.
@@ -97,8 +123,8 @@ function CoverTitleSlip({
     <section
       className={`absolute top-24 h-[610px] w-[132px] border ${foreEdge === "right" ? "right-24" : "left-24"}`}
       style={{
-        backgroundColor: "var(--df-paper-panel)",
-        borderColor: PAPER_LINE.strong,
+        backgroundColor: COVER_SLIP_BG,
+        borderColor: COVER_SLIP_BORDER,
       }}
       data-testid="paper-cover-title-slip"
     >
@@ -106,6 +132,7 @@ function CoverTitleSlip({
         className="absolute left-1/2 top-1/2 m-0 -translate-x-1/2 -translate-y-1/2 leading-none"
         style={{
           ...PAPER_TEXT.spineTitle,
+          color: COVER_SLIP_INK,
           fontSize: 48,
           letterSpacing: "0.1em",
           writingMode: "vertical-rl",
@@ -120,6 +147,7 @@ function CoverTitleSlip({
         style={
           {
             ...PAPER_TEXT.spineLabel,
+            color: COVER_SLIP_INK,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           } as CSSProperties
@@ -134,6 +162,7 @@ function CoverTitleSlip({
           style={
             {
               ...PAPER_TEXT.spineLabel,
+              color: COVER_SLIP_INK,
               writingMode: "vertical-rl",
               textOrientation: "mixed",
             } as CSSProperties
@@ -148,6 +177,7 @@ function CoverTitleSlip({
         style={
           {
             ...PAPER_TEXT.spineLabel,
+            color: COVER_SLIP_INK,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           } as CSSProperties
@@ -156,6 +186,229 @@ function CoverTitleSlip({
       >
         {volumeText}
       </span>
+    </section>
+  );
+}
+
+function CenteredCover({
+  title,
+  hallText,
+  volumeText,
+  inscription,
+}: {
+  title: string;
+  hallText: string;
+  volumeText: string;
+  inscription?: string;
+}) {
+  return (
+    <section className="contents" data-testid="paper-cover-layout-centered-classic">
+      <span
+        className="absolute right-14 top-14 border px-3 py-5 leading-none"
+        style={{
+          ...PAPER_TEXT.spineLabel,
+          borderColor: PAPER_LINE.strong,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-hall"
+      >
+        {hallText}
+      </span>
+      <div className="flex -translate-y-6 flex-col items-center gap-7">
+        <h1
+          className="m-0 leading-none"
+          style={{
+            ...PAPER_TEXT.spineTitle,
+            fontSize: 60,
+            letterSpacing: "0.08em",
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+          data-testid="paper-cover-title"
+        >
+          {title}
+        </h1>
+        <span
+          className="leading-none"
+          style={{
+            ...PAPER_TEXT.spineLabel,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+          data-testid="paper-cover-volume"
+        >
+          {volumeText}
+        </span>
+      </div>
+      {inscription ? (
+        <span
+          className="absolute bottom-16 left-1/2 -translate-x-1/2 leading-none"
+          style={{
+            ...PAPER_TEXT.spineLabel,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+          data-testid="paper-cover-inscription"
+        >
+          {inscription}
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
+function MinimalCover({
+  title,
+  hallText,
+  volumeText,
+  inscription,
+  foreEdge,
+}: {
+  title: string;
+  hallText: string;
+  volumeText: string;
+  inscription?: string;
+  foreEdge: "left" | "right";
+}) {
+  return (
+    <section
+      className={`absolute top-28 h-[520px] w-[94px] border ${foreEdge === "right" ? "right-28" : "left-28"}`}
+      style={{ backgroundColor: COVER_SLIP_BG, borderColor: COVER_SLIP_BORDER }}
+      data-testid="paper-cover-layout-minimal-thread"
+    >
+      <h1
+        className="absolute left-1/2 top-1/2 m-0 -translate-x-1/2 -translate-y-1/2 leading-none"
+        style={{
+          ...PAPER_TEXT.spineTitle,
+          color: COVER_SLIP_INK,
+          fontSize: 40,
+          letterSpacing: "0.08em",
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-title"
+      >
+        {title}
+      </h1>
+      <span
+        className="absolute right-3 top-6 leading-none"
+        style={{
+          ...PAPER_TEXT.spineLabel,
+          color: COVER_SLIP_INK,
+          fontSize: 11,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-hall"
+      >
+        {hallText}
+      </span>
+      <span
+        className="absolute bottom-6 left-3 leading-none"
+        style={{
+          ...PAPER_TEXT.spineLabel,
+          color: COVER_SLIP_INK,
+          fontSize: 11,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-volume"
+      >
+        {volumeText}
+      </span>
+      {inscription ? (
+        <span
+          className="absolute bottom-6 right-3 leading-none"
+          style={{
+            ...PAPER_TEXT.spineLabel,
+            color: COVER_SLIP_INK,
+            fontSize: 11,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+          data-testid="paper-cover-inscription"
+        >
+          {inscription}
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
+function ArchiveCover({
+  title,
+  hallText,
+  volumeText,
+  inscription,
+}: {
+  title: string;
+  hallText: string;
+  volumeText: string;
+  inscription?: string;
+}) {
+  return (
+    <section
+      className="relative h-[620px] w-[240px] border-2"
+      style={{
+        backgroundColor: COVER_SLIP_BG,
+        borderColor: COVER_SLIP_BORDER,
+        boxShadow: `inset 0 0 0 6px ${COVER_SLIP_BG}, inset 0 0 0 7px ${COVER_SLIP_BORDER}`,
+      }}
+      data-testid="paper-cover-layout-archive-frame"
+    >
+      <h1
+        className="absolute left-1/2 top-1/2 m-0 -translate-x-1/2 -translate-y-1/2 leading-none"
+        style={{
+          ...PAPER_TEXT.spineTitle,
+          color: COVER_SLIP_INK,
+          fontSize: 52,
+          letterSpacing: "0.1em",
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-title"
+      >
+        {title}
+      </h1>
+      <span
+        className="absolute right-8 top-10 leading-none"
+        style={{
+          ...PAPER_TEXT.spineLabel,
+          color: COVER_SLIP_INK,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-hall"
+      >
+        {hallText}
+      </span>
+      <span
+        className="absolute bottom-10 left-8 leading-none"
+        style={{
+          ...PAPER_TEXT.spineLabel,
+          color: COVER_SLIP_INK,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+        data-testid="paper-cover-volume"
+      >
+        {volumeText}
+      </span>
+      {inscription ? (
+        <span
+          className="absolute bottom-10 right-8 leading-none"
+          style={{
+            ...PAPER_TEXT.spineLabel,
+            color: COVER_SLIP_INK,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+          data-testid="paper-cover-inscription"
+        >
+          {inscription}
+        </span>
+      ) : null}
     </section>
   );
 }
@@ -195,19 +448,87 @@ function Colophon({
   );
 }
 
+function CenteredBackCover({ yearText, holderText }: { yearText: string; holderText: string }) {
+  return (
+    <div
+      className="flex flex-row-reverse items-center justify-center gap-9"
+      data-testid="paper-back-cover-colophon"
+    >
+      <span
+        style={{
+          ...PAPER_TEXT.spineHall,
+          fontSize: 26,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+      >
+        {holderText}
+      </span>
+      <span
+        style={{
+          ...PAPER_TEXT.spineLabel,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed",
+        }}
+      >
+        {yearText}
+      </span>
+    </div>
+  );
+}
+
+function ArchiveBackCover({
+  title,
+  yearText,
+  holderText,
+  volumeText,
+}: {
+  title: string;
+  yearText: string;
+  holderText: string;
+  volumeText: string;
+}) {
+  return (
+    <div
+      className="flex min-h-[390px] min-w-[240px] flex-row-reverse items-center justify-center gap-8 border-2 px-10 py-12"
+      style={{
+        backgroundColor: COVER_SLIP_BG,
+        borderColor: COVER_SLIP_BORDER,
+        boxShadow: `inset 0 0 0 6px ${COVER_SLIP_BG}, inset 0 0 0 7px ${COVER_SLIP_BORDER}`,
+      }}
+      data-testid="paper-back-cover-colophon"
+    >
+      {[title, holderText, yearText, volumeText].map((text, index) => (
+        <span
+          key={`${index}-${text}`}
+          style={{
+            ...(index === 0 ? PAPER_TEXT.spineTitle : PAPER_TEXT.spineLabel),
+            color: COVER_SLIP_INK,
+            fontSize: index === 0 ? 25 : undefined,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+          }}
+        >
+          {text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function resolveHallText(hallName: string | undefined, t: TranslateFn): string {
   return hallName?.trim() || t("genealogyBook.ouHallName", "DeepFamily");
 }
 
-function resolveEditedText(t: TranslateFn, year: number): string {
-  return t("genealogyBook.cover.editedYear", "Compiled in {{year}}", {
+function resolveColophonYear(t: TranslateFn, year: number): string {
+  return t("genealogyBook.cover.colophonYear", "{{year}}", {
     year,
     hanYear: toChineseDigitString(year),
   });
 }
 
 function resolveColophonHolder(hallText: string, t: TranslateFn): string {
-  return t("genealogyBook.cover.colophonHolder", "Published by {{hall}}", { hall: hallText });
+  return t("genealogyBook.cover.colophonHolder", "Revised by {{hall}}", { hall: hallText });
 }
 
 function SpreadShell({ children, testId }: { children: ReactNode; testId: string }) {
@@ -237,6 +558,9 @@ export function PaperCover({
   inscription,
   volumeCount = 1,
   pageOrder = "rtl",
+  coverStyleId = PAPER_COVER_STYLE.TRADITIONAL,
+  backCoverMode = PAPER_BACK_COVER_MODE.MATCHED,
+  showCoverSpine = true,
   t,
 }: {
   generations: PaperGeneration[];
@@ -250,38 +574,108 @@ export function PaperCover({
   volumeCount?: number;
   // Reading order, matching the body. "rtl" (traditional) puts the cover on the right page.
   pageOrder?: "ltr" | "rtl";
+  coverStyleId?: PaperCoverStyleId;
+  backCoverMode?: PaperBackCoverMode;
+  showCoverSpine?: boolean;
   t: TranslateFn;
 }) {
   const title = spineTitleOverride?.trim() || getPaperSpineTitle(generations, t);
   const hallText = resolveHallText(hallName, t);
-  const editedText = resolveEditedText(t, new Date().getFullYear());
+  const colophonYear = resolveColophonYear(t, new Date().getFullYear());
   const inscriptionText = inscription?.trim();
   const volumeText = t("genealogyBook.cover.volumeCount", "{{count}} Volumes", {
     count: volumeCount,
     han: toChineseNumeral(volumeCount),
   });
 
-  const coverPage = (
-    <CoverPage testId="paper-cover">
-      <CoverTitleSlip
-        title={title}
-        hallText={hallText}
-        volumeText={volumeText}
-        inscription={inscriptionText}
-        foreEdge={pageOrder === "rtl" ? "right" : "left"}
-      />
-    </CoverPage>
-  );
+  const foreEdge = pageOrder === "rtl" ? "right" : "left";
+  let coverContent: ReactNode;
+  switch (coverStyleId) {
+    case PAPER_COVER_STYLE.CENTERED:
+      coverContent = (
+        <CenteredCover
+          title={title}
+          hallText={hallText}
+          volumeText={volumeText}
+          inscription={inscriptionText}
+        />
+      );
+      break;
+    case PAPER_COVER_STYLE.MINIMAL:
+      coverContent = (
+        <MinimalCover
+          title={title}
+          hallText={hallText}
+          volumeText={volumeText}
+          inscription={inscriptionText}
+          foreEdge={foreEdge}
+        />
+      );
+      break;
+    case PAPER_COVER_STYLE.ARCHIVE:
+      coverContent = (
+        <ArchiveCover
+          title={title}
+          hallText={hallText}
+          volumeText={volumeText}
+          inscription={inscriptionText}
+        />
+      );
+      break;
+    default:
+      coverContent = (
+        <div className="contents" data-testid="paper-cover-layout-traditional-slip">
+          <CoverTitleSlip
+            title={title}
+            hallText={hallText}
+            volumeText={volumeText}
+            inscription={inscriptionText}
+            foreEdge={foreEdge}
+          />
+        </div>
+      );
+  }
+
+  const coverPage = <CoverPage testId="paper-cover">{coverContent}</CoverPage>;
+
+  let backCoverContent: ReactNode = null;
+  if (backCoverMode === PAPER_BACK_COVER_MODE.MATCHED) {
+    switch (coverStyleId) {
+      case PAPER_COVER_STYLE.CENTERED:
+        backCoverContent = (
+          <CenteredBackCover
+            yearText={colophonYear}
+            holderText={resolveColophonHolder(hallText, t)}
+          />
+        );
+        break;
+      case PAPER_COVER_STYLE.MINIMAL:
+        backCoverContent = null;
+        break;
+      case PAPER_COVER_STYLE.ARCHIVE:
+        backCoverContent = (
+          <ArchiveBackCover
+            title={title}
+            yearText={colophonYear}
+            holderText={resolveColophonHolder(hallText, t)}
+            volumeText={volumeText}
+          />
+        );
+        break;
+      default:
+        backCoverContent = (
+          <Colophon
+            yearText={colophonYear}
+            holderText={resolveColophonHolder(hallText, t)}
+            testId="paper-back-cover-colophon"
+          />
+        );
+    }
+  }
   // Keep the back cover in the printable cover spread with only the compact publication plaque;
   // 谱终 is a body-text end mark and does not belong on the outer cover.
   const backPage = (
-    <CoverPage testId="paper-back-cover">
-      <Colophon
-        yearText={editedText}
-        holderText={resolveColophonHolder(hallText, t)}
-        testId="paper-back-cover-colophon"
-      />
-    </CoverPage>
+    <CoverPage testId="paper-back-cover">{backCoverContent}</CoverPage>
   );
   // RTL (traditional) reads the right page first, so the cover sits on the right and the back cover
   // on the left; LTR mirrors it.
@@ -290,7 +684,11 @@ export function PaperCover({
   return (
     <SpreadShell testId="paper-cover-spread">
       {leftPage}
-      <CoverSpine title={title} hallText={hallText} />
+      {showCoverSpine ? (
+        <CoverSpine title={title} hallText={hallText} />
+      ) : (
+        <BlankCoverSpine />
+      )}
       {rightPage}
     </SpreadShell>
   );

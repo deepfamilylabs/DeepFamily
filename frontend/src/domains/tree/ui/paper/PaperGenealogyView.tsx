@@ -3,6 +3,7 @@ import type { NodeData, NodeId } from "../../../../shared/model";
 import type { TreeGraphData } from "../../selectors";
 import { PaperEmptyState } from "./PaperEmptyState";
 import { PAPER_GENEALOGY_STYLE, type PaperGenealogyStyle } from "./paperData";
+import type { PaperBackCoverMode, PaperCoverStyleId } from "./paperAppearance";
 import { LineageBookRenderer } from "./renderers/LineageBookRenderer";
 import { ModernBookRenderer } from "./renderers/ModernBookRenderer";
 import { OuBookRenderer } from "./renderers/OuBookRenderer";
@@ -38,6 +39,9 @@ export interface PaperGenealogyViewProps {
   coverEnabled?: boolean;
   // Optional custom inscription (落款/副标题) shown on the cover; blank renders nothing.
   coverInscription?: string;
+  coverStyleId?: PaperCoverStyleId;
+  backCoverMode?: PaperBackCoverMode;
+  showCoverSpine?: boolean;
 }
 
 type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
@@ -56,6 +60,9 @@ function buildCoverSlot(vm: PaperGenealogyViewModel, volumeCount: number) {
       hallName={vm.hallName}
       inscription={vm.coverInscription}
       volumeCount={volumeCount}
+      coverStyleId={vm.coverStyleId}
+      backCoverMode={vm.backCoverMode}
+      showCoverSpine={vm.showCoverSpine}
       t={vm.translate}
     />
   );
