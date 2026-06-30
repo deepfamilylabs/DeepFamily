@@ -20,8 +20,10 @@ import {
   isPaperGenealogyStyle,
   loadPaperAppearance,
   loadPaperSpineTitleOverride,
+  PAPER_BACK_COVER_MODES,
   PAPER_BORDER_STYLE_IDS,
   PAPER_COLOR_THEME_IDS,
+  PAPER_COVER_STYLE_IDS,
   PAPER_EXPORT_MARGIN_MAX,
   PAPER_EXPORT_MARGIN_MIN,
   PAPER_EXPORT_MARGIN_STEP,
@@ -36,8 +38,10 @@ import {
   savePaperAppearance,
   savePaperSpineTitleOverride,
   type PaperAppearance,
+  type PaperBackCoverMode,
   type PaperBorderStyleId,
   type PaperColorThemeId,
+  type PaperCoverStyleId,
   type PaperFontPresetId,
   type PaperGenealogyStyle,
   type PaperTextureId,
@@ -119,7 +123,10 @@ function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
     appearance.fontScale === DEFAULT_PAPER_APPEARANCE.fontScale &&
     appearance.exportMarginPx === DEFAULT_PAPER_APPEARANCE.exportMarginPx &&
     appearance.coverEnabled === DEFAULT_PAPER_APPEARANCE.coverEnabled &&
-    appearance.coverInscription === DEFAULT_PAPER_APPEARANCE.coverInscription
+    appearance.coverInscription === DEFAULT_PAPER_APPEARANCE.coverInscription &&
+    appearance.coverStyleId === DEFAULT_PAPER_APPEARANCE.coverStyleId &&
+    appearance.backCoverMode === DEFAULT_PAPER_APPEARANCE.backCoverMode &&
+    appearance.showCoverSpine === DEFAULT_PAPER_APPEARANCE.showCoverSpine
   );
 }
 
@@ -184,6 +191,22 @@ export default function GenealogyBookPage() {
       double: t("genealogyBook.settings.borders.double", "Double rule"),
       sides: t("genealogyBook.settings.borders.sides", "Side double"),
       wenwu: t("genealogyBook.settings.borders.wenwu", "Thick-thin"),
+    }),
+    [t],
+  );
+  const coverStyleLabels = useMemo(
+    (): Record<PaperCoverStyleId, string> => ({
+      "traditional-slip": t("genealogyBook.settings.coverStyles.traditional", "Title slip"),
+      "centered-classic": t("genealogyBook.settings.coverStyles.centered", "Centered"),
+      "minimal-thread": t("genealogyBook.settings.coverStyles.minimal", "Minimal"),
+      "archive-frame": t("genealogyBook.settings.coverStyles.archive", "Archive frame"),
+    }),
+    [t],
+  );
+  const backCoverModeLabels = useMemo(
+    (): Record<PaperBackCoverMode, string> => ({
+      matched: t("genealogyBook.settings.backCoverModes.matched", "Match style"),
+      blank: t("genealogyBook.settings.backCoverModes.blank", "Blank"),
     }),
     [t],
   );
@@ -404,6 +427,84 @@ export default function GenealogyBookPage() {
                 data-testid="paper-cover-enabled-input"
               />
             </label>
+            <fieldset
+              className="mt-1 flex flex-col gap-1.5 disabled:opacity-50"
+              disabled={!appearance.coverEnabled}
+            >
+              <legend className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
+              </legend>
+              <div
+                className="grid grid-cols-2 gap-2"
+                role="group"
+                aria-label={t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
+              >
+                {PAPER_COVER_STYLE_IDS.map((id) => {
+                  const selected = appearance.coverStyleId === id;
+                  const previewMarkClass = {
+                    "traditional-slip": "right-1.5 top-1.5 h-7 w-2.5 border",
+                    "centered-classic": "left-1/2 top-1.5 h-7 w-1.5 -translate-x-1/2",
+                    "minimal-thread": "right-2 top-2 h-6 w-1.5 border",
+                    "archive-frame": "left-1/2 top-1.5 h-7 w-5 -translate-x-1/2 border-2",
+                  }[id];
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => updateAppearance({ coverStyleId: id })}
+                      className={`flex min-h-16 items-center gap-2 rounded-md border p-2 text-left text-[11px] font-medium transition-colors ${
+                        selected
+                          ? "border-red-300 bg-red-50 text-red-800 ring-1 ring-red-200 dark:border-orange-700 dark:bg-orange-950/30 dark:text-orange-200 dark:ring-orange-900"
+                          : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      }`}
+                      aria-pressed={selected}
+                      data-testid={`paper-cover-style-${id}`}
+                    >
+                      <span className="relative h-10 w-7 shrink-0 border border-current opacity-70">
+                        <span className={`absolute bg-current ${previewMarkClass}`} />
+                      </span>
+                      <span>{coverStyleLabels[id]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <div className="mt-1 flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t("genealogyBook.settings.backCoverModeLabel", "Back cover")}
+              </span>
+              <div className={segmentGroupClassName} role="group">
+                {PAPER_BACK_COVER_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={!appearance.coverEnabled}
+                    onClick={() => updateAppearance({ backCoverMode: mode })}
+                    className={segmentButtonClassName(appearance.backCoverMode === mode)}
+                    aria-pressed={appearance.backCoverMode === mode}
+                    data-testid={`paper-back-cover-mode-${mode}`}
+                  >
+                    {backCoverModeLabels[mode]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="mt-1 flex cursor-pointer items-center justify-between gap-2">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t("genealogyBook.settings.coverSpineLabel", "Spine information")}
+              </span>
+              <input
+                type="checkbox"
+                checked={appearance.showCoverSpine}
+                disabled={!appearance.coverEnabled}
+                onChange={(event) => updateAppearance({ showCoverSpine: event.target.checked })}
+                className="h-4 w-4 shrink-0 accent-orange-500"
+                data-testid="paper-cover-spine-input"
+              />
+            </label>
+
             <input
               type="text"
               value={appearance.coverInscription ?? ""}
@@ -655,6 +756,9 @@ export default function GenealogyBookPage() {
             exportMarginPx={appearance.exportMarginPx}
             coverEnabled={appearance.coverEnabled}
             coverInscription={appearance.coverInscription ?? undefined}
+            coverStyleId={appearance.coverStyleId}
+            backCoverMode={appearance.backCoverMode}
+            showCoverSpine={appearance.showCoverSpine}
           />
         </div>
       </div>

@@ -415,7 +415,7 @@
     "diejiContinuedGeneration": "continued",
     "repeatedGeneration": "repeated",
     "cover": {
-      "editedYear": "Compiled in {{year}}",
+      "colophonYear": "{{year}}",
       "volumeCount": "{{count}} Volumes",
       "colophonHolder": "Published by {{hall}}"
     },
@@ -427,9 +427,22 @@
       "hallNameLabel": "Hall name",
       "hallNameHint": "Leave blank to use the default hall name",
       "coverEnabledLabel": "Cover page",
+      "coverStyleLabel": "Cover layout",
+      "backCoverModeLabel": "Back cover",
+      "coverSpineLabel": "Spine information",
       "coverInscriptionLabel": "Cover inscription",
       "coverInscriptionPlaceholder": "Inscription",
       "coverInscriptionHint": "Optional inscription shown on the cover under the title",
+      "coverStyles": {
+        "traditional": "Title slip",
+        "centered": "Centered",
+        "minimal": "Minimal",
+        "archive": "Archive frame"
+      },
+      "backCoverModes": {
+        "matched": "Match style",
+        "blank": "Blank"
+      },
       "colorThemeLabel": "Color theme",
       "fontLabel": "Font",
       "textureLabel": "Paper texture",

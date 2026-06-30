@@ -378,6 +378,27 @@ export function clampPaperExportMargin(value: unknown): number {
   return Math.round(clamped);
 }
 
+// ---- Cover layout ----------------------------------------------------------------------------
+
+export const PAPER_COVER_STYLE = {
+  TRADITIONAL: "traditional-slip",
+  CENTERED: "centered-classic",
+  MINIMAL: "minimal-thread",
+  ARCHIVE: "archive-frame",
+} as const;
+
+export type PaperCoverStyleId = (typeof PAPER_COVER_STYLE)[keyof typeof PAPER_COVER_STYLE];
+export const PAPER_COVER_STYLE_IDS = Object.values(PAPER_COVER_STYLE) as PaperCoverStyleId[];
+
+export const PAPER_BACK_COVER_MODE = {
+  MATCHED: "matched",
+  BLANK: "blank",
+} as const;
+
+export type PaperBackCoverMode =
+  (typeof PAPER_BACK_COVER_MODE)[keyof typeof PAPER_BACK_COVER_MODE];
+export const PAPER_BACK_COVER_MODES = Object.values(PAPER_BACK_COVER_MODE) as PaperBackCoverMode[];
+
 // ---- Appearance value + variable composition --------------------------------------------------
 
 export interface PaperAppearance {
@@ -396,6 +417,12 @@ export interface PaperAppearance {
   coverEnabled: boolean;
   // Optional custom inscription (落款/副标题) shown on the cover; null/empty means none.
   coverInscription: string | null;
+  // Paired front/back structural preset; colors remain controlled by the active color theme.
+  coverStyleId: PaperCoverStyleId;
+  // Follow the selected style's matching back cover or suppress all back-cover content.
+  backCoverMode: PaperBackCoverMode;
+  // Whether the printable cover band carries title/hall information.
+  showCoverSpine: boolean;
 }
 
 export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
@@ -408,6 +435,9 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   exportMarginPx: PAPER_EXPORT_MARGIN_DEFAULT,
   coverEnabled: true,
   coverInscription: null,
+  coverStyleId: PAPER_COVER_STYLE.TRADITIONAL,
+  backCoverMode: PAPER_BACK_COVER_MODE.MATCHED,
+  showCoverSpine: true,
 };
 
 // Compose the full --df-paper-* variable set for a given appearance. Starts from PAPER_VARS so any
@@ -440,6 +470,14 @@ function isTextureId(value: unknown): value is PaperTextureId {
 
 function isBorderStyleId(value: unknown): value is PaperBorderStyleId {
   return typeof value === "string" && value in PAPER_BORDER_STYLES;
+}
+
+function isCoverStyleId(value: unknown): value is PaperCoverStyleId {
+  return PAPER_COVER_STYLE_IDS.includes(value as PaperCoverStyleId);
+}
+
+function isBackCoverMode(value: unknown): value is PaperBackCoverMode {
+  return PAPER_BACK_COVER_MODES.includes(value as PaperBackCoverMode);
 }
 
 // Read the saved appearance, falling back field-by-field to defaults so a partial/corrupt payload
@@ -477,6 +515,16 @@ export function loadPaperAppearance(): PaperAppearance {
           ? parsed.coverEnabled
           : DEFAULT_PAPER_APPEARANCE.coverEnabled,
       coverInscription,
+      coverStyleId: isCoverStyleId(parsed.coverStyleId)
+        ? parsed.coverStyleId
+        : DEFAULT_PAPER_APPEARANCE.coverStyleId,
+      backCoverMode: isBackCoverMode(parsed.backCoverMode)
+        ? parsed.backCoverMode
+        : DEFAULT_PAPER_APPEARANCE.backCoverMode,
+      showCoverSpine:
+        typeof parsed.showCoverSpine === "boolean"
+          ? parsed.showCoverSpine
+          : DEFAULT_PAPER_APPEARANCE.showCoverSpine,
     };
   } catch {
     return { ...DEFAULT_PAPER_APPEARANCE };

@@ -168,6 +168,9 @@ describe("paperAppearance storage", () => {
       exportMarginPx: 64,
       coverEnabled: false,
       coverInscription: "癸卯年续修",
+      coverStyleId: "archive-frame",
+      backCoverMode: "blank",
+      showCoverSpine: false,
     };
     savePaperAppearance(next);
     expect(localStorage.getItem(PAPER_APPEARANCE_STORAGE_KEY)).toBeTruthy();
@@ -175,11 +178,14 @@ describe("paperAppearance storage", () => {
   });
 
   it("defaults cover fields and normalizes a blank inscription", () => {
-    // coverEnabled defaults true; a missing/blank inscription degrades to null on both save and load.
+    // Missing cover fields use the paired traditional defaults; a blank inscription becomes null.
     localStorage.setItem(PAPER_APPEARANCE_STORAGE_KEY, JSON.stringify({ colorThemeId: "xuan" }));
     const loaded = loadPaperAppearance();
     expect(loaded.coverEnabled).toBe(true);
     expect(loaded.coverInscription).toBeNull();
+    expect(loaded.coverStyleId).toBe("traditional-slip");
+    expect(loaded.backCoverMode).toBe("matched");
+    expect(loaded.showCoverSpine).toBe(true);
 
     savePaperAppearance({ ...DEFAULT_PAPER_APPEARANCE, coverInscription: "   " });
     expect(loadPaperAppearance().coverInscription).toBeNull();
@@ -219,6 +225,8 @@ describe("paperAppearance storage", () => {
         colorThemeId: "neon",
         fontPresetId: "comic",
         textureId: "dots",
+        coverStyleId: "poster",
+        backCoverMode: "metadata",
         hallName: "忠义堂",
       }),
     );
@@ -226,6 +234,8 @@ describe("paperAppearance storage", () => {
     expect(loaded.colorThemeId).toBe(DEFAULT_PAPER_APPEARANCE.colorThemeId);
     expect(loaded.fontPresetId).toBe(DEFAULT_PAPER_APPEARANCE.fontPresetId);
     expect(loaded.textureId).toBe(DEFAULT_PAPER_APPEARANCE.textureId);
+    expect(loaded.coverStyleId).toBe(DEFAULT_PAPER_APPEARANCE.coverStyleId);
+    expect(loaded.backCoverMode).toBe(DEFAULT_PAPER_APPEARANCE.backCoverMode);
     // A valid hall name survives even when the ids are invalid.
     expect(loaded.hallName).toBe("忠义堂");
     // A missing font scale falls back to the default.

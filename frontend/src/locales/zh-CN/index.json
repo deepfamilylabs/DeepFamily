@@ -415,7 +415,7 @@
     "diejiContinuedGeneration": "续",
     "repeatedGeneration": "重列",
     "cover": {
-      "editedYear": "公元{{hanYear}}年编修",
+      "colophonYear": "公元{{hanYear}}年",
       "volumeCount": "全{{han}}卷",
       "colophonHolder": "{{hall}}编印"
     },
@@ -427,9 +427,22 @@
       "hallNameLabel": "堂号",
       "hallNameHint": "留空则使用默认堂号",
       "coverEnabledLabel": "封面",
+      "coverStyleLabel": "封面版式",
+      "backCoverModeLabel": "封底内容",
+      "coverSpineLabel": "显示书脊信息",
       "coverInscriptionLabel": "封面落款",
       "coverInscriptionPlaceholder": "落款/副标题",
       "coverInscriptionHint": "可选，显示在封面谱名下方",
+      "coverStyles": {
+        "traditional": "传统题签",
+        "centered": "中轴古典",
+        "minimal": "素面线装",
+        "archive": "典藏框装"
+      },
+      "backCoverModes": {
+        "matched": "跟随版式",
+        "blank": "留白"
+      },
       "colorThemeLabel": "配色主题",
       "fontLabel": "字体",
       "textureLabel": "纸张纹理",
