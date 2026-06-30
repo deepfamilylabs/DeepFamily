@@ -16,6 +16,25 @@ export function toChineseNumeral(value: number): string {
   return `${digits[tens]}十${ones ? digits[ones] : ""}`;
 }
 
+// Years in vertical Chinese typography are read digit by digit (二〇二六), unlike counts
+// (二十六). Keeping this separate from toChineseNumeral avoids Arabic digits turning sideways in
+// mixed-orientation cover inscriptions.
+export function toChineseDigitString(value: number | string): string {
+  const digits: Record<string, string> = {
+    "0": "〇",
+    "1": "一",
+    "2": "二",
+    "3": "三",
+    "4": "四",
+    "5": "五",
+    "6": "六",
+    "7": "七",
+    "8": "八",
+    "9": "九",
+  };
+  return Array.from(String(value), (digit) => digits[digit] ?? digit).join("");
+}
+
 export function getPaperGenerationMark(depth: number, t: TranslateFn): string {
   return t("genealogyBook.generationMark", "{{han}}世", {
     han: toChineseNumeral(depth + 1),

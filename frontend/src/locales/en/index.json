@@ -414,6 +414,11 @@
     "lineageOverlapNote": "This chart repeats the previous chart's fifth generation.",
     "diejiContinuedGeneration": "continued",
     "repeatedGeneration": "repeated",
+    "cover": {
+      "editedYear": "Compiled in {{year}}",
+      "volumeCount": "{{count}} Volumes",
+      "colophonHolder": "Published by {{hall}}"
+    },
     "settings": {
       "title": "Display settings",
       "resetDefault": "Reset defaults",
@@ -421,6 +426,10 @@
       "spineTitleHint": "Leave blank to use the auto-generated title",
       "hallNameLabel": "Hall name",
       "hallNameHint": "Leave blank to use the default hall name",
+      "coverEnabledLabel": "Cover page",
+      "coverInscriptionLabel": "Cover inscription",
+      "coverInscriptionPlaceholder": "Inscription",
+      "coverInscriptionHint": "Optional inscription shown on the cover under the title",
       "colorThemeLabel": "Color theme",
       "fontLabel": "Font",
       "textureLabel": "Paper texture",

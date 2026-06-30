@@ -117,7 +117,9 @@ function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
     appearance.borderStyleId === DEFAULT_PAPER_APPEARANCE.borderStyleId &&
     appearance.hallName === DEFAULT_PAPER_APPEARANCE.hallName &&
     appearance.fontScale === DEFAULT_PAPER_APPEARANCE.fontScale &&
-    appearance.exportMarginPx === DEFAULT_PAPER_APPEARANCE.exportMarginPx
+    appearance.exportMarginPx === DEFAULT_PAPER_APPEARANCE.exportMarginPx &&
+    appearance.coverEnabled === DEFAULT_PAPER_APPEARANCE.coverEnabled &&
+    appearance.coverInscription === DEFAULT_PAPER_APPEARANCE.coverInscription
   );
 }
 
@@ -389,6 +391,38 @@ export default function GenealogyBookPage() {
           </label>
 
           <div className="flex flex-col gap-1.5">
+            <label className="flex cursor-pointer items-center justify-between gap-2">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                {t("genealogyBook.settings.coverEnabledLabel", "Cover page")}
+              </span>
+              <input
+                type="checkbox"
+                checked={appearance.coverEnabled}
+                onChange={(event) => updateAppearance({ coverEnabled: event.target.checked })}
+                aria-label={t("genealogyBook.settings.coverEnabledLabel", "Cover page")}
+                className="h-4 w-4 shrink-0 accent-orange-500"
+                data-testid="paper-cover-enabled-input"
+              />
+            </label>
+            <input
+              type="text"
+              value={appearance.coverInscription ?? ""}
+              onChange={(event) => updateAppearance({ coverInscription: event.target.value })}
+              disabled={!appearance.coverEnabled}
+              placeholder={t("genealogyBook.settings.coverInscriptionPlaceholder", "Inscription")}
+              aria-label={t("genealogyBook.settings.coverInscriptionLabel", "Cover inscription")}
+              className={fieldInputClassName}
+              data-testid="paper-cover-inscription-input"
+            />
+            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+              {t(
+                "genealogyBook.settings.coverInscriptionHint",
+                "Optional inscription shown on the cover under the title",
+              )}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
               {t("genealogyBook.settings.colorThemeLabel", "Color theme")}
             </span>
@@ -619,6 +653,8 @@ export default function GenealogyBookPage() {
             hallName={appearance.hallName ?? undefined}
             fontScale={appearance.fontScale}
             exportMarginPx={appearance.exportMarginPx}
+            coverEnabled={appearance.coverEnabled}
+            coverInscription={appearance.coverInscription ?? undefined}
           />
         </div>
       </div>

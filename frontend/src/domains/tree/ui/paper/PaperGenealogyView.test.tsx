@@ -20,7 +20,7 @@ import {
   OU_RECORD_SPLIT_UNIT_TOLERANCE,
   OU_RECORD_UNITS_PER_COLUMN,
 } from "./layout/ouPagination";
-import { measureRecordUnits } from "./paperText";
+import { measureRecordUnits, toChineseDigitString } from "./paperText";
 import { ModernBookRenderer, MODERN_RECORD_UNITS_PER_ROW } from "./renderers/ModernBookRenderer";
 import {
   buildDiejiPaperBook,
@@ -558,6 +558,58 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId(`paper-modern-relation-${rootId}`).className).not.toContain(
       "font-bold",
     );
+  });
+
+  it("prepends a cover spread carrying the cover and matching back cover when coverEnabled", () => {
+    render(
+      <PaperGenealogyView
+        style="modern"
+        graph={graph}
+        rootId={rootId}
+        nodesData={nodesData}
+        hasRoot
+        coverEnabled
+        coverInscription="癸卯年续修"
+      />,
+    );
+
+    // One double page (like a body spread) carries both the cover and the back cover; the spread
+    // element holds data-paper-spread so the PDF exporter emits it as page one.
+    const spread = screen.getByTestId("paper-cover-spread");
+    expect(spread.getAttribute("data-paper-spread")).toBe("");
+    expect(spread.className).toContain("min-w-[1180px]");
+
+    // Cover page: title, hall, volume and optional inscription share one traditional title slip.
+    expect(screen.getByTestId("paper-cover-title-slip")).toBeTruthy();
+    expect(screen.getByTestId("paper-cover-title").textContent).toContain("Genealogy");
+    expect(screen.getByTestId("paper-cover-volume").textContent).toContain("Volumes");
+    expect(screen.getByTestId("paper-cover-hall").textContent).toContain("DeepFamily");
+    expect(screen.getByTestId("paper-cover-inscription").textContent).toContain("癸卯年续修");
+    const coverSpine = screen.getByTestId("paper-cover-spine").textContent || "";
+    expect(coverSpine).toContain("Genealogy");
+    expect(coverSpine).toContain("DeepFamily");
+    expect(coverSpine).not.toContain(toChineseDigitString(new Date().getFullYear()));
+
+    // Back cover stays beside the front cover for printable imposition and carries only a concise
+    // publication plaque; the body-text end mark does not belong on the outer cover.
+    expect(screen.queryByTestId("paper-back-cover-end")).toBeNull();
+    const colophon = screen.getByTestId("paper-back-cover-colophon").textContent || "";
+    expect(colophon).toContain("DeepFamily");
+    expect(colophon).toContain("Published by");
+    expect(colophon).not.toContain("Volumes");
+    expect(colophon).toContain(`Compiled in ${new Date().getFullYear()}`);
+  });
+
+  it("formats cover years as upright Chinese digits", () => {
+    expect(toChineseDigitString(2026)).toBe("二〇二六");
+  });
+
+  it("omits the cover spread when coverEnabled is false or unset", () => {
+    render(
+      <PaperGenealogyView style="modern" graph={graph} rootId={rootId} nodesData={nodesData} hasRoot />,
+    );
+    expect(screen.queryByTestId("paper-cover-spread")).toBeNull();
+    expect(screen.queryByTestId("paper-cover")).toBeNull();
   });
 
   it("uses transmission counts and page references for modern ledger children", () => {
