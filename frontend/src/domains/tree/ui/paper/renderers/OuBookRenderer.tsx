@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   buildOuPaperBook,
   getOuRecordText,
@@ -303,6 +303,7 @@ export function OuBookRenderer({
   paperVars,
   hallName,
   fontScale,
+  coverSlot,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
@@ -310,6 +311,7 @@ export function OuBookRenderer({
   paperVars?: CSSProperties;
   hallName?: string;
   fontScale?: number;
+  coverSlot?: (volumeCount: number) => ReactNode;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -392,6 +394,7 @@ export function OuBookRenderer({
             data-testid="paper-ou-table-1"
           >
             <div ref={spreadsRef} className="flex flex-col gap-5">
+              {coverSlot?.(book.charts.length)}
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}

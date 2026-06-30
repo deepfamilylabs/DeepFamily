@@ -414,6 +414,11 @@
     "lineageOverlapNote": "本图重列上一图第五世。",
     "diejiContinuedGeneration": "续",
     "repeatedGeneration": "重列",
+    "cover": {
+      "editedYear": "公元{{hanYear}}年编修",
+      "volumeCount": "全{{han}}卷",
+      "colophonHolder": "{{hall}}编印"
+    },
     "settings": {
       "title": "显示设置",
       "resetDefault": "恢复默认",
@@ -421,6 +426,10 @@
       "spineTitleHint": "留空则使用自动生成的标题",
       "hallNameLabel": "堂号",
       "hallNameHint": "留空则使用默认堂号",
+      "coverEnabledLabel": "封面",
+      "coverInscriptionLabel": "封面落款",
+      "coverInscriptionPlaceholder": "落款/副标题",
+      "coverInscriptionHint": "可选，显示在封面谱名下方",
       "colorThemeLabel": "配色主题",
       "fontLabel": "字体",
       "textureLabel": "纸张纹理",

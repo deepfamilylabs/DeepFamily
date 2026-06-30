@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { NodeId } from "../../../../../shared/model";
 import type { TreeGraphData } from "../../../selectors";
 import {
@@ -380,6 +380,7 @@ export function LineageBookRenderer({
   paperVars,
   hallName,
   fontScale,
+  coverSlot,
 }: {
   graph: TreeGraphData;
   rootId: NodeId | null;
@@ -389,6 +390,7 @@ export function LineageBookRenderer({
   paperVars?: CSSProperties;
   hallName?: string;
   fontScale?: number;
+  coverSlot?: (volumeCount: number) => ReactNode;
 }) {
   const spreadsRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState<number | null>(null);
@@ -472,6 +474,7 @@ export function LineageBookRenderer({
             data-testid="paper-lineage-table-1"
           >
             <div ref={spreadsRef} className="flex flex-col gap-5">
+              {coverSlot?.(book.charts.length)}
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}

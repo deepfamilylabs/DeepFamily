@@ -17,6 +17,8 @@ export interface UsePaperGenealogyViewModelParams {
   paperVars?: CSSProperties;
   hallName?: string;
   fontScale?: number;
+  coverEnabled?: boolean;
+  coverInscription?: string;
 }
 
 export interface PaperGenealogyViewModel {
@@ -31,6 +33,8 @@ export interface PaperGenealogyViewModel {
   paperVars?: CSSProperties;
   hallName?: string;
   fontScale?: number;
+  coverEnabled?: boolean;
+  coverInscription?: string;
 }
 
 export function usePaperGenealogyViewModel(
@@ -48,6 +52,8 @@ export function usePaperGenealogyViewModel(
     paperVars,
     hallName,
     fontScale,
+    coverEnabled,
+    coverInscription,
   } = params;
   const { t } = useTranslation();
   const translate = useCallback<TranslateFn>(
@@ -75,5 +81,7 @@ export function usePaperGenealogyViewModel(
     paperVars,
     hallName,
     fontScale,
+    coverEnabled,
+    coverInscription,
   };
 }

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   splitPaperRecordLines,
   type PaperGeneration,
@@ -727,6 +727,7 @@ export function ModernBookRenderer({
   paperVars,
   hallName,
   fontScale,
+  coverSlot,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
@@ -734,6 +735,7 @@ export function ModernBookRenderer({
   paperVars?: CSSProperties;
   hallName?: string;
   fontScale?: number;
+  coverSlot?: (volumeCount: number) => ReactNode;
 }) {
   const spreadRef = useRef<HTMLDivElement | null>(null);
   const [spreadWidth, setSpreadWidth] = useState(0);
@@ -797,6 +799,7 @@ export function ModernBookRenderer({
             data-testid="paper-modern-chart"
           >
             <div className="flex flex-col gap-5">
+              {coverSlot?.(book.charts.length)}
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}

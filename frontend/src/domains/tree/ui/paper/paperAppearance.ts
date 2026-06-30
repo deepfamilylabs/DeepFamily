@@ -392,6 +392,10 @@ export interface PaperAppearance {
   fontScale: number;
   // Book-edge margin (in spread px) applied only when exporting to PDF (see PAPER_EXPORT_MARGIN_*).
   exportMarginPx: number;
+  // Whether to render a cover leaf (封面) as the first page of the book (preview + exported PDF).
+  coverEnabled: boolean;
+  // Optional custom inscription (落款/副标题) shown on the cover; null/empty means none.
+  coverInscription: string | null;
 }
 
 export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
@@ -402,6 +406,8 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   hallName: null,
   fontScale: PAPER_FONT_SCALE_DEFAULT,
   exportMarginPx: PAPER_EXPORT_MARGIN_DEFAULT,
+  coverEnabled: true,
+  coverInscription: null,
 };
 
 // Compose the full --df-paper-* variable set for a given appearance. Starts from PAPER_VARS so any
@@ -446,6 +452,10 @@ export function loadPaperAppearance(): PaperAppearance {
     const parsed = JSON.parse(raw) as Partial<PaperAppearance>;
     const hallName =
       typeof parsed.hallName === "string" && parsed.hallName.trim() ? parsed.hallName : null;
+    const coverInscription =
+      typeof parsed.coverInscription === "string" && parsed.coverInscription.trim()
+        ? parsed.coverInscription
+        : null;
     return {
       colorThemeId: isColorThemeId(parsed.colorThemeId)
         ? parsed.colorThemeId
@@ -462,6 +472,11 @@ export function loadPaperAppearance(): PaperAppearance {
       hallName,
       fontScale: clampPaperFontScale(parsed.fontScale),
       exportMarginPx: clampPaperExportMargin(parsed.exportMarginPx),
+      coverEnabled:
+        typeof parsed.coverEnabled === "boolean"
+          ? parsed.coverEnabled
+          : DEFAULT_PAPER_APPEARANCE.coverEnabled,
+      coverInscription,
     };
   } catch {
     return { ...DEFAULT_PAPER_APPEARANCE };

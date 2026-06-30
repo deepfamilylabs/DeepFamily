@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import {
   buildDiejiPaperBook,
   getDiejiFullRecordText,
@@ -314,6 +314,7 @@ export function DiejiBookRenderer({
   paperVars,
   hallName,
   fontScale,
+  coverSlot,
 }: {
   generations: PaperGeneration[];
   t: TranslateFn;
@@ -321,6 +322,7 @@ export function DiejiBookRenderer({
   paperVars?: CSSProperties;
   hallName?: string;
   fontScale?: number;
+  coverSlot?: (volumeCount: number) => ReactNode;
 }) {
   const book = useMemo(() => buildDiejiPaperBook({ generations, t }), [generations, t]);
   const autoSpineTitle = useMemo(() => getPaperSpineTitle(generations, t), [generations, t]);
@@ -360,6 +362,7 @@ export function DiejiBookRenderer({
             data-testid="paper-dieji-table-1"
           >
             <div className="flex flex-col gap-5">
+              {coverSlot?.(book.charts.length)}
               {spreadItems.map(({ chart, spread }) => (
                 <div
                   key={`${chart.index}-${spread.index}`}

@@ -166,10 +166,23 @@ describe("paperAppearance storage", () => {
       hallName: "忠义堂",
       fontScale: 1.2,
       exportMarginPx: 64,
+      coverEnabled: false,
+      coverInscription: "癸卯年续修",
     };
     savePaperAppearance(next);
     expect(localStorage.getItem(PAPER_APPEARANCE_STORAGE_KEY)).toBeTruthy();
     expect(loadPaperAppearance()).toEqual(next);
+  });
+
+  it("defaults cover fields and normalizes a blank inscription", () => {
+    // coverEnabled defaults true; a missing/blank inscription degrades to null on both save and load.
+    localStorage.setItem(PAPER_APPEARANCE_STORAGE_KEY, JSON.stringify({ colorThemeId: "xuan" }));
+    const loaded = loadPaperAppearance();
+    expect(loaded.coverEnabled).toBe(true);
+    expect(loaded.coverInscription).toBeNull();
+
+    savePaperAppearance({ ...DEFAULT_PAPER_APPEARANCE, coverInscription: "   " });
+    expect(loadPaperAppearance().coverInscription).toBeNull();
   });
 
   it("clamps an out-of-range font scale on save and load", () => {

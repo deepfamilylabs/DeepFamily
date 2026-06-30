@@ -6,6 +6,7 @@ import { PAPER_GENEALOGY_STYLE, type PaperGenealogyStyle } from "./paperData";
 import { LineageBookRenderer } from "./renderers/LineageBookRenderer";
 import { ModernBookRenderer } from "./renderers/ModernBookRenderer";
 import { OuBookRenderer } from "./renderers/OuBookRenderer";
+import { PaperCover } from "./renderers/PaperCover";
 import { SuBookRenderer } from "./renderers/SuBookRenderer";
 import { DiejiBookRenderer } from "./renderers/DiejiBookRenderer";
 import { usePaperGenealogyViewModel } from "./usePaperGenealogyViewModel";
@@ -33,9 +34,32 @@ export interface PaperGenealogyViewProps {
   // which keeps it out of each spread's offset size (export measures that) and out of the raster
   // (html-to-image ignores element margins); the exporter re-adds the same margin in the PDF.
   exportMarginPx?: number;
+  // When true, a cover spread (封面对开页: cover + matching back cover) opens the book (preview + PDF).
+  coverEnabled?: boolean;
+  // Optional custom inscription (落款/副标题) shown on the cover; blank renders nothing.
+  coverInscription?: string;
 }
 
 type PaperGenealogyViewModel = ReturnType<typeof usePaperGenealogyViewModel>;
+
+// Build the cover spread (封面对开页) for a renderer's leading slot. One double page carrying the
+// cover and its matching back cover, laid out like a body spread for printable imposition. Returns
+// null when disabled so the book starts directly at its first genealogy spread. The cover derives
+// the same title the spine uses; the renderer passes the post-pagination volume count (it varies
+// per style) for the title slip's 全X卷 line.
+function buildCoverSlot(vm: PaperGenealogyViewModel, volumeCount: number) {
+  if (!vm.coverEnabled) return null;
+  return (
+    <PaperCover
+      generations={vm.generations}
+      spineTitleOverride={vm.spineTitleOverride}
+      hallName={vm.hallName}
+      inscription={vm.coverInscription}
+      volumeCount={volumeCount}
+      t={vm.translate}
+    />
+  );
+}
 
 const PAPER_BOOK_RENDERERS = {
   [PAPER_GENEALOGY_STYLE.OU]: (vm) => (
@@ -46,6 +70,7 @@ const PAPER_BOOK_RENDERERS = {
       paperVars={vm.paperVars}
       hallName={vm.hallName}
       fontScale={vm.fontScale}
+      coverSlot={(volumeCount) => buildCoverSlot(vm, volumeCount)}
     />
   ),
   [PAPER_GENEALOGY_STYLE.SU]: (vm) => (
@@ -58,6 +83,7 @@ const PAPER_BOOK_RENDERERS = {
       paperVars={vm.paperVars}
       hallName={vm.hallName}
       fontScale={vm.fontScale}
+      coverSlot={(volumeCount) => buildCoverSlot(vm, volumeCount)}
     />
   ),
   [PAPER_GENEALOGY_STYLE.DIEJI]: (vm) => (
@@ -68,6 +94,7 @@ const PAPER_BOOK_RENDERERS = {
       paperVars={vm.paperVars}
       hallName={vm.hallName}
       fontScale={vm.fontScale}
+      coverSlot={(volumeCount) => buildCoverSlot(vm, volumeCount)}
     />
   ),
   [PAPER_GENEALOGY_STYLE.LINEAGE]: (vm) => (
@@ -80,6 +107,7 @@ const PAPER_BOOK_RENDERERS = {
       paperVars={vm.paperVars}
       hallName={vm.hallName}
       fontScale={vm.fontScale}
+      coverSlot={(volumeCount) => buildCoverSlot(vm, volumeCount)}
     />
   ),
   [PAPER_GENEALOGY_STYLE.MODERN]: (vm) => (
@@ -90,6 +118,7 @@ const PAPER_BOOK_RENDERERS = {
       paperVars={vm.paperVars}
       hallName={vm.hallName}
       fontScale={vm.fontScale}
+      coverSlot={(volumeCount) => buildCoverSlot(vm, volumeCount)}
     />
   ),
 } satisfies Record<PaperGenealogyStyle, (vm: PaperGenealogyViewModel) => ReactElement>;
