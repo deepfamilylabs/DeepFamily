@@ -416,17 +416,21 @@
     "repeatedGeneration": "repeated",
     "cover": {
       "colophonYear": "{{year}}",
-      "volumeCount": "{{count}} Volumes",
-      "colophonHolder": "Published by {{hall}}"
+      "colophonImprint": "Printed",
+      "volumeCount": "{{count}} Volumes"
     },
     "settings": {
-      "title": "Display settings",
+      "title": "Paper book settings",
       "resetDefault": "Reset defaults",
-      "spineTitleLabel": "Spine title",
+      "paperInfoLabel": "Book information",
+      "paperAppearanceLabel": "Paper appearance",
+      "typesettingLabel": "Typesetting",
+      "spineTitleLabel": "Genealogy title",
       "spineTitleHint": "Leave blank to use the auto-generated title",
       "hallNameLabel": "Hall name",
       "hallNameHint": "Leave blank to use the default hall name",
-      "coverEnabledLabel": "Cover page",
+      "coverEnabledLabel": "Show front & back cover",
+      "coverSectionLabel": "Cover & binding",
       "coverStyleLabel": "Cover layout",
       "backCoverModeLabel": "Back cover",
       "coverSpineLabel": "Spine information",
@@ -440,14 +444,14 @@
         "archive": "Archive frame"
       },
       "backCoverModes": {
-        "matched": "Match style",
+        "matched": "Publication colophon",
         "blank": "Blank"
       },
       "colorThemeLabel": "Color theme",
       "fontLabel": "Font",
       "textureLabel": "Paper texture",
-      "borderStyleLabel": "Page frame",
-      "fontScaleLabel": "Font scale",
+      "borderStyleLabel": "Page border",
+      "fontScaleLabel": "Type scale",
       "fontScaleHint": "Scales the whole sheet in the preview only",
       "exportMarginLabel": "Page margin",
       "exportMarginHint": "Blank book edge around each leaf, shown in the preview and the exported PDF",

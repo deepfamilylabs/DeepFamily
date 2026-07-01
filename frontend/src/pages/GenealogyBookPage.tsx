@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BookOpen,
+  ChevronDown,
   FileDown,
   GitMerge,
   Loader2,
@@ -205,7 +206,7 @@ export default function GenealogyBookPage() {
   );
   const backCoverModeLabels = useMemo(
     (): Record<PaperBackCoverMode, string> => ({
-      matched: t("genealogyBook.settings.backCoverModes.matched", "Match style"),
+      matched: t("genealogyBook.settings.backCoverModes.matched", "Publication colophon"),
       blank: t("genealogyBook.settings.backCoverModes.blank", "Blank"),
     }),
     [t],
@@ -215,15 +216,25 @@ export default function GenealogyBookPage() {
   const defaultHallName = t("genealogyBook.ouHallName", "DeepFamily");
   const hallNameInputValue = appearance.hallName ?? defaultHallName;
   const fieldInputClassName =
-    "h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-orange-400 dark:focus:ring-orange-400/30";
+    "h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 hover:border-orange-300 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-orange-700 dark:focus:border-orange-400 dark:focus:ring-orange-400/30";
+  const checkboxClassName =
+    "h-4 w-4 shrink-0 rounded border-stone-300 bg-white text-orange-600 accent-orange-500 transition-colors hover:border-orange-400 focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:border-orange-600 dark:checked:border-orange-500 dark:checked:bg-orange-500 dark:focus:ring-orange-400/30";
   const segmentGroupClassName =
     "inline-flex w-full items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900";
   const segmentButtonClassName = (selected: boolean) =>
-    `h-7 flex-1 rounded px-1 text-xs font-medium transition-colors ${
+    `h-7 flex-1 rounded px-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
       selected
-        ? "bg-white text-red-700 shadow-sm ring-1 ring-black/5 dark:bg-slate-700 dark:text-orange-200 dark:ring-white/10"
-        : "text-stone-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800"
+        ? "bg-white text-orange-700 shadow-sm ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
+        : "text-stone-600 hover:bg-white/70 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-orange-200"
     }`;
+  const optionCardStateClassName = (selected: boolean) =>
+    selected
+      ? "border-orange-400 bg-orange-50/70 text-orange-800 ring-1 ring-orange-500/20 dark:border-orange-600 dark:bg-orange-950/30 dark:text-orange-200 dark:ring-orange-400/20"
+      : "border-stone-200 bg-white text-stone-600 hover:border-orange-300 hover:bg-orange-50/50 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-orange-800 dark:hover:bg-orange-950/10 dark:hover:text-orange-200";
+  const rangeInputClassName =
+    "w-full cursor-pointer accent-orange-500 transition-opacity hover:accent-orange-600 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/30 dark:accent-orange-400 dark:hover:accent-orange-300";
+  const settingsSummaryClassName =
+    "flex cursor-pointer list-none items-center justify-between gap-2 rounded-md px-0.5 py-1.5 text-[13px] font-semibold leading-5 text-slate-800 transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 dark:text-slate-100 dark:hover:text-orange-200 [&::-webkit-details-marker]:hidden";
 
   // Mirror the view model's translate wrapper so the page derives the same auto spine title that
   // the renderers fall back to when the override is blank.
@@ -334,10 +345,10 @@ export default function GenealogyBookPage() {
                 key={item}
                 type="button"
                 onClick={() => setStyle(item)}
-                className={`h-7 rounded px-2.5 text-xs font-medium transition-colors md:px-3 ${
+                className={`h-7 rounded px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 md:px-3 ${
                   style === item
-                    ? "bg-white text-red-700 shadow-sm ring-1 ring-black/5 dark:bg-slate-700 dark:text-orange-200 dark:ring-white/10"
-                    : "text-stone-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-800"
+                    ? "bg-white text-orange-700 shadow-sm ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
+                    : "text-stone-600 hover:bg-white/70 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-orange-200"
                 }`}
                 aria-pressed={style === item}
                 title={styleLabels[item]}
@@ -352,20 +363,20 @@ export default function GenealogyBookPage() {
       <div className="flex min-h-0 flex-1">
         <aside
           className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-stone-200 bg-white p-4 dark:border-slate-800 dark:bg-black md:w-64"
-          aria-label={t("genealogyBook.settings.title", "Display settings")}
+          aria-label={t("genealogyBook.settings.title", "Paper book settings")}
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
               <SlidersHorizontal className="h-4 w-4 shrink-0 text-stone-500 dark:text-slate-400" />
               <span className="truncate">
-                {t("genealogyBook.settings.title", "Display settings")}
+                {t("genealogyBook.settings.title", "Paper book settings")}
               </span>
             </div>
             <button
               type="button"
               onClick={resetDisplaySettings}
               disabled={!hasCustomDisplaySettings}
-              className="shrink-0 text-xs font-medium text-stone-600 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:text-orange-200"
+              className="shrink-0 text-xs font-medium text-stone-600 transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:text-orange-200"
               title={t("genealogyBook.settings.resetDefault", "Reset defaults")}
               data-testid="paper-reset-display-settings"
             >
@@ -373,370 +384,457 @@ export default function GenealogyBookPage() {
             </button>
           </div>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {t("genealogyBook.settings.spineTitleLabel", "Spine title")}
-            </span>
-            <input
-              type="text"
-              value={spineTitleInputValue}
-              onChange={(event) => setSpineTitle(event.target.value)}
-              disabled={!hasRoot}
-              placeholder={autoSpineTitle}
-              aria-label={t("genealogyBook.settings.spineTitleLabel", "Spine title")}
-              className={fieldInputClassName}
-              data-testid="paper-spine-title-input"
-            />
-            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-              {t(
-                "genealogyBook.settings.spineTitleHint",
-                "Leave blank to use the auto-generated title",
-              )}
-            </span>
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {t("genealogyBook.settings.hallNameLabel", "Hall name")}
-            </span>
-            <input
-              type="text"
-              value={hallNameInputValue}
-              onChange={(event) => updateAppearance({ hallName: event.target.value })}
-              placeholder={defaultHallName}
-              aria-label={t("genealogyBook.settings.hallNameLabel", "Hall name")}
-              className={fieldInputClassName}
-              data-testid="paper-hall-name-input"
-            />
-            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-              {t("genealogyBook.settings.hallNameHint", "Leave blank to use the default hall name")}
-            </span>
-          </label>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="flex cursor-pointer items-center justify-between gap-2">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {t("genealogyBook.settings.coverEnabledLabel", "Cover page")}
-              </span>
-              <input
-                type="checkbox"
-                checked={appearance.coverEnabled}
-                onChange={(event) => updateAppearance({ coverEnabled: event.target.checked })}
-                aria-label={t("genealogyBook.settings.coverEnabledLabel", "Cover page")}
-                className="h-4 w-4 shrink-0 accent-orange-500"
-                data-testid="paper-cover-enabled-input"
+          <details open className="group/settings" data-testid="paper-info-settings">
+            <summary className={settingsSummaryClassName} data-testid="paper-info-settings-summary">
+              <span>{t("genealogyBook.settings.paperInfoLabel", "Book information")}</span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-stone-400 transition-transform group-open/settings:rotate-180 group-open/settings:text-orange-500 dark:text-slate-500"
+                aria-hidden="true"
               />
-            </label>
-            <fieldset
-              className="mt-1 flex flex-col gap-1.5 disabled:opacity-50"
-              disabled={!appearance.coverEnabled}
-            >
-              <legend className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                {t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
-              </legend>
-              <div
-                className="grid grid-cols-2 gap-2"
-                role="group"
-                aria-label={t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
-              >
-                {PAPER_COVER_STYLE_IDS.map((id) => {
-                  const selected = appearance.coverStyleId === id;
-                  const previewMarkClass = {
-                    "traditional-slip": "right-1.5 top-1.5 h-7 w-2.5 border",
-                    "centered-classic": "left-1/2 top-1.5 h-7 w-1.5 -translate-x-1/2",
-                    "minimal-thread": "right-2 top-2 h-6 w-1.5 border",
-                    "archive-frame": "left-1/2 top-1.5 h-7 w-5 -translate-x-1/2 border-2",
-                  }[id];
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => updateAppearance({ coverStyleId: id })}
-                      className={`flex min-h-16 items-center gap-2 rounded-md border p-2 text-left text-[11px] font-medium transition-colors ${
-                        selected
-                          ? "border-red-300 bg-red-50 text-red-800 ring-1 ring-red-200 dark:border-orange-700 dark:bg-orange-950/30 dark:text-orange-200 dark:ring-orange-900"
-                          : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                      }`}
-                      aria-pressed={selected}
-                      data-testid={`paper-cover-style-${id}`}
-                    >
-                      <span className="relative h-10 w-7 shrink-0 border border-current opacity-70">
-                        <span className={`absolute bg-current ${previewMarkClass}`} />
-                      </span>
-                      <span>{coverStyleLabels[id]}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
+            </summary>
+            <div className="mt-3 flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.spineTitleLabel", "Genealogy title")}
+                </span>
+                <input
+                  type="text"
+                  value={spineTitleInputValue}
+                  onChange={(event) => setSpineTitle(event.target.value)}
+                  disabled={!hasRoot}
+                  placeholder={autoSpineTitle}
+                  aria-label={t("genealogyBook.settings.spineTitleLabel", "Genealogy title")}
+                  className={fieldInputClassName}
+                  data-testid="paper-spine-title-input"
+                />
+                <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                  {t(
+                    "genealogyBook.settings.spineTitleHint",
+                    "Leave blank to use the auto-generated title",
+                  )}
+                </span>
+              </label>
 
-            <div className="mt-1 flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {t("genealogyBook.settings.backCoverModeLabel", "Back cover")}
-              </span>
-              <div className={segmentGroupClassName} role="group">
-                {PAPER_BACK_COVER_MODES.map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={!appearance.coverEnabled}
-                    onClick={() => updateAppearance({ backCoverMode: mode })}
-                    className={segmentButtonClassName(appearance.backCoverMode === mode)}
-                    aria-pressed={appearance.backCoverMode === mode}
-                    data-testid={`paper-back-cover-mode-${mode}`}
-                  >
-                    {backCoverModeLabels[mode]}
-                  </button>
-                ))}
-              </div>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.hallNameLabel", "Hall name")}
+                </span>
+                <input
+                  type="text"
+                  value={hallNameInputValue}
+                  onChange={(event) => updateAppearance({ hallName: event.target.value })}
+                  placeholder={defaultHallName}
+                  aria-label={t("genealogyBook.settings.hallNameLabel", "Hall name")}
+                  className={fieldInputClassName}
+                  data-testid="paper-hall-name-input"
+                />
+                <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                  {t(
+                    "genealogyBook.settings.hallNameHint",
+                    "Leave blank to use the default hall name",
+                  )}
+                </span>
+              </label>
             </div>
+          </details>
 
-            <label className="mt-1 flex cursor-pointer items-center justify-between gap-2">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {t("genealogyBook.settings.coverSpineLabel", "Spine information")}
-              </span>
-              <input
-                type="checkbox"
-                checked={appearance.showCoverSpine}
+          <details
+            className="group/settings border-t border-stone-200 pt-4 dark:border-slate-800"
+            data-testid="paper-cover-settings"
+          >
+            <summary
+              className={settingsSummaryClassName}
+              data-testid="paper-cover-settings-summary"
+            >
+              <span>{t("genealogyBook.settings.coverSectionLabel", "Cover & binding")}</span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-stone-400 transition-transform group-open/settings:rotate-180 group-open/settings:text-orange-500 dark:text-slate-500"
+                aria-hidden="true"
+              />
+            </summary>
+            <div className="mt-2 flex flex-col gap-2">
+              <label className="flex cursor-pointer items-center justify-between gap-2">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.coverEnabledLabel", "Show front & back cover")}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={appearance.coverEnabled}
+                  onChange={(event) => updateAppearance({ coverEnabled: event.target.checked })}
+                  aria-label={t(
+                    "genealogyBook.settings.coverEnabledLabel",
+                    "Show front & back cover",
+                  )}
+                  className={checkboxClassName}
+                  data-testid="paper-cover-enabled-input"
+                />
+              </label>
+              {/* Every cover/back-cover control lives inside one disabled fieldset so the whole
+                  group dims and locks together when the cover page is turned off. */}
+              <fieldset
+                className="mt-1 flex flex-col gap-3 disabled:opacity-50"
                 disabled={!appearance.coverEnabled}
-                onChange={(event) => updateAppearance({ showCoverSpine: event.target.checked })}
-                className="h-4 w-4 shrink-0 accent-orange-500"
-                data-testid="paper-cover-spine-input"
+                aria-label={t("genealogyBook.settings.coverSectionLabel", "Cover & binding")}
+              >
+                <label className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {t("genealogyBook.settings.coverSpineLabel", "Spine information")}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={appearance.showCoverSpine}
+                    onChange={(event) => updateAppearance({ showCoverSpine: event.target.checked })}
+                    className={checkboxClassName}
+                    data-testid="paper-cover-spine-input"
+                  />
+                </label>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
+                  </span>
+                  <div
+                    className="grid grid-cols-2 gap-2"
+                    role="group"
+                    aria-label={t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
+                  >
+                    {PAPER_COVER_STYLE_IDS.map((id) => {
+                      const selected = appearance.coverStyleId === id;
+                      const previewMarkClass = {
+                        "traditional-slip": "right-1.5 top-1.5 h-7 w-2.5 border",
+                        "centered-classic": "left-1/2 top-1.5 h-7 w-1.5 -translate-x-1/2",
+                        "minimal-thread": "right-2 top-2 h-6 w-1.5 border",
+                        "archive-frame": "left-1/2 top-1.5 h-7 w-5 -translate-x-1/2 border-2",
+                      }[id];
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => updateAppearance({ coverStyleId: id })}
+                          className={`flex min-h-16 items-center gap-2 rounded-md border p-2 text-left text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                          aria-pressed={selected}
+                          data-testid={`paper-cover-style-${id}`}
+                        >
+                          <span className="relative h-10 w-7 shrink-0 border border-current opacity-70">
+                            <span className={`absolute bg-current ${previewMarkClass}`} />
+                          </span>
+                          <span>{coverStyleLabels[id]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="paper-cover-inscription-input"
+                    className="text-xs font-medium text-slate-600 dark:text-slate-300"
+                  >
+                    {t("genealogyBook.settings.coverInscriptionLabel", "Cover inscription")}
+                  </label>
+                  <input
+                    id="paper-cover-inscription-input"
+                    type="text"
+                    value={appearance.coverInscription ?? ""}
+                    onChange={(event) => updateAppearance({ coverInscription: event.target.value })}
+                    placeholder={t(
+                      "genealogyBook.settings.coverInscriptionPlaceholder",
+                      "Inscription",
+                    )}
+                    className={fieldInputClassName}
+                    data-testid="paper-cover-inscription-input"
+                  />
+                  <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                    {t(
+                      "genealogyBook.settings.coverInscriptionHint",
+                      "Optional inscription shown on the cover under the title",
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {t("genealogyBook.settings.backCoverModeLabel", "Back cover")}
+                  </span>
+                  <div className={segmentGroupClassName} role="group">
+                    {PAPER_BACK_COVER_MODES.map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => updateAppearance({ backCoverMode: mode })}
+                        className={segmentButtonClassName(appearance.backCoverMode === mode)}
+                        aria-pressed={appearance.backCoverMode === mode}
+                        data-testid={`paper-back-cover-mode-${mode}`}
+                      >
+                        {backCoverModeLabels[mode]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </fieldset>
+            </div>
+          </details>
+
+          <details
+            open
+            className="group/settings border-t border-stone-200 pt-4 dark:border-slate-800"
+            data-testid="paper-appearance-settings"
+          >
+            <summary
+              className={settingsSummaryClassName}
+              data-testid="paper-appearance-settings-summary"
+            >
+              <span>{t("genealogyBook.settings.paperAppearanceLabel", "Paper appearance")}</span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-stone-400 transition-transform group-open/settings:rotate-180 group-open/settings:text-orange-500 dark:text-slate-500"
+                aria-hidden="true"
               />
-            </label>
+            </summary>
+            <div className="mt-3 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.colorThemeLabel", "Color theme")}
+                </span>
+                <div
+                  className="grid grid-cols-2 gap-2"
+                  role="group"
+                  aria-label={t("genealogyBook.settings.colorThemeLabel", "Color theme")}
+                >
+                  {PAPER_COLOR_THEME_IDS.map((id) => {
+                    const [sheet, line, accent] = getPaperColorThemeSwatch(id);
+                    const selected = appearance.colorThemeId === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => updateAppearance({ colorThemeId: id })}
+                        aria-pressed={selected}
+                        title={colorThemeLabels[id]}
+                        className={`group/option flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                        data-testid={`paper-color-theme-${id}`}
+                      >
+                        <span
+                          className="flex h-5 w-5 shrink-0 overflow-hidden rounded-sm border border-black/10"
+                          aria-hidden="true"
+                        >
+                          <span className="h-full w-1/3" style={{ backgroundColor: sheet }} />
+                          <span className="h-full w-1/3" style={{ backgroundColor: line }} />
+                          <span className="h-full w-1/3" style={{ backgroundColor: accent }} />
+                        </span>
+                        <span
+                          className={`min-w-0 truncate text-xs transition-colors ${
+                            selected
+                              ? "text-orange-800 dark:text-orange-200"
+                              : "text-slate-700 group-hover/option:text-orange-700 dark:text-slate-200 dark:group-hover/option:text-orange-200"
+                          }`}
+                        >
+                          {colorThemeLabels[id]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            <input
-              type="text"
-              value={appearance.coverInscription ?? ""}
-              onChange={(event) => updateAppearance({ coverInscription: event.target.value })}
-              disabled={!appearance.coverEnabled}
-              placeholder={t("genealogyBook.settings.coverInscriptionPlaceholder", "Inscription")}
-              aria-label={t("genealogyBook.settings.coverInscriptionLabel", "Cover inscription")}
-              className={fieldInputClassName}
-              data-testid="paper-cover-inscription-input"
-            />
-            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-              {t(
-                "genealogyBook.settings.coverInscriptionHint",
-                "Optional inscription shown on the cover under the title",
-              )}
-            </span>
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.textureLabel", "Paper texture")}
+                </span>
+                <div
+                  className={segmentGroupClassName}
+                  role="group"
+                  aria-label={t("genealogyBook.settings.textureLabel", "Paper texture")}
+                >
+                  {PAPER_TEXTURE_IDS.map((id) => {
+                    const selected = appearance.textureId === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => updateAppearance({ textureId: id })}
+                        aria-pressed={selected}
+                        title={textureLabels[id]}
+                        className={segmentButtonClassName(selected)}
+                        data-testid={`paper-texture-${id}`}
+                      >
+                        {textureLabels[id]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {t("genealogyBook.settings.colorThemeLabel", "Color theme")}
-            </span>
-            <div
-              className="grid grid-cols-2 gap-2"
-              role="group"
-              aria-label={t("genealogyBook.settings.colorThemeLabel", "Color theme")}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.borderStyleLabel", "Page border")}
+                </span>
+                <div
+                  className="grid grid-cols-2 gap-2"
+                  role="group"
+                  aria-label={t("genealogyBook.settings.borderStyleLabel", "Page border")}
+                >
+                  {PAPER_BORDER_STYLE_IDS.map((id) => {
+                    const vars = getPaperBorderStyleVars(id);
+                    const selected = appearance.borderStyleId === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => updateAppearance({ borderStyleId: id })}
+                        aria-pressed={selected}
+                        title={borderStyleLabels[id]}
+                        className={`group/option flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                        data-testid={`paper-border-style-${id}`}
+                      >
+                        <span
+                          className={`relative block h-5 w-6 shrink-0 transition-colors ${
+                            selected
+                              ? "text-orange-700 dark:text-orange-200"
+                              : "text-stone-500 group-hover/option:text-orange-700 dark:text-slate-300 dark:group-hover/option:text-orange-200"
+                          }`}
+                          style={{
+                            borderStyle: "solid",
+                            borderColor: "currentColor",
+                            borderWidth: vars["--df-paper-frame-outer"],
+                          }}
+                          aria-hidden="true"
+                        >
+                          <span
+                            className="absolute"
+                            style={{
+                              top: vars["--df-paper-frame-pad-tb"],
+                              bottom: vars["--df-paper-frame-pad-tb"],
+                              left: vars["--df-paper-frame-pad-lr"],
+                              right: vars["--df-paper-frame-pad-lr"],
+                              borderStyle: "solid",
+                              borderColor: "currentColor",
+                              borderTopWidth: vars["--df-paper-frame-inner-tb"],
+                              borderBottomWidth: vars["--df-paper-frame-inner-tb"],
+                              borderLeftWidth: vars["--df-paper-frame-inner-lr"],
+                              borderRightWidth: vars["--df-paper-frame-inner-lr"],
+                            }}
+                          />
+                        </span>
+                        <span
+                          className={`min-w-0 truncate text-xs transition-colors ${
+                            selected
+                              ? "text-orange-800 dark:text-orange-200"
+                              : "text-slate-700 group-hover/option:text-orange-700 dark:text-slate-200 dark:group-hover/option:text-orange-200"
+                          }`}
+                        >
+                          {borderStyleLabels[id]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details
+            open
+            className="group/settings border-t border-stone-200 pt-4 dark:border-slate-800"
+            data-testid="paper-typesetting-settings"
+          >
+            <summary
+              className={settingsSummaryClassName}
+              data-testid="paper-typesetting-settings-summary"
             >
-              {PAPER_COLOR_THEME_IDS.map((id) => {
-                const [sheet, line, accent] = getPaperColorThemeSwatch(id);
-                const selected = appearance.colorThemeId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => updateAppearance({ colorThemeId: id })}
-                    aria-pressed={selected}
-                    title={colorThemeLabels[id]}
-                    className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
-                      selected
-                        ? "border-orange-500 ring-1 ring-orange-500/30 dark:border-orange-400"
-                        : "border-stone-200 hover:border-stone-300 dark:border-slate-700 dark:hover:border-slate-600"
-                    }`}
-                    data-testid={`paper-color-theme-${id}`}
-                  >
-                    <span
-                      className="flex h-5 w-5 shrink-0 overflow-hidden rounded-sm border border-black/10"
-                      aria-hidden="true"
-                    >
-                      <span className="h-full w-1/3" style={{ backgroundColor: sheet }} />
-                      <span className="h-full w-1/3" style={{ backgroundColor: line }} />
-                      <span className="h-full w-1/3" style={{ backgroundColor: accent }} />
-                    </span>
-                    <span className="min-w-0 truncate text-xs text-slate-700 dark:text-slate-200">
-                      {colorThemeLabels[id]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+              <span>{t("genealogyBook.settings.typesettingLabel", "Typesetting")}</span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-stone-400 transition-transform group-open/settings:rotate-180 group-open/settings:text-orange-500 dark:text-slate-500"
+                aria-hidden="true"
+              />
+            </summary>
+            <div className="mt-3 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {t("genealogyBook.settings.fontLabel", "Font")}
+                </span>
+                <div
+                  className={segmentGroupClassName}
+                  role="group"
+                  aria-label={t("genealogyBook.settings.fontLabel", "Font")}
+                >
+                  {PAPER_FONT_PRESET_IDS.map((id) => {
+                    const selected = appearance.fontPresetId === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => updateAppearance({ fontPresetId: id })}
+                        aria-pressed={selected}
+                        title={fontPresetLabels[id]}
+                        className={segmentButtonClassName(selected)}
+                        data-testid={`paper-font-preset-${id}`}
+                      >
+                        {fontPresetLabels[id]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {t("genealogyBook.settings.fontLabel", "Font")}
-            </span>
-            <div
-              className={segmentGroupClassName}
-              role="group"
-              aria-label={t("genealogyBook.settings.fontLabel", "Font")}
-            >
-              {PAPER_FONT_PRESET_IDS.map((id) => {
-                const selected = appearance.fontPresetId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => updateAppearance({ fontPresetId: id })}
-                    aria-pressed={selected}
-                    title={fontPresetLabels[id]}
-                    className={segmentButtonClassName(selected)}
-                    data-testid={`paper-font-preset-${id}`}
-                  >
-                    {fontPresetLabels[id]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {t("genealogyBook.settings.fontScaleLabel", "Type scale")}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-stone-500 dark:text-slate-400">
+                    {Math.round(appearance.fontScale * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={PAPER_FONT_SCALE_MIN}
+                  max={PAPER_FONT_SCALE_MAX}
+                  step={PAPER_FONT_SCALE_STEP}
+                  value={appearance.fontScale}
+                  onChange={(event) => updateAppearance({ fontScale: Number(event.target.value) })}
+                  aria-label={t("genealogyBook.settings.fontScaleLabel", "Type scale")}
+                  className={rangeInputClassName}
+                  data-testid="paper-font-scale-input"
+                />
+                <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                  {t(
+                    "genealogyBook.settings.fontScaleHint",
+                    "Scales the whole sheet in the preview only",
+                  )}
+                </span>
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {t("genealogyBook.settings.textureLabel", "Paper texture")}
-            </span>
-            <div
-              className={segmentGroupClassName}
-              role="group"
-              aria-label={t("genealogyBook.settings.textureLabel", "Paper texture")}
-            >
-              {PAPER_TEXTURE_IDS.map((id) => {
-                const selected = appearance.textureId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => updateAppearance({ textureId: id })}
-                    aria-pressed={selected}
-                    title={textureLabels[id]}
-                    className={segmentButtonClassName(selected)}
-                    data-testid={`paper-texture-${id}`}
-                  >
-                    {textureLabels[id]}
-                  </button>
-                );
-              })}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {t("genealogyBook.settings.exportMarginLabel", "Page margin")}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-stone-500 dark:text-slate-400">
+                    {appearance.exportMarginPx}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={PAPER_EXPORT_MARGIN_MIN}
+                  max={PAPER_EXPORT_MARGIN_MAX}
+                  step={PAPER_EXPORT_MARGIN_STEP}
+                  value={appearance.exportMarginPx}
+                  onChange={(event) =>
+                    updateAppearance({ exportMarginPx: Number(event.target.value) })
+                  }
+                  aria-label={t("genealogyBook.settings.exportMarginLabel", "PDF margin")}
+                  className={rangeInputClassName}
+                  data-testid="paper-export-margin-input"
+                />
+                <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                  {t(
+                    "genealogyBook.settings.exportMarginHint",
+                    "Blank book edge around each leaf, shown in the preview and the exported PDF",
+                  )}
+                </span>
+              </div>
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              {t("genealogyBook.settings.borderStyleLabel", "Page frame")}
-            </span>
-            <div
-              className="grid grid-cols-2 gap-2"
-              role="group"
-              aria-label={t("genealogyBook.settings.borderStyleLabel", "Page frame")}
-            >
-              {PAPER_BORDER_STYLE_IDS.map((id) => {
-                const vars = getPaperBorderStyleVars(id);
-                const selected = appearance.borderStyleId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => updateAppearance({ borderStyleId: id })}
-                    aria-pressed={selected}
-                    title={borderStyleLabels[id]}
-                    className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
-                      selected
-                        ? "border-orange-500 ring-1 ring-orange-500/30 dark:border-orange-400"
-                        : "border-stone-200 hover:border-stone-300 dark:border-slate-700 dark:hover:border-slate-600"
-                    }`}
-                    data-testid={`paper-border-style-${id}`}
-                  >
-                    <span
-                      className="relative block h-5 w-6 shrink-0 text-stone-500 dark:text-slate-300"
-                      style={{
-                        borderStyle: "solid",
-                        borderColor: "currentColor",
-                        borderWidth: vars["--df-paper-frame-outer"],
-                      }}
-                      aria-hidden="true"
-                    >
-                      <span
-                        className="absolute"
-                        style={{
-                          top: vars["--df-paper-frame-pad-tb"],
-                          bottom: vars["--df-paper-frame-pad-tb"],
-                          left: vars["--df-paper-frame-pad-lr"],
-                          right: vars["--df-paper-frame-pad-lr"],
-                          borderStyle: "solid",
-                          borderColor: "currentColor",
-                          borderTopWidth: vars["--df-paper-frame-inner-tb"],
-                          borderBottomWidth: vars["--df-paper-frame-inner-tb"],
-                          borderLeftWidth: vars["--df-paper-frame-inner-lr"],
-                          borderRightWidth: vars["--df-paper-frame-inner-lr"],
-                        }}
-                      />
-                    </span>
-                    <span className="min-w-0 truncate text-xs text-slate-700 dark:text-slate-200">
-                      {borderStyleLabels[id]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {t("genealogyBook.settings.fontScaleLabel", "Font scale")}
-              </span>
-              <span className="text-[11px] tabular-nums text-stone-500 dark:text-slate-400">
-                {Math.round(appearance.fontScale * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min={PAPER_FONT_SCALE_MIN}
-              max={PAPER_FONT_SCALE_MAX}
-              step={PAPER_FONT_SCALE_STEP}
-              value={appearance.fontScale}
-              onChange={(event) => updateAppearance({ fontScale: Number(event.target.value) })}
-              aria-label={t("genealogyBook.settings.fontScaleLabel", "Font scale")}
-              className="w-full accent-orange-500"
-              data-testid="paper-font-scale-input"
-            />
-            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-              {t(
-                "genealogyBook.settings.fontScaleHint",
-                "Scales the whole sheet in the preview only",
-              )}
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                {t("genealogyBook.settings.exportMarginLabel", "Page margin")}
-              </span>
-              <span className="text-[11px] tabular-nums text-stone-500 dark:text-slate-400">
-                {appearance.exportMarginPx}px
-              </span>
-            </div>
-            <input
-              type="range"
-              min={PAPER_EXPORT_MARGIN_MIN}
-              max={PAPER_EXPORT_MARGIN_MAX}
-              step={PAPER_EXPORT_MARGIN_STEP}
-              value={appearance.exportMarginPx}
-              onChange={(event) => updateAppearance({ exportMarginPx: Number(event.target.value) })}
-              aria-label={t("genealogyBook.settings.exportMarginLabel", "PDF margin")}
-              className="w-full accent-orange-500"
-              data-testid="paper-export-margin-input"
-            />
-            <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-              {t(
-                "genealogyBook.settings.exportMarginHint",
-                "Blank book edge around each leaf, shown in the preview and the exported PDF",
-              )}
-            </span>
-          </div>
+          </details>
         </aside>
 
         <div ref={exportRef} className="min-h-0 min-w-0 flex-1 overflow-hidden">

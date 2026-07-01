@@ -301,6 +301,47 @@ describe("GenealogyBookPage", () => {
   it("applies the default appearance and forwards it to the view", () => {
     render(<GenealogyBookPage />);
 
+    expect(screen.getByText("Paper book settings")).toBeTruthy();
+    expect(screen.getByText("Book information")).toBeTruthy();
+    expect(screen.getByText("Cover & binding")).toBeTruthy();
+    expect(screen.getByText("Paper appearance")).toBeTruthy();
+    expect(screen.getByText("Typesetting")).toBeTruthy();
+    expect(screen.getByLabelText("Show front & back cover")).toBeTruthy();
+
+    for (const section of ["info", "appearance", "typesetting"]) {
+      const settings = screen.getByTestId(`paper-${section}-settings`);
+      const summary = screen.getByTestId(`paper-${section}-settings-summary`);
+      expect(settings.classList.contains("group/settings")).toBe(true);
+      expect(settings.classList.contains("group")).toBe(false);
+      expect(summary.className).toContain("text-[13px]");
+      expect(summary.className).toContain("text-slate-800");
+      expect(summary.className).toContain("py-1.5");
+      expect(settings.hasAttribute("open")).toBe(true);
+      fireEvent.click(summary);
+      expect(settings.hasAttribute("open")).toBe(false);
+      fireEvent.click(summary);
+      expect(settings.hasAttribute("open")).toBe(true);
+    }
+
+    const coverSettings = screen.getByTestId("paper-cover-settings");
+    expect(coverSettings.hasAttribute("open")).toBe(false);
+    fireEvent.click(screen.getByTestId("paper-cover-settings-summary"));
+    expect(coverSettings.hasAttribute("open")).toBe(true);
+    const coverFieldset = coverSettings.querySelector("fieldset");
+    expect(
+      coverFieldset?.firstElementChild?.contains(screen.getByTestId("paper-cover-spine-input")),
+    ).toBe(true);
+    const coverStyleButton = screen.getByTestId("paper-cover-style-traditional-slip");
+    const coverInscriptionInput = screen.getByTestId("paper-cover-inscription-input");
+    const backCoverButton = screen.getByTestId("paper-back-cover-mode-blank");
+    expect(
+      coverStyleButton.compareDocumentPosition(coverInscriptionInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      coverInscriptionInput.compareDocumentPosition(backCoverButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
     expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
       "true",
@@ -311,6 +352,33 @@ describe("GenealogyBookPage", () => {
     ).toBe("true");
     expect(screen.getByTestId("paper-back-cover-mode-matched").getAttribute("aria-pressed")).toBe(
       "true",
+    );
+    expect(screen.getByTestId("paper-cover-style-traditional-slip").className).toContain(
+      "border-orange-400",
+    );
+    expect(screen.getByTestId("paper-cover-style-traditional-slip").className).not.toContain(
+      "border-red",
+    );
+    expect(screen.getByTestId("paper-back-cover-mode-matched").className).toContain(
+      "text-orange-700",
+    );
+    expect(screen.getByTestId("paper-cover-enabled-input").className).toContain("text-orange-600");
+    expect(screen.getByTestId("paper-cover-spine-input").className).toContain("text-orange-600");
+    expect(screen.getByTestId("paper-color-theme-plain").className).toContain(
+      "hover:border-orange-300",
+    );
+    expect(screen.getByTestId("paper-color-theme-plain").classList.contains("group/option")).toBe(
+      true,
+    );
+    expect(screen.getByTestId("paper-color-theme-plain").classList.contains("group")).toBe(false);
+    expect(screen.getByTestId("paper-border-style-single").className).toContain(
+      "hover:border-orange-300",
+    );
+    expect(screen.getByTestId("paper-font-preset-song").className).toContain(
+      "hover:text-orange-700",
+    );
+    expect(screen.getByTestId("paper-font-scale-input").className).toContain(
+      "hover:accent-orange-600",
     );
 
     const view = screen.getByTestId("paper-view");

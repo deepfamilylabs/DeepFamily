@@ -590,21 +590,29 @@ describe("PaperGenealogyView", () => {
     expect(coverSpine).toContain("Genealogy");
     expect(coverSpine).toContain("DeepFamily");
     expect(coverSpine).not.toContain(toChineseDigitString(new Date().getFullYear()));
+    // The English fallback is nine characters, so it uses the medium adaptive spine size.
+    expect(screen.getByTestId("paper-cover-spine-title").style.fontSize).toBe("28px");
+    expect(screen.getByTestId("paper-cover-spine-hall").style.fontSize).toBe("15px");
 
     // Back cover stays beside the front cover for printable imposition and carries only a concise
-    // publication plaque; the body-text end mark does not belong on the outer cover.
+    // publication colophon; a clan hall must not be misrepresented as the printer or editor.
     expect(screen.queryByTestId("paper-back-cover-end")).toBeNull();
-    const colophon = screen.getByTestId("paper-back-cover-colophon").textContent || "";
-    expect(colophon).toContain("DeepFamily");
-    expect(colophon).toContain("Revised by");
+    const colophonElement = screen.getByTestId("paper-back-cover-colophon");
+    const colophon = colophonElement.textContent || "";
+    expect(colophon).not.toContain("DeepFamily");
+    expect(colophon).not.toContain("Published by");
     expect(colophon).not.toContain("Volumes");
+    expect(colophon).toContain("Printed");
     expect(colophon).toContain(String(new Date().getFullYear()));
+    expect(colophonElement.children).toHaveLength(2);
+    expect(colophonElement.className).toContain("bottom-36");
+    expect(colophonElement.className).toContain("min-w-[104px]");
   });
 
-  it("renders paired cover layouts, blank backs and an optional blank spine", () => {
+  it("renders paired cover layouts with matching back covers and honors blank overrides", () => {
     const cases = [
       ["centered-classic", "paper-cover-layout-centered-classic", true],
-      ["minimal-thread", "paper-cover-layout-minimal-thread", false],
+      ["minimal-thread", "paper-cover-layout-minimal-thread", true],
       ["archive-frame", "paper-cover-layout-archive-frame", true],
     ] as const;
 
