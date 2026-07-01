@@ -419,7 +419,7 @@ export interface PaperAppearance {
   coverInscription: string | null;
   // Paired front/back structural preset; colors remain controlled by the active color theme.
   coverStyleId: PaperCoverStyleId;
-  // Follow the selected style's matching back cover or suppress all back-cover content.
+  // Show a restrained publication colophon or keep the traditional outer back cover blank.
   backCoverMode: PaperBackCoverMode;
   // Whether the printable cover band carries title/hall information.
   showCoverSpine: boolean;

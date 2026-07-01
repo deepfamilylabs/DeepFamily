@@ -416,17 +416,21 @@
     "repeatedGeneration": "重列",
     "cover": {
       "colophonYear": "公元{{hanYear}}年",
-      "volumeCount": "全{{han}}卷",
-      "colophonHolder": "{{hall}}编印"
+      "colophonImprint": "编印",
+      "volumeCount": "全{{han}}卷"
     },
     "settings": {
-      "title": "显示设置",
+      "title": "纸谱设置",
       "resetDefault": "恢复默认",
-      "spineTitleLabel": "书脊标题",
+      "paperInfoLabel": "谱书信息",
+      "paperAppearanceLabel": "纸张外观",
+      "typesettingLabel": "排版设置",
+      "spineTitleLabel": "谱名",
       "spineTitleHint": "留空则使用自动生成的标题",
       "hallNameLabel": "堂号",
       "hallNameHint": "留空则使用默认堂号",
-      "coverEnabledLabel": "封面",
+      "coverEnabledLabel": "显示封面与封底",
+      "coverSectionLabel": "封面与装帧",
       "coverStyleLabel": "封面版式",
       "backCoverModeLabel": "封底内容",
       "coverSpineLabel": "显示书脊信息",
@@ -440,14 +444,14 @@
         "archive": "典藏框装"
       },
       "backCoverModes": {
-        "matched": "跟随版式",
+        "matched": "编印刊记",
         "blank": "留白"
       },
       "colorThemeLabel": "配色主题",
       "fontLabel": "字体",
       "textureLabel": "纸张纹理",
-      "borderStyleLabel": "版框",
-      "fontScaleLabel": "字体倍数",
+      "borderStyleLabel": "谱页边框",
+      "fontScaleLabel": "字号比例",
       "fontScaleHint": "仅缩放屏幕预览，不影响 PDF 打印尺寸",
       "exportMarginLabel": "页边距",
       "exportMarginHint": "每页四周的书边留白，预览与导出 PDF 同步显示",

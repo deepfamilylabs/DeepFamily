@@ -22,6 +22,13 @@ const COVER_SLIP_BG = "var(--df-paper-cover-slip-bg, var(--df-paper-panel))";
 const COVER_SLIP_BORDER = "var(--df-paper-cover-slip-border, var(--df-paper-line))";
 const COVER_SLIP_INK = "var(--df-paper-cover-slip-ink, var(--df-paper-ink))";
 
+function getCoverSpineTitleSize(title: string): number {
+  const length = Array.from(title.trim()).length;
+  if (length <= 6) return 32;
+  if (length <= 10) return 28;
+  return 24;
+}
+
 // A single full-height cover/back sheet. Its contents choose their own traditional placement.
 function CoverPage({ children, testId }: { children: ReactNode; testId: string }) {
   return (
@@ -61,11 +68,12 @@ function CoverSpine({
           className="leading-none"
           style={{
             ...PAPER_TEXT.spineTitle,
-            fontSize: 26,
-            letterSpacing: "0.12em",
+            fontSize: getCoverSpineTitleSize(title),
+            letterSpacing: "0.08em",
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           }}
+          data-testid="paper-cover-spine-title"
         >
           {title}
         </span>
@@ -75,9 +83,12 @@ function CoverSpine({
           className="leading-none"
           style={{
             ...PAPER_TEXT.spineLabel,
+            fontSize: 15,
+            letterSpacing: "0.08em",
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           }}
+          data-testid="paper-cover-spine-hall"
         >
           {hallText}
         </span>
@@ -413,98 +424,50 @@ function ArchiveCover({
   );
 }
 
-// 牌记 — a compact ruled block for the back cover: the hall's 编印 line (main, larger) and the
-// compilation year read as vertical columns from right to left.
-function Colophon({
+// A restrained publication colophon for the back cover. Users can still explicitly choose a blank
+// outer back cover. The clan hall is deliberately omitted: it identifies
+// the genealogy, not a printer or editor, so appending 编印 would make a false attribution.
+function BackCoverColophon({
   yearText,
-  holderText,
-  testId,
+  imprintText,
+  coverStyleId,
 }: {
   yearText: string;
-  holderText: string;
-  testId: string;
+  imprintText: string;
+  coverStyleId: PaperCoverStyleId;
 }) {
+  const isMinimal = coverStyleId === PAPER_COVER_STYLE.MINIMAL;
+  const isCentered = coverStyleId === PAPER_COVER_STYLE.CENTERED;
+  const isArchive = coverStyleId === PAPER_COVER_STYLE.ARCHIVE;
+  const framed = !isMinimal && !isCentered;
+
   return (
     <div
-      className="flex min-h-[230px] min-w-[124px] flex-row-reverse items-center justify-center gap-6 border px-7 py-9"
-      style={{ borderColor: PAPER_LINE.strong }}
-      data-testid={testId}
+      className={`absolute bottom-36 flex flex-row-reverse items-center justify-center gap-4 px-5 py-7 ${
+        isArchive
+          ? "min-h-[184px] min-w-[120px] border-2"
+          : "min-h-[168px] min-w-[104px]"
+      } ${framed && !isArchive ? "border" : ""}`}
+      style={{
+        borderColor: framed ? COVER_SLIP_BORDER : undefined,
+        backgroundColor: isArchive ? COVER_SLIP_BG : undefined,
+        boxShadow: isArchive
+          ? `inset 0 0 0 4px ${COVER_SLIP_BG}, inset 0 0 0 5px ${COVER_SLIP_BORDER}`
+          : undefined,
+        opacity: isMinimal ? 0.82 : 1,
+      }}
+      data-cover-style={coverStyleId}
+      data-testid="paper-back-cover-colophon"
     >
-      {[yearText, holderText].map((text, index) => (
+      {[yearText, imprintText].map((text, index) => (
         <span
           key={text}
-          style={
-            {
-              ...(index === 1 ? PAPER_TEXT.spineHall : PAPER_TEXT.spineLabel),
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-            } as CSSProperties
-          }
-        >
-          {text}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function CenteredBackCover({ yearText, holderText }: { yearText: string; holderText: string }) {
-  return (
-    <div
-      className="flex flex-row-reverse items-center justify-center gap-9"
-      data-testid="paper-back-cover-colophon"
-    >
-      <span
-        style={{
-          ...PAPER_TEXT.spineHall,
-          fontSize: 26,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {holderText}
-      </span>
-      <span
-        style={{
-          ...PAPER_TEXT.spineLabel,
-          writingMode: "vertical-rl",
-          textOrientation: "mixed",
-        }}
-      >
-        {yearText}
-      </span>
-    </div>
-  );
-}
-
-function ArchiveBackCover({
-  title,
-  yearText,
-  holderText,
-  volumeText,
-}: {
-  title: string;
-  yearText: string;
-  holderText: string;
-  volumeText: string;
-}) {
-  return (
-    <div
-      className="flex min-h-[390px] min-w-[240px] flex-row-reverse items-center justify-center gap-8 border-2 px-10 py-12"
-      style={{
-        backgroundColor: COVER_SLIP_BG,
-        borderColor: COVER_SLIP_BORDER,
-        boxShadow: `inset 0 0 0 6px ${COVER_SLIP_BG}, inset 0 0 0 7px ${COVER_SLIP_BORDER}`,
-      }}
-      data-testid="paper-back-cover-colophon"
-    >
-      {[title, holderText, yearText, volumeText].map((text, index) => (
-        <span
-          key={`${index}-${text}`}
+          className="leading-none"
           style={{
-            ...(index === 0 ? PAPER_TEXT.spineTitle : PAPER_TEXT.spineLabel),
-            color: COVER_SLIP_INK,
-            fontSize: index === 0 ? 25 : undefined,
+            ...(index === 0 ? PAPER_TEXT.spineLabel : PAPER_TEXT.spineHall),
+            color: isArchive ? COVER_SLIP_INK : undefined,
+            fontSize: index === 0 ? (isCentered ? 15 : 12) : 17,
+            letterSpacing: "0.08em",
             writingMode: "vertical-rl",
             textOrientation: "mixed",
           }}
@@ -527,8 +490,8 @@ function resolveColophonYear(t: TranslateFn, year: number): string {
   });
 }
 
-function resolveColophonHolder(hallText: string, t: TranslateFn): string {
-  return t("genealogyBook.cover.colophonHolder", "Revised by {{hall}}", { hall: hallText });
+function resolveColophonImprint(t: TranslateFn): string {
+  return t("genealogyBook.cover.colophonImprint", "Printed");
 }
 
 function SpreadShell({ children, testId }: { children: ReactNode; testId: string }) {
@@ -582,6 +545,7 @@ export function PaperCover({
   const title = spineTitleOverride?.trim() || getPaperSpineTitle(generations, t);
   const hallText = resolveHallText(hallName, t);
   const colophonYear = resolveColophonYear(t, new Date().getFullYear());
+  const colophonImprint = resolveColophonImprint(t);
   const inscriptionText = inscription?.trim();
   const volumeText = t("genealogyBook.cover.volumeCount", "{{count}} Volumes", {
     count: volumeCount,
@@ -640,40 +604,16 @@ export function PaperCover({
 
   let backCoverContent: ReactNode = null;
   if (backCoverMode === PAPER_BACK_COVER_MODE.MATCHED) {
-    switch (coverStyleId) {
-      case PAPER_COVER_STYLE.CENTERED:
-        backCoverContent = (
-          <CenteredBackCover
-            yearText={colophonYear}
-            holderText={resolveColophonHolder(hallText, t)}
-          />
-        );
-        break;
-      case PAPER_COVER_STYLE.MINIMAL:
-        backCoverContent = null;
-        break;
-      case PAPER_COVER_STYLE.ARCHIVE:
-        backCoverContent = (
-          <ArchiveBackCover
-            title={title}
-            yearText={colophonYear}
-            holderText={resolveColophonHolder(hallText, t)}
-            volumeText={volumeText}
-          />
-        );
-        break;
-      default:
-        backCoverContent = (
-          <Colophon
-            yearText={colophonYear}
-            holderText={resolveColophonHolder(hallText, t)}
-            testId="paper-back-cover-colophon"
-          />
-        );
-    }
+    backCoverContent = (
+      <BackCoverColophon
+        yearText={colophonYear}
+        imprintText={colophonImprint}
+        coverStyleId={coverStyleId}
+      />
+    );
   }
-  // Keep the back cover in the printable cover spread with only the compact publication plaque;
-  // 谱终 is a body-text end mark and does not belong on the outer cover.
+  // Keep the back cover in the printable cover spread. The publication colophon is intentionally
+  // quieter than the front title slip. 谱终 belongs to body text.
   const backPage = (
     <CoverPage testId="paper-back-cover">{backCoverContent}</CoverPage>
   );
