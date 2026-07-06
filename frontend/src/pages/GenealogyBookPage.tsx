@@ -7,7 +7,6 @@ import {
   GitMerge,
   Loader2,
   RefreshCw,
-  ScrollText,
   SlidersHorizontal,
   Users,
 } from "lucide-react";
@@ -131,6 +130,86 @@ function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
   );
 }
 
+function CoverStyleThumbnail({ styleId }: { styleId: PaperCoverStyleId }) {
+  const verticalText = (
+    <span className="absolute left-1/2 top-1/2 h-7 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-current" />
+  );
+
+  return (
+    <span
+      className="relative block h-14 w-10 overflow-hidden rounded-[2px] border border-current/50 bg-[#f4eddd] shadow-sm dark:bg-slate-800"
+      aria-hidden="true"
+      data-testid={`paper-cover-style-thumbnail-${styleId}`}
+    >
+      {styleId === "traditional-slip" ? (
+        <span className="absolute bottom-1.5 right-1.5 top-1.5 w-3 border border-current/70 bg-white/55">
+          {verticalText}
+        </span>
+      ) : null}
+      {styleId === "centered-classic" ? (
+        <>
+          {verticalText}
+          <span className="absolute right-1.5 top-1.5 h-2.5 w-1.5 border border-current/60" />
+          <span className="absolute bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 bg-current/70" />
+        </>
+      ) : null}
+      {styleId === "minimal-thread" ? (
+        <>
+          <span className="absolute bottom-2 right-2 top-2 w-2.5 border border-current/60 bg-white/45">
+            {verticalText}
+          </span>
+          <span className="absolute bottom-0 left-1 top-0 border-l border-dashed border-current/60" />
+          <span className="absolute left-0.5 top-3 h-1 w-1 rounded-full bg-current/70" />
+          <span className="absolute bottom-3 left-0.5 h-1 w-1 rounded-full bg-current/70" />
+        </>
+      ) : null}
+      {styleId === "archive-frame" ? (
+        <span className="absolute inset-1.5 border-2 border-current/70 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.45)]">
+          {verticalText}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function SettingsSwitch({
+  checked,
+  onChange,
+  ariaLabel,
+  testId,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  ariaLabel: string;
+  testId: string;
+}) {
+  return (
+    <span className="relative inline-flex shrink-0">
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={ariaLabel}
+        className="peer sr-only"
+        data-testid={testId}
+      />
+      <span
+        aria-hidden="true"
+        className={`relative h-5 w-9 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-orange-500/40 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed ${
+          checked ? "bg-orange-500" : "bg-stone-300 dark:bg-slate-600"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-[18px]" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+    </span>
+  );
+}
+
 export default function GenealogyBookPage() {
   const { t } = useTranslation();
   const { style, setStyle } = usePersistedPaperStyle();
@@ -217,8 +296,6 @@ export default function GenealogyBookPage() {
   const hallNameInputValue = appearance.hallName ?? defaultHallName;
   const fieldInputClassName =
     "h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 hover:border-orange-300 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-orange-700 dark:focus:border-orange-400 dark:focus:ring-orange-400/30";
-  const checkboxClassName =
-    "h-4 w-4 shrink-0 rounded border-stone-300 bg-white text-orange-600 accent-orange-500 transition-colors hover:border-orange-400 focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:border-orange-600 dark:checked:border-orange-500 dark:checked:bg-orange-500 dark:focus:ring-orange-400/30";
   const segmentGroupClassName =
     "inline-flex w-full items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900";
   const segmentButtonClassName = (selected: boolean) =>
@@ -280,7 +357,7 @@ export default function GenealogyBookPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full flex-col overflow-hidden bg-stone-100 dark:bg-slate-950">
-      <div className="flex flex-col gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-black md:flex-row md:items-center md:justify-between md:px-6">
+      <div className="flex flex-col gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-black md:px-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-stone-50 text-stone-700 dark:border-slate-700 dark:bg-slate-900 dark:text-stone-200">
             <BookOpen className="h-5 w-5" />
@@ -295,67 +372,103 @@ export default function GenealogyBookPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="hidden items-center gap-2 text-xs font-medium md:flex">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-stone-700 dark:bg-slate-900 dark:text-slate-300">
-              <Users className="h-3.5 w-3.5" />
-              {t("familyTree.ui.nodesLabelFull", "Nodes")}: {progress?.created || 0}
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 xl:justify-end"
+          data-testid="paper-book-toolbar"
+        >
+          <div className="hidden items-center gap-2 md:flex" data-testid="paper-book-stats">
+            <span className="inline-flex items-baseline gap-1.5 rounded-md bg-stone-100 px-2.5 py-1 dark:bg-slate-800/60">
+              <Users
+                className="h-3.5 w-3.5 shrink-0 self-center text-stone-400 dark:text-slate-500"
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold leading-none tabular-nums text-slate-700 dark:text-slate-200">
+                {progress?.created || 0}
+              </span>
+              <span className="text-xs leading-none text-stone-500 dark:text-slate-400">
+                {t("genealogyBook.peopleUnit", "People")}
+              </span>
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-stone-700 dark:bg-slate-900 dark:text-slate-300">
-              <GitMerge className="h-3.5 w-3.5" />
-              {t("familyTree.ui.depthLabelFull", "Depth")}: {progress?.depth || 0}
+            <span className="inline-flex items-baseline gap-1.5 rounded-md bg-stone-100 px-2.5 py-1 dark:bg-slate-800/60">
+              <GitMerge
+                className="h-3.5 w-3.5 shrink-0 self-center text-stone-400 dark:text-slate-500"
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold leading-none tabular-nums text-slate-700 dark:text-slate-200">
+                {progress?.depth || 0}
+              </span>
+              <span className="text-xs leading-none text-stone-500 dark:text-slate-400">
+                {t("genealogyBook.generationsUnit", "Generations")}
+              </span>
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={loading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            title={t("familyTree.actions.refresh", "Refresh")}
+          <div
+            className="order-1 flex min-w-0 max-w-full basis-full items-center gap-2 md:basis-auto"
+            data-testid="paper-style-switcher"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{t("familyTree.actions.refresh", "Refresh")}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              exportPdf(exportRef.current, style, paperVars, appearance.exportMarginPx)
-            }
-            disabled={!hasRoot || loading || exporting}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            title={t("genealogyBook.exportPdf", "Export PDF")}
-          >
-            {exporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileDown className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden sm:inline">{t("genealogyBook.exportPdf", "Export PDF")}</span>
-          </button>
+            <span className="shrink-0 text-xs font-medium text-stone-500 dark:text-slate-400">
+              {t("genealogyBook.styleLabel", "Style")}
+            </span>
+            <div className="min-w-0 overflow-x-auto rounded-md">
+              <div
+                className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900"
+                role="group"
+                aria-label={t("genealogyBook.styleSwitchLabel", "Genealogy book style")}
+              >
+                {PAPER_GENEALOGY_STYLES.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setStyle(item)}
+                    className={`h-7 shrink-0 rounded px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
+                      style === item
+                        ? "bg-white text-orange-700 shadow-sm ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
+                        : "text-stone-600 hover:bg-white/70 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-orange-200"
+                    }`}
+                    aria-pressed={style === item}
+                    title={styleLabels[item]}
+                  >
+                    {styleLabels[item]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           <div
-            className="inline-flex max-w-full items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900"
-            aria-label={t("genealogyBook.styleSwitchLabel", "Genealogy book style")}
+            className="order-2 flex shrink-0 items-center gap-2"
+            data-testid="paper-toolbar-actions"
           >
-            <ScrollText className="ml-1 hidden h-4 w-4 shrink-0 text-stone-500 dark:text-slate-400 sm:block" />
-            {PAPER_GENEALOGY_STYLES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setStyle(item)}
-                className={`h-7 rounded px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 md:px-3 ${
-                  style === item
-                    ? "bg-white text-orange-700 shadow-sm ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
-                    : "text-stone-600 hover:bg-white/70 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-orange-200"
-                }`}
-                aria-pressed={style === item}
-                title={styleLabels[item]}
-              >
-                {styleLabels[item]}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={loading}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition-colors hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-orange-800 dark:hover:bg-orange-950/20 dark:hover:text-orange-200"
+              title={t("familyTree.actions.refresh", "Refresh")}
+              aria-label={t("familyTree.actions.refresh", "Refresh")}
+              data-testid="paper-refresh-button"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                exportPdf(exportRef.current, style, paperVars, appearance.exportMarginPx)
+              }
+              disabled={!hasRoot || loading || exporting}
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-orange-600 bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:border-orange-700 hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 dark:border-orange-500 dark:bg-orange-500 dark:hover:border-orange-400 dark:hover:bg-orange-400"
+              title={t("genealogyBook.exportPdf", "Export PDF")}
+              data-testid="paper-export-button"
+            >
+              {exporting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileDown className="h-3.5 w-3.5" />
+              )}
+              <span>{t("genealogyBook.exportPdf", "Export PDF")}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -446,116 +559,134 @@ export default function GenealogyBookPage() {
               className={settingsSummaryClassName}
               data-testid="paper-cover-settings-summary"
             >
-              <span>{t("genealogyBook.settings.coverSectionLabel", "Cover & binding")}</span>
+              <span>{t("genealogyBook.settings.coverSectionLabel", "Front & back cover")}</span>
               <ChevronDown
                 className="h-4 w-4 shrink-0 text-stone-400 transition-transform group-open/settings:rotate-180 group-open/settings:text-orange-500 dark:text-slate-500"
                 aria-hidden="true"
               />
             </summary>
-            <div className="mt-2 flex flex-col gap-2">
-              <label className="flex cursor-pointer items-center justify-between gap-2">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {t("genealogyBook.settings.coverEnabledLabel", "Show front & back cover")}
+            <div className="mt-2 flex flex-col">
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900/70">
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t("genealogyBook.settings.coverEnabledLabel", "Enable front & back cover")}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                    {t(
+                      "genealogyBook.settings.coverEnabledHint",
+                      "When disabled, the book starts directly with its contents",
+                    )}
+                  </span>
                 </span>
-                <input
-                  type="checkbox"
+                <SettingsSwitch
                   checked={appearance.coverEnabled}
-                  onChange={(event) => updateAppearance({ coverEnabled: event.target.checked })}
-                  aria-label={t(
+                  onChange={(checked) => updateAppearance({ coverEnabled: checked })}
+                  ariaLabel={t(
                     "genealogyBook.settings.coverEnabledLabel",
-                    "Show front & back cover",
+                    "Enable front & back cover",
                   )}
-                  className={checkboxClassName}
-                  data-testid="paper-cover-enabled-input"
+                  testId="paper-cover-enabled-input"
                 />
               </label>
               {/* Every cover/back-cover control lives inside one disabled fieldset so the whole
                   group dims and locks together when the cover page is turned off. */}
               <fieldset
-                className="mt-1 flex flex-col gap-3 disabled:opacity-50"
+                className="mt-3 flex flex-col gap-3 transition-opacity disabled:opacity-45"
                 disabled={!appearance.coverEnabled}
-                aria-label={t("genealogyBook.settings.coverSectionLabel", "Cover & binding")}
+                aria-label={t("genealogyBook.settings.coverSectionLabel", "Front & back cover")}
               >
-                <label className="flex cursor-pointer items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                    {t("genealogyBook.settings.coverSpineLabel", "Spine information")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={appearance.showCoverSpine}
-                    onChange={(event) => updateAppearance({ showCoverSpine: event.target.checked })}
-                    className={checkboxClassName}
-                    data-testid="paper-cover-spine-input"
-                  />
-                </label>
-
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                    {t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
-                  </span>
-                  <div
-                    className="grid grid-cols-2 gap-2"
-                    role="group"
-                    aria-label={t("genealogyBook.settings.coverStyleLabel", "Cover layout")}
-                  >
-                    {PAPER_COVER_STYLE_IDS.map((id) => {
-                      const selected = appearance.coverStyleId === id;
-                      const previewMarkClass = {
-                        "traditional-slip": "right-1.5 top-1.5 h-7 w-2.5 border",
-                        "centered-classic": "left-1/2 top-1.5 h-7 w-1.5 -translate-x-1/2",
-                        "minimal-thread": "right-2 top-2 h-6 w-1.5 border",
-                        "archive-frame": "left-1/2 top-1.5 h-7 w-5 -translate-x-1/2 border-2",
-                      }[id];
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => updateAppearance({ coverStyleId: id })}
-                          className={`flex min-h-16 items-center gap-2 rounded-md border p-2 text-left text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
-                          aria-pressed={selected}
-                          data-testid={`paper-cover-style-${id}`}
-                        >
-                          <span className="relative h-10 w-7 shrink-0 border border-current opacity-70">
-                            <span className={`absolute bg-current ${previewMarkClass}`} />
-                          </span>
-                          <span>{coverStyleLabels[id]}</span>
-                        </button>
-                      );
-                    })}
+                <section
+                  className="rounded-lg border border-stone-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/45"
+                  data-testid="paper-front-cover-settings"
+                >
+                  <h4 className="mb-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t("genealogyBook.settings.frontCoverSectionLabel", "Front cover")}
+                  </h4>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-medium text-stone-500 dark:text-slate-400">
+                      {t("genealogyBook.settings.coverStyleLabel", "Layout")}
+                    </span>
+                    <div
+                      className="grid grid-cols-2 gap-2"
+                      role="group"
+                      aria-label={t("genealogyBook.settings.coverStyleLabel", "Layout")}
+                    >
+                      {PAPER_COVER_STYLE_IDS.map((id) => {
+                        const selected = appearance.coverStyleId === id;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => updateAppearance({ coverStyleId: id })}
+                            className={`flex min-h-[92px] flex-col items-center justify-center gap-1.5 rounded-md border p-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                            aria-pressed={selected}
+                            data-testid={`paper-cover-style-${id}`}
+                          >
+                            <CoverStyleThumbnail styleId={id} />
+                            <span className="leading-tight">{coverStyleLabels[id]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                  <div className="mt-3 flex flex-col gap-1.5 border-t border-stone-100 pt-3 dark:border-slate-800">
+                    <label
+                      htmlFor="paper-cover-inscription-input"
+                      className="text-[11px] font-medium text-stone-500 dark:text-slate-400"
+                    >
+                      {t("genealogyBook.settings.coverInscriptionLabel", "Cover inscription")}
+                    </label>
+                    <input
+                      id="paper-cover-inscription-input"
+                      type="text"
+                      value={appearance.coverInscription ?? ""}
+                      onChange={(event) => updateAppearance({ coverInscription: event.target.value })}
+                      placeholder={t(
+                        "genealogyBook.settings.coverInscriptionPlaceholder",
+                        "For example: Revised in spring 2024",
+                      )}
+                      className={fieldInputClassName}
+                      data-testid="paper-cover-inscription-input"
+                    />
+                    <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                      {t(
+                        "genealogyBook.settings.coverInscriptionHint",
+                        "Optional; use for a revision date or short inscription",
+                      )}
+                    </span>
+                  </div>
+                </section>
 
-                <div className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor="paper-cover-inscription-input"
-                    className="text-xs font-medium text-slate-600 dark:text-slate-300"
-                  >
-                    {t("genealogyBook.settings.coverInscriptionLabel", "Cover inscription")}
+                <section
+                  className="rounded-lg border border-stone-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/45"
+                  data-testid="paper-spine-settings"
+                >
+                  <h4 className="mb-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t("genealogyBook.settings.spineSectionLabel", "Spine")}
+                  </h4>
+                  <label className="flex cursor-pointer items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      {t("genealogyBook.settings.coverSpineLabel", "Show title and hall name")}
+                    </span>
+                    <SettingsSwitch
+                      checked={appearance.showCoverSpine}
+                      onChange={(checked) => updateAppearance({ showCoverSpine: checked })}
+                      ariaLabel={t(
+                        "genealogyBook.settings.coverSpineLabel",
+                        "Show title and hall name",
+                      )}
+                      testId="paper-cover-spine-input"
+                    />
                   </label>
-                  <input
-                    id="paper-cover-inscription-input"
-                    type="text"
-                    value={appearance.coverInscription ?? ""}
-                    onChange={(event) => updateAppearance({ coverInscription: event.target.value })}
-                    placeholder={t(
-                      "genealogyBook.settings.coverInscriptionPlaceholder",
-                      "Inscription",
-                    )}
-                    className={fieldInputClassName}
-                    data-testid="paper-cover-inscription-input"
-                  />
-                  <span className="text-[11px] leading-snug text-stone-500 dark:text-slate-400">
-                    {t(
-                      "genealogyBook.settings.coverInscriptionHint",
-                      "Optional inscription shown on the cover under the title",
-                    )}
-                  </span>
-                </div>
+                </section>
 
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                    {t("genealogyBook.settings.backCoverModeLabel", "Back cover")}
-                  </span>
+                <section
+                  className="rounded-lg border border-stone-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/45"
+                  data-testid="paper-back-cover-settings"
+                >
+                  <h4 className="mb-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t("genealogyBook.settings.backCoverSectionLabel", "Back cover")}
+                  </h4>
                   <div className={segmentGroupClassName} role="group">
                     {PAPER_BACK_COVER_MODES.map((mode) => (
                       <button
@@ -570,7 +701,15 @@ export default function GenealogyBookPage() {
                       </button>
                     ))}
                   </div>
-                </div>
+                  {appearance.backCoverMode === "matched" ? (
+                    <span className="mt-1.5 block text-[11px] leading-snug text-stone-500 dark:text-slate-400">
+                      {t(
+                        "genealogyBook.settings.backCoverMatchedHint",
+                        "The print year and volume count are generated automatically",
+                      )}
+                    </span>
+                  ) : null}
+                </section>
               </fieldset>
             </div>
           </details>

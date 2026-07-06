@@ -63,7 +63,7 @@ vi.mock("../domains/tree", () => ({
     hallName: null,
     fontScale: 1,
     exportMarginPx: 48,
-    coverEnabled: true,
+    coverEnabled: false,
     coverInscription: null,
     coverStyleId: "traditional-slip",
     backCoverMode: "matched",
@@ -136,7 +136,7 @@ vi.mock("../domains/tree", () => ({
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
-      coverEnabled: true,
+      coverEnabled: false,
       coverInscription: null,
       coverStyleId: "traditional-slip",
       backCoverMode: "matched",
@@ -209,6 +209,30 @@ describe("GenealogyBookPage", () => {
 
     expect(screen.getByTestId("paper-view").dataset.style).toBe("ou");
     expect(screen.getByTestId("paper-view").dataset.hasRoot).toBe("true");
+
+    const toolbar = screen.getByTestId("paper-book-toolbar");
+    const stats = screen.getByTestId("paper-book-stats");
+    const styleSwitcher = screen.getByTestId("paper-style-switcher");
+    const toolbarActions = screen.getByTestId("paper-toolbar-actions");
+    const refreshButton = screen.getByTestId("paper-refresh-button");
+    const exportButton = screen.getByTestId("paper-export-button");
+    expect(screen.getByText("Style")).toBeTruthy();
+    expect(stats.textContent).toContain("1People");
+    expect(stats.textContent).toContain("1Generations");
+    expect(toolbar.className).toContain("gap-x-3");
+    expect(stats.children.length).toBe(2);
+    expect(toolbarActions.className).toContain("gap-2");
+    expect(
+      stats.compareDocumentPosition(styleSwitcher) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      styleSwitcher.compareDocumentPosition(refreshButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      refreshButton.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(refreshButton.className).toContain("w-8");
+    expect(exportButton.className).toContain("bg-orange-600");
 
     const cases = [
       ["Su-style", "su"],
@@ -303,10 +327,10 @@ describe("GenealogyBookPage", () => {
 
     expect(screen.getByText("Paper book settings")).toBeTruthy();
     expect(screen.getByText("Book information")).toBeTruthy();
-    expect(screen.getByText("Cover & binding")).toBeTruthy();
+    expect(screen.getByText("Front & back cover")).toBeTruthy();
     expect(screen.getByText("Paper appearance")).toBeTruthy();
     expect(screen.getByText("Typesetting")).toBeTruthy();
-    expect(screen.getByLabelText("Show front & back cover")).toBeTruthy();
+    expect(screen.getByLabelText("Enable front & back cover")).toBeTruthy();
 
     for (const section of ["info", "appearance", "typesetting"]) {
       const settings = screen.getByTestId(`paper-${section}-settings`);
@@ -328,9 +352,17 @@ describe("GenealogyBookPage", () => {
     fireEvent.click(screen.getByTestId("paper-cover-settings-summary"));
     expect(coverSettings.hasAttribute("open")).toBe(true);
     const coverFieldset = coverSettings.querySelector("fieldset");
+    const frontCoverSettings = screen.getByTestId("paper-front-cover-settings");
+    const spineSettings = screen.getByTestId("paper-spine-settings");
+    const backCoverSettings = screen.getByTestId("paper-back-cover-settings");
+    expect(coverFieldset?.firstElementChild).toBe(frontCoverSettings);
     expect(
-      coverFieldset?.firstElementChild?.contains(screen.getByTestId("paper-cover-spine-input")),
-    ).toBe(true);
+      frontCoverSettings.compareDocumentPosition(spineSettings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      spineSettings.compareDocumentPosition(backCoverSettings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(spineSettings.contains(screen.getByTestId("paper-cover-spine-input"))).toBe(true);
     const coverStyleButton = screen.getByTestId("paper-cover-style-traditional-slip");
     const coverInscriptionInput = screen.getByTestId("paper-cover-inscription-input");
     const backCoverButton = screen.getByTestId("paper-back-cover-mode-blank");
@@ -359,11 +391,22 @@ describe("GenealogyBookPage", () => {
     expect(screen.getByTestId("paper-cover-style-traditional-slip").className).not.toContain(
       "border-red",
     );
+    expect(screen.getByTestId("paper-cover-style-thumbnail-traditional-slip")).toBeTruthy();
     expect(screen.getByTestId("paper-back-cover-mode-matched").className).toContain(
       "text-orange-700",
     );
-    expect(screen.getByTestId("paper-cover-enabled-input").className).toContain("text-orange-600");
-    expect(screen.getByTestId("paper-cover-spine-input").className).toContain("text-orange-600");
+    expect(screen.getByTestId("paper-cover-enabled-input").getAttribute("role")).toBe("switch");
+    expect(screen.getByTestId("paper-cover-spine-input").getAttribute("role")).toBe("switch");
+    expect(screen.getByTestId("paper-cover-enabled-input").nextElementSibling?.className).toContain(
+      "bg-stone-300",
+    );
+    expect(screen.getByTestId("paper-cover-spine-input").nextElementSibling?.className).toContain(
+      "bg-orange-500",
+    );
+    expect((screen.getByTestId("paper-cover-enabled-input") as HTMLInputElement).checked).toBe(
+      false,
+    );
+    expect(coverFieldset?.hasAttribute("disabled")).toBe(true);
     expect(screen.getByTestId("paper-color-theme-plain").className).toContain(
       "hover:border-orange-300",
     );
@@ -408,6 +451,7 @@ describe("GenealogyBookPage", () => {
   it("persists the paired cover layout, back-cover mode and spine visibility", () => {
     render(<GenealogyBookPage />);
 
+    fireEvent.click(screen.getByTestId("paper-cover-enabled-input"));
     fireEvent.click(screen.getByTestId("paper-cover-style-archive-frame"));
     fireEvent.click(screen.getByTestId("paper-back-cover-mode-blank"));
     fireEvent.click(screen.getByTestId("paper-cover-spine-input"));
@@ -452,7 +496,7 @@ describe("GenealogyBookPage", () => {
       hallName: null,
       fontScale: 1,
       exportMarginPx: 48,
-      coverEnabled: true,
+      coverEnabled: false,
       coverInscription: null,
       coverStyleId: "traditional-slip",
       backCoverMode: "matched",
