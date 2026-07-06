@@ -433,7 +433,7 @@ export const DEFAULT_PAPER_APPEARANCE: PaperAppearance = {
   hallName: null,
   fontScale: PAPER_FONT_SCALE_DEFAULT,
   exportMarginPx: PAPER_EXPORT_MARGIN_DEFAULT,
-  coverEnabled: true,
+  coverEnabled: false,
   coverInscription: null,
   coverStyleId: PAPER_COVER_STYLE.TRADITIONAL,
   backCoverMode: PAPER_BACK_COVER_MODE.MATCHED,

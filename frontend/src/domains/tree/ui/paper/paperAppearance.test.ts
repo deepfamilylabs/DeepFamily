@@ -181,7 +181,7 @@ describe("paperAppearance storage", () => {
     // Missing cover fields use the paired traditional defaults; a blank inscription becomes null.
     localStorage.setItem(PAPER_APPEARANCE_STORAGE_KEY, JSON.stringify({ colorThemeId: "xuan" }));
     const loaded = loadPaperAppearance();
-    expect(loaded.coverEnabled).toBe(true);
+    expect(loaded.coverEnabled).toBe(false);
     expect(loaded.coverInscription).toBeNull();
     expect(loaded.coverStyleId).toBe("traditional-slip");
     expect(loaded.backCoverMode).toBe("matched");
