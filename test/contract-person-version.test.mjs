@@ -19,10 +19,10 @@ describe('Person Version (add-person) Tests', function () {
   this.timeout(120_000)
 
   async function baseSetup() {
-    const { deepFamily, deepFamilyReader } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+    const { deepFamily, deepFamilyReader, token } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
     const [signer] = await hre.ethers.getSigners()
     await setupStubVerifiers(hre.ethers, deepFamily)
-    return { deepFamily, reader: deepFamilyReader, signer }
+    return { deepFamily, reader: deepFamilyReader, token, signer }
   }
 
   it('adds a basic person and emits event', async () => {
@@ -97,6 +97,51 @@ describe('Person Version (add-person) Tests', function () {
     expect(totalVersions).to.equal(2n)
     expect(versions[0].tag).to.equal('first')
     expect(versions[1].tag).to.equal('second')
+  })
+
+  it('rewards each unique version hash when both proof-derived parent hashes are non-zero', async () => {
+    const { deepFamily, reader, token, signer } = await baseSetup()
+    const fatherPerson = makeTestPerson('Reward Father', { birthYear: 1970 })
+    const motherPerson = makeTestPerson('Reward Mother', { birthYear: 1972, gender: 2 })
+    const childPerson = makeTestPerson('Reward Child', { birthYear: 2001 })
+    const fatherCommitment = commitmentOf(fatherPerson)
+    const motherCommitment = commitmentOf(motherPerson)
+    const childCommitment = commitmentOf(childPerson)
+    const signerAddress = await signer.getAddress()
+
+    await addPerson(hre.ethers, deepFamily, signer, fatherCommitment, { person: fatherPerson, tag: 'father' })
+    await addPerson(hre.ethers, deepFamily, signer, motherCommitment, { person: motherPerson, tag: 'mother' })
+
+    const balanceBefore = await token.balanceOf(signerAddress)
+    const firstReward = await token.getReward(1)
+    await addPerson(hre.ethers, deepFamily, signer, childCommitment, {
+      person: childPerson,
+      fatherPerson,
+      motherPerson,
+      fatherIdentityCommitment: fatherCommitment,
+      motherIdentityCommitment: motherCommitment,
+      fatherVersionIndex: 1,
+      motherVersionIndex: 1,
+      tag: 'child-v1',
+    })
+
+    const secondReward = await token.getReward(2)
+    await addPerson(hre.ethers, deepFamily, signer, childCommitment, {
+      person: childPerson,
+      fatherPerson,
+      motherPerson,
+      fatherIdentityCommitment: fatherCommitment,
+      motherIdentityCommitment: motherCommitment,
+      fatherVersionIndex: 1,
+      motherVersionIndex: 1,
+      tag: 'child-v2',
+    })
+
+    const childHash = computePersonHash(hre.ethers, childCommitment)
+    const [, totalVersions] = await reader.listPersonVersions(childHash, 0, 0)
+    expect(totalVersions).to.equal(2n)
+    expect(await token.totalAdditions()).to.equal(2n)
+    expect(await token.balanceOf(signerAddress)).to.equal(balanceBefore + firstReward + secondReward)
   })
 
   it('allows providing parent hash with unknown (0) version index when parent exists', async () => {

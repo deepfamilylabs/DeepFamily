@@ -123,6 +123,11 @@ function addPersonVersion(
 4. Uses the proof-derived parent hashes plus the provided parent version indices to update lineage links
 5. Routes to `_addPersonInternal()` for family tree update
 
+**Mining Reward Semantics**:
+- A reward is issued for every unique version hash whose proof-derived father and mother identity commitments are both non-zero.
+- The version hash binds `personHash`, both parent hashes, both parent version indices, and `tag`. Consequently, the same person may receive another reward for a genuinely distinct version hash.
+- A parent version index of `0` means “unspecified”. Reward eligibility requires both proof-derived parent hashes, but does not require those parents to already have non-zero on-chain version indices.
+
 #### Community Endorsement
 ```solidity
 function endorseVersion(
@@ -134,6 +139,7 @@ function endorseVersion(
 
 **Endorsement Mechanics**:
 - Endorsers pay `recentReward` amount in DEEP utility points (ERC20)
+- `recentReward` is `0` before the first successful mining reward, tracks the most recently minted reward during mining, and returns to `0` when mining rewards end
 - **Fee Distribution**: Majority flows to NFT holder (if minted) or original contributor, with a small protocol share (default 5%, max 20%) for sustainability
 - Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
@@ -321,7 +327,8 @@ verifiers, the verifier adapter, and the libraries.
   the community can audit/exit/cancel before an upgrade lands.
 - On live networks the deployment refuses to keep upgrade authority on an EOA: a `GOVERNANCE_OWNER`
   (validated to behave like a timelock with a non-zero delay) is mandatory, and ownership is handed
-  over after wiring. Local/simulated networks keep the deployer as owner for test flows.
+  over after wiring. The non-upgradeable token's residual owner role is handed to the same governance
+  owner after its one-time binding. Local/simulated networks keep the deployer as owner for test flows.
 
 ### Storage-Layout Safety
 
@@ -375,12 +382,16 @@ uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 
 **Cycle Progression**:
 - Cycles: 1 → 10 → 100 → 1K → 10K → 100K → 1M → 10M → 100M → Fixed 100M
 - Each cycle completion halves reward via bit shifting: `INITIAL_REWARD >> cycleIndex`
-- Mining continues indefinitely with progressively smaller rewards until MAX_SUPPLY is reached
-- Final supply: approaches 100 billion DEEP (rewards continue halving asymptotically)
+- Mining stops when the live supply reaches `MAX_SUPPLY` or integer right-shifting makes the next reward zero
+- `MAX_SUPPLY` is a hard live-supply ceiling, not a guaranteed final issuance target
+- Maximum supply is capped at `100 billion DEEP`; actual scheduled mining issuance may be slightly lower because halvings use integer arithmetic
+- Because the cap checks `totalSupply()`, burns create an equal amount of live-supply headroom; the remaining reward schedule and `totalAdditions` still limit subsequent minting
 
 **Reward Calculation**:
 ```solidity
 function getReward(uint256 recordCount) public view returns (uint256) {
+    if (recordCount == 0) revert InvalidRecordCount();
+
     uint256 cycleIndex;
     uint256 countLeft = recordCount;
 
@@ -413,6 +424,7 @@ function initialize(address _deepFamilyContract) external onlyOwner
 ```
 - Owner-only, single-use function
 - Registers authorized DeepFamily contract address
+- Rejects zero addresses, EOAs, contracts that do not expose the expected token binding, and DeepFamily contracts configured for a different token
 - Prevents unauthorized minting after deployment
 
 #### Mining
@@ -423,7 +435,7 @@ function mint(address miner) external onlyDeepFamilyContract returns (uint256 re
 - Checks reward calculation for next addition index
 - Enforces MAX_SUPPLY cap with partial reward if needed
 - Updates `totalAdditions` counter and `recentReward` for endorsement pricing
-- Returns 0 only when MAX_SUPPLY is reached
+- Returns 0 when `MAX_SUPPLY` is reached or the next integer reward is zero
 
 #### View Functions
 ```solidity
@@ -453,8 +465,9 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 - `initialize()`: Owner-only, single-use initialization
 
 **Security Features**:
-- Supply cap enforcement (halts at 100B utility points)
+- Hard live-supply cap enforcement (never exceeds 100B utility points)
 - Progressive halving ensures controlled supply distribution
+- One-time contract-code and reciprocal token-binding validation
 - Custom error types for precise debugging
 - OpenZeppelin's secure ERC20 base implementation
 

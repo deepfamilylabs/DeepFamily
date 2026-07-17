@@ -4,6 +4,11 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+interface IDeepFamilyTokenBinding {
+  // solhint-disable-next-line func-name-mixedcase
+  function DEEP_FAMILY_TOKEN_CONTRACT() external view returns (address);
+}
+
 /**
  * @title DeepFamily Token (DEEP)
  * @dev Family tree mining token contract - Standard ERC20 token
@@ -12,11 +17,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * - Standard ERC20 compatible, supports wallets and DEX
  * - Only authorized deep family contract can mint tokens
  * - Progressive halving mining reward mechanism
- * - Designed cap of 100 billion, controlled by halving mechanism
+ * - Hard cap of 100 billion, with issuance ending earlier if integer rewards reach zero
  *
  * Halving cycles: 1 → 10 → 100 → 1k → 10k → 100k → 1M → 10M → 100M → Fixed 100M
  * Initial reward: 113,777 DEEP
- * Final supply: ~100 billion DEEP
+ * Maximum supply: 100 billion DEEP; actual mining issuance may be slightly lower due to integer halvings
  */
 contract DeepFamilyToken is ERC20Burnable, Ownable {
   // ========== Mining Parameter Constants ==========
@@ -63,6 +68,9 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
   error ZeroAddress();
   error AlreadyInitialized();
   error NotInitialized();
+  error InvalidDeepFamilyContract();
+  error InvalidTokenBinding();
+  error InvalidRecordCount();
   error AllowanceBelowZero();
 
   // ========== Modifiers ==========
@@ -87,6 +95,17 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
   function initialize(address _deepFamilyContract) external onlyOwner {
     if (initialized) revert AlreadyInitialized();
     if (_deepFamilyContract == address(0)) revert ZeroAddress();
+    if (_deepFamilyContract.code.length == 0) revert InvalidDeepFamilyContract();
+
+    address configuredToken;
+    try IDeepFamilyTokenBinding(_deepFamilyContract).DEEP_FAMILY_TOKEN_CONTRACT() returns (
+      address tokenAddress
+    ) {
+      configuredToken = tokenAddress;
+    } catch {
+      revert InvalidDeepFamilyContract();
+    }
+    if (configuredToken != address(this)) revert InvalidTokenBinding();
 
     deepFamilyContract = _deepFamilyContract;
     initialized = true;
@@ -141,6 +160,8 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
    * @return reward Corresponding reward amount
    */
   function getReward(uint256 recordCount) public view returns (uint256) {
+    if (recordCount == 0) revert InvalidRecordCount();
+
     uint256 cycleIndex;
     uint256 countLeft = recordCount;
 

@@ -188,7 +188,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       networkConfig: { type: "http", chainId: 11155111 },
     });
 
-    it("hands ownership of both proxies to the governance timelock", async () => {
+    it("hands ownership of both proxies and the token to the governance timelock", async () => {
       const [deployer, member] = await hre.ethers.getSigners();
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
       const tl = await Timelock.deploy(
@@ -208,6 +208,7 @@ describe("Upgrade tooling & governance deploy path", function () {
 
       expect(await deployed.deepFamily.owner()).to.equal(tlAddr);
       expect(await deployed.deepFamilyAttestationRegistry.owner()).to.equal(tlAddr);
+      expect(await deployed.token.owner()).to.equal(tlAddr);
     });
 
     it("refuses to deploy without GOVERNANCE_OWNER on a live network", async () => {
