@@ -157,11 +157,11 @@ const assertGovernanceOwnerInvariants = async (ethers, address) => {
   }
 };
 
-// On live networks, refuse to reuse a deployment whose upgrade authority is not the intended
-// governance owner. Without this, an existing JSON pointing at proxies that still belong to a
-// deployer EOA would silently be accepted and downstream tasks would proceed as if the system
-// were under timelock/multisig control. Local dev networks intentionally keep deployer-as-owner
-// and are exempt.
+// On live networks, refuse to reuse a deployment whose administrative ownership is not the
+// intended governance owner. Without this, an existing JSON pointing at contracts that still
+// belong to a deployer EOA would silently be accepted and downstream tasks would proceed as if
+// the system were under timelock/multisig control. Local dev networks intentionally keep
+// deployer-as-owner and are exempt.
 const assertExistingGovernanceOwner = async (connection, ethers, contracts) => {
   if (isLocalDevNetwork(connection)) return;
   const governanceOwner = process.env.GOVERNANCE_OWNER;
@@ -181,7 +181,7 @@ const assertExistingGovernanceOwner = async (connection, ethers, contracts) => {
     if (actual !== expected) {
       throw new Error(
         `Deployment ${contractName} owner=${actual} does not match GOVERNANCE_OWNER=${expected}; ` +
-          `refusing to reuse a deployment whose upgrade authority is not the intended governance owner.`,
+          `refusing to reuse a deployment whose ownership is not assigned to the intended governance owner.`,
       );
     }
   }
@@ -490,7 +490,9 @@ export const deployIntegratedSystem = async (
     )
   ).wait();
 
-  // Hand upgrade authority to governance (intended: timelock + multisig).
+  // Hand upgrade and residual administrative ownership to governance (intended: timelock +
+  // multisig). DeepFamilyToken has no mutable owner-only configuration after its one-time binding,
+  // but transferring it too keeps production ownership consistent and avoids a stale deployer EOA.
   // Must run after bindDeepFamily / setVerifier, which require the deployer to still be owner.
   // With UUPS the owner can replace the entire implementation, so on live networks a governance
   // owner is mandatory (validated up front). Local dev networks always keep the deployer as owner
@@ -498,6 +500,7 @@ export const deployIntegratedSystem = async (
   if (hasGovernanceOwner && !isLocalDev) {
     await (await deepFamily.transferOwnership(governanceOwner)).wait();
     await (await deepFamilyAttestationRegistry.transferOwnership(governanceOwner)).wait();
+    await (await token.transferOwnership(governanceOwner)).wait();
   }
 
   if (writeDeployments) {
@@ -649,6 +652,7 @@ export const ensureIntegratedSystem = async (
           contractName: "DeepFamilyAttestationRegistry",
           contract: deepFamilyAttestationRegistry,
         },
+        { contractName: "DeepFamilyToken", contract: token },
       ]);
       if (writeDeployments) {
         const artifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
