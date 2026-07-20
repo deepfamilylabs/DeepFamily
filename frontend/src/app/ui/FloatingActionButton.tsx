@@ -101,10 +101,10 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
     <>
       {/* Transparent backdrop for closing menu when clicking outside */}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] bg-transparent" onClick={closeMenu} />
+        <div className="fixed inset-0 z-9999 bg-transparent" onClick={closeMenu} />
       )}
 
-      <div className={`fixed right-6 md:right-10 z-[10000] bottom-24 md:bottom-10 ${className}`}>
+      <div className={`fixed right-6 md:right-10 z-10000 bottom-24 md:bottom-10 ${className}`}>
         {/* Action menu items */}
         <div
           ref={menuRef}
@@ -133,13 +133,13 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
                   className={`
                     group flex items-center gap-3 pl-4 pr-6 py-2.5 rounded-full
                     bg-white dark:bg-zinc-900 border ${action.borderClass}
-                    shadow-sm hover:shadow-md
-                    active:scale-95 focus:outline-none
+                    shadow-xs hover:shadow-md
+                    active:scale-95 focus:outline-hidden
                     w-full
                     hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)]
                   `}
                 >
-                  <div className="flex-shrink-0 text-orange-500 dark:text-orange-400 group-hover:text-white">
+                  <div className="shrink-0 text-orange-500 dark:text-orange-400 group-hover:text-white">
                     <Icon className="w-5 h-5" strokeWidth={2.5} />
                   </div>
                   <span className="text-[14px] font-bold tracking-wide text-gray-600 dark:text-gray-300 group-hover:text-white whitespace-nowrap">
@@ -167,7 +167,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
             relative w-14 h-14 md:w-16 md:h-16 rounded-full 
             flex items-center justify-center transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)
             hover:scale-110 active:scale-90 
-            bg-gradient-to-br from-orange-400 via-orange-500 to-red-500 text-white
+            bg-linear-to-br from-orange-400 via-orange-500 to-red-500 text-white
             shadow-[0_0_30px_rgba(249,115,22,0.4)] hover:shadow-[0_0_40px_rgba(249,115,22,0.6)]
             border border-white/20
           `}

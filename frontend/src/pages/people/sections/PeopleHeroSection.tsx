@@ -18,11 +18,11 @@ export function PeopleHeroSection({ t, stats, personNotice }: PeopleHeroSectionP
       <PageContainer className="relative z-10">
         <div className="text-center mb-16 md:mb-24">
           <h1 className="text-6xl md:text-8xl font-bold tracking-tighter mb-6">
-            <span className="bg-clip-text text-transparent bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+            <span className="bg-clip-text text-transparent bg-linear-to-b from-ink to-ink-muted">
               {t("people.title", "Family Encyclopedia")}
             </span>
           </h1>
-          <p className="text-xl md:text-2xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
+          <p className="text-xl md:text-2xl text-ink-muted max-w-2xl mx-auto font-light leading-relaxed">
             {t("people.subtitle", "Explore family member profiles preserved on the blockchain")}
           </p>
         </div>
@@ -106,75 +106,55 @@ function PeopleStatsGrid({
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-5xl mx-auto">
       <StatCard
         icon={<Users className="w-5 h-5" />}
-        watermark={<Users className="w-40 h-40 text-blue-600 dark:text-blue-400" />}
+        watermark={<Users className="w-40 h-40" />}
         label={t("people.totalPeople", "People")}
         value={stats.totalCount}
-        accent="blue"
       />
       <StatCard
         icon={<BookOpen className="w-5 h-5" />}
-        watermark={<BookOpen className="w-40 h-40 text-purple-600 dark:text-purple-400" />}
+        watermark={<BookOpen className="w-40 h-40" />}
         label={t("people.withEncyclopedia", "Encyclopedia")}
         value={stats.storyCount}
-        accent="purple"
       />
       <StatCard
         icon={<Tag className="w-5 h-5" />}
-        watermark={<Tag className="w-40 h-40 text-orange-600 dark:text-orange-400" />}
+        watermark={<Tag className="w-40 h-40" />}
         label={t("people.withNFTs", "NFTs")}
         value={stats.totalNFTs}
-        accent="orange"
       />
     </div>
   );
 }
 
+// Unified brand treatment: cards are distinguished by icon + label, not by
+// clashing accent hues. All chrome flows from semantic tokens. To give one card
+// a different accent, swap the value gradient to another token (e.g. from-info).
 function StatCard({
   icon,
   watermark,
   label,
   value,
-  accent,
 }: {
   icon: ReactNode;
   watermark: ReactNode;
   label: string;
   value: number;
-  accent: "blue" | "purple" | "orange";
 }) {
-  const accentClasses = {
-    blue: {
-      icon: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30",
-      label: "text-blue-900/50 dark:text-blue-100/50",
-      value: "from-blue-600 to-indigo-600",
-    },
-    purple: {
-      icon: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30",
-      label: "text-purple-900/50 dark:text-purple-100/50",
-      value: "from-purple-600 to-pink-600",
-    },
-    orange: {
-      icon: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 group-hover:bg-orange-100 dark:group-hover:bg-orange-900/30",
-      label: "text-orange-900/50 dark:text-orange-100/50",
-      value: "from-orange-500 to-red-600",
-    },
-  }[accent];
-
   return (
-    <div className="group relative p-8 rounded-[2rem] bg-white dark:bg-gray-900 shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden hover:-translate-y-1 transition-all duration-500">
-      <div className="absolute -right-6 -top-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-500 transform group-hover:scale-110 group-hover:rotate-12 origin-center">
+    <div className="group relative p-8 rounded-4xl bg-surface shadow-xl shadow-ink/5 dark:shadow-none border border-hairline overflow-hidden hover:-translate-y-1 transition-all duration-500">
+      <div className="absolute -right-6 -top-6 text-primary opacity-[0.04] group-hover:opacity-[0.09] transition-opacity duration-500 transform group-hover:scale-110 group-hover:rotate-12 origin-center">
         {watermark}
       </div>
       <div className="relative z-10">
         <div className="flex items-center gap-3 mb-4">
-          <div className={`p-2.5 rounded-xl transition-colors ${accentClasses.icon}`}>{icon}</div>
-          <div className={`text-xs font-bold uppercase tracking-widest ${accentClasses.label}`}>
+          <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+            {icon}
+          </div>
+          <div className="text-xs font-bold uppercase tracking-widest text-ink-subtle">
             {label}
           </div>
         </div>
-        <div
-          className={`text-6xl font-black tracking-tighter bg-gradient-to-br bg-clip-text text-transparent tabular-nums ${accentClasses.value}`}
-        >
+        <div className="text-6xl font-black tracking-tighter bg-linear-to-br from-primary to-primary-hover bg-clip-text text-transparent tabular-nums">
           {value}
         </div>
       </div>

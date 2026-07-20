@@ -75,7 +75,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             aria-label="Close"
-            className="absolute top-3 right-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+            className="absolute top-3 right-3 p-1 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
             onClick={onCancel}
           >
             <X size={18} />
@@ -106,7 +106,7 @@ export default function ConfirmDialog({
               type="button"
               onClick={onConfirm}
               className={
-                "px-4 py-2 rounded-md text-sm text-white shadow-sm focus:outline-none focus:ring-2 transition-colors " +
+                "px-4 py-2 rounded-md text-sm text-white shadow-xs focus:outline-hidden focus:ring-2 transition-colors " +
                 typeClasses +
                 (confirmBtnClassName ? " " + confirmBtnClassName : "")
               }

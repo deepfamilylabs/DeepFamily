@@ -130,7 +130,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 aria-live={style.live}
                 aria-atomic="true"
               >
-                <Icon className={`w-4 h-4 flex-shrink-0 ${style.iconColor}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${style.iconColor}`} />
                 <span className="flex-1">{toast.message}</span>
               </div>
             );

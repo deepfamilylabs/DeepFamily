@@ -70,7 +70,7 @@ export default function WalletSelectionModal({
 
         {/* Header Section */}
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
+          <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
             <Wallet className="w-8 h-8 text-white" />
           </div>
           <div>
@@ -95,12 +95,12 @@ export default function WalletSelectionModal({
                   className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-orange-500 dark:hover:border-orange-400 hover:shadow-md hover:shadow-orange-500/10 group transition-none"
                 >
                   {/* Wallet Icon */}
-                  <div className="relative flex-shrink-0">
+                  <div className="relative shrink-0">
                     <div
                       className={`
                         w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden
-                        ${wallet.icon ? "bg-white dark:bg-gray-800 p-1.5" : `bg-gradient-to-br ${colors.gradient}`}
-                        shadow-sm
+                        ${wallet.icon ? "bg-white dark:bg-gray-800 p-1.5" : `bg-linear-to-br ${colors.gradient}`}
+                        shadow-xs
                       `}
                     >
                       {wallet.icon ? (
@@ -129,7 +129,7 @@ export default function WalletSelectionModal({
                   </div>
 
                   {/* Arrow */}
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     <ChevronRight className="w-5 h-5 text-gray-300 dark:text-gray-600 group-hover:text-orange-500" />
                   </div>
                 </button>
@@ -166,7 +166,7 @@ export default function WalletSelectionModal({
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors border border-gray-100 dark:border-white/5"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-white p-1.5 shadow-sm flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-white p-1.5 shadow-xs flex items-center justify-center">
                       <img
                         src={wallet.icon}
                         alt={wallet.name}

@@ -54,14 +54,14 @@ export function MetadataEncryptionSection({
     .join(" ");
 
   return (
-    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800 !mt-2">
+    <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800 mt-2!">
       <div className="space-y-2">
         <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">
           {t("addVersion.tag", "Tag")}
         </label>
         <input
           {...register("tag")}
-          className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+          className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
           placeholder={t("addVersion.tagPlaceholder", "Optional tag (e.g. 'Standard Version')")}
         />
       </div>
@@ -87,7 +87,7 @@ export function MetadataEncryptionSection({
                 checked={usePersonPassphraseForEncryption}
                 onChange={(event) => onUsePersonPassphraseForEncryptionChange(event.target.checked)}
               />
-              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-500/30 dark:peer-focus:ring-orange-400/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500 dark:peer-checked:bg-orange-500"></div>
+              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden peer-focus:ring-4 peer-focus:ring-orange-500/30 dark:peer-focus:ring-orange-400/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500 dark:peer-checked:bg-orange-500"></div>
             </div>
             <span className="text-xs font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
               {t("addVersion.usePassphraseForEncryption", "Use identity passphrase")}
@@ -96,7 +96,7 @@ export function MetadataEncryptionSection({
         </div>
 
         {showManualEncryptionInputs ? (
-          <div className="space-y-3 pt-2 animate-fadeIn">
+          <div className="space-y-3 pt-2 animate-fade-in">
             {showPassphraseMissing && (
               <div
                 id={passphraseMissingId}
@@ -119,7 +119,7 @@ export function MetadataEncryptionSection({
                   type={showEncryptionPassword ? "text" : "password"}
                   ref={encryptionPasswordRef}
                   onChange={onEncryptionErrorClear}
-                  className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-hidden transition-all"
                   aria-invalid={Boolean(encryptionError)}
                   aria-describedby={encryptionDescribedBy || undefined}
                   placeholder={t(
@@ -150,7 +150,7 @@ export function MetadataEncryptionSection({
                   type={showConfirmEncryptionPassword ? "text" : "password"}
                   ref={confirmEncryptionPasswordRef}
                   onChange={onEncryptionErrorClear}
-                  className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                  className="h-11 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 pr-10 text-sm placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-hidden transition-all"
                   aria-invalid={Boolean(encryptionError)}
                   aria-describedby={encryptionDescribedBy || undefined}
                   placeholder={t("addVersion.encryptionPasswordConfirm", "Confirm password")}
@@ -223,7 +223,7 @@ export function MetadataEncryptionSection({
       <div>
         <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
           {t("addVersion.metadataCID", "Metadata CID")}
-          <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          <span className="ml-2 px-1.5 py-0.5 rounded-sm text-[10px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
             {t("addVersion.autoGenerated", "Auto-generated")}
           </span>
         </label>
@@ -231,7 +231,7 @@ export function MetadataEncryptionSection({
           <input
             {...register("metadataCID")}
             readOnly
-            className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 text-sm text-gray-500 dark:text-gray-400 font-mono text-xs placeholder-gray-400 outline-none cursor-not-allowed select-all"
+            className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 text-sm text-gray-500 dark:text-gray-400 font-mono text-xs placeholder-gray-400 outline-hidden cursor-not-allowed select-all"
             placeholder={t(
               "addVersion.metadataCIDPlaceholder",
               "Generated from encrypted metadata...",
@@ -241,7 +241,7 @@ export function MetadataEncryptionSection({
             type="button"
             onClick={onDownloadMetadata}
             disabled={isSubmitting}
-            className="px-4 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-sm"
+            className="px-4 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-xs"
             title={t("addVersion.downloadMetadata", "Download metadata JSON")}
           >
             <Download className="w-4 h-4" />

@@ -43,7 +43,7 @@ export function ResponsiveModalFrame({
       ariaLabel={ariaLabel}
       disableBackdropClose={isDesktop}
     >
-      <div className="overflow-x-hidden touch-pan-y h-[100dvh] max-h-[100dvh] md:h-full md:max-h-none">
+      <div className="overflow-x-hidden touch-pan-y h-dvh max-h-dvh md:h-full md:max-h-none">
         <div className="flex items-end md:items-center justify-center h-full w-full px-2 pt-6 pb-[env(safe-area-inset-bottom)] md:p-4">
           <div
             className={`relative flex flex-col w-full max-w-4xl h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-lg md:rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full md:translate-y-0"} will-change-transform`}
@@ -70,7 +70,7 @@ export function ResponsiveModalFrame({
 
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-11 h-11 rounded-lg bg-orange-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                  <div className="w-11 h-11 rounded-lg bg-orange-600 flex items-center justify-center shadow-xs shrink-0">
                     {icon}
                   </div>
                   <div className="min-w-0">
@@ -91,7 +91,7 @@ export function ResponsiveModalFrame({
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors flex-shrink-0 group"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors shrink-0 group"
                   aria-label={closeLabel}
                 >
                   <X className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />

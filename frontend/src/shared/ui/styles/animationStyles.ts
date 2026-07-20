@@ -93,7 +93,7 @@ export const BUTTON_ANIMATIONS = {
   HOVER_SCALE: "hover:scale-105",
   HOVER_SHADOW: "hover:shadow-md",
   ACTIVE_SCALE: "active:scale-95",
-  FOCUS_RING: "focus:outline-none focus:ring-2 focus:ring-blue-500/60",
+  FOCUS_RING: "focus:outline-hidden focus:ring-2 focus:ring-blue-500/60",
 } as const;
 
 // Loading animation styles
@@ -101,5 +101,5 @@ export const LOADING_ANIMATIONS = {
   PULSE: "animate-pulse",
   SPIN: "animate-spin",
   BOUNCE: "animate-bounce",
-  SKELETON: "animate-pulse bg-gray-200 dark:bg-gray-700 rounded",
+  SKELETON: "animate-pulse bg-gray-200 dark:bg-gray-700 rounded-sm",
 } as const;

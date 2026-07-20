@@ -64,14 +64,14 @@ export function EndorseFeePanel({
           <div className="flex flex-col gap-1.5 text-xs">
             <div className="flex items-center gap-2">
               <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
-                <div className="w-1 h-3 rounded-full bg-gradient-to-b from-orange-400 to-red-600"></div>
+                <div className="w-1 h-3 rounded-full bg-linear-to-b from-orange-400 to-red-600"></div>
                 {t("endorse.feeDistribution", "Fee Distribution")}
               </span>
             </div>
             <span className="text-gray-600 dark:text-gray-400 leading-relaxed pl-2.5">
               {isNFTMinted ? (
                 <>
-                  <strong className="text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">
+                  <strong className="text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/30 px-1.5 py-0.5 rounded-sm text-xs uppercase tracking-wider mr-1.5">
                     {t("endorse.nftMinted", "NFT Minted")}
                   </strong>
                   {t(
@@ -82,7 +82,7 @@ export function EndorseFeePanel({
                 </>
               ) : (
                 <>
-                  <strong className="text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs uppercase tracking-wider mr-1.5">
+                  <strong className="text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm text-xs uppercase tracking-wider mr-1.5">
                     {t("endorse.noNFT", "No NFT Yet")}
                   </strong>
                   {t(

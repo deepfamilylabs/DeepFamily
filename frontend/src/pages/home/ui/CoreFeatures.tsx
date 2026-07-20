@@ -6,7 +6,7 @@ import { PageContainer } from "../../../shared/ui";
 
 const BorderLine = ({ side, className = "" }: { side: "left" | "right"; className?: string }) => (
   <div
-    className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
+    className={`hidden md:block absolute top-0 bottom-0 w-px transition-colors duration-300
       ${side === "left" ? "left-0" : "right-0"}
       ${className}
       group-hover:bg-slate-300
@@ -14,13 +14,13 @@ const BorderLine = ({ side, className = "" }: { side: "left" | "right"; classNam
   >
     {/* Top Cap */}
     <div
-      className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute top-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
     {/* Bottom Cap */}
     <div
-      className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute bottom-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
@@ -99,7 +99,7 @@ const CoreFeatures = memo(() => {
                 {/* Interactive Area Layer (Background & Lines) */}
                 <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
                   {/* Hover Background - Gradient matching Theme */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-r from-orange-50 to-transparent" />
 
                   {/* Left Border Line */}
                   <BorderLine side="left" className="bg-slate-200" />
@@ -108,7 +108,7 @@ const CoreFeatures = memo(() => {
                   <BorderLine side="right" className={rightBorderClass} />
 
                   {/* Mobile Line (Simple left border for <md) */}
-                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-px bg-slate-200" />
                 </div>
 
                 {/* Content Layer */}

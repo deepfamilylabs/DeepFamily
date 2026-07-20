@@ -91,7 +91,7 @@ export default function DecryptMetadataPage() {
   ) => {
     if (mode === "random") {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50 shadow-sm transition-transform hover:scale-105 cursor-default">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50 shadow-xs transition-transform hover:scale-105 cursor-default">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
           {labels.random}
         </span>
@@ -99,7 +99,7 @@ export default function DecryptMetadataPage() {
     }
     if (mode === "deterministic") {
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200/60 dark:bg-gray-800/80 dark:text-gray-300 dark:border-gray-700/60 shadow-sm transition-transform hover:scale-105 cursor-default">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200/60 dark:bg-gray-800/80 dark:text-gray-300 dark:border-gray-700/60 shadow-xs transition-transform hover:scale-105 cursor-default">
           <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500"></span>
           {labels.deterministic}
         </span>
@@ -223,11 +223,11 @@ export default function DecryptMetadataPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between border-b border-gray-200/60 dark:border-gray-800/60 pb-6">
         <div className="space-y-1">
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 drop-shadow-sm">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 drop-shadow-xs">
             {t("decryptMetadata.title", "Decrypt Metadata")}
           </h1>
         </div>
-        <span className="inline-flex px-4 py-1.5 text-xs font-semibold tracking-wide rounded-full bg-orange-50/80 text-orange-700 border border-orange-200/50 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-900/30 backdrop-blur-md shadow-sm">
+        <span className="inline-flex px-4 py-1.5 text-xs font-semibold tracking-wide rounded-full bg-orange-50/80 text-orange-700 border border-orange-200/50 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-900/30 backdrop-blur-md shadow-xs">
           AES-256-GCM <span className="mx-2 opacity-40">·</span> Argon2id
         </span>
       </div>
@@ -250,15 +250,15 @@ export default function DecryptMetadataPage() {
                   {t("decryptMetadata.baseUrl", "Base URL")}
                 </label>
                 <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
-                  <div className="relative flex items-center h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all duration-300 shadow-sm">
+                  <div className="absolute -inset-0.5 bg-linear-to-r from-orange-400 to-red-500 rounded-2xl blur-sm opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
+                  <div className="relative flex items-center h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all duration-300 shadow-xs">
                     <input
                       value={baseUrl}
                       onChange={(e) => setBaseUrl(e.target.value)}
                       onFocus={() => setShowGatewayList(true)}
                       onBlur={() => setTimeout(() => setShowGatewayList(false), 120)}
                       readOnly={!isDev}
-                      className="flex-1 min-w-0 h-full bg-transparent border-none outline-none px-4 text-sm font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                      className="flex-1 min-w-0 h-full bg-transparent border-none outline-hidden px-4 text-sm font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400"
                       placeholder="https://ipfs.io/ipfs/"
                     />
                     <button
@@ -303,11 +303,11 @@ export default function DecryptMetadataPage() {
                   CID
                 </label>
                 <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
+                  <div className="absolute -inset-0.5 bg-linear-to-r from-orange-400 to-red-500 rounded-2xl blur-sm opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
                   <input
                     value={cid}
                     onChange={(e) => setCid(e.target.value)}
-                    className="relative w-full h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 px-4 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-sm placeholder-gray-400"
+                    className="relative w-full h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 px-4 text-sm font-medium focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-xs placeholder-gray-400"
                     placeholder={t("decryptMetadata.cidPlaceholder", "Paste CID")}
                   />
                 </div>
@@ -319,9 +319,9 @@ export default function DecryptMetadataPage() {
                 type="button"
                 onClick={handleFetch}
                 disabled={isFetching || (!isDev && !isBaseUrlAllowlisted)}
-                className="group relative inline-flex items-center gap-2 px-7 h-12 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-sm font-bold transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+                className="group relative inline-flex items-center gap-2 px-7 h-12 rounded-full bg-linear-to-r from-orange-400 to-red-500 text-white text-sm font-bold transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
               >
-                <div className="absolute -inset-1 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur opacity-30 group-hover:opacity-50 transition duration-300"></div>
+                <div className="absolute -inset-1 bg-linear-to-r from-orange-400 to-red-500 rounded-full blur-sm opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative flex items-center gap-2">
                   {isFetching ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -334,7 +334,7 @@ export default function DecryptMetadataPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 px-7 h-12 rounded-full border-2 border-gray-200/80 dark:border-gray-700/80 bg-white/50 dark:bg-gray-800/50 text-sm font-bold text-gray-600 dark:text-gray-300 hover:border-orange-400 hover:text-orange-500 dark:hover:border-orange-500 dark:hover:text-orange-400 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shadow-sm"
+                className="inline-flex items-center gap-2 px-7 h-12 rounded-full border-2 border-gray-200/80 dark:border-gray-700/80 bg-white/50 dark:bg-gray-800/50 text-sm font-bold text-gray-600 dark:text-gray-300 hover:border-orange-400 hover:text-orange-500 dark:hover:border-orange-500 dark:hover:text-orange-400 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shadow-xs"
               >
                 <Upload className="w-4 h-4" />
                 {t("decryptMetadata.upload", "Upload File")}
@@ -354,7 +354,7 @@ export default function DecryptMetadataPage() {
                 {t("decryptMetadata.password", "Decryption Password")}
               </label>
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
+                <div className="absolute -inset-0.5 bg-linear-to-r from-orange-400 to-red-500 rounded-2xl blur-sm opacity-0 group-focus-within:opacity-20 transition duration-500"></div>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -362,7 +362,7 @@ export default function DecryptMetadataPage() {
                     onChange={() => {
                       if (error) setError(null);
                     }}
-                    className="w-full h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 pl-5 pr-14 text-sm font-medium focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-sm placeholder-gray-400"
+                    className="w-full h-14 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 pl-5 pr-14 text-sm font-medium focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-xs placeholder-gray-400"
                     placeholder={t(
                       "decryptMetadata.passwordPlaceholder",
                       "Enter decryption password",
@@ -400,18 +400,18 @@ export default function DecryptMetadataPage() {
             </div>
 
             <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition duration-500 pointer-events-none"></div>
+              <div className="absolute -inset-0.5 bg-linear-to-r from-orange-400 to-red-500 rounded-2xl blur-sm opacity-0 group-focus-within:opacity-20 transition duration-500 pointer-events-none"></div>
               <textarea
                 value={encryptedJson}
                 onChange={(e) => setEncryptedJson(e.target.value)}
-                className="relative w-full min-h-[220px] rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-gray-50/80 dark:bg-gray-950/80 px-5 py-5 text-sm font-mono focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-inner placeholder-gray-400 custom-scrollbar resize-y leading-relaxed text-gray-700 dark:text-gray-300"
+                className="relative w-full min-h-[220px] rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-gray-50/80 dark:bg-gray-950/80 px-5 py-5 text-sm font-mono focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 shadow-inner placeholder-gray-400 custom-scrollbar resize-y leading-relaxed text-gray-700 dark:text-gray-300"
                 placeholder="Encrypted JSON content will appear here..."
               />
             </div>
 
             {payloadMeta && (
               <div className="grid sm:grid-cols-3 gap-4 text-xs">
-                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-sm transition-transform hover:scale-[1.02]">
+                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-xs transition-transform hover:scale-[1.02]">
                   <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                     {t("decryptMetadata.payloadMeta.version", "Format Version")}
                   </span>
@@ -419,7 +419,7 @@ export default function DecryptMetadataPage() {
                     {payloadMeta.version || "—"}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-sm transition-transform hover:scale-[1.02]">
+                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-xs transition-transform hover:scale-[1.02]">
                   <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                     Schema
                   </span>
@@ -427,7 +427,7 @@ export default function DecryptMetadataPage() {
                     {payloadMeta.schema || payloadMeta.aad || "—"}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-sm transition-transform hover:scale-[1.02]">
+                <div className="flex flex-col gap-1.5 px-5 py-4 rounded-xl border border-gray-100/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-900/80 shadow-xs transition-transform hover:scale-[1.02]">
                   <span className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
                     {t("decryptMetadata.payloadMeta.cipher", "Algorithm")}
                   </span>
@@ -440,7 +440,7 @@ export default function DecryptMetadataPage() {
           </div>
 
           {error && (
-            <div className="p-5 rounded-2xl border border-red-200/60 bg-red-50/80 dark:bg-red-900/20 dark:border-red-900/40 text-red-700 dark:text-red-400 text-sm flex items-start gap-3.5 animate-in fade-in slide-in-from-top-4 duration-300 shadow-sm">
+            <div className="p-5 rounded-2xl border border-red-200/60 bg-red-50/80 dark:bg-red-900/20 dark:border-red-900/40 text-red-700 dark:text-red-400 text-sm flex items-start gap-3.5 animate-in fade-in slide-in-from-top-4 duration-300 shadow-xs">
               <div className="p-1.5 rounded-full bg-red-100 dark:bg-red-900/40 shrink-0">
                 <AlertTriangle className="w-4 h-4" />
               </div>
@@ -453,9 +453,9 @@ export default function DecryptMetadataPage() {
               type="button"
               onClick={handleDecrypt}
               disabled={isDecrypting}
-              className="relative group inline-flex items-center justify-center gap-3 px-10 h-16 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-lg font-extrabold transition-all duration-300 hover:scale-[1.03] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 w-full sm:w-auto"
+              className="relative group inline-flex items-center justify-center gap-3 px-10 h-16 rounded-full bg-linear-to-r from-orange-400 to-red-500 text-white text-lg font-extrabold transition-all duration-300 hover:scale-[1.03] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 w-full sm:w-auto"
             >
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-orange-400 to-red-500 rounded-full blur opacity-40 group-hover:opacity-70 transition duration-300"></div>
+              <div className="absolute -inset-1.5 bg-linear-to-r from-orange-400 to-red-500 rounded-full blur-sm opacity-40 group-hover:opacity-70 transition duration-300"></div>
               <div className="relative flex items-center gap-2">
                 {isDecrypting ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
@@ -506,7 +506,7 @@ export default function DecryptMetadataPage() {
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="rounded-xl border border-white/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/60 p-4 space-y-3 shadow-sm transition-colors hover:border-blue-200 dark:hover:border-blue-800">
+                    <div className="rounded-xl border border-white/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/60 p-4 space-y-3 shadow-xs transition-colors hover:border-blue-200 dark:hover:border-blue-800">
                       <div className="text-[10px] font-extrabold tracking-widest uppercase text-blue-600 dark:text-blue-400">
                         {t("decryptMetadata.personIdentityMode", "Person")}
                       </div>
@@ -536,7 +536,7 @@ export default function DecryptMetadataPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-white/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/60 p-4 space-y-3 shadow-sm transition-colors hover:border-blue-200 dark:hover:border-blue-800">
+                    <div className="rounded-xl border border-white/80 dark:border-gray-800/80 bg-white/80 dark:bg-gray-950/60 p-4 space-y-3 shadow-xs transition-colors hover:border-blue-200 dark:hover:border-blue-800">
                       <div className="text-[10px] font-extrabold tracking-widest uppercase text-blue-600 dark:text-blue-400">
                         {t("decryptMetadata.parentIdentityModes", "Parents")}
                       </div>
@@ -569,13 +569,13 @@ export default function DecryptMetadataPage() {
                 </div>
 
                 <div className="relative flex-1 rounded-2xl bg-[#0d1117] dark:bg-black/40 border border-gray-800/40 p-1 overflow-hidden shadow-xl group/code">
-                  <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-[#161b22] to-transparent pointer-events-none z-10" />
+                  <div className="absolute top-0 left-0 w-full h-8 bg-linear-to-b from-[#161b22] to-transparent pointer-events-none z-10" />
                   <div className="absolute top-3 left-4 flex gap-1.5 z-20 opacity-50 group-hover/code:opacity-100 transition-opacity">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
                   </div>
-                  <pre className="h-full pt-10 pb-4 px-5 text-sm text-[#e6edf3] font-mono overflow-auto whitespace-pre-wrap break-words custom-scrollbar leading-relaxed">
+                  <pre className="h-full pt-10 pb-4 px-5 text-sm text-[#e6edf3] font-mono overflow-auto whitespace-pre-wrap wrap-break-word custom-scrollbar leading-relaxed">
                     {JSON.stringify(result, null, 2)}
                   </pre>
                 </div>
@@ -583,7 +583,7 @@ export default function DecryptMetadataPage() {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border-2 border-dashed border-gray-200/80 dark:border-gray-700/80 bg-gray-50/40 dark:bg-gray-900/20 group/lock transition-colors hover:border-orange-300 dark:hover:border-orange-700/50">
                 <div className="relative w-20 h-20 mb-6 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 rounded-full scale-100 group-hover/lock:scale-110 group-hover/lock:bg-orange-50 dark:group-hover/lock:bg-orange-900/20 transition-all duration-500 ease-out shadow-sm" />
+                  <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 rounded-full scale-100 group-hover/lock:scale-110 group-hover/lock:bg-orange-50 dark:group-hover/lock:bg-orange-900/20 transition-all duration-500 ease-out shadow-xs" />
                   <Lock className="w-8 h-8 text-gray-400 dark:text-gray-500 relative z-10 group-hover/lock:text-orange-500 transition-colors duration-300" />
                 </div>
                 <h4 className="text-base font-bold text-gray-700 dark:text-gray-300 mb-2">

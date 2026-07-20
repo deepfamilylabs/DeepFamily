@@ -89,10 +89,10 @@ function PersonStoryCard({
   return (
     <div
       onMouseEnter={handleMouseEnter}
-      className="group relative flex flex-col h-full bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 overflow-hidden"
+      className="group relative flex flex-col h-full bg-linear-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-4xl border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 overflow-hidden"
     >
       {/* Top accent light - subtle gradient line */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-orange-400/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-linear-to-r from-transparent via-orange-400/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
       <div className="relative flex-1 flex flex-col p-6 z-10">
         {/* Avatar Header */}
@@ -100,7 +100,7 @@ function PersonStoryCard({
           {/* Glow effect behind avatar */}
           <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-          <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-xl shadow-orange-500/20 group-hover:scale-105 transition-transform duration-500 ring-4 ring-white dark:ring-gray-900">
+          <div className="relative w-24 h-24 rounded-full bg-linear-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-xl shadow-orange-500/20 group-hover:scale-105 transition-transform duration-500 ring-4 ring-white dark:ring-gray-900">
             <User className="w-10 h-10 text-white" strokeWidth={2} />
           </div>
           {hasDetailedStory && (
@@ -118,7 +118,7 @@ function PersonStoryCard({
 
         {/* Name and Badges */}
         <div className="text-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-orange-500 transition-colors duration-300 line-clamp-2 min-h-[3.5rem]">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-orange-500 transition-colors duration-300 line-clamp-2 min-h-14">
             {person.fullName || `Person #${shortHash(person.personHash)}`}
           </h3>
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -154,7 +154,7 @@ function PersonStoryCard({
         <div className="space-y-2 mb-6 flex-1">
           {(formatDate.birth || person.birthPlace) && (
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
-              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
+              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
                 <Baby className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
               </div>
               <div className="flex-1 min-w-0">
@@ -170,7 +170,7 @@ function PersonStoryCard({
 
           {(formatDate.death || person.deathPlace) && (
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
-              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center flex-shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
+              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
                 <Flower2 className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
               </div>
               <div className="flex-1 min-w-0">
@@ -216,7 +216,7 @@ function PersonStoryCard({
 
           <button
             onClick={() => onOpen(person)}
-            className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white hover:!bg-orange-600 hover:scale-110 transition-all duration-300 shadow-lg shadow-gray-200 dark:shadow-none"
+            className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white hover:bg-orange-600! hover:scale-110 transition-all duration-300 shadow-lg shadow-gray-200 dark:shadow-none"
             aria-label={t("common.open", "Open details")}
           >
             <ChevronRight className="w-5 h-5" />

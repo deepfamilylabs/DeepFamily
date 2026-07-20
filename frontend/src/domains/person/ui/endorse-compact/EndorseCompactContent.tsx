@@ -209,7 +209,7 @@ export default function EndorseCompactModal({
       <div className="space-y-8">
         {/* Header Section */}
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
+          <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
             <Star className="w-8 h-8 fill-current" />
           </div>
           <div>

@@ -49,7 +49,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
       <header className="flex items-end justify-between gap-4 pb-2">
         <div className="min-w-0 space-y-1">
           <h2 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
+            <span className="bg-clip-text text-transparent bg-linear-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
               {editor.titleText}
             </span>
             {editor.isSealed && <Lock className="text-orange-500" size={24} />}
@@ -156,7 +156,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                       }
                       onKeyDown={handleChunkTypeKeyDown}
                       disabled={editor.submitting}
-                      className="w-full flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
+                      className="w-full flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
                       aria-haspopup="listbox"
                       aria-expanded={form.showChunkTypeDropdown}
                       aria-controls={form.showChunkTypeDropdown ? chunkTypeListboxId : undefined}
@@ -171,7 +171,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                       </div>
                       <ChevronDown
                         size={16}
-                        className={`flex-shrink-0 text-gray-400 transition-transform ${form.showChunkTypeDropdown ? "rotate-180" : ""}`}
+                        className={`shrink-0 text-gray-400 transition-transform ${form.showChunkTypeDropdown ? "rotate-180" : ""}`}
                       />
                     </button>
 
@@ -207,7 +207,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                                 {isSelected && (
                                   <Check
                                     size={16}
-                                    className="flex-shrink-0 text-orange-600 dark:text-orange-400"
+                                    className="shrink-0 text-orange-600 dark:text-orange-400"
                                   />
                                 )}
                               </button>
@@ -229,7 +229,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                       "storyChunkEditor.attachmentPlaceholder",
                       "CID (e.g. bafy...) or leave empty",
                     )}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 transition-all hover:border-gray-300 hover:bg-gray-50 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-600"
                     disabled={editor.submitting}
                   />
                 </div>
@@ -282,7 +282,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                   !form.data.content.trim() ||
                   form.byteLength > form.maxBytes
                 }
-                className="flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-400 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:scale-[1.02] hover:shadow-orange-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
+                className="flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-400 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:scale-[1.02] hover:shadow-orange-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
                 type="button"
               >
                 <Save size={16} />

@@ -34,14 +34,14 @@ function FormSection({ title, icon: Icon, defaultOpen = false, children }: FormS
   };
 
   return (
-    <div className="relative z-10 hover:z-40 focus-within:z-50 border border-slate-200/60 dark:border-slate-700/50 rounded-xl mb-3 bg-slate-50/50 dark:bg-slate-800/30 transition-all duration-300 shadow-sm hover:shadow-md dark:shadow-none">
+    <div className="relative z-10 hover:z-40 focus-within:z-50 border border-slate-200/60 dark:border-slate-700/50 rounded-xl mb-3 bg-slate-50/50 dark:bg-slate-800/30 transition-all duration-300 shadow-xs hover:shadow-md dark:shadow-none">
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between p-3.5 bg-slate-50/60 dark:bg-slate-800/60 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-colors rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+        className="w-full flex items-center justify-between p-3.5 bg-slate-50/60 dark:bg-slate-800/60 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-colors rounded-xl focus:outline-hidden focus:ring-2 focus:ring-orange-500/30"
       >
         <div className="flex items-center gap-2.5 text-slate-700 dark:text-slate-200">
-          <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 text-orange-500">
+          <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg shadow-xs border border-slate-100 dark:border-slate-700 text-orange-500">
             <Icon className="w-4 h-4" />
           </div>
           <span className="font-semibold text-sm tracking-tight">{title}</span>

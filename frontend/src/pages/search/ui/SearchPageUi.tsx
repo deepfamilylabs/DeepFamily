@@ -5,7 +5,7 @@ import { formatHashMiddle } from "../../../shared/model";
 export function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <div className="text-xs text-red-500 font-medium leading-snug whitespace-normal break-words w-full mt-1 ml-1">
+    <div className="text-xs text-red-500 font-medium leading-snug whitespace-normal wrap-break-word w-full mt-1 ml-1">
       {message}
     </div>
   );
@@ -24,7 +24,7 @@ export function SectionCard({
 }) {
   return (
     <div
-      className={`group relative overflow-hidden rounded-3xl bg-white dark:bg-black border border-gray-100 dark:border-gray-800 transition-all duration-500 ${isOpen ? "shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50" : "shadow-sm hover:shadow-md"}`}
+      className={`group relative overflow-hidden rounded-3xl bg-white dark:bg-black border border-gray-100 dark:border-gray-800 transition-all duration-500 ${isOpen ? "shadow-2xl shadow-gray-200/50 dark:shadow-gray-900/50" : "shadow-xs hover:shadow-md"}`}
     >
       <div
         className="p-6 flex items-center justify-between cursor-pointer select-none"
@@ -32,10 +32,10 @@ export function SectionCard({
       >
         <div className="flex items-center gap-4">
           <div
-            className={`w-1.5 h-6 rounded-full bg-gradient-to-b from-orange-400 to-red-500 transition-all duration-500 ${isOpen ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0"}`}
+            className={`w-1.5 h-6 rounded-full bg-linear-to-b from-orange-400 to-red-500 transition-all duration-500 ${isOpen ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0"}`}
           />
           <h3
-            className={`text-lg font-bold transition-all duration-300 ${isOpen ? "bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400" : "text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200"}`}
+            className={`text-lg font-bold transition-all duration-300 ${isOpen ? "bg-clip-text text-transparent bg-linear-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400" : "text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200"}`}
           >
             {title}
           </h3>
@@ -62,7 +62,7 @@ export const Input = React.forwardRef<
 >(({ className = "", ...props }, ref) => (
   <input
     ref={ref}
-    className={`w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300 ${className}`}
+    className={`w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300 ${className}`}
     {...props}
   />
 ));
@@ -74,7 +74,7 @@ export function ButtonPrimary({
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`px-6 py-2.5 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
+      className={`px-6 py-2.5 rounded-full bg-linear-to-r from-orange-400 to-red-500 text-white font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
       {...props}
     />
   );

@@ -41,7 +41,7 @@ export default function ViewContainer({
       <TreeListView />
     )
   ) : (
-    <div className="w-full min-h-[520px] md:min-h-[680px] bg-gradient-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 flex items-center justify-center">
+    <div className="w-full min-h-[520px] md:min-h-[680px] bg-linear-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 flex items-center justify-center">
       {loading ? (
         <LoadingSkeleton />
       ) : contractMessage ? (

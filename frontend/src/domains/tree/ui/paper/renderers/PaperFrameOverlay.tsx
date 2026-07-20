@@ -19,7 +19,7 @@ export function PaperFrameOverlay() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute z-[1]"
+      className="pointer-events-none absolute z-1"
       style={{
         top: "var(--df-paper-frame-pad-tb)",
         bottom: "var(--df-paper-frame-pad-tb)",

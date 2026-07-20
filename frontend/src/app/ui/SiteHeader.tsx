@@ -47,7 +47,7 @@ const SiteHeader = memo(() => {
 
   return (
     <header
-      className={`sticky top-0 z-[100] w-full transition-all duration-300 ${
+      className={`sticky top-0 z-100 w-full transition-all duration-300 ${
         isHomePage
           ? "bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-white/20 dark:border-white/10"
           : "bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-gray-800"
@@ -65,17 +65,17 @@ const SiteHeader = memo(() => {
           </button>
           <NavLink
             to="/"
-            className="flex items-center gap-1.5 group focus:outline-none"
+            className="flex items-center gap-1.5 group focus:outline-hidden"
             onClick={() => handleNavClick("/")}
           >
-            <Logo className="w-7 h-7 flex-shrink-0 text-orange-500 hover:-rotate-90 transition-transform duration-300" />
+            <Logo className="w-7 h-7 shrink-0 text-orange-500 hover:-rotate-90 transition-transform duration-300" />
             <div className="inline-flex items-baseline gap-1">
-              <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
+              <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-linear-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
                 Deepfamily
               </span>
               {badgeConfig && (
                 <span
-                  className={`hidden sm:inline-flex text-[9px] font-bold px-1.5 py-1 rounded ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider pointer-events-none`}
+                  className={`hidden sm:inline-flex text-[9px] font-bold px-1.5 py-1 rounded-sm ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider pointer-events-none`}
                 >
                   {badgeConfig.text}
                 </span>

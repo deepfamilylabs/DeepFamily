@@ -44,14 +44,14 @@ function ChunkListCard({ person }: { person: PersonPageController }) {
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
           {t("person.chunkList", "Chunk List")}
           {data.storyChunks && data.storyChunks.length > 0 && (
-            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-sm">
               {data.storyChunks.length}
             </span>
           )}
         </h3>
       </div>
       {sortedChunks.length > 0 ? (
-        <div className="divide-y divide-gray-200 dark:divide-gray-800 max-h-[500px] overflow-y-auto [scrollbar-gutter:stable]">
+        <div className="divide-y divide-gray-200 dark:divide-gray-800 max-h-[500px] overflow-y-auto scrollbar-gutter-stable">
           {sortedChunks.map((chunk) => (
             <ChunkListItem key={chunk.chunkIndex} chunk={chunk} person={person} />
           ))}
@@ -95,9 +95,9 @@ function ChunkListItem({
             person.toggleChunk(chunk.chunkIndex);
           }
         }}
-        className="w-full text-left flex items-start gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+        className="w-full text-left flex items-start gap-1.5 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 rounded-sm"
       >
-        <span className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0">
+        <span className="mt-0.5 text-gray-400 dark:text-gray-500 shrink-0">
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
         <div className="flex-1 min-w-0">
@@ -152,7 +152,7 @@ function ChunkDetails({
       onClick={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <User size={12} className="flex-shrink-0" />
+        <User size={12} className="shrink-0" />
         {chunk.editor ? (
           <>
             <span className="truncate" title={chunk.editor}>
@@ -170,12 +170,12 @@ function ChunkDetails({
         )}
       </div>
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <Clock size={12} className="flex-shrink-0" />
+        <Clock size={12} className="shrink-0" />
         <span>{formatUnixSeconds(chunk.timestamp)}</span>
       </div>
       {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          <Link size={12} className="flex-shrink-0" />
+          <Link size={12} className="shrink-0" />
           <span className="truncate font-mono" title={chunk.attachmentCID}>
             {chunk.attachmentCID.length > 20
               ? `${chunk.attachmentCID.slice(0, 8)}...${chunk.attachmentCID.slice(-8)}`
@@ -190,7 +190,7 @@ function ChunkDetails({
         </div>
       )}
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <Hash size={12} className="flex-shrink-0" />
+        <Hash size={12} className="shrink-0" />
         <span className="font-mono truncate" title={chunk.chunkHash}>
           {formatHashMiddle(chunk.chunkHash)}
         </span>
@@ -308,7 +308,7 @@ function DesktopCopyValue({
       <div className="text-gray-500 dark:text-gray-400 text-xs mb-1.5">{label}</div>
       <div className="flex items-center">
         <div
-          className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700"
+          className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-sm select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700"
           title={title}
         >
           {value}

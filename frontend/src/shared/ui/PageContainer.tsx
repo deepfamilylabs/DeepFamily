@@ -16,7 +16,7 @@ interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
 const sizeMap: Record<NonNullable<PageContainerProps["size"]>, string> = {
   default: "max-w-7xl",
   narrow: "max-w-3xl",
-  wide: "max-w-screen-xl",
+  wide: "max-w-(--breakpoint-xl)",
   full: "w-full max-w-none",
 };
 

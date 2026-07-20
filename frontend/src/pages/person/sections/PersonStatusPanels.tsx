@@ -5,11 +5,11 @@ export function PersonLoadingState() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
       <div className="animate-pulse w-full max-w-4xl px-4">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-6" />
+        <div className="h-6 bg-gray-200 rounded-sm w-1/3 mb-6" />
         <div className="space-y-3">
-          <div className="h-4 bg-gray-200 rounded" />
-          <div className="h-4 bg-gray-200 rounded w-5/6" />
-          <div className="h-4 bg-gray-200 rounded w-2/3" />
+          <div className="h-4 bg-gray-200 rounded-sm" />
+          <div className="h-4 bg-gray-200 rounded-sm w-5/6" />
+          <div className="h-4 bg-gray-200 rounded-sm w-2/3" />
         </div>
       </div>
     </div>
@@ -25,18 +25,18 @@ export function PersonErrorAlert({ person }: { person: PersonPageController }) {
     <div className="pb-4">
       <div
         role="alert"
-        className="mb-6 flex flex-col sm:flex-row sm:items-start gap-4 rounded-xl border border-red-300 dark:border-red-700/50 bg-red-50/80 dark:bg-red-900/30 p-5 shadow-sm"
+        className="mb-6 flex flex-col sm:flex-row sm:items-start gap-4 rounded-xl border border-red-300 dark:border-red-700/50 bg-red-50/80 dark:bg-red-900/30 p-5 shadow-xs"
       >
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">
             {t("person.fetchFailed", "Failed to load token")}
           </p>
-          <p className="text-sm text-red-600 dark:text-red-200 break-words">{person.error}</p>
+          <p className="text-sm text-red-600 dark:text-red-200 wrap-break-word">{person.error}</p>
         </div>
         <div className="flex gap-2 shrink-0">
           <button
             onClick={person.retry}
-            className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 hover:bg-red-700 text-white shadow-sm"
+            className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-600 hover:bg-red-700 text-white shadow-xs"
           >
             {t("common.retry", "Retry")}
           </button>

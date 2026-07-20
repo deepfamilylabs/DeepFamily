@@ -137,7 +137,7 @@ function CoverStyleThumbnail({ styleId }: { styleId: PaperCoverStyleId }) {
 
   return (
     <span
-      className="relative block h-14 w-10 overflow-hidden rounded-[2px] border border-current/50 bg-[#f4eddd] shadow-sm dark:bg-slate-800"
+      className="relative block h-14 w-10 overflow-hidden rounded-[2px] border border-current/50 bg-[#f4eddd] shadow-xs dark:bg-slate-800"
       aria-hidden="true"
       data-testid={`paper-cover-style-thumbnail-${styleId}`}
     >
@@ -201,7 +201,7 @@ function SettingsSwitch({
         }`}
       >
         <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-xs transition-transform ${
             checked ? "translate-x-[18px]" : "translate-x-0.5"
           }`}
         />
@@ -295,13 +295,13 @@ export default function GenealogyBookPage() {
   const defaultHallName = t("genealogyBook.ouHallName", "DeepFamily");
   const hallNameInputValue = appearance.hallName ?? defaultHallName;
   const fieldInputClassName =
-    "h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-stone-400 hover:border-orange-300 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-orange-700 dark:focus:border-orange-400 dark:focus:ring-orange-400/30";
+    "h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-slate-900 shadow-xs transition-colors placeholder:text-stone-400 hover:border-orange-300 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-orange-700 dark:focus:border-orange-400 dark:focus:ring-orange-400/30";
   const segmentGroupClassName =
     "inline-flex w-full items-center gap-1 rounded-md border border-stone-200 bg-stone-100 p-1 dark:border-slate-700 dark:bg-slate-900";
   const segmentButtonClassName = (selected: boolean) =>
-    `h-7 flex-1 rounded px-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
+    `h-7 flex-1 rounded px-1 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
       selected
-        ? "bg-white text-orange-700 shadow-sm ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
+        ? "bg-white text-orange-700 shadow-xs ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
         : "text-stone-600 hover:bg-white/70 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-orange-200"
     }`;
   const optionCardStateClassName = (selected: boolean) =>
@@ -309,9 +309,9 @@ export default function GenealogyBookPage() {
       ? "border-orange-400 bg-orange-50/70 text-orange-800 ring-1 ring-orange-500/20 dark:border-orange-600 dark:bg-orange-950/30 dark:text-orange-200 dark:ring-orange-400/20"
       : "border-stone-200 bg-white text-stone-600 hover:border-orange-300 hover:bg-orange-50/50 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-orange-800 dark:hover:bg-orange-950/10 dark:hover:text-orange-200";
   const rangeInputClassName =
-    "w-full cursor-pointer accent-orange-500 transition-opacity hover:accent-orange-600 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/30 dark:accent-orange-400 dark:hover:accent-orange-300";
+    "w-full cursor-pointer accent-orange-500 transition-opacity hover:accent-orange-600 hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/30 dark:accent-orange-400 dark:hover:accent-orange-300";
   const settingsSummaryClassName =
-    "flex cursor-pointer list-none items-center justify-between gap-2 rounded-md px-0.5 py-1.5 text-[13px] font-semibold leading-5 text-slate-800 transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 dark:text-slate-100 dark:hover:text-orange-200 [&::-webkit-details-marker]:hidden";
+    "flex cursor-pointer list-none items-center justify-between gap-2 rounded-md px-0.5 py-1.5 text-[13px] font-semibold leading-5 text-slate-800 transition-colors hover:text-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 dark:text-slate-100 dark:hover:text-orange-200 [&::-webkit-details-marker]:hidden";
 
   // Mirror the view model's translate wrapper so the page derives the same auto spine title that
   // the renderers fall back to when the override is blank.
@@ -421,9 +421,9 @@ export default function GenealogyBookPage() {
                     key={item}
                     type="button"
                     onClick={() => setStyle(item)}
-                    className={`h-7 shrink-0 rounded px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
+                    className={`h-7 shrink-0 rounded px-2.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
                       style === item
-                        ? "bg-white text-orange-700 shadow-sm ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
+                        ? "bg-white text-orange-700 shadow-xs ring-1 ring-orange-500/20 dark:bg-slate-700 dark:text-orange-200 dark:ring-orange-400/20"
                         : "text-stone-600 hover:bg-white/70 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-orange-200"
                     }`}
                     aria-pressed={style === item}
@@ -444,7 +444,7 @@ export default function GenealogyBookPage() {
               type="button"
               onClick={refresh}
               disabled={loading}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition-colors hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-orange-800 dark:hover:bg-orange-950/20 dark:hover:text-orange-200"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition-colors hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-orange-800 dark:hover:bg-orange-950/20 dark:hover:text-orange-200"
               title={t("familyTree.actions.refresh", "Refresh")}
               aria-label={t("familyTree.actions.refresh", "Refresh")}
               data-testid="paper-refresh-button"
@@ -458,7 +458,7 @@ export default function GenealogyBookPage() {
                 exportPdf(exportRef.current, style, paperVars, appearance.exportMarginPx)
               }
               disabled={!hasRoot || loading || exporting}
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-orange-600 bg-orange-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:border-orange-700 hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 dark:border-orange-500 dark:bg-orange-500 dark:hover:border-orange-400 dark:hover:bg-orange-400"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-orange-600 bg-orange-600 px-3 text-xs font-semibold text-white shadow-xs transition-colors hover:border-orange-700 hover:bg-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 dark:border-orange-500 dark:bg-orange-500 dark:hover:border-orange-400 dark:hover:bg-orange-400"
               title={t("genealogyBook.exportPdf", "Export PDF")}
               data-testid="paper-export-button"
             >
@@ -489,7 +489,7 @@ export default function GenealogyBookPage() {
               type="button"
               onClick={resetDisplaySettings}
               disabled={!hasCustomDisplaySettings}
-              className="shrink-0 text-xs font-medium text-stone-600 transition-colors hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:text-orange-200"
+              className="shrink-0 text-xs font-medium text-stone-600 transition-colors hover:text-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:text-orange-200"
               title={t("genealogyBook.settings.resetDefault", "Reset defaults")}
               data-testid="paper-reset-display-settings"
             >
@@ -618,7 +618,7 @@ export default function GenealogyBookPage() {
                             key={id}
                             type="button"
                             onClick={() => updateAppearance({ coverStyleId: id })}
-                            className={`flex min-h-[92px] flex-col items-center justify-center gap-1.5 rounded-md border p-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                            className={`flex min-h-[92px] flex-col items-center justify-center gap-1.5 rounded-md border p-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
                             aria-pressed={selected}
                             data-testid={`paper-cover-style-${id}`}
                           >
@@ -749,11 +749,11 @@ export default function GenealogyBookPage() {
                         onClick={() => updateAppearance({ colorThemeId: id })}
                         aria-pressed={selected}
                         title={colorThemeLabels[id]}
-                        className={`group/option flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                        className={`group/option flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
                         data-testid={`paper-color-theme-${id}`}
                       >
                         <span
-                          className="flex h-5 w-5 shrink-0 overflow-hidden rounded-sm border border-black/10"
+                          className="flex h-5 w-5 shrink-0 overflow-hidden rounded-xs border border-black/10"
                           aria-hidden="true"
                         >
                           <span className="h-full w-1/3" style={{ backgroundColor: sheet }} />
@@ -822,7 +822,7 @@ export default function GenealogyBookPage() {
                         onClick={() => updateAppearance({ borderStyleId: id })}
                         aria-pressed={selected}
                         title={borderStyleLabels[id]}
-                        className={`group/option flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
+                        className={`group/option flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/40 ${optionCardStateClassName(selected)}`}
                         data-testid={`paper-border-style-${id}`}
                       >
                         <span

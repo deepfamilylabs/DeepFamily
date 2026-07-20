@@ -47,7 +47,7 @@ export default function NetworkPicker({
           <button
             type="button"
             onClick={() => setOpen(!isOpen)}
-            className="w-full px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all duration-200 shadow-sm border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500 flex items-center justify-between"
+            className="w-full px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all duration-200 shadow-xs border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500 flex items-center justify-between"
           >
             <span className="truncate">
               {selected === "custom"
@@ -76,7 +76,7 @@ export default function NetworkPicker({
                     className={`${buttonClass} ${selected === n.chainId ? itemActive : itemIdle}`}
                   >
                     <span className="truncate">{n.name}</span>
-                    {selected === n.chainId && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                    {selected === n.chainId && <Check className="w-3.5 h-3.5 shrink-0" />}
                   </button>
                 ))}
 
@@ -99,7 +99,7 @@ export default function NetworkPicker({
                       >
                         <span className="truncate">{n.name}</span>
                         {selected === n.chainId && (
-                          <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                          <Check className="w-3.5 h-3.5 shrink-0" />
                         )}
                       </button>
                     ))}
@@ -119,7 +119,7 @@ export default function NetworkPicker({
                   <span className="truncate">
                     {t("familyTree.config.customNetwork", "Custom network")}
                   </span>
-                  {selected === "custom" && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                  {selected === "custom" && <Check className="w-3.5 h-3.5 shrink-0" />}
                 </button>
               </div>
             </div>
@@ -130,7 +130,7 @@ export default function NetworkPicker({
           type="text"
           value={rpcUrl}
           readOnly
-          className={`flex-1 px-3 py-1.5 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 shadow-sm ${
+          className={`flex-1 px-3 py-1.5 text-xs font-mono rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 shadow-xs ${
             rpcError
               ? "border-red-400 focus:border-red-500 focus:ring-red-500/60 dark:border-red-500"
               : "border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 hover:border-orange-400 dark:hover:border-orange-500"

@@ -148,7 +148,7 @@ export default function ActionsPage() {
       <PageContainer className="py-12">
         <div className="max-w-2xl mx-auto text-center">
           <div className="mb-8 relative inline-block">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-red-500 blur-xl opacity-20 rounded-full"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-orange-400 to-red-500 blur-xl opacity-20 rounded-full"></div>
             <div className="relative bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg">
               <Wallet className="w-12 h-12 text-orange-500" />
             </div>
@@ -258,7 +258,7 @@ export default function ActionsPage() {
                 className="p-12 animate-in fade-in slide-in-from-bottom-4 duration-500"
               >
                 <div className="text-center mb-10">
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/10 mb-6 shadow-inner">
+                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-linear-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/10 mb-6 shadow-inner">
                     <Icon className="w-10 h-10 text-orange-500" />
                   </div>
                   <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
@@ -273,7 +273,7 @@ export default function ActionsPage() {
                   {tab.id === "add-version" && (
                     <button
                       onClick={() => setAddVersionModal({ isOpen: true })}
-                      className="w-full px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
+                      className="w-full px-8 py-4 bg-linear-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
                     >
                       {t("actions.startAddVersion", "Start Adding Version")}
                     </button>
@@ -289,7 +289,7 @@ export default function ActionsPage() {
                             versionIndex: undefined,
                           })
                         }
-                        className="w-full px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
+                        className="w-full px-8 py-4 bg-linear-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
                       >
                         {t("actions.openMintNFT", "Open NFT Minting")}
                       </button>
@@ -306,7 +306,7 @@ export default function ActionsPage() {
                             versionIndex: undefined,
                           })
                         }
-                        className="w-full px-8 py-4 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
+                        className="w-full px-8 py-4 bg-linear-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
                       >
                         {t("actions.openEndorse", "Open Endorsement")}
                       </button>

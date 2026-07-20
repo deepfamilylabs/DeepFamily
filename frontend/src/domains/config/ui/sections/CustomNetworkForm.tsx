@@ -26,7 +26,7 @@ export default function CustomNetworkForm({
   const { t } = useTranslation();
 
   const inputClass =
-    "px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 shadow-sm";
+    "px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 shadow-xs";
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-3 space-y-2.5">
@@ -71,7 +71,7 @@ export default function CustomNetworkForm({
         <button
           type="button"
           onClick={submit}
-          className="shrink-0 px-3 py-1.5 text-xs rounded-full bg-gradient-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+          className="shrink-0 px-3 py-1.5 text-xs rounded-full bg-linear-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white font-semibold shadow-xs hover:shadow-md transition-all duration-200"
         >
           {t("familyTree.config.addCustomNetwork", "Save custom")}
         </button>

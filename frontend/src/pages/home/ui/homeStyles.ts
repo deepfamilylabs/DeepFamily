@@ -6,7 +6,7 @@ export const HERO_STYLES = {
   container: "relative text-center z-10 w-full",
   // Subtle grid pattern for texture
   backgroundOverlay:
-    "absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none",
+    "absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-size-[24px_24px] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none",
   gradientOverlay: "hidden", // Removed heavy overlay to keep it clean
 } as const;
 
@@ -35,7 +35,7 @@ export const TAG_STRIP_STYLES = {
   container: "animate-fade-in-up animation-delay-500 mt-16 mb-12",
   wrapper: "flex flex-wrap items-center justify-center gap-3 max-w-4xl mx-auto px-4",
   tagBase:
-    "flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-sm transition-all hover:scale-105 hover:shadow-md cursor-default",
+    "flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-xs transition-all hover:scale-105 hover:shadow-md cursor-default",
   dotBase: "w-1.5 h-1.5 rounded-full animate-pulse",
   text: "text-xs font-semibold text-slate-600 tracking-wide uppercase",
 } as const;
@@ -46,10 +46,10 @@ export const CTA_BUTTON_STYLES = {
     "animate-fade-in-up animation-delay-400 flex flex-col sm:flex-row items-center justify-center gap-5 px-4",
   // Primary: Orange/Red Gradient
   primaryButton:
-    "group relative inline-flex items-center justify-center px-10 py-4 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white font-bold text-base hover:shadow-lg hover:shadow-orange-500/25 hover:scale-105 transition-all duration-300 overflow-hidden",
+    "group relative inline-flex items-center justify-center px-10 py-4 rounded-full bg-linear-to-r from-orange-400 to-red-500 text-white font-bold text-base hover:shadow-lg hover:shadow-orange-500/25 hover:scale-105 transition-all duration-300 overflow-hidden",
   // Secondary: Clean White/Gray
   secondaryButton:
-    "group inline-flex items-center justify-center px-10 py-4 rounded-full bg-white text-slate-600 font-bold text-base border border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-300 shadow-sm hover:shadow-md",
+    "group inline-flex items-center justify-center px-10 py-4 rounded-full bg-white text-slate-600 font-bold text-base border border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-300 shadow-xs hover:shadow-md",
   blueSecondary: "",
   greenSecondary: "",
   overlay:
@@ -61,11 +61,11 @@ export const CTA_BUTTON_STYLES = {
 // Hero content styles - High Key Typography
 export const HERO_CONTENT_STYLES = {
   badge:
-    "inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 mb-8 text-slate-600 shadow-sm",
+    "inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 mb-8 text-slate-600 shadow-xs",
   badgeIcon: "w-3.5 h-3.5 text-orange-500",
   badgeText: "text-xs font-bold tracking-wider uppercase",
   title:
-    "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight text-slate-900 mb-8 max-w-5xl mx-auto leading-[1.1] drop-shadow-sm",
+    "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight text-slate-900 mb-8 max-w-5xl mx-auto leading-[1.1] drop-shadow-xs",
   titleGradient: "", // Removed gradient text for pure black elegance
   subtitle:
     "text-xl sm:text-2xl text-slate-500 max-w-3xl mx-auto mb-12 leading-relaxed font-normal",
