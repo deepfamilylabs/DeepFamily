@@ -25,7 +25,7 @@ struct PersonBasicInfo {
     uint16 birthYear;           // Birth year (0=unknown)
     uint8 birthMonth;           // Birth month (1-12, 0=unknown)
     uint8 birthDay;             // Birth day (1-31, 0=unknown)
-    uint8 gender;               // Gender (0=unknown, 1=male, 2=female, 3=other)
+    uint8 gender;               // Gender code (0=unknown, 1=male, 2=female, 3=other, 4-255=custom)
 }
 ```
 
@@ -35,6 +35,9 @@ struct PersonBasicInfo {
 - `derivedSecretField`
 - packed birth / gender fields
 - `schemaVersion`, `cryptoSuiteVersion`, and `hashAlgoId`
+
+The packed field uses non-overlapping bit ranges: `birthYear[25..40]`,
+`birthMonth[17..24]`, `birthDay[9..16]`, `gender[1..8]`, and `isBirthBC[0]`.
 
 #### PersonVersion
 ```solidity
@@ -124,9 +127,10 @@ function addPersonVersion(
 5. Routes to `_addPersonInternal()` for family tree update
 
 **Mining Reward Semantics**:
-- A reward is issued for every unique version hash whose proof-derived father and mother identity commitments are both non-zero.
-- The version hash binds `personHash`, both parent hashes, both parent version indices, and `tag`. Consequently, the same person may receive another reward for a genuinely distinct version hash.
-- A parent version index of `0` means “unspecified”. Reward eligibility requires both proof-derived parent hashes, but does not require those parents to already have non-zero on-chain version indices.
+- Each `personHash` can receive at most one mining reward, on its first version whose proof-derived father and mother identity commitments are both non-zero.
+- A person may be added without parents and claim the one-time reward later when a complete-parent version is submitted.
+- Parent records do not need to exist on-chain. Both parent version indices may remain `0` (“unspecified”).
+- Later versions, including replaying the same proof with a different free-form `tag`, do not mint another reward for that person.
 
 #### Community Endorsement
 ```solidity

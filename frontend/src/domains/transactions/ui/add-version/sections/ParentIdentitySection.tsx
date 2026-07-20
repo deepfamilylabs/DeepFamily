@@ -138,7 +138,7 @@ export function ParentIdentitySection({
               <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed opacity-90">
                 {t(
                   "addVersion.parentInfoNotice",
-                  "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and earns DEEP token rewards. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
+                  "Providing both parents locally generates zero-knowledge proofs for family linking (only hashes go on-chain). The first complete two-parent commitment for a person hash may receive DEEP utility points; parents do not need to exist on-chain first. Their details must match when linking to their identities later.",
                 )}
               </p>
             </div>

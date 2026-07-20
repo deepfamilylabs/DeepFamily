@@ -12,7 +12,9 @@ import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
-  const { deepFamilyReader } = await ensureIntegratedSystem(connection);
+  const { deepFamilyReader } = await ensureIntegratedSystem(connection, {
+    artifacts: hre.artifacts,
+  });
   const tokenId = BigInt(args.tokenid);
   const offset = Number(args.offset);
   const limit = Number(args.limit);

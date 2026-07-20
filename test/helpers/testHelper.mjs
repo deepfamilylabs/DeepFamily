@@ -477,9 +477,9 @@ export async function makeProtocolFeeAttestationRef(
 
 export function packBirthGenderField({ birthYear = 0, birthMonth = 0, birthDay = 0, gender = 0, isBirthBC = false }) {
   return (
-    (BigInt(birthYear) << 24n) |
-    (BigInt(birthMonth) << 16n) |
-    (BigInt(birthDay) << 8n) |
+    (BigInt(birthYear) << 25n) |
+    (BigInt(birthMonth) << 17n) |
+    (BigInt(birthDay) << 9n) |
     (BigInt(gender) << 1n) |
     (isBirthBC ? 1n : 0n)
   )

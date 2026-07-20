@@ -94,9 +94,9 @@ export function packBirthGenderField(input: {
   gender: number;
 }): bigint {
   return (
-    (BigInt(input.birthYear) << 24n) |
-    (BigInt(input.birthMonth) << 16n) |
-    (BigInt(input.birthDay) << 8n) |
+    (BigInt(input.birthYear) << 25n) |
+    (BigInt(input.birthMonth) << 17n) |
+    (BigInt(input.birthDay) << 9n) |
     (BigInt(input.gender) << 1n) |
     (input.isBirthBC ? 1n : 0n)
   );

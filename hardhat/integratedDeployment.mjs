@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 
 const GROTH16_PROOF_SYSTEM_ID = 1;
 const PROOF_PURPOSE_PERSON_COMMITMENT = 0;
@@ -103,6 +104,52 @@ const assertErc1967Proxy = async (ethers, contractName, deployment) => {
       `Deployment ${contractName} at ${address} points at implementation ${implAddress} ` +
         "which has no code on this network",
     );
+  }
+  return implAddress;
+};
+
+// A deployment file is an address book, not proof that those addresses run the code from the
+// current checkout. When current Hardhat artifacts are available (deploy/seed/check-root paths),
+// compare every protocol module that affects identity/proof semantics before reusing it. Local
+// development can then redeploy a coherent module set; live networks must use the explicit upgrade
+// workflow instead of silently pairing new clients/ABIs with old bytecode.
+const assertCurrentArtifactSet = async ({
+  connection,
+  ethers,
+  artifacts,
+  deepFamilyImplementation,
+  registryImplementation,
+  deployments,
+}) => {
+  const hreLike = { artifacts };
+  const checks = [
+    {
+      contractName: "DeepFamily",
+      implementation: deepFamilyImplementation,
+      spec: { needsLibraries: true },
+    },
+    {
+      contractName: "DeepFamilyAttestationRegistry",
+      implementation: registryImplementation,
+      spec: { needsLibraries: false },
+    },
+    ...deployments.map(({ contractName, deployment }) => ({
+      contractName,
+      implementation: deployment.address,
+      spec: {
+        needsLibraries: false,
+        librarySelfAddress: contractName === "PoseidonT5",
+      },
+    })),
+  ];
+
+  for (const check of checks) {
+    await assertImplementationMatchesArtifact({
+      connection,
+      ethers,
+      hre: hreLike,
+      ...check,
+    });
   }
 };
 
@@ -586,25 +633,80 @@ export const deployIntegratedSystem = async (
 
 export const ensureIntegratedSystem = async (
   hreOrConnection,
-  { writeDeployments = false, artifacts: artifactReader } = {},
+  { writeDeployments, artifacts: artifactReader, allowNewDeployment = false } = {},
 ) => {
   const connection = await resolveConnection(hreOrConnection);
   if (connection.__deepfamilyIntegrated?.deepFamily) return connection.__deepfamilyIntegrated;
 
   const { ethers } = connection;
   const [defaultSigner] = await ethers.getSigners();
+  const currentArtifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
+  // Operational tasks run as separate processes. On a persistent localhost node, a stale
+  // address book must therefore be replaced on disk together with the freshly deployed module
+  // set; otherwise every subsequent task would deploy yet another isolated system. In-process
+  // Hardhat networks remain ephemeral and keep their existing no-write default. Callers may
+  // still explicitly override either behavior.
+  const shouldWriteDeployments =
+    writeDeployments ??
+    (isLocalDevNetwork(connection) &&
+      !isEphemeralNetwork(connection) &&
+      Boolean(currentArtifacts?.readArtifact));
 
   const existingDeep = await safeReadDeployment(connection, "DeepFamily");
   const existingToken = await safeReadDeployment(connection, "DeepFamilyToken");
   const existingRegistry = await safeReadDeployment(connection, "DeepFamilyAttestationRegistry");
   const existingReader = await safeReadDeployment(connection, "DeepFamilyReader");
   const existingGroth16Adapter = await safeReadDeployment(connection, "Groth16VerifierAdapter");
-  if (
+  const existingPoseidonT5 = await safeReadDeployment(connection, "PoseidonT5");
+  const existingAdultAgeGate = await safeReadDeployment(connection, "AdultAgeGate");
+  const existingPersonVerifier = await safeReadDeployment(connection, "PersonCommitmentVerifier");
+  const existingDisclosureVerifier = await safeReadDeployment(
+    connection,
+    "DisclosureBindingVerifier",
+  );
+  const recordedDeployments = [
+    ["DeepFamily", existingDeep],
+    ["DeepFamilyToken", existingToken],
+    ["DeepFamilyAttestationRegistry", existingRegistry],
+    ["DeepFamilyReader", existingReader],
+    ["Groth16VerifierAdapter", existingGroth16Adapter],
+    ["PoseidonT5", existingPoseidonT5],
+    ["AdultAgeGate", existingAdultAgeGate],
+    ["PersonCommitmentVerifier", existingPersonVerifier],
+    ["DisclosureBindingVerifier", existingDisclosureVerifier],
+  ];
+  const recordedNames = recordedDeployments
+    .filter(([, deployment]) => deployment?.address)
+    .map(([contractName]) => contractName);
+  const hasCompleteCoreDeployment =
     existingDeep?.address &&
     existingToken?.address &&
     existingRegistry?.address &&
-    existingReader?.address
-  ) {
+    existingReader?.address;
+
+  if (recordedNames.length === 0 && !isLocalDevNetwork(connection)) {
+    if (!allowNewDeployment) {
+      throw new Error(
+        "No deployment metadata exists for this live network; refusing to deploy a new system " +
+          "from an operational task. Run the explicit integrated deployment command first.",
+      );
+    }
+    if (writeDeployments !== true || !currentArtifacts?.readArtifact) {
+      throw new Error(
+        "A new live-network deployment must persist its complete current artifact metadata; " +
+          "set writeDeployments=true and pass Hardhat artifacts.",
+      );
+    }
+  }
+
+  if (!hasCompleteCoreDeployment && recordedNames.length > 0) {
+    const message =
+      `Deployment metadata is partial (${recordedNames.join(", ")}); refusing to treat this ` +
+      "network as a fresh deployment";
+    if (!isLocalDevNetwork(connection)) throw new Error(message);
+    console.warn(`[deployment] ${message}; deploying a fresh local module set`);
+  }
+  if (hasCompleteCoreDeployment) {
     try {
       await assertDeploymentCode(ethers, [
         ["DeepFamily", existingDeep],
@@ -615,8 +717,68 @@ export const ensureIntegratedSystem = async (
 
       // DeepFamily and the registry must be UUPS proxies; a legacy direct deployment would
       // pass the code/wiring checks above yet be silently non-upgradeable.
-      await assertErc1967Proxy(ethers, "DeepFamily", existingDeep);
-      await assertErc1967Proxy(ethers, "DeepFamilyAttestationRegistry", existingRegistry);
+      const deepFamilyImplementation = await assertErc1967Proxy(ethers, "DeepFamily", existingDeep);
+      const registryImplementation = await assertErc1967Proxy(
+        ethers,
+        "DeepFamilyAttestationRegistry",
+        existingRegistry,
+      );
+
+      if (currentArtifacts?.readArtifact) {
+        const artifactBoundDeployments = [
+          ["PoseidonT5", existingPoseidonT5],
+          ["AdultAgeGate", existingAdultAgeGate],
+          ["PersonCommitmentVerifier", existingPersonVerifier],
+          ["DisclosureBindingVerifier", existingDisclosureVerifier],
+          ["Groth16VerifierAdapter", existingGroth16Adapter],
+        ];
+        const missing = artifactBoundDeployments
+          .filter(([, deployment]) => !deployment?.address)
+          .map(([contractName]) => contractName);
+        if (missing.length > 0) {
+          throw new Error(
+            `Deployment metadata is missing ${missing.join(", ")}; refusing to reuse a ` +
+              "deployment whose verifier/library version cannot be checked",
+          );
+        }
+
+        await assertDeploymentCode(ethers, artifactBoundDeployments);
+
+        const groth16Adapter = await ethers.getContractAt(
+          "Groth16VerifierAdapter",
+          existingGroth16Adapter.address,
+          defaultSigner,
+        );
+        const [personVerifierBackend, disclosureVerifierBackend] = await Promise.all([
+          groth16Adapter.personVerifier(),
+          groth16Adapter.disclosureBindingVerifier(),
+        ]);
+        if (
+          !sameAddress(personVerifierBackend, existingPersonVerifier.address) ||
+          !sameAddress(disclosureVerifierBackend, existingDisclosureVerifier.address)
+        ) {
+          throw new Error(
+            "Deployment wiring mismatch: Groth16 adapter backend verifiers do not match the " +
+              "recorded PersonCommitmentVerifier/DisclosureBindingVerifier deployments",
+          );
+        }
+
+        await assertCurrentArtifactSet({
+          connection,
+          ethers,
+          artifacts: currentArtifacts,
+          deepFamilyImplementation,
+          registryImplementation,
+          deployments: [
+            { contractName: "DeepFamilyToken", deployment: existingToken },
+            { contractName: "DeepFamilyReader", deployment: existingReader },
+            ...artifactBoundDeployments.map(([contractName, deployment]) => ({
+              contractName,
+              deployment,
+            })),
+          ],
+        });
+      }
 
       const deepFamily = await ethers.getContractAt(
         "DeepFamily",
@@ -654,11 +816,11 @@ export const ensureIntegratedSystem = async (
         },
         { contractName: "DeepFamilyToken", contract: token },
       ]);
-      if (writeDeployments) {
-        const artifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
+      if (shouldWriteDeployments) {
+        const artifacts = currentArtifacts;
         if (!artifacts?.readArtifact) {
           throw new Error(
-            "writeDeployments=true requires passing Hardhat hre (with artifacts) to ensureIntegratedSystem",
+            "Persisting deployments requires passing Hardhat hre (with artifacts) to ensureIntegratedSystem",
           );
         }
         const refreshTargets = [
@@ -699,11 +861,15 @@ export const ensureIntegratedSystem = async (
       // UUPS module set. On live networks, surface validation failures instead of silently
       // creating a second, orphaned module set.
       if (!isLocalDevNetwork(connection)) throw error;
+      console.warn(
+        `[deployment] Existing local module set is stale or inconsistent; deploying a fresh set: ` +
+          `${error?.message || error}`,
+      );
     }
   }
 
   const deployed = await deployIntegratedSystem(connection, {
-    writeDeployments,
+    writeDeployments: shouldWriteDeployments,
     signer: defaultSigner,
     artifacts: artifactReader ?? hreOrConnection?.artifacts,
   });

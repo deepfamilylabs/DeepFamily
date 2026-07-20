@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -251,6 +251,7 @@ contract DeepFamily is
   mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public trustedEndorserOf;
   mapping(bytes32 => mapping(uint256 => address[])) private trustedEndorsers;
   mapping(bytes32 => mapping(uint256 => mapping(address => uint256))) private trustedEndorserIndex;
+  mapping(bytes32 => bool) public rewardClaimedByPerson;
 
   // NOTE: No storage gap. This is the most-derived (leaf) upgradeable contract and every
   // inherited base uses ERC-7201 namespaced storage, so a new implementation adds state simply
@@ -392,9 +393,9 @@ contract DeepFamily is
     PersonBasicInfo calldata basicInfo
   ) internal pure returns (uint256) {
     return
-      (uint256(basicInfo.birthYear) << 24) |
-      (uint256(basicInfo.birthMonth) << 16) |
-      (uint256(basicInfo.birthDay) << 8) |
+      (uint256(basicInfo.birthYear) << 25) |
+      (uint256(basicInfo.birthMonth) << 17) |
+      (uint256(basicInfo.birthDay) << 9) |
       (uint256(basicInfo.gender) << 1) |
       (basicInfo.isBirthBC ? 1 : 0);
   }
@@ -462,6 +463,8 @@ contract DeepFamily is
     if (bytes(coreInfo.supplementInfo.deathPlace).length > MAX_LONG_TEXT_LENGTH) {
       revert InvalidDeathPlace();
     }
+    if (coreInfo.basicInfo.birthMonth > 12) revert InvalidBirthMonth();
+    if (coreInfo.basicInfo.birthDay > 31) revert InvalidBirthDay();
     if (coreInfo.supplementInfo.deathMonth > 12) revert InvalidDeathMonth();
     if (coreInfo.supplementInfo.deathDay > 31) revert InvalidDeathDay();
   }
@@ -582,7 +585,9 @@ contract DeepFamily is
     address _attestationRegistry,
     address initialOwner
   ) public initializer {
-    if (_deepFamilyTokenContract == address(0)) revert TokenContractNotSet();
+    if (
+      _deepFamilyTokenContract == address(0) || _deepFamilyTokenContract.code.length == 0
+    ) revert TokenContractNotSet();
     if (_attestationRegistry == address(0)) revert InvalidAttestationRegistry();
     if (_attestationRegistry.code.length == 0) revert InvalidAttestationRegistry();
 
@@ -627,7 +632,7 @@ contract DeepFamily is
     ProofPurpose purpose,
     address verifier
   ) internal {
-    if (verifier == address(0)) revert InvalidVerifierAddress();
+    if (verifier == address(0) || verifier.code.length == 0) revert InvalidVerifierAddress();
     verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
   }
@@ -754,7 +759,14 @@ contract DeepFamily is
       motherVersionIndex,
       tag
     );
-    if (fatherHash != bytes32(0) && motherHash != bytes32(0)) {
+    // Reward the first complete-parent claim for a person. Parent versions may remain unspecified
+    // (index 0) and the parent records do not need to exist on-chain yet.
+    if (
+      !rewardClaimedByPerson[personHash] &&
+      fatherHash != bytes32(0) &&
+      motherHash != bytes32(0)
+    ) {
+      rewardClaimedByPerson[personHash] = true;
       uint256 reward = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).mint(msg.sender);
       if (reward > 0) {
         emit TokenRewardDistributed(msg.sender, personHash, versionIndex, reward);

@@ -9,7 +9,9 @@ const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
-  const { deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection);
+  const { deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection, {
+    artifacts: hre.artifacts,
+  });
   const deepFamilyWithSigner = deepFamily.connect(signer);
 
   const tokenId = BigInt(args.tokenid);

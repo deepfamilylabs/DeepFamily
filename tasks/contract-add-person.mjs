@@ -8,7 +8,7 @@ const { generatePersonCommitmentProof } = personCommitmentProof;
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
-  const { deepFamily } = await ensureIntegratedSystem(connection);
+  const { deepFamily } = await ensureIntegratedSystem(connection, { artifacts: hre.artifacts });
   const [signer] = await ethers.getSigners();
   const submitterAddress = await signer.getAddress();
 
@@ -27,8 +27,8 @@ const action = async (args, hre) => {
   if (birthDayNum < 0 || birthDayNum > 31) {
     throw new Error(`Birth day out of range: ${birthDayNum}`);
   }
-  if (genderNum < 0 || genderNum > 3) {
-    throw new Error(`Gender out of range: ${genderNum}`);
+  if (!Number.isInteger(genderNum) || genderNum < 0 || genderNum > 255) {
+    throw new Error(`Gender must be an integer in [0, 255]: ${genderNum}`);
   }
 
   if (!args.fullname || args.fullname.trim().length === 0) {
@@ -59,6 +59,13 @@ const action = async (args, hre) => {
       }
     : null;
 
+  if (
+    fatherData &&
+    (!Number.isInteger(fatherData.gender) || fatherData.gender < 0 || fatherData.gender > 255)
+  ) {
+    throw new Error(`Father gender must be an integer in [0, 255]: ${fatherData.gender}`);
+  }
+
   // Prepare mother data
   const motherData = args.mothername
     ? {
@@ -71,6 +78,13 @@ const action = async (args, hre) => {
         gender: Number(args.mothergender),
       }
     : null;
+
+  if (
+    motherData &&
+    (!Number.isInteger(motherData.gender) || motherData.gender < 0 || motherData.gender > 255)
+  ) {
+    throw new Error(`Mother gender must be an integer in [0, 255]: ${motherData.gender}`);
+  }
 
   personData.derivedSecretField = 0n;
   if (fatherData) fatherData.derivedSecretField = 0n;
@@ -139,7 +153,7 @@ export default task("add-person", "Add a person version using ZK proof")
   })
   .addOption({
     name: "gender",
-    description: "Gender (0=Unknown,1=Male,2=Female,3=Other)",
+    description: "Gender (0=Unknown, 1=Male, 2=Female, 3=Other, 4-255=Custom)",
     type: ArgumentType.STRING_WITHOUT_DEFAULT,
     defaultValue: undefined,
   })
@@ -175,7 +189,7 @@ export default task("add-person", "Add a person version using ZK proof")
   })
   .addOption({
     name: "fathergender",
-    description: "Father gender (0=Unknown,1=Male,2=Female,3=Other)",
+    description: "Father gender (0=Unknown, 1=Male, 2=Female, 3=Other, 4-255=Custom)",
     type: ArgumentType.STRING,
     defaultValue: "1",
   })
@@ -217,7 +231,7 @@ export default task("add-person", "Add a person version using ZK proof")
   })
   .addOption({
     name: "mothergender",
-    description: "Mother gender (0=Unknown,1=Male,2=Female,3=Other)",
+    description: "Mother gender (0=Unknown, 1=Male, 2=Female, 3=Other, 4-255=Custom)",
     type: ArgumentType.STRING,
     defaultValue: "2",
   })

@@ -38,9 +38,9 @@ function computePersonHash(fullName, birthYear, birthMonth, birthDay, gender, pa
 
   // Pack personal information
   const packedData =
-    (BigInt(birthYear) << 24n) |
-    (BigInt(birthMonth) << 16n) |
-    (BigInt(birthDay) << 8n) |
+    (BigInt(birthYear) << 25n) |
+    (BigInt(birthMonth) << 17n) |
+    (BigInt(birthDay) << 9n) |
     (BigInt(gender) << 1n);
 
   // Simplified: directly hash all inputs

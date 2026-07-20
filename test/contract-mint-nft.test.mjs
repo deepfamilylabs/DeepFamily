@@ -13,6 +13,7 @@ import {
   makeTestPerson,
   makeEndorseAttestationRef,
   makeMintAttestationRef,
+  packBirthGenderField,
 } from './helpers/testHelper.mjs'
 
 const toTimestamp = (year, month, day) => Math.floor(Date.UTC(year, month - 1, day) / 1000)
@@ -61,6 +62,77 @@ describe('Mint NFT Tests', function () {
     const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, { person })
     await endorseVersion(deepFamily, signer, personHash, 1)
     return { deepFamily, signer, FULLNAME, personHash, identityCommitment }
+  }
+
+  async function prepareBasicInfoMintAttempt(
+    fullName,
+    personOverrides = {},
+    basicInfoOverrides = {},
+  ) {
+    const { deepFamily, signer } = await baseSetup()
+    const person = makeTestPerson(fullName, {
+      isBirthBC: false,
+      birthYear: 1999,
+      birthMonth: 1,
+      birthDay: 1,
+      gender: 1,
+      ...personOverrides,
+    })
+    const identityCommitment = computeIdentityCommitment(
+      hre.ethers,
+      fullName,
+      person,
+      1,
+      1,
+      1,
+    )
+    const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, {
+      person,
+    })
+    await endorseVersion(deepFamily, signer, personHash, 1)
+
+    const basicInfo = {
+      identityCommitment: hre.ethers.zeroPadValue(
+        hre.ethers.toBeHex(identityCommitment),
+        32,
+      ),
+      isBirthBC: person.isBirthBC,
+      birthYear: person.birthYear,
+      birthMonth: person.birthMonth,
+      birthDay: person.birthDay,
+      gender: person.gender,
+      ...basicInfoOverrides,
+    }
+    const publicSignals = {
+      identityCommitment: BigInt(identityCommitment),
+      disclosureBinding: computeDisclosureBinding(hre.ethers, fullName, basicInfo, 1, 1, 1),
+      minter: BigInt(await signer.getAddress()),
+      schemaVersion: 1,
+      cryptoSuiteVersion: 1,
+      hashAlgoId: 1,
+    }
+    const coreInfo = {
+      basicInfo,
+      supplementInfo: {
+        fullName,
+        birthPlace: '',
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: '',
+        story: '',
+      },
+    }
+
+    return {
+      deepFamily,
+      signer,
+      personHash,
+      identityCommitment,
+      publicSignals,
+      coreInfo,
+    }
   }
 
   it('fails mint before endorsement', async () => {
@@ -311,6 +383,85 @@ describe('Mint NFT Tests', function () {
 
     expect(receipt?.status).to.equal(1)
     expect(await deepFamily.tokenCounter()).to.equal(1n)
+  })
+
+  describe('Birth field canonical encoding', () => {
+    function submitMint(attempt) {
+      const { deepFamily, signer, personHash, publicSignals, coreInfo } = attempt
+      return mintPersonVersionNFT(
+        deepFamily,
+        signer,
+        personHash,
+        makeStubProof(),
+        publicSignals,
+        1,
+        '',
+        coreInfo,
+      )
+    }
+
+    async function expectMintToRevert(attempt, errorName) {
+      await expect(submitMint(attempt)).to.be.revertedWithCustomError(
+        attempt.deepFamily,
+        errorName,
+      )
+    }
+
+    it('rejects birthMonth above 12', async () => {
+      const attempt = await prepareBasicInfoMintAttempt('Invalid Birth Month', {
+        birthMonth: 13,
+      })
+
+      await expectMintToRevert(attempt, 'InvalidBirthMonth')
+    })
+
+    it('rejects birthDay above 31', async () => {
+      const attempt = await prepareBasicInfoMintAttempt('Invalid Birth Day', {
+        birthDay: 32,
+      })
+
+      await expectMintToRevert(attempt, 'InvalidBirthDay')
+    })
+
+    for (const gender of [4, 255]) {
+      it(`allows gender ${gender} as a full uint8 value`, async () => {
+        const attempt = await prepareBasicInfoMintAttempt(`Gender ${gender}`, { gender })
+
+        await submitMint(attempt)
+
+        expect(await attempt.deepFamily.tokenCounter()).to.equal(1n)
+      })
+    }
+
+    it('keeps the former day/gender alias distinct after packing', () => {
+      const fullName = 'Packed Birth Alias'
+      const canonicalBasicInfo = {
+        isBirthBC: false,
+        birthYear: 1999,
+        birthMonth: 1,
+        birthDay: 1,
+        gender: 1,
+      }
+      const formerlyAliasedBasicInfo = {
+        ...canonicalBasicInfo,
+        birthDay: 0,
+        gender: 129,
+      }
+
+      expect(
+        packBirthGenderField(canonicalBasicInfo),
+      ).to.not.equal(packBirthGenderField(formerlyAliasedBasicInfo))
+      expect(
+        computeDisclosureBinding(hre.ethers, fullName, canonicalBasicInfo, 1, 1, 1),
+      ).to.not.equal(
+        computeDisclosureBinding(hre.ethers, fullName, formerlyAliasedBasicInfo, 1, 1, 1),
+      )
+      expect(
+        computeIdentityCommitment(hre.ethers, fullName, canonicalBasicInfo, 1, 1, 1),
+      ).to.not.equal(
+        computeIdentityCommitment(hre.ethers, fullName, formerlyAliasedBasicInfo, 1, 1, 1),
+      )
+    })
   })
 
   describe('Age gate', () => {

@@ -14,7 +14,7 @@ const action = async (args, hre) => {
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
   const signerAddr = await signer.getAddress();
-  const { deepFamily } = await ensureIntegratedSystem(connection);
+  const { deepFamily } = await ensureIntegratedSystem(connection, { artifacts: hre.artifacts });
 
   const versionIndex = Number(args.vindex);
   if (!Number.isInteger(versionIndex) || versionIndex <= 0) {
@@ -33,7 +33,9 @@ const action = async (args, hre) => {
   if (birthYear < 0 || birthYear > 65535) throw new Error("birthYear out of uint16 range");
   if (birthMonth < 0 || birthMonth > 12) throw new Error("birthMonth must be 0-12");
   if (birthDay < 0 || birthDay > 31) throw new Error("birthDay must be 0-31");
-  if (gender < 0 || gender > 3) throw new Error("gender must be 0-3");
+  if (!Number.isInteger(gender) || gender < 0 || gender > 255) {
+    throw new Error("gender must be an integer in [0, 255]");
+  }
   if (deathYear < 0 || deathYear > 65535) throw new Error("deathYear out of uint16 range");
   if (deathMonth < 0 || deathMonth > 12) throw new Error("deathMonth must be 0-12");
   if (deathDay < 0 || deathDay > 31) throw new Error("deathDay must be 0-31");
@@ -177,7 +179,7 @@ export default task("mint-nft", "Mint NFT for a person version (requires prior e
   })
   .addOption({
     name: "gender",
-    description: "Gender (0=Unknown,1=Male,2=Female,3=Other)",
+    description: "Gender (0=Unknown, 1=Male, 2=Female, 3=Other, 4-255=Custom)",
     type: ArgumentType.STRING_WITHOUT_DEFAULT,
     defaultValue: undefined,
   })

@@ -139,6 +139,26 @@ const linkDeployedBytecode = (artifact, libraryAddresses) => {
   return "0x" + body;
 };
 
+// Solidity libraries that expose external functions begin their deployed runtime with
+// `PUSH20 <self-address>` followed by a delegatecall-only guard. The artifact contains a zero
+// placeholder while the deployed code contains the library's own address. Link that placeholder
+// explicitly so a real library deployment can still be compared byte-for-byte; also reject an
+// unexpected prefix instead of masking arbitrary bytes.
+const linkLibrarySelfAddress = (bytecode, implementation) => {
+  const body = String(bytecode || "").replace(/^0x/, "");
+  const placeholder = `73${"0".repeat(40)}`;
+  if (!body.startsWith(placeholder)) {
+    throw new Error("Library artifact does not contain the expected self-address placeholder");
+  }
+  const address = String(implementation || "")
+    .toLowerCase()
+    .replace(/^0x/, "");
+  if (address.length !== 40) {
+    throw new Error(`Invalid library implementation address: ${implementation}`);
+  }
+  return `0x73${address}${body.slice(placeholder.length)}`;
+};
+
 // Verify a pre-deployed implementation address really hosts the bytecode of the artifact the
 // operator claims. Without this, the candidate storage-layout check would still pass on the
 // artifact while the actual upgrade points at unrelated code. Library links are resolved from
@@ -159,7 +179,10 @@ export const assertImplementationMatchesArtifact = async ({
     libraries.PoseidonT5 = await readDeploymentAddress(connection, "PoseidonT5");
     libraries.AdultAgeGate = await readDeploymentAddress(connection, "AdultAgeGate");
   }
-  const expected = linkDeployedBytecode(artifact, libraries);
+  let expected = linkDeployedBytecode(artifact, libraries);
+  if (spec?.librarySelfAddress) {
+    expected = linkLibrarySelfAddress(expected, implementation);
+  }
   const onChain = await ethers.provider.getCode(implementation);
   if (onChain === "0x") {
     throw new Error(`Implementation ${implementation} has no code on this network`);

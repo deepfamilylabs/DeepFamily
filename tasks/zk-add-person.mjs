@@ -77,7 +77,7 @@ function extractProofShape(proofJson) {
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
-  const { deepFamily } = await ensureIntegratedSystem(connection);
+  const { deepFamily } = await ensureIntegratedSystem(connection, { artifacts: hre.artifacts });
   const [signer] = await ethers.getSigners();
   const sender = await signer.getAddress();
 

@@ -56,9 +56,9 @@ nameSecretCommitment =
   Poseidon4(DOMAIN_NAME_SECRET, nameField, derivedSecretField, suiteCommitment)
 
 packedBirthGenderField =
-  (birthYear << 24) |
-  (birthMonth << 16) |
-  (birthDay << 8) |
+  (birthYear << 25) |
+  (birthMonth << 17) |
+  (birthDay << 9) |
   (gender << 1) |
   isBirthBC
 
@@ -80,6 +80,11 @@ disclosureBinding =
     suiteCommitment
   )
 ```
+
+This allocates non-overlapping ranges to `birthYear[25..40]`, `birthMonth[17..24]`,
+`birthDay[9..16]`, `gender[1..8]`, and `isBirthBC[0]`. Gender is an unsigned
+8-bit application code: `0` is unknown, `1` and `2` are conventional values,
+`3` is other, and `4..255` are available for custom semantics.
 
 ## Circuit 1: Person Commitment
 
@@ -163,7 +168,7 @@ The circuit enforces:
 - `birthYear` fits in 16 bits
 - `birthMonth <= 12`
 - `birthDay` fits in 5 bits
-- `gender` fits in 3 bits
+- `gender` fits in 8 bits (`0..255`)
 
 ### Public Signals Order
 
@@ -411,6 +416,26 @@ npm run zk:refresh
 ```
 
 This rebuilds the circuits, regenerates proving artifacts, re-exports verifier contracts, and refreshes `frontend/public/zk/`.
+
+### Protocol Versioning Policy
+
+`schemaVersion`, `cryptoSuiteVersion`, and `hashAlgoId` identify cryptographic semantics; they are
+not application release numbers. Before the first public deployment, an incompatible circuit or
+packing change may still replace the development `v1` only when every development chain is reset
+and the circuit, proving artifacts, verifier, contract, frontend, fixtures, and seed output are
+refreshed together.
+
+The first production deployment freezes those `v1` semantics. After that point, an incompatible
+packing, circuit, or hash change must use a new suite/verifier route and versioned frontend
+artifacts, while retaining an explicit compatibility or migration path for existing identities.
+
+### Trusted Setup Status
+
+The proving keys currently checked into `frontend/public/zk/` were produced by a single local
+contributor and are suitable for development and testing only. A production release must replace
+them with artifacts from an auditable multi-party ceremony, publish the contribution transcript and
+artifact hashes, regenerate the Solidity verifiers, and verify that every deployed verifier matches
+the published proving and verification keys.
 
 ## Security Properties
 

@@ -1,7 +1,7 @@
 {
   "storage": [
     {
-      "astId": 13074,
+      "astId": 16265,
       "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
       "label": "deepFamily",
       "offset": 0,
@@ -9,15 +9,15 @@
       "type": "t_address"
     },
     {
-      "astId": 13079,
+      "astId": 16270,
       "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
       "label": "attestationRefs",
       "offset": 0,
       "slot": "1",
-      "type": "t_mapping(t_bytes32,t_struct(AttestationRef)15806_storage)"
+      "type": "t_mapping(t_bytes32,t_struct(AttestationRef)20070_storage)"
     },
     {
-      "astId": 13083,
+      "astId": 16274,
       "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
       "label": "attestationRefExists",
       "offset": 0,
@@ -48,24 +48,24 @@
       "numberOfBytes": "32",
       "value": "t_bool"
     },
-    "t_mapping(t_bytes32,t_struct(AttestationRef)15806_storage)": {
+    "t_mapping(t_bytes32,t_struct(AttestationRef)20070_storage)": {
       "encoding": "mapping",
       "key": "t_bytes32",
       "label": "mapping(bytes32 => struct AttestationTypes.AttestationRef)",
       "numberOfBytes": "32",
-      "value": "t_struct(AttestationRef)15806_storage"
+      "value": "t_struct(AttestationRef)20070_storage"
     },
     "t_string_storage": {
       "encoding": "bytes",
       "label": "string",
       "numberOfBytes": "32"
     },
-    "t_struct(AttestationRef)15806_storage": {
+    "t_struct(AttestationRef)20070_storage": {
       "encoding": "inplace",
       "label": "struct AttestationTypes.AttestationRef",
       "members": [
         {
-          "astId": 15781,
+          "astId": 20045,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "attestationRefVersion",
           "offset": 0,
@@ -73,7 +73,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 15783,
+          "astId": 20047,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "subjectType",
           "offset": 2,
@@ -81,7 +81,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 15785,
+          "astId": 20049,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "subjectHash",
           "offset": 0,
@@ -89,7 +89,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 15787,
+          "astId": 20051,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "actionType",
           "offset": 0,
@@ -97,7 +97,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 15789,
+          "astId": 20053,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "actionDigest",
           "offset": 0,
@@ -105,7 +105,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 15791,
+          "astId": 20055,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "attestationPayloadDigest",
           "offset": 0,
@@ -113,7 +113,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 15793,
+          "astId": 20057,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "signatureSuiteId",
           "offset": 0,
@@ -121,7 +121,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 15795,
+          "astId": 20059,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "signerKeyId",
           "offset": 0,
@@ -129,7 +129,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 15797,
+          "astId": 20061,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "uri",
           "offset": 0,
@@ -137,7 +137,7 @@
           "type": "t_string_storage"
         },
         {
-          "astId": 15799,
+          "astId": 20063,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "issuedAt",
           "offset": 0,
@@ -145,7 +145,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 15801,
+          "astId": 20065,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "expiresAt",
           "offset": 8,
@@ -153,7 +153,7 @@
           "type": "t_uint64"
         },
         {
-          "astId": 15803,
+          "astId": 20067,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "revocationType",
           "offset": 16,
@@ -161,7 +161,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 15805,
+          "astId": 20069,
           "contract": "project/contracts/DeepFamilyAttestationRegistry.sol:DeepFamilyAttestationRegistry",
           "label": "revocationRef",
           "offset": 0,

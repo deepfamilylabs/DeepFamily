@@ -642,7 +642,8 @@
       "genders": {
         "male": "Male",
         "female": "Female",
-        "other": "Other"
+        "other": "Other",
+        "custom": "Custom"
       },
       "errors": {}
     },
@@ -950,13 +951,13 @@
     "motherHash": "Mother Hash",
     "motherVersionIndex": "Mother Version",
     "tokenReward": "Utility Distribution Complete",
-    "familyComplete": "Parent hash commitments submitted - utility points distributed",
+    "familyComplete": "First complete two-parent commitment submitted for this person hash — utility points distributed",
     "miner": "Miner",
     "hashPrefix": "Hash",
     "prover": "Prover",
     "rewardAmount": "Utility Amount",
     "noTokenReward": "No Utility Distribution",
-    "tokenRewardCondition": "Utility points distribute when parent hash commitments are submitted",
+    "tokenRewardCondition": "No utility points were distributed. Possible reasons include a missing parent commitment, a reward already claimed for this person hash, or unavailable issuance capacity. Parents do not need to exist on-chain first.",
     "failed": "Transaction Failed",
     "errorType": "Error Type",
     "errorMessage": "Message",
@@ -987,7 +988,7 @@
     "regenerateRecoverySalt": "Generate New Salt",
     "identityRecoverySaltPlaceholder": "Paste saved recovery salt or keep the generated value",
     "identityRecoverySaltNotice": "If this is a brand-new identity, keep the generated salt. If this identity was created earlier in enhanced mode, replace it with the saved recovery salt before submitting.",
-    "parentInfoNotice": "Providing parent info locally generates zero-knowledge proofs for family linking (only hash values go on-chain) and triggers DEEP utility distribution. Parent info must match their actual versions exactly (incl. passphrase) to establish connection.",
+    "parentInfoNotice": "Providing both parents locally generates zero-knowledge proofs for family linking (only hashes go on-chain). The first complete two-parent commitment for a person hash may receive DEEP utility points; parents do not need to exist on-chain first. Their details must match when linking to their identities later.",
     "parentIdentityMode": "Parent Identity Recovery Mode",
     "parentIdentityModeHint": "Use enhanced mode only when the parent identity was originally created with a saved recovery salt.",
     "parentRecoverySalt": "Parent Recovery Salt",

@@ -51,7 +51,7 @@ describe("disclosureBinding", () => {
       hashAlgoId: 1,
     });
 
-    expect(result.packedBirthGenderField.toString()).toBe("33386991362");
+    expect(result.packedBirthGenderField.toString()).toBe("66773982722");
     expect(bigintTo32ByteHex(result.disclosureBinding).startsWith("0x")).toBe(true);
   });
 
