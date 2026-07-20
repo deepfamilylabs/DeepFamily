@@ -196,9 +196,9 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
   return (
     <div className={`space-y-4 sm:space-y-6 ${className}`}>
       {/* Title and description */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg p-3 sm:p-4 border border-indigo-200 dark:border-indigo-800">
+      <div className="bg-linear-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg p-3 sm:p-4 border border-indigo-200 dark:border-indigo-800">
         <div className="flex items-center gap-2 sm:gap-3 mb-2">
-          <Key className="text-indigo-600 dark:text-indigo-400 flex-shrink-0" size={20} />
+          <Key className="text-indigo-600 dark:text-indigo-400 shrink-0" size={20} />
           <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-gray-100">
             {t("keyDerivation.component.title")}
           </h2>
@@ -258,7 +258,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
         className={`w-full py-3 sm:py-4 rounded-lg font-semibold text-sm sm:text-base text-white transition-all ${
           isGenerating || !normalizeNameForHash(publicFormData?.fullName || "").length
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
+            : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
         }`}
       >
         {isGenerating ? (
@@ -279,7 +279,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
         <div className="space-y-2">
           <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-300"
+              className="h-full bg-linear-to-r from-indigo-600 to-purple-600 transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -291,9 +291,9 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
 
       {/* Result display */}
       {derivedKey && derivedAddress && (
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4 sm:p-6 border-2 border-green-300 dark:border-green-700 space-y-3 sm:space-y-4">
+        <div className="bg-linear-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4 sm:p-6 border-2 border-green-300 dark:border-green-700 space-y-3 sm:space-y-4">
           <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-bold">
-            <CheckCircle size={20} className="flex-shrink-0" />
+            <CheckCircle size={20} className="shrink-0" />
             <span className="text-base sm:text-lg">
               {t("keyDerivation.component.derivedSuccess")}
             </span>
@@ -327,10 +327,10 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
               <code className="flex-1 text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 break-all leading-relaxed min-w-0">
                 {showPrivateKey ? derivedKey : "•".repeat(66)}
               </code>
-              <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row gap-1 shrink-0">
                 <button
                   onClick={() => setShowPrivateKey(!showPrivateKey)}
-                  className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition"
                 >
                   {showPrivateKey ? (
                     <EyeOff size={14} className="text-gray-600 dark:text-gray-400" />

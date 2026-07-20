@@ -43,7 +43,7 @@ export function ResultDataRow({
         <span className={`text-xs ${config.valueColor}`}>{value}</span>
       ) : (
         <code
-          className={`${config.valueBg} ${config.valueColor} px-2 py-1 rounded font-mono text-xs break-all`}
+          className={`${config.valueBg} ${config.valueColor} px-2 py-1 rounded-sm font-mono text-xs break-all`}
         >
           {value}
         </code>

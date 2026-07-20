@@ -39,7 +39,8 @@ vi.mock("../../../transactions", () => ({
 }));
 
 function zValue(className: string) {
-  return Number(className.match(/z-\[(\d+)\]/)?.[1] ?? 0);
+  // Accept both the v3 arbitrary form (z-[10040]) and the v4 bare value (z-10040).
+  return Number(className.match(/z-\[?(\d+)\]?/)?.[1] ?? 0);
 }
 
 describe("EndorseCompactModal", () => {

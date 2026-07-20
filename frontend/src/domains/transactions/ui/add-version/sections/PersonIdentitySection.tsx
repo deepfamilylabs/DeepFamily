@@ -39,7 +39,7 @@ export function PersonIdentitySection({
       </h3>
 
       <div className="flex items-start gap-3 p-3 bg-green-50/50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/30">
-        <Shield className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+        <Shield className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
         <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
           {t(
             "addVersion.personInfoPrivacy",

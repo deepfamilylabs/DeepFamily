@@ -30,7 +30,7 @@ export function EndorseRequiredDialog({
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
-      <div className="h-full flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="h-full flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
         <div
           className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg p-6"
           onClick={(event) => event.stopPropagation()}

@@ -20,8 +20,8 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
-        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+      <div className="flex items-center gap-3 p-4 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
+        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shrink-0">
           <Check className="w-6 h-6 text-white" />
         </div>
         <div>
@@ -199,7 +199,7 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
         ) : (
           <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t("addVersion.noTokenReward", "No Token Reward")}

@@ -49,7 +49,7 @@ export function EndorseTargetForm({
               value={personHash}
               onChange={(event) => onPersonHashChange(event.target.value)}
               {...personHashA11y.fieldProps}
-              className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 font-mono transition-all outline-none ${
+              className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 font-mono transition-all outline-hidden ${
                 hashInputInvalid
                   ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 dark:border-red-500"
                   : "border-gray-200 dark:border-gray-700 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
@@ -69,11 +69,11 @@ export function EndorseTargetForm({
               </div>
             )}
             {!hashInputInvalid && hasValidTarget && (
-              <div className="pt-2 animate-fadeIn">
+              <div className="pt-2 animate-fade-in">
                 {isTargetValidOnChain ? (
                   <div className="flex flex-wrap items-center gap-3">
                     {displayName && (
-                      <div className="font-bold text-gray-900 dark:text-gray-100 px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-sm">
+                      <div className="font-bold text-gray-900 dark:text-gray-100 px-2 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-xs text-sm">
                         {displayName}
                       </div>
                     )}
@@ -115,7 +115,7 @@ export function EndorseTargetForm({
               min="1"
               value={versionIndex}
               onChange={(event) => onVersionIndexChange(parseInt(event.target.value) || 1)}
-              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
               placeholder="1"
             />
           </div>

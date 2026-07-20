@@ -445,7 +445,7 @@ function StoryErrorState({ error }: { error: string }) {
 
 function StoryFullTextPanel({ fullStory }: { fullStory: string }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 sm:p-8 border border-gray-100 dark:border-gray-800 shadow-sm leading-relaxed">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 sm:p-8 border border-gray-100 dark:border-gray-800 shadow-xs leading-relaxed">
       <div className="prose prose-base dark:prose-invert max-w-none">
         <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200 font-serif leading-relaxed">
           {fullStory}
@@ -494,7 +494,7 @@ function StoryChunkCard({
             onToggle(chunk.chunkIndex);
           }
         }}
-        className="w-full text-left p-4 pl-5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-r-2xl rounded-l-md"
+        className="w-full text-left p-4 pl-5 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-orange-500/50 rounded-r-2xl rounded-l-md"
       >
         <div className="flex items-start gap-4">
           <div
@@ -519,7 +519,7 @@ function StoryChunkCard({
                 >
                   #{chunk.chunkIndex}
                 </span>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white dark:bg-black border border-gray-100 dark:border-gray-800 shadow-sm">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white dark:bg-black border border-gray-100 dark:border-gray-800 shadow-xs">
                   <ChunkIcon size={12} className={iconColor} />
                   <span
                     className={`text-[10px] uppercase font-bold tracking-wider ${iconColor.replace("text-", "text-opacity-80 text-")}`}
@@ -572,7 +572,7 @@ function StoryChunkCard({
                   <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
                     <Link size={14} className="text-gray-400" />
                     <span
-                      className="truncate font-mono bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded"
+                      className="truncate font-mono bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm"
                       title={chunk.attachmentCID}
                     >
                       {chunk.attachmentCID}

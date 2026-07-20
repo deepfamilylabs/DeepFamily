@@ -83,7 +83,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-base md:text-lg touch-manipulation select-none"
+        className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-base md:text-lg touch-manipulation select-none"
       >
         +
       </button>
@@ -113,13 +113,13 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         className="relative w-4 md:w-6 touch-none select-none"
         style={{ height: trackHeight }}
       >
-        <div className="absolute left-1/2 -translate-x-1/2 top-1 bottom-1 md:top-1.5 md:bottom-1.5 w-1.5 rounded-full bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-slate-600 dark:via-slate-500 dark:to-slate-600 shadow-inner backdrop-blur-sm">
+        <div className="absolute left-1/2 -translate-x-1/2 top-1 bottom-1 md:top-1.5 md:bottom-1.5 w-1.5 rounded-full bg-linear-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-slate-600 dark:via-slate-500 dark:to-slate-600 shadow-inner backdrop-blur-sm">
           <div
-            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-gradient-to-r from-orange-400 to-red-500 shadow-lg shadow-orange-500/30 ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing"
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-linear-to-r from-orange-400 to-red-500 shadow-lg shadow-orange-500/30 ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing"
             style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
           />
           <div
-            className="absolute left-1/2 -translate-x-1/2 bottom-0 w-1.5 rounded-full bg-gradient-to-t from-orange-400/80 to-red-500/60 dark:from-orange-500/70 dark:to-red-500/50"
+            className="absolute left-1/2 -translate-x-1/2 bottom-0 w-1.5 rounded-full bg-linear-to-t from-orange-400/80 to-red-500/60 dark:from-orange-500/70 dark:to-red-500/50"
             style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
           />
         </div>
@@ -132,7 +132,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-base md:text-lg touch-manipulation select-none"
+        className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-base md:text-lg touch-manipulation select-none"
       >
         -
       </button>

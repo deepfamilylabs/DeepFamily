@@ -22,7 +22,7 @@ export function StoryChunksSidebar({ editor }: { editor: StoryEditorController }
   return (
     <aside className="xl:col-span-1 flex flex-col gap-6">
       {editor.sortedChunks.length > 0 ? (
-        <section className="flex flex-col flex-shrink-0 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+        <section className="flex flex-col shrink-0 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
           <header className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               {t("storyChunkEditor.chunks", "Existing Chunks")}
@@ -42,7 +42,7 @@ export function StoryChunksSidebar({ editor }: { editor: StoryEditorController }
                     className={`w-full text-left flex items-start gap-3 rounded-2xl border p-4 transition-all cursor-pointer ${
                       isExpanded
                         ? "bg-white border-orange-200 shadow-md shadow-orange-100 dark:bg-gray-800 dark:border-orange-900/50 dark:shadow-none"
-                        : "bg-gray-50/50 border-transparent hover:bg-white hover:border-gray-100 hover:shadow-sm dark:bg-gray-800/30 dark:hover:bg-gray-800 dark:hover:border-gray-700"
+                        : "bg-gray-50/50 border-transparent hover:bg-white hover:border-gray-100 hover:shadow-xs dark:bg-gray-800/30 dark:hover:bg-gray-800 dark:hover:border-gray-700"
                     }`}
                     onClick={() => editor.toggleChunkExpansion(chunk.chunkIndex)}
                   >
@@ -51,7 +51,7 @@ export function StoryChunksSidebar({ editor }: { editor: StoryEditorController }
                         event.stopPropagation();
                         editor.toggleChunkExpansion(chunk.chunkIndex);
                       }}
-                      className="mt-0.5 text-gray-400 dark:text-gray-500 flex-shrink-0 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
+                      className="mt-0.5 text-gray-400 dark:text-gray-500 shrink-0 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
                       type="button"
                       aria-label={isExpanded ? "Collapse" : "Expand"}
                     >
@@ -130,7 +130,7 @@ function ExpandedChunkDetails({
       onClick={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <User size={12} className="flex-shrink-0" />
+        <User size={12} className="shrink-0" />
         {chunk.editor ? (
           <>
             <span className="truncate" title={chunk.editor}>
@@ -148,12 +148,12 @@ function ExpandedChunkDetails({
         )}
       </div>
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <Clock size={12} className="flex-shrink-0" />
+        <Clock size={12} className="shrink-0" />
         <span>{formatUnixSeconds(chunk.timestamp)}</span>
       </div>
       {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          <Link size={12} className="flex-shrink-0" />
+          <Link size={12} className="shrink-0" />
           <span className="truncate font-mono">{chunk.attachmentCID}</span>
           <CopyIconButton
             label={t("search.copy")}
@@ -164,7 +164,7 @@ function ExpandedChunkDetails({
         </div>
       )}
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <Hash size={12} className="flex-shrink-0" />
+        <Hash size={12} className="shrink-0" />
         <span className="font-mono truncate" title={chunk.chunkHash}>
           {editor.formatHash(chunk.chunkHash)}
         </span>
@@ -207,7 +207,7 @@ function StoryMetadataCard({ editor }: { editor: StoryEditorController }) {
             {t("person.status", "Status")}
           </span>
           <span
-            className={`text-xs px-2 py-0.5 rounded font-medium ${meta.isSealed ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"}`}
+            className={`text-xs px-2 py-0.5 rounded-sm font-medium ${meta.isSealed ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"}`}
           >
             {meta.isSealed ? t("person.sealed", "Sealed") : t("person.editable", "Editable")}
           </span>

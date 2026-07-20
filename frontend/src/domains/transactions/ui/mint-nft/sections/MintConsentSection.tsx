@@ -37,7 +37,7 @@ export function MintConsentSection({
   ] as const;
 
   return (
-    <div className="p-5 rounded-2xl border border-red-200/50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 backdrop-blur-sm !mt-8">
+    <div className="p-5 rounded-2xl border border-red-200/50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 backdrop-blur-sm mt-8!">
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
           <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -59,7 +59,7 @@ export function MintConsentSection({
           </div>
           {consentError && (
             <div
-              className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fadeIn"
+              className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fade-in"
               role="alert"
               aria-live="assertive"
             >

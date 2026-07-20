@@ -32,7 +32,7 @@ const CallToAction = memo(() => {
             {/* Primary Button: Vibrant Gradient (Orange/Red like screenshot) */}
             <NavLink
               to="/actions"
-              className="group relative inline-flex items-center gap-2 bg-gradient-to-r from-orange-400 to-red-500 text-white px-10 py-4 rounded-full font-bold hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-300 hover:scale-105"
+              className="group relative inline-flex items-center gap-2 bg-linear-to-r from-orange-400 to-red-500 text-white px-10 py-4 rounded-full font-bold hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-300 hover:scale-105"
             >
               <span className="relative z-10">{t("home.cta.startButton")}</span>
               <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />

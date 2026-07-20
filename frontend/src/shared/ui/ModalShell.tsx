@@ -122,7 +122,7 @@ export function ModalShell({
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         tabIndex={-1}
-        className={`w-full ${maxWidth} bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden outline-none`}
+        className={`w-full ${maxWidth} bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden outline-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {!hideCloseButton && (

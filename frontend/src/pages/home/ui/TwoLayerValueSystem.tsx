@@ -6,7 +6,7 @@ import { PageContainer } from "../../../shared/ui";
 
 const BorderLine = ({ side, className = "" }: { side: "left" | "right"; className?: string }) => (
   <div
-    className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
+    className={`hidden md:block absolute top-0 bottom-0 w-px transition-colors duration-300
       ${side === "left" ? "left-0" : "right-0"}
       ${className}
       group-hover:bg-slate-300
@@ -14,13 +14,13 @@ const BorderLine = ({ side, className = "" }: { side: "left" | "right"; classNam
   >
     {/* Top Cap */}
     <div
-      className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute top-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
     {/* Bottom Cap */}
     <div
-      className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute bottom-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
@@ -72,7 +72,7 @@ const TwoLayerValueSystem = memo(() => {
                 {/* Interactive Area Layer (Background & Lines) */}
                 <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
                   {/* Hover Background - Gradient matching Theme */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-r from-orange-50 to-transparent" />
 
                   {/* Left Border Line */}
                   <BorderLine side="left" className="bg-slate-200" />
@@ -84,7 +84,7 @@ const TwoLayerValueSystem = memo(() => {
                   />
 
                   {/* Mobile Line (Simple left border for <md) */}
-                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-px bg-slate-200" />
                 </div>
 
                 {/* Content Layer */}
@@ -105,7 +105,7 @@ const TwoLayerValueSystem = memo(() => {
                   </div>
 
                   {/* Description */}
-                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed mb-8 flex-grow">
+                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed mb-8 grow">
                     {t(`home.valueSystem.${layer.key}.description`)}
                   </p>
 
@@ -113,7 +113,7 @@ const TwoLayerValueSystem = memo(() => {
                   <div className="space-y-3 mt-auto pt-8 border-t border-slate-100/0 group-hover:border-slate-200/50 transition-colors duration-300">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex items-start gap-3">
-                        <CheckCircle className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 mt-1 flex-shrink-0" />
+                        <CheckCircle className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 mt-1 shrink-0" />
                         <span className="text-slate-500 group-hover:text-slate-900 transition-colors duration-300 font-medium">
                           {t(`home.valueSystem.${layer.key}.feature${i}`)}
                         </span>

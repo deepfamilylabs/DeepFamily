@@ -25,7 +25,7 @@ export default function ToggleControl({
   tooltip,
 }: ToggleControlProps) {
   return (
-    <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
+    <div className="flex items-center justify-between gap-2 shrink-0 relative">
       <div className="flex items-center gap-1.5 min-w-0">
         <span className="text-xs font-medium text-slate-600 dark:text-slate-400 truncate">
           {label}:
@@ -33,7 +33,7 @@ export default function ToggleControl({
         <button
           type="button"
           onClick={onToggleTooltip}
-          className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
+          className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-hidden"
         >
           <HelpCircle size={14} />
         </button>
@@ -44,18 +44,18 @@ export default function ToggleControl({
         aria-checked={value}
         aria-label={label}
         onClick={() => onChange(!value)}
-        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 ${
-          value ? "bg-gradient-to-r from-orange-400 to-red-500" : "bg-slate-300 dark:bg-slate-600"
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 ${
+          value ? "bg-linear-to-r from-orange-400 to-red-500" : "bg-slate-300 dark:bg-slate-600"
         }`}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform duration-200 ${
             value ? "translate-x-[18px]" : "translate-x-0.5"
           }`}
         />
       </button>
       {tooltipOpen && (
-        <div className="absolute bottom-full left-0 z-[9999] mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute bottom-full left-0 z-9999 mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
           {tooltip}
         </div>
       )}

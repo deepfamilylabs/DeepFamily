@@ -49,13 +49,13 @@ export default function SortButton({
         <div className="flex flex-col -space-y-1 items-center ml-0.5">
           <ChevronUp
             className={`w-3.5 h-3.5 transition-all duration-200 ${
-              sortOrder === "asc" ? "text-white drop-shadow-sm" : "text-white/40"
+              sortOrder === "asc" ? "text-white drop-shadow-xs" : "text-white/40"
             }`}
             strokeWidth={2.5}
           />
           <ChevronDown
             className={`w-3.5 h-3.5 transition-all duration-200 ${
-              sortOrder === "desc" ? "text-white drop-shadow-sm" : "text-white/40"
+              sortOrder === "desc" ? "text-white drop-shadow-xs" : "text-white/40"
             }`}
             strokeWidth={2.5}
           />

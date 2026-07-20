@@ -41,7 +41,7 @@ export function MintTargetSection({
       </h3>
 
       <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20">
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr,140px] gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-4">
           <div>
             <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
               {t("mintNFT.personHash", "Person Hash")} <span className="text-red-500">*</span>
@@ -51,7 +51,7 @@ export function MintTargetSection({
               value={personHash}
               onChange={(event) => onPersonHashChange(event.target.value)}
               {...personHashA11y.fieldProps}
-              className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none transition-all font-mono ${
+              className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-hidden transition-all font-mono ${
                 hashInputInvalid
                   ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                   : "border-gray-200 dark:border-gray-700 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
@@ -69,7 +69,7 @@ export function MintTargetSection({
               min="1"
               value={versionIndex}
               onChange={(event) => onVersionIndexChange(parseInt(event.target.value) || 1)}
-              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
               placeholder="1"
             />
           </div>
@@ -127,7 +127,7 @@ export function MintTargetSection({
           (hasMissingParents.father || hasMissingParents.mother) && (
             <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/30 rounded-xl border border-amber-100 dark:border-amber-900/30">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-bold text-amber-900 dark:text-amber-100 mb-1">
                     {t("mintNFT.missingParentsTitle", "Incomplete Parent Information")}

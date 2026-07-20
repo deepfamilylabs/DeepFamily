@@ -40,7 +40,7 @@ export function PeopleFiltersPanel({
                 "people.searchPlaceholder",
                 "Search by name, location, or story content...",
               )}
-              className="w-full pl-11 pr-4 py-2.5 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 focus:bg-white dark:focus:bg-gray-800 transition-all duration-300"
+              className="w-full pl-11 pr-4 py-2.5 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-hidden focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 focus:bg-white dark:focus:bg-gray-800 transition-all duration-300"
             />
           </div>
         </div>
@@ -178,14 +178,14 @@ function TokenFilterInput({
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder={placeholder}
-            className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-hidden focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition-all"
           />
         </div>
         <button
           type="button"
           onClick={onAdd}
           disabled={addDisabled}
-          className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-orange-600 dark:hover:bg-orange-400 disabled:opacity-50 disabled:hover:bg-gray-900 dark:disabled:hover:bg-white transition-all flex items-center justify-center flex-shrink-0 active:scale-95"
+          className="w-10 h-10 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-orange-600 dark:hover:bg-orange-400 disabled:opacity-50 disabled:hover:bg-gray-900 dark:disabled:hover:bg-white transition-all flex items-center justify-center shrink-0 active:scale-95"
         >
           <Plus className="w-5 h-5" strokeWidth={2.5} />
         </button>

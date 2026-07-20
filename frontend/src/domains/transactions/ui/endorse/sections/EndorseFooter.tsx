@@ -84,7 +84,7 @@ export function EndorseFooter({
               !isTargetValidOnChain ||
               !isPersonHashFormatValid
             }
-            className="flex-[2]"
+            className="flex-2"
           >
             {isApproving ? (
               <div className="flex items-center justify-center gap-2">

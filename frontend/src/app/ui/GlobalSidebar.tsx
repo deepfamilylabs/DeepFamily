@@ -162,7 +162,7 @@ export default function GlobalSidebar() {
       {/* Sidebar Container */}
       <div
         className={`
-          fixed left-0 bottom-0 z-[10002]
+          fixed left-0 bottom-0 z-10002
           bg-white dark:bg-slate-900 shadow-xl
           transition-all duration-300 ease-in-out
           will-change-transform
@@ -185,8 +185,8 @@ export default function GlobalSidebar() {
         {/* Mobile Header */}
         <div className="md:hidden p-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
           <div className="flex items-center gap-1.5">
-            <Logo className="w-7 h-7 flex-shrink-0 text-orange-500" />
-            <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
+            <Logo className="w-7 h-7 shrink-0 text-orange-500" />
+            <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-linear-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
               Deepfamily
             </span>
           </div>
@@ -241,7 +241,7 @@ export default function GlobalSidebar() {
                         className={`inline-flex w-10 h-6 items-center rounded-full p-1 transition-colors ${item.value ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-600"}`}
                       >
                         <span
-                          className={`block w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${item.value ? "translate-x-4" : ""}`}
+                          className={`block w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${item.value ? "translate-x-4" : ""}`}
                         />
                       </span>
                     </span>

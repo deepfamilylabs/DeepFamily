@@ -27,10 +27,10 @@ export function EndorseSuccessResult({
     `${(Number(value) / Math.pow(10, deepTokenDecimals)).toLocaleString()} ${deepTokenSymbol}`;
 
   return (
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex items-center gap-4 p-5 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-100 dark:border-green-800">
-        <div className="w-12 h-12 rounded-full bg-green-500 shadow-lg shadow-green-500/20 flex items-center justify-center flex-shrink-0">
-          <Check className="w-6 h-6 text-white stroke-[3]" />
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center gap-4 p-5 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-100 dark:border-green-800">
+        <div className="w-12 h-12 rounded-full bg-green-500 shadow-lg shadow-green-500/20 flex items-center justify-center shrink-0">
+          <Check className="w-6 h-6 text-white stroke-3" />
         </div>
         <div>
           <h3 className="text-lg font-bold text-green-900 dark:text-green-100">
@@ -48,7 +48,7 @@ export function EndorseSuccessResult({
       >
         <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-green-100/50 dark:hover:bg-green-900/20 transition-colors select-none">
           <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full shadow-sm shadow-green-500/50"></div>
+            <div className="w-2 h-2 bg-green-500 rounded-full shadow-xs shadow-green-500/50"></div>
             <span className="text-sm font-bold text-green-900 dark:text-green-100">
               {t("endorse.endorsementDetails", "Endorsement Details")}
             </span>

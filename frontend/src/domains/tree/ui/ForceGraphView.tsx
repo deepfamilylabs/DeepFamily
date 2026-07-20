@@ -121,7 +121,7 @@ const ForceGraphView = noPropsForwardRef<FamilyTreeViewHandle>((ref) => {
     <GraphViewport
       containerRef={containerRef}
       height="100%"
-      containerClassName="relative w-full h-full overflow-hidden bg-gradient-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 touch-none overscroll-contain"
+      containerClassName="relative w-full h-full overflow-hidden bg-linear-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 touch-none overscroll-contain"
       svgClassName="block min-w-full min-h-full select-none touch-none"
       viewBox={`0 0 ${layout.FORCE_VIEWBOX_WIDTH} ${height}`}
       svgRef={svgRef}

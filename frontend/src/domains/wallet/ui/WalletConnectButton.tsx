@@ -62,7 +62,7 @@ export default function WalletConnectButton({
       <button
         onClick={connect}
         disabled={isConnecting}
-        className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
+        className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-xs backdrop-blur-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
           isHomePage
             ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15"
             : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600"
@@ -103,13 +103,13 @@ export default function WalletConnectButton({
           }}
           className={`group flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:gap-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all hover:scale-105 whitespace-nowrap ${
             isHomePage
-              ? "bg-gradient-to-r from-amber-400/20 to-orange-400/20 dark:from-amber-500/20 dark:to-orange-500/20 text-yellow-100 dark:text-yellow-200 border border-yellow-400/40 dark:border-yellow-500/40 hover:from-amber-400/30 hover:to-orange-400/30 shadow-sm shadow-amber-500/10"
-              : "bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-900/40 dark:hover:to-orange-900/40 shadow-sm"
+              ? "bg-linear-to-r from-amber-400/20 to-orange-400/20 dark:from-amber-500/20 dark:to-orange-500/20 text-yellow-100 dark:text-yellow-200 border border-yellow-400/40 dark:border-yellow-500/40 hover:from-amber-400/30 hover:to-orange-400/30 shadow-xs shadow-amber-500/10"
+              : "bg-linear-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-900/40 dark:hover:to-orange-900/40 shadow-xs"
           }`}
           title={t("wallet.clickToSwitch", "Click to switch network")}
         >
           <RefreshCw
-            className={`w-3.5 h-3.5 sm:w-3 sm:h-3 flex-shrink-0 group-hover:rotate-180 transition-transform duration-300 ${
+            className={`w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0 group-hover:rotate-180 transition-transform duration-300 ${
               isHomePage ? "text-yellow-200/70" : "text-amber-500 dark:text-amber-400"
             }`}
           />
@@ -118,14 +118,14 @@ export default function WalletConnectButton({
       )}
 
       <div
-        className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-sm backdrop-blur-sm whitespace-nowrap min-w-0 ${
+        className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-xs backdrop-blur-sm whitespace-nowrap min-w-0 ${
           isHomePage
             ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15"
             : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600"
         }`}
       >
         <div
-          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+          className={`w-2 h-2 rounded-full shrink-0 ${
             isHomePage ? "bg-green-300 dark:bg-green-400" : "bg-green-500"
           }`}
         ></div>
@@ -153,7 +153,7 @@ export default function WalletConnectButton({
 
         <button
           onClick={disconnect}
-          className="flex-shrink-0 p-0 rounded transition-opacity hover:opacity-70"
+          className="shrink-0 p-0 rounded-sm transition-opacity hover:opacity-70"
           title={t("wallet.disconnect", "Disconnect")}
         >
           <LogOut

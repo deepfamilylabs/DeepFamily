@@ -6,7 +6,7 @@ import { PageContainer } from "../../../shared/ui";
 
 const BorderLine = ({ side, showDefault }: { side: "left" | "right"; showDefault?: boolean }) => (
   <div
-    className={`hidden md:block absolute top-0 bottom-0 w-[1px] transition-colors duration-300
+    className={`hidden md:block absolute top-0 bottom-0 w-px transition-colors duration-300
       ${side === "left" ? "left-0" : "right-0"}
       ${showDefault ? "bg-slate-200" : "bg-transparent"}
       group-hover:bg-slate-300
@@ -14,13 +14,13 @@ const BorderLine = ({ side, showDefault }: { side: "left" | "right"; showDefault
   >
     {/* Top Cap */}
     <div
-      className={`absolute top-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute top-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
     {/* Bottom Cap */}
     <div
-      className={`absolute bottom-0 h-[1px] w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute bottom-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
@@ -79,7 +79,7 @@ const Audience = memo(() => {
                 {/* Interactive Area Layer (Background & Lines) */}
                 <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
                   {/* Hover Background - Gradient matching Theme */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-orange-50 to-transparent" />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-r from-orange-50 to-transparent" />
 
                   {/* Left Border Line */}
                   <BorderLine side="left" showDefault={true} />
@@ -88,7 +88,7 @@ const Audience = memo(() => {
                   <BorderLine side="right" showDefault={isLastInRow} />
 
                   {/* Mobile Line (Simple left border) */}
-                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-[1px] bg-slate-200" />
+                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-px bg-slate-200" />
                 </div>
 
                 {/* Content Layer */}
@@ -104,20 +104,20 @@ const Audience = memo(() => {
                   </h3>
 
                   {/* Description */}
-                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed mb-8 flex-grow">
+                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed mb-8 grow">
                     {t(`home.audience.${item.key}.description`)}
                   </p>
 
                   {/* Benefits List */}
                   <div className="space-y-3 mt-auto pt-8 border-t border-slate-100/0 group-hover:border-slate-200/50 transition-colors duration-300">
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 mt-1 flex-shrink-0" />
+                      <CheckCircle className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 mt-1 shrink-0" />
                       <span className="text-slate-500 group-hover:text-slate-900 transition-colors duration-300 font-medium">
                         {t(`home.audience.${item.key}.benefit1`)}
                       </span>
                     </div>
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 mt-1 flex-shrink-0" />
+                      <CheckCircle className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 mt-1 shrink-0" />
                       <span className="text-slate-500 group-hover:text-slate-900 transition-colors duration-300 font-medium">
                         {t(`home.audience.${item.key}.benefit2`)}
                       </span>

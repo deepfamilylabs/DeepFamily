@@ -36,7 +36,7 @@ describe("ToastProvider", () => {
     expect(toast).toBeTruthy();
     expect(toast?.getAttribute("aria-live")).toBe("polite");
     expect(toast?.getAttribute("aria-atomic")).toBe("true");
-    expect(toast?.parentElement?.parentElement?.className).toContain("z-[11000]");
+    expect(toast?.parentElement?.parentElement?.className).toContain("z-11000");
   });
 
   it("announces error toasts as assertive alerts", () => {

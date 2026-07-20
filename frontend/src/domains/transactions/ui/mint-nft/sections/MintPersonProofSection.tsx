@@ -60,7 +60,7 @@ export function MintPersonProofSection({
 
         <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed font-medium">
               {t(
                 "mintNFT.basicInfoMustMatch",
@@ -74,7 +74,7 @@ export function MintPersonProofSection({
           ref={personCalcRef}
           showTitle={false}
           collapsible={false}
-          className="bg-transparent border-0 shadow-none !p-0"
+          className="bg-transparent border-0 shadow-none p-0!"
           identityMode={personIdentityMode}
           identitySaltHex={personIdentityMode === "random" ? personRecoverySaltHex : undefined}
           initialValues={
@@ -125,7 +125,7 @@ export function MintPersonProofSection({
                 onClick={() => onPersonIdentityModeChange("deterministic")}
                 className={`rounded-xl border px-4 py-3 text-left transition-all ${
                   personIdentityMode === "deterministic"
-                    ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                    ? "border-blue-500 bg-white dark:bg-gray-800 shadow-xs"
                     : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
                 }`}
               >
@@ -144,7 +144,7 @@ export function MintPersonProofSection({
                 onClick={() => onPersonIdentityModeChange("random")}
                 className={`rounded-xl border px-4 py-3 text-left transition-all ${
                   personIdentityMode === "random"
-                    ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+                    ? "border-blue-500 bg-white dark:bg-gray-800 shadow-xs"
                     : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
                 }`}
               >
@@ -169,7 +169,7 @@ export function MintPersonProofSection({
                   type="text"
                   value={personRecoverySaltHex}
                   onChange={(event) => onPersonRecoverySaltHexChange(event.target.value)}
-                  className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-hidden focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   placeholder={t(
                     "mintNFT.identityRecoverySaltPlaceholder",
                     "Paste the saved recovery salt for this identity",

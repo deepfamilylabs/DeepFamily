@@ -46,7 +46,7 @@ export function IdentityRecoveryModePanel({
           onClick={() => onModeChange("deterministic")}
           className={`rounded-xl border px-4 py-3 text-left transition-all ${
             mode === "deterministic"
-              ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+              ? "border-blue-500 bg-white dark:bg-gray-800 shadow-xs"
               : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
           }`}
         >
@@ -68,7 +68,7 @@ export function IdentityRecoveryModePanel({
           }}
           className={`rounded-xl border px-4 py-3 text-left transition-all ${
             mode === "random"
-              ? "border-blue-500 bg-white dark:bg-gray-800 shadow-sm"
+              ? "border-blue-500 bg-white dark:bg-gray-800 shadow-xs"
               : "border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/40"
           }`}
         >
@@ -102,7 +102,7 @@ export function IdentityRecoveryModePanel({
             type="text"
             value={recoverySaltHex}
             onChange={(event) => onRecoverySaltHexChange(event.target.value)}
-            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-xs font-mono text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-hidden focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
             placeholder={saltPlaceholder}
           />
           {notice && (

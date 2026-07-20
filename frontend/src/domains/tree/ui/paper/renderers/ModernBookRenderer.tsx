@@ -791,7 +791,7 @@ export function ModernBookRenderer({
       >
         {spreadItems.length ? (
           <section
-            className="border p-[var(--df-paper-leaf-margin)] shadow-sm"
+            className="border p-(--df-paper-leaf-margin) shadow-xs"
             style={{
               ...PAPER_LEAF_STYLE,
               borderColor: PAPER_LINE.strong,

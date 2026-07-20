@@ -19,7 +19,7 @@ export function PaperEmptyState({
       data-testid="paper-genealogy-empty"
     >
       <div
-        className="max-w-md border px-6 py-5 text-center shadow-sm"
+        className="max-w-md border px-6 py-5 text-center shadow-xs"
         style={{
           background: "var(--df-paper-sheet)",
           borderColor: "var(--df-paper-line-soft)",

@@ -59,7 +59,7 @@ function PersonIdentitySection({ person }: { person: PersonPageController }) {
         {data.personHash && data.versionIndex !== undefined && (
           <button
             onClick={person.viewFamilyTree}
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg transition-colors"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg transition-colors"
             title={t("person.viewFamilyTree", "View Family Tree") as string}
           >
             <GitBranch size={16} />
@@ -216,7 +216,7 @@ function InfoRow({
         align === "start" ? "sm:items-start" : "sm:items-center"
       } gap-1 sm:gap-4 ${padded ? "pt-1" : ""}`}
     >
-      <span className="text-gray-500 dark:text-gray-400 sm:w-24 flex-shrink-0">{label}</span>
+      <span className="text-gray-500 dark:text-gray-400 sm:w-24 shrink-0">{label}</span>
       {children}
     </div>
   );
@@ -237,7 +237,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
             {t("person.profileData", "Profile Data")}
           </h3>
           {data.storyMetadata?.isSealed ? (
-            <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
               {t("person.sealed", "Sealed")}
             </span>
           ) : (
@@ -261,7 +261,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
 
       {hasStoryIntegrityIssues(data) && (
         <div className="mb-4">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
             {t("person.integrityWarn", "Integrity Warning")}
           </span>
@@ -327,7 +327,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
           <p className="whitespace-pre-wrap">{data.fullStory}</p>
         </div>
       ) : person.viewMode === "raw" && data.fullStory ? (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-sm p-3 border border-gray-200 dark:border-gray-700">
           <pre className="font-mono text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-x-auto">
             {data.fullStory}
           </pre>
@@ -347,7 +347,7 @@ function ViewModeToggle({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
 
   return (
-    <div className="inline-flex items-center rounded border border-gray-300 dark:border-gray-600">
+    <div className="inline-flex items-center rounded-sm border border-gray-300 dark:border-gray-600">
       <ViewModeButton
         active={person.viewMode === "sections"}
         icon={<Layers size={14} />}

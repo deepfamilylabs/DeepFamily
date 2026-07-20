@@ -111,7 +111,7 @@ const ThemedSelect: React.FC<{
         type="button"
         onClick={() => setOpen((o) => !o)}
         onKeyDown={handleButtonKeyDown}
-        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
@@ -504,14 +504,14 @@ export const PersonHashCalculator = forwardRef<
                 {t("search.hashCalculator.name")} <span className="text-red-500">*</span>
               </label>
               <input
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                 placeholder={t("search.hashCalculator.nameInputPlaceholder")}
                 {...register("fullName")}
               />
               <FieldError message={errors.fullName?.message} />
             </div>
 
-            <div className="w-28 sm:w-28 flex-shrink-0">
+            <div className="w-28 sm:w-28 shrink-0">
               <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
                 {t("search.hashCalculator.gender")}
               </label>
@@ -557,7 +557,7 @@ export const PersonHashCalculator = forwardRef<
                   min="0"
                   max={isBirthBC ? 9999 : new Date().getFullYear()}
                   placeholder={isBirthBC ? "<10000" : "<=" + new Date().getFullYear()}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                   {...register("birthYear", {
                     setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                   })}
@@ -575,7 +575,7 @@ export const PersonHashCalculator = forwardRef<
                 min="0"
                 max="12"
                 placeholder={t("search.hashCalculator.birthMonth")}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                 {...register("birthMonth", {
                   setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                 })}
@@ -592,7 +592,7 @@ export const PersonHashCalculator = forwardRef<
                 min="0"
                 max="31"
                 placeholder={t("search.hashCalculator.birthDay")}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                 {...register("birthDay", { setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)) })}
               />
               <FieldError message={errors.birthDay?.message} />
@@ -642,7 +642,7 @@ export const PersonHashCalculator = forwardRef<
                         <button
                           type="button"
                           onClick={() => setShowPassphraseHelp(false)}
-                          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm"
                           aria-label={t("common.close", "Close")}
                         >
                           ×
@@ -718,7 +718,7 @@ export const PersonHashCalculator = forwardRef<
             <div className="relative">
               <input
                 type={showPassphrase ? "text" : "password"}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                 placeholder={t(
                   "search.hashCalculator.passphrasePlaceholder",
                   "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
@@ -735,7 +735,7 @@ export const PersonHashCalculator = forwardRef<
               <button
                 type="button"
                 onClick={() => setShowPassphrase(!showPassphrase)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
                 aria-label={
                   showPassphrase
                     ? t(
@@ -925,7 +925,7 @@ export const PersonHashCalculator = forwardRef<
 
       return (
         <div
-          className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden ${className}`}
+          className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-xs overflow-hidden ${className}`}
         >
           {showTitle && (
             <div className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 border-b border-gray-200 dark:border-gray-700/60">
@@ -941,7 +941,7 @@ export const PersonHashCalculator = forwardRef<
 
     return (
       <div
-        className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-sm overflow-hidden ${className}`}
+        className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-xs overflow-hidden ${className}`}
       >
         <div
           className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
@@ -954,7 +954,7 @@ export const PersonHashCalculator = forwardRef<
           )}
           <button
             type="button"
-            className="text-sm px-2 py-1 rounded border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="text-sm px-2 py-1 rounded-sm border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               handleToggle();

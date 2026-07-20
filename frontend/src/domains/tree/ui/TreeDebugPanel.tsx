@@ -76,7 +76,7 @@ export default function TreeDebugPanel() {
   const [collapsed, setCollapsed] = useState(true);
 
   return (
-    <div className="text-xs rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm px-3 py-1.5 space-y-2">
+    <div className="text-xs rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-xs px-3 py-1.5 space-y-2">
       <button
         type="button"
         onClick={() => setCollapsed((v) => !v)}
@@ -244,7 +244,7 @@ export default function TreeDebugPanel() {
           <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
             <span title="Persistent cache backend availability.">IndexedDB:</span>
             <span
-              className={`font-mono px-1 rounded ${idbEnabled && isIndexedDBSupported() ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200"}`}
+              className={`font-mono px-1 rounded-sm ${idbEnabled && isIndexedDBSupported() ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200"}`}
             >
               {idbEnabled && isIndexedDBSupported() ? "enabled" : "disabled"}
             </span>

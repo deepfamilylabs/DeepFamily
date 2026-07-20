@@ -18,9 +18,9 @@ export function MintNFTSuccessResult({ t, successResult }: MintNFTSuccessResultP
   const event = successResult.events.PersonNFTMinted;
 
   return (
-    <div className="space-y-4 animate-fadeIn">
-      <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700">
-        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center gap-3 p-4 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700">
+        <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shrink-0">
           <Check className="w-6 h-6 text-white" />
         </div>
         <div>

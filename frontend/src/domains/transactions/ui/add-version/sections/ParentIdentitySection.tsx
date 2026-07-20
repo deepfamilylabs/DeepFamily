@@ -87,14 +87,14 @@ export function ParentIdentitySection({
         : "bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400";
 
   return (
-    <div className={`space-y-2 ${isFather ? "" : "!mt-2"}`}>
+    <div className={`space-y-2 ${isFather ? "" : "mt-2!"}`}>
       <button
         type="button"
         onClick={() => onExpandedChange(!expanded)}
         className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group ${
           expanded
             ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
-            : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm"
+            : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-xs"
         }`}
       >
         <div className="flex items-center gap-3">
@@ -134,7 +134,7 @@ export function ParentIdentitySection({
         <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
           <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
             <div className="flex items-start gap-2">
-              <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed opacity-90">
                 {t(
                   "addVersion.parentInfoNotice",
@@ -217,7 +217,7 @@ export function ParentIdentitySection({
               {...register(versionField, {
                 setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
               })}
-              className="w-full sm:w-32 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+              className="w-full sm:w-32 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
               placeholder="0"
             />
           </div>

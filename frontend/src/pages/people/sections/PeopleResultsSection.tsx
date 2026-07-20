@@ -67,7 +67,7 @@ function PeopleSkeletonGrid() {
       {Array.from({ length: 6 }).map((_, index) => (
         <div
           key={index}
-          className="h-[520px] rounded-[2rem] border border-gray-200/80 dark:border-gray-800 bg-white/70 dark:bg-gray-900/40 animate-pulse"
+          className="h-[520px] rounded-4xl border border-gray-200/80 dark:border-gray-800 bg-white/70 dark:bg-gray-900/40 animate-pulse"
         />
       ))}
     </div>

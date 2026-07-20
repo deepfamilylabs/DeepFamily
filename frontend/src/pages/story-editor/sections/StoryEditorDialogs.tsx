@@ -16,7 +16,7 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
       isOpen={showConfirm}
       onClose={closeDialog}
       bare
-      zIndex="z-[1002]"
+      zIndex="z-1002"
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
       disableBackdropClose
@@ -28,7 +28,7 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
         >
         <div className="p-8">
           <div className="flex flex-col items-center text-center gap-4 mb-8">
-            <div className="flex-shrink-0 w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
+            <div className="shrink-0 w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
               <Lock size={32} className="text-orange-600 dark:text-orange-500" />
             </div>
             <div>
@@ -60,7 +60,7 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
               type="button"
               onClick={editor.seal.execute}
               disabled={editor.submitting}
-              className="flex-1 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-orange-400 to-red-600 hover:shadow-lg shadow-orange-500/20 rounded-full disabled:opacity-50 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 text-sm font-bold text-white bg-linear-to-r from-orange-400 to-red-600 hover:shadow-lg shadow-orange-500/20 rounded-full disabled:opacity-50 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
             >
               {editor.submitting ? (
                 <>
@@ -94,7 +94,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
       isOpen={showChunkTypeHelp}
       onClose={closeDialog}
       bare
-      zIndex="z-[1002]"
+      zIndex="z-1002"
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
@@ -108,7 +108,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
         >
         <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-4">
-            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+            <div className="shrink-0 w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
               <HelpCircle size={24} className="text-blue-600 dark:text-blue-400" />
             </div>
             <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-gray-100">
@@ -259,7 +259,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
                 ),
               ].map((note) => (
                 <li key={note} className="flex items-start gap-2">
-                  <span className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5">•</span>
+                  <span className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">•</span>
                   <span>{note}</span>
                 </li>
               ))}
@@ -310,12 +310,12 @@ function HelpGroup({
           return (
             <div
               key={item.value}
-              className="flex items-start gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800/50"
+              className="flex items-start gap-2 p-2 rounded-sm bg-gray-50 dark:bg-gray-800/50"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Icon
                   size={16}
-                  className={getChunkTypeColorClass(item.value) + " flex-shrink-0 mt-0.5"}
+                  className={getChunkTypeColorClass(item.value) + " shrink-0 mt-0.5"}
                 />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">

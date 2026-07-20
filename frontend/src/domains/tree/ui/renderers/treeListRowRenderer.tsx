@@ -76,7 +76,7 @@ export default function TreeListRowRenderer(
       <div className="absolute inset-y-0 left-0 flex pointer-events-none">
         {ancestorGuides.map((show, i) =>
           show ? (
-            <div key={i} className="w-4 flex-shrink-0 relative">
+            <div key={i} className="w-4 shrink-0 relative">
               <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-slate-300 dark:bg-slate-600" />
             </div>
           ) : (
@@ -105,7 +105,7 @@ export default function TreeListRowRenderer(
               e.stopPropagation();
               hasChildren && toggle(nodeId);
             }}
-            className={`mr-1 ${hasChildren ? "w-5 h-5 text-[10px]" : "w-5 h-5 text-lg leading-none"} grid place-items-center rounded border ${hasChildren ? "bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-slate-300" : "border-transparent text-slate-400 dark:text-slate-500 cursor-default"}`}
+            className={`mr-1 ${hasChildren ? "w-5 h-5 text-[10px]" : "w-5 h-5 text-lg leading-none"} grid place-items-center rounded-sm border ${hasChildren ? "bg-white dark:bg-gray-800 hover:bg-slate-100 dark:hover:bg-gray-700 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-slate-300" : "border-transparent text-slate-400 dark:text-slate-500 cursor-default"}`}
           >
             {hasChildren ? (isOpen ? "−" : "+") : "•"}
           </button>
@@ -125,7 +125,7 @@ export default function TreeListRowRenderer(
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              className={`inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors ${mintedFlag ? "hover:bg-emerald-50 dark:hover:bg-emerald-900/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500" : "hover:bg-slate-100 dark:hover:bg-slate-800/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"}`}
+              className={`inline-flex items-center gap-1 rounded-sm px-1 py-0.5 transition-colors ${mintedFlag ? "hover:bg-emerald-50 dark:hover:bg-emerald-900/40 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500" : "hover:bg-slate-100 dark:hover:bg-slate-800/60 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"}`}
               title="Endorsements"
             >
               <svg
@@ -133,7 +133,7 @@ export default function TreeListRowRenderer(
                 height="14"
                 viewBox="0 0 20 20"
                 aria-hidden="true"
-                className="flex-shrink-0"
+                className="shrink-0"
               >
                 <path
                   d="M10 1.5l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15l-5.2 2.8 1-5.9-4.3-4.2 5.9-.9L10 1.5z"
@@ -148,7 +148,7 @@ export default function TreeListRowRenderer(
           {mintedFlag && (
             <>
               <span
-                className={`text-[10px] px-1 rounded ${theme.tagBadgeBgClass.replace("fill-", "bg-")} ${theme.tagBadgeText.html} border border-emerald-300 dark:border-emerald-700/40`}
+                className={`text-[10px] px-1 rounded-sm ${theme.tagBadgeBgClass.replace("fill-", "bg-")} ${theme.tagBadgeText.html} border border-emerald-300 dark:border-emerald-700/40`}
               >
                 NFT
               </span>
@@ -167,7 +167,7 @@ export default function TreeListRowRenderer(
           )}
           {ui.tagText && (
             <span
-              className={`text-xs ${theme.tagBadgeText.html} ${theme.tagBadgeBgClass.replace("fill-", "bg-")} border border-blue-200 dark:border-blue-700/40 px-1 rounded`}
+              className={`text-xs ${theme.tagBadgeText.html} ${theme.tagBadgeBgClass.replace("fill-", "bg-")} border border-blue-200 dark:border-blue-700/40 px-1 rounded-sm`}
               title={ui.tagText}
             >
               {ui.tagText}

@@ -25,14 +25,14 @@ export default function ChildrenModeControls({
 }: ChildrenModeControlsProps) {
   const { t } = useTranslation();
   const buttonBase =
-    "px-3 py-1.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium";
-  const active = "bg-gradient-to-r from-orange-400 to-red-500 text-white shadow-md";
+    "px-3 py-1.5 text-xs transition-all duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium";
+  const active = "bg-linear-to-r from-orange-400 to-red-500 text-white shadow-md";
   const idle =
     "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700";
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-shrink-0 relative">
+      <div className="flex items-center justify-between gap-2 shrink-0 relative">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
             {t("familyTree.ui.childrenMode", "Node Mode")}:
@@ -40,7 +40,7 @@ export default function ChildrenModeControls({
           <button
             type="button"
             onClick={onToggleModeTooltip}
-            className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-none"
+            className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-hidden"
           >
             <HelpCircle size={14} />
           </button>
@@ -72,7 +72,7 @@ export default function ChildrenModeControls({
           </div>
         </div>
         {modeTooltipOpen && (
-          <div className="absolute bottom-full left-0 z-[9999] mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute bottom-full left-0 z-9999 mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
             {mode === "strict"
               ? t(
                   "familyTree.ui.childrenModeTooltip.strict",

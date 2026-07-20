@@ -304,7 +304,7 @@ export default function PersonStoryModal({
         {person.fullName || `Person ${person.personHash.slice(0, 8)}...`}
       </span>
       {marquee && (
-        <span className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white dark:from-gray-950 to-transparent" />
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l from-white dark:from-gray-950 to-transparent" />
       )}
     </span>
   );
@@ -323,7 +323,7 @@ export default function PersonStoryModal({
         </>
       )}
       {(endorsementCount > 0 || isMinted(person)) && (
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {endorsementCount > 0 && (
             <button
               type="button"
@@ -334,7 +334,7 @@ export default function PersonStoryModal({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none flex-shrink-0 whitespace-nowrap"
+              className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden shrink-0 whitespace-nowrap"
             >
               <Star className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
               <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
@@ -357,7 +357,7 @@ export default function PersonStoryModal({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none flex-shrink-0 whitespace-nowrap"
+              className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden shrink-0 whitespace-nowrap"
               title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
             >
               <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />

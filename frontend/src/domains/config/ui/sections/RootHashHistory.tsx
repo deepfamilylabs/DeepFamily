@@ -27,7 +27,7 @@ export default function RootHashHistory({
             <button
               type="button"
               onClick={() => onSelect(h)}
-              className="px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-600 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 hover:border-emerald-500 dark:hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors duration-150 font-mono text-[11px] shadow-sm truncate max-w-[240px]"
+              className="px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-600 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 hover:border-emerald-500 dark:hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors duration-150 font-mono text-[11px] shadow-xs truncate max-w-[240px]"
               title={h}
             >
               {formatHashMiddle(h)}
@@ -35,7 +35,7 @@ export default function RootHashHistory({
             <button
               type="button"
               aria-label={t("familyTree.actions.remove", "Remove")}
-              className="w-4 h-4 inline-flex items-center justify-center rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors duration-150"
+              className="w-4 h-4 inline-flex items-center justify-center rounded-sm text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors duration-150"
               onClick={() => onRemove(h)}
               title={t("familyTree.actions.remove", "Remove") as string}
             >

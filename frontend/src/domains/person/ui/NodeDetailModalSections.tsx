@@ -121,7 +121,7 @@ export function NodeDetailHeaderActions({
           }}
           onPointerDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
-          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
           title={t("people.clickToEndorse", "Click to endorse this version")}
         >
           <Star className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
@@ -140,7 +140,7 @@ export function NodeDetailHeaderActions({
           }}
           onPointerDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
-          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
           title={t("familyTree.nodeDetail.mintNFTTooltip", "Mint this person as an NFT")}
         >
           <Image className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
@@ -160,7 +160,7 @@ export function NodeDetailHeaderActions({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
             title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
           >
             <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
@@ -177,7 +177,7 @@ export function NodeDetailHeaderActions({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-none"
+            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
             title={t("familyTree.nodeDetail.editStory", "Edit Story")}
           >
             <Edit2 className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
@@ -307,7 +307,7 @@ export function NodeDetailHashRows({
                   e.stopPropagation();
                   onDecryptCid(nodeData.metadataCID!);
                 }}
-                className="flex-shrink-0 whitespace-nowrap px-4 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 text-gray-500 hover:text-white dark:hover:text-white hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
+                className="shrink-0 whitespace-nowrap px-4 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 text-gray-500 hover:text-white dark:hover:text-white hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
               >
                 {t("familyTree.nodeDetail.decrypt", "Decrypt and View")}
               </button>
@@ -438,7 +438,7 @@ export function NodeDetailTrustedEndorsersSection({
                     type="button"
                     onClick={() => void removeAccount(account)}
                     disabled={pending === account.toLowerCase()}
-                    className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-white hover:bg-red-500 hover:border-red-500 disabled:opacity-50"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-white hover:bg-red-500 hover:border-red-500 disabled:opacity-50"
                     aria-label={t(
                       "familyTree.nodeDetail.removeTrusted",
                       "Remove recommended source",
@@ -494,7 +494,7 @@ function NodeDetailStorySection({ t, story }: { t: NodeDetailT; story?: string }
         <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
           {t("familyTree.nodeDetail.story")}
         </div>
-        <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto font-medium">
+        <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap wrap-break-word max-h-[200px] overflow-y-auto font-medium">
           {story}
         </div>
       </div>

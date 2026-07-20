@@ -380,7 +380,7 @@ function SuGenerationColumn({
           aria-label={row.label}
         >
           <span
-            className="flex min-h-16 w-8 items-center justify-center px-1.5 py-2 shadow-sm"
+            className="flex min-h-16 w-8 items-center justify-center px-1.5 py-2 shadow-xs"
             style={{
               ...PAPER_TEXT.generationMark,
               backgroundColor: PAPER_MARK_BG,
@@ -541,7 +541,7 @@ export function SuBookRenderer({
       >
         {spreadItems.length ? (
           <section
-            className="border p-[var(--df-paper-leaf-margin)] shadow-sm"
+            className="border p-(--df-paper-leaf-margin) shadow-xs"
             style={{
               ...PAPER_LEAF_STYLE,
               borderColor: PAPER_LINE.strong,

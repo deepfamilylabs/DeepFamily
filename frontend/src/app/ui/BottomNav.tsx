@@ -33,7 +33,7 @@ export default function BottomNav() {
     }`;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/10 shadow-2xl shadow-orange-500/5 z-[9999] transform-gpu pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/10 shadow-2xl shadow-orange-500/5 z-9999 transform-gpu pb-[env(safe-area-inset-bottom)]">
       <div className="flex h-16 w-full px-4 gap-2 justify-between items-stretch max-w-lg mx-auto">
         <NavLink
           to="/"

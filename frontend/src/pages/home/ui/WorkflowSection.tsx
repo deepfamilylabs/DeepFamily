@@ -83,12 +83,12 @@ const WorkflowSection: React.FC = memo(() => {
   return (
     <section className="py-32 bg-white relative overflow-hidden">
       {/* Background Pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-size-[24px_24px] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
       <PageContainer className="relative z-10">
         {/* Header */}
         <div className={`text-center mb-20 ${ANIMATION_CLASSES.FADE_IN_UP}`}>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 mb-8 shadow-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 mb-8 shadow-xs">
             <GitBranch className="w-3.5 h-3.5 text-emerald-600" />
             <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
               Workflow Process
@@ -114,10 +114,10 @@ const WorkflowSection: React.FC = memo(() => {
             {steps.map((step, index) => (
               <div
                 key={index}
-                className={`group relative bg-white rounded-3xl p-8 border ${step.border} shadow-sm hover:shadow-xl ${step.hoverShadow} ${step.hoverBorder} transition-all duration-300 hover:-translate-y-1 flex flex-col items-center text-center h-full`}
+                className={`group relative bg-white rounded-3xl p-8 border ${step.border} shadow-xs hover:shadow-xl ${step.hoverShadow} ${step.hoverBorder} transition-all duration-300 hover:-translate-y-1 flex flex-col items-center text-center h-full`}
               >
                 {/* Step Number Badge */}
-                <div className="absolute -top-4 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <div className="absolute -top-4 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-xs text-xs font-bold text-slate-400 uppercase tracking-wider">
                   Step {step.number}
                 </div>
 

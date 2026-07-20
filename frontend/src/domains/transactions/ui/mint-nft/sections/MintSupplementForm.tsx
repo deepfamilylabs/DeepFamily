@@ -43,7 +43,7 @@ export function MintSupplementForm({
 
         <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/30">
           <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+            <Lock className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
             <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed font-medium">
               {t(
                 "mintNFT.supplementalInfoImmutable",
@@ -61,7 +61,7 @@ export function MintSupplementForm({
               </label>
               <input
                 {...register("birthPlace")}
-                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
                 placeholder={t("mintNFT.birthPlacePlaceholder", "Enter birth place")}
               />
             </div>
@@ -72,7 +72,7 @@ export function MintSupplementForm({
               </label>
               <input
                 {...register("deathPlace")}
-                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
                 placeholder={t(
                   "mintNFT.deathPlacePlaceholder",
                   "Enter death place (if applicable)",
@@ -111,7 +111,7 @@ export function MintSupplementForm({
                     min="0"
                     max={isDeathBC ? 9999 : currentYear}
                     placeholder={isDeathBC ? "<10000" : "<=" + currentYear}
-                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                     {...register("deathYear", {
                       setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
                     })}
@@ -128,7 +128,7 @@ export function MintSupplementForm({
                   min="0"
                   max="12"
                   placeholder={t("search.hashCalculator.birthMonth")}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                   {...register("deathMonth", {
                     setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
                   })}
@@ -144,7 +144,7 @@ export function MintSupplementForm({
                   min="0"
                   max="31"
                   placeholder={t("search.hashCalculator.birthDay")}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-none transition"
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
                   {...register("deathDay", {
                     setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
                   })}
@@ -161,7 +161,7 @@ export function MintSupplementForm({
               {...register("story")}
               rows={4}
               {...storyA11y.fieldProps}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all resize-none"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all resize-none"
               placeholder={t("mintNFT.storyPlaceholder", "Enter a brief life story summary...")}
             />
             {errors.story && (
@@ -181,7 +181,7 @@ export function MintSupplementForm({
           <input
             {...register("tokenURI")}
             {...tokenUriA11y.fieldProps}
-            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
+            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
             placeholder="https://... or ipfs://..."
           />
           <p id={tokenUriHintId} className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">

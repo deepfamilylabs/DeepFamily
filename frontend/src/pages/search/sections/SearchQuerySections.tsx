@@ -103,7 +103,7 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 max-w-full flex-1 min-w-0">
-                        <span className="whitespace-nowrap flex-shrink-0">
+                        <span className="whitespace-nowrap shrink-0">
                           {t("search.versionsQuery.creator")}:
                         </span>
                         <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0">
@@ -128,7 +128,7 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                     <div className="flex flex-col gap-1 text-sm pl-0 md:pl-0">
                       {version.metadataCID && (
                         <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
-                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right text-xs">
+                          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0 text-right text-xs">
                             {t("search.versionsQuery.metadataCID")}
                           </span>
                           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
@@ -281,7 +281,7 @@ export function TrustedEndorsersQuerySection({ search }: { search: SearchPageCon
                     className="p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
                   >
                     <div className="grid grid-cols-[96px_1fr] gap-2 items-center text-sm">
-                      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right">
+                      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0 text-right">
                         {t("search.trustedEndorsersQuery.account")}:
                       </span>
                       <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
@@ -332,7 +332,7 @@ function VersionParentRow({
 }) {
   return (
     <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
-      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right text-xs">
+      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0 text-right text-xs">
         {label}
       </span>
       <div className="flex items-center gap-2 min-w-0 overflow-hidden">
@@ -343,7 +343,7 @@ function VersionParentRow({
           />
           <CopyIconButton onClick={() => onCopy(hash)} label={copyLabel} size="xs" />
         </div>
-        <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+        <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
           (v{versionIndex})
         </span>
       </div>
@@ -577,7 +577,7 @@ export function ChildrenQuerySection({ search }: { search: SearchPageController 
                   >
                     <div className="flex flex-col gap-2 text-sm">
                       <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
-                        <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right">
+                        <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0 text-right">
                           {t("search.childrenQuery.childHash")}:
                         </span>
                         <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
@@ -593,7 +593,7 @@ export function ChildrenQuerySection({ search }: { search: SearchPageController 
                         </div>
                       </div>
                       <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
-                        <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0 text-right">
+                        <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0 text-right">
                           {t("search.childrenQuery.childVersion")}:
                         </span>
                         <div className="w-fit">
@@ -754,10 +754,10 @@ export function StoryChunksQuerySection({ search }: { search: SearchPageControll
                         )}
                         {chunk.attachmentCID && chunk.attachmentCID.length > 0 && (
                           <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
-                            <span className="whitespace-nowrap flex-shrink-0 text-right">
+                            <span className="whitespace-nowrap shrink-0 text-right">
                               {t("search.storyChunksQuery.attachmentCID")}:
                             </span>
-                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded min-w-0 w-fit max-w-full">
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm min-w-0 w-fit max-w-full">
                               <span
                                 className="font-mono truncate flex-1 min-w-0"
                                 title={chunk.attachmentCID}
@@ -933,8 +933,8 @@ function HashDataRow({
 }) {
   return (
     <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
-      <span className="whitespace-nowrap flex-shrink-0 text-right">{label}</span>
-      <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded min-w-0 w-fit max-w-full">
+      <span className="whitespace-nowrap shrink-0 text-right">{label}</span>
+      <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm min-w-0 w-fit max-w-full">
         <HashInline value={value} className="font-mono flex-1 min-w-0" />
         <CopyIconButton label={copyLabel} onClick={() => onCopy(value)} size={size} />
       </div>
@@ -966,7 +966,7 @@ function PaginationFooter({
         <ButtonSecondary
           onClick={onPrev}
           disabled={loading || offset === 0}
-          className="!px-4 !py-1.5 text-sm"
+          className="px-4! py-1.5! text-sm"
         >
           <ArrowLeft size={14} />
           {t("search.prev")}
@@ -974,7 +974,7 @@ function PaginationFooter({
         <ButtonSecondary
           onClick={onNext}
           disabled={loading || !hasMore}
-          className="!px-4 !py-1.5 text-sm"
+          className="px-4! py-1.5! text-sm"
         >
           {t("search.next")}
           <ArrowRight size={14} />

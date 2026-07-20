@@ -130,7 +130,7 @@ export default function NetworkSelectionModal({
 
         {/* Header Section */}
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
             <Globe className="w-8 h-8 text-white" />
           </div>
           <div>
@@ -165,12 +165,12 @@ export default function NetworkSelectionModal({
                 `}
               >
                 {/* Network Icon */}
-                <div className="relative flex-shrink-0">
+                <div className="relative shrink-0">
                   <div
                     className={`
                       w-12 h-12 rounded-xl flex items-center justify-center
-                      bg-gradient-to-br ${config.gradient}
-                      shadow-sm
+                      bg-linear-to-br ${config.gradient}
+                      shadow-xs
                     `}
                   >
                     <span className="text-white">{config.icon}</span>
@@ -199,7 +199,7 @@ export default function NetworkSelectionModal({
                 </div>
 
                 {/* Action Indicator */}
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   {isLoading ? (
                     <RefreshCw className="w-5 h-5 text-orange-500 animate-spin" />
                   ) : isActive ? (

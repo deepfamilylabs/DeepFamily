@@ -1,6 +1,70 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/forms';
+
+/* Class-based dark mode: GlobalSidebar toggles `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tree node palettes are composed at runtime (see domains/tree/ui/nodeTheme.ts:
+ * `fill-${color}-${shade}`, `dark:text-${color}-${shade}`, …), so the static
+ * scanner can't see them. Force-generate the full matrix — this replaces the
+ * old JS-config `safelist` regex.
+ */
+@source inline("{,dark:}{text,fill,stroke}-{slate,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,stone,gray}-{50,100,200,300,400,500,600,700,800,900}");
+@source inline("dark:fill-{slate,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,stone,gray}-{800,900}/{20,60}");
+
+/* Static tokens (fonts + the one used custom animation) → Tailwind theme. */
+@theme {
+  --font-sans:
+    "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
+    BlinkMacSystemFont, "Segoe UI", "Roboto", Arial, sans-serif;
+  --font-display:
+    "Zain", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body:
+    "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
+    BlinkMacSystemFont, "Segoe UI", "Roboto", Arial, sans-serif;
+  --animate-fade-in: fadeIn 0.6s ease-out;
+}
+
+/*
+ * Semantic color tokens → Tailwind color utilities. `inline` so the generated
+ * utilities reference the switchable --df-* vars directly (html.dark flips
+ * them); opacity modifiers like bg-primary/10 work via color-mix.
+ */
+@theme inline {
+  --color-surface: var(--df-surface-card);
+  --color-surface-body: var(--df-surface-body);
+  --color-surface-alt: var(--df-surface-alt);
+  --color-surface-muted: var(--df-surface-muted);
+  --color-ink: var(--df-ink);
+  --color-ink-muted: var(--df-ink-muted);
+  --color-ink-subtle: var(--df-ink-subtle);
+  --color-hairline: var(--df-border-soft);
+  --color-hairline-strong: var(--df-border-strong);
+  --color-primary: var(--df-primary);
+  --color-primary-hover: var(--df-primary-hover);
+  --color-danger: var(--df-danger);
+  --color-success: var(--df-success);
+  --color-warning: var(--df-warning);
+  --color-info: var(--df-info);
+}
+
+/*
+  The default border color changed to `currentcolor` in Tailwind v4; restore the
+  v3 gray-200 default so the ~13 width-only `border` usages don't inherit text
+  color. Remove once those get explicit border-color utilities.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 /* App custom styles - Dual Font System */
 body {
@@ -67,17 +131,50 @@ h3 {
   line-height: 120%;
 }
 
+/*
+ * Design tokens — semantic color layer (light + html.dark).
+ * Plain hex for readability; Tailwind v4 handles opacity modifiers
+ * (bg-primary/10, text-ink-muted/70, …) via color-mix, no channel split needed.
+ * The @theme inline block above maps these to surface / ink / hairline /
+ * primary / danger / … utilities — consume those, not raw gray/slate/blue.
+ */
 :root {
+  /* surfaces (page → card → alt → muted fill) */
   --df-surface-body: #f7f9fb;
   --df-surface-card: #fcfdff;
   --df-surface-alt: #f5f8fc;
+  --df-surface-muted: #eef2f7;
+  /* text (ink) */
+  --df-ink: #0f172a;
+  --df-ink-muted: #64748b;
+  --df-ink-subtle: #94a3b8;
+  /* borders */
   --df-border-soft: #e6e8ec;
+  --df-border-strong: #cbd5e1;
+  /* brand + status */
+  --df-primary: #f97316;
+  --df-primary-hover: #ea580c;
+  --df-danger: #dc2626;
+  --df-success: #16a34a;
+  --df-warning: #d97706;
+  --df-info: #2563eb;
 }
 html.dark {
   --df-surface-body: #0d1117;
   --df-surface-card: #111827;
   --df-surface-alt: #1f2937;
+  --df-surface-muted: #263241;
+  --df-ink: #f3f4f6;
+  --df-ink-muted: #9ca3af;
+  --df-ink-subtle: #6b7280;
   --df-border-soft: #374151;
+  --df-border-strong: #4b5563;
+  --df-primary: #fb923c;
+  --df-primary-hover: #f97316;
+  --df-danger: #f87171;
+  --df-success: #4ade80;
+  --df-warning: #fbbf24;
+  --df-info: #60a5fa;
 }
 
 input:-webkit-autofill,
