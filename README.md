@@ -57,7 +57,6 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 |----------|---------|
 | **DeepFamily.sol** | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding. UUPS-upgradeable behind a proxy |
 | **DeepFamilyReader.sol** | Stateless aggregated/paginated read views over the core protocol |
-| **DeepFamilyAttestationRegistry.sol** | Off-chain attestation anchors for endorsements/mints/seals/verifier updates. UUPS-upgradeable behind a proxy |
 | **DeepFamilyToken.sol** | Utility token powering endorsement and incentive mechanics |
 | **PersonCommitmentVerifier.sol** | ZK verifier for person identity and parent commitment proofs |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs |
@@ -130,7 +129,7 @@ npm run verify:net --net=sepolia
 
 ### Upgradeability & Governance
 
-`DeepFamily` and `DeepFamilyAttestationRegistry` are UUPS proxies. On live networks the deployment
+`DeepFamily` is a UUPS proxy. On live networks the deployment
 requires `GOVERNANCE_OWNER` (a `TimelockController`-like address with a non-zero delay) and hands
 upgrade authority to it after wiring — it refuses to leave upgrade rights on the deployer EOA. Local
 and simulated networks keep the deployer as owner for test flows. Upgrades are staged/executed via

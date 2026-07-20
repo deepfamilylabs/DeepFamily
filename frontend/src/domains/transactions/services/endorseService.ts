@@ -1,9 +1,8 @@
 import { ethers } from "ethers";
-import { createDeepFamilyInterface, createDeepTokenContract } from "../../../shared/clients/contractFactory";
 import {
-  makeDraftEndorseAttestationRef,
-  type AttestationRef,
-} from "../../../shared/attestation";
+  createDeepFamilyInterface,
+  createDeepTokenContract,
+} from "../../../shared/clients/contractFactory";
 import { ensureAllowance } from "../api/erc20Gateway";
 import { estimateGasWithFallback, parseReceiptEvents } from "../api/txGateway";
 
@@ -24,7 +23,6 @@ export type EndorseReceiptEvent = {
 export type EndorseVersionFn = (
   personHash: string,
   versionIndex: number,
-  attestationRef: AttestationRef,
   overrides?: Record<string, unknown>,
   txOptions?: { suppressToasts?: boolean },
 ) => Promise<any>;
@@ -35,7 +33,6 @@ export type ExecuteEndorseFlowParams = {
   address: string;
   personHash: string;
   versionIndex: number;
-  attestationRef?: AttestationRef;
   endorseVersion: EndorseVersionFn;
   deepTokenAddress?: string;
   fallbackGas?: bigint;
@@ -65,7 +62,10 @@ export type ExecuteEndorseFlowResult =
 
 type TokenAllowanceContract = {
   allowance: (owner: string, spender: string) => Promise<bigint>;
-  approve: (spender: string, amount: bigint) => Promise<{ wait: () => Promise<any>; hash?: string }>;
+  approve: (
+    spender: string,
+    amount: bigint,
+  ) => Promise<{ wait: () => Promise<any>; hash?: string }>;
   increaseAllowance?: (
     spender: string,
     amount: bigint,
@@ -83,22 +83,12 @@ function attachErrorCode(error: unknown, code: string): Error {
   return normalized;
 }
 
-async function resolveContractChainId(contract: ethers.Contract): Promise<bigint | number> {
-  const provider = (contract as any)?.runner?.provider;
-  if (!provider || typeof provider.getNetwork !== "function") {
-    throw new Error("Contract provider is required to build an attestation reference");
-  }
-  const network = await provider.getNetwork();
-  return network.chainId;
-}
-
 export async function executeEndorseFlow({
   contract,
   signer,
   address,
   personHash,
   versionIndex,
-  attestationRef,
   endorseVersion,
   deepTokenAddress,
   fallbackGas = 400_000n,
@@ -113,7 +103,10 @@ export async function executeEndorseFlow({
   onStageChange?.("checking");
 
   const tokenAddress = deepTokenAddress || (await contract.DEEP_FAMILY_TOKEN_CONTRACT());
-  const tokenContract = createDeepTokenContract(tokenAddress, signer) as unknown as TokenAllowanceContract;
+  const tokenContract = createDeepTokenContract(
+    tokenAddress,
+    signer,
+  ) as unknown as TokenAllowanceContract;
   const spender = await contract.getAddress();
 
   const fee: bigint = await tokenContract.recentReward();
@@ -156,19 +149,9 @@ export async function executeEndorseFlow({
   }
 
   onStageChange?.("submitting");
-  const ref =
-    attestationRef ??
-    makeDraftEndorseAttestationRef({
-      chainId: await resolveContractChainId(contract),
-      contractAddress: spender,
-      actor: address,
-      personHash,
-      versionIndex,
-    });
-
   const gasLimit = await estimateGasWithFallback({
     contractMethod: (contract as any).endorseVersion,
-    args: [personHash, versionIndex, ref] as const,
+    args: [personHash, versionIndex] as const,
     decodeContract: contract,
     fallbackGas,
     label: "endorseVersion",
@@ -177,7 +160,6 @@ export async function executeEndorseFlow({
   const receipt = await endorseVersion(
     personHash,
     versionIndex,
-    ref,
     gasLimit ? { gasLimit } : undefined,
     { suppressToasts },
   );

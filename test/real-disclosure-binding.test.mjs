@@ -4,7 +4,6 @@ import hre from "hardhat";
 import disclosureBindingProof from "../lib/disclosureBindingProof.js";
 import personCommitmentProof from "../lib/personCommitmentProof.js";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
-import { makeEndorseAttestationRef, makeMintAttestationRef } from "./helpers/testHelper.mjs";
 
 const { generateDisclosureBindingProof } = disclosureBindingProof;
 const { generatePersonCommitmentProof } = personCommitmentProof;
@@ -39,13 +38,7 @@ describe("Real disclosure binding proof", function () {
       );
 
     const personHash = personProof.person.personHash;
-    await deepFamily
-      .connect(signer)
-      .endorseVersion(
-        personHash,
-        1,
-        await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, personHash, 1),
-      );
+    await deepFamily.connect(signer).endorseVersion(personHash, 1);
 
     const disclosureProof = await generateDisclosureBindingProof(person, signerAddress);
     expect(disclosureProof.person.identityCommitment).to.equal(
@@ -86,15 +79,6 @@ describe("Real disclosure binding proof", function () {
           1,
           tokenURI,
           coreInfo,
-          await makeMintAttestationRef(
-            hre.ethers,
-            deepFamily,
-            signer,
-            personHash,
-            1,
-            tokenURI,
-            coreInfo,
-          ),
         ),
     )
       .to.emit(deepFamily, "PersonNFTMinted")

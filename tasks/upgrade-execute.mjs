@@ -126,7 +126,7 @@ const action = async (args, hre) => {
 export default task("upgrade-execute", "Execute a previously scheduled timelock UUPS upgrade")
   .addOption({
     name: "target",
-    description: "Which proxy to upgrade: main | registry",
+    description: "Proxy to upgrade: main",
     type: ArgumentType.STRING,
     defaultValue: "main",
   })

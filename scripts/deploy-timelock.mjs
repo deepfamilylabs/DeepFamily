@@ -1,6 +1,6 @@
 import hre from "hardhat";
 
-// Deploy a TimelockController (via the GovernanceTimelock artifact) to own the UUPS proxies.
+// Deploy a TimelockController (via the GovernanceTimelock artifact) to own the UUPS proxy.
 //
 // Usage:
 //   MIN_DELAY=120 PROPOSERS=0x.. EXECUTORS=0x.. \

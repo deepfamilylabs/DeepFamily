@@ -11,8 +11,6 @@ import {
   computeIdentityCommitment,
   makeStubProof,
   makeTestPerson,
-  makeEndorseAttestationRef,
-  makeMintAttestationRef,
   packBirthGenderField,
 } from './helpers/testHelper.mjs'
 
@@ -22,21 +20,16 @@ describe('Mint NFT Tests', function () {
   this.timeout(60_000)
 
   async function endorseVersion(deepFamily, signer, personHash, versionIndex = 1) {
-    return deepFamily.connect(signer).endorseVersion(
-      personHash,
-      versionIndex,
-      await makeEndorseAttestationRef(hre.ethers, deepFamily, signer, personHash, versionIndex),
-    )
+    return deepFamily.connect(signer).endorseVersion(personHash, versionIndex)
   }
 
-  async function mintPersonVersionNFT(deepFamily, signer, personHash, proof, ps, versionIndex, tokenURI, coreInfo) {
+  async function mintPersonVersionNFT(deepFamily, signer, _personHash, proof, ps, versionIndex, tokenURI, coreInfo) {
     return deepFamily.connect(signer).mintPersonVersionNFT(
       proof,
       ps,
       versionIndex,
       tokenURI,
       coreInfo,
-      await makeMintAttestationRef(hre.ethers, deepFamily, signer, personHash, versionIndex, tokenURI, coreInfo),
     )
   }
 

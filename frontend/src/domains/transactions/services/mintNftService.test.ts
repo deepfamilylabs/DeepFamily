@@ -148,11 +148,6 @@ describe("mintService executeMintFlow", () => {
       expect.objectContaining({
         basicInfo: expect.objectContaining({ identityCommitment: identityCommitmentHex }),
       }),
-      expect.objectContaining({
-        actionType: 1,
-        subjectType: 2,
-        uri: expect.stringMatching(/^ipfs:\/\//),
-      }),
     );
     expect(getVersionDetails).toHaveBeenCalledWith(
       "0x00000000000000000000000000000000000000000000000000000000000000aa",

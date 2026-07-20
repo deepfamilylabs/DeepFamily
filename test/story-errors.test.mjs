@@ -1,120 +1,124 @@
-import '../hardhat-test-setup.mjs'
-import { expect } from 'chai'
-import hre from 'hardhat'
-import { deployIntegratedFixture } from './fixtures/integrated.mjs'
-import {
-  setupStubVerifiers,
-  mintPerson,
-  makeSealStoryAttestationRef,
-} from './helpers/testHelper.mjs'
+import "../hardhat-test-setup.mjs";
+import { expect } from "chai";
+import hre from "hardhat";
+import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
+import { setupStubVerifiers, mintPerson } from "./helpers/testHelper.mjs";
 
-describe('Story Sharding - Error & Edge Cases', function () {
+describe("Story Sharding - Error & Edge Cases", function () {
   this.timeout(90_000);
 
   async function deployAndMint() {
     const { deepFamily, deepFamilyReader } =
-      await hre.networkHelpers.loadFixture(deployIntegratedFixture)
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [signer, other] = await hre.ethers.getSigners();
-    await setupStubVerifiers(hre.ethers, deepFamily)
+    await setupStubVerifiers(hre.ethers, deepFamily);
 
-    await mintPerson(hre.ethers, deepFamily, signer, null, 'Edge Person', {
+    await mintPerson(hre.ethers, deepFamily, signer, null, "Edge Person", {
       birthYear: 1970,
       gender: 1,
-    })
+    });
 
-    return { deepFamily: deepFamily.connect(signer), reader: deepFamilyReader, signer, other, tokenId: 1n };
+    return {
+      deepFamily: deepFamily.connect(signer),
+      reader: deepFamilyReader,
+      signer,
+      other,
+      tokenId: 1n,
+    };
   }
 
-  async function sealStory(deepFamily, signer, tokenId) {
-    return deepFamily.sealStory(
-      tokenId,
-      await makeSealStoryAttestationRef(hre.ethers, deepFamily, signer, tokenId),
-    )
+  async function sealStory(deepFamily, _signer, tokenId) {
+    return deepFamily.sealStory(tokenId);
   }
 
-  it('reverts when non-owner adds chunk', async () => {
+  it("reverts when non-owner adds chunk", async () => {
     const { deepFamily, other, tokenId } = await deployAndMint();
     await expect(
-      deepFamily
-        .connect(other)
-        .addStoryChunk(tokenId, 0, 0, 'content', '', hre.ethers.ZeroHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'MustBeNFTHolder');
+      deepFamily.connect(other).addStoryChunk(tokenId, 0, 0, "content", "", hre.ethers.ZeroHash),
+    ).to.be.revertedWithCustomError(deepFamily, "MustBeNFTHolder");
   });
 
-  it('reverts on index mismatch (skipping index)', async () => {
+  it("reverts on index mismatch (skipping index)", async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    await deepFamily.addStoryChunk(tokenId, 0, 0, 'c0', '', hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 0, 0, "c0", "", hre.ethers.ZeroHash);
     await expect(
-      deepFamily.addStoryChunk(tokenId, 2, 0, 'c2', '', hre.ethers.ZeroHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'ChunkIndexOutOfRange');
+      deepFamily.addStoryChunk(tokenId, 2, 0, "c2", "", hre.ethers.ZeroHash),
+    ).to.be.revertedWithCustomError(deepFamily, "ChunkIndexOutOfRange");
   });
 
-  it('reverts on oversize content', async () => {
+  it("reverts on oversize content", async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    const longStr = 'a'.repeat(2049);
+    const longStr = "a".repeat(2049);
     await expect(
-      deepFamily.addStoryChunk(tokenId, 0, 0, longStr, '', hre.ethers.ZeroHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'InvalidChunkContent');
+      deepFamily.addStoryChunk(tokenId, 0, 0, longStr, "", hre.ethers.ZeroHash),
+    ).to.be.revertedWithCustomError(deepFamily, "InvalidChunkContent");
   });
 
-  it('reverts on hash mismatch', async () => {
+  it("reverts on hash mismatch", async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    const wrongHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes('DIFFERENT'));
+    const wrongHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("DIFFERENT"));
     await expect(
-      deepFamily.addStoryChunk(tokenId, 0, 0, 'Real Content', '', wrongHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'ChunkHashMismatch');
+      deepFamily.addStoryChunk(tokenId, 0, 0, "Real Content", "", wrongHash),
+    ).to.be.revertedWithCustomError(deepFamily, "ChunkHashMismatch");
   });
 
-  it('cannot append after sealing', async () => {
+  it("cannot append after sealing", async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    await deepFamily.addStoryChunk(tokenId, 0, 0, 'c0', '', hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 0, 0, "c0", "", hre.ethers.ZeroHash);
     const [signer] = await hre.ethers.getSigners();
     await sealStory(deepFamily, signer, tokenId);
     await expect(
-      deepFamily.addStoryChunk(tokenId, 1, 0, 'c1', '', hre.ethers.ZeroHash)
-    ).to.be.revertedWithCustomError(deepFamily, 'StoryAlreadySealed');
+      deepFamily.addStoryChunk(tokenId, 1, 0, "c1", "", hre.ethers.ZeroHash),
+    ).to.be.revertedWithCustomError(deepFamily, "StoryAlreadySealed");
   });
 
-  it('reverts sealing with zero chunks', async () => {
+  it("reverts sealing with zero chunks", async () => {
     const { deepFamily, signer, tokenId } = await deployAndMint();
     await expect(sealStory(deepFamily, signer, tokenId)).to.be.revertedWithCustomError(
       deepFamily,
-      'StoryNotFound'
+      "StoryNotFound",
     );
   });
 
-  it('updates fullStoryHash correctly as chunks append', async () => {
+  it("updates fullStoryHash correctly as chunks append", async () => {
     const { deepFamily, tokenId } = await deployAndMint();
-    const c0 = 'Chunk Zero';
-    const c1 = 'Chunk One';
-    await deepFamily.addStoryChunk(tokenId, 0, 0, c0, '', hre.ethers.ZeroHash);
-    await deepFamily.addStoryChunk(tokenId, 1, 0, c1, '', hre.ethers.ZeroHash);
+    const c0 = "Chunk Zero";
+    const c1 = "Chunk One";
+    await deepFamily.addStoryChunk(tokenId, 0, 0, c0, "", hre.ethers.ZeroHash);
+    await deepFamily.addStoryChunk(tokenId, 1, 0, c1, "", hre.ethers.ZeroHash);
     const h0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c0));
     const h1 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c1));
     let expected = hre.ethers.ZeroHash;
     expected = hre.ethers.keccak256(
-      hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 0n, h0])
+      hre.ethers.solidityPacked(["bytes32", "uint256", "bytes32"], [expected, 0n, h0]),
     );
     expected = hre.ethers.keccak256(
-      hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 1n, h1])
+      hre.ethers.solidityPacked(["bytes32", "uint256", "bytes32"], [expected, 1n, h1]),
     );
     let meta = await deepFamily.storyMetadata(tokenId);
     expect(meta.fullStoryHash).to.equal(expected);
 
-    const c2 = 'Chunk Two';
-    await deepFamily.addStoryChunk(tokenId, 2, 0, c2, '', hre.ethers.ZeroHash);
+    const c2 = "Chunk Two";
+    await deepFamily.addStoryChunk(tokenId, 2, 0, c2, "", hre.ethers.ZeroHash);
     const h2 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(c2));
     expected = hre.ethers.keccak256(
-      hre.ethers.solidityPacked(['bytes32', 'uint256', 'bytes32'], [expected, 2n, h2])
+      hre.ethers.solidityPacked(["bytes32", "uint256", "bytes32"], [expected, 2n, h2]),
     );
     meta = await deepFamily.storyMetadata(tokenId);
     expect(meta.fullStoryHash).to.equal(expected);
   });
 
-  it('records chunkType and attachment CID when provided', async () => {
+  it("records chunkType and attachment CID when provided", async () => {
     const { deepFamily, reader, tokenId } = await deployAndMint();
-    const attachment = 'ipfs://exampleAttachmentCID';
-    await deepFamily.addStoryChunk(tokenId, 0, 3, 'Source citation entry', attachment, hre.ethers.ZeroHash);
+    const attachment = "ipfs://exampleAttachmentCID";
+    await deepFamily.addStoryChunk(
+      tokenId,
+      0,
+      3,
+      "Source citation entry",
+      attachment,
+      hre.ethers.ZeroHash,
+    );
     const chunk = await reader.getStoryChunk(tokenId, 0);
     expect(chunk.chunkType).to.equal(3);
     expect(chunk.attachmentCID).to.equal(attachment);

@@ -27,7 +27,7 @@ const cleanupConnection = async () => {
 };
 
 // Register cleanup for test completion
-if (typeof after === 'function') {
+if (typeof after === "function") {
   after(async function () {
     await cleanupConnection();
     // Force exit to prevent hanging
@@ -36,13 +36,13 @@ if (typeof after === 'function') {
 }
 
 // Process-level cleanup hooks
-if (typeof process !== 'undefined' && process.on) {
-  process.on('beforeExit', cleanupConnection);
-  process.on('SIGINT', async () => {
+if (typeof process !== "undefined" && process.on) {
+  process.on("beforeExit", cleanupConnection);
+  process.on("SIGINT", async () => {
     await cleanupConnection();
     process.exit(0);
   });
-  process.on('SIGTERM', async () => {
+  process.on("SIGTERM", async () => {
     await cleanupConnection();
     process.exit(0);
   });
@@ -172,10 +172,7 @@ hre.run = async (taskName, args = {}) => {
 
     case "seal-story": {
       const tokenId = BigInt(String(args.tokenid));
-      const tx = await deepFamily.connect(signer).sealStory(
-        tokenId,
-        await seedHelpers.makeSealStoryAttestationRef({ deepFamily, signer, tokenId }),
-      );
+      const tx = await deepFamily.connect(signer).sealStory(tokenId);
       return tx.wait();
     }
 

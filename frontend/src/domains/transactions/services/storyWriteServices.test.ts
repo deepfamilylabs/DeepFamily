@@ -23,7 +23,7 @@ type Deferred<T> = {
   reject: (reason?: unknown) => void;
 };
 
-const createDeferred = <T,>(): Deferred<T> => {
+const createDeferred = <T>(): Deferred<T> => {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
   const promise = new Promise<T>((res, rej) => {
@@ -87,8 +87,21 @@ describe("storyWriteServices", () => {
     }
 
     const contractAddress = "0x0000000000000000000000000000000000000abc";
-    const chunkLog = eventInterface.encodeEventLog(chunkEvent, [1n, 0n, "0x" + "11".repeat(32), "0x00000000000000000000000000000000000000bb", 5n, 2, "ipfs://chunk"]);
-    const sealLog = eventInterface.encodeEventLog(sealEvent, [1n, 3n, "0x" + "22".repeat(32), "0x00000000000000000000000000000000000000bb"]);
+    const chunkLog = eventInterface.encodeEventLog(chunkEvent, [
+      1n,
+      0n,
+      "0x" + "11".repeat(32),
+      "0x00000000000000000000000000000000000000bb",
+      5n,
+      2,
+      "ipfs://chunk",
+    ]);
+    const sealLog = eventInterface.encodeEventLog(sealEvent, [
+      1n,
+      3n,
+      "0x" + "22".repeat(32),
+      "0x00000000000000000000000000000000000000bb",
+    ]);
 
     const contract = {
       addStoryChunk: vi.fn(async () => ({
@@ -133,14 +146,7 @@ describe("storyWriteServices", () => {
     expect(addResult.newChunk.chunkType).toBe(2);
 
     const sealResult = await sealStoryService(signer as any, contractAddress, "1");
-    expect(contract.sealStory).toHaveBeenCalledWith(
-      "1",
-      expect.objectContaining({
-        actionType: 3,
-        subjectType: 3,
-        uri: expect.stringMatching(/^ipfs:\/\//),
-      }),
-    );
+    expect(contract.sealStory).toHaveBeenCalledWith("1");
     expect(sealResult.events.StorySealed?.totalChunks).toBe(3);
     expect(sealResult.fullStoryHash).toBe("0x" + "22".repeat(32));
   });

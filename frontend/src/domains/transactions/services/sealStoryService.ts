@@ -1,6 +1,8 @@
 import { ethers, type JsonRpcSigner } from "ethers";
-import { createDeepFamilyContract, createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
-import { makeDraftStorySealAttestationRef } from "../../../shared/attestation";
+import {
+  createDeepFamilyContract,
+  createDeepFamilyInterface,
+} from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
 
@@ -27,19 +29,7 @@ export async function sealStoryService(
   const contract = createDeepFamilyContract(contractAddress, signer);
 
   try {
-    const actor = await signer.getAddress();
-    const network = await signer.provider.getNetwork();
-    const metadata = await contract.storyMetadata(tokenId);
-    const attestationRef = makeDraftStorySealAttestationRef({
-      chainId: network.chainId,
-      contractAddress,
-      actor,
-      tokenId,
-      totalChunks: metadata.totalChunks,
-      fullStoryHash: metadata.fullStoryHash,
-    });
-
-    const tx = await contract.sealStory(tokenId, attestationRef);
+    const tx = await contract.sealStory(tokenId);
     const receipt = await waitForTransactionReceipt(tx);
     const eventInterface = createDeepFamilyInterface();
     const sealEvent = parseReceiptEvents(receipt, eventInterface, contractAddress).find(

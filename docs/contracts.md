@@ -136,8 +136,7 @@ function addPersonVersion(
 ```solidity
 function endorseVersion(
     bytes32 personHash,
-    uint256 versionIndex,
-    AttestationRef calldata attestationRef
+    uint256 versionIndex
 ) external
 ```
 
@@ -148,7 +147,6 @@ function endorseVersion(
 - Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
 - Switching endorsements rebalances vote counts
-- Phase 3 requires `attestationRef` to bind high-trust endorsement references to this action
 
 #### NFT Minting with Disclosure Proof
 ```solidity
@@ -157,8 +155,7 @@ function mintPersonVersionNFT(
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo,
-    AttestationRef calldata attestationRef
+    PersonCoreInfo calldata coreInfo
 ) external nonReentrant
 ```
 
@@ -170,7 +167,6 @@ function mintPersonVersionNFT(
 5. `publicSignals.minter` must equal `uint256(uint160(msg.sender))`
 6. `personHash` is derived from `publicSignals.identityCommitment`
 7. Linked `AdultAgeGate` age validation must pass
-8. Phase 3 `attestationRef` must match the mint action digest and version subject
 
 #### Story Sharding System
 ```solidity
@@ -182,7 +178,7 @@ function addStoryChunk(
     string calldata attachmentCID,
     bytes32 expectedHash
 ) external
-function sealStory(uint256 tokenId, AttestationRef calldata attestationRef) external
+function sealStory(uint256 tokenId) external
 ```
 
 **Story Management**:
@@ -192,7 +188,6 @@ function sealStory(uint256 tokenId, AttestationRef calldata attestationRef) exte
 - Optional `chunkType` classifies content (narrative/quote/etc.)
 - Optional `attachmentCID` links to decentralized media evidence
 - Sealing makes stories permanently immutable
-- Phase 3 `attestationRef` binds the seal to the token and current story hash
 
 **chunkType Mapping**
 
@@ -238,13 +233,6 @@ function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata 
 function getStoryChunk(uint256 tokenId, uint256 chunkIndex) external view returns (StoryChunk memory)
 function listStoryChunks(uint256 tokenId, uint256 offset, uint256 limit) external view returns (StoryChunk[] memory, uint256, bool, uint256)
 ```
-
-## DeepFamilyAttestationRegistry.sol - Phase 3 Anchors
-
-Phase 3 attestation reference storage and `AttestationReferenceAnchored` events live in
-`DeepFamilyAttestationRegistry`. The registry is bound once to the deployed
-`DeepFamily` address. Its external anchor methods are action-specific and reject
-callers other than that bound main contract; there is no generic public anchor path.
 
 ### Events System
 
@@ -307,8 +295,8 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 
 ## Upgradeability & Governance (UUPS)
 
-`DeepFamily` and `DeepFamilyAttestationRegistry` are deployed as **UUPS (ERC-1967) proxies**, so
-their logic can evolve while their addresses and state persist. The other contracts are **not**
+`DeepFamily` is deployed as a **UUPS (ERC-1967) proxy**, so its logic can evolve while its address
+and state persist. The other contracts are **not**
 upgradeable by design: `DeepFamilyToken` (the value contract is kept minimal/immutable),
 `DeepFamilyReader` (stateless; redeploy + point at the same proxy to change read logic), the ZK
 verifiers, the verifier adapter, and the libraries.
@@ -316,16 +304,15 @@ verifiers, the verifier adapter, and the libraries.
 ### Proxy & Initialization
 
 - The proxy is a thin `ERC1967Proxy` wrapper (`contracts/proxy/UUPSProxy.sol`).
-- Each implementation disables initializers in its constructor (`_disableInitializers()`), so the
+- The implementation disables initializers in its constructor (`_disableInitializers()`), so the
   logic contract can never be initialized directly — only the proxy is, exactly once.
-- `DeepFamily.initialize(token, attestationRegistry, initialOwner)` and
-  `DeepFamilyAttestationRegistry.initialize(initialOwner)` replace constructors. Values that were
-  previously `immutable` (token / registry addresses) are now plain storage written once in
+- `DeepFamily.initialize(token, initialOwner)` replaces the constructor. The token address, which
+  was previously `immutable`, is now plain storage written once in
   `initialize` with no setter (effectively immutable; `immutable` is unusable behind a proxy).
 
 ### Upgrade Authorization & Governance
 
-- Upgrades are gated by `_authorizeUpgrade(newImplementation) onlyOwner` on both proxies.
+- Upgrades are gated by `_authorizeUpgrade(newImplementation) onlyOwner` on the proxy.
 - Intended production owner is a **`TimelockController`** whose `PROPOSER`/`CANCELLER` roles are held
   by a **multisig**: the multisig decides *who* can upgrade, the timelock enforces a public delay so
   the community can audit/exit/cancel before an upgrade lands.
@@ -532,7 +519,7 @@ error TokenContractNotSet();
 
 ### Security Patterns
 - **Reentrancy Guards**: External value transfers protected via OpenZeppelin `ReentrancyGuardTransient` (EIP-1153 transient storage; proxy-safe, no initializer)
-- **Upgradeability**: `DeepFamily` + `DeepFamilyAttestationRegistry` are UUPS proxies; upgrades gated by `_authorizeUpgrade` (timelock-owned) and storage-layout safety checks (see [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups))
+- **Upgradeability**: `DeepFamily` is a UUPS proxy; upgrades are gated by `_authorizeUpgrade` (timelock-owned) and storage-layout safety checks (see [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups))
 - **Input Validation**: Comprehensive parameter checking with custom constraints
 - **Access Control**: Role-based permissions with explicit error types
 - **Immutability Controls**: Sealed stories and initialized contracts prevent further modification

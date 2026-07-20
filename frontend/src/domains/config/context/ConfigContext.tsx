@@ -12,7 +12,6 @@ type ConfigValues = {
   rpcUrl: string;
   contractAddress: string;
   readerAddress: string;
-  attestationRegistryAddress: string;
   tokenAddress: string;
   rootHash: string;
   rootVersionIndex: number;
@@ -52,7 +51,6 @@ function getEnvDefaults(): ConfigValues {
     rpcUrl,
     contractAddress: "",
     readerAddress,
-    attestationRegistryAddress: "",
     tokenAddress: "",
     rootHash,
     rootVersionIndex,
@@ -78,7 +76,6 @@ function normalizeStoredConfig(defaults: ConfigValues): ConfigValues {
     ...stored,
     readerAddress,
     contractAddress: "",
-    attestationRegistryAddress: "",
     tokenAddress: "",
   };
 }
@@ -89,7 +86,6 @@ function persistConfig(next: ConfigValues): void {
       rpcUrl,
       contractAddress,
       readerAddress,
-      attestationRegistryAddress,
       tokenAddress,
       rootHash,
       rootVersionIndex,
@@ -101,7 +97,6 @@ function persistConfig(next: ConfigValues): void {
         rpcUrl,
         contractAddress,
         readerAddress,
-        attestationRegistryAddress,
         tokenAddress,
         rootHash,
         rootVersionIndex,
@@ -181,13 +176,11 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             readerAddress: resolved.readerAddress,
             contractAddress: resolved.contractAddress,
-            attestationRegistryAddress: resolved.attestationRegistryAddress,
             tokenAddress: resolved.tokenAddress,
           };
           if (
             sameAddress(prev.readerAddress, next.readerAddress) &&
             sameAddress(prev.contractAddress, next.contractAddress) &&
-            sameAddress(prev.attestationRegistryAddress, next.attestationRegistryAddress) &&
             sameAddress(prev.tokenAddress, next.tokenAddress)
           ) {
             return prev;
@@ -204,13 +197,12 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
           if (prev.rpcUrl.trim() !== rpcUrl || prev.readerAddress.trim() !== readerAddress) {
             return prev;
           }
-          if (!prev.contractAddress && !prev.attestationRegistryAddress && !prev.tokenAddress) {
+          if (!prev.contractAddress && !prev.tokenAddress) {
             return prev;
           }
           const next = {
             ...prev,
             contractAddress: "",
-            attestationRegistryAddress: "",
             tokenAddress: "",
           };
           persistConfig(next);
@@ -264,7 +256,6 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
         !sameAddress(partial.readerAddress, prev.readerAddress)
       ) {
         next.contractAddress = "";
-        next.attestationRegistryAddress = "";
         next.tokenAddress = "";
       }
       try {

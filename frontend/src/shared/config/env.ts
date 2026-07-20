@@ -126,10 +126,6 @@ export function getDefaultReaderAddress(): string {
   return getDefaultEntryReaderAddress();
 }
 
-export function getDefaultAttestationRegistryAddress(): string {
-  return getStringEnv("VITE_ATTESTATION_REGISTRY_ADDRESS");
-}
-
 export function getDefaultRootHash(): string {
   return getStringEnv("VITE_ROOT_PERSON_HASH");
 }

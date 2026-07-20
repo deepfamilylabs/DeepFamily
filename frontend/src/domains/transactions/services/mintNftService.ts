@@ -1,8 +1,4 @@
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
-import {
-  makeDraftMintAttestationRef,
-  type AttestationRef,
-} from "../../../shared/attestation";
 import { parseReceiptEvents } from "../api/txGateway";
 
 export type MintDisclosurePublicSignals = {
@@ -41,7 +37,6 @@ export type MintPersonVersionNFTFn = (
   versionIndex: number,
   tokenURI: string,
   coreInfo: MintCoreInfo,
-  attestationRef: AttestationRef,
 ) => Promise<any>;
 
 export type MintReceiptEvent = {
@@ -62,7 +57,6 @@ export type ExecuteMintFlowParams = {
   publicSignals: MintDisclosurePublicSignals;
   tokenURI: string;
   coreInfo: MintCoreInfo;
-  attestationRef?: AttestationRef;
   mintPersonVersionNFT: MintPersonVersionNFTFn;
   getVersionDetails?: (personHash: string, versionIndex: number) => Promise<any>;
 };
@@ -80,15 +74,6 @@ export type ExecuteMintFlowResult =
       event: MintReceiptEvent | null;
     };
 
-async function resolveContractChainId(contract: any): Promise<bigint | number> {
-  const provider = contract?.runner?.provider;
-  if (!provider || typeof provider.getNetwork !== "function") {
-    throw new Error("Contract provider is required to build an attestation reference");
-  }
-  const network = await provider.getNetwork();
-  return network.chainId;
-}
-
 export async function executeMintFlow({
   contract,
   address,
@@ -98,7 +83,6 @@ export async function executeMintFlow({
   publicSignals,
   tokenURI,
   coreInfo,
-  attestationRef,
   mintPersonVersionNFT,
   getVersionDetails,
 }: ExecuteMintFlowParams): Promise<ExecuteMintFlowResult> {
@@ -108,25 +92,12 @@ export async function executeMintFlow({
   }
 
   const contractAddress = await contract.getAddress();
-  const ref =
-    attestationRef ??
-    makeDraftMintAttestationRef({
-      chainId: await resolveContractChainId(contract),
-      contractAddress,
-      actor: address,
-      personHash,
-      versionIndex,
-      tokenURI,
-      coreInfo,
-    });
-
   const receipt = await mintPersonVersionNFT(
     proofEnvelope,
     publicSignals,
     versionIndex,
     tokenURI,
     coreInfo,
-    ref,
   );
 
   const eventInterface = createDeepFamilyInterface();

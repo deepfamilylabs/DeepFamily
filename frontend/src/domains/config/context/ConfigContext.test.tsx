@@ -30,7 +30,6 @@ vi.mock("../services", () => ({
 }));
 
 const mainAddress = "0x0000000000000000000000000000000000000202";
-const registryAddress = "0x0000000000000000000000000000000000000303";
 const tokenAddress = "0x0000000000000000000000000000000000000404";
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -41,22 +40,22 @@ describe("ConfigContext module address resolution", () => {
   beforeEach(() => {
     localStorage.clear();
     mocks.resolveModuleAddresses.mockReset();
-    mocks.resolveModuleAddresses.mockImplementation(async ({ readerAddress }: { readerAddress: string }) => ({
-      readerAddress,
-      contractAddress: mainAddress,
-      attestationRegistryAddress: registryAddress,
-      tokenAddress,
-    }));
+    mocks.resolveModuleAddresses.mockImplementation(
+      async ({ readerAddress }: { readerAddress: string }) => ({
+        readerAddress,
+        contractAddress: mainAddress,
+        tokenAddress,
+      }),
+    );
   });
 
-  it("treats the configured reader as the entrypoint and derives main/registry/token", async () => {
+  it("treats the configured reader as the entrypoint and derives main/token", async () => {
     const { result } = renderHook(() => useConfig(), { wrapper });
 
     expect(result.current.readerAddress).toBe(mocks.env.readerAddress);
     expect(result.current.contractAddress).toBe("");
 
     await waitFor(() => expect(result.current.contractAddress).toBe(mainAddress));
-    expect(result.current.attestationRegistryAddress).toBe(registryAddress);
     expect(result.current.tokenAddress).toBe(tokenAddress);
     expect(result.current.moduleResolutionError).toBeNull();
   });
@@ -69,7 +68,6 @@ describe("ConfigContext module address resolution", () => {
         chainId: 31337,
         readerAddress: mocks.env.readerAddress,
         contractAddress: mainAddress,
-        attestationRegistryAddress: registryAddress,
         tokenAddress,
         rootHash: mocks.env.rootHash,
         rootVersionIndex: 1,
@@ -81,7 +79,6 @@ describe("ConfigContext module address resolution", () => {
 
     await waitFor(() => expect(result.current.moduleResolutionError).toBe("bad module wiring"));
     expect(result.current.contractAddress).toBe("");
-    expect(result.current.attestationRegistryAddress).toBe("");
     expect(result.current.tokenAddress).toBe("");
   });
 
@@ -96,7 +93,6 @@ describe("ConfigContext module address resolution", () => {
     });
 
     expect(result.current.contractAddress).toBe("");
-    expect(result.current.attestationRegistryAddress).toBe("");
     expect(result.current.tokenAddress).toBe("");
   });
 });

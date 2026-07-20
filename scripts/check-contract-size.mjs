@@ -5,10 +5,6 @@ const MAX_DEPLOYED_BYTES = 24_576;
 const ARTIFACTS = [
   ["DeepFamily", "artifacts/contracts/DeepFamily.sol/DeepFamily.json"],
   ["DeepFamilyReader", "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json"],
-  [
-    "DeepFamilyAttestationRegistry",
-    "artifacts/contracts/DeepFamilyAttestationRegistry.sol/DeepFamilyAttestationRegistry.json",
-  ],
   ["AdultAgeGate", "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json"],
   ["PoseidonT5", "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json"],
   ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],

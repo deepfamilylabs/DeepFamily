@@ -197,7 +197,6 @@ export default function TreePage() {
     if (envReader && normalizeAddr(envReader) !== normalizeAddr(readerAddress || "")) {
       nextUpdate.readerAddress = envReader;
       nextUpdate.contractAddress = "";
-      nextUpdate.attestationRegistryAddress = "";
       nextUpdate.tokenAddress = "";
     }
     const hasEnvRoot = isValidRootHash(envRootHash);

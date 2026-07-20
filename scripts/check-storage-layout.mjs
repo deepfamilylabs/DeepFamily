@@ -10,11 +10,6 @@ const UPDATE = process.argv.includes("--update") || process.env.STORAGE_BASELINE
 // versions, so each build is diffed against a committed baseline snapshot.
 const PROXY_CONTRACTS = [
   { name: "DeepFamily", artifact: "artifacts/contracts/DeepFamily.sol/DeepFamily.json" },
-  {
-    name: "DeepFamilyAttestationRegistry",
-    artifact:
-      "artifacts/contracts/DeepFamilyAttestationRegistry.sol/DeepFamilyAttestationRegistry.json",
-  },
 ];
 
 // Positive: the canonical upgrade target must be a safe extension of the base.

@@ -3,11 +3,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { checkImplementationAgainstBaseline } from "../../scripts/lib/storageLayout.mjs";
 
-// Upgradeable proxies and whether their implementation links external libraries. The owner of
-// each proxy is expected to be a TimelockController (intended production model: timelock + multisig).
+// Upgradeable proxy and whether its implementation links external libraries. Its owner is
+// expected to be a TimelockController (intended production model: timelock + multisig).
 export const UPGRADE_TARGETS = {
   main: { contract: "DeepFamily", needsLibraries: true },
-  registry: { contract: "DeepFamilyAttestationRegistry", needsLibraries: false },
 };
 
 const deploymentsDir = (connection) => {
@@ -212,7 +211,7 @@ export const deriveSalt = (ethers, { target, implementation, initData, override 
 export const resolveTarget = async (connection, ethers, targetArg) => {
   const spec = UPGRADE_TARGETS[targetArg];
   if (!spec) {
-    throw new Error(`Unknown --target "${targetArg}" (expected one of: main, registry)`);
+    throw new Error(`Unknown --target "${targetArg}" (expected: main)`);
   }
   const proxyAddress = await readDeploymentAddress(connection, spec.contract);
   const proxy = await ethers.getContractAt(spec.contract, proxyAddress);

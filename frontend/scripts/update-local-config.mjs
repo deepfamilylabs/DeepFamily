@@ -4,26 +4,26 @@
  * Reads deployment info from `deployments/localhost` and updates `.env.local`
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { ethers } from 'ethers';
-import seedHelpers from '../../lib/seedHelpers.js';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { ethers } from "ethers";
+import seedHelpers from "../../lib/seedHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const FRONTEND_DIR = path.dirname(__dirname);
 const PROJECT_ROOT = path.dirname(FRONTEND_DIR);
-const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, 'deployments', 'localhost');
-const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, '.env.local');
+const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, "deployments", "localhost");
+const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, ".env.local");
 const { loadMultiLanguageRoots, checkPersonExists, computePersonHash } = seedHelpers;
 
 const LANGUAGE_LABELS = {
-  en: 'English Root (Kennedy Family)',
-  zh: 'Chinese Root (曹操家族)'
+  en: "English Root (Kennedy Family)",
+  zh: "Chinese Root (曹操家族)",
 };
-const LANGUAGE_PRIORITY = ['en', 'zh'];
+const LANGUAGE_PRIORITY = ["en", "zh"];
 
 function computePersonHashFromBasicInfo(basicInfo) {
   return computePersonHash({ personData: basicInfo });
@@ -38,15 +38,15 @@ function getLanguageLabel(lang, rootData = {}) {
 function pickDefaultRoot(entries) {
   const prioritized = (predicate) => {
     for (const lang of LANGUAGE_PRIORITY) {
-      const hit = entries.find(entry => entry.lang === lang && predicate(entry));
+      const hit = entries.find((entry) => entry.lang === lang && predicate(entry));
       if (hit) return hit;
     }
     return null;
   };
 
   return (
-    prioritized(entry => entry.exists) ||
-    entries.find(entry => entry.exists) ||
+    prioritized((entry) => entry.exists) ||
+    entries.find((entry) => entry.exists) ||
     prioritized(() => true) ||
     entries[0]
   );
@@ -60,13 +60,15 @@ async function collectMultiLanguageRootHashes(deepFamily) {
     try {
       const hash = computePersonHashFromBasicInfo(rootData);
       console.log(`   [${lang.toUpperCase()}] Computing hash for ${rootData.fullName}: ${hash}`);
-      
+
       const { exists, totalVersions } = await checkPersonExists({
         deepFamily,
-        personHash: hash
+        personHash: hash,
       });
-      
-      console.log(`   [${lang.toUpperCase()}] Result - exists: ${exists}, versions: ${totalVersions}`);
+
+      console.log(
+        `   [${lang.toUpperCase()}] Result - exists: ${exists}, versions: ${totalVersions}`,
+      );
 
       entries.push({
         lang,
@@ -74,8 +76,8 @@ async function collectMultiLanguageRootHashes(deepFamily) {
         label: getLanguageLabel(lang, rootData),
         exists,
         totalVersions,
-        versionIndex: '1',
-        personData: rootData
+        versionIndex: "1",
+        personData: rootData,
       });
     } catch (error) {
       console.warn(`Warning: Failed to compute ${lang.toUpperCase()} root hash: ${error.message}`);
@@ -84,58 +86,56 @@ async function collectMultiLanguageRootHashes(deepFamily) {
   }
 
   if (entries.length === 0) {
-    throw new Error('No multi-language root data found. Ensure data/persons JSON files are present.');
+    throw new Error(
+      "No multi-language root data found. Ensure data/persons JSON files are present.",
+    );
   }
 
   return {
     entries,
-    defaultRoot: pickDefaultRoot(entries)
+    defaultRoot: pickDefaultRoot(entries),
   };
 }
 
 async function updateLocalConfig() {
   try {
     if (!fs.existsSync(DEPLOYMENTS_DIR)) {
-      console.log('No localhost deployments found. Run `npm run dev:deploy` first.');
+      console.log("No localhost deployments found. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
 
-    const deepFamilyPath = path.join(DEPLOYMENTS_DIR, 'DeepFamily.json');
-    const readerPath = path.join(DEPLOYMENTS_DIR, 'DeepFamilyReader.json');
-    const registryPath = path.join(DEPLOYMENTS_DIR, 'DeepFamilyAttestationRegistry.json');
+    const deepFamilyPath = path.join(DEPLOYMENTS_DIR, "DeepFamily.json");
+    const readerPath = path.join(DEPLOYMENTS_DIR, "DeepFamilyReader.json");
     if (!fs.existsSync(deepFamilyPath)) {
-      console.log('DeepFamily contract not deployed. Run `npm run dev:deploy` first.');
+      console.log("DeepFamily contract not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
-    if (!fs.existsSync(readerPath) || !fs.existsSync(registryPath)) {
-      console.log('DeepFamily reader/registry modules not deployed. Run `npm run dev:deploy` first.');
+    if (!fs.existsSync(readerPath)) {
+      console.log("DeepFamily reader module not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
 
-    const deepFamilyDeployment = JSON.parse(fs.readFileSync(deepFamilyPath, 'utf8'));
-    const readerDeployment = JSON.parse(fs.readFileSync(readerPath, 'utf8'));
-    const registryDeployment = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const deepFamilyDeployment = JSON.parse(fs.readFileSync(deepFamilyPath, "utf8"));
+    const readerDeployment = JSON.parse(fs.readFileSync(readerPath, "utf8"));
     const contractAddress = deepFamilyDeployment.address;
     const readerAddress = readerDeployment.address;
-    const attestationRegistryAddress = registryDeployment.address;
 
     console.log(`Found DeepFamily contract at: ${contractAddress}`);
     console.log(`Found DeepFamilyReader contract at: ${readerAddress}`);
-    console.log(`Found DeepFamilyAttestationRegistry contract at: ${attestationRegistryAddress}`);
 
-    const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
-    
+    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
+
     try {
       const blockNumber = await provider.getBlockNumber();
       console.log(`Connected to local node (block: ${blockNumber})`);
     } catch (error) {
-      console.error('Failed to connect to local node:', error.message);
-      console.error('   Make sure Hardhat node is running on http://127.0.0.1:8545');
+      console.error("Failed to connect to local node:", error.message);
+      console.error("   Make sure Hardhat node is running on http://127.0.0.1:8545");
       process.exit(1);
     }
-    
+
     const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
-    
+
     try {
       const tokenCounter = await deepFamily.tokenCounter();
       console.log(`Contract accessible (total NFTs: ${tokenCounter.toString()})\n`);
@@ -145,34 +145,38 @@ async function updateLocalConfig() {
 
     const { entries: rootEntries, defaultRoot } = await collectMultiLanguageRootHashes(deepFamily);
 
-    console.log('\nMulti-language root hashes:');
-    rootEntries.forEach(entry => {
+    console.log("\nMulti-language root hashes:");
+    rootEntries.forEach((entry) => {
       console.log(`   [${entry.lang.toUpperCase()}] ${entry.label}`);
       console.log(`      Hash: ${entry.hash}`);
       if (entry.exists) {
         console.log(`      On-chain (versions: ${entry.totalVersions})`);
       } else {
-        console.log('      Not found on-chain yet. Run `npm run dev:seed` after deploying.');
+        console.log("      Not found on-chain yet. Run `npm run dev:seed` after deploying.");
       }
     });
 
-    console.log(`\nDefault frontend root: [${defaultRoot.lang.toUpperCase()}] ${defaultRoot.label}`);
+    console.log(
+      `\nDefault frontend root: [${defaultRoot.lang.toUpperCase()}] ${defaultRoot.label}`,
+    );
     console.log(`   Hash: ${defaultRoot.hash}`);
     if (!defaultRoot.exists) {
-      console.log('   Default root not found on-chain yet. Frontend tree will stay empty until seeded.');
+      console.log(
+        "   Default root not found on-chain yet. Frontend tree will stay empty until seeded.",
+      );
     }
 
-    let envContent = '';
+    let envContent = "";
     let isNewFile = false;
 
     if (fs.existsSync(ENV_LOCAL_PATH)) {
-      envContent = fs.readFileSync(ENV_LOCAL_PATH, 'utf8');
-      console.log('Updating existing .env.local');
+      envContent = fs.readFileSync(ENV_LOCAL_PATH, "utf8");
+      console.log("Updating existing .env.local");
     } else {
-      const envExamplePath = path.join(FRONTEND_DIR, '.env.example');
+      const envExamplePath = path.join(FRONTEND_DIR, ".env.example");
       if (fs.existsSync(envExamplePath)) {
-        envContent = fs.readFileSync(envExamplePath, 'utf8');
-        console.log('Creating .env.local from .env.example');
+        envContent = fs.readFileSync(envExamplePath, "utf8");
+        console.log("Creating .env.local from .env.example");
         isNewFile = true;
       } else {
         envContent = `# Local development environment
@@ -184,12 +188,11 @@ async function updateLocalConfig() {
     }
 
     const updates = {
-      'VITE_RPC_URL': 'http://127.0.0.1:8545',
-      'VITE_CONTRACT_ADDRESS': readerAddress,
-      'VITE_READER_ADDRESS': readerAddress,
-      'VITE_ATTESTATION_REGISTRY_ADDRESS': attestationRegistryAddress,
-      'VITE_ROOT_PERSON_HASH': defaultRoot.hash,
-      'VITE_ROOT_VERSION_INDEX': defaultRoot.versionIndex
+      VITE_RPC_URL: "http://127.0.0.1:8545",
+      VITE_CONTRACT_ADDRESS: readerAddress,
+      VITE_READER_ADDRESS: readerAddress,
+      VITE_ROOT_PERSON_HASH: defaultRoot.hash,
+      VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };
 
     for (const entry of rootEntries) {
@@ -200,8 +203,8 @@ async function updateLocalConfig() {
 
     let updatedContent = envContent;
     for (const [key, value] of Object.entries(updates)) {
-      const regex = new RegExp(`^${key}=.*$`, 'm');
-      const commentedRegex = new RegExp(`^#\\s*${key}=.*$`, 'm');
+      const regex = new RegExp(`^${key}=.*$`, "m");
+      const commentedRegex = new RegExp(`^#\\s*${key}=.*$`, "m");
       if (regex.test(updatedContent)) {
         updatedContent = updatedContent.replace(regex, `${key}=${value}`);
         console.log(`Updated ${key}=${value}`);
@@ -215,24 +218,22 @@ async function updateLocalConfig() {
     }
 
     fs.writeFileSync(ENV_LOCAL_PATH, updatedContent);
-    
+
     if (isNewFile) {
-      console.log('\nCreated .env.local with local deployment configuration!');
+      console.log("\nCreated .env.local with local deployment configuration!");
     } else {
-      console.log('\nUpdated .env.local with latest deployment addresses!');
+      console.log("\nUpdated .env.local with latest deployment addresses!");
     }
-    
-    console.log('\nCurrent configuration:');
+
+    console.log("\nCurrent configuration:");
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Contract: ${contractAddress}`);
     console.log(`   Reader: ${readerAddress}`);
-    console.log(`   Attestation registry: ${attestationRegistryAddress}`);
     console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
-    
-    console.log('\nYou can now start the frontend with: npm run dev');
 
+    console.log("\nYou can now start the frontend with: npm run dev");
   } catch (error) {
-    console.error('Error updating local config:', error.message);
+    console.error("Error updating local config:", error.message);
     process.exit(1);
   }
 }
