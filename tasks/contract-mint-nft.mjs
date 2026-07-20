@@ -1,10 +1,8 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import { ethers } from "ethers";
 import personCommitmentProof from "../lib/personCommitmentProof.js";
 import disclosureBindingProof from "../lib/disclosureBindingProof.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
-import { makeMintAttestationRef } from "../lib/seedHelpers.js";
 
 const { computePersonHashFromInput } = personCommitmentProof;
 const { generateDisclosureBindingProof } = disclosureBindingProof;
@@ -100,21 +98,15 @@ const action = async (args, hre) => {
     },
   };
 
-  const tx = await deepFamily.connect(signer).mintPersonVersionNFT(
-    result.proofEnvelope,
-    result.publicSignalsStruct,
-    versionIndex,
-    args.tokenuri,
-    coreInfo,
-    await makeMintAttestationRef({
-      deepFamily,
-      signer,
-      personHash: args.person,
+  const tx = await deepFamily
+    .connect(signer)
+    .mintPersonVersionNFT(
+      result.proofEnvelope,
+      result.publicSignalsStruct,
       versionIndex,
-      tokenURI: args.tokenuri,
+      args.tokenuri,
       coreInfo,
-    }),
-  );
+    );
   const receipt = await tx.wait();
 
   console.log(`NFT minted for person ${args.person}`);

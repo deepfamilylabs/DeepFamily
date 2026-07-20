@@ -7,8 +7,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
-import {IDeepFamilyAttestationRegistry} from "./interfaces/IDeepFamilyAttestationRegistry.sol";
-import {AttestationTypes} from "./libraries/AttestationTypes.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
@@ -59,21 +57,9 @@ contract DeepFamily is
   error InvalidTokenURI();
   error InvalidZKProof();
   error InvalidVerifierAddress();
-  error InvalidAttestationRegistry();
   error VerifierRouteNotSet();
   error UnsupportedProofEncoding();
   error MalformedProofData();
-  error InvalidAttestationRefVersion();
-  error InvalidAttestationSubject();
-  error InvalidAttestationAction();
-  error InvalidAttestationPayloadDigest();
-  error InvalidAttestationSignatureSuite();
-  error InvalidAttestationSignerKey();
-  error InvalidAttestationURI();
-  error InvalidAttestationIssuedAt();
-  error InvalidAttestationExpiresAt();
-  error InvalidAttestationRevocation();
-  error DuplicateAttestationReference();
 
   // Business logic errors
   error DuplicateVersion();
@@ -246,7 +232,6 @@ contract DeepFamily is
   string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
 
   address public DEEP_FAMILY_TOKEN_CONTRACT;
-  IDeepFamilyAttestationRegistry public ATTESTATION_REGISTRY;
   mapping(uint16 => mapping(uint8 => address)) public verifierRegistry;
   mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public trustedEndorserOf;
   mapping(bytes32 => mapping(uint256 => address[])) private trustedEndorsers;
@@ -541,30 +526,6 @@ contract DeepFamily is
     _tokenURIs[tokenId] = _tokenURI;
   }
 
-  function _computeCoreInfoDigest(
-    PersonCoreInfo calldata coreInfo
-  ) internal pure returns (bytes32) {
-    return
-      keccak256(
-        abi.encode(
-          coreInfo.basicInfo.identityCommitment,
-          coreInfo.basicInfo.isBirthBC,
-          coreInfo.basicInfo.birthYear,
-          coreInfo.basicInfo.birthMonth,
-          coreInfo.basicInfo.birthDay,
-          coreInfo.basicInfo.gender,
-          _hashString(coreInfo.supplementInfo.fullName),
-          _hashString(coreInfo.supplementInfo.birthPlace),
-          coreInfo.supplementInfo.isDeathBC,
-          coreInfo.supplementInfo.deathYear,
-          coreInfo.supplementInfo.deathMonth,
-          coreInfo.supplementInfo.deathDay,
-          _hashString(coreInfo.supplementInfo.deathPlace),
-          _hashString(coreInfo.supplementInfo.story)
-        )
-      );
-  }
-
   // ========== Constructor / Initializer ==========
 
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -575,21 +536,14 @@ contract DeepFamily is
   /**
    * @dev Initializer (replaces the constructor for the upgradeable proxy pattern).
    *      Sets up ERC721 metadata, ownership, and the immutable-by-convention wiring
-   *      to the token + attestation registry contracts.
+   *      to the token contract.
    * @param _deepFamilyTokenContract DeepFamily token contract address
-   * @param _attestationRegistry Attestation registry contract address
    * @param initialOwner Initial owner of the proxy, expected to become timelock/multisig governance.
    */
-  function initialize(
-    address _deepFamilyTokenContract,
-    address _attestationRegistry,
-    address initialOwner
-  ) public initializer {
+  function initialize(address _deepFamilyTokenContract, address initialOwner) public initializer {
     if (
       _deepFamilyTokenContract == address(0) || _deepFamilyTokenContract.code.length == 0
     ) revert TokenContractNotSet();
-    if (_attestationRegistry == address(0)) revert InvalidAttestationRegistry();
-    if (_attestationRegistry.code.length == 0) revert InvalidAttestationRegistry();
 
     __ERC721_init("DeepFamily", "Family");
     __ERC721Enumerable_init();
@@ -598,7 +552,6 @@ contract DeepFamily is
     // the unentered value at the start of every transaction, so it needs no initializer.
 
     DEEP_FAMILY_TOKEN_CONTRACT = _deepFamilyTokenContract;
-    ATTESTATION_REGISTRY = IDeepFamilyAttestationRegistry(_attestationRegistry);
     protocolEndorsementFeeBps = 500;
   }
 
@@ -614,24 +567,8 @@ contract DeepFamily is
   function setVerifier(
     uint16 proofSystemId,
     ProofPurpose purpose,
-    address verifier,
-    AttestationTypes.AttestationRef calldata attestationRef
-  ) external onlyOwner {
-    ATTESTATION_REGISTRY.anchorVerifierUpdateRef(
-      attestationRef,
-      msg.sender,
-      proofSystemId,
-      uint8(purpose),
-      verifier
-    );
-    _setVerifierInternal(proofSystemId, purpose, verifier);
-  }
-
-  function _setVerifierInternal(
-    uint16 proofSystemId,
-    ProofPurpose purpose,
     address verifier
-  ) internal {
+  ) external onlyOwner {
     if (verifier == address(0) || verifier.code.length == 0) revert InvalidVerifierAddress();
     verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
     emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
@@ -841,14 +778,8 @@ contract DeepFamily is
 
   function endorseVersion(
     bytes32 personHash,
-    uint256 versionIndex,
-    AttestationTypes.AttestationRef calldata attestationRef
+    uint256 versionIndex
   ) external nonReentrant validPersonAndVersion(personHash, versionIndex) {
-    ATTESTATION_REGISTRY.anchorEndorsementRef(attestationRef, msg.sender, personHash, versionIndex);
-    _endorseVersionInternal(personHash, versionIndex);
-  }
-
-  function _endorseVersionInternal(bytes32 personHash, uint256 versionIndex) internal {
     uint256 prev = endorsedVersionIndex[personHash][msg.sender];
     if (prev == versionIndex) revert AlreadyEndorsed();
 
@@ -982,28 +913,8 @@ contract DeepFamily is
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo,
-    AttestationTypes.AttestationRef calldata attestationRef
-  ) external nonReentrant {
-    bytes32 personHash = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
-    ATTESTATION_REGISTRY.anchorMintRef(
-      attestationRef,
-      msg.sender,
-      personHash,
-      versionIndex,
-      _hashString(_tokenURI),
-      _computeCoreInfoDigest(coreInfo)
-    );
-    _mintPersonVersionNFTInternal(proof, publicSignals, versionIndex, _tokenURI, coreInfo);
-  }
-
-  function _mintPersonVersionNFTInternal(
-    ProofEnvelope calldata proof,
-    DisclosureBindingPublicSignals calldata publicSignals,
-    uint256 versionIndex,
-    string calldata _tokenURI,
     PersonCoreInfo calldata coreInfo
-  ) internal {
+  ) external nonReentrant {
     bytes32 personHash = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
     if (personHash == bytes32(0)) revert InvalidPersonHash();
     if (versionIndex == 0 || versionIndex > personVersions[personHash].length) {
@@ -1050,15 +961,7 @@ contract DeepFamily is
     emit TokenURIUpdated(tokenId, msg.sender, oldURI, newURI);
   }
 
-  function updateEndorsementFee(
-    uint256 newBps,
-    AttestationTypes.AttestationRef calldata attestationRef
-  ) external onlyOwner {
-    ATTESTATION_REGISTRY.anchorProtocolFeeRef(attestationRef, msg.sender, newBps);
-    _updateEndorsementFeeInternal(newBps);
-  }
-
-  function _updateEndorsementFeeInternal(uint256 newBps) internal {
+  function updateEndorsementFee(uint256 newBps) external onlyOwner {
     if (newBps > PROTOCOL_FEE_BPS_MAX) revert ProtocolFeeTooHigh();
     uint256 previous = protocolEndorsementFeeBps;
     if (previous == newBps) {
@@ -1122,22 +1025,7 @@ contract DeepFamily is
     );
   }
 
-  function sealStory(
-    uint256 tokenId,
-    AttestationTypes.AttestationRef calldata attestationRef
-  ) external nonReentrant {
-    StoryMetadata storage metadata = storyMetadata[tokenId];
-    ATTESTATION_REGISTRY.anchorStorySealRef(
-      attestationRef,
-      msg.sender,
-      tokenId,
-      metadata.totalChunks,
-      metadata.fullStoryHash
-    );
-    _sealStoryInternal(tokenId);
-  }
-
-  function _sealStoryInternal(uint256 tokenId) internal {
+  function sealStory(uint256 tokenId) external nonReentrant {
     if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
 
     StoryMetadata storage metadata = storyMetadata[tokenId];

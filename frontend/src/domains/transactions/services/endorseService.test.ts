@@ -116,11 +116,6 @@ describe("endorseService executeEndorseFlow", () => {
     expect(endorseVersion).toHaveBeenCalledWith(
       "0x00000000000000000000000000000000000000000000000000000000000000aa",
       2,
-      expect.objectContaining({
-        actionType: 2,
-        subjectType: 2,
-        uri: expect.stringMatching(/^ipfs:\/\//),
-      }),
       { gasLimit: 120n },
       { suppressToasts: true },
     );

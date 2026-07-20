@@ -10,7 +10,6 @@ import { getFriendlyError } from "../../../../../shared/lib/errors";
 import { waitForTransactionReceipt } from "../../../api/txGateway";
 import { executeMintFlow } from "../../../services/mintNftService";
 import { initialMintNftFlowState, mintNftReducer } from "../model/mintNftReducer";
-import type { AttestationRef } from "../../../../../shared/attestation";
 import type { ExecuteMintFlowResult, MintNftFlowArgs } from "../model/mintNftTypes";
 
 export type { ExecuteMintFlowResult, MintNftFlowArgs };
@@ -58,7 +57,6 @@ export function useMintNftFlow() {
           versionIndex: number,
           tokenURI: string,
           coreInfo: MintNftFlowArgs["coreInfo"],
-          attestationRef: AttestationRef,
         ) => {
           if (runIdRef.current === thisRunId) {
             dispatch({ type: "stage", step: "submitting" });
@@ -69,7 +67,6 @@ export function useMintNftFlow() {
             versionIndex,
             tokenURI,
             coreInfo,
-            attestationRef,
           );
           if (runIdRef.current === thisRunId) {
             dispatch({ type: "stage", step: "confirming" });

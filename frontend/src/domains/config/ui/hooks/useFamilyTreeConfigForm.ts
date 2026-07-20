@@ -176,7 +176,6 @@ export function useFamilyTreeConfigForm() {
       chainId: localChainId,
       readerAddress: localReaderAddress,
       contractAddress: "",
-      attestationRegistryAddress: "",
       tokenAddress: "",
       rootHash: localRootHash,
       rootVersionIndex: localVersion,

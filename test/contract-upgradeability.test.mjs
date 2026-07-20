@@ -2,7 +2,6 @@ import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
-import { computeAttestationKey, makeProtocolFeeAttestationRef } from "./helpers/testHelper.mjs";
 
 describe("UUPS upgradeability", function () {
   this.timeout(60_000);
@@ -19,17 +18,11 @@ describe("UUPS upgradeability", function () {
     return impl;
   };
 
-  it("binds registry and main to the proxy addresses (mutual wiring)", async () => {
-    const { deepFamily, deepFamilyAttestationRegistry } =
-      await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+  it("initializes the main proxy with the expected owner", async () => {
+    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [owner] = await hre.ethers.getSigners();
-    const deepFamilyAddress = await deepFamily.getAddress();
-    const registryAddress = await deepFamilyAttestationRegistry.getAddress();
 
-    expect(await deepFamily.ATTESTATION_REGISTRY()).to.equal(registryAddress);
-    expect(await deepFamilyAttestationRegistry.deepFamily()).to.equal(deepFamilyAddress);
     expect(await deepFamily.owner()).to.equal(await owner.getAddress());
-    expect(await deepFamilyAttestationRegistry.owner()).to.equal(await owner.getAddress());
   });
 
   it("upgrades the main contract while preserving storage and adding behavior", async () => {
@@ -40,7 +33,6 @@ describe("UUPS upgradeability", function () {
     const feeBefore = await deepFamily.protocolEndorsementFeeBps();
     const ownerBefore = await deepFamily.owner();
     const nameBefore = await deepFamily.name();
-    const registryBefore = await deepFamily.ATTESTATION_REGISTRY();
 
     const v2Impl = await deployV2Impl(poseidonT5, adultAgeGate);
     await (await deepFamily.upgradeToAndCall(await v2Impl.getAddress(), "0x")).wait();
@@ -51,7 +43,6 @@ describe("UUPS upgradeability", function () {
     expect(await v2.protocolEndorsementFeeBps()).to.equal(feeBefore);
     expect(await v2.owner()).to.equal(ownerBefore);
     expect(await v2.name()).to.equal(nameBefore);
-    expect(await v2.ATTESTATION_REGISTRY()).to.equal(registryBefore);
 
     // New behavior + new storage works.
     expect(await v2.version()).to.equal("V2");
@@ -73,55 +64,21 @@ describe("UUPS upgradeability", function () {
   it("cannot re-initialize the proxy", async () => {
     const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const tokenAddr = await deepFamily.DEEP_FAMILY_TOKEN_CONTRACT();
-    const registryAddr = await deepFamily.ATTESTATION_REGISTRY();
 
     await expect(
-      deepFamily.initialize(tokenAddr, registryAddr, await deepFamily.owner()),
+      deepFamily.initialize(tokenAddr, await deepFamily.owner()),
     ).to.be.revertedWithCustomError(deepFamily, "InvalidInitialization");
   });
 
   it("disables initializers on the implementation contract", async () => {
-    const { poseidonT5, adultAgeGate, token, deepFamilyAttestationRegistry } =
+    const { poseidonT5, adultAgeGate, token } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [owner] = await hre.ethers.getSigners();
     const impl = await deployV2Impl(poseidonT5, adultAgeGate);
 
     await expect(
-      impl.initialize(
-        await token.getAddress(),
-        await deepFamilyAttestationRegistry.getAddress(),
-        await owner.getAddress(),
-      ),
+      impl.initialize(await token.getAddress(), await owner.getAddress()),
     ).to.be.revertedWithCustomError(impl, "InvalidInitialization");
-  });
-
-  it("upgrades the registry while preserving binding and anchored refs", async () => {
-    const { deepFamily, deepFamilyAttestationRegistry } =
-      await hre.networkHelpers.loadFixture(deployIntegratedFixture);
-    const [owner] = await hre.ethers.getSigners();
-    const registryProxy = await deepFamilyAttestationRegistry.getAddress();
-    const boundBefore = await deepFamilyAttestationRegistry.deepFamily();
-    const ref = await makeProtocolFeeAttestationRef(hre.ethers, deepFamily, owner, 333);
-    const key = computeAttestationKey(hre.ethers, ref);
-
-    await (await deepFamily.updateEndorsementFee(333, ref)).wait();
-    expect(await deepFamilyAttestationRegistry.attestationRefExists(key)).to.equal(true);
-
-    const Registry = await hre.ethers.getContractFactory("DeepFamilyAttestationRegistry");
-    const newImpl = await Registry.deploy();
-    await newImpl.waitForDeployment();
-    await (
-      await deepFamilyAttestationRegistry.upgradeToAndCall(await newImpl.getAddress(), "0x")
-    ).wait();
-
-    const upgraded = await hre.ethers.getContractAt("DeepFamilyAttestationRegistry", registryProxy);
-    expect(await upgraded.deepFamily()).to.equal(boundBefore);
-    expect(boundBefore).to.equal(await deepFamily.getAddress());
-    expect(await upgraded.attestationRefExists(key)).to.equal(true);
-    await expect(deepFamily.updateEndorsementFee(333, ref)).to.be.revertedWithCustomError(
-      deepFamily,
-      "DuplicateAttestationReference",
-    );
   });
 
   it("upgrades the main contract through a timelock governance owner", async () => {

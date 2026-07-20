@@ -5,13 +5,6 @@ import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrad
 const GROTH16_PROOF_SYSTEM_ID = 1;
 const PROOF_PURPOSE_PERSON_COMMITMENT = 0;
 const PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
-const ATTESTATION_REF_VERSION_V1 = 1;
-const SUBJECT_TYPE_ACTION = 6;
-const ACTION_TYPE_VERIFIER_UPDATE = 4;
-const SIG_SUITE_ECDSA_SECP256K1_V1 = 1;
-const REVOCATION_TYPE_NONE = 0;
-const DOMAIN_ATTESTATION_ACTION = "DeepFamily.AttestationAction.V1";
-let attestationNonce = 1n;
 
 const resolveConnection = async (hreOrConnection) => {
   if (hreOrConnection?.ethers?.getSigners) {
@@ -118,7 +111,6 @@ const assertCurrentArtifactSet = async ({
   ethers,
   artifacts,
   deepFamilyImplementation,
-  registryImplementation,
   deployments,
 }) => {
   const hreLike = { artifacts };
@@ -127,11 +119,6 @@ const assertCurrentArtifactSet = async ({
       contractName: "DeepFamily",
       implementation: deepFamilyImplementation,
       spec: { needsLibraries: true },
-    },
-    {
-      contractName: "DeepFamilyAttestationRegistry",
-      implementation: registryImplementation,
-      spec: { needsLibraries: false },
     },
     ...deployments.map(({ contractName, deployment }) => ({
       contractName,
@@ -260,28 +247,10 @@ const assertExistingIntegratedWiring = async ({
   ethers,
   deepFamily,
   token,
-  deepFamilyAttestationRegistry,
   deepFamilyReader,
   expectedGroth16Adapter,
 }) => {
   const deepFamilyAddress = await deepFamily.getAddress();
-  const registryAddress = await deepFamilyAttestationRegistry.getAddress();
-
-  const deepFamilyRegistry = await deepFamily.ATTESTATION_REGISTRY();
-  if (!sameAddress(deepFamilyRegistry, registryAddress)) {
-    throw new Error(
-      `Deployment wiring mismatch: DeepFamily.ATTESTATION_REGISTRY=${deepFamilyRegistry}, ` +
-        `expected ${registryAddress}`,
-    );
-  }
-
-  const boundRegistryMain = await deepFamilyAttestationRegistry.deepFamily();
-  if (!sameAddress(boundRegistryMain, deepFamilyAddress)) {
-    throw new Error(
-      `Deployment wiring mismatch: registry.deepFamily=${boundRegistryMain}, ` +
-        `expected ${deepFamilyAddress}`,
-    );
-  }
 
   const readerMain = await deepFamilyReader.DEEP_FAMILY();
   if (!sameAddress(readerMain, deepFamilyAddress)) {
@@ -322,56 +291,6 @@ const assertExistingIntegratedWiring = async ({
   }
 };
 
-const makeSetVerifierAttestationRef = async (
-  ethers,
-  deepFamily,
-  signer,
-  proofSystemId,
-  purpose,
-  verifier,
-) => {
-  const network = await ethers.provider.getNetwork();
-  const contractAddress = await deepFamily.getAddress();
-  const actor = await signer.getAddress();
-  const actionDigest = ethers.keccak256(
-    ethers.AbiCoder.defaultAbiCoder().encode(
-      ["string", "uint256", "address", "uint16", "address", "uint16", "uint8", "address"],
-      [
-        DOMAIN_ATTESTATION_ACTION,
-        network.chainId,
-        contractAddress,
-        ACTION_TYPE_VERIFIER_UPDATE,
-        actor,
-        proofSystemId,
-        purpose,
-        verifier,
-      ],
-    ),
-  );
-  const latestBlock = await ethers.provider.getBlock("latest");
-  const nonce = attestationNonce++;
-  return {
-    attestationRefVersion: ATTESTATION_REF_VERSION_V1,
-    subjectType: SUBJECT_TYPE_ACTION,
-    subjectHash: actionDigest,
-    actionType: ACTION_TYPE_VERIFIER_UPDATE,
-    actionDigest,
-    attestationPayloadDigest: ethers.keccak256(
-      ethers.AbiCoder.defaultAbiCoder().encode(
-        ["bytes32", "address", "uint256"],
-        [actionDigest, actor, nonce],
-      ),
-    ),
-    signatureSuiteId: SIG_SUITE_ECDSA_SECP256K1_V1,
-    signerKeyId: ethers.zeroPadValue(actor, 32),
-    uri: `ipfs://deploy-attestation-${nonce.toString()}`,
-    issuedAt: Number(latestBlock.timestamp),
-    expiresAt: Number(latestBlock.timestamp) + 3600,
-    revocationType: REVOCATION_TYPE_NONE,
-    revocationRef: ethers.ZeroHash,
-  };
-};
-
 // Deploy a UUPS proxy: deploy the implementation, then an ERC1967 proxy (UUPSProxy)
 // pointing at it with the encoded initialize() calldata.
 const deployUUPSProxy = async (ethers, deployer, factory, initArgs) => {
@@ -407,7 +326,7 @@ export const deployIntegratedSystem = async (
     governanceOwner !== ethers.ZeroAddress;
   if (!hasGovernanceOwner && !isLocalDev) {
     throw new Error(
-      `GOVERNANCE_OWNER must be set to a valid nonzero address before deploying UUPS proxies to ` +
+      `GOVERNANCE_OWNER must be set to a valid nonzero address before deploying a UUPS proxy to ` +
         `a live network (got ${governanceOwner ?? "unset"}); otherwise unilateral upgrade ` +
         `authority would remain on the deployer key.`,
     );
@@ -459,22 +378,7 @@ export const deployIntegratedSystem = async (
   await groth16VerifierAdapter.waitForDeployment();
   const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress();
 
-  // Registry behind a UUPS proxy (stable address survives logic upgrades).
-  const DeepFamilyAttestationRegistry = await ethers.getContractFactory(
-    "DeepFamilyAttestationRegistry",
-    deployer,
-  );
-  const {
-    implAddress: deepFamilyAttestationRegistryImplementationAddress,
-    proxyAddress: deepFamilyAttestationRegistryAddress,
-  } = await deployUUPSProxy(ethers, deployer, DeepFamilyAttestationRegistry, [deployerAddress]);
-  const deepFamilyAttestationRegistry = await ethers.getContractAt(
-    "DeepFamilyAttestationRegistry",
-    deepFamilyAttestationRegistryAddress,
-    deployer,
-  );
-
-  // Main contract behind a UUPS proxy. initialize() wires token + registry (proxy) addresses.
+  // Main contract behind a UUPS proxy. initialize() wires the token address.
   const DeepFamily = await ethers.getContractFactory("DeepFamily", {
     signer: deployer,
     libraries: {
@@ -483,14 +387,8 @@ export const deployIntegratedSystem = async (
     },
   });
   const { implAddress: deepFamilyImplementationAddress, proxyAddress: deepFamilyAddress } =
-    await deployUUPSProxy(ethers, deployer, DeepFamily, [
-      tokenAddress,
-      deepFamilyAttestationRegistryAddress,
-      deployerAddress,
-    ]);
+    await deployUUPSProxy(ethers, deployer, DeepFamily, [tokenAddress, deployerAddress]);
   const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyAddress, deployer);
-
-  await (await deepFamilyAttestationRegistry.bindDeepFamily(deepFamilyAddress)).wait();
 
   const DeepFamilyReader = await ethers.getContractFactory("DeepFamilyReader", deployer);
   const deepFamilyReader = await DeepFamilyReader.deploy(deepFamilyAddress);
@@ -511,14 +409,6 @@ export const deployIntegratedSystem = async (
       GROTH16_PROOF_SYSTEM_ID,
       PROOF_PURPOSE_PERSON_COMMITMENT,
       groth16VerifierAdapterAddress,
-      await makeSetVerifierAttestationRef(
-        ethers,
-        deepFamily,
-        deployer,
-        GROTH16_PROOF_SYSTEM_ID,
-        PROOF_PURPOSE_PERSON_COMMITMENT,
-        groth16VerifierAdapterAddress,
-      ),
     )
   ).wait();
   await (
@@ -526,27 +416,18 @@ export const deployIntegratedSystem = async (
       GROTH16_PROOF_SYSTEM_ID,
       PROOF_PURPOSE_DISCLOSURE_BINDING,
       groth16VerifierAdapterAddress,
-      await makeSetVerifierAttestationRef(
-        ethers,
-        deepFamily,
-        deployer,
-        GROTH16_PROOF_SYSTEM_ID,
-        PROOF_PURPOSE_DISCLOSURE_BINDING,
-        groth16VerifierAdapterAddress,
-      ),
     )
   ).wait();
 
   // Hand upgrade and residual administrative ownership to governance (intended: timelock +
   // multisig). DeepFamilyToken has no mutable owner-only configuration after its one-time binding,
   // but transferring it too keeps production ownership consistent and avoids a stale deployer EOA.
-  // Must run after bindDeepFamily / setVerifier, which require the deployer to still be owner.
+  // Must run after verifier registration, which requires the deployer to still be owner.
   // With UUPS the owner can replace the entire implementation, so on live networks a governance
   // owner is mandatory (validated up front). Local dev networks always keep the deployer as owner
   // so owner-only test/dev flows keep working even if GOVERNANCE_OWNER leaks in from .env.
   if (hasGovernanceOwner && !isLocalDev) {
     await (await deepFamily.transferOwnership(governanceOwner)).wait();
-    await (await deepFamilyAttestationRegistry.transferOwnership(governanceOwner)).wait();
     await (await token.transferOwnership(governanceOwner)).wait();
   }
 
@@ -561,9 +442,6 @@ export const deployIntegratedSystem = async (
 
     const tokenArtifact = await artifacts.readArtifact("DeepFamilyToken");
     const deepArtifact = await artifacts.readArtifact("DeepFamily");
-    const attestationRegistryArtifact = await artifacts.readArtifact(
-      "DeepFamilyAttestationRegistry",
-    );
     const readerArtifact = await artifacts.readArtifact("DeepFamilyReader");
     const poseidonT5Artifact = await artifacts.readArtifact("PoseidonT5");
     const adultAgeGateArtifact = await artifacts.readArtifact("AdultAgeGate");
@@ -597,13 +475,6 @@ export const deployIntegratedSystem = async (
       groth16VerifierAdapterAddress,
       groth16AdapterArtifact.abi,
     );
-    await writeDeployment(
-      connection,
-      "DeepFamilyAttestationRegistry",
-      deepFamilyAttestationRegistryAddress,
-      attestationRegistryArtifact.abi,
-      { implementationAddress: deepFamilyAttestationRegistryImplementationAddress },
-    );
     await writeDeployment(connection, "DeepFamily", deepFamilyAddress, deepArtifact.abi, {
       implementationAddress: deepFamilyImplementationAddress,
     });
@@ -623,10 +494,8 @@ export const deployIntegratedSystem = async (
     personCommitmentVerifier,
     nameDisclosureVerifier,
     groth16VerifierAdapter,
-    deepFamilyAttestationRegistry,
     deepFamily,
     deepFamilyReader,
-    deepFamilyAttestationRegistryImplementationAddress,
     deepFamilyImplementationAddress,
   };
 };
@@ -654,7 +523,6 @@ export const ensureIntegratedSystem = async (
 
   const existingDeep = await safeReadDeployment(connection, "DeepFamily");
   const existingToken = await safeReadDeployment(connection, "DeepFamilyToken");
-  const existingRegistry = await safeReadDeployment(connection, "DeepFamilyAttestationRegistry");
   const existingReader = await safeReadDeployment(connection, "DeepFamilyReader");
   const existingGroth16Adapter = await safeReadDeployment(connection, "Groth16VerifierAdapter");
   const existingPoseidonT5 = await safeReadDeployment(connection, "PoseidonT5");
@@ -667,7 +535,6 @@ export const ensureIntegratedSystem = async (
   const recordedDeployments = [
     ["DeepFamily", existingDeep],
     ["DeepFamilyToken", existingToken],
-    ["DeepFamilyAttestationRegistry", existingRegistry],
     ["DeepFamilyReader", existingReader],
     ["Groth16VerifierAdapter", existingGroth16Adapter],
     ["PoseidonT5", existingPoseidonT5],
@@ -679,10 +546,7 @@ export const ensureIntegratedSystem = async (
     .filter(([, deployment]) => deployment?.address)
     .map(([contractName]) => contractName);
   const hasCompleteCoreDeployment =
-    existingDeep?.address &&
-    existingToken?.address &&
-    existingRegistry?.address &&
-    existingReader?.address;
+    existingDeep?.address && existingToken?.address && existingReader?.address;
 
   if (recordedNames.length === 0 && !isLocalDevNetwork(connection)) {
     if (!allowNewDeployment) {
@@ -711,18 +575,12 @@ export const ensureIntegratedSystem = async (
       await assertDeploymentCode(ethers, [
         ["DeepFamily", existingDeep],
         ["DeepFamilyToken", existingToken],
-        ["DeepFamilyAttestationRegistry", existingRegistry],
         ["DeepFamilyReader", existingReader],
       ]);
 
-      // DeepFamily and the registry must be UUPS proxies; a legacy direct deployment would
+      // DeepFamily must be a UUPS proxy; a legacy direct deployment would
       // pass the code/wiring checks above yet be silently non-upgradeable.
       const deepFamilyImplementation = await assertErc1967Proxy(ethers, "DeepFamily", existingDeep);
-      const registryImplementation = await assertErc1967Proxy(
-        ethers,
-        "DeepFamilyAttestationRegistry",
-        existingRegistry,
-      );
 
       if (currentArtifacts?.readArtifact) {
         const artifactBoundDeployments = [
@@ -768,7 +626,6 @@ export const ensureIntegratedSystem = async (
           ethers,
           artifacts: currentArtifacts,
           deepFamilyImplementation,
-          registryImplementation,
           deployments: [
             { contractName: "DeepFamilyToken", deployment: existingToken },
             { contractName: "DeepFamilyReader", deployment: existingReader },
@@ -790,11 +647,6 @@ export const ensureIntegratedSystem = async (
         existingToken.address,
         defaultSigner,
       );
-      const deepFamilyAttestationRegistry = await ethers.getContractAt(
-        "DeepFamilyAttestationRegistry",
-        existingRegistry.address,
-        defaultSigner,
-      );
       const deepFamilyReader = await ethers.getContractAt(
         "DeepFamilyReader",
         existingReader.address,
@@ -804,16 +656,11 @@ export const ensureIntegratedSystem = async (
         ethers,
         deepFamily,
         token,
-        deepFamilyAttestationRegistry,
         deepFamilyReader,
         expectedGroth16Adapter: existingGroth16Adapter,
       });
       await assertExistingGovernanceOwner(connection, ethers, [
         { contractName: "DeepFamily", contract: deepFamily },
-        {
-          contractName: "DeepFamilyAttestationRegistry",
-          contract: deepFamilyAttestationRegistry,
-        },
         { contractName: "DeepFamilyToken", contract: token },
       ]);
       if (shouldWriteDeployments) {
@@ -825,11 +672,6 @@ export const ensureIntegratedSystem = async (
         }
         const refreshTargets = [
           { contractName: "DeepFamily", contract: deepFamily, isProxy: true },
-          {
-            contractName: "DeepFamilyAttestationRegistry",
-            contract: deepFamilyAttestationRegistry,
-            isProxy: true,
-          },
           { contractName: "DeepFamilyToken", contract: token },
           { contractName: "DeepFamilyReader", contract: deepFamilyReader },
         ];
@@ -851,7 +693,6 @@ export const ensureIntegratedSystem = async (
       connection.__deepfamilyIntegrated = {
         deepFamily,
         token,
-        deepFamilyAttestationRegistry,
         deepFamilyReader,
       };
       return connection.__deepfamilyIntegrated;
@@ -876,7 +717,6 @@ export const ensureIntegratedSystem = async (
   connection.__deepfamilyIntegrated = {
     deepFamily: deployed.deepFamily,
     token: deployed.token,
-    deepFamilyAttestationRegistry: deployed.deepFamilyAttestationRegistry,
     deepFamilyReader: deployed.deepFamilyReader,
   };
   return connection.__deepfamilyIntegrated;

@@ -16,7 +16,6 @@ import networksListTask from "./tasks/networks-list.mjs";
 import addStoryChunkTask from "./tasks/story-add-chunk.mjs";
 import listStoryChunksTask from "./tasks/story-list-chunks.mjs";
 import sealStoryTask from "./tasks/story-seal.mjs";
-import attestationVerifyTask from "./tasks/attestation-verify.mjs";
 import upgradeScheduleTask from "./tasks/upgrade-schedule.mjs";
 import upgradeExecuteTask from "./tasks/upgrade-execute.mjs";
 
@@ -208,7 +207,6 @@ export default {
     addStoryChunkTask,
     listStoryChunksTask,
     sealStoryTask,
-    attestationVerifyTask,
     upgradeScheduleTask,
     upgradeExecuteTask,
   ],

@@ -5,7 +5,6 @@ import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import {
   addPerson,
   computeProfileIdentityCommitment,
-  makeEndorseAttestationRef,
   makeTestPerson,
   mintPerson,
   setupStubVerifiers,
@@ -176,13 +175,7 @@ describe("Trusted Endorser Sources", function () {
 
     const fee = await token.recentReward();
     if (fee > 0n) await token.connect(signers[0]).approve(deepFamily.target, fee);
-    await deepFamily
-      .connect(signers[0])
-      .endorseVersion(
-        personHash,
-        1,
-        await makeEndorseAttestationRef(hre.ethers, deepFamily, signers[0], personHash, 1),
-      );
+    await deepFamily.connect(signers[0]).endorseVersion(personHash, 1);
 
     expect(await reader.isVersionEndorsedByAny(personHash, 1, [contributor])).to.equal(true);
     expect(await reader.isVersionEndorsedByAny(personHash, 1, [outsider])).to.equal(false);

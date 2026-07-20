@@ -7,8 +7,11 @@ import { getFriendlyError } from "../../../../../shared/lib/errors";
 import { waitForTransactionReceipt } from "../../../api/txGateway";
 import { executeEndorseFlow } from "../../../services/endorseService";
 import { endorseReducer, initialEndorseFlowState } from "../model/endorseReducer";
-import type { AttestationRef } from "../../../../../shared/attestation";
-import type { EndorseFlowArgs, ExecuteEndorseFlowResult, EndorseServiceStage } from "../model/endorseTypes";
+import type {
+  EndorseFlowArgs,
+  ExecuteEndorseFlowResult,
+  EndorseServiceStage,
+} from "../model/endorseTypes";
 
 export type { EndorseFlowArgs, ExecuteEndorseFlowResult, EndorseServiceStage };
 
@@ -63,13 +66,12 @@ export function useEndorseFlow() {
         const endorseVersion = async (
           personHash: string,
           versionIndex: number,
-          attestationRef: AttestationRef,
           overrides?: Record<string, unknown>,
         ) => {
           const tx =
             overrides && Object.keys(overrides).length > 0
-              ? await contract.endorseVersion(personHash, versionIndex, attestationRef, overrides)
-              : await contract.endorseVersion(personHash, versionIndex, attestationRef);
+              ? await contract.endorseVersion(personHash, versionIndex, overrides)
+              : await contract.endorseVersion(personHash, versionIndex);
           return await waitForTransactionReceipt(tx);
         };
 

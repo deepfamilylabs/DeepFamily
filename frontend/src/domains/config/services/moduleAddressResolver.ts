@@ -1,6 +1,5 @@
 import { ethers } from "ethers";
 import {
-  createDeepFamilyAttestationRegistryContract,
   createDeepFamilyContract,
   createDeepFamilyReaderContract,
 } from "../../../shared/clients/contractFactory";
@@ -9,7 +8,6 @@ import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 export type ResolvedModuleAddresses = {
   readerAddress: string;
   contractAddress: string;
-  attestationRegistryAddress: string;
   tokenAddress: string;
 };
 
@@ -26,10 +24,6 @@ function normalizeAddress(address: string, label: string): string {
   return ethers.getAddress(address);
 }
 
-function sameAddress(a: string, b: string): boolean {
-  return String(a || "").toLowerCase() === String(b || "").toLowerCase();
-}
-
 export async function resolveModuleAddresses({
   rpcUrl,
   chainId,
@@ -43,27 +37,14 @@ export async function resolveModuleAddresses({
 
   const contractAddress = normalizeAddress(await reader.DEEP_FAMILY(), "DeepFamily");
   const deepFamily = createDeepFamilyContract(contractAddress, provider);
-  const attestationRegistryAddress = normalizeAddress(
-    await deepFamily.ATTESTATION_REGISTRY(),
-    "attestation registry",
-  );
   const tokenAddress = normalizeAddress(
     await deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
     "DeepFamily token",
   );
 
-  const registry = createDeepFamilyAttestationRegistryContract(attestationRegistryAddress, provider);
-  const boundDeepFamily = normalizeAddress(await registry.deepFamily(), "bound DeepFamily");
-  if (!sameAddress(boundDeepFamily, contractAddress)) {
-    throw new Error(
-      `Module wiring mismatch: registry is bound to ${boundDeepFamily}, expected ${contractAddress}`,
-    );
-  }
-
   return {
     readerAddress: normalizedReader,
     contractAddress,
-    attestationRegistryAddress,
     tokenAddress,
   };
 }

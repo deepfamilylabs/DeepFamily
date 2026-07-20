@@ -55,20 +55,14 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(a).to.equal(b);
     });
 
-    it("differs by target / initData and honors an explicit override", async () => {
+    it("differs by initData and honors an explicit override", async () => {
       const impl = "0x0000000000000000000000000000000000000001";
       const main = deriveSalt(hre.ethers, { target: "main", implementation: impl, initData: "0x" });
-      const registry = deriveSalt(hre.ethers, {
-        target: "registry",
-        implementation: impl,
-        initData: "0x",
-      });
       const withInit = deriveSalt(hre.ethers, {
         target: "main",
         implementation: impl,
         initData: "0x1234",
       });
-      expect(main).to.not.equal(registry);
       expect(main).to.not.equal(withInit);
 
       const override = hre.ethers.id("custom-salt");
@@ -79,25 +73,23 @@ describe("Upgrade tooling & governance deploy path", function () {
   });
 
   describe("on-chain bytecode match gate (assertImplementationMatchesArtifact)", function () {
-    // Use the registry (needsLibraries: false) so the check does not depend on recorded
+    // Use the token (needsLibraries: false) so the check does not depend on recorded
     // library deployment files.
     it("accepts an address hosting the claimed artifact bytecode", async () => {
-      const impl = await (
-        await hre.ethers.getContractFactory("DeepFamilyAttestationRegistry")
-      ).deploy();
+      const impl = await (await hre.ethers.getContractFactory("DeepFamilyToken")).deploy();
       await impl.waitForDeployment();
       await assertImplementationMatchesArtifact({
         connection: undefined,
         ethers: hre.ethers,
         hre,
-        contractName: "DeepFamilyAttestationRegistry",
+        contractName: "DeepFamilyToken",
         implementation: await impl.getAddress(),
         spec: { needsLibraries: false },
       });
     });
 
     it("rejects an address whose bytecode does not match the artifact", async () => {
-      const wrong = await (await hre.ethers.getContractFactory("DeepFamilyToken")).deploy();
+      const wrong = await (await hre.ethers.getContractFactory("AdultAgeGate")).deploy();
       await wrong.waitForDeployment();
       let err;
       try {
@@ -105,7 +97,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           connection: undefined,
           ethers: hre.ethers,
           hre,
-          contractName: "DeepFamilyAttestationRegistry",
+          contractName: "DeepFamilyToken",
           implementation: await wrong.getAddress(),
           spec: { needsLibraries: false },
         });
@@ -202,7 +194,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       networkConfig: { type: "http", chainId: 11155111 },
     });
 
-    it("hands ownership of both proxies and the token to the governance timelock", async () => {
+    it("hands ownership of the main proxy and token to the governance timelock", async () => {
       const [deployer, member] = await hre.ethers.getSigners();
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
       const tl = await Timelock.deploy(
@@ -221,7 +213,6 @@ describe("Upgrade tooling & governance deploy path", function () {
       });
 
       expect(await deployed.deepFamily.owner()).to.equal(tlAddr);
-      expect(await deployed.deepFamilyAttestationRegistry.owner()).to.equal(tlAddr);
       expect(await deployed.token.owner()).to.equal(tlAddr);
     });
 
@@ -437,12 +428,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       await fs.mkdir(deploymentsDir, { recursive: true });
 
       const staleAddress = "0x000000000000000000000000000000000000dEaD";
-      for (const contractName of [
-        "DeepFamily",
-        "DeepFamilyToken",
-        "DeepFamilyAttestationRegistry",
-        "DeepFamilyReader",
-      ]) {
+      for (const contractName of ["DeepFamily", "DeepFamilyToken", "DeepFamilyReader"]) {
         await fs.writeFile(
           path.join(deploymentsDir, `${contractName}.json`),
           JSON.stringify({ address: staleAddress, abi: [] }, null, 2),
