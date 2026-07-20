@@ -250,10 +250,13 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  main().then(
+    () => process.exit(process.exitCode ?? 0),
+    (error) => {
+      console.error(error);
+      process.exit(1);
+    },
+  );
 }
 
 export {

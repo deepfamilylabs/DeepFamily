@@ -31,6 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Install Circom compiler
+        run: npm run zk:fetch
+
+      - name: Check ZK artifacts and proofs
+        run: npm run zk:artifacts:check && npm run zk:check
+
       - name: Lint (solhint)
         run: npm run lint
 
@@ -41,6 +47,9 @@ jobs:
         run: npm run build
         env:
           CONTRACT_SIZER_STRICT: "false"
+
+      - name: Check storage layouts
+        run: npm run storage:check
 
       - name: Test
         run: npm test

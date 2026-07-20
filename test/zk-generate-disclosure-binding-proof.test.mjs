@@ -53,6 +53,20 @@ describe("zk-generate-disclosure-binding-proof helpers", function () {
         }),
       ).to.throw(/birthYear/);
     });
+
+    it("accepts the full uint8 gender range and rejects values above it", function () {
+      const args = {
+        fullname: "Custom Gender",
+        birthyear: "1990",
+        birthmonth: "5",
+        birthday: "15",
+      };
+
+      expect(parseDisclosureBindingPersonArgs({ ...args, gender: "255" }).gender).to.equal(255);
+      expect(() => parseDisclosureBindingPersonArgs({ ...args, gender: "256" })).to.throw(
+        /gender must be an integer in \[0, 255\]/,
+      );
+    });
   });
 
   describe("buildDisclosureBindingTaskInput", function () {

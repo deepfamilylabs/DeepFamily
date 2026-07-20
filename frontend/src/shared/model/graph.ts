@@ -187,7 +187,9 @@ export function genderText(
     case 3:
       return t("familyTree.nodeDetail.genders.other", "Other");
     default:
-      return "";
+      return gender !== undefined && gender >= 4 && gender <= 255
+        ? `${t("familyTree.nodeDetail.genders.custom", "Custom")} (${gender})`
+        : "";
   }
 }
 

@@ -25,7 +25,7 @@ describe("Hardhat Tasks Integration", function () {
     birthyear: "1990",
     birthmonth: "5",
     birthday: "15",
-    gender: "1",
+    gender: "255",
     fathername: "",
     mothername: "",
     fatherversion: "0",
@@ -41,7 +41,7 @@ describe("Hardhat Tasks Integration", function () {
     birthYear: 1990,
     birthMonth: 5,
     birthDay: 15,
-    gender: 1,
+    gender: 255,
   }).personHash;
 
   before(async function () {
@@ -115,7 +115,7 @@ describe("Hardhat Tasks Integration", function () {
       birthbc: "false",
       birthmonth: "5",
       birthday: "15",
-      gender: "1",
+      gender: "255",
       birthplace: "Shanghai",
       deathbc: "false",
       deathyear: "0",

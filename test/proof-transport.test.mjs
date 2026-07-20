@@ -170,9 +170,9 @@ describe('Proof transport layer tests', function () {
   })
 
   describe('DeepFamily proof-route failures', () => {
-    it('rejects zero verifier address registration', async () => {
+    it('rejects zero and codeless verifier address registration', async () => {
       const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture)
-      const [owner] = await hre.ethers.getSigners()
+      const [owner, eoa] = await hre.ethers.getSigners()
 
       await expect(
         deepFamily.setVerifier(
@@ -186,6 +186,23 @@ describe('Proof transport layer tests', function () {
             1,
             PURPOSE_PERSON,
             hre.ethers.ZeroAddress,
+          ),
+        )
+      ).to.be.revertedWithCustomError(deepFamily, 'InvalidVerifierAddress')
+
+      const eoaAddress = await eoa.getAddress()
+      await expect(
+        deepFamily.setVerifier(
+          1,
+          PURPOSE_PERSON,
+          eoaAddress,
+          await makeSetVerifierAttestationRef(
+            hre.ethers,
+            deepFamily,
+            owner,
+            1,
+            PURPOSE_PERSON,
+            eoaAddress,
           ),
         )
       ).to.be.revertedWithCustomError(deepFamily, 'InvalidVerifierAddress')

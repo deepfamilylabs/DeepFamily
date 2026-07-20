@@ -1,15 +1,15 @@
 {
   "storage": [
     {
-      "astId": 10075,
+      "astId": 10375,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "personVersions",
       "offset": 0,
       "slot": "0",
-      "type": "t_mapping(t_bytes32,t_array(t_struct(PersonVersion)9976_storage)dyn_storage)"
+      "type": "t_mapping(t_bytes32,t_array(t_struct(PersonVersion)10276_storage)dyn_storage)"
     },
     {
-      "astId": 10077,
+      "astId": 10377,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "totalPersonsCount",
       "offset": 0,
@@ -17,7 +17,7 @@
       "type": "t_uint256"
     },
     {
-      "astId": 10083,
+      "astId": 10383,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "versionExists",
       "offset": 0,
@@ -25,7 +25,7 @@
       "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_bool))"
     },
     {
-      "astId": 10089,
+      "astId": 10389,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "endorsedVersionIndex",
       "offset": 0,
@@ -33,7 +33,7 @@
       "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
     },
     {
-      "astId": 10091,
+      "astId": 10391,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "tokenCounter",
       "offset": 0,
@@ -41,7 +41,7 @@
       "type": "t_uint256"
     },
     {
-      "astId": 10095,
+      "astId": 10395,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "tokenIdToPerson",
       "offset": 0,
@@ -49,7 +49,7 @@
       "type": "t_mapping(t_uint256,t_bytes32)"
     },
     {
-      "astId": 10099,
+      "astId": 10399,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "tokenIdToVersionIndex",
       "offset": 0,
@@ -57,15 +57,15 @@
       "type": "t_mapping(t_uint256,t_uint256)"
     },
     {
-      "astId": 10104,
+      "astId": 10404,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "nftCoreInfo",
       "offset": 0,
       "slot": "7",
-      "type": "t_mapping(t_uint256,t_struct(PersonCoreInfo)10000_storage)"
+      "type": "t_mapping(t_uint256,t_struct(PersonCoreInfo)10300_storage)"
     },
     {
-      "astId": 10108,
+      "astId": 10408,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "_tokenURIs",
       "offset": 0,
@@ -73,7 +73,7 @@
       "type": "t_mapping(t_uint256,t_string_storage)"
     },
     {
-      "astId": 10113,
+      "astId": 10413,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "tokenURIHistory",
       "offset": 0,
@@ -81,7 +81,7 @@
       "type": "t_mapping(t_uint256,t_array(t_string_storage)dyn_storage)"
     },
     {
-      "astId": 10119,
+      "astId": 10419,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "versionToTokenId",
       "offset": 0,
@@ -89,23 +89,23 @@
       "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_uint256))"
     },
     {
-      "astId": 10124,
+      "astId": 10424,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "storyMetadata",
       "offset": 0,
       "slot": "11",
-      "type": "t_mapping(t_uint256,t_struct(StoryMetadata)10069_storage)"
+      "type": "t_mapping(t_uint256,t_struct(StoryMetadata)10369_storage)"
     },
     {
-      "astId": 10131,
+      "astId": 10431,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "storyChunks",
       "offset": 0,
       "slot": "12",
-      "type": "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(StoryChunk)10058_storage))"
+      "type": "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(StoryChunk)10358_storage))"
     },
     {
-      "astId": 10137,
+      "astId": 10437,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "versionEndorsementCount",
       "offset": 0,
@@ -113,7 +113,7 @@
       "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_uint256))"
     },
     {
-      "astId": 10139,
+      "astId": 10439,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "protocolEndorsementFeeBps",
       "offset": 0,
@@ -121,15 +121,15 @@
       "type": "t_uint256"
     },
     {
-      "astId": 10147,
+      "astId": 10447,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "childrenOf",
       "offset": 0,
       "slot": "15",
-      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(ChildRef)10043_storage)dyn_storage))"
+      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(ChildRef)10343_storage)dyn_storage))"
     },
     {
-      "astId": 10152,
+      "astId": 10452,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "userEndorsedPersons",
       "offset": 0,
@@ -137,7 +137,7 @@
       "type": "t_mapping(t_address,t_array(t_bytes32)dyn_storage)"
     },
     {
-      "astId": 10158,
+      "astId": 10458,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "userEndorsementIndex",
       "offset": 0,
@@ -145,7 +145,7 @@
       "type": "t_mapping(t_address,t_mapping(t_bytes32,t_uint256))"
     },
     {
-      "astId": 10190,
+      "astId": 10490,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "DEEP_FAMILY_TOKEN_CONTRACT",
       "offset": 0,
@@ -153,20 +153,52 @@
       "type": "t_address"
     },
     {
-      "astId": 10193,
+      "astId": 10493,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "ATTESTATION_REGISTRY",
       "offset": 0,
       "slot": "19",
-      "type": "t_contract(IDeepFamilyAttestationRegistry)15506"
+      "type": "t_contract(IDeepFamilyAttestationRegistry)15230"
     },
     {
-      "astId": 10199,
+      "astId": 10499,
       "contract": "project/contracts/DeepFamily.sol:DeepFamily",
       "label": "verifierRegistry",
       "offset": 0,
       "slot": "20",
       "type": "t_mapping(t_uint16,t_mapping(t_uint8,t_address))"
+    },
+    {
+      "astId": 10507,
+      "contract": "project/contracts/DeepFamily.sol:DeepFamily",
+      "label": "trustedEndorserOf",
+      "offset": 0,
+      "slot": "21",
+      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_mapping(t_address,t_bool)))"
+    },
+    {
+      "astId": 10514,
+      "contract": "project/contracts/DeepFamily.sol:DeepFamily",
+      "label": "trustedEndorsers",
+      "offset": 0,
+      "slot": "22",
+      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_address)dyn_storage))"
+    },
+    {
+      "astId": 10522,
+      "contract": "project/contracts/DeepFamily.sol:DeepFamily",
+      "label": "trustedEndorserIndex",
+      "offset": 0,
+      "slot": "23",
+      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_mapping(t_address,t_uint256)))"
+    },
+    {
+      "astId": 10526,
+      "contract": "project/contracts/DeepFamily.sol:DeepFamily",
+      "label": "rewardClaimedByPerson",
+      "offset": 0,
+      "slot": "24",
+      "type": "t_mapping(t_bytes32,t_bool)"
     }
   ],
   "types": {
@@ -174,6 +206,12 @@
       "encoding": "inplace",
       "label": "address",
       "numberOfBytes": "20"
+    },
+    "t_array(t_address)dyn_storage": {
+      "base": "t_address",
+      "encoding": "dynamic_array",
+      "label": "address[]",
+      "numberOfBytes": "32"
     },
     "t_array(t_bytes32)dyn_storage": {
       "base": "t_bytes32",
@@ -187,14 +225,14 @@
       "label": "string[]",
       "numberOfBytes": "32"
     },
-    "t_array(t_struct(ChildRef)10043_storage)dyn_storage": {
-      "base": "t_struct(ChildRef)10043_storage",
+    "t_array(t_struct(ChildRef)10343_storage)dyn_storage": {
+      "base": "t_struct(ChildRef)10343_storage",
       "encoding": "dynamic_array",
       "label": "struct DeepFamily.ChildRef[]",
       "numberOfBytes": "32"
     },
-    "t_array(t_struct(PersonVersion)9976_storage)dyn_storage": {
-      "base": "t_struct(PersonVersion)9976_storage",
+    "t_array(t_struct(PersonVersion)10276_storage)dyn_storage": {
+      "base": "t_struct(PersonVersion)10276_storage",
       "encoding": "dynamic_array",
       "label": "struct DeepFamily.PersonVersion[]",
       "numberOfBytes": "32"
@@ -209,7 +247,7 @@
       "label": "bytes32",
       "numberOfBytes": "32"
     },
-    "t_contract(IDeepFamilyAttestationRegistry)15506": {
+    "t_contract(IDeepFamilyAttestationRegistry)15230": {
       "encoding": "inplace",
       "label": "contract IDeepFamilyAttestationRegistry",
       "numberOfBytes": "20"
@@ -220,6 +258,13 @@
       "label": "mapping(address => bytes32[])",
       "numberOfBytes": "32",
       "value": "t_array(t_bytes32)dyn_storage"
+    },
+    "t_mapping(t_address,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
     },
     "t_mapping(t_address,t_mapping(t_bytes32,t_uint256))": {
       "encoding": "mapping",
@@ -235,12 +280,12 @@
       "numberOfBytes": "32",
       "value": "t_uint256"
     },
-    "t_mapping(t_bytes32,t_array(t_struct(PersonVersion)9976_storage)dyn_storage)": {
+    "t_mapping(t_bytes32,t_array(t_struct(PersonVersion)10276_storage)dyn_storage)": {
       "encoding": "mapping",
       "key": "t_bytes32",
       "label": "mapping(bytes32 => struct DeepFamily.PersonVersion[])",
       "numberOfBytes": "32",
-      "value": "t_array(t_struct(PersonVersion)9976_storage)dyn_storage"
+      "value": "t_array(t_struct(PersonVersion)10276_storage)dyn_storage"
     },
     "t_mapping(t_bytes32,t_bool)": {
       "encoding": "mapping",
@@ -263,12 +308,33 @@
       "numberOfBytes": "32",
       "value": "t_mapping(t_bytes32,t_bool)"
     },
-    "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(ChildRef)10043_storage)dyn_storage))": {
+    "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_address)dyn_storage))": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => mapping(uint256 => address[]))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint256,t_array(t_address)dyn_storage)"
+    },
+    "t_mapping(t_bytes32,t_mapping(t_uint256,t_array(t_struct(ChildRef)10343_storage)dyn_storage))": {
       "encoding": "mapping",
       "key": "t_bytes32",
       "label": "mapping(bytes32 => mapping(uint256 => struct DeepFamily.ChildRef[]))",
       "numberOfBytes": "32",
-      "value": "t_mapping(t_uint256,t_array(t_struct(ChildRef)10043_storage)dyn_storage)"
+      "value": "t_mapping(t_uint256,t_array(t_struct(ChildRef)10343_storage)dyn_storage)"
+    },
+    "t_mapping(t_bytes32,t_mapping(t_uint256,t_mapping(t_address,t_bool)))": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => mapping(uint256 => mapping(address => bool)))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint256,t_mapping(t_address,t_bool))"
+    },
+    "t_mapping(t_bytes32,t_mapping(t_uint256,t_mapping(t_address,t_uint256)))": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => mapping(uint256 => mapping(address => uint256)))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))"
     },
     "t_mapping(t_bytes32,t_mapping(t_uint256,t_uint256))": {
       "encoding": "mapping",
@@ -291,6 +357,13 @@
       "numberOfBytes": "32",
       "value": "t_mapping(t_uint8,t_address)"
     },
+    "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => address[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_address)dyn_storage"
+    },
     "t_mapping(t_uint256,t_array(t_string_storage)dyn_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
@@ -298,12 +371,12 @@
       "numberOfBytes": "32",
       "value": "t_array(t_string_storage)dyn_storage"
     },
-    "t_mapping(t_uint256,t_array(t_struct(ChildRef)10043_storage)dyn_storage)": {
+    "t_mapping(t_uint256,t_array(t_struct(ChildRef)10343_storage)dyn_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct DeepFamily.ChildRef[])",
       "numberOfBytes": "32",
-      "value": "t_array(t_struct(ChildRef)10043_storage)dyn_storage"
+      "value": "t_array(t_struct(ChildRef)10343_storage)dyn_storage"
     },
     "t_mapping(t_uint256,t_bytes32)": {
       "encoding": "mapping",
@@ -312,12 +385,26 @@
       "numberOfBytes": "32",
       "value": "t_bytes32"
     },
-    "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(StoryChunk)10058_storage))": {
+    "t_mapping(t_uint256,t_mapping(t_address,t_bool))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(address => bool))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_address,t_bool)"
+    },
+    "t_mapping(t_uint256,t_mapping(t_address,t_uint256))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(address => uint256))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_address,t_uint256)"
+    },
+    "t_mapping(t_uint256,t_mapping(t_uint256,t_struct(StoryChunk)10358_storage))": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => mapping(uint256 => struct DeepFamily.StoryChunk))",
       "numberOfBytes": "32",
-      "value": "t_mapping(t_uint256,t_struct(StoryChunk)10058_storage)"
+      "value": "t_mapping(t_uint256,t_struct(StoryChunk)10358_storage)"
     },
     "t_mapping(t_uint256,t_string_storage)": {
       "encoding": "mapping",
@@ -326,26 +413,26 @@
       "numberOfBytes": "32",
       "value": "t_string_storage"
     },
-    "t_mapping(t_uint256,t_struct(PersonCoreInfo)10000_storage)": {
+    "t_mapping(t_uint256,t_struct(PersonCoreInfo)10300_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct DeepFamily.PersonCoreInfo)",
       "numberOfBytes": "32",
-      "value": "t_struct(PersonCoreInfo)10000_storage"
+      "value": "t_struct(PersonCoreInfo)10300_storage"
     },
-    "t_mapping(t_uint256,t_struct(StoryChunk)10058_storage)": {
+    "t_mapping(t_uint256,t_struct(StoryChunk)10358_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct DeepFamily.StoryChunk)",
       "numberOfBytes": "32",
-      "value": "t_struct(StoryChunk)10058_storage"
+      "value": "t_struct(StoryChunk)10358_storage"
     },
-    "t_mapping(t_uint256,t_struct(StoryMetadata)10069_storage)": {
+    "t_mapping(t_uint256,t_struct(StoryMetadata)10369_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct DeepFamily.StoryMetadata)",
       "numberOfBytes": "32",
-      "value": "t_struct(StoryMetadata)10069_storage"
+      "value": "t_struct(StoryMetadata)10369_storage"
     },
     "t_mapping(t_uint256,t_uint256)": {
       "encoding": "mapping",
@@ -366,12 +453,12 @@
       "label": "string",
       "numberOfBytes": "32"
     },
-    "t_struct(ChildRef)10043_storage": {
+    "t_struct(ChildRef)10343_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.ChildRef",
       "members": [
         {
-          "astId": 10040,
+          "astId": 10340,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "childHash",
           "offset": 0,
@@ -379,7 +466,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 10042,
+          "astId": 10342,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "childVersionIndex",
           "offset": 0,
@@ -389,12 +476,12 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(PersonBasicInfo)9955_storage": {
+    "t_struct(PersonBasicInfo)10255_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.PersonBasicInfo",
       "members": [
         {
-          "astId": 9944,
+          "astId": 10244,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "identityCommitment",
           "offset": 0,
@@ -402,7 +489,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 9946,
+          "astId": 10246,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "isBirthBC",
           "offset": 0,
@@ -410,7 +497,7 @@
           "type": "t_bool"
         },
         {
-          "astId": 9948,
+          "astId": 10248,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "birthYear",
           "offset": 1,
@@ -418,7 +505,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 9950,
+          "astId": 10250,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "birthMonth",
           "offset": 3,
@@ -426,7 +513,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 9952,
+          "astId": 10252,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "birthDay",
           "offset": 4,
@@ -434,7 +521,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 9954,
+          "astId": 10254,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "gender",
           "offset": 5,
@@ -444,35 +531,35 @@
       ],
       "numberOfBytes": "64"
     },
-    "t_struct(PersonCoreInfo)10000_storage": {
+    "t_struct(PersonCoreInfo)10300_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.PersonCoreInfo",
       "members": [
         {
-          "astId": 9996,
+          "astId": 10296,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "basicInfo",
           "offset": 0,
           "slot": "0",
-          "type": "t_struct(PersonBasicInfo)9955_storage"
+          "type": "t_struct(PersonBasicInfo)10255_storage"
         },
         {
-          "astId": 9999,
+          "astId": 10299,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "supplementInfo",
           "offset": 0,
           "slot": "2",
-          "type": "t_struct(PersonSupplementInfo)9993_storage"
+          "type": "t_struct(PersonSupplementInfo)10293_storage"
         }
       ],
       "numberOfBytes": "224"
     },
-    "t_struct(PersonSupplementInfo)9993_storage": {
+    "t_struct(PersonSupplementInfo)10293_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.PersonSupplementInfo",
       "members": [
         {
-          "astId": 9978,
+          "astId": 10278,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "fullName",
           "offset": 0,
@@ -480,7 +567,7 @@
           "type": "t_string_storage"
         },
         {
-          "astId": 9980,
+          "astId": 10280,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "birthPlace",
           "offset": 0,
@@ -488,7 +575,7 @@
           "type": "t_string_storage"
         },
         {
-          "astId": 9982,
+          "astId": 10282,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "isDeathBC",
           "offset": 0,
@@ -496,7 +583,7 @@
           "type": "t_bool"
         },
         {
-          "astId": 9984,
+          "astId": 10284,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "deathYear",
           "offset": 1,
@@ -504,7 +591,7 @@
           "type": "t_uint16"
         },
         {
-          "astId": 9986,
+          "astId": 10286,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "deathMonth",
           "offset": 3,
@@ -512,7 +599,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 9988,
+          "astId": 10288,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "deathDay",
           "offset": 4,
@@ -520,7 +607,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 9990,
+          "astId": 10290,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "deathPlace",
           "offset": 0,
@@ -528,7 +615,7 @@
           "type": "t_string_storage"
         },
         {
-          "astId": 9992,
+          "astId": 10292,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "story",
           "offset": 0,
@@ -538,12 +625,12 @@
       ],
       "numberOfBytes": "160"
     },
-    "t_struct(PersonVersion)9976_storage": {
+    "t_struct(PersonVersion)10276_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.PersonVersion",
       "members": [
         {
-          "astId": 9957,
+          "astId": 10257,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "personHash",
           "offset": 0,
@@ -551,7 +638,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 9959,
+          "astId": 10259,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "fatherHash",
           "offset": 0,
@@ -559,7 +646,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 9961,
+          "astId": 10261,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "motherHash",
           "offset": 0,
@@ -567,7 +654,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 9963,
+          "astId": 10263,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "versionIndex",
           "offset": 0,
@@ -575,7 +662,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 9965,
+          "astId": 10265,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "fatherVersionIndex",
           "offset": 0,
@@ -583,7 +670,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 9967,
+          "astId": 10267,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "motherVersionIndex",
           "offset": 0,
@@ -591,7 +678,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 9969,
+          "astId": 10269,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "addedBy",
           "offset": 0,
@@ -599,7 +686,7 @@
           "type": "t_address"
         },
         {
-          "astId": 9971,
+          "astId": 10271,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "timestamp",
           "offset": 20,
@@ -607,7 +694,7 @@
           "type": "t_uint96"
         },
         {
-          "astId": 9973,
+          "astId": 10273,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "tag",
           "offset": 0,
@@ -615,7 +702,7 @@
           "type": "t_string_storage"
         },
         {
-          "astId": 9975,
+          "astId": 10275,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "metadataCID",
           "offset": 0,
@@ -625,12 +712,12 @@
       ],
       "numberOfBytes": "288"
     },
-    "t_struct(StoryChunk)10058_storage": {
+    "t_struct(StoryChunk)10358_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.StoryChunk",
       "members": [
         {
-          "astId": 10045,
+          "astId": 10345,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "chunkIndex",
           "offset": 0,
@@ -638,7 +725,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 10047,
+          "astId": 10347,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "chunkHash",
           "offset": 0,
@@ -646,7 +733,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 10049,
+          "astId": 10349,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "content",
           "offset": 0,
@@ -654,7 +741,7 @@
           "type": "t_string_storage"
         },
         {
-          "astId": 10051,
+          "astId": 10351,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "timestamp",
           "offset": 0,
@@ -662,7 +749,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 10053,
+          "astId": 10353,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "editor",
           "offset": 0,
@@ -670,7 +757,7 @@
           "type": "t_address"
         },
         {
-          "astId": 10055,
+          "astId": 10355,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "chunkType",
           "offset": 20,
@@ -678,7 +765,7 @@
           "type": "t_uint8"
         },
         {
-          "astId": 10057,
+          "astId": 10357,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "attachmentCID",
           "offset": 0,
@@ -688,12 +775,12 @@
       ],
       "numberOfBytes": "192"
     },
-    "t_struct(StoryMetadata)10069_storage": {
+    "t_struct(StoryMetadata)10369_storage": {
       "encoding": "inplace",
       "label": "struct DeepFamily.StoryMetadata",
       "members": [
         {
-          "astId": 10060,
+          "astId": 10360,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "totalChunks",
           "offset": 0,
@@ -701,7 +788,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 10062,
+          "astId": 10362,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "fullStoryHash",
           "offset": 0,
@@ -709,7 +796,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 10064,
+          "astId": 10364,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "lastUpdateTime",
           "offset": 0,
@@ -717,7 +804,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 10066,
+          "astId": 10366,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "isSealed",
           "offset": 0,
@@ -725,7 +812,7 @@
           "type": "t_bool"
         },
         {
-          "astId": 10068,
+          "astId": 10368,
           "contract": "project/contracts/DeepFamily.sol:DeepFamily",
           "label": "totalLength",
           "offset": 0,

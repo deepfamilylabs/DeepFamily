@@ -26,9 +26,8 @@ export const DEFAULT_ZKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
 
 export function normalizeNameForHash(value) {
   if (value === undefined || value === null) return "";
-  const normalized = typeof String(value).normalize === "function"
-    ? String(value).normalize("NFKC")
-    : String(value);
+  const normalized =
+    typeof String(value).normalize === "function" ? String(value).normalize("NFKC") : String(value);
   return normalized.replace(/\s+/gu, " ").trim();
 }
 
@@ -52,8 +51,8 @@ export function parseDisclosureBindingPersonArgs(args) {
   if (!Number.isInteger(birthDay) || birthDay < 0 || birthDay > 31) {
     throw new Error("birthDay must be an integer in [0, 31]");
   }
-  if (!Number.isInteger(gender) || gender < 0 || gender > 3) {
-    throw new Error("gender must be an integer in [0, 3]");
+  if (!Number.isInteger(gender) || gender < 0 || gender > 255) {
+    throw new Error("gender must be an integer in [0, 255]");
   }
   if (derivedSecretField < 0n) {
     throw new Error("derivedSecretField must be non-negative");
@@ -240,7 +239,7 @@ function applyTaskOptions(builder) {
     })
     .addOption({
       name: "gender",
-      description: "Gender (0=Unknown,1=Male,2=Female,3=Other)",
+      description: "Gender (0=Unknown, 1=Male, 2=Female, 3=Other, 4-255=Custom)",
       type: ArgumentType.STRING,
       defaultValue: "0",
     })

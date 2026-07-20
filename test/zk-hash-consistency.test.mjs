@@ -17,9 +17,9 @@ const SNARK_FIELD = 218882428718392752222464057452572750885483644004160343436982
 
 function packBirthGenderField({ birthYear, birthMonth, birthDay, gender, isBirthBC }) {
   return (
-    (BigInt(birthYear) << 24n) |
-    (BigInt(birthMonth) << 16n) |
-    (BigInt(birthDay) << 8n) |
+    (BigInt(birthYear) << 25n) |
+    (BigInt(birthMonth) << 17n) |
+    (BigInt(birthDay) << 9n) |
     (BigInt(gender) << 1n) |
     (isBirthBC ? 1n : 0n)
   )

@@ -37,10 +37,12 @@ template IdentityCommitmentCore() {
     birthMonthCheck.out === 1;
     component birthDayCheck = Num2Bits(5);
     birthDayCheck.in <== birthDay;
-    component genderCheck = Num2Bits(3);
+    component genderCheck = Num2Bits(8);
     genderCheck.in <== gender;
 
-    packedBirthGenderField <== birthYear * 16777216 + birthMonth * 65536 + birthDay * 256 + gender * 2 + isBirthBC;
+    // Non-overlapping layout: birthYear[25..40], birthMonth[17..24],
+    // birthDay[9..16], gender[1..8], isBirthBC[0].
+    packedBirthGenderField <== birthYear * 33554432 + birthMonth * 131072 + birthDay * 512 + gender * 2 + isBirthBC;
 
     signal domainNameSecret <== 1001;
     signal domainIdentity <== 1002;

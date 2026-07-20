@@ -642,7 +642,8 @@
       "genders": {
         "male": "男",
         "female": "女",
-        "other": "其他"
+        "other": "其他",
+        "custom": "自定义"
       },
       "errors": {}
     },
@@ -950,13 +951,13 @@
     "motherHash": "母亲哈希",
     "motherVersionIndex": "母亲版本",
     "tokenReward": "功能积分已分发",
-    "familyComplete": "提交父母哈希承诺 - 功能积分已发放",
+    "familyComplete": "该人物哈希的首次完整双亲承诺已提交，功能积分已发放",
     "miner": "矿工",
     "hashPrefix": "哈希",
     "prover": "证明者",
     "rewardAmount": "功能积分数量",
     "noTokenReward": "无功能积分发放",
-    "tokenRewardCondition": "提交父母哈希承诺即可发放功能积分",
+    "tokenRewardCondition": "本次未发放功能积分。可能原因包括：未同时提交双亲哈希承诺、该人物哈希已领取过奖励，或当前发行额度不足。父母无需预先存在于链上。",
     "failed": "交易失败",
     "errorType": "错误类型",
     "errorMessage": "错误信息",
@@ -987,7 +988,7 @@
     "regenerateRecoverySalt": "重新生成 Salt",
     "identityRecoverySaltPlaceholder": "粘贴已保存的 recovery salt，或保留当前生成值",
     "identityRecoverySaltNotice": "如果这是全新身份，请保存当前生成的 salt；如果该身份此前已用增强模式创建，请在提交前替换为之前保存的 recovery salt。",
-    "parentInfoNotice": "填写父母信息本地生成零知识证明建立家族链接（仅哈希值上链），可触发 DEEP 功能积分发放。父母信息需与其实际版本完全一致（含口令）才能成功关联。",
+    "parentInfoNotice": "填写双亲信息会在本地生成零知识证明建立家族链接（仅哈希值上链）。同一人物哈希首次提交完整双亲承诺时可能获得 DEEP 功能积分；父母无需预先存在于链上。后续关联父母身份时，所填信息需与其身份一致。",
     "parentIdentityMode": "父母身份恢复模式",
     "parentIdentityModeHint": "仅当该父母身份最初就是用已保存的 recovery salt 创建时，才使用增强模式。",
     "parentRecoverySalt": "父母 Recovery Salt",

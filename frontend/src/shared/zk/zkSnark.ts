@@ -10,11 +10,15 @@ import {
   computeNameSecretCommitment,
   computeIdentityCommitment,
   computeDisclosureBinding,
+  computePersonHashFromData,
   DEFAULT_SCHEMA_VERSION,
   DEFAULT_CRYPTO_SUITE_VERSION,
   DEFAULT_HASH_ALGO_ID,
-  SNARK_FIELD,
 } from "./zk";
+import {
+  decodeDisclosureBindingPublicSignals,
+  decodePersonCommitmentPublicSignals,
+} from "./publicSignalSpecs";
 import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
   PERSON_COMMITMENT_PROOF_DESCRIPTOR,
@@ -32,7 +36,14 @@ const artifactPromiseCache = new Map<string, Promise<ZkArtifacts>>();
 const vkeyPromiseCache = new Map<string, Promise<any>>();
 
 async function loadArtifacts(wasmUrl: string, zkeyUrl: string): Promise<ZkArtifacts> {
-  const [wasmRes, zkeyRes] = await Promise.all([fetch(wasmUrl), fetch(zkeyUrl)]);
+  // Public ZK files intentionally keep stable paths during pre-release development. Always
+  // revalidate them on a new page load so a browser cache cannot pair a newly deployed verifier
+  // with stale proving artifacts. The in-memory descriptor cache still avoids duplicate downloads
+  // within the same session.
+  const [wasmRes, zkeyRes] = await Promise.all([
+    fetch(wasmUrl, { cache: "no-cache" }),
+    fetch(zkeyUrl, { cache: "no-cache" }),
+  ]);
   if (!wasmRes.ok) throw new Error(`Failed to load wasm from ${wasmUrl}: ${wasmRes.status}`);
   if (!zkeyRes.ok) throw new Error(`Failed to load zkey from ${zkeyUrl}: ${zkeyRes.status}`);
   const [wasmBuffer, zkeyBuffer] = await Promise.all([
@@ -43,7 +54,7 @@ async function loadArtifacts(wasmUrl: string, zkeyUrl: string): Promise<ZkArtifa
 }
 
 async function loadJson(url: string): Promise<any> {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-cache" });
   if (!res.ok) throw new Error(`Failed to load json from ${url}: ${res.status}`);
   return await res.json();
 }
@@ -139,6 +150,95 @@ function preparePersonField(person: PersonData | null): {
   };
 }
 
+function computeExpectedIdentityCommitment(person: PersonData, suiteCommitment: bigint): bigint {
+  const nameField = computeNameField(canonicalizeFullName(person.fullName));
+  const nameSecretCommitment = computeNameSecretCommitment(
+    nameField,
+    person.derivedSecretField,
+    suiteCommitment,
+  );
+  return computeIdentityCommitment(
+    nameSecretCommitment,
+    packBirthGenderField(person),
+    suiteCommitment,
+  );
+}
+
+function assertSignalMatches(
+  proofLabel: string,
+  fieldName: string,
+  actual: bigint | number,
+  expected: bigint | number,
+) {
+  if (BigInt(actual) !== BigInt(expected)) {
+    throw new Error(
+      `${proofLabel} ${fieldName} public signal mismatch ` +
+        `(expected ${expected}, got ${actual})`,
+    );
+  }
+}
+
+export function assertPersonCommitmentPublicSignalsMatch(
+  publicSignals: ReadonlyArray<string | number | bigint>,
+  person: PersonData,
+  father: PersonData | null,
+  mother: PersonData | null,
+  submitterAddress: string,
+) {
+  const schemaVersion = person.schemaVersion ?? DEFAULT_SCHEMA_VERSION;
+  const cryptoSuiteVersion = person.cryptoSuiteVersion ?? DEFAULT_CRYPTO_SUITE_VERSION;
+  const hashAlgoId = person.hashAlgoId ?? DEFAULT_HASH_ALGO_ID;
+  const suiteCommitment = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
+  const hasFather = Boolean(father && canonicalizeFullName(father.fullName).length > 0);
+  const hasMother = Boolean(mother && canonicalizeFullName(mother.fullName).length > 0);
+  const decoded = decodePersonCommitmentPublicSignals(publicSignals);
+  const expected = {
+    identityCommitment: computeExpectedIdentityCommitment(person, suiteCommitment),
+    fatherIdentityCommitment:
+      hasFather && father ? computeExpectedIdentityCommitment(father, suiteCommitment) : 0n,
+    motherIdentityCommitment:
+      hasMother && mother ? computeExpectedIdentityCommitment(mother, suiteCommitment) : 0n,
+    submitter: BigInt(submitterAddress),
+    schemaVersion,
+    cryptoSuiteVersion,
+    hashAlgoId,
+  };
+
+  for (const fieldName of Object.keys(expected) as Array<keyof typeof expected>) {
+    assertSignalMatches("Person commitment", fieldName, decoded[fieldName], expected[fieldName]);
+  }
+
+  return decoded;
+}
+
+export function assertDisclosureBindingPublicSignalsMatch(
+  publicSignals: ReadonlyArray<string | number | bigint>,
+  person: PersonData,
+  minterAddress: string,
+) {
+  const schemaVersion = person.schemaVersion ?? DEFAULT_SCHEMA_VERSION;
+  const cryptoSuiteVersion = person.cryptoSuiteVersion ?? DEFAULT_CRYPTO_SUITE_VERSION;
+  const hashAlgoId = person.hashAlgoId ?? DEFAULT_HASH_ALGO_ID;
+  const suiteCommitment = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
+  const nameField = computeNameField(canonicalizeFullName(person.fullName));
+  const packedBirthGenderField = packBirthGenderField(person);
+  const decoded = decodeDisclosureBindingPublicSignals(publicSignals);
+  const expected = {
+    identityCommitment: computePersonHashFromData(person).identityCommitment,
+    disclosureBinding: computeDisclosureBinding(nameField, packedBirthGenderField, suiteCommitment),
+    minter: BigInt(minterAddress),
+    schemaVersion,
+    cryptoSuiteVersion,
+    hashAlgoId,
+  };
+
+  for (const fieldName of Object.keys(expected) as Array<keyof typeof expected>) {
+    assertSignalMatches("Disclosure binding", fieldName, decoded[fieldName], expected[fieldName]);
+  }
+
+  return decoded;
+}
+
 export async function generatePersonCommitmentProof(
   person: PersonData,
   father: PersonData | null,
@@ -190,6 +290,7 @@ export async function generatePersonCommitmentProof(
     PERSON_COMMITMENT_PROOF_DESCRIPTOR,
     input,
   );
+  assertPersonCommitmentPublicSignalsMatch(publicSignals, person, father, mother, submitterAddress);
   return { proof, publicSignals };
 }
 
@@ -230,6 +331,7 @@ export async function generateDisclosureBindingProof(
     DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
     input,
   );
+  assertDisclosureBindingPublicSignalsMatch(publicSignals, person, minterAddress);
   return { proof, publicSignals };
 }
 

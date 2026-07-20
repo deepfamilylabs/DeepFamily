@@ -10,7 +10,9 @@ const action = async (args, hre) => {
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
   const signerAddr = await signer.getAddress();
-  const { deepFamily, token } = await ensureIntegratedSystem(connection);
+  const { deepFamily, token } = await ensureIntegratedSystem(connection, {
+    artifacts: hre.artifacts,
+  });
   const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase();
 
   const versionIndex = Number(args.vindex);

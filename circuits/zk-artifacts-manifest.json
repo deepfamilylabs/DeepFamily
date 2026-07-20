@@ -1,0 +1,11 @@
+{
+  "circomVersion": "2.1.6",
+  "circuits": {
+    "person_commitment": {
+      "r1csSha256": "6fd8036b197df526da6e23a435453c74a5db1090815b8e3c658f1c7d9351013b"
+    },
+    "disclosure_binding": {
+      "r1csSha256": "15c2b2b7f78914d306668def6505d6a51663827b7497707e38606eb3ae6ed2b2"
+    }
+  }
+}

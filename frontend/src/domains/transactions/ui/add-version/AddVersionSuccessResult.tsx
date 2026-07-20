@@ -170,7 +170,7 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
               <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
                 {t(
                   "addVersion.familyComplete",
-                  "Parent hash commitments submitted - token reward earned",
+                  "First complete two-parent commitment submitted for this person hash — utility points distributed",
                 )}
               </p>
               <ResultDataRow
@@ -207,7 +207,7 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   {t(
                     "addVersion.tokenRewardCondition",
-                    "Token rewards are only distributed when both parents already exist in the system",
+                    "No utility points were distributed. Possible reasons include missing a parent commitment, a reward already claimed for this person hash, or unavailable issuance capacity. Parents do not need to exist on-chain first.",
                   )}
                 </p>
               </div>

@@ -10,8 +10,7 @@ const main = async () => {
   const { ethers } = connection;
   const [deployer] = await ethers.getSigners();
   const deployerAddress = await deployer.getAddress();
-  const forceNew =
-    process.argv.includes("--force-new") || process.env.FORCE_NEW_DEPLOYMENT === "1";
+  const forceNew = process.argv.includes("--force-new") || process.env.FORCE_NEW_DEPLOYMENT === "1";
 
   const deployed = forceNew
     ? await deployIntegratedSystem(connection, {
@@ -22,6 +21,7 @@ const main = async () => {
     : await ensureIntegratedSystem(connection, {
         writeDeployments: true,
         artifacts: hre.artifacts,
+        allowNewDeployment: true,
       });
   const { deepFamily } = deployed;
   const deepFamilyAddress = await deepFamily.getAddress();

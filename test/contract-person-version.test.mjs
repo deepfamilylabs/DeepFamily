@@ -99,7 +99,7 @@ describe('Person Version (add-person) Tests', function () {
     expect(versions[1].tag).to.equal('second')
   })
 
-  it('rewards each unique version hash when both proof-derived parent hashes are non-zero', async () => {
+  it('rewards only the first eligible version and does not reward proof replay with a different tag', async () => {
     const { deepFamily, reader, token, signer } = await baseSetup()
     const fatherPerson = makeTestPerson('Reward Father', { birthYear: 1970 })
     const motherPerson = makeTestPerson('Reward Mother', { birthYear: 1972, gender: 2 })
@@ -114,34 +114,87 @@ describe('Person Version (add-person) Tests', function () {
 
     const balanceBefore = await token.balanceOf(signerAddress)
     const firstReward = await token.getReward(1)
-    await addPerson(hre.ethers, deepFamily, signer, childCommitment, {
-      person: childPerson,
-      fatherPerson,
-      motherPerson,
+    const proof = makeStubProof()
+    const publicSignals = makeAddPersonPublicSignals(childCommitment, signerAddress, {
       fatherIdentityCommitment: fatherCommitment,
       motherIdentityCommitment: motherCommitment,
-      fatherVersionIndex: 1,
-      motherVersionIndex: 1,
-      tag: 'child-v1',
     })
+    await deepFamily.connect(signer).addPersonVersion(
+      proof,
+      publicSignals,
+      1,
+      1,
+      'child-v1',
+      'ipfs://child-replay',
+    )
 
-    const secondReward = await token.getReward(2)
-    await addPerson(hre.ethers, deepFamily, signer, childCommitment, {
-      person: childPerson,
-      fatherPerson,
-      motherPerson,
-      fatherIdentityCommitment: fatherCommitment,
-      motherIdentityCommitment: motherCommitment,
-      fatherVersionIndex: 1,
-      motherVersionIndex: 1,
-      tag: 'child-v2',
-    })
+    expect(await token.totalAdditions()).to.equal(1n)
+    expect(await token.balanceOf(signerAddress)).to.equal(balanceBefore + firstReward)
+    expect(
+      await deepFamily.rewardClaimedByPerson(computePersonHash(hre.ethers, childCommitment)),
+    ).to.equal(true)
+
+    // Reuse the exact same proof and public signals; only the free-form version tag changes.
+    await deepFamily.connect(signer).addPersonVersion(
+      proof,
+      publicSignals,
+      1,
+      1,
+      'child-v2',
+      'ipfs://child-replay',
+    )
 
     const childHash = computePersonHash(hre.ethers, childCommitment)
     const [, totalVersions] = await reader.listPersonVersions(childHash, 0, 0)
     expect(totalVersions).to.equal(2n)
-    expect(await token.totalAdditions()).to.equal(2n)
-    expect(await token.balanceOf(signerAddress)).to.equal(balanceBefore + firstReward + secondReward)
+    expect(await token.totalAdditions()).to.equal(1n)
+    expect(await token.balanceOf(signerAddress)).to.equal(balanceBefore + firstReward)
+  })
+
+  it('rewards once when an existing person first gains non-zero parent commitments', async () => {
+    const { deepFamily, reader, token, signer } = await baseSetup()
+    const fatherPerson = makeTestPerson('Backfill Reward Father', { birthYear: 1970 })
+    const motherPerson = makeTestPerson('Backfill Reward Mother', { birthYear: 1972, gender: 2 })
+    const childPerson = makeTestPerson('Backfill Reward Child', { birthYear: 2001 })
+    const fatherCommitment = commitmentOf(fatherPerson)
+    const motherCommitment = commitmentOf(motherPerson)
+    const childCommitment = commitmentOf(childPerson)
+    const signerAddress = await signer.getAddress()
+
+    const childHash = await addPerson(hre.ethers, deepFamily, signer, childCommitment, {
+      person: childPerson,
+      tag: 'child-without-parents',
+    })
+    const fatherHash = computePersonHash(hre.ethers, fatherCommitment)
+    const motherHash = computePersonHash(hre.ethers, motherCommitment)
+    expect(await deepFamily.personVersionsCount(fatherHash)).to.equal(0n)
+    expect(await deepFamily.personVersionsCount(motherHash)).to.equal(0n)
+    expect(await deepFamily.rewardClaimedByPerson(childHash)).to.equal(false)
+
+    const balanceBefore = await token.balanceOf(signerAddress)
+    const firstReward = await token.getReward(1)
+    const proof = makeStubProof()
+    const publicSignals = makeAddPersonPublicSignals(childCommitment, signerAddress, {
+      fatherIdentityCommitment: fatherCommitment,
+      motherIdentityCommitment: motherCommitment,
+    })
+
+    await deepFamily
+      .connect(signer)
+      .addPersonVersion(proof, publicSignals, 0, 0, 'child-backfilled-v1', 'ipfs://child-backfill')
+
+    expect(await token.totalAdditions()).to.equal(1n)
+    expect(await token.balanceOf(signerAddress)).to.equal(balanceBefore + firstReward)
+    expect(await deepFamily.rewardClaimedByPerson(childHash)).to.equal(true)
+
+    await deepFamily
+      .connect(signer)
+      .addPersonVersion(proof, publicSignals, 0, 0, 'child-backfilled-v2', 'ipfs://child-backfill')
+
+    const [, totalVersions] = await reader.listPersonVersions(childHash, 0, 0)
+    expect(totalVersions).to.equal(3n)
+    expect(await token.totalAdditions()).to.equal(1n)
+    expect(await token.balanceOf(signerAddress)).to.equal(balanceBefore + firstReward)
   })
 
   it('allows providing parent hash with unknown (0) version index when parent exists', async () => {

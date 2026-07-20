@@ -233,8 +233,8 @@ describe('Attestation reference anchoring', function () {
   it('anchors mint, story seal, verifier update, and protocol fee update references', async () => {
     const { deepFamily, deepFamilyReader } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture)
-    const [owner, verifier, signer] = await hre.ethers.getSigners()
-    await setupStubVerifiers(hre.ethers, deepFamily)
+    const [owner, , signer] = await hre.ethers.getSigners()
+    const { adapter: verifier } = await setupStubVerifiers(hre.ethers, deepFamily)
 
     const verifierAddress = await verifier.getAddress()
     await expect(

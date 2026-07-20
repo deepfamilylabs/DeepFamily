@@ -72,7 +72,10 @@ function verifyEcdsaLeg(ref, payloadDigest, signatureEntry) {
   if (signatureEntry.signerKeyId.toLowerCase() !== ref.signerKeyId.toLowerCase()) {
     throw new Error("ECDSA signerKeyId does not match chain reference");
   }
-  const recovered = ethersLib.verifyMessage(ethersLib.getBytes(payloadDigest), signatureEntry.signature);
+  const recovered = ethersLib.verifyMessage(
+    ethersLib.getBytes(payloadDigest),
+    signatureEntry.signature,
+  );
   const recoveredKeyId = ethersLib.zeroPadValue(recovered.toLowerCase(), 32);
   if (recoveredKeyId.toLowerCase() !== ref.signerKeyId.toLowerCase()) {
     throw new Error(`ECDSA signer mismatch: recovered ${recovered}`);
@@ -83,8 +86,10 @@ function verifyEcdsaLeg(ref, payloadDigest, signatureEntry) {
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
-  const { deepFamilyAttestationRegistry: defaultRegistry } =
-    await ensureIntegratedSystem(connection);
+  const { deepFamilyAttestationRegistry: defaultRegistry } = await ensureIntegratedSystem(
+    connection,
+    { artifacts: hre.artifacts },
+  );
   const registry = args.contract
     ? await ethers.getContractAt("DeepFamilyAttestationRegistry", args.contract)
     : defaultRegistry;
@@ -133,7 +138,10 @@ const action = async (args, hre) => {
   return { status: "signature-verified", recovered };
 };
 
-export default task("attestation-verify", "Verify an anchored attestation envelope from a local JSON file")
+export default task(
+  "attestation-verify",
+  "Verify an anchored attestation envelope from a local JSON file",
+)
   .addOption({
     name: "key",
     description: "attestationKey bytes32",

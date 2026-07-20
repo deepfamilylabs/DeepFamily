@@ -105,9 +105,9 @@ function validatePersonCommitmentInput(raw) {
 
 function packBirthGenderField({ birthYear, birthMonth, birthDay, gender, isBirthBC }) {
   return (
-    (birthYear << 24n) |
-    (birthMonth << 16n) |
-    (birthDay << 8n) |
+    (birthYear << 25n) |
+    (birthMonth << 17n) |
+    (birthDay << 9n) |
     (gender << 1n) |
     (isBirthBC & 1n)
   );
@@ -382,10 +382,13 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  main().then(
+    () => process.exit(process.exitCode ?? 0),
+    (error) => {
+      console.error(error);
+      process.exit(1);
+    },
+  );
 }
 
 export {

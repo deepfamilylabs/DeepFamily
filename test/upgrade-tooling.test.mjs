@@ -115,6 +115,20 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(err, "expected a bytecode mismatch").to.be.an("error");
       expect(err.message).to.match(/does NOT match/i);
     });
+
+    it("accepts a deployed Solidity library after linking its self-address guard", async () => {
+      const library = await (await hre.ethers.getContractFactory("PoseidonT5")).deploy();
+      await library.waitForDeployment();
+
+      await assertImplementationMatchesArtifact({
+        connection: undefined,
+        ethers: hre.ethers,
+        hre,
+        contractName: "PoseidonT5",
+        implementation: await library.getAddress(),
+        spec: { needsLibraries: false, librarySelfAddress: true },
+      });
+    });
   });
 
   describe("timelock role dual-mode (sendOrPrint)", function () {
@@ -244,7 +258,178 @@ describe("Upgrade tooling & governance deploy path", function () {
     });
   });
 
-  describe("local dev deployment reuse", function () {
+  describe("deployment reuse guards", function () {
+    it("refuses an implicit first deployment from an operational live-network path", async () => {
+      const originalCwd = process.cwd();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-empty-live-"));
+
+      try {
+        process.chdir(tmpDir);
+        let err;
+        try {
+          await ensureIntegratedSystem({
+            ethers: hre.ethers,
+            networkName: "sepolia",
+            networkConfig: { type: "http", chainId: 11155111 },
+          });
+        } catch (error) {
+          err = error;
+        }
+
+        expect(err, "expected an implicit live deployment to abort").to.be.an("error");
+        expect(err.message).to.match(/no deployment metadata.*operational task/i);
+      } finally {
+        process.chdir(originalCwd);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("requires an explicitly allowed first live deployment to persist current artifacts", async () => {
+      const originalCwd = process.cwd();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-unwritten-live-"));
+
+      try {
+        process.chdir(tmpDir);
+        let err;
+        try {
+          await ensureIntegratedSystem(
+            {
+              ethers: hre.ethers,
+              networkName: "sepolia",
+              networkConfig: { type: "http", chainId: 11155111 },
+            },
+            { allowNewDeployment: true, artifacts: hre.artifacts },
+          );
+        } catch (error) {
+          err = error;
+        }
+
+        expect(err, "expected an unpersisted live deployment to abort").to.be.an("error");
+        expect(err.message).to.match(/must persist.*artifact metadata/i);
+      } finally {
+        process.chdir(originalCwd);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("refuses partial deployment metadata on a live network", async () => {
+      const originalCwd = process.cwd();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-partial-live-"));
+      const deploymentsDir = path.join(tmpDir, "deployments", "sepolia");
+      await fs.mkdir(deploymentsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(deploymentsDir, "DeepFamily.json"),
+        JSON.stringify({ address: "0x000000000000000000000000000000000000dEaD", abi: [] }),
+      );
+
+      try {
+        process.chdir(tmpDir);
+        let err;
+        try {
+          await ensureIntegratedSystem({
+            ethers: hre.ethers,
+            networkName: "sepolia",
+            networkConfig: { type: "http", chainId: 11155111 },
+          });
+        } catch (error) {
+          err = error;
+        }
+
+        expect(err, "expected partial live metadata to abort").to.be.an("error");
+        expect(err.message).to.match(/metadata is partial/i);
+      } finally {
+        process.chdir(originalCwd);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("reuses a deployment only when the complete artifact and verifier set matches", async () => {
+      const originalCwd = process.cwd();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-coherent-localhost-"));
+      const connection = {
+        ethers: hre.ethers,
+        networkName: "localhost",
+        networkConfig: { type: "http", chainId: 31337 },
+      };
+
+      try {
+        process.chdir(tmpDir);
+        const deployed = await deployIntegratedSystem(connection, {
+          writeDeployments: true,
+          artifacts: hre.artifacts,
+        });
+        const originalAddress = await deployed.deepFamily.getAddress();
+
+        const reused = await ensureIntegratedSystem(connection, {
+          writeDeployments: true,
+          artifacts: hre.artifacts,
+        });
+
+        expect(await reused.deepFamily.getAddress()).to.equal(originalAddress);
+      } finally {
+        process.chdir(originalCwd);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("redeploys and persists a coherent localhost set after verifier metadata mismatch", async () => {
+      const originalCwd = process.cwd();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-mixed-localhost-"));
+      const connection = {
+        ethers: hre.ethers,
+        networkName: "localhost",
+        networkConfig: { type: "http", chainId: 31337 },
+      };
+
+      try {
+        process.chdir(tmpDir);
+        const deployed = await deployIntegratedSystem(connection, {
+          writeDeployments: true,
+          artifacts: hre.artifacts,
+        });
+        const originalAddress = await deployed.deepFamily.getAddress();
+        const tokenAddress = await deployed.token.getAddress();
+        const personVerifierPath = path.join(
+          tmpDir,
+          "deployments",
+          "localhost",
+          "PersonCommitmentVerifier.json",
+        );
+        const personVerifierDeployment = JSON.parse(await fs.readFile(personVerifierPath, "utf8"));
+        personVerifierDeployment.address = tokenAddress;
+        await fs.writeFile(personVerifierPath, JSON.stringify(personVerifierDeployment, null, 2));
+
+        const redeployed = await ensureIntegratedSystem(connection, {
+          artifacts: hre.artifacts,
+        });
+        const redeployedAddress = await redeployed.deepFamily.getAddress();
+
+        expect(redeployedAddress).to.not.equal(originalAddress);
+
+        const deepFamilyDeploymentPath = path.join(
+          tmpDir,
+          "deployments",
+          "localhost",
+          "DeepFamily.json",
+        );
+        const persistedDeepFamily = JSON.parse(await fs.readFile(deepFamilyDeploymentPath, "utf8"));
+        expect(persistedDeepFamily.address).to.equal(redeployedAddress);
+
+        const nextTaskConnection = {
+          ethers: hre.ethers,
+          networkName: "localhost",
+          networkConfig: { type: "http", chainId: 31337 },
+        };
+        const reused = await ensureIntegratedSystem(nextTaskConnection, {
+          artifacts: hre.artifacts,
+        });
+        expect(await reused.deepFamily.getAddress()).to.equal(redeployedAddress);
+      } finally {
+        process.chdir(originalCwd);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
     it("redeploys when localhost deployment files point at an empty restarted chain", async () => {
       const originalCwd = process.cwd();
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-stale-localhost-"));
