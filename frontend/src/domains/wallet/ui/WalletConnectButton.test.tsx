@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   },
   configChainId: 1,
   isSupportedChain: vi.fn(),
+  getNetworkConfig: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -37,6 +38,7 @@ vi.mock("../../config", () => ({
 
 vi.mock("../../../shared/config", () => ({
   isSupportedChain: (...args: any[]) => mocks.isSupportedChain(...args),
+  getNetworkConfig: (...args: any[]) => mocks.getNetworkConfig(...args),
 }));
 
 describe("WalletConnectButton", () => {
@@ -52,21 +54,39 @@ describe("WalletConnectButton", () => {
     mocks.configChainId = 1;
     mocks.isSupportedChain.mockReset();
     mocks.isSupportedChain.mockReturnValue(true);
+    mocks.getNetworkConfig.mockReset();
+    mocks.getNetworkConfig.mockImplementation((chainId: number) => {
+      if (chainId === 1030) return { nativeCurrency: { symbol: "CFX" } };
+      if (chainId === 1) return { nativeCurrency: { symbol: "ETH" } };
+      return undefined;
+    });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("formats ETH balances without floating point helpers", () => {
+  it("formats balances with the connected network's native currency", () => {
+    mocks.wallet.chainId = 1030;
     const { rerender } = render(<WalletConnectButton />);
 
-    expect(screen.getByText("1.235 ETH")).toBeTruthy();
+    expect(screen.getByText("1.235 CFX")).toBeTruthy();
 
     mocks.wallet.balance = "0.000000000000000123";
     rerender(<WalletConnectButton />);
 
-    expect(screen.getByText("< 0.001 ETH")).toBeTruthy();
+    expect(screen.getByText("< 0.001 CFX")).toBeTruthy();
+
+    mocks.wallet.balance = "1.23456";
+    mocks.wallet.chainId = 1;
+    rerender(<WalletConnectButton />);
+
+    expect(screen.getByText("1.235 ETH")).toBeTruthy();
+
+    mocks.wallet.chainId = 999;
+    rerender(<WalletConnectButton />);
+
+    expect(screen.getByText("1.235 NATIVE")).toBeTruthy();
   });
 
   it("routes wrong-network action to switchOrAddChain when config chain is supported", () => {

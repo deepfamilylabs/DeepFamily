@@ -53,22 +53,40 @@ describe("DeepFamilyToken", function () {
       token.initialize(await mismatchedMinter.getAddress()),
     ).to.be.revertedWithCustomError(token, "InvalidTokenBinding");
 
+    const unauthorizedToken = await deployToken();
+    const validMinter = await deployMinter(await unauthorizedToken.getAddress());
+    await expect(unauthorizedToken.connect(eoa).initialize(await validMinter.getAddress()))
+      .to.be.revertedWithCustomError(unauthorizedToken, "OwnableUnauthorizedAccount")
+      .withArgs(await eoa.getAddress());
+
     expect(await token.owner()).to.equal(await owner.getAddress());
   });
 
   it("binds exactly once to a contract that points back to this token", async () => {
+    const [owner] = await hre.ethers.getSigners();
     const token = await deployToken();
     const minter = await deployMinter(await token.getAddress());
     const minterAddress = await minter.getAddress();
 
     await expect(token.initialize(minterAddress))
       .to.emit(token, "DeepFamilyContractInitialized")
-      .withArgs(minterAddress);
+      .withArgs(minterAddress)
+      .and.to.emit(token, "OwnershipTransferred")
+      .withArgs(await owner.getAddress(), hre.ethers.ZeroAddress);
 
     expect(await token.deepFamilyContract()).to.equal(minterAddress);
+    expect(await token.owner()).to.equal(hre.ethers.ZeroAddress);
     await expect(token.initialize(minterAddress)).to.be.revertedWithCustomError(
       token,
       "AlreadyInitialized",
+    );
+    await expect(token.transferOwnership(await owner.getAddress())).to.be.revertedWithCustomError(
+      token,
+      "OwnableUnauthorizedAccount",
+    );
+    await expect(token.renounceOwnership()).to.be.revertedWithCustomError(
+      token,
+      "OwnableUnauthorizedAccount",
     );
   });
 

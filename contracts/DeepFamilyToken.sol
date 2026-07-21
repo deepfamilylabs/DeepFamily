@@ -92,8 +92,9 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
    * @dev Initialize DeepFamily contract address (can only be called once)
    * @param _deepFamilyContract DeepFamily contract address
    */
-  function initialize(address _deepFamilyContract) external onlyOwner {
+  function initialize(address _deepFamilyContract) external {
     if (initialized) revert AlreadyInitialized();
+    _checkOwner();
     if (_deepFamilyContract == address(0)) revert ZeroAddress();
     if (_deepFamilyContract.code.length == 0) revert InvalidDeepFamilyContract();
 
@@ -109,6 +110,10 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
 
     deepFamilyContract = _deepFamilyContract;
     initialized = true;
+
+    // The owner only protects the one-time deployment handshake. Once the reciprocal binding is
+    // established there is no owner-managed configuration, so retire that authority permanently.
+    _transferOwnership(address(0));
 
     emit DeepFamilyContractInitialized(_deepFamilyContract);
   }

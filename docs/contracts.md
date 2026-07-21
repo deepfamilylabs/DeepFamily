@@ -290,7 +290,8 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 - **50+ Custom Errors**: Explicit revert reasons for all failure cases
 - **Reentrancy Guards**: `ReentrancyGuardTransient` (EIP-1153) on all external value transfers
 - **Input Validation**: Comprehensive parameter checking with constraints
-- **ETH Rejection**: Contract rejects direct ETH transfers (receive/fallback revert)
+- **Native-Currency Rejection**: Contract rejects direct native-currency transfers (ETH on Ethereum,
+  CFX on Conflux eSpace; receive/fallback revert)
 - **ZK Proof Validation**: Verifier registry routes person and name-disclosure proofs by proof purpose
 
 ## Upgradeability & Governance (UUPS)
@@ -313,13 +314,275 @@ verifiers, the verifier adapter, and the libraries.
 ### Upgrade Authorization & Governance
 
 - Upgrades are gated by `_authorizeUpgrade(newImplementation) onlyOwner` on the proxy.
-- Intended production owner is a **`TimelockController`** whose `PROPOSER`/`CANCELLER` roles are held
-  by a **multisig**: the multisig decides *who* can upgrade, the timelock enforces a public delay so
-  the community can audit/exit/cancel before an upgrade lands.
-- On live networks the deployment refuses to keep upgrade authority on an EOA: a `GOVERNANCE_OWNER`
-  (validated to behave like a timelock with a non-zero delay) is mandatory, and ownership is handed
-  over after wiring. The non-upgradeable token's residual owner role is handed to the same governance
-  owner after its one-time binding. Local/simulated networks keep the deployer as owner for test flows.
+- Intended production owner is **`GovernanceTimelock`** (an OpenZeppelin `TimelockController`)
+  whose `PROPOSER`/`CANCELLER` and `EXECUTOR` roles are held by a **governance multisig**.
+  The multisig approval policy decides *who* can propose or execute; the timelock separately
+  enforces a public delay so the community can audit, exit, or cancel before a change lands.
+- The same Timelock is the **DEEP protocol treasury**. Paid endorsements send their protocol share
+  to `DeepFamily.owner()`, which is the Timelock in production. A treasury transfer is therefore a
+  Timelock operation and must pass the governance multisig plus the configured delay. This token
+  balance is unrelated to ERC-20 ownership: `DeepFamilyToken.owner()` remains `address(0)`.
+- On live networks the deployment refuses to keep upgrade authority on an EOA: `GOVERNANCE_OWNER`
+  must match the current `GovernanceTimelock` runtime bytecode and have a non-zero delay. Ownership
+  of `DeepFamily` is handed over after wiring. Local/simulated networks keep the deployer as
+  `DeepFamily.owner()` for test flows.
+- `DeepFamilyToken` is deliberately outside Timelock **administrative ownership**. Its deployer owner
+  exists only to authorize the one-time reciprocal binding. A successful
+  `token.initialize(DeepFamily)` atomically sets `owner()` to `address(0)` on every network; Token
+  contract ownership is never transferred to the multisig or Timelock, and the binding cannot be
+  changed afterward. The Timelock can still hold and transfer its own DEEP balance like any account.
+- A multisig must not be assigned as `DeepFamily.owner()` directly: that would remove the timelock
+  delay. Live deployment requires `GOVERNANCE_MULTISIG` to contain contract code, expose
+  `getOwners()` and `getThreshold()` state with threshold at least 2, and to be the sole holder of
+  the timelock's `PROPOSER_ROLE`, `CANCELLER_ROLE`, and `EXECUTOR_ROLE`. It rejects EOAs,
+  single-signer policies, lookalike contracts that merely expose `getMinDelay()`, open roles, and
+  extra role holders.
+
+#### Production setup
+
+Deploy the timelock first with one governance multisig. The deploy script requires `MIN_DELAY` and
+`GOVERNANCE_MULTISIG` explicitly on every non-local network, validates the delay as a positive safe
+integer, and checks the `getOwners()`/`getThreshold()` state. This confirms the reported threshold
+and owners, but it does not independently attest the multisig implementation or bytecode; verify
+the wallet deployment, signer policy, modules, and guards before funding or transferring ownership.
+
+Conflux eSpace is the primary deployment target: rehearse the complete deployment and governance
+flow on `confluxTestnet`, then use `conflux` with reviewed production addresses for Mainnet. Conflux
+eSpace is an EVM-compatible execution environment within Conflux Network, not an Ethereum L2.
+Ethereum Mainnet and Sepolia remain optional compatibility targets.
+`CONFLUX_TESTNET_RPC_URL` and `CONFLUX_RPC_URL` override the corresponding eSpace RPC endpoint;
+blank or whitespace-only values use the official public endpoints configured in the project.
+
+The wrapper internally fixes the external admin to `address(0)`, makes role membership enumerable,
+and restricts `grantRole`, `revokeRole`, and `renounceRole` to timelock self-calls. OpenZeppelin's
+timelock still grants `DEFAULT_ADMIN_ROLE` to itself, so roles can be migrated, but only by scheduling
+and executing a delayed timelock operation. A zero delay is rejected both initially and on updates.
+
+```bash
+# Example: rehearse the intended 48-hour production delay. Use the actual testnet multisig address.
+MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
+  npm run deploy:timelock --net=confluxTestnet
+
+# Use the resulting timelock address, not the multisig address, as the protocol owner.
+GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
+  npm run deploy:net --net=confluxTestnet
+```
+
+To verify contracts on ConfluxScan, run for example
+`npm run verify:net --net=confluxTestnet -- 0xContractAddress`, appending constructor arguments
+when that contract has them.
+When `EXPLORER_API_KEY` is blank, the configuration supplies ConfluxScan's non-secret `espace`
+placeholder automatically. Ethereum Mainnet and Sepolia instead require a real Etherscan key for
+the current invocation, for example
+`EXPLORER_API_KEY=... npm run verify:net --net=sepolia -- 0xContractAddress`.
+Do not reuse the Conflux placeholder for Ethereum verification.
+
+Only in-process simulated networks and the explicitly named `localhost` network permit the local
+defaults (`MIN_DELAY=120` with the deployer as role holder). A remote HTTP network is treated as live
+even if it uses chain ID 31337.
+
+#### General owner operations
+
+Use `governance-schedule` and `governance-execute` for ordinary `onlyOwner` configuration. For
+example, `updateEndorsementFee(750)` sets the protocol fee to 750 basis points (7.5%):
+
+```bash
+npx hardhat --config hardhat.config.mjs governance-schedule --network confluxTestnet \
+  --target main --function updateEndorsementFee --args '[750]'
+
+# Run only after the schedule transaction is mined and the configured delay has elapsed.
+npx hardhat --config hardhat.config.mjs governance-execute --network confluxTestnet \
+  --target main --function updateEndorsementFee --args '[750]'
+
+# Cancel a still-pending governance or upgrade operation using its printed operation ID.
+npx hardhat --config hardhat.config.mjs governance-cancel --network confluxTestnet \
+  --target main --operation-id 0x...
+```
+
+The two commands must use exactly the same target, function, arguments, and optional `--salt`; these
+values derive the operation ID. Omitting `--salt` uses a deterministic value. To schedule the exact
+same call again after it has already executed, provide a new bytes32 salt to both commands. Function
+arguments are a JSON array; quote large integers as strings so JavaScript cannot round them. A full
+signature such as `updateEndorsementFee(uint256)` can be used if a function name is overloaded.
+
+The task resolves only allowlisted deployment targets (`main`), encodes calls against the recorded
+ABI, fixes the native-currency value and predecessor to zero, requires at least the timelock minimum
+delay, and simulates the target call before scheduling unless `--skip-simulation` is explicitly
+supplied. It does not accept an arbitrary destination or raw calldata. `upgradeTo`, `upgradeToAndCall`,
+`transferOwnership`, and `renounceOwnership` are rejected: upgrades must pass the dedicated storage
+and bytecode checks below, ownership transfers must use the validated migration process, and
+renouncing ownership is reserved for an independently constructed and audited final-exit operation.
+
+When the configured CLI signer has the required Timelock role, the task sends the transaction. When
+the role belongs to a multisig—or no local private key is configured—it prints `to`, `value`, `data`,
+and `operation` for submission through that wallet. The delay starts when the Timelock schedule
+transaction is mined, not when the multisig transaction is first proposed.
+
+#### Protocol treasury
+
+The current `GovernanceTimelock` is both `DeepFamily.owner()` and the receiver of the protocol share
+of each paid endorsement. Use the read-only status task to verify the Timelock and Token runtimes,
+the DeepFamily/Token binding, the Timelock role policy, and its DEEP balance. The report prints both
+the raw token-unit balance and its human-readable value, together with symbol/decimals, raw/formatted
+total supply, minimum delay, and the multisig threshold:
+
+```bash
+npx hardhat --config hardhat.config.mjs treasury-status --network confluxTestnet \
+  --contract-name GovernanceTimelock --token-contract-name DeepFamilyToken
+```
+
+To transfer 125.5 DEEP from the treasury to a reviewed non-zero recipient, schedule and execute the
+same operation through the governance multisig:
+
+```bash
+npx hardhat --config hardhat.config.mjs treasury-transfer --network confluxTestnet \
+  --phase schedule --recipient 0xRecipient... --amount 125.5 \
+  --contract-name GovernanceTimelock --token-contract-name DeepFamilyToken
+
+# Run after the multisig's schedule transaction is mined and the delay has elapsed.
+npx hardhat --config hardhat.config.mjs treasury-transfer --network confluxTestnet \
+  --phase execute --recipient 0xRecipient... --amount 125.5 \
+  --contract-name GovernanceTimelock --token-contract-name DeepFamilyToken
+```
+
+`--amount` is a human-readable decimal DEEP amount, not the raw 18-decimal integer. The task rejects
+zero recipients, the Timelock/Token/DeepFamily addresses as recipients, zero amounts, insufficient
+treasury balances, arbitrary tokens, and arbitrary targets. It always resolves
+`deployments/<network>/DeepFamilyToken.json`, verifies the exact selected Token and Timelock runtimes
+and their binding, and encodes `DeepFamilyToken.transfer(recipient, amount)`. Schedule and execute
+must use identical recipient, amount, optional `--salt`, and artifact arguments. Omitting `--salt`
+derives a deterministic call-bound value. Scheduling does not reserve DEEP; execution re-checks the
+live balance. If the CLI signer lacks the required role, each phase prints generic `to`, `value`,
+`data`, and `operation` fields for submission through the governance multisig.
+
+This treasury design deliberately puts protocol spending behind the same approval threshold and
+public delay as administrative changes. Do not send unrelated or unsupported assets to the
+Timelock: the dedicated tooling only manages the deployed DEEP token.
+
+#### Final governance exit
+
+`DeepFamily.renounceOwnership()` is retained at the contract layer, but the ordinary governance
+tasks intentionally reject it. Renouncing is not automatically equivalent to decentralization; it
+is an irreversible decision to freeze the current implementation and all owner-controlled policy.
+After execution, upgrades, verifier changes, protocol-fee changes, ownership migration, and every
+other `onlyOwner` operation become permanently unavailable. Future protocol fee shares are burned
+because `owner()` is `address(0)`, while DEEP already held by the Timelock is not automatically
+transferred or burned.
+
+There is intentionally no convenience task for this operation. If a final, immutable protocol is a
+documented governance objective, first complete an end-state audit, decide and execute the treasury
+disposition, publish the exact consequences and calldata, and obtain explicit multisig approval.
+Only then construct the raw Timelock `schedule` and `execute` calls for `renounceOwnership()` and
+wait the full configured delay. Losing keys or accidentally executing this call provides no recovery
+path and must not be treated as a routine maintenance action.
+
+#### Governance status and lifecycle maintenance
+
+Inspect the current Timelock runtime, delay, complete enumerable role membership, inferred multisig
+threshold/owners, and an optional operation ID without changing state:
+
+```bash
+npx hardhat --config hardhat.config.mjs timelock-status --network confluxTestnet
+npx hardhat --config hardhat.config.mjs timelock-status --network confluxTestnet \
+  --contract-name GovernanceTimelock --operation-id 0x...
+```
+
+The report is marked `DANGER` for a runtime mismatch, zero delay, non-self admin, extra/open/split
+role membership, a codeless role holder, an invalid multisig inspection response, a multisig
+threshold below 2, a non-zero `DeepFamilyToken.owner()`, or broken bidirectional wiring.
+The inspection interface cannot prove the wallet implementation or that a module/guard cannot bypass
+the advertised threshold; verify those separately. `--contract-name` defaults to the
+current `GovernanceTimelock` artifact and can select a retained versioned artifact for an older
+deployment.
+
+If the selected artifact does not expose the required Timelock inspection ABI, the task fails
+instead of producing a partial status report.
+
+Replace the Timelock's sole governance multisig using one atomic batch. The batch first grants all
+three roles to the inspected new multisig, then revokes all three from the expected old multisig.
+The task rejects a codeless or threshold-1 replacement, unexpected existing role membership, a
+non-self admin, and a runtime that does not match the selected `--contract-name` artifact:
+
+```bash
+npx hardhat --config hardhat.config.mjs timelock-migrate-multisig --network confluxTestnet \
+  --contract-name GovernanceTimelock --phase schedule \
+  --old-multisig 0xOldMultisig... --new-multisig 0xNewMultisig...
+
+# Run after the schedule transaction is mined and its delay has elapsed.
+npx hardhat --config hardhat.config.mjs timelock-migrate-multisig --network confluxTestnet \
+  --contract-name GovernanceTimelock --phase execute \
+  --old-multisig 0xOldMultisig... --new-multisig 0xNewMultisig...
+```
+
+Use the same optional `--salt` in both phases. `--delay` may be supplied to the schedule phase but
+cannot be below the current minimum. Update the operator's `GOVERNANCE_MULTISIG` only after the
+execute transaction and final role state are confirmed. Changing owners or threshold *inside the
+same multisig address* is a wallet-internal operation and is not delayed by this Timelock.
+
+Change the minimum delay through a Timelock self-call. The update itself is always scheduled using
+the current delay; zero and no-op values are rejected. Raising the delay does not extend operations
+that were already scheduled:
+
+```bash
+npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
+  --contract-name GovernanceTimelock --phase schedule --new-delay 259200
+npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
+  --contract-name GovernanceTimelock --phase execute --new-delay 259200
+```
+
+To replace the Timelock contract, first deploy a new `GovernanceTimelock` using the intended new
+multisig as a one-command override. Keep the persistent operator environment pointed at the old
+governance until migration is confirmed:
+
+```bash
+MIN_DELAY=259200 GOVERNANCE_MULTISIG=0xNewMultisig... \
+  npm run deploy:timelock --net=confluxTestnet
+```
+
+Then migrate governance and the DEEP treasury in one atomic `scheduleBatch`/`executeBatch`. The
+batch has exactly two calls in this order: `DeepFamily.transferOwnership(newTimelock)`, followed by
+an old-Timelock self-call to `sweepERC20(DEEP, newTimelock)`. The sweep reads the complete old
+Timelock balance during execution, so it includes protocol fees received while the delay was
+running; a zero balance is also valid. `DeepFamilyToken.owner()` remains zero throughout. The
+following example redeploys the same runtime. For a code-changing V1-to-V2 migration, replace the
+two Timelock artifact arguments with the separately retained versioned artifact names:
+
+```bash
+npx hardhat --config hardhat.config.mjs timelock-migrate-owner --network confluxTestnet \
+  --phase schedule --old-timelock 0xOldTimelock... --new-timelock 0xNewTimelock... \
+  --old-multisig 0xOldMultisig... --new-multisig 0xNewMultisig... \
+  --old-contract-name GovernanceTimelock --new-contract-name GovernanceTimelock \
+  --proxy-contract-name UUPSProxy --deep-family-contract-name DeepFamily \
+  --token-contract-name DeepFamilyToken
+
+npx hardhat --config hardhat.config.mjs timelock-migrate-owner --network confluxTestnet \
+  --phase execute --old-timelock 0xOldTimelock... --new-timelock 0xNewTimelock... \
+  --old-multisig 0xOldMultisig... --new-multisig 0xNewMultisig... \
+  --old-contract-name GovernanceTimelock --new-contract-name GovernanceTimelock \
+  --proxy-contract-name UUPSProxy --deep-family-contract-name DeepFamily \
+  --token-contract-name DeepFamilyToken
+```
+
+This migration requires explicit expected old/new multisig addresses and explicit artifacts for both
+Timelocks, the proxy, the current `DeepFamily` implementation, and the token. It verifies every
+selected runtime, both exact role policies and multisig thresholds, non-zero delays, bidirectional
+proxy/token wiring, `DeepFamily.owner() == oldTimelock`, and `DeepFamilyToken.owner() == address(0)`.
+The old selected Timelock artifact must expose the self-call-only
+`sweepERC20(address,address)` function. Keep audited, version-named source/artifacts for every
+deployed Timelock; the old and new contracts are deliberately verified independently—for example,
+as `GovernanceTimelockV1` and `GovernanceTimelockV2`—and there is no unsafe bypass.
+It rejects a new Timelock whose delay is shorter than the old one. If a shorter delay is an
+intentional governance decision, first execute `timelock-update-delay` on the old Timelock, then
+deploy the replacement with a delay at least equal to that approved value. Only update
+`GOVERNANCE_OWNER` after the ownership and treasury migration is confirmed. A directly sent DEEP
+dust balance that arrives at the old Timelock after execution is not part of the already-completed
+migration and is reported separately rather than making the completed operation appear to fail.
+
+All lifecycle and treasury mutating tasks require an explicit `--phase schedule|execute`, derive a
+call-bound deterministic salt, check operation state, and print generic `to/value/data/operation`
+fields when no local role-holder signer is available. Preserve the printed
+addresses, salt, and operation ID in the governance record. A pending lifecycle operation can be
+cancelled with `governance-cancel` while the old Timelock still owns `main`.
 
 ### Storage-Layout Safety
 
@@ -335,7 +598,9 @@ verifiers, the verifier adapter, and the libraries.
 - The `upgrade-schedule` / `upgrade-execute` Hardhat tasks (`tasks/upgrade-schedule.mjs`,
   `tasks/upgrade-execute.mjs`) additionally validate the *specific* candidate implementation against
   the proxy baseline and verify the on-chain runtime bytecode (metadata-stripped, library-linked)
-  before staging an upgrade through the timelock.
+  before staging an upgrade through the timelock. When `upgrade-schedule` deploys a candidate, it
+  prints an exact source-verification command and exits without scheduling; after explorer
+  verification succeeds, rerun with that address in `--implementation` to create the operation.
 
 ### Reentrancy Guard
 
@@ -346,10 +611,20 @@ chains (all current targets — Ethereum, Conflux eSpace ≥ v3.0, local Hardhat
 
 ### Build Requirements
 
-The upgradeable stack requires **solc 0.8.28**, **`viaIR` enabled** (without it the `DeepFamily`
-implementation exceeds the EIP-170 24,576-byte limit), and **`evmVersion: cancun`** (OpenZeppelin
-5.6 emits `MCOPY`, and `ReentrancyGuardTransient` uses `TSTORE`/`TLOAD`). The compiler also emits
-`storageLayout` so the upgrade-safety checker can diff proxy contracts.
+The upgradeable stack requires **solc 0.8.28**, **`viaIR` enabled**, and **`evmVersion: cancun`**
+(OpenZeppelin 5.6 emits `MCOPY`, and `ReentrancyGuardTransient` uses `TSTORE`/`TLOAD`). Ethereum's
+EIP-170 deployed-code limit is 24,576 bytes, while Conflux eSpace permits 49,152 bytes. The project
+still treats the stricter 24,576-byte ceiling as its conservative cross-network build budget;
+without `viaIR`, the `DeepFamily` implementation exceeds that portable budget. The compiler also
+emits `storageLayout` so the upgrade-safety checker can diff proxy contracts.
+
+See the official Conflux documentation for the
+[eSpace EVM compatibility differences](https://doc.confluxnetwork.org/docs/espace/build/evm-compatibility/)
+and the [v3.0 transient-storage fix](https://doc.confluxnetwork.org/docs/general/hardforks/v3.0/).
+
+`UNLIMITED_SIZE=true` relaxes the size check only for the local Hardhat development network. It does
+not change any live network's code-size rules and must not be used to reason that a Conflux eSpace or
+Ethereum deployment is unlimited.
 
 ## DeepFamilyToken.sol - DEEP ERC20 Utility Point
 
@@ -411,11 +686,14 @@ function getReward(uint256 recordCount) public view returns (uint256) {
 
 #### Initialization
 ```solidity
-function initialize(address _deepFamilyContract) external onlyOwner
+function initialize(address _deepFamilyContract) external
 ```
-- Owner-only, single-use function
+- Performs an explicit owner check and can run only once; the deployer owner exists only before binding
 - Registers authorized DeepFamily contract address
 - Rejects zero addresses, EOAs, contracts that do not expose the expected token binding, and DeepFamily contracts configured for a different token
+- On success, automatically transfers Token ownership to `address(0)` in the same transaction
+- The Token is never owned by governance and cannot be rebound after initialization
+- Do not manually call inherited ownership-transfer/renounce functions during bootstrap; use the integrated deployment so binding and owner retirement occur atomically
 - Prevents unauthorized minting after deployment
 
 #### Mining
@@ -453,12 +731,13 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 
 **Restricted Functions**:
 - `mint()`: Protected by `onlyDeepFamilyContract` modifier
-- `initialize()`: Owner-only, single-use initialization
+- `initialize()`: Owner-only before binding; success permanently leaves `owner() == address(0)`
 
 **Security Features**:
 - Hard live-supply cap enforcement (never exceeds 100B utility points)
 - Progressive halving ensures controlled supply distribution
 - One-time contract-code and reciprocal token-binding validation
+- Automatic owner removal after binding eliminates residual Token administration
 - Custom error types for precise debugging
 - OpenZeppelin's secure ERC20 base implementation
 

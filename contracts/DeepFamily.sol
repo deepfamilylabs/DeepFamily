@@ -83,7 +83,7 @@ contract DeepFamily is
 
   // Query-related errors
   error PageSizeExceedsLimit();
-  error DirectETHNotAccepted();
+  error DirectNativeCurrencyNotAccepted();
 
   // Story sharding related errors
   error StoryAlreadySealed();
@@ -1087,12 +1087,12 @@ contract DeepFamily is
     return trustedEndorsers[personHash][versionIndex][index];
   }
 
-  // ===== ETH Reception Path Protection: Reject Direct Transfers =====
+  // ===== Native Currency Reception Protection: Reject Direct Transfers =====
   receive() external payable {
-    revert DirectETHNotAccepted();
+    revert DirectNativeCurrencyNotAccepted();
   }
 
   fallback() external payable {
-    revert DirectETHNotAccepted();
+    revert DirectNativeCurrencyNotAccepted();
   }
 }

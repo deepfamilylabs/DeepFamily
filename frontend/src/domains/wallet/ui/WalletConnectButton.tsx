@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Wallet, LogOut, RefreshCw } from "lucide-react";
 import { parseEther } from "ethers";
 import { shortAddress } from "../../../shared/model";
-import { isSupportedChain } from "../../../shared/config";
+import { getNetworkConfig, isSupportedChain } from "../../../shared/config";
 import { useConfig } from "../../config";
 
 interface WalletConnectButtonProps {
@@ -33,6 +33,9 @@ export default function WalletConnectButton({
 
   const { t } = useTranslation();
   const isHomePage = variant === "home";
+  const nativeCurrencySymbol = chainId
+    ? (getNetworkConfig(chainId)?.nativeCurrency.symbol ?? "NATIVE")
+    : "NATIVE";
 
   const formatAddress = (addr: string) => {
     return shortAddress(addr, 6, 4);
@@ -41,19 +44,19 @@ export default function WalletConnectButton({
   const formatBalance = (bal: string) => {
     try {
       const wei = parseEther(bal);
-      const milliEth = 10n ** 15n;
+      const milliUnit = 10n ** 15n;
 
-      if (wei > 0n && wei < milliEth) {
-        return "< 0.001 ETH";
+      if (wei > 0n && wei < milliUnit) {
+        return `< 0.001 ${nativeCurrencySymbol}`;
       }
 
-      const roundedMilliEth = (wei + 5n * 10n ** 14n) / milliEth;
-      const whole = roundedMilliEth / 1000n;
-      const fraction = (roundedMilliEth % 1000n).toString().padStart(3, "0");
+      const roundedMilliUnit = (wei + 5n * 10n ** 14n) / milliUnit;
+      const whole = roundedMilliUnit / 1000n;
+      const fraction = (roundedMilliUnit % 1000n).toString().padStart(3, "0");
 
-      return `${whole}.${fraction} ETH`;
+      return `${whole}.${fraction} ${nativeCurrencySymbol}`;
     } catch {
-      return `${bal} ETH`;
+      return `${bal} ${nativeCurrencySymbol}`;
     }
   };
 

@@ -64,7 +64,7 @@ export type KeyPurpose = keyof typeof PURPOSE;
 export interface DerivedKey {
   // Derived key (0x... format)
   key: string;
-  // Corresponding Ethereum address (if used as private key)
+  // Corresponding EVM address (if used as a wallet private key)
   address?: string;
   // Derivation timestamp
   timestamp: number;
@@ -84,7 +84,7 @@ export interface DerivedKey {
  * Flow:
  * 1. Compute PersonHash (original logic)
  * 2. Apply scrypt KDF strengthening
- * 3. Return derived key + Ethereum address
+ * 3. Return derived key + EVM address
  *
  * @param input - Form data from PersonHashCalculator
  * @param purpose - Key purpose (affects salt)

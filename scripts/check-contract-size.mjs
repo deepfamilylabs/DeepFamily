@@ -1,13 +1,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const MAX_DEPLOYED_BYTES = 24_576;
+// Keep the stricter Ethereum EIP-170 ceiling so one artifact remains deployable on every
+// supported network. Conflux eSpace currently permits up to 49,152 deployed bytes.
+const CROSS_CHAIN_MAX_DEPLOYED_BYTES = 24_576;
 const ARTIFACTS = [
   ["DeepFamily", "artifacts/contracts/DeepFamily.sol/DeepFamily.json"],
   ["DeepFamilyReader", "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json"],
   ["AdultAgeGate", "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json"],
   ["PoseidonT5", "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json"],
   ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],
+  [
+    "GovernanceTimelock",
+    "artifacts/contracts/governance/GovernanceTimelock.sol/GovernanceTimelock.json",
+  ],
   [
     "Groth16VerifierAdapter",
     "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
@@ -36,13 +42,15 @@ async function main() {
     const artifactPath = path.resolve(process.cwd(), relativePath);
     const artifact = JSON.parse(await fs.readFile(artifactPath, "utf8"));
     const bytes = getDeployedBytecodeSize(artifact);
-    const status = bytes <= MAX_DEPLOYED_BYTES ? "ok" : "oversize";
+    const status = bytes <= CROSS_CHAIN_MAX_DEPLOYED_BYTES ? "ok" : "oversize";
     console.log(`${status.padEnd(8)} ${name.padEnd(34)} ${String(bytes).padStart(6)} bytes`);
-    if (bytes > MAX_DEPLOYED_BYTES) failed = true;
+    if (bytes > CROSS_CHAIN_MAX_DEPLOYED_BYTES) failed = true;
   }
 
   if (failed) {
-    throw new Error(`One or more deployable artifacts exceed ${MAX_DEPLOYED_BYTES} bytes`);
+    throw new Error(
+      `One or more deployable artifacts exceed the ${CROSS_CHAIN_MAX_DEPLOYED_BYTES}-byte cross-chain compatibility limit`,
+    );
   }
 }
 

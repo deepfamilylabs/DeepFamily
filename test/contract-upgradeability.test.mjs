@@ -84,19 +84,14 @@ describe("UUPS upgradeability", function () {
   it("upgrades the main contract through a timelock governance owner", async () => {
     const { deepFamily, poseidonT5, adultAgeGate } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
-    const [deployer, member1, member2] = await hre.ethers.getSigners();
+    const [deployer, roleHolder] = await hre.ethers.getSigners();
     const proxyAddress = await deepFamily.getAddress();
 
-    // A timelock whose proposer/executor roles are held by multiple member EOAs, standing in
-    // for a multisig's signers. minDelay enforces the governance waiting period.
+    // The dedicated multisig integration test covers threshold approval; this test isolates the
+    // UUPS schedule/execute path with one local role-holder account.
     const minDelay = 3600;
     const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
-    const timelock = await Timelock.deploy(
-      minDelay,
-      [await member1.getAddress(), await member2.getAddress()],
-      [await member1.getAddress(), await member2.getAddress()],
-      hre.ethers.ZeroAddress,
-    );
+    const timelock = await Timelock.deploy(minDelay, await roleHolder.getAddress());
     await timelock.waitForDeployment();
     const timelockAddress = await timelock.getAddress();
 
@@ -115,22 +110,22 @@ describe("UUPS upgradeability", function () {
     const data = deepFamily.interface.encodeFunctionData("upgradeToAndCall", [v2ImplAddress, "0x"]);
     const salt = hre.ethers.id("upgrade-main-v2");
 
-    // Schedule the upgrade through the timelock (member1 holds PROPOSER_ROLE).
+    // Schedule the upgrade through the timelock.
     await (
       await timelock
-        .connect(member1)
+        .connect(roleHolder)
         .schedule(proxyAddress, 0, data, hre.ethers.ZeroHash, salt, minDelay)
     ).wait();
 
     // Executing before the delay elapses must fail.
     await expect(
-      timelock.connect(member2).execute(proxyAddress, 0, data, hre.ethers.ZeroHash, salt),
+      timelock.connect(roleHolder).execute(proxyAddress, 0, data, hre.ethers.ZeroHash, salt),
     ).to.be.revertedWithCustomError(timelock, "TimelockUnexpectedOperationState");
 
-    // Advance past the timelock delay, then execute (member2 holds EXECUTOR_ROLE).
+    // Advance past the timelock delay, then execute.
     await hre.networkHelpers.time.increase(minDelay + 1);
     await (
-      await timelock.connect(member2).execute(proxyAddress, 0, data, hre.ethers.ZeroHash, salt)
+      await timelock.connect(roleHolder).execute(proxyAddress, 0, data, hre.ethers.ZeroHash, salt)
     ).wait();
 
     const v2 = await hre.ethers.getContractAt("DeepFamilyV2Mock", proxyAddress);

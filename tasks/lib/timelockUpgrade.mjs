@@ -208,7 +208,12 @@ export const deriveSalt = (ethers, { target, implementation, initData, override 
   return ethers.id(`deepfamily-upgrade|${target}|${implementation.toLowerCase()}|${initData}`);
 };
 
-export const resolveTarget = async (connection, ethers, targetArg) => {
+export const resolveTarget = async (
+  connection,
+  ethers,
+  targetArg,
+  timelockContractName = "GovernanceTimelock",
+) => {
   const spec = UPGRADE_TARGETS[targetArg];
   if (!spec) {
     throw new Error(`Unknown --target "${targetArg}" (expected: main)`);
@@ -216,8 +221,9 @@ export const resolveTarget = async (connection, ethers, targetArg) => {
   const proxyAddress = await readDeploymentAddress(connection, spec.contract);
   const proxy = await ethers.getContractAt(spec.contract, proxyAddress);
   const timelockAddress = await proxy.owner();
-  // The owner is expected to be a TimelockController; GovernanceTimelock exposes its full ABI.
-  const timelock = await ethers.getContractAt("GovernanceTimelock", timelockAddress);
+  // The owner is expected to be a TimelockController. Lifecycle tasks pass the exact retained
+  // artifact for historical deployments; ordinary governance tasks use the current default.
+  const timelock = await ethers.getContractAt(timelockContractName, timelockAddress);
   return { spec, proxyAddress, proxy, timelockAddress, timelock };
 };
 
@@ -249,9 +255,18 @@ export const sendOrPrint = async ({
   method,
   callArgs,
 }) => {
+  const calldata = timelock.interface.encodeFunctionData(method, callArgs);
+  if (!signer) {
+    console.log("  no configured signer; submit this transaction from the governance multisig:");
+    console.log(`    to:        ${timelockAddress}`);
+    console.log("    value:     0");
+    console.log(`    data:      ${calldata}`);
+    console.log("    operation: CALL");
+    return { sent: false, calldata };
+  }
+
   const signerAddress = await signer.getAddress();
   const hasRole = await timelock.hasRole(role, signerAddress);
-  const calldata = timelock.interface.encodeFunctionData(method, callArgs);
   if (hasRole) {
     const tx = await timelock.connect(signer)[method](...callArgs);
     await tx.wait();
@@ -259,7 +274,9 @@ export const sendOrPrint = async ({
     return { sent: true, txHash: tx.hash, calldata };
   }
   console.log(`  signer ${signerAddress} lacks the required role; submit this from the multisig:`);
-  console.log(`    to:   ${timelockAddress}`);
-  console.log(`    data: ${calldata}`);
+  console.log(`    to:        ${timelockAddress}`);
+  console.log("    value:     0");
+  console.log(`    data:      ${calldata}`);
+  console.log("    operation: CALL");
   return { sent: false, calldata };
 };

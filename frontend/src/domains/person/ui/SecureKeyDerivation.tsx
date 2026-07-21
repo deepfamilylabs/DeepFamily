@@ -1,7 +1,7 @@
 /**
  * Secure Key Derivation Component
  *
- * UI component for deriving secure private keys from PersonHash
+ * UI component for deriving EVM-compatible wallet private keys from PersonHash
  */
 
 import React, { useState, useMemo, useCallback, useRef } from "react";
@@ -299,10 +299,10 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
             </span>
           </div>
 
-          {/* Ethereum address */}
+          {/* EVM address */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-              {t("keyDerivation.component.ethereumAddress")}
+              {t("keyDerivation.component.evmAddress")}
             </label>
             <div className="flex items-start sm:items-center gap-2 bg-white dark:bg-gray-800 rounded-lg p-2 sm:p-3 border border-gray-300 dark:border-gray-600">
               <code className="flex-1 text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 break-all leading-relaxed">

@@ -7,4 +7,9 @@ contract DeepFamilyTokenHarness is DeepFamilyToken {
   function seedSupply(address account, uint256 amount) external {
     _mint(account, amount);
   }
+
+  /// @dev Test-only hook for exercising monitoring against a legacy/non-retired token owner.
+  function forceBootstrapOwnerForTest(address account) external {
+    _transferOwnership(account);
+  }
 }

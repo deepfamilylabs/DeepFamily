@@ -6,6 +6,7 @@ import hardhatTypechain from "@nomicfoundation/hardhat-typechain";
 import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import "dotenv/config";
 
+import { resolveConfluxRpcUrls, SOLIDITY_EVM_VERSION } from "./scripts/lib/hardhatConfig.mjs";
 import addPersonTask from "./tasks/contract-add-person.mjs";
 import endorseTask from "./tasks/contract-endorse.mjs";
 import mintNftTask from "./tasks/contract-mint-nft.mjs";
@@ -16,14 +17,76 @@ import networksListTask from "./tasks/networks-list.mjs";
 import addStoryChunkTask from "./tasks/story-add-chunk.mjs";
 import listStoryChunksTask from "./tasks/story-list-chunks.mjs";
 import sealStoryTask from "./tasks/story-seal.mjs";
+import governanceScheduleTask from "./tasks/governance-schedule.mjs";
+import governanceExecuteTask from "./tasks/governance-execute.mjs";
+import governanceCancelTask from "./tasks/governance-cancel.mjs";
+import timelockStatusTask from "./tasks/timelock-status.mjs";
+import timelockMigrateMultisigTask from "./tasks/timelock-migrate-multisig.mjs";
+import timelockUpdateDelayTask from "./tasks/timelock-update-delay.mjs";
+import timelockMigrateOwnerTask from "./tasks/timelock-migrate-owner.mjs";
+import treasuryStatusTask from "./tasks/treasury-status.mjs";
+import treasuryTransferTask from "./tasks/treasury-transfer.mjs";
 import upgradeScheduleTask from "./tasks/upgrade-schedule.mjs";
 import upgradeExecuteTask from "./tasks/upgrade-execute.mjs";
+import {
+  explorerApiKeyForNetwork,
+  selectedHardhatNetwork,
+} from "./tasks/lib/explorerVerification.mjs";
 
 const PRIVATE_KEY =
   process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+// Hardhat 3 accepts one Etherscan-compatible API key per invocation. ConfluxScan only requires a
+// non-empty placeholder; Ethereum verification deliberately keeps an absent key empty so the
+// operator must explicitly provide a real Etherscan key.
+const EXPLORER_API_KEY = explorerApiKeyForNetwork(
+  selectedHardhatNetwork(),
+  process.env.EXPLORER_API_KEY,
+);
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
+const CONFLUX_RPC_URLS = resolveConfluxRpcUrls();
+
+const solidityProfile = () => ({
+  // Keep deployment and verification compiler inputs identical across Hardhat build profiles.
+  isolated: false,
+  toolVersionsInBuildInfo: false,
+  compilers: [
+    {
+      version: "0.8.28",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 1,
+        },
+        // viaIR (Yul pipeline) keeps the shared artifact within the conservative 24,576-byte
+        // cross-network budget used by this project. Conflux eSpace permits a larger artifact,
+        // but keeping one portable build avoids network-specific production bytecode.
+        viaIR: process.env.VIA_IR !== "false",
+        // ReentrancyGuardTransient requires EIP-1153, so this target must not be downgraded.
+        evmVersion: SOLIDITY_EVM_VERSION,
+        // Emit storage layout so the upgrade-safety checker can diff proxy contracts.
+        outputSelection: {
+          "*": {
+            "*": ["storageLayout"],
+          },
+        },
+      },
+    },
+  ],
+  overrides: {
+    "poseidon-solidity/PoseidonT5.sol": {
+      version: "0.8.28",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 1,
+        },
+        viaIR: false,
+        evmVersion: SOLIDITY_EVM_VERSION,
+      },
+    },
+  },
+});
 
 /** @type {import('hardhat/config').HardhatUserConfig} */
 export default {
@@ -37,41 +100,9 @@ export default {
   ],
   solidity: {
     npmFilesToBuild: ["poseidon-solidity/PoseidonT5.sol"],
-    compilers: [
-      {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1,
-          },
-          // viaIR (Yul pipeline) is required: without it the DeepFamily implementation compiles
-          // to ~26KB and exceeds the EIP-170 24,576-byte deployment limit. Default on; set
-          // VIA_IR=false only for local experiments that don't need a deployable artifact.
-          viaIR: process.env.VIA_IR !== "false",
-          // Allow overriding EVM version via environment variable (default istanbul)
-          evmVersion: process.env.EVM_VERSION || "cancun",
-          // Emit storage layout so the upgrade-safety checker can diff proxy contracts.
-          outputSelection: {
-            "*": {
-              "*": ["storageLayout"],
-            },
-          },
-        },
-      },
-    ],
-    overrides: {
-      "poseidon-solidity/PoseidonT5.sol": {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1,
-          },
-          viaIR: false,
-          evmVersion: process.env.EVM_VERSION || "cancun",
-        },
-      },
+    profiles: {
+      default: solidityProfile(),
+      production: solidityProfile(),
     },
   },
 
@@ -132,19 +163,6 @@ export default {
       timeout: 1200000,
     },
 
-    // Holesky testnet (latest Ethereum testnet)
-    holesky: {
-      type: "http",
-      url: `https://holesky.infura.io/v3/${INFURA_API_KEY}`,
-      accounts:
-        PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000"
-          ? [PRIVATE_KEY]
-          : [],
-      chainId: 17000,
-      gasPrice: "auto",
-      timeout: 1200000,
-    },
-
     // Ethereum mainnet
     mainnet: {
       type: "http",
@@ -161,7 +179,7 @@ export default {
     // Conflux eSpace testnet
     confluxTestnet: {
       type: "http",
-      url: "https://evmtestnet.confluxrpc.com",
+      url: CONFLUX_RPC_URLS.confluxTestnet,
       accounts:
         PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000"
           ? [PRIVATE_KEY]
@@ -174,7 +192,7 @@ export default {
     // Conflux eSpace mainnet
     conflux: {
       type: "http",
-      url: "https://evm.confluxrpc.com",
+      url: CONFLUX_RPC_URLS.conflux,
       accounts:
         PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000"
           ? [PRIVATE_KEY]
@@ -182,6 +200,32 @@ export default {
       chainId: 1030,
       gasPrice: "auto",
       timeout: 1200000,
+    },
+  },
+
+  // Custom Etherscan-compatible explorers used by Hardhat 3 verification.
+  // Ethereum Mainnet and Sepolia are already present in Hardhat's built-in
+  // chain descriptors, so only Conflux eSpace needs to be declared here.
+  chainDescriptors: {
+    71: {
+      name: "Conflux eSpace Testnet",
+      blockExplorers: {
+        etherscan: {
+          name: "ConfluxScan",
+          url: "https://evmtestnet.confluxscan.org",
+          apiUrl: "https://evmapi-testnet.confluxscan.org/api/",
+        },
+      },
+    },
+    1030: {
+      name: "Conflux eSpace",
+      blockExplorers: {
+        etherscan: {
+          name: "ConfluxScan",
+          url: "https://evm.confluxscan.org",
+          apiUrl: "https://evmapi.confluxscan.org/api/",
+        },
+      },
     },
   },
   test: {
@@ -207,48 +251,30 @@ export default {
     addStoryChunkTask,
     listStoryChunksTask,
     sealStoryTask,
+    governanceScheduleTask,
+    governanceExecuteTask,
+    governanceCancelTask,
+    timelockStatusTask,
+    timelockMigrateMultisigTask,
+    timelockUpdateDelayTask,
+    timelockMigrateOwnerTask,
+    treasuryStatusTask,
+    treasuryTransferTask,
     upgradeScheduleTask,
     upgradeExecuteTask,
   ],
 
-  // Contract verification configuration
-  etherscan: {
-    apiKey: {
-      // Ethereum networks
-      mainnet: ETHERSCAN_API_KEY,
-      sepolia: ETHERSCAN_API_KEY,
-      holesky: ETHERSCAN_API_KEY,
-
-      // Conflux eSpace networks
-      conflux: process.env.CONFLUXSCAN_API_KEY || "",
-      confluxTestnet: process.env.CONFLUXSCAN_API_KEY || "",
+  // Hardhat 3 contract verification configuration
+  verify: {
+    blockscout: {
+      enabled: false,
     },
-    customChains: [
-      {
-        network: "holesky",
-        chainId: 17000,
-        urls: {
-          apiURL: "https://api-holesky.etherscan.io/api",
-          browserURL: "https://holesky.etherscan.io",
-        },
-      },
-      {
-        network: "confluxTestnet",
-        chainId: 71,
-        urls: {
-          apiURL: "https://evmapi-testnet.confluxscan.net/api",
-          browserURL: "https://evmtestnet.confluxscan.net",
-        },
-      },
-      {
-        network: "conflux",
-        chainId: 1030,
-        urls: {
-          apiURL: "https://evmapi.confluxscan.net/api",
-          browserURL: "https://evm.confluxscan.net",
-        },
-      },
-    ],
+    etherscan: {
+      apiKey: EXPLORER_API_KEY,
+    },
+    sourcify: {
+      enabled: false,
+    },
   },
 
   // Gas reporter configuration
