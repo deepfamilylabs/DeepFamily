@@ -1,11 +1,32 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 
-const action = async (args, hre) => {
-  const { ethers, config } = hre;
+export const nativeCurrencySymbol = (chainId) =>
+  chainId === 71n || chainId === 1030n ? "CFX" : "ETH";
 
-  // Generate candidate networks
-  let names = Object.keys(config.networks).filter((n) => n !== "hardhat");
+export const resolveRpcUrl = async (networkConfig) => {
+  const configuredUrl = networkConfig?.url;
+  if (typeof configuredUrl === "string") {
+    return configuredUrl;
+  }
+  if (configuredUrl && typeof configuredUrl.get === "function") {
+    return configuredUrl.get();
+  }
+  return undefined;
+};
+
+export const runNetworkCheck = async (
+  args,
+  hre,
+  { log = console.log, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {},
+) => {
+  const { config } = hre;
+
+  // Only HTTP-backed networks have external RPC connectivity to check. Hardhat
+  // 3's default/node/hardhat entries are in-process simulated networks.
+  let names = Object.entries(config.networks)
+    .filter(([, networkConfig]) => networkConfig?.type === "http")
+    .map(([name]) => name);
 
   // Parse only/exclude
   const onlySet = new Set(
@@ -29,19 +50,21 @@ const action = async (args, hre) => {
   }
   const results = {};
 
-  console.log("Checking network connectivity...\n");
+  log("Checking network connectivity...\n");
 
   for (const name of names) {
-    console.log(`\nChecking: ${name}`);
+    log(`\nChecking: ${name}`);
+
+    let connection;
 
     try {
       const netCfg = config.networks[name] || {};
-      const url = netCfg.url;
+      const url = await resolveRpcUrl(netCfg);
 
       // If missing URL, skip unless includeMissing
-      if (!url || typeof url !== "string") {
+      if (typeof url !== "string" || url.length === 0) {
         if (!args.includeMissing) {
-          console.log("  Skipped: invalid RPC URL (use --include-missing to force check)");
+          log("  Skipped: invalid RPC URL (use --include-missing to force check)");
           results[name] = false;
           continue;
         }
@@ -50,20 +73,25 @@ const action = async (args, hre) => {
 
       // If Infura and missing INFURA_API_KEY, skip unless includeMissing
       if (url.includes("infura.io/v3/") && !process.env.INFURA_API_KEY && !args.includeMissing) {
-        console.log("  Warning: Skipped: missing INFURA_API_KEY (use --include-missing to force check)");
+        log("  Warning: Skipped: missing INFURA_API_KEY (use --include-missing to force check)");
         results[name] = false;
         continue;
       }
 
-      const provider = new ethers.JsonRpcProvider(url);
+      // In Hardhat 3, ethers is attached to each network connection rather than
+      // directly to the HRE. Let Hardhat resolve configuration variables and
+      // construct the provider for the selected network.
+      connection = await hre.network.create(name);
+      const { ethers } = connection;
+      const provider = ethers.provider;
       const network = await provider.getNetwork();
-      console.log(`  - Chain ID: ${network.chainId}`);
+      log(`  - Chain ID: ${network.chainId}`);
 
       const start = Date.now();
       const blockNumber = await provider.getBlockNumber();
       const rt = Date.now() - start;
-      console.log(`  - Latest block: ${blockNumber}`);
-      console.log(`  - Response time: ${rt}ms`);
+      log(`  - Latest block: ${blockNumber}`);
+      log(`  - Response time: ${rt}ms`);
 
       // Optional: output balance if PRIVATE_KEY provided
       try {
@@ -71,19 +99,24 @@ const action = async (args, hre) => {
         if (pk && /^0x[0-9a-fA-F]{64}$/.test(pk)) {
           const wallet = new ethers.Wallet(pk, provider);
           const bal = await provider.getBalance(wallet.address);
-          console.log(`  - Deployer: ${wallet.address}`);
-          console.log(`  - Balance: ${ethers.formatEther(bal)} ETH`);
+          log(`  - Deployer: ${wallet.address}`);
+          log(`  - Balance: ${ethers.formatEther(bal)} ${nativeCurrencySymbol(network.chainId)}`);
         }
       } catch {}
 
-      console.log(`  ${name} reachable`);
+      log(`  ${name} reachable`);
       results[name] = true;
     } catch (e) {
-      console.log(`  ${name} failed: ${e.message}`);
+      log(`  ${name} failed: ${e.message}`);
       results[name] = false;
+    } finally {
+      try {
+        await connection?.close?.();
+      } catch {}
     }
 
-    await new Promise((r) => setTimeout(r, parseInt(args.delay)));
+    const delay = Math.max(0, Number.parseInt(args.delay, 10) || 0);
+    await wait(delay);
   }
 
   const ok = Object.values(results).filter(Boolean).length;
@@ -93,17 +126,17 @@ const action = async (args, hre) => {
     failed: names.length - ok,
     results,
   };
-  console.log("\n" + "=".repeat(50));
-  console.log("Summary:");
-  console.log("=".repeat(50));
-  console.log(`Total checked: ${summary.totalChecked}`);
-  console.log(`Success: ${summary.success}`);
-  console.log(`Failed: ${summary.failed}`);
+  log("\n" + "=".repeat(50));
+  log("Summary:");
+  log("=".repeat(50));
+  log(`Total checked: ${summary.totalChecked}`);
+  log(`Success: ${summary.success}`);
+  log(`Failed: ${summary.failed}`);
 
   return summary;
 };
 
-export default task("networks:check", "Check connectivity for networks in hardhat.config.js")
+export default task("networks:check", "Check connectivity for networks in hardhat.config.mjs")
   .addOption({
     name: "delay",
     description: "Delay between requests ms",
@@ -126,5 +159,5 @@ export default task("networks:check", "Check connectivity for networks in hardha
     name: "includeMissing",
     description: "Include networks missing credentials/URL",
   })
-  .setAction(() => Promise.resolve({ default: action }))
+  .setAction(() => Promise.resolve({ default: runNetworkCheck }))
   .build();

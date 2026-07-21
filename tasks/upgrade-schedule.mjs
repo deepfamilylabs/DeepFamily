@@ -1,3 +1,19 @@
+/**
+ * Usage with an already deployed, verified candidate implementation:
+ *   npx hardhat --config hardhat.config.mjs upgrade-schedule --network confluxTestnet \
+ *     --target main --contract-name DeepFamilyV2 --implementation 0xNewImplementation
+ *
+ * Required: --contract-name. Omit --implementation to deploy the candidate only: the task prints
+ * its exact explorer verification command and deliberately stops without scheduling. After source
+ * verification succeeds, rerun with that address in --implementation. Keep --target,
+ * --implementation, --init-data, and optional --salt identical for execution. If the signer is not
+ * the proposer, submit the printed to/value/data through the governance multisig only after
+ * verification; the delay starts when that schedule transaction is mined. A supplied
+ * implementation must match the selected artifact's deployed runtime.
+ * --skip-storage-check skips only the baseline preflight; candidate layout validation still runs.
+ * List every option with:
+ *   npx hardhat --config hardhat.config.mjs upgrade-schedule --help
+ */
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import {
@@ -10,11 +26,24 @@ import {
   assertImplementationMatchesArtifact,
   sendOrPrint,
 } from "./lib/timelockUpgrade.mjs";
+import {
+  connectionNetworkName,
+  printCandidateVerificationGuidance,
+} from "./lib/explorerVerification.mjs";
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
+
+  const haveContractName = Boolean(args.contractName) && args.contractName !== "";
+  const havePreDeployed = Boolean(args.implementation) && args.implementation !== "";
+  if (!haveContractName) {
+    throw new Error(
+      "--contract-name <artifact> is mandatory: the upgrade task will not schedule an " +
+        "implementation whose storage layout and runtime bytecode cannot be validated",
+    );
+  }
 
   if (!args.skipStorageCheck) {
     console.log("storage-layout baseline check (pre-flight):");
@@ -27,35 +56,11 @@ const action = async (args, hre) => {
     args.target,
   );
 
-  const haveContractName = Boolean(args.contractName) && args.contractName !== "";
-  const havePreDeployed = Boolean(args.implementation) && args.implementation !== "";
-
-  if (!haveContractName && !havePreDeployed) {
-    throw new Error(
-      "Provide --implementation <addr> or --contract-name <artifact> to deploy a new one",
-    );
-  }
-
   // Candidate storage-layout check is mandatory whenever an artifact name is provided, regardless
   // of --skipStorageCheck (which only skips the baseline preflight at the top of this task). The
   // candidate check is the actual upgrade-safety gate; gating it on the same flag as the preflight
   // would let an operator accidentally disable both with one switch.
-  if (haveContractName) {
-    await assertImplementationStorageSafe(hre, spec.contract, args.contractName);
-  } else if (!args.allowUnsafe) {
-    throw new Error(
-      "--implementation given without --contract-name: cannot validate the implementation's storage " +
-        "layout against the proxy baseline. Pass --contract-name <artifact> so the upgrade task can " +
-        "diff its layout (and verify the deployed bytecode if --implementation is also given), or " +
-        "pass --allow-unsafe to acknowledge that this implementation is opaque to the storage-layout " +
-        "checker (NOT recommended for live networks).",
-    );
-  } else {
-    console.warn(
-      "WARNING: --allow-unsafe set; the implementation's storage layout is NOT being validated " +
-        "against the proxy baseline. Make sure you have verified storage compatibility off-task.",
-    );
-  }
+  await assertImplementationStorageSafe(hre, spec.contract, args.contractName);
 
   let implementation = args.implementation;
   if (havePreDeployed && haveContractName) {
@@ -71,6 +76,12 @@ const action = async (args, hre) => {
       spec,
     });
   } else if (!havePreDeployed) {
+    if (!signer) {
+      throw new Error(
+        "No signer is configured to deploy the new implementation. Pre-deploy it with a reviewed " +
+          "account, then pass both --implementation and --contract-name.",
+      );
+    }
     console.log(`deploying new implementation from artifact "${args.contractName}"...`);
     implementation = await deployImplementation(
       connection,
@@ -80,6 +91,27 @@ const action = async (args, hre) => {
       args.contractName,
     );
     console.log(`  implementation: ${implementation}`);
+  }
+
+  const candidateArtifact = await hre.artifacts.readArtifact(args.contractName);
+  const verification = printCandidateVerificationGuidance({
+    networkName: connectionNetworkName(connection),
+    sourceName: candidateArtifact.sourceName,
+    contractName: candidateArtifact.contractName,
+    implementation,
+    freshlyDeployed: !havePreDeployed,
+  });
+
+  // Explorer verification is intentionally manual: an automatic deployment cannot be both newly
+  // mined and already verified. Stop here so no schedule calldata exists before the operator has
+  // verified the exact candidate, then require the pre-deployed path on the second invocation.
+  if (verification.stopBeforeScheduling) {
+    return {
+      implementation,
+      verificationCommand: verification.command,
+      scheduled: false,
+      requiresVerification: true,
+    };
   }
 
   const initData = args.initData && args.initData !== "" ? args.initData : "0x";
@@ -136,7 +168,13 @@ const action = async (args, hre) => {
         "--target/--implementation/--init-data/--salt.",
     );
   }
-  return { implementation, operationId, salt, scheduled: result.sent };
+  return {
+    implementation,
+    operationId,
+    salt,
+    scheduled: result.sent,
+    verificationCommand: verification.command,
+  };
 };
 
 export default task("upgrade-schedule", "Stage a UUPS upgrade through the timelock owner")
@@ -148,14 +186,14 @@ export default task("upgrade-schedule", "Stage a UUPS upgrade through the timelo
   })
   .addOption({
     name: "implementation",
-    description: "Address of an already-deployed new implementation (skips deployment)",
+    description:
+      "Address of an already-deployed and source-verified implementation (skips deployment)",
     type: ArgumentType.STRING,
     defaultValue: "",
   })
   .addOption({
     name: "contractName",
-    description:
-      "Artifact name of the new implementation to deploy when --implementation is omitted",
+    description: "Implementation artifact used for mandatory storage and bytecode validation",
     type: ArgumentType.STRING,
     defaultValue: "",
   })
@@ -182,11 +220,6 @@ export default task("upgrade-schedule", "Stage a UUPS upgrade through the timelo
     description:
       "Skip the pre-flight baseline storage-layout check only. The candidate-vs-baseline check " +
       "still runs whenever --contract-name is given.",
-  })
-  .addFlag({
-    name: "allowUnsafe",
-    description:
-      "Allow scheduling --implementation without --contract-name (storage layout cannot be validated)",
   })
   .setAction(() => Promise.resolve({ default: action }))
   .build();

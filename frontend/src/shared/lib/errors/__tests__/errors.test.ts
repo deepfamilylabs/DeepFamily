@@ -161,12 +161,40 @@ describe("errors", () => {
     expect(ERROR_SELECTOR_MAP["0x2872d6ce"]).toBe("DuplicateVersion");
   });
 
+  it("maps rejected direct transfers without assuming the native currency is ETH", () => {
+    const selector = selectorOf("DirectNativeCurrencyNotAccepted()");
+
+    expect(selector).toBe("0x28926207");
+    expect(ERROR_SELECTOR_MAP[selector]).toBe("DirectNativeCurrencyNotAccepted");
+    expect(resolveErrorReason({ data: selector })).toBe("DirectNativeCurrencyNotAccepted");
+  });
+
+  it("maps governance and multisig custom errors by their exact selectors", () => {
+    const expected = [
+      ["InvalidGovernanceDelay()", "0x5bb5c7d1", "InvalidGovernanceDelay"],
+      ["InvalidGovernanceMultisig()", "0x49b8423a", "InvalidGovernanceMultisig"],
+      ["InvalidTreasuryToken()", "0x666b4c14", "InvalidTreasuryToken"],
+      ["InvalidTreasuryRecipient()", "0x7ed64517", "InvalidTreasuryRecipient"],
+      ["NotOwner()", "0x30cd7471", "NotOwner"],
+      ["AlreadyApproved()", "0x101f817a", "AlreadyApproved"],
+      ["TransactionAlreadyExecuted()", "0xdb5e659b", "TransactionAlreadyExecuted"],
+      ["TransactionFailed()", "0xbf961a28", "TransactionFailed"],
+    ] as const;
+
+    for (const [signature, selector, name] of expected) {
+      expect(selectorOf(signature)).toBe(selector);
+      expect(ERROR_SELECTOR_MAP[selector]).toBe(name);
+    }
+  });
+
   it("covers compiled DeepFamily ABI custom errors and local Solidity custom errors", () => {
     const abiErrors = DeepFamily.abi
       .filter((item: any) => item.type === "error")
       .map((item: any) => ({
         name: item.name,
-        selector: selectorOf(`${item.name}(${(item.inputs || []).map((input: any) => input.type).join(",")})`),
+        selector: selectorOf(
+          `${item.name}(${(item.inputs || []).map((input: any) => input.type).join(",")})`,
+        ),
         signature: `${item.name}(${(item.inputs || []).map((input: any) => input.type).join(",")})`,
         file: "frontend/src/abi/DeepFamily.json",
       }));

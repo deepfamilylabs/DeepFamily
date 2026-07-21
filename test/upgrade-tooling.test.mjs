@@ -14,6 +14,12 @@ import {
   deriveSalt,
   sendOrPrint,
 } from "../tasks/lib/timelockUpgrade.mjs";
+import {
+  buildImplementationVerificationCommand,
+  candidateVerificationGuidance,
+  explorerApiKeyForNetwork,
+  selectedHardhatNetwork,
+} from "../tasks/lib/explorerVerification.mjs";
 
 // Covers the upgrade-tooling layer that the contract-level UUPS tests
 // (test/contract-upgradeability.test.mjs) do not reach: the storage / bytecode safety gates
@@ -21,6 +27,78 @@ import {
 // role dual-mode, and the GOVERNANCE_OWNER deploy-handover path in integratedDeployment.mjs.
 describe("Upgrade tooling & governance deploy path", function () {
   this.timeout(120_000);
+
+  describe("candidate source-verification guidance", function () {
+    const implementation = "0x1234567890abcdef1234567890abcdef12345678";
+
+    it("uses the ConfluxScan placeholder only for eSpace networks", function () {
+      expect(explorerApiKeyForNetwork("confluxTestnet", "")).to.equal("espace");
+      expect(explorerApiKeyForNetwork("conflux", "")).to.equal("espace");
+      expect(explorerApiKeyForNetwork("sepolia", "")).to.equal("");
+      expect(explorerApiKeyForNetwork("mainnet", "")).to.equal("");
+      expect(explorerApiKeyForNetwork("sepolia", "espace")).to.equal("");
+      expect(explorerApiKeyForNetwork("conflux", "  configured-key  ")).to.equal("configured-key");
+    });
+
+    it("recognizes both Hardhat network argument forms", function () {
+      expect(
+        selectedHardhatNetwork(["node", "hardhat", "verify", "--network", "conflux"]),
+      ).to.equal("conflux");
+      expect(
+        selectedHardhatNetwork(["node", "hardhat", "verify", "--network=confluxTestnet"]),
+      ).to.equal("confluxTestnet");
+    });
+
+    it("prints an exact current-network, fully-qualified verification command", function () {
+      expect(
+        buildImplementationVerificationCommand({
+          networkName: "confluxTestnet",
+          sourceName: "contracts/DeepFamilyV2.sol",
+          contractName: "DeepFamilyV2",
+          implementation,
+        }),
+      ).to.equal(
+        "npx hardhat --config hardhat.config.mjs --build-profile default verify " +
+          "--network confluxTestnet --contract contracts/DeepFamilyV2.sol:DeepFamilyV2 " +
+          implementation,
+      );
+    });
+
+    it("stops a freshly deployed candidate before scheduling and explains the two-step flow", function () {
+      const guidance = candidateVerificationGuidance({
+        networkName: "conflux",
+        sourceName: "contracts/DeepFamilyV2.sol",
+        contractName: "DeepFamilyV2",
+        implementation,
+        freshlyDeployed: true,
+      });
+      const output = guidance.lines.join("\n");
+
+      expect(guidance.stopBeforeScheduling).to.equal(true);
+      expect(output).to.include("--network conflux");
+      expect(output).to.include("ConfluxScan");
+      expect(output).to.include('fallback "espace"');
+      expect(output).to.match(/no Timelock operation was scheduled/i);
+      expect(output).to.match(/rerun upgrade-schedule.*--implementation/i);
+    });
+
+    it("requires a real Etherscan key and verification before multisig submission", function () {
+      const guidance = candidateVerificationGuidance({
+        networkName: "sepolia",
+        sourceName: "contracts/DeepFamilyV2.sol",
+        contractName: "DeepFamilyV2",
+        implementation,
+        freshlyDeployed: false,
+      });
+      const output = guidance.lines.join("\n");
+
+      expect(guidance.stopBeforeScheduling).to.equal(false);
+      expect(output).to.include("--network sepolia");
+      expect(output).to.match(/real Etherscan API key/i);
+      expect(output).to.match(/before submitting.*schedule.*governance multisig/i);
+      expect(output).to.match(/does not contact the explorer/i);
+    });
+  });
 
   describe("storage-layout safety gate (assertImplementationStorageSafe)", function () {
     it("accepts a storage-safe append-only implementation", async () => {
@@ -126,7 +204,7 @@ describe("Upgrade tooling & governance deploy path", function () {
   describe("timelock role dual-mode (sendOrPrint)", function () {
     const deployTimelock = async (roleHolder) => {
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
-      const tl = await Timelock.deploy(3600, [roleHolder], [roleHolder], hre.ethers.ZeroAddress);
+      const tl = await Timelock.deploy(3600, roleHolder);
       await tl.waitForDeployment();
       return tl;
     };
@@ -174,50 +252,83 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(res.sent).to.equal(false);
       expect(res.calldata).to.match(/^0x[0-9a-fA-F]+$/);
     });
+
+    it("prints multisig calldata when no local signer is configured", async () => {
+      const [deployer] = await hre.ethers.getSigners();
+      const tl = await deployTimelock(await deployer.getAddress());
+      const res = await sendOrPrint({
+        timelock: tl,
+        timelockAddress: await tl.getAddress(),
+        signer: undefined,
+        role: await tl.PROPOSER_ROLE(),
+        method: "schedule",
+        callArgs: [
+          hre.ethers.ZeroAddress,
+          0,
+          "0x",
+          hre.ethers.ZeroHash,
+          hre.ethers.id("salt-no-signer"),
+          3600,
+        ],
+      });
+      expect(res.sent).to.equal(false);
+      expect(res.calldata).to.match(/^0x[0-9a-fA-F]+$/);
+    });
   });
 
   describe("GOVERNANCE_OWNER deploy handover (live-network path)", function () {
-    const ENV = "GOVERNANCE_OWNER";
-    let original;
+    const OWNER_ENV = "GOVERNANCE_OWNER";
+    const MULTISIG_ENV = "GOVERNANCE_MULTISIG";
+    let originalOwner;
+    let originalMultisig;
     beforeEach(() => {
-      original = process.env[ENV];
+      originalOwner = process.env[OWNER_ENV];
+      originalMultisig = process.env[MULTISIG_ENV];
+      delete process.env[OWNER_ENV];
+      delete process.env[MULTISIG_ENV];
     });
     afterEach(() => {
-      if (original === undefined) delete process.env[ENV];
-      else process.env[ENV] = original;
+      if (originalOwner === undefined) delete process.env[OWNER_ENV];
+      else process.env[OWNER_ENV] = originalOwner;
+      if (originalMultisig === undefined) delete process.env[MULTISIG_ENV];
+      else process.env[MULTISIG_ENV] = originalMultisig;
     });
 
     // deployIntegratedSystem exempts local/simulated networks from the governance-owner
     // requirement; fake a live networkConfig so the requirement and the ownership handover run.
     const fakeLiveConnection = () => ({
       ethers: hre.ethers,
+      artifacts: hre.artifacts,
       networkConfig: { type: "http", chainId: 11155111 },
     });
 
-    it("hands ownership of the main proxy and token to the governance timelock", async () => {
-      const [deployer, member] = await hre.ethers.getSigners();
-      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
-      const tl = await Timelock.deploy(
-        3600,
-        [await member.getAddress()],
-        [await member.getAddress()],
-        hre.ethers.ZeroAddress,
+    it("hands the main proxy to governance and retires the token bootstrap owner", async () => {
+      const [deployer, member1, member2] = await hre.ethers.getSigners();
+      const Multisig = await hre.ethers.getContractFactory("TwoOfTwoMultisigMock");
+      const multisig = await Multisig.deploy(
+        await member1.getAddress(),
+        await member2.getAddress(),
       );
+      await multisig.waitForDeployment();
+      const multisigAddr = await multisig.getAddress();
+
+      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+      const tl = await Timelock.deploy(3600, multisigAddr);
       await tl.waitForDeployment();
       const tlAddr = await tl.getAddress();
 
-      process.env[ENV] = tlAddr;
+      process.env[OWNER_ENV] = tlAddr;
+      process.env[MULTISIG_ENV] = multisigAddr;
       const deployed = await deployIntegratedSystem(fakeLiveConnection(), {
         writeDeployments: false,
         signer: deployer,
       });
 
       expect(await deployed.deepFamily.owner()).to.equal(tlAddr);
-      expect(await deployed.token.owner()).to.equal(tlAddr);
+      expect(await deployed.token.owner()).to.equal(hre.ethers.ZeroAddress);
     });
 
     it("refuses to deploy without GOVERNANCE_OWNER on a live network", async () => {
-      delete process.env[ENV];
       const [deployer] = await hre.ethers.getSigners();
       let err;
       try {
@@ -234,7 +345,7 @@ describe("Upgrade tooling & governance deploy path", function () {
 
     it("refuses an EOA (codeless) governance owner", async () => {
       const [deployer, eoa] = await hre.ethers.getSigners();
-      process.env[ENV] = await eoa.getAddress();
+      process.env[OWNER_ENV] = await eoa.getAddress();
       let err;
       try {
         await deployIntegratedSystem(fakeLiveConnection(), {
@@ -246,6 +357,136 @@ describe("Upgrade tooling & governance deploy path", function () {
       }
       expect(err, "expected an EOA-owner abort").to.be.an("error");
       expect(err.message).to.match(/no code|EOA/i);
+    });
+
+    it("refuses a multisig contract as the direct governance owner", async () => {
+      const [deployer, member1, member2] = await hre.ethers.getSigners();
+      const Multisig = await hre.ethers.getContractFactory("TwoOfTwoMultisigMock");
+      const multisig = await Multisig.deploy(
+        await member1.getAddress(),
+        await member2.getAddress(),
+      );
+      await multisig.waitForDeployment();
+      process.env[OWNER_ENV] = await multisig.getAddress();
+      process.env[MULTISIG_ENV] = await multisig.getAddress();
+
+      let err;
+      try {
+        await deployIntegratedSystem(fakeLiveConnection(), {
+          writeDeployments: false,
+          signer: deployer,
+        });
+      } catch (e) {
+        err = e;
+      }
+
+      expect(err, "expected a non-timelock owner abort").to.be.an("error");
+      expect(err.message).to.match(/does not behave like a TimelockController/i);
+      expect(err.message).to.match(/bytecode does NOT match artifact GovernanceTimelock/i);
+      expect(err.message).to.match(/multisig.*proposer\/canceller\/executor.*instead/i);
+    });
+
+    it("requires a configured multisig contract for a genuine timelock", async () => {
+      const [deployer, member] = await hre.ethers.getSigners();
+      const memberAddr = await member.getAddress();
+      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+      const tl = await Timelock.deploy(3600, memberAddr);
+      await tl.waitForDeployment();
+      process.env[OWNER_ENV] = await tl.getAddress();
+
+      let err;
+      try {
+        await deployIntegratedSystem(fakeLiveConnection(), {
+          writeDeployments: false,
+          signer: deployer,
+        });
+      } catch (e) {
+        err = e;
+      }
+
+      expect(err, "expected a missing-multisig abort").to.be.an("error");
+      expect(err.message).to.match(/GOVERNANCE_MULTISIG must be set/i);
+    });
+
+    it("rejects a contract wallet whose reported threshold is below two", async () => {
+      const [deployer, owner] = await hre.ethers.getSigners();
+      const Wallet = await hre.ethers.getContractFactory("SingleSignerWalletMock");
+      const wallet = await Wallet.deploy(await owner.getAddress());
+      await wallet.waitForDeployment();
+      const walletAddress = await wallet.getAddress();
+
+      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+      const tl = await Timelock.deploy(3600, walletAddress);
+      await tl.waitForDeployment();
+      process.env[OWNER_ENV] = await tl.getAddress();
+      process.env[MULTISIG_ENV] = walletAddress;
+
+      let err;
+      try {
+        await deployIntegratedSystem(fakeLiveConnection(), {
+          writeDeployments: false,
+          signer: deployer,
+        });
+      } catch (e) {
+        err = e;
+      }
+
+      expect(err, "expected a single-signer policy abort").to.be.an("error");
+      expect(err.message).to.match(/threshold=1.*requires at least 2/i);
+    });
+
+    it("rejects a codeless GOVERNANCE_MULTISIG even when that EOA holds timelock roles", async () => {
+      const [deployer, roleHolder] = await hre.ethers.getSigners();
+      const roleHolderAddr = await roleHolder.getAddress();
+      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+      const tl = await Timelock.deploy(3600, roleHolderAddr);
+      await tl.waitForDeployment();
+      process.env[OWNER_ENV] = await tl.getAddress();
+      process.env[MULTISIG_ENV] = roleHolderAddr;
+
+      let err;
+      try {
+        await deployIntegratedSystem(fakeLiveConnection(), {
+          writeDeployments: false,
+          signer: deployer,
+        });
+      } catch (e) {
+        err = e;
+      }
+
+      expect(err, "expected a codeless-multisig abort").to.be.an("error");
+      expect(err.message).to.match(/GOVERNANCE_MULTISIG .* has no contract code/i);
+    });
+
+    it("requires all timelock governance roles to belong to the configured multisig", async () => {
+      const [deployer, member1, member2, unrelated] = await hre.ethers.getSigners();
+      const Multisig = await hre.ethers.getContractFactory("TwoOfTwoMultisigMock");
+      const multisig = await Multisig.deploy(
+        await member1.getAddress(),
+        await member2.getAddress(),
+      );
+      await multisig.waitForDeployment();
+      const multisigAddr = await multisig.getAddress();
+      const unrelatedAddr = await unrelated.getAddress();
+
+      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+      const tl = await Timelock.deploy(3600, unrelatedAddr);
+      await tl.waitForDeployment();
+      process.env[OWNER_ENV] = await tl.getAddress();
+      process.env[MULTISIG_ENV] = multisigAddr;
+
+      let err;
+      try {
+        await deployIntegratedSystem(fakeLiveConnection(), {
+          writeDeployments: false,
+          signer: deployer,
+        });
+      } catch (e) {
+        err = e;
+      }
+
+      expect(err, "expected a missing-role abort").to.be.an("error");
+      expect(err.message).to.match(/missing PROPOSER_ROLE, CANCELLER_ROLE, EXECUTOR_ROLE/i);
     });
   });
 

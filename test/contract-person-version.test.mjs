@@ -25,6 +25,18 @@ describe('Person Version (add-person) Tests', function () {
     return { deepFamily, reader: deepFamilyReader, token, signer }
   }
 
+  it('rejects direct native-currency transfers and unknown calldata', async () => {
+    const { deepFamily, signer } = await baseSetup()
+    const target = await deepFamily.getAddress()
+
+    await expect(
+      signer.sendTransaction({ to: target, value: 1n })
+    ).to.be.revertedWithCustomError(deepFamily, 'DirectNativeCurrencyNotAccepted')
+    await expect(
+      signer.sendTransaction({ to: target, data: '0x12345678' })
+    ).to.be.revertedWithCustomError(deepFamily, 'DirectNativeCurrencyNotAccepted')
+  })
+
   it('adds a basic person and emits event', async () => {
     const { deepFamily, reader, signer } = await baseSetup()
     const person = makeTestPerson('Basic Person')

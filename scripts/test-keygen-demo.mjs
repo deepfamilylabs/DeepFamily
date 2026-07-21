@@ -179,7 +179,7 @@ async function demo() {
   );
   const result3 = await deriveKey(hash3, user1Modified, "PrivateKey", "FAST");
 
-  console.log(`Passphrase Change (original -> modified):`);;
+  console.log(`Passphrase Change (original -> modified):`);
   console.log(`   Original Key: ${result1.key.substring(0, 20)}...`);
   console.log(`   New Key: ${result3.key.substring(0, 20)}...`);
   console.log(`   Completely Different: ${result1.key !== result3.key}\n`);
@@ -215,7 +215,7 @@ async function demo() {
   console.log("Deterministic: Same inputs -> Same key");
   console.log("Security: KDF provides 131,072x brute-force protection");
   console.log("Avalanche Effect: Any minor change -> Completely different key");
-  console.log("Practicality: Can be directly used for Ethereum wallets\n");
+  console.log("Practicality: Can be directly used with EVM-compatible wallets\n");
   console.log("Important: Strong passphrase (20+ characters) is key to security!\n");
 }
 

@@ -1,5 +1,6 @@
 // Supported networks configuration for DeepFamily
-// Officially supported: Ethereum (Mainnet/Sepolia/Holesky) and Conflux eSpace (Mainnet/Testnet)
+// Primary networks: Conflux eSpace (Mainnet/Testnet)
+// Optional EVM-compatible networks: Ethereum (Mainnet/Sepolia)
 
 export interface NetworkConfig {
   chainId: number;
@@ -21,6 +22,30 @@ export interface NetworkPreset {
 }
 
 export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
+  // Conflux eSpace Mainnet
+  1030: {
+    chainId: 1030,
+    name: "Conflux eSpace",
+    rpcUrl: "https://evm.confluxrpc.com",
+    blockExplorer: "https://evm.confluxscan.org",
+    nativeCurrency: {
+      name: "CFX",
+      symbol: "CFX",
+      decimals: 18,
+    },
+  },
+  // Conflux eSpace Testnet
+  71: {
+    chainId: 71,
+    name: "Conflux eSpace Testnet",
+    rpcUrl: "https://evmtestnet.confluxrpc.com",
+    blockExplorer: "https://evmtestnet.confluxscan.org",
+    nativeCurrency: {
+      name: "CFX",
+      symbol: "CFX",
+      decimals: 18,
+    },
+  },
   // Ethereum Mainnet
   1: {
     chainId: 1,
@@ -45,42 +70,6 @@ export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
       decimals: 18,
     },
   },
-  // Ethereum Holesky testnet
-  17000: {
-    chainId: 17000,
-    name: "Ethereum Holesky",
-    rpcUrl: "https://ethereum-holesky-rpc.publicnode.com",
-    blockExplorer: "https://holesky.etherscan.io",
-    nativeCurrency: {
-      name: "Holesky Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-  },
-  // Conflux eSpace Mainnet
-  1030: {
-    chainId: 1030,
-    name: "Conflux eSpace",
-    rpcUrl: "https://evm.confluxrpc.com",
-    blockExplorer: "https://evm.confluxscan.io",
-    nativeCurrency: {
-      name: "CFX",
-      symbol: "CFX",
-      decimals: 18,
-    },
-  },
-  // Conflux eSpace Testnet
-  71: {
-    chainId: 71,
-    name: "Conflux eSpace Testnet",
-    rpcUrl: "https://evmtestnet.confluxrpc.com",
-    blockExplorer: "https://evmtestnet.confluxscan.io",
-    nativeCurrency: {
-      name: "CFX",
-      symbol: "CFX",
-      decimals: 18,
-    },
-  },
   // Localhost/Hardhat (for development)
   31337: {
     chainId: 31337,
@@ -96,24 +85,6 @@ export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
 
 export const NETWORK_PRESETS: NetworkPreset[] = [
   {
-    chainId: 1,
-    nameKey: "wallet.networks.ethereum",
-    defaultName: "Ethereum Mainnet",
-    rpcUrl: "https://ethereum-rpc.publicnode.com",
-  },
-  {
-    chainId: 11155111,
-    nameKey: "wallet.networks.sepolia",
-    defaultName: "Ethereum Sepolia",
-    rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
-  },
-  {
-    chainId: 17000,
-    nameKey: "wallet.networks.holesky",
-    defaultName: "Ethereum Holesky",
-    rpcUrl: "https://ethereum-holesky-rpc.publicnode.com",
-  },
-  {
     chainId: 1030,
     nameKey: "wallet.networks.confluxEspace",
     defaultName: "Conflux eSpace",
@@ -124,6 +95,18 @@ export const NETWORK_PRESETS: NetworkPreset[] = [
     nameKey: "wallet.networks.confluxEspaceTestnet",
     defaultName: "Conflux eSpace Testnet",
     rpcUrl: "https://evmtestnet.confluxrpc.com",
+  },
+  {
+    chainId: 1,
+    nameKey: "wallet.networks.ethereum",
+    defaultName: "Ethereum Mainnet",
+    rpcUrl: "https://ethereum-rpc.publicnode.com",
+  },
+  {
+    chainId: 11155111,
+    nameKey: "wallet.networks.sepolia",
+    defaultName: "Ethereum Sepolia",
+    rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
   },
   {
     chainId: 31337,
@@ -148,7 +131,7 @@ export function getAddChainParams(chainId: number): object | null {
 }
 
 // List of supported chain IDs
-export const SUPPORTED_CHAIN_IDS = Object.keys(SUPPORTED_NETWORKS).map(Number);
+export const SUPPORTED_CHAIN_IDS = NETWORK_PRESETS.map(({ chainId }) => chainId);
 
 // Check if a chain ID is supported
 export function isSupportedChain(chainId: number | null | undefined): boolean {

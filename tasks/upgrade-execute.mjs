@@ -1,3 +1,16 @@
+/**
+ * Usage (after upgrade-schedule has been mined and the Timelock delay has elapsed):
+ *   npx hardhat --config hardhat.config.mjs upgrade-execute --network confluxTestnet \
+ *     --target main --implementation 0xNewImplementation
+ *
+ * Required: --implementation.
+ * Use the exact --target, --implementation, --init-data, and optional --salt from the schedule
+ * command. If the local signer is not the executor, submit the printed to/value/data through the
+ * governance multisig, then re-run this command to confirm the proxy implementation and refresh
+ * deployment metadata.
+ * List every option with:
+ *   npx hardhat --config hardhat.config.mjs upgrade-execute --help
+ */
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import {
@@ -89,7 +102,7 @@ const action = async (args, hre) => {
   // EXECUTOR_ROLE granted to address(0) means execution is open to anyone after the delay.
   const openExecutor = await timelock.hasRole(executorRole, ethers.ZeroAddress);
   let executed = false;
-  if (openExecutor) {
+  if (openExecutor && signer) {
     console.log("  executor role is open (address(0)); executing directly");
     const tx = await timelock
       .connect(signer)
@@ -98,6 +111,9 @@ const action = async (args, hre) => {
     console.log(`  executed: tx ${tx.hash}`);
     executed = true;
   } else {
+    if (openExecutor) {
+      console.log("  executor role is open, but no signer is configured; printing calldata");
+    }
     const result = await sendOrPrint({
       timelock,
       timelockAddress,

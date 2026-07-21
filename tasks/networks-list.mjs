@@ -1,32 +1,46 @@
 import { task } from "hardhat/config";
 
-const action = async (_, hre) => {
-  const all = Object.entries(hre.config.networks).map(([name, conf]) => ({
+const INTERNAL_NETWORKS = new Set(["default", "node", "hardhat"]);
+const NETWORK_ORDER = new Map(
+  ["conflux", "confluxTestnet", "mainnet", "sepolia", "localhost"].map((name, index) => [
     name,
-    chainId: conf.chainId,
-  }));
+    index,
+  ]),
+);
 
-  console.log("DeepFamily supported blockchain networks\n");
-  console.log("-".repeat(60));
+export const listSupportedNetworks = (networks) =>
+  Object.entries(networks)
+    .filter(([name]) => !INTERNAL_NETWORKS.has(name))
+    .map(([name, conf]) => ({
+      name,
+      chainId: conf.chainId,
+    }))
+    .sort(
+      (a, b) =>
+        (NETWORK_ORDER.get(a.name) ?? Number.MAX_SAFE_INTEGER) -
+          (NETWORK_ORDER.get(b.name) ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name),
+    );
+
+export const runNetworksList = async (_, hre, { log = console.log } = {}) => {
+  const all = listSupportedNetworks(hre.config.networks);
+
+  log("DeepFamily supported blockchain networks\n");
+  log("-".repeat(60));
   for (const n of all) {
-    console.log(`${String(n.name).padEnd(20)} | Chain ID: ${String(n.chainId || "-")}`);
+    log(`${String(n.name).padEnd(20)} | Chain ID: ${String(n.chainId || "-")}`);
   }
 
-  console.log("\nDeployment command examples:");
-  console.log("-".repeat(60));
+  log("\nDeployment command examples:");
+  log("-".repeat(60));
   for (const n of all) {
-    if (n.name !== "localhost") {
-      const scriptName = n.name.replace(/([A-Z])/g, "-$1").toLowerCase();
-      console.log(`npm run deploy:${scriptName}`);
-    }
+    log(`npm run deploy:net --net=${n.name}`);
   }
 
-  console.log("\nVerification command examples:");
-  console.log("-".repeat(60));
+  log("\nVerification command examples:");
+  log("-".repeat(60));
   for (const n of all) {
     if (n.name !== "localhost") {
-      const scriptName = n.name.replace(/([A-Z])/g, "-$1").toLowerCase();
-      console.log(`npm run verify:${scriptName}`);
+      log(`npm run verify:net --net=${n.name}`);
     }
   }
 
@@ -34,5 +48,5 @@ const action = async (_, hre) => {
 };
 
 export default task("networks:list", "List available networks and common command hints")
-  .setAction(() => Promise.resolve({ default: action }))
+  .setAction(() => Promise.resolve({ default: runNetworksList }))
   .build();
