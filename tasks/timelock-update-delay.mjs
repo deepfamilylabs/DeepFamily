@@ -22,6 +22,7 @@ import {
   sendOrPrint,
 } from "./lib/timelockUpgrade.mjs";
 import { readExactTimelockRoleState } from "./lib/timelockMultisigMigration.mjs";
+import { assertConfiguredTimelockGovernanceProfile } from "./lib/timelockGovernancePolicy.mjs";
 import { DEFAULT_TIMELOCK_ARTIFACT, parseArtifactName } from "./lib/timelockArtifacts.mjs";
 
 const VALID_PHASES = new Set(["schedule", "execute"]);
@@ -95,7 +96,13 @@ export const resolveDelayUpdateOperation = async ({ hre, connection, ethers, arg
     spec: { needsLibraries: false },
   });
   await assertSelfAdmin(ethers, timelock, timelockAddress);
-  await readExactTimelockRoleState({ ethers, timelock, timelockAddress });
+  const roleState = await readExactTimelockRoleState({ ethers, timelock, timelockAddress });
+  await assertConfiguredTimelockGovernanceProfile({
+    ethers,
+    timelock,
+    timelockAddress,
+    roleState,
+  });
 
   const currentDelay = await timelock.getMinDelay();
   const target = timelockAddress;

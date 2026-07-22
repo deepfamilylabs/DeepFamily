@@ -14,6 +14,8 @@ import {
   resolveGovernanceCall,
   simulateGovernanceCall,
 } from "../tasks/lib/timelockGovernance.mjs";
+import { resolveGovernedTarget } from "../tasks/lib/timelockUpgrade.mjs";
+import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "../scripts/lib/governanceSafety.mjs";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 
 describe("Generic governance tooling", function () {
@@ -170,6 +172,47 @@ describe("Generic governance tooling", function () {
   });
 
   describe("schedule / execute task guards", function () {
+    it("shares the optional strict wallet-profile gate while preserving the blank-profile path", async () => {
+      const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+      const [, ownerA, ownerB] = await hre.ethers.getSigners();
+      const Multisig = await hre.ethers.getContractFactory("TwoOfTwoMultisigMock");
+      const multisig = await Multisig.deploy(await ownerA.getAddress(), await ownerB.getAddress());
+      await multisig.waitForDeployment();
+      const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+      const timelock = await Timelock.deploy(60, await multisig.getAddress());
+      await timelock.waitForDeployment();
+      await (await deepFamily.transferOwnership(await timelock.getAddress())).wait();
+
+      const originalCwd = process.cwd();
+      const originalProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
+      const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-profile-gate-"));
+      const networkName = "governance-profile-gate";
+      const deploymentDirectory = path.join(temporaryRoot, "deployments", networkName);
+      await fs.mkdir(deploymentDirectory, { recursive: true });
+      await fs.writeFile(
+        path.join(deploymentDirectory, "DeepFamily.json"),
+        JSON.stringify({ address: await deepFamily.getAddress() }),
+      );
+      const connection = { ethers: hre.ethers, networkName };
+
+      try {
+        process.chdir(temporaryRoot);
+        delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+        const generic = await resolveGovernedTarget(connection, hre.ethers, "main");
+        expect(generic.governanceProfile).to.equal(null);
+
+        process.env.GOVERNANCE_MULTISIG_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
+        await expect(resolveGovernedTarget(connection, hre.ethers, "main")).to.be.rejectedWith(
+          /restricted to Conflux eSpace.*31337/i,
+        );
+      } finally {
+        process.chdir(originalCwd);
+        if (originalProfile === undefined) delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+        else process.env.GOVERNANCE_MULTISIG_PROFILE = originalProfile;
+        await fs.rm(temporaryRoot, { recursive: true, force: true });
+      }
+    });
+
     it("enforces scheduling state and the timelock delay before executing", async () => {
       const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
       const [deployer] = await hre.ethers.getSigners();

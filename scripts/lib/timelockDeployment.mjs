@@ -1,4 +1,7 @@
-import { assertGovernanceMultisig, isLocalDevelopmentConnection } from "./governanceSafety.mjs";
+import {
+  assertGovernanceMultisigWithProfile,
+  isLocalDevelopmentConnection,
+} from "./governanceSafety.mjs";
 
 const LOCAL_MIN_DELAY_SECONDS = 120;
 
@@ -37,7 +40,7 @@ export const resolveTimelockDeploymentConfig = async ({
   env,
   deployerAddress,
   provider = ethers.provider,
-  inspectMultisig = assertGovernanceMultisig,
+  inspectMultisig,
 }) => {
   const isLocal = isLocalTimelockNetwork({ connection });
 
@@ -61,7 +64,17 @@ export const resolveTimelockDeploymentConfig = async ({
   });
 
   if (!isLocal) {
-    await inspectMultisig({
+    const inspect =
+      inspectMultisig ??
+      ((args) =>
+        assertGovernanceMultisigWithProfile({
+          ...args,
+          // `env` is an explicit configuration boundary for this resolver. Passing undefined
+          // would trigger the helper's process.env default and make injected/test environments
+          // unexpectedly inherit a host-level production profile.
+          profile: env.GOVERNANCE_MULTISIG_PROFILE ?? "",
+        }));
+    await inspect({
       ethers,
       provider,
       address: governanceMultisig,

@@ -15,6 +15,21 @@ const publicErrorMessage = (error) => {
     .slice(0, 500);
 };
 
+// ConfluxScan can finish a verification request successfully but return the machine status
+// `already_verified` while Hardhat is polling it. hardhat-verify currently doesn't recognize
+// that eSpace-specific spelling and wraps it in HHE80024, so handle only the explorer's exact
+// machine marker here. Free-form messages such as "already verified" remain failures.
+const isConfluxScanAlreadyVerified = (error) => {
+  if (error?.customCode === "already_verified" || error?.body?.customCode === "already_verified") {
+    return true;
+  }
+
+  const messages = [error?.shortMessage, error?.reason, error?.message]
+    .filter((value) => typeof value === "string")
+    .join("\n");
+  return /(?:^|[\s"'])already_verified\s*:/i.test(messages);
+};
+
 const log = (logger, level, message) => {
   if (!logger) return;
   if (typeof logger === "function") {
@@ -160,6 +175,15 @@ export const verifyAcceptanceContracts = async ({
         lastError = undefined;
         break;
       } catch (error) {
+        if (isConfluxScanAlreadyVerified(error)) {
+          lastError = undefined;
+          log(
+            logger,
+            "log",
+            `[verify] ${entry.label} already verified on ConfluxScan; accepting explorer status`,
+          );
+          break;
+        }
         lastError = error;
         const detail = publicErrorMessage(error);
         log(logger, "warn", `[verify] ${entry.label} attempt ${attempts} failed: ${detail}`);

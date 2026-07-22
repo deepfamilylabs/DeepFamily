@@ -1,4 +1,4 @@
-import { assertGovernanceMultisig } from "../../scripts/lib/governanceSafety.mjs";
+import { assertGovernanceMultisigWithProfile } from "../../scripts/lib/governanceSafety.mjs";
 import { DEFAULT_TIMELOCK_ARTIFACT, parseArtifactName } from "./timelockArtifacts.mjs";
 import { readExactTimelockRoleState } from "./timelockMultisigMigration.mjs";
 import {
@@ -110,7 +110,7 @@ export const resolveTreasury = async ({ hre, connection, ethers, args }) => {
     timelock,
     timelockAddress,
   });
-  const multisigPolicy = await assertGovernanceMultisig({
+  const multisigPolicy = await assertGovernanceMultisigWithProfile({
     ethers,
     provider: ethers.provider,
     address: roleState.currentMultisig,

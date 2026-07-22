@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 import {
-  assertGovernanceMultisig,
+  assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "../scripts/lib/governanceSafety.mjs";
 
@@ -22,7 +22,13 @@ const resolveConnection = async (hreOrConnection) => {
   throw new Error("Expected a Hardhat 3 connection or an hre with network.connect()");
 };
 
-const getNetworkDeploymentsDir = (connection) => {
+const getNetworkDeploymentsDir = (connection, deploymentDirectory) => {
+  if (deploymentDirectory !== undefined) {
+    if (typeof deploymentDirectory !== "string" || deploymentDirectory.trim() === "") {
+      throw new Error("deploymentDirectory must be a non-empty path when provided");
+    }
+    return path.resolve(deploymentDirectory);
+  }
   const networkName =
     connection.networkName ||
     connection.network?.name ||
@@ -142,8 +148,15 @@ const assertCurrentArtifactSet = async ({
   }
 };
 
-const writeDeployment = async (connection, contractName, address, abi, extra = {}) => {
-  const dir = getNetworkDeploymentsDir(connection);
+const writeDeployment = async (
+  connection,
+  contractName,
+  address,
+  abi,
+  extra = {},
+  deploymentDirectory,
+) => {
+  const dir = getNetworkDeploymentsDir(connection, deploymentDirectory);
   await fs.mkdir(dir, { recursive: true });
   const filePath = path.join(dir, `${contractName}.json`);
   const payload = { address, ...extra, abi };
@@ -211,7 +224,7 @@ const assertGovernanceOwnerInvariants = async ({ connection, ethers, artifacts, 
   }
 
   const multisig = ethers.getAddress(configuredMultisig);
-  const multisigPolicy = await assertGovernanceMultisig({
+  const multisigPolicy = await assertGovernanceMultisigWithProfile({
     ethers,
     provider: ethers.provider,
     address: multisig,
@@ -408,6 +421,7 @@ export const deployIntegratedSystem = async (
     transactionConfirmations = 1,
     transactionTimeoutMs = 0,
     onTransactionReceipt,
+    deploymentDirectory,
   } = {},
 ) => {
   const connection = await resolveConnection(hreOrConnection);
@@ -424,6 +438,9 @@ export const deployIntegratedSystem = async (
   }
   if (onTransactionReceipt !== undefined && typeof onTransactionReceipt !== "function") {
     throw new Error("onTransactionReceipt must be a function when provided");
+  }
+  if (deploymentDirectory !== undefined && writeDeployments !== true) {
+    throw new Error("deploymentDirectory requires writeDeployments=true");
   }
   const transactionReceipts = {};
   const waitForTransaction = async (label, transaction) => {
@@ -603,40 +620,71 @@ export const deployIntegratedSystem = async (
     const nameVerifierArtifact = await artifacts.readArtifact("DisclosureBindingVerifier");
     const groth16AdapterArtifact = await artifacts.readArtifact("Groth16VerifierAdapter");
 
-    await writeDeployment(connection, "DeepFamilyToken", tokenAddress, tokenArtifact.abi);
-    await writeDeployment(connection, "PoseidonT5", poseidonT5Address, poseidonT5Artifact.abi);
+    await writeDeployment(
+      connection,
+      "DeepFamilyToken",
+      tokenAddress,
+      tokenArtifact.abi,
+      {},
+      deploymentDirectory,
+    );
+    await writeDeployment(
+      connection,
+      "PoseidonT5",
+      poseidonT5Address,
+      poseidonT5Artifact.abi,
+      {},
+      deploymentDirectory,
+    );
     await writeDeployment(
       connection,
       "AdultAgeGate",
       adultAgeGateAddress,
       adultAgeGateArtifact.abi,
+      {},
+      deploymentDirectory,
     );
     await writeDeployment(
       connection,
       "PersonCommitmentVerifier",
       personCommitmentVerifierAddress,
       personVerifierArtifact.abi,
+      {},
+      deploymentDirectory,
     );
     await writeDeployment(
       connection,
       "DisclosureBindingVerifier",
       nameDisclosureVerifierAddress,
       nameVerifierArtifact.abi,
+      {},
+      deploymentDirectory,
     );
     await writeDeployment(
       connection,
       "Groth16VerifierAdapter",
       groth16VerifierAdapterAddress,
       groth16AdapterArtifact.abi,
+      {},
+      deploymentDirectory,
     );
-    await writeDeployment(connection, "DeepFamily", deepFamilyAddress, deepArtifact.abi, {
-      implementationAddress: deepFamilyImplementationAddress,
-    });
+    await writeDeployment(
+      connection,
+      "DeepFamily",
+      deepFamilyAddress,
+      deepArtifact.abi,
+      {
+        implementationAddress: deepFamilyImplementationAddress,
+      },
+      deploymentDirectory,
+    );
     await writeDeployment(
       connection,
       "DeepFamilyReader",
       deepFamilyReaderAddress,
       readerArtifact.abi,
+      {},
+      deploymentDirectory,
     );
   }
 

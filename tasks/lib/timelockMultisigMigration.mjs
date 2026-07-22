@@ -1,4 +1,4 @@
-import { assertGovernanceMultisig } from "../../scripts/lib/governanceSafety.mjs";
+import { assertGovernanceMultisigWithProfile } from "../../scripts/lib/governanceSafety.mjs";
 
 const GOVERNANCE_ROLE_NAMES = ["PROPOSER_ROLE", "CANCELLER_ROLE", "EXECUTOR_ROLE"];
 
@@ -68,7 +68,7 @@ export const readExactTimelockRoleState = async ({ ethers, timelock, timelockAdd
 };
 
 export const assertNewMultisigForMigration = async ({ ethers, address }) => {
-  return assertGovernanceMultisig({
+  return assertGovernanceMultisigWithProfile({
     ethers,
     provider: ethers.provider,
     address,

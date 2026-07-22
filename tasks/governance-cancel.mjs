@@ -13,7 +13,7 @@
  */
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import { resolveTarget, sendOrPrint } from "./lib/timelockUpgrade.mjs";
+import { resolveGovernedTarget, sendOrPrint } from "./lib/timelockUpgrade.mjs";
 
 export const action = async (args, hre) => {
   const connection = await hre.network.connect();
@@ -24,7 +24,7 @@ export const action = async (args, hre) => {
     throw new Error("--operation-id must be a 32-byte timelock operation ID");
   }
 
-  const { spec, proxyAddress, timelock, timelockAddress } = await resolveTarget(
+  const { spec, proxyAddress, timelock, timelockAddress } = await resolveGovernedTarget(
     connection,
     ethers,
     args.target,

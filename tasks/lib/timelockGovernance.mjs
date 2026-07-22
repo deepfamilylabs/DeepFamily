@@ -1,4 +1,4 @@
-import { resolveTarget } from "./timelockUpgrade.mjs";
+import { resolveGovernedTarget } from "./timelockUpgrade.mjs";
 
 const FORBIDDEN_GOVERNANCE_SIGNATURES = [
   "upgradeToAndCall(address,bytes)",
@@ -129,7 +129,7 @@ export const parseGovernanceDelay = (rawDelay, minDelay) => {
 };
 
 export const resolveGovernanceOperation = async ({ connection, ethers, args }) => {
-  const resolved = await resolveTarget(connection, ethers, args.target);
+  const resolved = await resolveGovernedTarget(connection, ethers, args.target);
   const { proxy, proxyAddress, timelock } = resolved;
   const call = resolveGovernanceCall({
     ethers,

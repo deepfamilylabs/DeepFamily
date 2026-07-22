@@ -50,7 +50,7 @@ export const buildImplementationVerificationCommand = ({
   assertSafeCommandValue("implementation address", implementation, /^0x[0-9a-fA-F]{40}$/);
 
   return (
-    "npx hardhat --config hardhat.config.mjs --build-profile default verify " +
+    "npx hardhat --config hardhat.config.mjs --build-profile production verify " +
     `--network ${networkName} --contract ${sourceName}:${contractName} ${implementation}`
   );
 };

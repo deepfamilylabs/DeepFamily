@@ -20,7 +20,10 @@
  */
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import { assertGovernanceMultisig } from "../scripts/lib/governanceSafety.mjs";
+import {
+  assertGovernanceMultisig,
+  assertGovernanceMultisigWithProfile,
+} from "../scripts/lib/governanceSafety.mjs";
 import { parseArtifactName } from "./lib/timelockArtifacts.mjs";
 import { buildOwnerMigrationOperation } from "./lib/timelockOwnerMigration.mjs";
 import {
@@ -200,13 +203,16 @@ export const resolveOwnerMigrationOperation = async ({ hre, connection, ethers, 
         `--new-multisig ${newMultisig}`,
     );
   }
+  // The source wallet may be the reason governance is migrating. Require its generic multisig
+  // safety interface, but do not make recovery depend on it still matching the destination's
+  // strict implementation profile. The destination must satisfy the configured profile.
   const oldMultisigPolicy = await assertGovernanceMultisig({
     ethers,
     provider: ethers.provider,
     address: oldMultisig,
     label: "old timelock governance multisig",
   });
-  const newMultisigPolicy = await assertGovernanceMultisig({
+  const newMultisigPolicy = await assertGovernanceMultisigWithProfile({
     ethers,
     provider: ethers.provider,
     address: newMultisig,

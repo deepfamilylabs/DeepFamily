@@ -2,7 +2,9 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import {
   ESPACE_E2E_CONFIRMATION,
-  buildMultisigExecuteTypedData,
+  ESPACE_E2E_MODE_DIAGNOSTIC,
+  ESPACE_E2E_MODE_RELEASE_REHEARSAL,
+  ESPACE_E2E_RELEASE_SAFE_PROFILE,
   deriveAcceptanceWallet,
   deriveAcceptanceWallets,
   hashRunId,
@@ -12,7 +14,7 @@ import {
   runIdReportFileComponent,
   safeJsonStringify,
   sanitizeRunId,
-  signMultisigExecute,
+  summarizeProductionBuildInfo,
   withTimeout,
 } from "../scripts/lib/espaceAcceptanceSafety.mjs";
 
@@ -44,13 +46,62 @@ describe("eSpace acceptance safety helpers", function () {
       const result = parseESpaceAcceptanceConfig(baseConfig());
       expect(result.networkName).to.equal("confluxTestnet");
       expect(result.chainId).to.equal(71n);
+      expect(result.acceptanceMode).to.equal(ESPACE_E2E_MODE_DIAGNOSTIC);
       expect(result.minDelaySeconds).to.equal(30);
+      expect(result.productionMinDelaySeconds).to.equal(null);
+      expect(result.productionGovernanceMultisigProfile).to.equal(null);
       expect(result.confirmations).to.equal(2);
       expect(result.maxCfx).to.equal("5");
       expect(result.maxCfxWei).to.equal(ethers.parseEther("5"));
       expect(result.verify).to.equal(true);
       expect(result.recover).to.equal(false);
+      expect(result.requireFinality).to.equal(true);
+      expect(result.finalityTimeoutSeconds).to.equal(3600);
       expect(result.runId).to.equal(null);
+    });
+
+    it("accepts only the two explicit acceptance modes", function () {
+      expect(
+        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: ESPACE_E2E_MODE_DIAGNOSTIC }))
+          .acceptanceMode,
+      ).to.equal(ESPACE_E2E_MODE_DIAGNOSTIC);
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: "release" })),
+      ).to.throw(/ESPACE_E2E_MODE.*diagnostic.*release-rehearsal/i);
+    });
+
+    it("requires complete release-rehearsal flags and the exact production delay", function () {
+      const releaseEnv = {
+        ESPACE_E2E_MODE: ESPACE_E2E_MODE_RELEASE_REHEARSAL,
+        ESPACE_E2E_MIN_DELAY: "172800",
+        MIN_DELAY: "172800",
+        GOVERNANCE_MULTISIG_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
+      };
+      const result = parseESpaceAcceptanceConfig(baseConfig(releaseEnv));
+      expect(result.acceptanceMode).to.equal(ESPACE_E2E_MODE_RELEASE_REHEARSAL);
+      expect(result.verify).to.equal(true);
+      expect(result.requireFinality).to.equal(true);
+      expect(result.minDelaySeconds).to.equal(172800);
+      expect(result.productionMinDelaySeconds).to.equal(172800);
+      expect(result.productionGovernanceMultisigProfile).to.equal(ESPACE_E2E_RELEASE_SAFE_PROFILE);
+
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, ESPACE_E2E_VERIFY: "0" })),
+      ).to.throw(/release-rehearsal requires ESPACE_E2E_VERIFY=1/i);
+      expect(() =>
+        parseESpaceAcceptanceConfig(
+          baseConfig({ ...releaseEnv, ESPACE_E2E_REQUIRE_FINALITY: "0" }),
+        ),
+      ).to.throw(/release-rehearsal requires ESPACE_E2E_REQUIRE_FINALITY=1/i);
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "" })),
+      ).to.throw(/MIN_DELAY.*explicitly set.*positive/i);
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "30" })),
+      ).to.throw(/ESPACE_E2E_MIN_DELAY \(172800\).*MIN_DELAY \(30\)/i);
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, GOVERNANCE_MULTISIG_PROFILE: "" })),
+      ).to.throw(/GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1\.3\.0-2of3/i);
     });
 
     it("requires exact network name, chain ID, and confirmation phrase", function () {
@@ -78,9 +129,9 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MAX_CFX: "1e2" }))).to.throw(
         /positive plain decimal/i,
       );
-      expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MIN_DELAY: "86401" })),
-      ).to.throw(/must not exceed 86400/i);
+      expect(
+        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MIN_DELAY: "172800" })).minDelaySeconds,
+      ).to.equal(172800);
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_CONFIRMATIONS: "101" })),
       ).to.throw(/must not exceed 100/i);
@@ -90,6 +141,12 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_RECOVER: "yes" }))).to.throw(
         /exactly 0 or 1/i,
       );
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_REQUIRE_FINALITY: "yes" })),
+      ).to.throw(/exactly 0 or 1/i);
+      expect(() =>
+        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_FINALITY_TIMEOUT: "59" })),
+      ).to.throw(/FINALITY_TIMEOUT.*>= 60/i);
     });
 
     it("requires a safe run ID in recovery mode", function () {
@@ -117,7 +174,7 @@ describe("eSpace acceptance safety helpers", function () {
       expect(runIdReportFileComponent(runId)).to.equal(runIdReportFileComponent(runId));
     });
 
-    it("derives four distinct deterministic wallets without serializing secrets", function () {
+    it("derives a deployer and two disjoint 2-of-3 owner sets deterministically", function () {
       const first = deriveAcceptanceWallets({ basePrivateKey, runId });
       const second = deriveAcceptanceWallets({ basePrivateKey, runId });
       const baseAddress = new ethers.Wallet(basePrivateKey).address;
@@ -127,12 +184,22 @@ describe("eSpace acceptance safety helpers", function () {
         first.ownerA.address,
         first.ownerB.address,
         first.ownerC.address,
+        first.ownerD.address,
+        first.ownerE.address,
+        first.ownerF.address,
       ];
-      expect(new Set(addresses.map((address) => address.toLowerCase())).size).to.equal(5);
+      expect(new Set(addresses.map((address) => address.toLowerCase())).size).to.equal(8);
       expect(second.runDeployer.address).to.equal(first.runDeployer.address);
-      expect(second.ownerA.address).to.equal(first.ownerA.address);
-      expect(second.ownerB.address).to.equal(first.ownerB.address);
-      expect(second.ownerC.address).to.equal(first.ownerC.address);
+      for (const label of ["ownerA", "ownerB", "ownerC", "ownerD", "ownerE", "ownerF"]) {
+        expect(second[label].address).to.equal(first[label].address);
+      }
+      const primaryOwners = [first.ownerA, first.ownerB, first.ownerC].map(
+        (wallet) => wallet.address,
+      );
+      const replacementOwners = [first.ownerD, first.ownerE, first.ownerF].map(
+        (wallet) => wallet.address,
+      );
+      expect(replacementOwners).not.to.include.members(primaryOwners);
       expect(addresses.slice(1)).not.to.include(baseAddress);
 
       const differentRun = deriveAcceptanceWallets({
@@ -152,138 +219,56 @@ describe("eSpace acceptance safety helpers", function () {
     });
   });
 
-  describe("EIP-712 2-of-3 execution signatures", function () {
-    it("hashes calldata and produces signatures recoverable to both owners", async function () {
-      const { ownerA, ownerB } = deriveAcceptanceWallets({ basePrivateKey, runId });
-      const multisigAddress = "0x0000000000000000000000000000000000000071";
-      const target = "0x0000000000000000000000000000000000000072";
-      const data = "0x12345678";
-      const signed = await signMultisigExecute({
-        wallets: [ownerA, ownerB],
-        chainId: 71,
-        multisigAddress,
-        target,
-        value: 3n,
-        data,
-        nonce: 4n,
+  describe("production build-info evidence", function () {
+    const record = ({ file, viaIR, sources }) => ({
+      file,
+      digest: ethers.id(file),
+      buildInfo: {
+        solcVersion: "0.8.28",
+        solcLongVersion: "0.8.28+commit.7893614a",
+        input: {
+          sources: Object.fromEntries(sources.map((source) => [source, { content: "" }])),
+          settings: {
+            optimizer: { enabled: true, runs: 1 },
+            evmVersion: "cancun",
+            viaIR,
+          },
+        },
+      },
+    });
+    const projectRecord = () =>
+      record({
+        file: "artifacts/build-info/project.json",
+        viaIR: true,
+        sources: ["project/contracts/DeepFamily.sol"],
+      });
+    const poseidonRecord = () =>
+      record({
+        file: "artifacts/build-info/poseidon.json",
+        viaIR: false,
+        sources: ["npm/poseidon-solidity@0.0.5/PoseidonT5.sol"],
       });
 
-      expect(signed.typedData.domain.name).to.equal("DeepFamily E2E Testnet Multisig");
-      expect(signed.typedData.domain.version).to.equal("1");
-      expect(signed.typedData.message.dataHash).to.equal(ethers.keccak256(data));
-      expect(signed.signatures).to.have.length(2);
-      const recovered = signed.signatures.map((signature) =>
-        ethers.verifyTypedData(
-          signed.typedData.domain,
-          signed.typedData.types,
-          signed.typedData.message,
-          signature,
-        ),
-      );
-      expect(recovered.map((address) => address.toLowerCase())).to.have.members([
-        ownerA.address.toLowerCase(),
-        ownerB.address.toLowerCase(),
-      ]);
+    it("derives the production compiler policy from actual project and override jobs", function () {
+      const summary = summarizeProductionBuildInfo([projectRecord(), poseidonRecord()]);
+      expect(summary.buildInfoFileCount).to.equal(2);
+      expect(summary.hasProjectCompilerJob).to.equal(true);
+      expect(summary.hasPoseidonOverrideCompilerJob).to.equal(true);
+      expect(summary.productionSettingsMatched).to.equal(true);
+      expect(summary.compilerJobs.map((job) => job.viaIR)).to.deep.equal([true, false]);
     });
 
-    it("supports three distinct owner signatures over the same typed message", async function () {
-      const { ownerA, ownerB, ownerC } = deriveAcceptanceWallets({ basePrivateKey, runId });
-      const signed = await signMultisigExecute({
-        wallets: [ownerC, ownerA, ownerB],
-        chainId: 71,
-        multisigAddress: "0x0000000000000000000000000000000000000071",
-        target: "0x0000000000000000000000000000000000000072",
-        value: 0n,
-        data: "0xabcdef",
-        nonce: 5n,
-      });
-
-      expect(signed.signatures).to.have.length(3);
-      const recovered = signed.signatures.map((signature) =>
-        ethers.verifyTypedData(
-          signed.typedData.domain,
-          signed.typedData.types,
-          signed.typedData.message,
-          signature,
-        ),
+    it("fails closed for missing or compiler-divergent build-info jobs", function () {
+      expect(summarizeProductionBuildInfo([projectRecord()]).productionSettingsMatched).to.equal(
+        false,
       );
-      expect(recovered.map((address) => address.toLowerCase())).to.deep.equal([
-        ownerC.address.toLowerCase(),
-        ownerA.address.toLowerCase(),
-        ownerB.address.toLowerCase(),
-      ]);
-    });
-
-    it("rejects the wrong chain, invalid targets, invalid counts and duplicate owners", async function () {
-      const { runDeployer, ownerA, ownerB, ownerC } = deriveAcceptanceWallets({
-        basePrivateKey,
-        runId,
-      });
-      expect(() =>
-        buildMultisigExecuteTypedData({
-          chainId: 1030,
-          multisigAddress: "0x0000000000000000000000000000000000000071",
-          target: "0x0000000000000000000000000000000000000072",
-          data: "0x",
-          nonce: 0,
-        }),
-      ).to.throw(/chainId 71/i);
-      expect(() =>
-        buildMultisigExecuteTypedData({
-          chainId: 71,
-          multisigAddress: ethers.ZeroAddress,
-          target: "0x0000000000000000000000000000000000000072",
-          data: "0x",
-          nonce: 0,
-        }),
-      ).to.throw(/nonzero EVM address/i);
-      await expectRejected(
-        () =>
-          signMultisigExecute({
-            wallets: [ownerA, ownerA],
-            chainId: 71,
-            multisigAddress: "0x0000000000000000000000000000000000000071",
-            target: "0x0000000000000000000000000000000000000072",
-            data: "0x",
-            nonce: 0,
-          }),
-        /distinct/i,
-      );
-      await expectRejected(
-        () =>
-          signMultisigExecute({
-            wallets: [ownerA, ownerB, ownerA],
-            chainId: 71,
-            multisigAddress: "0x0000000000000000000000000000000000000071",
-            target: "0x0000000000000000000000000000000000000072",
-            data: "0x",
-            nonce: 0,
-          }),
-        /distinct/i,
-      );
-      await expectRejected(
-        () =>
-          signMultisigExecute({
-            wallets: [ownerA],
-            chainId: 71,
-            multisigAddress: "0x0000000000000000000000000000000000000071",
-            target: "0x0000000000000000000000000000000000000072",
-            data: "0x",
-            nonce: 0,
-          }),
-        /two or three/i,
-      );
-      await expectRejected(
-        () =>
-          signMultisigExecute({
-            wallets: [ownerA, ownerB, ownerC, runDeployer],
-            chainId: 71,
-            multisigAddress: "0x0000000000000000000000000000000000000071",
-            target: "0x0000000000000000000000000000000000000072",
-            data: "0x",
-            nonce: 0,
-          }),
-        /two or three/i,
+      const wrongProject = projectRecord();
+      wrongProject.buildInfo.input.settings.viaIR = false;
+      expect(
+        summarizeProductionBuildInfo([wrongProject, poseidonRecord()]).productionSettingsMatched,
+      ).to.equal(false);
+      expect(() => summarizeProductionBuildInfo([{ file: "bad", digest: "0x12" }])).to.throw(
+        /Malformed Hardhat build-info/,
       );
     });
   });
