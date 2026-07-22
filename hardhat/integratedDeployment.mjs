@@ -387,21 +387,28 @@ const assertExistingIntegratedWiring = async ({
 
 // Deploy a UUPS proxy: deploy the implementation, then an ERC1967 proxy (UUPSProxy)
 // pointing at it with the encoded initialize() calldata.
-const deployUUPSProxy = async (ethers, deployer, factory, initArgs) => {
+const deployUUPSProxy = async (ethers, deployer, factory, initArgs, waitForDeployment) => {
   const impl = await factory.deploy();
-  await impl.waitForDeployment();
+  await waitForDeployment("deepFamilyImplementation", impl);
   const implAddress = await impl.getAddress();
   const initData = factory.interface.encodeFunctionData("initialize", initArgs);
   const Proxy = await ethers.getContractFactory("UUPSProxy", deployer);
   const proxy = await Proxy.deploy(implAddress, initData);
-  await proxy.waitForDeployment();
+  await waitForDeployment("deepFamilyProxy", proxy);
   const proxyAddress = await proxy.getAddress();
   return { implAddress, proxyAddress };
 };
 
 export const deployIntegratedSystem = async (
   hreOrConnection,
-  { writeDeployments = false, signer, artifacts: artifactReader } = {},
+  {
+    writeDeployments = false,
+    signer,
+    artifacts: artifactReader,
+    transactionConfirmations = 1,
+    transactionTimeoutMs = 0,
+    onTransactionReceipt,
+  } = {},
 ) => {
   const connection = await resolveConnection(hreOrConnection);
   const { ethers } = connection;
@@ -409,6 +416,32 @@ export const deployIntegratedSystem = async (
   const [defaultSigner] = await ethers.getSigners();
   const deployer = signer ?? defaultSigner;
   const deployerAddress = await deployer.getAddress();
+  if (!Number.isSafeInteger(transactionConfirmations) || transactionConfirmations < 1) {
+    throw new Error("transactionConfirmations must be a positive safe integer");
+  }
+  if (!Number.isSafeInteger(transactionTimeoutMs) || transactionTimeoutMs < 0) {
+    throw new Error("transactionTimeoutMs must be a non-negative safe integer");
+  }
+  if (onTransactionReceipt !== undefined && typeof onTransactionReceipt !== "function") {
+    throw new Error("onTransactionReceipt must be a function when provided");
+  }
+  const transactionReceipts = {};
+  const waitForTransaction = async (label, transaction) => {
+    if (!transaction?.hash) throw new Error(`${label} transaction hash is unavailable`);
+    // ethers v6 removes its transaction/block listeners when this native timeout fires. A
+    // Promise.race wrapper would return control but leave the underlying wait running.
+    const receipt = await transaction.wait(transactionConfirmations, transactionTimeoutMs);
+    if (!receipt) throw new Error(`${label} transaction was not confirmed`);
+    if (Number(receipt.status) !== 1) throw new Error(`${label} transaction reverted`);
+    transactionReceipts[label] = receipt;
+    await onTransactionReceipt?.(label, receipt);
+    return receipt;
+  };
+  const waitForDeployment = async (label, contract) => {
+    const transaction = contract.deploymentTransaction();
+    if (!transaction) throw new Error(`${label} deployment transaction is unavailable`);
+    await waitForTransaction(label, transaction);
+  };
 
   // Validate the governance owner up front so a misconfigured live deployment fails before any
   // contracts are created, rather than leaving orphaned modules after a late-stage throw. Local
@@ -437,29 +470,29 @@ export const deployIntegratedSystem = async (
 
   const Token = await ethers.getContractFactory("DeepFamilyToken", deployer);
   const token = await Token.deploy();
-  await token.waitForDeployment();
+  await waitForDeployment("deepFamilyToken", token);
 
   const PoseidonT5 = await ethers.getContractFactory("PoseidonT5", deployer);
   const poseidonT5 = await PoseidonT5.deploy();
-  await poseidonT5.waitForDeployment();
+  await waitForDeployment("poseidonT5", poseidonT5);
 
   const AdultAgeGate = await ethers.getContractFactory("AdultAgeGate", deployer);
   const adultAgeGate = await AdultAgeGate.deploy();
-  await adultAgeGate.waitForDeployment();
+  await waitForDeployment("adultAgeGate", adultAgeGate);
 
   const PersonCommitmentVerifier = await ethers.getContractFactory(
     "PersonCommitmentVerifier",
     deployer,
   );
   const personCommitmentVerifier = await PersonCommitmentVerifier.deploy();
-  await personCommitmentVerifier.waitForDeployment();
+  await waitForDeployment("personCommitmentVerifier", personCommitmentVerifier);
 
   const DisclosureBindingVerifier = await ethers.getContractFactory(
     "DisclosureBindingVerifier",
     deployer,
   );
   const nameDisclosureVerifier = await DisclosureBindingVerifier.deploy();
-  await nameDisclosureVerifier.waitForDeployment();
+  await waitForDeployment("disclosureBindingVerifier", nameDisclosureVerifier);
 
   const tokenAddress = await token.getAddress();
   const poseidonT5Address = await poseidonT5.getAddress();
@@ -475,7 +508,7 @@ export const deployIntegratedSystem = async (
     personCommitmentVerifierAddress,
     nameDisclosureVerifierAddress,
   );
-  await groth16VerifierAdapter.waitForDeployment();
+  await waitForDeployment("groth16VerifierAdapter", groth16VerifierAdapter);
   const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress();
 
   // Main contract behind a UUPS proxy. initialize() wires the token address.
@@ -487,18 +520,24 @@ export const deployIntegratedSystem = async (
     },
   });
   const { implAddress: deepFamilyImplementationAddress, proxyAddress: deepFamilyAddress } =
-    await deployUUPSProxy(ethers, deployer, DeepFamily, [tokenAddress, deployerAddress]);
+    await deployUUPSProxy(
+      ethers,
+      deployer,
+      DeepFamily,
+      [tokenAddress, deployerAddress],
+      waitForDeployment,
+    );
   const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyAddress, deployer);
 
   const DeepFamilyReader = await ethers.getContractFactory("DeepFamilyReader", deployer);
   const deepFamilyReader = await DeepFamilyReader.deploy(deepFamilyAddress);
-  await deepFamilyReader.waitForDeployment();
+  await waitForDeployment("deepFamilyReader", deepFamilyReader);
   const deepFamilyReaderAddress = await deepFamilyReader.getAddress();
 
   const bound = await token.deepFamilyContract().catch(() => ethers.ZeroAddress);
   if (bound === ethers.ZeroAddress) {
     const tx = await token.initialize(deepFamilyAddress);
-    await tx.wait();
+    await waitForTransaction("tokenInitialize", tx);
   }
   const configuredMain = await token.deepFamilyContract();
   const tokenOwner = await token.owner();
@@ -515,20 +554,22 @@ export const deployIntegratedSystem = async (
   // Register the Groth16 adapter under PROOF_SYSTEM_ID_GROTH16_BN254_V1 = 1
   // for both purposes (PersonCommitment = 0, DisclosureBinding = 1). The adapter internally
   // dispatches to the backend verifiers.
-  await (
+  await waitForTransaction(
+    "setPersonCommitmentVerifier",
     await deepFamily.setVerifier(
       GROTH16_PROOF_SYSTEM_ID,
       PROOF_PURPOSE_PERSON_COMMITMENT,
       groth16VerifierAdapterAddress,
-    )
-  ).wait();
-  await (
+    ),
+  );
+  await waitForTransaction(
+    "setDisclosureBindingVerifier",
     await deepFamily.setVerifier(
       GROTH16_PROOF_SYSTEM_ID,
       PROOF_PURPOSE_DISCLOSURE_BINDING,
       groth16VerifierAdapterAddress,
-    )
-  ).wait();
+    ),
+  );
 
   // Hand DeepFamily upgrade/configuration ownership to governance (intended: timelock + multisig).
   // DeepFamilyToken already retired its bootstrap owner during initialize(), so it intentionally
@@ -538,7 +579,10 @@ export const deployIntegratedSystem = async (
   // owner is mandatory (validated up front). Local dev networks always keep the deployer as owner
   // so owner-only test/dev flows keep working even if GOVERNANCE_OWNER leaks in from .env.
   if (hasGovernanceOwner && !isLocalDev) {
-    await (await deepFamily.transferOwnership(governanceOwner)).wait();
+    await waitForTransaction(
+      "transferDeepFamilyOwnership",
+      await deepFamily.transferOwnership(governanceOwner),
+    );
   }
 
   if (writeDeployments) {
@@ -607,6 +651,7 @@ export const deployIntegratedSystem = async (
     deepFamily,
     deepFamilyReader,
     deepFamilyImplementationAddress,
+    transactionReceipts,
   };
 };
 
