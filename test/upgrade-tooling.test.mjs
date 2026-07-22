@@ -42,6 +42,9 @@ describe("Upgrade tooling & governance deploy path", function () {
       await expect(deployIntegratedSystem(hre, { onTransactionReceipt: true })).to.be.rejectedWith(
         "onTransactionReceipt must be a function when provided",
       );
+      await expect(
+        deployIntegratedSystem(hre, { deploymentDirectory: "/tmp/unused" }),
+      ).to.be.rejectedWith("deploymentDirectory requires writeDeployments=true");
     });
 
     it("publishes every confirmed deployment receipt through the callback", async () => {
@@ -60,6 +63,32 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(observed.size).to.equal(12);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
+      }
+    });
+
+    it("runs the production deployment metadata writer in an isolated directory", async () => {
+      const deploymentDirectory = await fs.mkdtemp(
+        path.join(os.tmpdir(), "deepfamily-isolated-deployments-"),
+      );
+      try {
+        const connection = await hre.network.connect();
+        const deployed = await deployIntegratedSystem(connection, {
+          writeDeployments: true,
+          artifacts: hre.artifacts,
+          deploymentDirectory,
+        });
+        const files = (await fs.readdir(deploymentDirectory)).sort();
+        expect(files).to.have.length(8);
+        const deepFamilyMetadata = JSON.parse(
+          await fs.readFile(path.join(deploymentDirectory, "DeepFamily.json"), "utf8"),
+        );
+        expect(deepFamilyMetadata.address).to.equal(await deployed.deepFamily.getAddress());
+        expect(deepFamilyMetadata.implementationAddress).to.equal(
+          deployed.deepFamilyImplementationAddress,
+        );
+        expect(deepFamilyMetadata.abi).to.be.an("array").that.is.not.empty;
+      } finally {
+        await fs.rm(deploymentDirectory, { recursive: true, force: true });
       }
     });
   });
@@ -94,7 +123,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           implementation,
         }),
       ).to.equal(
-        "npx hardhat --config hardhat.config.mjs --build-profile default verify " +
+        "npx hardhat --config hardhat.config.mjs --build-profile production verify " +
           "--network confluxTestnet --contract contracts/DeepFamilyV2.sol:DeepFamilyV2 " +
           implementation,
       );

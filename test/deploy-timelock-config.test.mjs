@@ -6,6 +6,7 @@ import {
   parsePositiveSafeInteger,
   resolveTimelockDeploymentConfig,
 } from "../scripts/lib/timelockDeployment.mjs";
+import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "../scripts/lib/governanceSafety.mjs";
 
 describe("Timelock deployment configuration", function () {
   const deployer = "0x0000000000000000000000000000000000000001";
@@ -114,5 +115,36 @@ describe("Timelock deployment configuration", function () {
         },
       }),
     ).to.be.rejectedWith(/threshold=1/i);
+  });
+
+  it("treats the injected env as authoritative when no wallet profile is supplied", async () => {
+    const [, ownerA, ownerB] = await hre.ethers.getSigners();
+    const Multisig = await hre.ethers.getContractFactory("TwoOfTwoMultisigMock");
+    const deployedMultisig = await Multisig.deploy(
+      await ownerA.getAddress(),
+      await ownerB.getAddress(),
+    );
+    await deployedMultisig.waitForDeployment();
+    const deployedAddress = await deployedMultisig.getAddress();
+    const originalProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
+    process.env.GOVERNANCE_MULTISIG_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
+
+    try {
+      const config = await resolveTimelockDeploymentConfig({
+        connection: { networkConfig: { type: "http" } },
+        ethers: hre.ethers,
+        env: { MIN_DELAY: "172800", GOVERNANCE_MULTISIG: deployedAddress },
+        deployerAddress: deployer,
+        provider: hre.ethers.provider,
+      });
+      expect(config).to.deep.equal({
+        isLocal: false,
+        minDelay: 172800,
+        governanceMultisig: deployedAddress,
+      });
+    } finally {
+      if (originalProfile === undefined) delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+      else process.env.GOVERNANCE_MULTISIG_PROFILE = originalProfile;
+    }
   });
 });

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { checkImplementationAgainstBaseline } from "../../scripts/lib/storageLayout.mjs";
+import { assertConfiguredTimelockGovernanceProfile } from "./timelockGovernancePolicy.mjs";
 
 // Upgradeable proxy and whether its implementation links external libraries. Its owner is
 // expected to be a TimelockController (intended production model: timelock + multisig).
@@ -228,6 +229,25 @@ export const resolveTarget = async (
   // artifact for historical deployments; ordinary governance tasks use the current default.
   const timelock = await ethers.getContractAt(timelockContractName, timelockAddress);
   return { spec, proxyAddress, proxy, timelockAddress, timelock };
+};
+
+// Production governance and upgrade operations share this resolver so an enabled wallet profile
+// cannot be bypassed by choosing a different schedule/execute/cancel task. With no configured
+// profile it is deliberately identical to resolveTarget and remains multisig-implementation
+// neutral.
+export const resolveGovernedTarget = async (
+  connection,
+  ethers,
+  targetArg,
+  timelockContractName = "GovernanceTimelock",
+) => {
+  const resolved = await resolveTarget(connection, ethers, targetArg, timelockContractName);
+  const governanceProfile = await assertConfiguredTimelockGovernanceProfile({
+    ethers,
+    timelock: resolved.timelock,
+    timelockAddress: resolved.timelockAddress,
+  });
+  return { ...resolved, governanceProfile };
 };
 
 export const deployImplementation = async (connection, ethers, signer, spec, contractName) => {

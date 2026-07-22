@@ -20,6 +20,7 @@ import {
   resolveTarget,
 } from "./lib/timelockUpgrade.mjs";
 import { DEFAULT_TIMELOCK_ARTIFACT, parseArtifactName } from "./lib/timelockArtifacts.mjs";
+import { assertGovernanceMultisigProfile } from "../scripts/lib/governanceSafety.mjs";
 
 const MULTISIG_INSPECTION_ABI = [
   "function getThreshold() view returns (uint256)",
@@ -78,6 +79,7 @@ const inspectMultisig = async ({ ethers, address, issues }) => {
     threshold: null,
     owners: [],
     inspectionError: null,
+    profile: null,
   };
   const code = await ethers.provider.getCode(address);
   result.hasCode = hasContractCode(code);
@@ -117,6 +119,16 @@ const inspectMultisig = async ({ ethers, address, issues }) => {
     }
     if (new Set(normalizedOwners).size !== normalizedOwners.length) {
       issues.push(`multisig ${address} returned duplicate owners`);
+    }
+    try {
+      const profiled = await assertGovernanceMultisigProfile({
+        provider: ethers.provider,
+        address,
+        owners,
+      });
+      result.profile = profiled?.profile ?? null;
+    } catch (error) {
+      issues.push(`multisig ${address} does not match the configured profile: ${error.message}`);
     }
   } catch (error) {
     const detail = error.shortMessage || error.reason || error.message;
@@ -306,6 +318,7 @@ export const action = async (args, hre) => {
     console.log(
       `  threshold:   ${multisig.threshold === null ? "unavailable" : multisig.threshold}`,
     );
+    if (multisig.profile) console.log(`  profile:     ${multisig.profile} (match)`);
     printMembers("owners", multisig.owners);
   }
 

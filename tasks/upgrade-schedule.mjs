@@ -17,7 +17,7 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import {
-  resolveTarget,
+  resolveGovernedTarget,
   deployImplementation,
   encodeUpgradeCall,
   deriveSalt,
@@ -50,7 +50,7 @@ const action = async (args, hre) => {
     runStorageCheck();
   }
 
-  const { spec, proxy, proxyAddress, timelock, timelockAddress } = await resolveTarget(
+  const { spec, proxy, proxyAddress, timelock, timelockAddress } = await resolveGovernedTarget(
     connection,
     ethers,
     args.target,

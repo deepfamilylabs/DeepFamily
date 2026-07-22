@@ -63,17 +63,42 @@ describe("eSpace acceptance source verification", function () {
     expect(JSON.stringify(results)).not.to.include(secretConstructorData);
   });
 
-  it("treats an already-verified success as passed", async () => {
+  it("treats ConfluxScan's already_verified machine status as passed", async () => {
     const results = await verifyAcceptanceContracts({
       hre: {},
       entries: [{ label: "existing", address: address(3), contract: "A.sol:A" }],
       timeoutMs: 1_000,
       retries: 0,
       logger: null,
-      verifyFn: async () => true,
+      verifyFn: async () => {
+        throw new Error(
+          'HHE80024: status polling failed: "already_verified:The contract is already verified"',
+        );
+      },
     });
 
     expect(results[0]).to.include({ status: "passed", attempts: 1 });
+  });
+
+  it("does not trust a free-form already-verified-like error", async () => {
+    let caught;
+    try {
+      await verifyAcceptanceContracts({
+        hre: {},
+        entries: [{ label: "ambiguous", address: address(31), contract: "A.sol:A" }],
+        timeoutMs: 1_000,
+        retries: 0,
+        logger: null,
+        verifyFn: async () => {
+          throw new Error("the contract may already be verified, but the explorer is unavailable");
+        },
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).to.be.an("error");
+    expect(caught.results[0]).to.include({ status: "failed", attempts: 1 });
   });
 
   it("does not accept a false verifier result as success", async () => {

@@ -10,6 +10,7 @@ import {
   parseRequiredPositiveInteger,
   parseTimelockPhase,
 } from "../tasks/timelock-update-delay.mjs";
+import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "../scripts/lib/governanceSafety.mjs";
 
 describe("timelock-update-delay task", function () {
   this.timeout(60_000);
@@ -196,6 +197,24 @@ describe("timelock-update-delay task", function () {
 
     expect(error, "expected same-delay scheduling to abort").to.be.an("error");
     expect(error.message).to.match(/equals the current delay/i);
+  });
+
+  it("enforces the configured governance wallet profile before preparing a delay update", async () => {
+    const { target } = await deploySelfAdminTimelockTarget(60);
+    const originalProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
+    process.env.GOVERNANCE_MULTISIG_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
+    try {
+      const error = await withRecordedTarget(await target.getAddress(), (taskHre) =>
+        captureError(() =>
+          updateTimelockDelay({ phase: "schedule", newDelay: "120", salt: "" }, taskHre),
+        ),
+      );
+      expect(error, "expected the strict wallet profile to abort").to.be.an("error");
+      expect(error.message).to.match(/current governance multisig .* has no contract code/i);
+    } finally {
+      if (originalProfile === undefined) delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+      else process.env.GOVERNANCE_MULTISIG_PROFILE = originalProfile;
+    }
   });
 
   it("rejects an interface-compatible-looking owner with the wrong runtime", async () => {

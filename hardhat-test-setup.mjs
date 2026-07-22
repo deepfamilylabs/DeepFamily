@@ -2,6 +2,11 @@ import hre from "hardhat";
 import seedHelpers from "./lib/seedHelpers.js";
 import { ensureIntegratedSystem } from "./hardhat/integratedDeployment.mjs";
 
+// A developer's production .env must not silently turn local mock-wallet tests into Conflux Safe
+// integration tests. Individual profile tests opt in explicitly and restore the value themselves.
+const originalGovernanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
+delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+
 const getOrCreateTestConnection = async () => {
   if (!globalThis.__deepfamilyTestConnectionPromise) {
     globalThis.__deepfamilyTestConnectionPromise = hre.network.connect();
@@ -29,6 +34,11 @@ const cleanupConnection = async () => {
 // Register cleanup for test completion
 if (typeof after === "function") {
   after(async function () {
+    if (originalGovernanceMultisigProfile === undefined) {
+      delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+    } else {
+      process.env.GOVERNANCE_MULTISIG_PROFILE = originalGovernanceMultisigProfile;
+    }
     await cleanupConnection();
     // Force exit to prevent hanging
     setTimeout(() => process.exit(0), 50);

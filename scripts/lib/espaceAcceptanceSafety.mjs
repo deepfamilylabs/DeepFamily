@@ -4,17 +4,9 @@ import { ethers } from "ethers";
 export const ESPACE_TESTNET_NAME = "confluxTestnet";
 export const ESPACE_TESTNET_CHAIN_ID = 71n;
 export const ESPACE_E2E_CONFIRMATION = "conflux-testnet-chain-71";
-export const ESPACE_MULTISIG_DOMAIN_NAME = "DeepFamily E2E Testnet Multisig";
-export const ESPACE_MULTISIG_DOMAIN_VERSION = "1";
-
-export const ESPACE_MULTISIG_EXECUTE_TYPES = Object.freeze({
-  Execute: Object.freeze([
-    Object.freeze({ name: "target", type: "address" }),
-    Object.freeze({ name: "value", type: "uint256" }),
-    Object.freeze({ name: "dataHash", type: "bytes32" }),
-    Object.freeze({ name: "nonce", type: "uint256" }),
-  ]),
-});
+export const ESPACE_E2E_MODE_DIAGNOSTIC = "diagnostic";
+export const ESPACE_E2E_MODE_RELEASE_REHEARSAL = "release-rehearsal";
+export const ESPACE_E2E_RELEASE_SAFE_PROFILE = "conflux-safe-1.3.0-2of3";
 
 const SECP256K1_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{7,79}$/;
@@ -40,6 +32,29 @@ const parseBooleanFlag = (name, value, defaultValue) => {
     throw new Error(`${name} must be exactly 0 or 1`);
   }
   return raw === "1";
+};
+
+const parseAcceptanceMode = (value) => {
+  const mode = value === undefined || value === "" ? ESPACE_E2E_MODE_DIAGNOSTIC : String(value);
+  if (mode !== ESPACE_E2E_MODE_DIAGNOSTIC && mode !== ESPACE_E2E_MODE_RELEASE_REHEARSAL) {
+    throw new Error(
+      `ESPACE_E2E_MODE must be exactly ${ESPACE_E2E_MODE_DIAGNOSTIC} or ` +
+        ESPACE_E2E_MODE_RELEASE_REHEARSAL,
+    );
+  }
+  return mode;
+};
+
+const parseRequiredPositiveInteger = (name, value) => {
+  const raw = String(value ?? "");
+  if (!/^[1-9][0-9]*$/.test(raw)) {
+    throw new Error(`${name} must be explicitly set to a positive base-10 integer`);
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`${name} exceeds the JavaScript safe-integer range`);
+  }
+  return parsed;
 };
 
 export const sanitizeRunId = (value) => {
@@ -85,6 +100,7 @@ export const parseESpaceAcceptanceConfig = ({ env = process.env, networkName, ch
     );
   }
 
+  const acceptanceMode = parseAcceptanceMode(env.ESPACE_E2E_MODE);
   const minDelaySeconds = parseInteger("ESPACE_E2E_MIN_DELAY", env.ESPACE_E2E_MIN_DELAY, 30, 10);
   const confirmations = parseInteger(
     "ESPACE_E2E_CONFIRMATIONS",
@@ -92,14 +108,45 @@ export const parseESpaceAcceptanceConfig = ({ env = process.env, networkName, ch
     2,
     1,
   );
-  if (minDelaySeconds > 86_400) {
-    throw new Error("ESPACE_E2E_MIN_DELAY must not exceed 86400 seconds");
-  }
   if (confirmations > 100) {
     throw new Error("ESPACE_E2E_CONFIRMATIONS must not exceed 100");
   }
   const verify = parseBooleanFlag("ESPACE_E2E_VERIFY", env.ESPACE_E2E_VERIFY, "1");
   const recover = parseBooleanFlag("ESPACE_E2E_RECOVER", env.ESPACE_E2E_RECOVER, "0");
+  const requireFinality = parseBooleanFlag(
+    "ESPACE_E2E_REQUIRE_FINALITY",
+    env.ESPACE_E2E_REQUIRE_FINALITY,
+    "1",
+  );
+  let productionMinDelaySeconds = null;
+  let productionGovernanceMultisigProfile = null;
+  if (acceptanceMode === ESPACE_E2E_MODE_RELEASE_REHEARSAL) {
+    if (!verify) {
+      throw new Error("release-rehearsal requires ESPACE_E2E_VERIFY=1");
+    }
+    if (!requireFinality) {
+      throw new Error("release-rehearsal requires ESPACE_E2E_REQUIRE_FINALITY=1");
+    }
+    productionMinDelaySeconds = parseRequiredPositiveInteger("MIN_DELAY", env.MIN_DELAY);
+    if (productionMinDelaySeconds !== minDelaySeconds) {
+      throw new Error(
+        `release-rehearsal requires ESPACE_E2E_MIN_DELAY (${minDelaySeconds}) to equal ` +
+          `MIN_DELAY (${productionMinDelaySeconds})`,
+      );
+    }
+    productionGovernanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
+    if (productionGovernanceMultisigProfile !== ESPACE_E2E_RELEASE_SAFE_PROFILE) {
+      throw new Error(
+        `release-rehearsal requires GOVERNANCE_MULTISIG_PROFILE=` + ESPACE_E2E_RELEASE_SAFE_PROFILE,
+      );
+    }
+  }
+  const finalityTimeoutSeconds = parseInteger(
+    "ESPACE_E2E_FINALITY_TIMEOUT",
+    env.ESPACE_E2E_FINALITY_TIMEOUT,
+    3600,
+    60,
+  );
 
   const rawMaxCfx = String(env.ESPACE_E2E_MAX_CFX ?? "5").trim();
   if (!DECIMAL_CFX_PATTERN.test(rawMaxCfx)) {
@@ -117,16 +164,89 @@ export const parseESpaceAcceptanceConfig = ({ env = process.env, networkName, ch
   }
 
   return Object.freeze({
+    acceptanceMode,
     networkName,
     chainId: normalizedChainId,
     minDelaySeconds,
     confirmations,
     verify,
     recover,
+    requireFinality,
+    productionMinDelaySeconds,
+    productionGovernanceMultisigProfile,
+    finalityTimeoutSeconds,
     maxCfx: rawMaxCfx,
     maxCfxWei,
     runId,
     runIdHash: runId === null ? null : hashRunId(runId),
+  });
+};
+
+/**
+ * Summarizes the actual Hardhat build-info inputs used by the acceptance artifacts. This keeps the
+ * report tied to compiler evidence instead of restating hardhat.config.mjs as an unchecked claim.
+ */
+export const summarizeProductionBuildInfo = (records) => {
+  if (!Array.isArray(records)) {
+    throw new Error("Build-info records must be an array");
+  }
+  const compilerJobs = records.map((record, index) => {
+    const buildInfo = record?.buildInfo;
+    const sourceNames = Object.keys(buildInfo?.input?.sources ?? {}).sort();
+    const settings = buildInfo?.input?.settings;
+    if (
+      typeof record?.file !== "string" ||
+      !ethers.isHexString(record?.digest, 32) ||
+      typeof buildInfo?.solcVersion !== "string" ||
+      typeof buildInfo?.solcLongVersion !== "string" ||
+      !settings ||
+      sourceNames.length === 0
+    ) {
+      throw new Error(`Malformed Hardhat build-info record at index ${index}`);
+    }
+    const poseidonOverride =
+      sourceNames.length === 1 &&
+      (sourceNames[0] === "npm/poseidon-solidity@0.0.5/PoseidonT5.sol" ||
+        sourceNames[0].endsWith("/poseidon-solidity/PoseidonT5.sol"));
+    const projectBuild = sourceNames.includes("project/contracts/DeepFamily.sol");
+    const optimizer = {
+      enabled: settings.optimizer?.enabled === true,
+      runs: settings.optimizer?.runs,
+    };
+    const expectedSettingsMatched =
+      buildInfo.solcVersion === "0.8.28" &&
+      buildInfo.solcLongVersion === "0.8.28+commit.7893614a" &&
+      optimizer.enabled === true &&
+      optimizer.runs === 1 &&
+      settings.evmVersion === "cancun" &&
+      settings.viaIR === !poseidonOverride;
+    return Object.freeze({
+      file: record.file,
+      digest: record.digest.toLowerCase(),
+      solcVersion: buildInfo.solcVersion,
+      solcLongVersion: buildInfo.solcLongVersion,
+      optimizer,
+      evmVersion: settings.evmVersion ?? null,
+      viaIR: settings.viaIR === true,
+      sourceCount: sourceNames.length,
+      sourceSetDigest: ethers.keccak256(ethers.toUtf8Bytes(sourceNames.join("\n"))),
+      projectBuild,
+      poseidonOverride,
+      expectedSettingsMatched,
+    });
+  });
+  const hasProjectCompilerJob = compilerJobs.some((job) => job.projectBuild);
+  const hasPoseidonOverrideCompilerJob = compilerJobs.some((job) => job.poseidonOverride);
+  return Object.freeze({
+    buildInfoFileCount: compilerJobs.length,
+    compilerJobs: Object.freeze(compilerJobs),
+    hasProjectCompilerJob,
+    hasPoseidonOverrideCompilerJob,
+    productionSettingsMatched:
+      compilerJobs.length > 0 &&
+      hasProjectCompilerJob &&
+      hasPoseidonOverrideCompilerJob &&
+      compilerJobs.every((job) => job.expectedSettingsMatched),
   });
 };
 
@@ -188,73 +308,30 @@ export const deriveAcceptanceWallets = ({ basePrivateKey, runId, provider = null
       label: "multisig-owner-c",
       provider,
     }),
+    ownerD: deriveAcceptanceWallet({
+      basePrivateKey: normalizedKey,
+      runId: normalizedRunId,
+      label: "multisig-owner-d",
+      provider,
+    }),
+    ownerE: deriveAcceptanceWallet({
+      basePrivateKey: normalizedKey,
+      runId: normalizedRunId,
+      label: "multisig-owner-e",
+      provider,
+    }),
+    ownerF: deriveAcceptanceWallet({
+      basePrivateKey: normalizedKey,
+      runId: normalizedRunId,
+      label: "multisig-owner-f",
+      provider,
+    }),
   };
   const addresses = [baseAddress, ...Object.values(wallets).map((wallet) => wallet.address)];
   if (new Set(addresses.map((address) => address.toLowerCase())).size !== addresses.length) {
     throw new Error("Acceptance wallet derivation produced duplicate addresses");
   }
   return Object.freeze(wallets);
-};
-
-const assertAddress = (name, value) => {
-  if (!ethers.isAddress(value) || value === ethers.ZeroAddress) {
-    throw new Error(`${name} must be a valid nonzero EVM address`);
-  }
-  return ethers.getAddress(value);
-};
-
-export const buildMultisigExecuteTypedData = ({
-  chainId,
-  multisigAddress,
-  target,
-  value = 0n,
-  data,
-  nonce,
-}) => {
-  const normalizedChainId = BigInt(chainId);
-  if (normalizedChainId !== ESPACE_TESTNET_CHAIN_ID) {
-    throw new Error(`Multisig acceptance signatures require chainId 71; got ${normalizedChainId}`);
-  }
-  const normalizedData = ethers.hexlify(data);
-  const normalizedValue = BigInt(value);
-  const normalizedNonce = BigInt(nonce);
-  if (normalizedValue < 0n || normalizedNonce < 0n) {
-    throw new Error("Multisig value and nonce must be non-negative");
-  }
-
-  return Object.freeze({
-    domain: Object.freeze({
-      name: ESPACE_MULTISIG_DOMAIN_NAME,
-      version: ESPACE_MULTISIG_DOMAIN_VERSION,
-      chainId: normalizedChainId,
-      verifyingContract: assertAddress("multisigAddress", multisigAddress),
-    }),
-    types: ESPACE_MULTISIG_EXECUTE_TYPES,
-    message: Object.freeze({
-      target: assertAddress("target", target),
-      value: normalizedValue,
-      dataHash: ethers.keccak256(normalizedData),
-      nonce: normalizedNonce,
-    }),
-  });
-};
-
-export const signMultisigExecute = async ({ wallets, ...execute }) => {
-  if (!Array.isArray(wallets) || wallets.length < 2 || wallets.length > 3) {
-    throw new Error("Exactly two or three acceptance owner wallets are required");
-  }
-  const ownerAddresses = await Promise.all(wallets.map((wallet) => wallet.getAddress()));
-  const distinctOwnerAddresses = new Set(ownerAddresses.map((address) => address.toLowerCase()));
-  if (distinctOwnerAddresses.size !== ownerAddresses.length) {
-    throw new Error("Acceptance owner wallets must be distinct");
-  }
-  const typedData = buildMultisigExecuteTypedData(execute);
-  const signatures = await Promise.all(
-    wallets.map((wallet) =>
-      wallet.signTypedData(typedData.domain, typedData.types, typedData.message),
-    ),
-  );
-  return { typedData, signatures };
 };
 
 export const withTimeout = async (operation, { timeoutMs, description = "operation" } = {}) => {

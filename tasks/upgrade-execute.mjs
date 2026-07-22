@@ -14,7 +14,7 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import {
-  resolveTarget,
+  resolveGovernedTarget,
   encodeUpgradeCall,
   deriveSalt,
   sendOrPrint,
@@ -53,7 +53,7 @@ const action = async (args, hre) => {
     throw new Error("--implementation <addr> is required and must match the scheduled upgrade");
   }
 
-  const { spec, proxy, proxyAddress, timelock, timelockAddress } = await resolveTarget(
+  const { spec, proxy, proxyAddress, timelock, timelockAddress } = await resolveGovernedTarget(
     connection,
     ethers,
     args.target,

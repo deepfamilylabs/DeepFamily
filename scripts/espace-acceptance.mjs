@@ -2,23 +2,55 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { Contract, id as solidityId, Interface, JsonRpcProvider, keccak256 } from "ethers";
 
 import hre from "hardhat";
 
 import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import personCommitmentProof from "../lib/personCommitmentProof.js";
 import disclosureBindingProof from "../lib/disclosureBindingProof.js";
+import { resolveArtifactFile } from "../lib/proofCommon.js";
+import {
+  DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+} from "../lib/proofDescriptors.js";
 import {
   assertImplementationMatchesArtifact,
   assertImplementationStorageSafe,
+  deriveSalt as deriveUpgradeSalt,
 } from "../tasks/lib/timelockUpgrade.mjs";
 import {
-  deriveAcceptanceWallet,
+  ESPACE_E2E_RELEASE_SAFE_PROFILE,
+  deriveAcceptanceWallets,
+  hashRunId,
   parseESpaceAcceptanceConfig,
   runIdReportFileComponent,
-  signMultisigExecute,
+  summarizeProductionBuildInfo,
 } from "./lib/espaceAcceptanceSafety.mjs";
+import {
+  CANONICAL_SAFE_DEPLOYMENT_TYPE,
+  CANONICAL_SAFE_VERSION,
+  assertCanonicalSafeProfile,
+  assertSafeExecutionSuccess,
+  connectCanonicalSafe,
+  createCanonicalSafeInterface,
+  createCanonicalSafeTransaction,
+  getCanonicalSafeDeploymentMetadata,
+  prepareCanonicalSafeDeployment,
+  signCanonicalSafeTransaction,
+} from "./lib/safeGovernance.mjs";
+import { resolveTimelockDeploymentConfig } from "./lib/timelockDeployment.mjs";
+import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "./lib/governanceSafety.mjs";
 import { verifyAcceptanceContracts } from "./lib/espaceAcceptanceVerification.mjs";
+import {
+  buildMultisigMigrationOperation,
+  readExactTimelockRoleState,
+} from "../tasks/lib/timelockMultisigMigration.mjs";
+import { buildOwnerMigrationOperation } from "../tasks/lib/timelockOwnerMigration.mjs";
+import { deriveTreasuryTransferSalt } from "../tasks/lib/timelockTreasury.mjs";
+import { deriveGovernanceSalt } from "../tasks/lib/timelockGovernance.mjs";
+import { deriveDelayUpdateSalt } from "../tasks/timelock-update-delay.mjs";
+import { resolveConfluxRpcUrls } from "./lib/hardhatConfig.mjs";
 
 const { generatePersonCommitmentProof } = personCommitmentProof;
 const { generateDisclosureBindingProof } = disclosureBindingProof;
@@ -35,6 +67,12 @@ const ERC1967_IMPLEMENTATION_SLOT =
   "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 const REPORT_ROOT = path.join(process.cwd(), "tmp", "espace-acceptance");
 const DEPLOYMENTS_DIR = path.join(process.cwd(), "deployments", EXPECTED_NETWORK);
+const OWNABLE_UNAUTHORIZED_SELECTOR = solidityId("OwnableUnauthorizedAccount(address)").slice(
+  0,
+  10,
+);
+const STORY_ALREADY_SEALED_SELECTOR = solidityId("StoryAlreadySealed()").slice(0, 10);
+const STANDARD_REVERT_INTERFACE = new Interface(["error Error(string)", "error Panic(uint256)"]);
 
 const nowIso = () => new Date().toISOString();
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -80,6 +118,62 @@ const retryBounded = async (operation, { attempts = 3, timeoutMs = 30_000, label
     }
   }
   throw new Error(`${label} failed after ${attempts} attempts: ${safeErrorMessage(lastError)}`);
+};
+
+const inspectCanonicalSafeInfrastructure = async ({ provider, chainId }) => {
+  const rpcChainId = await retryBounded(() => provider.send("eth_chainId", []), {
+    label: `raw Safe infrastructure chain-id query for ${chainId}`,
+  });
+  assertCondition(
+    typeof rpcChainId === "string" && BigInt(rpcChainId) === BigInt(chainId),
+    `Safe infrastructure RPC expected raw chainId ${chainId}, got ${String(rpcChainId)}`,
+  );
+  const network = await retryBounded(() => provider.getNetwork(), {
+    label: `Safe infrastructure chain-id query for ${chainId}`,
+  });
+  assertCondition(
+    network.chainId === BigInt(chainId),
+    `Safe infrastructure provider expected chainId ${chainId}, got ${network.chainId}`,
+  );
+  const metadata = getCanonicalSafeDeploymentMetadata(chainId);
+  const components = {};
+  for (const name of ["singleton", "proxyFactory", "fallbackHandler"]) {
+    const expected = metadata[name];
+    const code = await retryBounded(() => provider.getCode(expected.address), {
+      label: `Safe ${name} code query for chainId ${chainId}`,
+    });
+    assertCondition(code !== "0x", `Safe ${name} has no code on chainId ${chainId}`);
+    const actualCodeHash = keccak256(code).toLowerCase();
+    assertCondition(
+      actualCodeHash === expected.codeHash,
+      `Safe ${name} codeHash mismatch on chainId ${chainId}: expected ` +
+        `${expected.codeHash}, got ${actualCodeHash}`,
+    );
+    components[name] = {
+      address: expected.address,
+      expectedCodeHash: expected.codeHash,
+      actualCodeHash,
+      matched: true,
+    };
+  }
+  const proxyFactory = new Contract(
+    metadata.proxyFactory.address,
+    metadata.proxyFactory.abi,
+    provider,
+  );
+  const canonicalProxyRuntimeCode = await retryBounded(() => proxyFactory.proxyRuntimeCode(), {
+    label: `Safe proxy runtime query for chainId ${chainId}`,
+  });
+  assertCondition(
+    typeof canonicalProxyRuntimeCode === "string" && canonicalProxyRuntimeCode !== "0x",
+    `Safe ProxyFactory returned invalid proxy runtime code on chainId ${chainId}`,
+  );
+  return {
+    chainId: network.chainId,
+    rpcChainId,
+    components,
+    canonicalProxyCodeHash: keccak256(canonicalProxyRuntimeCode).toLowerCase(),
+  };
 };
 
 const pollUntil = async (predicate, { timeoutMs, intervalMs = POLL_INTERVAL_MS, label }) => {
@@ -129,6 +223,21 @@ const gitCommit = () => {
   }
 };
 
+const gitWorkingTreeState = () => {
+  try {
+    const porcelain = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
+      encoding: "utf8",
+    }).trim();
+    return {
+      commit: gitCommit(),
+      clean: porcelain === "",
+      changedPathCount: porcelain === "" ? 0 : porcelain.split("\n").length,
+    };
+  } catch {
+    return { commit: gitCommit(), clean: null, changedPathCount: null };
+  }
+};
+
 const hashDirectory = async (ethers, directory) => {
   const entries = [];
   const visit = async (current, relative = "") => {
@@ -158,6 +267,104 @@ const hashDirectory = async (ethers, directory) => {
   };
 };
 
+const hashAcceptanceInputs = async (ethers) => {
+  const directoryNames = [
+    "artifacts",
+    "contracts",
+    "circuits",
+    "hardhat",
+    "lib",
+    "packages",
+    "scripts",
+    "tasks",
+  ];
+  const fileNames = ["hardhat.config.mjs", "package.json", "package-lock.json"];
+  const entries = [];
+  const directories = {};
+  const files = {};
+  for (const name of directoryNames) {
+    const snapshot = await hashDirectory(ethers, path.join(process.cwd(), name));
+    directories[name] = snapshot;
+    entries.push(`directory:${name}:${snapshot.fileCount}:${snapshot.digest}`);
+  }
+  for (const name of fileNames) {
+    const content = await fs.readFile(path.join(process.cwd(), name));
+    const digest = ethers.keccak256(content);
+    files[name] = digest;
+    entries.push(`file:${name}:${digest}`);
+  }
+  return {
+    digest: ethers.keccak256(ethers.toUtf8Bytes(entries.join("\n"))),
+    directories,
+    files,
+  };
+};
+
+const readProductionBuildInfoState = async (ethers) => {
+  const buildInfoDirectory = path.join(process.cwd(), "artifacts", "build-info");
+  let entries;
+  try {
+    entries = await fs.readdir(buildInfoDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") return summarizeProductionBuildInfo([]);
+    throw error;
+  }
+  const files = entries
+    .filter(
+      (entry) =>
+        entry.isFile() && entry.name.endsWith(".json") && !entry.name.endsWith(".output.json"),
+    )
+    .map((entry) => entry.name)
+    .sort();
+  const records = [];
+  for (const file of files) {
+    const content = await fs.readFile(path.join(buildInfoDirectory, file));
+    records.push({
+      file: path.posix.join("artifacts", "build-info", file),
+      digest: ethers.keccak256(content),
+      buildInfo: JSON.parse(content.toString("utf8")),
+    });
+  }
+  return summarizeProductionBuildInfo(records);
+};
+
+const hashProofArtifacts = async (ethers, artifacts) => {
+  const evidence = {};
+  for (const [kind, artifactPath] of Object.entries(artifacts)) {
+    const content = await fs.readFile(artifactPath);
+    const stats = await fs.stat(artifactPath);
+    evidence[kind] = {
+      path: path.relative(process.cwd(), artifactPath),
+      bytes: stats.size,
+      keccak256: ethers.keccak256(content),
+    };
+  }
+  return evidence;
+};
+
+const resolveProofArtifacts = (descriptor, label) =>
+  Object.fromEntries(
+    ["wasm", "zkey"].map((kind) => [
+      kind,
+      resolveArtifactFile(
+        `${label} ${kind}`,
+        undefined,
+        descriptor.files.node[kind].map((candidate) => path.resolve(process.cwd(), candidate)),
+      ),
+    ]),
+  );
+
+const assertProofArtifactsUnchanged = (before, after, label) => {
+  for (const kind of ["wasm", "zkey"]) {
+    assertCondition(
+      before[kind].path === after[kind].path &&
+        before[kind].bytes === after[kind].bytes &&
+        before[kind].keccak256 === after[kind].keccak256,
+      `${label} ${kind} changed while the proof was being generated`,
+    );
+  }
+};
+
 const publicReceipt = (receipt) => ({
   hash: receipt.hash,
   blockNumber: receipt.blockNumber,
@@ -173,20 +380,140 @@ const implementationAddress = async (ethers, provider, proxyAddress) => {
   return ethers.getAddress(ethers.dataSlice(raw, 12));
 };
 
-const expectRevert = async (operation, label) => {
+const errorEvidence = (error) => {
+  const strings = [];
+  const revertData = [];
+  const seen = new Set();
+  const visit = (value, depth = 0) => {
+    if (typeof value === "string") {
+      strings.push(value);
+      if (/^0x[0-9a-fA-F]{8,}$/.test(value)) revertData.push(value.toLowerCase());
+      return;
+    }
+    if (value === null || typeof value !== "object" || depth > 5 || seen.has(value)) return;
+    seen.add(value);
+    for (const child of Object.values(value)) visit(child, depth + 1);
+  };
+  visit(error);
+  for (const value of [
+    error?.name,
+    error?.shortMessage,
+    error?.reason,
+    error?.message,
+    error?.revert?.name,
+    error?.errorName,
+  ]) {
+    if (typeof value === "string") strings.push(value);
+  }
+  for (const data of revertData) {
+    try {
+      const parsed = STANDARD_REVERT_INTERFACE.parseError(data);
+      if (parsed?.name === "Error" && typeof parsed.args[0] === "string") {
+        strings.push(parsed.args[0]);
+      }
+    } catch {
+      // Custom-error selectors are matched directly by expectRevert.
+    }
+  }
+  return { strings, revertData };
+};
+
+const expectRevert = async (
+  operation,
+  label,
+  { expectedErrorNames = [], expectedSelectors = [], expectedMessages = [] } = {},
+) => {
   try {
     await operation();
-  } catch {
-    return;
+  } catch (error) {
+    const evidence = errorEvidence(error);
+    const matchedName = expectedErrorNames.find((name) =>
+      evidence.strings.some((value) => value.includes(name)),
+    );
+    const normalizedSelectors = expectedSelectors.map((selector) => selector.toLowerCase());
+    const matchedSelector = normalizedSelectors.find((selector) =>
+      evidence.revertData.some((data) => data.startsWith(selector)),
+    );
+    const matchedMessage = expectedMessages.find((message) =>
+      evidence.strings.some((value) => value.includes(message)),
+    );
+    if (matchedName || matchedSelector || matchedMessage) {
+      return {
+        matchedName: matchedName ?? null,
+        matchedSelector: matchedSelector ?? null,
+        matchedMessage: matchedMessage ?? null,
+      };
+    }
+    throw new Error(
+      `${label} failed without the expected rejection ` +
+        `(errors=${expectedErrorNames.join(",") || "none"}; ` +
+        `selectors=${expectedSelectors.join(",") || "none"}): ${safeErrorMessage(error)}`,
+      { cause: error },
+    );
   }
   throw new Error(`${label} unexpectedly succeeded`);
 };
 
+const expectSafeSimulationFailure = async ({
+  provider,
+  from,
+  safeAddress,
+  data,
+  safeInterface,
+  label,
+  expectedSafeRevertCodes,
+}) => {
+  let result;
+  try {
+    result = await provider.call({ from, to: safeAddress, data });
+  } catch (error) {
+    const errorText = errorEvidence(error).strings.join("\n");
+    const observedCodes = [...new Set(errorText.match(/\bGS\d{3}\b/g) ?? [])];
+    const acceptedCodes = Array.isArray(expectedSafeRevertCodes) ? expectedSafeRevertCodes : [];
+    if (observedCodes.some((code) => acceptedCodes.includes(code))) {
+      return { outcome: "reverted", safeRevertCodes: observedCodes };
+    }
+    throw new Error(
+      `${label} simulation failed without an expected Safe revert code ` +
+        `(${acceptedCodes.join(", ") || "none configured"}): ${safeErrorMessage(error)}`,
+      { cause: error },
+    );
+  }
+  let innerSuccess;
+  try {
+    [innerSuccess] = safeInterface.decodeFunctionResult("execTransaction", result);
+  } catch (error) {
+    throw new Error(
+      `${label} returned malformed Safe execTransaction data: ${safeErrorMessage(error)}`,
+      { cause: error },
+    );
+  }
+  if (innerSuccess === false) return { outcome: "returned-false", safeRevertCodes: [] };
+  throw new Error(`${label} unexpectedly succeeded`);
+};
+
+const duplicateSafeSignatureCalldata = ({ ethers, safeInterface, encodedTransaction }) => {
+  const parsed = safeInterface.parseTransaction({ data: encodedTransaction });
+  assertCondition(parsed?.name === "execTransaction", "Expected Safe execTransaction calldata");
+  const args = [...parsed.args];
+  const signaturesIndex = args.length - 1;
+  args[signaturesIndex] = ethers.concat([args[signaturesIndex], args[signaturesIndex]]);
+  return safeInterface.encodeFunctionData(parsed.fragment, args);
+};
+
 const waitForReady = async (timelock, operationId, minDelay) =>
-  pollUntil(() => timelock.isOperationReady(operationId), {
-    timeoutMs: minDelay * 1_000 + READY_GRACE_MS,
-    label: `Timelock operation ${operationId} readiness`,
-  });
+  pollUntil(
+    () =>
+      retryBounded(() => timelock.isOperationReady(operationId), {
+        attempts: 1,
+        timeoutMs: 30_000,
+        label: `Timelock readiness query for ${operationId}`,
+      }),
+    {
+      timeoutMs: minDelay * 1_000 + READY_GRACE_MS,
+      label: `Timelock operation ${operationId} readiness`,
+    },
+  );
 
 const verificationEntry = async (
   artifacts,
@@ -205,12 +532,14 @@ const verificationEntry = async (
   };
 };
 
-const verifyEntries = async (entries, report, saveReport) => {
+const verifyEntries = async (entries, report, saveReport, phase = "deployment") => {
   report.verification.status = "running";
+  const phaseReport = { phase, status: "running", contracts: [] };
+  report.verification.phases.push(phaseReport);
   await saveReport();
   let failures = [];
   try {
-    report.verification.contracts = await verifyAcceptanceContracts({
+    phaseReport.contracts = await verifyAcceptanceContracts({
       hre,
       entries,
       timeoutMs: 15 * 60 * 1000,
@@ -218,13 +547,22 @@ const verifyEntries = async (entries, report, saveReport) => {
       retries: 2,
       logger: console,
     });
+    phaseReport.status = "passed";
+    report.verification.contracts.push(
+      ...phaseReport.contracts.map((contract) => ({ phase, ...contract })),
+    );
     report.verification.status = "passed";
   } catch (error) {
-    report.verification.contracts = Array.isArray(error.results) ? error.results : [];
-    failures = report.verification.contracts.filter((item) => item.status !== "passed");
+    phaseReport.contracts = Array.isArray(error.results) ? error.results : [];
+    report.verification.contracts.push(
+      ...phaseReport.contracts.map((contract) => ({ phase, ...contract })),
+    );
+    failures = phaseReport.contracts.filter((item) => item.status !== "passed");
     if (failures.length === 0) {
       failures = [{ label: "verification-batch", status: "failed" }];
     }
+    phaseReport.status = "failed";
+    phaseReport.error = safeErrorMessage(error);
     report.verification.status = "failed";
     report.verification.error = safeErrorMessage(error);
   }
@@ -282,8 +620,10 @@ const runRecovery = async ({ ethers, provider, config, funder, runDeployer, base
     `${config.reportFileComponent}.recovery-${Date.now().toString(10)}.json`,
   );
   const report = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     mode: "recovery",
+    acceptanceMode: config.acceptanceMode,
+    releaseReady: false,
     runId: config.runId,
     status: "running",
     startedAt: nowIso(),
@@ -322,6 +662,15 @@ export const main = async () => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const provider = ethers.provider;
+  const rawTestnetChainId = await retryBounded(() => provider.send("eth_chainId", []), {
+    label: "raw testnet RPC chain-id query",
+  });
+  assertCondition(
+    typeof rawTestnetChainId === "string" && BigInt(rawTestnetChainId) === EXPECTED_CHAIN_ID,
+    `eSpace acceptance RPC must report raw chainId ${EXPECTED_CHAIN_ID}; got ${String(
+      rawTestnetChainId,
+    )}`,
+  );
   const network = await retryBounded(() => provider.getNetwork(), { label: "RPC chain-id query" });
   // The tested safety parser evaluates the network name, chain ID and explicit confirmation
   // together before report creation, funding, or any other transaction.
@@ -334,7 +683,10 @@ export const main = async () => {
   const runId = parsedConfig.runId || defaultRunId();
   const config = {
     privateKey,
+    acceptanceMode: parsedConfig.acceptanceMode,
     minDelay: parsedConfig.minDelaySeconds,
+    productionMinDelay: parsedConfig.productionMinDelaySeconds,
+    productionGovernanceMultisigProfile: parsedConfig.productionGovernanceMultisigProfile,
     confirmations: parsedConfig.confirmations,
     maxCfx: parsedConfig.maxCfxWei,
     maxCfxText: parsedConfig.maxCfx,
@@ -342,18 +694,20 @@ export const main = async () => {
     reportFileComponent: runIdReportFileComponent(runId),
     recover: parsedConfig.recover,
     verify: parsedConfig.verify,
+    requireFinality: parsedConfig.requireFinality,
+    finalityTimeoutMs: parsedConfig.finalityTimeoutSeconds * 1_000,
   };
 
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey) || /^0x0{64}$/i.test(privateKey)) {
     throw new Error("PRIVATE_KEY must be a valid non-zero 0x-prefixed private key");
   }
   const funder = new ethers.Wallet(privateKey, provider);
-  const runDeployer = deriveAcceptanceWallet({
+  const acceptanceWallets = deriveAcceptanceWallets({
     basePrivateKey: privateKey,
     runId,
-    label: "run-deployer",
     provider,
   });
+  const { runDeployer, ownerA, ownerB, ownerC, ownerD, ownerE, ownerF } = acceptanceWallets;
 
   const reportPath = path.join(REPORT_ROOT, `${config.reportFileComponent}.json`);
   if (config.recover) {
@@ -368,27 +722,28 @@ export const main = async () => {
     return;
   }
 
-  const ownerA = deriveAcceptanceWallet({
-    basePrivateKey: privateKey,
-    runId,
-    label: "multisig-owner-a",
-    provider,
-  });
-  const ownerB = deriveAcceptanceWallet({
-    basePrivateKey: privateKey,
-    runId,
-    label: "multisig-owner-b",
-    provider,
-  });
-  const ownerC = deriveAcceptanceWallet({
-    basePrivateKey: privateKey,
-    runId,
-    label: "multisig-owner-c",
-    provider,
-  });
+  const isolatedDeploymentDirectory = path.join(
+    REPORT_ROOT,
+    config.reportFileComponent,
+    "deployments",
+    EXPECTED_NETWORK,
+  );
+
+  const primarySafeOwners = [ownerA.address, ownerB.address, ownerC.address];
+  const replacementSafeOwners = [ownerD.address, ownerE.address, ownerF.address];
+  const ownerLabels = new Map(
+    [
+      ["A", ownerA],
+      ["B", ownerB],
+      ["C", ownerC],
+      ["D", ownerD],
+      ["E", ownerE],
+      ["F", ownerF],
+    ].map(([label, wallet]) => [wallet.address.toLowerCase(), label]),
+  );
   assertCondition(
-    new Set([funder.address, runDeployer.address, ownerA.address, ownerB.address, ownerC.address])
-      .size === 5,
+    new Set([funder.address, runDeployer.address, ...primarySafeOwners, ...replacementSafeOwners])
+      .size === 8,
     "Derived test accounts must all be distinct",
   );
 
@@ -415,22 +770,44 @@ export const main = async () => {
     `Funder balance is below the ${config.maxCfxText} CFX test budget plus funding gas`,
   );
 
-  const deploymentsBefore = await hashDirectory(ethers, DEPLOYMENTS_DIR);
+  const [deploymentsBefore, isolatedDeploymentsBefore, acceptanceInputs, compilerBuildState] =
+    await Promise.all([
+      hashDirectory(ethers, DEPLOYMENTS_DIR),
+      hashDirectory(ethers, isolatedDeploymentDirectory),
+      hashAcceptanceInputs(ethers),
+      readProductionBuildInfoState(ethers),
+    ]);
+  const sourceState = gitWorkingTreeState();
+  const buildState = {
+    hardhatBuildProfile: hre.globalOptions?.buildProfile ?? "default",
+    ...compilerBuildState,
+    artifactsFileCount: acceptanceInputs.directories.artifacts.fileCount,
+    artifactsDigest: acceptanceInputs.directories.artifacts.digest,
+  };
   const report = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     mode: "acceptance",
+    acceptanceMode: config.acceptanceMode,
+    releaseReady: false,
     runId: config.runId,
     status: "running",
     failedStep: null,
     error: null,
     startedAt: nowIso(),
     finishedAt: null,
-    releaseCommit: gitCommit(),
+    releaseCommit: sourceState.commit,
+    sourceState: {
+      ...sourceState,
+      acceptanceInputDigest: acceptanceInputs.digest,
+      acceptanceInputs,
+    },
+    buildState,
     network: {
       name: connection.networkName,
       chainId: network.chainId,
       confirmations: config.confirmations,
       latestBlockAtStart: await provider.getBlockNumber(),
+      finality: { required: config.requireFinality, status: "pending" },
     },
     safety: {
       confirmationMatched: true,
@@ -444,23 +821,59 @@ export const main = async () => {
     addresses: {
       funder: funder.address,
       runDeployer: runDeployer.address,
-      multisigOwners: [ownerA.address, ownerB.address, ownerC.address],
+      safeOwners: primarySafeOwners,
+      replacementSafeOwners,
     },
-    multisigPolicy: {
+    safeInfrastructure: {
+      version: CANONICAL_SAFE_VERSION,
+      deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+      saltNonce: BigInt(hashRunId(runId)).toString(),
+      components: {},
+    },
+    safePolicy: {
       policy: "2-of-3",
       ownerCount: 3,
       threshold: 2,
       oneSignatureRejected: false,
       duplicateSignatureRejected: false,
-      nonOwnerSignatureRejected: false,
+      nonOwnerSigningRejectedBySdk: false,
       twoSignaturePairsExecuted: [],
-      threeSignatureExecuted: false,
       replayRejected: false,
+      modules: null,
+      guard: null,
+      fallbackHandler: null,
+      ownerSets: {
+        primary: { labels: ["A", "B", "C"], addresses: primarySafeOwners },
+        replacement: { labels: ["D", "E", "F"], addresses: replacementSafeOwners },
+      },
+      primaryOwnerSignaturesRejectedByReplacementSafe: false,
+      executions: [],
+    },
+    timelockDeployment: {},
+    productionParity: {
+      canonicalSafeImplementationMatched: false,
+      sameSafeManifestOnChain71And1030: false,
+      mainnetCanonicalSafeInfrastructureMatched: false,
+      sameTimelockArtifactAndConfigResolver: false,
+      sameProtocolDeploymentHelper: false,
+      sameDeploymentMetadataWriter: false,
+      sharedGovernanceOperationBuildersMatched: false,
+      criticalTransactionsFinalized: false,
+      cleanReleaseCommit: sourceState.clean,
+      productionBuildProfileMatched: buildState.hardhatBuildProfile === "production",
+      productionSafeProfileMatched:
+        config.productionGovernanceMultisigProfile === ESPACE_E2E_RELEASE_SAFE_PROFILE,
+      artifactManifestCaptured:
+        buildState.artifactsFileCount > 0 && buildState.buildInfoFileCount > 0,
+      productionCompilerSettingsMatched: buildState.productionSettingsMatched,
+      ownerKeysRepresentIndependentHumans: false,
+      hardwareWalletAndUiCovered: false,
     },
     steps: [],
     transactions: {},
     onchain: { status: "running" },
     governance: {},
+    terminalGovernanceState: { status: "pending" },
     business: {},
     treasury: {},
     upgrade: {},
@@ -468,6 +881,8 @@ export const main = async () => {
       enabled: config.verify,
       status: config.verify ? "pending" : "skipped",
       contracts: [],
+      phases: [],
+      gateBeforeUpgradeSchedule: true,
     },
     budget: {
       capWei: config.maxCfx,
@@ -482,13 +897,19 @@ export const main = async () => {
       after: null,
       unchanged: null,
     },
+    isolatedDeploymentArtifacts: {
+      path: path.relative(process.cwd(), isolatedDeploymentDirectory),
+      before: isolatedDeploymentsBefore,
+      after: null,
+      productionWriterExercised: false,
+    },
   };
   const saveReport = () => writeJsonAtomic(reportPath, report);
   await saveReport();
   console.log(`[espace-acceptance] run ID: ${config.runId}`);
   console.log(`[espace-acceptance] report initialized: ${reportPath}`);
 
-  let currentStep = "funding";
+  let currentStep = "acceptance-mode-preflight";
   let originalError = null;
   let funded = false;
   const secretValues = [
@@ -497,6 +918,9 @@ export const main = async () => {
     ownerA.privateKey,
     ownerB.privateKey,
     ownerC.privateKey,
+    ownerD.privateKey,
+    ownerE.privateKey,
+    ownerF.privateKey,
   ];
   const addStep = async (name, evidence = {}) => {
     report.steps.push({ name, status: "passed", at: nowIso(), ...evidence });
@@ -527,8 +951,92 @@ export const main = async () => {
 
   let oldGovernanceOwner = process.env.GOVERNANCE_OWNER;
   let oldGovernanceMultisig = process.env.GOVERNANCE_MULTISIG;
+  let oldGovernanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
+  let mainnetSafeInfrastructure;
+  let testnetSafeInfrastructure;
 
   try {
+    currentStep = "production-build-preflight";
+    assertCondition(
+      buildState.hardhatBuildProfile === "production",
+      "eSpace acceptance requires Hardhat --build-profile production",
+    );
+    assertCondition(
+      buildState.artifactsFileCount > 0 && buildState.buildInfoFileCount > 0,
+      "eSpace acceptance requires non-empty artifacts and build-info manifests",
+    );
+    assertCondition(
+      buildState.productionSettingsMatched,
+      "Actual build-info compiler settings do not match the pinned production configuration",
+    );
+    assertCondition(
+      isolatedDeploymentsBefore.fileCount === 0,
+      "Isolated deployment-metadata directory is not empty for this run ID",
+    );
+    await addStep("production-build-manifest-preflight", buildState);
+
+    if (config.acceptanceMode === "release-rehearsal") {
+      currentStep = "acceptance-mode-preflight";
+      assertCondition(
+        sourceState.clean === true,
+        "release-rehearsal requires a clean Git working tree before any testnet funding",
+      );
+      assertCondition(
+        config.productionGovernanceMultisigProfile === ESPACE_E2E_RELEASE_SAFE_PROFILE,
+        `release-rehearsal requires GOVERNANCE_MULTISIG_PROFILE=${ESPACE_E2E_RELEASE_SAFE_PROFILE}`,
+      );
+      await addStep("release-rehearsal-clean-source-preflight", {
+        commit: sourceState.commit,
+        clean: sourceState.clean,
+        acceptanceInputDigest: acceptanceInputs.digest,
+        productionMinDelaySeconds: config.productionMinDelay,
+        productionGovernanceMultisigProfile: config.productionGovernanceMultisigProfile,
+        buildState,
+      });
+    }
+
+    currentStep = "testnet-safe-infrastructure";
+    testnetSafeInfrastructure = await inspectCanonicalSafeInfrastructure({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+    });
+    await addStep("canonical-safe-testnet-infrastructure", testnetSafeInfrastructure);
+
+    currentStep = "mainnet-safe-infrastructure";
+    const mainnetProvider = new JsonRpcProvider(resolveConfluxRpcUrls().conflux);
+    try {
+      mainnetSafeInfrastructure = await inspectCanonicalSafeInfrastructure({
+        provider: mainnetProvider,
+        chainId: 1030n,
+      });
+    } finally {
+      mainnetProvider.destroy();
+    }
+    const safeInfrastructureMatchesAcrossNetworks = [
+      "singleton",
+      "proxyFactory",
+      "fallbackHandler",
+    ].every(
+      (component) =>
+        testnetSafeInfrastructure.components[component].address ===
+          mainnetSafeInfrastructure.components[component].address &&
+        testnetSafeInfrastructure.components[component].actualCodeHash ===
+          mainnetSafeInfrastructure.components[component].actualCodeHash,
+    );
+    assertCondition(
+      safeInfrastructureMatchesAcrossNetworks &&
+        testnetSafeInfrastructure.canonicalProxyCodeHash ===
+          mainnetSafeInfrastructure.canonicalProxyCodeHash,
+      "Canonical Safe infrastructure differs between eSpace testnet and mainnet",
+    );
+    report.productionParity.mainnetCanonicalSafeInfrastructureMatched = true;
+    report.productionParity.sameSafeManifestOnChain71And1030 = true;
+    await addStep("canonical-safe-mainnet-infrastructure", {
+      ...mainnetSafeInfrastructure,
+      matchesTestnet: true,
+    });
+
+    currentStep = "funding";
     const fundingTx = await funder.sendTransaction({
       to: runDeployer.address,
       value: config.maxCfx,
@@ -541,41 +1049,127 @@ export const main = async () => {
     );
     await addStep("fund-isolated-run-deployer", { amountWei: config.maxCfx });
 
-    currentStep = "deploy-multisig-timelock";
-    const multisig = await deploy("E2ETestnetMultisig", runDeployer, [
-      ownerA.address,
-      ownerB.address,
-      ownerC.address,
-    ]);
-    const multisigAddress = await multisig.getAddress();
+    currentStep = "deploy-canonical-safe-timelock";
+    const safeOwners = primarySafeOwners;
+    const safeSaltNonce = BigInt(hashRunId(config.runId)).toString();
+    const testnetSafeMetadata = getCanonicalSafeDeploymentMetadata(EXPECTED_CHAIN_ID);
+    const mainnetSafeMetadata = getCanonicalSafeDeploymentMetadata(1030n);
+    const manifestComponents = ["singleton", "proxyFactory", "fallbackHandler"];
+    const sameManifestOnBothESpaceNetworks = manifestComponents.every(
+      (component) =>
+        testnetSafeMetadata[component].address === mainnetSafeMetadata[component].address &&
+        testnetSafeMetadata[component].codeHash === mainnetSafeMetadata[component].codeHash,
+    );
+    assertCondition(
+      sameManifestOnBothESpaceNetworks,
+      "Pinned Safe manifest differs between Conflux eSpace testnet and mainnet",
+    );
+
+    const preparedSafe = await prepareCanonicalSafeDeployment({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+      owners: safeOwners,
+      saltNonce: safeSaltNonce,
+    });
+    assertCondition(
+      (await provider.getCode(preparedSafe.safeAddress)) === "0x",
+      `Predicted governance Safe ${preparedSafe.safeAddress} is already deployed`,
+    );
+    const safeDeploymentTx = await runDeployer.sendTransaction(preparedSafe.deploymentTransaction);
+    await recordTx("deploy-canonical-governance-safe", safeDeploymentTx);
+    const safeAddress = preparedSafe.safeAddress;
+    const initialSafeProfile = await assertCanonicalSafeProfile({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+      safeAddress,
+      expectedOwners: safeOwners,
+      expectedNonce: 0n,
+    });
+    assertCondition(
+      initialSafeProfile.canonicalProxyCodeHash ===
+        mainnetSafeInfrastructure.canonicalProxyCodeHash,
+      "Canonical SafeProxy runtime differs between eSpace testnet and mainnet factories",
+    );
+    const safeReader = await connectCanonicalSafe({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+      safeAddress,
+    });
+
+    const timelockConfig = await resolveTimelockDeploymentConfig({
+      connection,
+      ethers,
+      provider,
+      deployerAddress: runDeployer.address,
+      env: {
+        ...process.env,
+        MIN_DELAY: String(config.minDelay),
+        GOVERNANCE_MULTISIG: safeAddress,
+      },
+      inspectMultisig: ({ provider: inspectionProvider, address }) =>
+        assertCanonicalSafeProfile({
+          provider: inspectionProvider,
+          chainId: EXPECTED_CHAIN_ID,
+          safeAddress: address,
+          expectedOwners: safeOwners,
+        }),
+    });
     const timelock = await deploy("GovernanceTimelock", runDeployer, [
-      config.minDelay,
-      multisigAddress,
+      timelockConfig.minDelay,
+      timelockConfig.governanceMultisig,
     ]);
     const timelockAddress = await timelock.getAddress();
-    report.addresses.multisig = multisigAddress;
+    report.addresses.governanceSafe = safeAddress;
     report.addresses.timelock = timelockAddress;
-
-    const owners = await multisig.getOwners();
-    assertCondition((await multisig.getThreshold()) === 2n, "Test multisig threshold is not 2");
-    assertCondition(
-      owners
-        .map((item) => item.toLowerCase())
-        .sort()
-        .join(",") ===
-        [ownerA.address, ownerB.address, ownerC.address]
-          .map((item) => item.toLowerCase())
-          .sort()
-          .join(","),
-      "Test multisig owner set mismatch",
-    );
-    assertCondition((await multisig.nonce()) === 0n, "Test multisig initial nonce is not zero");
+    report.safeInfrastructure = {
+      version: CANONICAL_SAFE_VERSION,
+      deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+      saltNonce: safeSaltNonce,
+      predictedAddress: safeAddress,
+      deploymentFactoryMatched:
+        preparedSafe.deploymentTransaction.to === testnetSafeMetadata.proxyFactory.address,
+      components: Object.fromEntries(
+        manifestComponents.map((component) => [
+          component,
+          {
+            address: testnetSafeMetadata[component].address,
+            expectedCodeHash: testnetSafeMetadata[component].codeHash,
+            actualCodeHash: initialSafeProfile.componentCodeHashes[component],
+            matched:
+              testnetSafeMetadata[component].codeHash ===
+              initialSafeProfile.componentCodeHashes[component],
+          },
+        ]),
+      ),
+      testnetPreflight: testnetSafeInfrastructure,
+      mainnet: mainnetSafeInfrastructure,
+    };
+    Object.assign(report.safePolicy, {
+      owners: initialSafeProfile.owners,
+      modules: initialSafeProfile.modules,
+      guard: initialSafeProfile.guard,
+      fallbackHandler: initialSafeProfile.fallbackHandler,
+      singleton: initialSafeProfile.singleton,
+      proxyCodeHash: initialSafeProfile.proxyCodeHash,
+      canonicalProxyCodeHash: initialSafeProfile.canonicalProxyCodeHash,
+      proxyRuntimeMatched:
+        initialSafeProfile.proxyCodeHash === initialSafeProfile.canonicalProxyCodeHash,
+    });
+    report.productionParity.canonicalSafeImplementationMatched = true;
+    report.productionParity.sameTimelockArtifactAndConfigResolver = true;
+    report.timelockDeployment = {
+      configResolver: "resolveTimelockDeploymentConfig",
+      minDelaySeconds: timelockConfig.minDelay,
+      governanceSafe: timelockConfig.governanceMultisig,
+      rolesExclusive: true,
+    };
+    await saveReport();
 
     const roleChecks = [
       ["admin", await timelock.DEFAULT_ADMIN_ROLE(), timelockAddress],
-      ["proposer", await timelock.PROPOSER_ROLE(), multisigAddress],
-      ["canceller", await timelock.CANCELLER_ROLE(), multisigAddress],
-      ["executor", await timelock.EXECUTOR_ROLE(), multisigAddress],
+      ["proposer", await timelock.PROPOSER_ROLE(), safeAddress],
+      ["canceller", await timelock.CANCELLER_ROLE(), safeAddress],
+      ["executor", await timelock.EXECUTOR_ROLE(), safeAddress],
     ];
     for (const [name, role, expected] of roleChecks) {
       const count = await timelock.getRoleMemberCount(role);
@@ -590,104 +1184,175 @@ export const main = async () => {
       "Timelock delay mismatch",
     );
 
-    const signedExecution = async (target, value, data, wallets = [ownerA, ownerB]) => {
-      const nonce = await multisig.nonce();
-      const { signatures } = await signMultisigExecute({
-        wallets,
-        chainId: EXPECTED_CHAIN_ID,
-        multisigAddress,
+    const safeInterface = createCanonicalSafeInterface(EXPECTED_CHAIN_ID);
+    const primarySafeContext = { label: "primary", safeAddress, safeReader };
+    const signedExecution = async (
+      target,
+      value,
+      data,
+      wallets = [ownerA, ownerB],
+      safeContext = primarySafeContext,
+    ) => {
+      const nonce = await safeContext.safeReader.getNonce();
+      const unsigned = await createCanonicalSafeTransaction({
+        safe: safeContext.safeReader,
         target,
         value,
         data,
         nonce,
       });
-      return { nonce, signatures };
-    };
-    const executeMultisig = async (label, target, value, data, wallets = [ownerA, ownerB]) => {
-      const { nonce, signatures } = await signedExecution(target, value, data, wallets);
-      const tx = await multisig.connect(runDeployer).execute(target, value, data, signatures);
-      const receipt = await recordTx(label, tx);
+      const signed = await signCanonicalSafeTransaction({
+        provider,
+        chainId: EXPECTED_CHAIN_ID,
+        safeAddress: safeContext.safeAddress,
+        safeTransaction: unsigned.safeTransaction,
+        signerPrivateKeys: wallets.map((wallet) => wallet.privateKey),
+      });
       assertCondition(
-        (await multisig.nonce()) === nonce + 1n,
-        `${label} did not advance multisig nonce`,
+        signed.safeTxHash === unsigned.safeTxHash,
+        "Safe transaction hash changed while collecting signatures",
       );
-      return { receipt, nonce, signatures };
+      return { nonce, ...signed };
+    };
+    const executeSafe = async (
+      label,
+      target,
+      value,
+      data,
+      wallets = [ownerA, ownerB],
+      safeContext = primarySafeContext,
+    ) => {
+      const signed = await signedExecution(target, value, data, wallets, safeContext);
+      const tx = await runDeployer.sendTransaction({
+        to: safeContext.safeAddress,
+        value: 0n,
+        data: signed.encodedTransaction,
+      });
+      const receipt = await recordTx(label, tx);
+      const execution = assertSafeExecutionSuccess({
+        receipt,
+        safeAddress: safeContext.safeAddress,
+        safeTxHash: signed.safeTxHash,
+        chainId: EXPECTED_CHAIN_ID,
+      });
+      assertCondition(
+        BigInt(await safeContext.safeReader.getNonce()) === BigInt(signed.nonce) + 1n,
+        `${label} did not advance Safe nonce`,
+      );
+      const evidence = {
+        label,
+        safe: safeContext.label,
+        safeAddress: safeContext.safeAddress,
+        safeNonce: signed.nonce,
+        safeTxHash: execution.safeTxHash,
+        signers: wallets.map((wallet) => {
+          const signerLabel = ownerLabels.get(wallet.address.toLowerCase());
+          assertCondition(signerLabel, `Unknown acceptance Safe signer ${wallet.address}`);
+          return signerLabel;
+        }),
+        event: "ExecutionSuccess",
+        outerTransactionHash: receipt.hash,
+      };
+      report.safePolicy.executions.push(evidence);
+      await saveReport();
+      return { receipt, ...signed, evidence };
     };
 
-    const singleExecution = await signedExecution(runDeployer.address, 0n, "0x", [ownerA, ownerB]);
+    const singleExecution = await signedExecution(runDeployer.address, 0n, "0x", [ownerA]);
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress,
+      data: singleExecution.encodedTransaction,
+      safeInterface,
+      label: "Single-signature Safe execution",
+      expectedSafeRevertCodes: ["GS020"],
+    });
+    report.safePolicy.oneSignatureRejected = true;
+
+    const duplicateExecutionData = duplicateSafeSignatureCalldata({
+      ethers,
+      safeInterface,
+      encodedTransaction: singleExecution.encodedTransaction,
+    });
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress,
+      data: duplicateExecutionData,
+      safeInterface,
+      label: "Duplicate-owner Safe execution",
+      expectedSafeRevertCodes: ["GS026"],
+    });
+    report.safePolicy.duplicateSignatureRejected = true;
+
+    const outsiderUnsigned = await createCanonicalSafeTransaction({
+      safe: safeReader,
+      target: runDeployer.address,
+      value: 0n,
+      data: "0x",
+      nonce: await safeReader.getNonce(),
+    });
     await expectRevert(
       () =>
-        multisig.execute.staticCall(runDeployer.address, 0n, "0x", [singleExecution.signatures[0]]),
-      "Single-signature multisig execution",
+        signCanonicalSafeTransaction({
+          provider,
+          chainId: EXPECTED_CHAIN_ID,
+          safeAddress,
+          safeTransaction: outsiderUnsigned.safeTransaction,
+          signerPrivateKeys: [runDeployer.privateKey],
+        }),
+      "Non-owner Safe signing",
+      { expectedMessages: ["Transactions can only be signed by Safe owners"] },
     );
-    report.multisigPolicy.oneSignatureRejected = true;
+    report.safePolicy.nonOwnerSigningRejectedBySdk = true;
 
-    const duplicateExecution = await signedExecution(runDeployer.address, 0n, "0x", [
-      ownerA,
-      ownerB,
-    ]);
-    await expectRevert(
-      () =>
-        multisig.execute.staticCall(runDeployer.address, 0n, "0x", [
-          duplicateExecution.signatures[0],
-          duplicateExecution.signatures[0],
-        ]),
-      "Duplicate-owner multisig execution",
-    );
-    report.multisigPolicy.duplicateSignatureRejected = true;
-
-    const nonOwnerExecution = await signedExecution(runDeployer.address, 0n, "0x", [
-      ownerA,
-      runDeployer,
-    ]);
-    await expectRevert(
-      () =>
-        multisig.execute.staticCall(runDeployer.address, 0n, "0x", nonOwnerExecution.signatures),
-      "Non-owner multisig execution",
-    );
-    report.multisigPolicy.nonOwnerSignatureRejected = true;
-
-    const abExecution = await executeMultisig(
-      "multisig-two-signature-smoke-ab",
+    const abExecution = await executeSafe(
+      "safe-two-signature-smoke-ab",
       runDeployer.address,
       0n,
       "0x",
       [ownerA, ownerB],
     );
-    report.multisigPolicy.twoSignaturePairsExecuted.push("AB");
-    await executeMultisig("multisig-two-signature-smoke-ac", runDeployer.address, 0n, "0x", [
+    report.safePolicy.twoSignaturePairsExecuted.push("AB");
+    await executeSafe("safe-two-signature-smoke-ac", runDeployer.address, 0n, "0x", [
       ownerA,
       ownerC,
     ]);
-    report.multisigPolicy.twoSignaturePairsExecuted.push("AC");
-    await executeMultisig("multisig-two-signature-smoke-bc", runDeployer.address, 0n, "0x", [
+    report.safePolicy.twoSignaturePairsExecuted.push("AC");
+    await executeSafe("safe-two-signature-smoke-bc", runDeployer.address, 0n, "0x", [
       ownerB,
       ownerC,
     ]);
-    report.multisigPolicy.twoSignaturePairsExecuted.push("BC");
-    await executeMultisig("multisig-three-signature-smoke", runDeployer.address, 0n, "0x", [
-      ownerA,
-      ownerB,
-      ownerC,
-    ]);
-    report.multisigPolicy.threeSignatureExecuted = true;
-    await expectRevert(
-      () => multisig.execute.staticCall(runDeployer.address, 0n, "0x", abExecution.signatures),
-      "Multisig replay",
-    );
-    report.multisigPolicy.replayRejected = true;
-    await addStep("eip712-two-of-three-multisig", {
-      ...report.multisigPolicy,
-      nonceAfterSmoke: await multisig.nonce(),
+    report.safePolicy.twoSignaturePairsExecuted.push("BC");
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress,
+      data: abExecution.encodedTransaction,
+      safeInterface,
+      label: "Safe nonce replay",
+      expectedSafeRevertCodes: ["GS026"],
+    });
+    report.safePolicy.replayRejected = true;
+    await addStep("canonical-safe-1.3.0-two-of-three", {
+      ...report.safePolicy,
+      owners: [...report.safePolicy.owners],
+      modules: [...report.safePolicy.modules],
+      twoSignaturePairsExecuted: [...report.safePolicy.twoSignaturePairsExecuted],
+      executions: report.safePolicy.executions.map((execution) => ({ ...execution })),
+      nonceAfterSmoke: await safeReader.getNonce(),
     });
 
     currentStep = "deploy-protocol";
     process.env.GOVERNANCE_OWNER = timelockAddress;
-    process.env.GOVERNANCE_MULTISIG = multisigAddress;
+    process.env.GOVERNANCE_MULTISIG = safeAddress;
+    process.env.GOVERNANCE_MULTISIG_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
     const deployed = await deployIntegratedSystem(connection, {
-      writeDeployments: false,
+      writeDeployments: true,
       signer: runDeployer,
       artifacts: hre.artifacts,
+      deploymentDirectory: isolatedDeploymentDirectory,
       transactionConfirmations: config.confirmations,
       transactionTimeoutMs: TX_TIMEOUT_MS,
       onTransactionReceipt: async (label, receipt) => {
@@ -719,6 +1384,40 @@ export const main = async () => {
       deepFamilyReader: await deepFamilyReader.getAddress(),
     };
     Object.assign(report.addresses, addresses);
+
+    const expectedDeploymentMetadata = {
+      DeepFamilyToken: addresses.token,
+      PoseidonT5: addresses.poseidonT5,
+      AdultAgeGate: addresses.adultAgeGate,
+      PersonCommitmentVerifier: addresses.personCommitmentVerifier,
+      DisclosureBindingVerifier: addresses.disclosureBindingVerifier,
+      Groth16VerifierAdapter: addresses.groth16VerifierAdapter,
+      DeepFamily: addresses.deepFamily,
+      DeepFamilyReader: addresses.deepFamilyReader,
+    };
+    for (const [contractName, expectedAddress] of Object.entries(expectedDeploymentMetadata)) {
+      const deploymentMetadata = JSON.parse(
+        await fs.readFile(path.join(isolatedDeploymentDirectory, `${contractName}.json`), "utf8"),
+      );
+      assertCondition(
+        ethers.getAddress(deploymentMetadata.address) === ethers.getAddress(expectedAddress) &&
+          Array.isArray(deploymentMetadata.abi) &&
+          deploymentMetadata.abi.length > 0 &&
+          (contractName !== "DeepFamily" ||
+            ethers.getAddress(deploymentMetadata.implementationAddress) ===
+              ethers.getAddress(deepFamilyImplementationAddress)),
+        `Persisted ${contractName} deployment metadata does not match the deployed contract`,
+      );
+    }
+    const isolatedDeploymentsAfter = await hashDirectory(ethers, isolatedDeploymentDirectory);
+    assertCondition(
+      isolatedDeploymentsAfter.fileCount === Object.keys(expectedDeploymentMetadata).length,
+      "Production deployment metadata writer did not persist the complete contract set",
+    );
+    report.isolatedDeploymentArtifacts.after = isolatedDeploymentsAfter;
+    report.isolatedDeploymentArtifacts.productionWriterExercised = true;
+    report.productionParity.sameProtocolDeploymentHelper = true;
+    report.productionParity.sameDeploymentMetadataWriter = true;
     await saveReport();
 
     // The callback above persists every receipt immediately so a mid-deployment failure still
@@ -772,6 +1471,94 @@ export const main = async () => {
       confirmations: config.confirmations,
     });
 
+    currentStep = "verify-initial-deployment";
+    const governedVerifierCandidate = await deploy("Groth16VerifierAdapter", runDeployer, [
+      addresses.personCommitmentVerifier,
+      addresses.disclosureBindingVerifier,
+    ]);
+    addresses.governedVerifierCandidate = await governedVerifierCandidate.getAddress();
+    assertCondition(
+      (await governedVerifierCandidate.personVerifier()) === addresses.personCommitmentVerifier &&
+        (await governedVerifierCandidate.disclosureBindingVerifier()) ===
+          addresses.disclosureBindingVerifier,
+      "Governed verifier candidate backend mismatch",
+    );
+    report.addresses.governedVerifierCandidate = addresses.governedVerifierCandidate;
+
+    const deepFamilyFactory = await ethers.getContractFactory("DeepFamily", {
+      signer: runDeployer,
+      libraries: {
+        PoseidonT5: addresses.poseidonT5,
+        AdultAgeGate: addresses.adultAgeGate,
+      },
+    });
+    const proxyInitData = deepFamilyFactory.interface.encodeFunctionData("initialize", [
+      addresses.token,
+      runDeployer.address,
+    ]);
+    const initialVerificationEntries = [
+      await verificationEntry(hre.artifacts, "GovernanceTimelock", timelockAddress, [
+        config.minDelay,
+        safeAddress,
+      ]),
+      await verificationEntry(hre.artifacts, "DeepFamilyToken", addresses.token),
+      await verificationEntry(hre.artifacts, "PoseidonT5", addresses.poseidonT5),
+      await verificationEntry(hre.artifacts, "AdultAgeGate", addresses.adultAgeGate),
+      await verificationEntry(
+        hre.artifacts,
+        "PersonCommitmentVerifier",
+        addresses.personCommitmentVerifier,
+      ),
+      await verificationEntry(
+        hre.artifacts,
+        "DisclosureBindingVerifier",
+        addresses.disclosureBindingVerifier,
+      ),
+      await verificationEntry(
+        hre.artifacts,
+        "Groth16VerifierAdapter",
+        addresses.groth16VerifierAdapter,
+        [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+      ),
+      {
+        ...(await verificationEntry(
+          hre.artifacts,
+          "Groth16VerifierAdapter",
+          addresses.governedVerifierCandidate,
+          [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+        )),
+        label: "GovernedVerifierCandidate",
+      },
+      await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
+        PoseidonT5: addresses.poseidonT5,
+        AdultAgeGate: addresses.adultAgeGate,
+      }),
+      await verificationEntry(hre.artifacts, "UUPSProxy", addresses.deepFamily, [
+        addresses.deepFamilyImplementation,
+        proxyInitData,
+      ]),
+      await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
+        addresses.deepFamily,
+      ]),
+    ];
+    if (config.verify) {
+      const initialVerificationFailures = await verifyEntries(
+        initialVerificationEntries,
+        report,
+        saveReport,
+        "initial-deployment",
+      );
+      if (initialVerificationFailures.length > 0) {
+        throw new Error(
+          `${initialVerificationFailures.length} initial ConfluxScan verification(s) failed; see report`,
+        );
+      }
+    }
+    await addStep("source-verified-initial-deployment", {
+      status: config.verify ? "passed" : "skipped-diagnostic",
+      contractCount: initialVerificationEntries.length,
+    });
+
     const scheduleOperation = async ({ label, target, data, salt, signers = [ownerA, ownerB] }) => {
       const operationId = await timelock.hashOperation(target, 0n, data, ZERO_HASH, salt);
       const scheduleData = timelock.interface.encodeFunctionData("schedule", [
@@ -782,7 +1569,7 @@ export const main = async () => {
         salt,
         config.minDelay,
       ]);
-      await executeMultisig(`${label}-schedule`, timelockAddress, 0n, scheduleData, signers);
+      await executeSafe(`${label}-schedule`, timelockAddress, 0n, scheduleData, signers);
       assertCondition(await timelock.isOperationPending(operationId), `${label} is not pending`);
       return { operationId, target, data, salt };
     };
@@ -794,7 +1581,7 @@ export const main = async () => {
         ZERO_HASH,
         operation.salt,
       ]);
-      await executeMultisig(`${label}-execute`, timelockAddress, 0n, executeData, signers);
+      await executeSafe(`${label}-execute`, timelockAddress, 0n, executeData, signers);
       assertCondition(
         await timelock.isOperationDone(operation.operationId),
         `${label} is not done`,
@@ -804,14 +1591,40 @@ export const main = async () => {
     currentStep = "governance-fee";
     const feeBefore = await deepFamily.protocolEndorsementFeeBps();
     const newFee = feeBefore === 501n ? 502n : 501n;
+    await expectRevert(
+      () => deepFamily.connect(runDeployer).updateEndorsementFee.staticCall(newFee),
+      "Direct non-owner endorsement fee update",
+      {
+        expectedErrorNames: ["OwnableUnauthorizedAccount"],
+        expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
+      },
+    );
+    await expectRevert(
+      () =>
+        deepFamily
+          .connect(runDeployer)
+          .setVerifier.staticCall(1, 0, addresses.governedVerifierCandidate),
+      "Direct non-owner verifier update",
+      {
+        expectedErrorNames: ["OwnableUnauthorizedAccount"],
+        expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
+      },
+    );
     const feeData = deepFamily.interface.encodeFunctionData("updateEndorsementFee", [newFee]);
     const feeOperation = await scheduleOperation({
       label: "fee-update",
       target: addresses.deepFamily,
       data: feeData,
-      salt: ethers.id(`deepfamily-e2e:${config.runId}:fee-update`),
+      salt: deriveGovernanceSalt(ethers, {
+        targetAddress: addresses.deepFamily,
+        calldata: feeData,
+      }),
       signers: [ownerA, ownerB],
     });
+    assertCondition(
+      !(await timelock.isOperationReady(feeOperation.operationId)),
+      "Fee operation became ready before the early-execution check",
+    );
     const earlyExecuteData = timelock.interface.encodeFunctionData("execute", [
       feeOperation.target,
       0n,
@@ -820,21 +1633,53 @@ export const main = async () => {
       feeOperation.salt,
     ]);
     const early = await signedExecution(timelockAddress, 0n, earlyExecuteData, [ownerB, ownerC]);
-    const nonceBeforeEarly = await multisig.nonce();
-    await expectRevert(
-      () => multisig.execute.staticCall(timelockAddress, 0n, earlyExecuteData, early.signatures),
-      "Early Timelock execution",
+    const nonceBeforeEarly = await safeReader.getNonce();
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress,
+      data: early.encodedTransaction,
+      safeInterface,
+      label: "Early Timelock execution through Safe",
+      expectedSafeRevertCodes: ["GS013"],
+    });
+    assertCondition(
+      (await safeReader.getNonce()) === nonceBeforeEarly,
+      "Early execution simulation changed Safe nonce",
     );
-    assertCondition((await multisig.nonce()) === nonceBeforeEarly, "Early execution changed nonce");
     assertCondition(
       (await deepFamily.protocolEndorsementFeeBps()) === feeBefore,
       "Early execution changed endorsement fee",
     );
+    const verifierOperation = await scheduleOperation({
+      label: "verifier-update",
+      target: addresses.deepFamily,
+      data: deepFamily.interface.encodeFunctionData("setVerifier", [
+        1,
+        0,
+        addresses.governedVerifierCandidate,
+      ]),
+      salt: deriveGovernanceSalt(ethers, {
+        targetAddress: addresses.deepFamily,
+        calldata: deepFamily.interface.encodeFunctionData("setVerifier", [
+          1,
+          0,
+          addresses.governedVerifierCandidate,
+        ]),
+      }),
+      signers: [ownerB, ownerC],
+    });
     await waitForReady(timelock, feeOperation.operationId, config.minDelay);
+    await waitForReady(timelock, verifierOperation.operationId, config.minDelay);
     await executeOperation("fee-update", feeOperation, [ownerA, ownerC]);
     assertCondition(
       (await deepFamily.protocolEndorsementFeeBps()) === newFee,
       "Governed endorsement fee was not updated",
+    );
+    await executeOperation("verifier-update", verifierOperation, [ownerA, ownerB]);
+    assertCondition(
+      (await deepFamily.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate,
+      "Governed person-commitment verifier route was not updated",
     );
 
     const cancelledFee = newFee === 502n ? 503n : 502n;
@@ -842,13 +1687,16 @@ export const main = async () => {
       label: "fee-update-cancelled",
       target: addresses.deepFamily,
       data: deepFamily.interface.encodeFunctionData("updateEndorsementFee", [cancelledFee]),
-      salt: ethers.id(`deepfamily-e2e:${config.runId}:cancel`),
+      salt: deriveGovernanceSalt(ethers, {
+        targetAddress: addresses.deepFamily,
+        calldata: deepFamily.interface.encodeFunctionData("updateEndorsementFee", [cancelledFee]),
+      }),
       signers: [ownerB, ownerC],
     });
     const cancelData = timelock.interface.encodeFunctionData("cancel", [
       cancelOperation.operationId,
     ]);
-    await executeMultisig("fee-update-cancel", timelockAddress, 0n, cancelData, [ownerA, ownerB]);
+    await executeSafe("fee-update-cancel", timelockAddress, 0n, cancelData, [ownerA, ownerB]);
     assertCondition(
       !(await timelock.isOperation(cancelOperation.operationId)),
       "Cancelled operation still exists",
@@ -868,20 +1716,23 @@ export const main = async () => {
       ownerA,
       ownerC,
     ]);
-    await expectRevert(
-      () =>
-        multisig.execute.staticCall(
-          timelockAddress,
-          0n,
-          cancelledExecuteData,
-          cancelledExecution.signatures,
-        ),
-      "Execution of a cancelled Timelock operation",
-    );
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress,
+      data: cancelledExecution.encodedTransaction,
+      safeInterface,
+      label: "Execution of a cancelled Timelock operation through Safe",
+      expectedSafeRevertCodes: ["GS013"],
+    });
     report.governance = {
       feeBefore,
       feeAfter: newFee,
       executedOperationId: feeOperation.operationId,
+      verifierOperationId: verifierOperation.operationId,
+      verifierBefore: addresses.groth16VerifierAdapter,
+      verifierAfter: addresses.governedVerifierCandidate,
+      directPrivilegedCallsRejected: true,
       cancelledOperationId: cancelOperation.operationId,
       earlyExecutionRejected: true,
       cancelled: true,
@@ -889,11 +1740,13 @@ export const main = async () => {
       signaturePairs: {
         feeSchedule: "AB",
         feeExecute: "AC",
+        verifierSchedule: "BC",
+        verifierExecute: "AB",
         cancelledFeeSchedule: "BC",
         cancel: "AB",
       },
     };
-    await addStep("multisig-timelock-schedule-wait-execute-cancel", report.governance);
+    await addStep("safe-timelock-schedule-wait-execute-cancel", report.governance);
 
     currentStep = "real-zk-business";
     const person = {
@@ -903,7 +1756,8 @@ export const main = async () => {
       birthYear: 1990,
       birthMonth: 1,
       birthDay: 1,
-      gender: 3,
+      // Exercise the full contract/circuit uint8 range, not only the frontend's current 0-3 UI.
+      gender: 255,
     };
     const father = {
       fullName: `DeepFamily eSpace E2E Father ${config.runId}`,
@@ -923,10 +1777,24 @@ export const main = async () => {
       birthDay: 1,
       gender: 2,
     };
+    const personProofArtifactPaths = resolveProofArtifacts(
+      PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+      "Person commitment circuit",
+    );
+    const personProofArtifactsBefore = await hashProofArtifacts(ethers, personProofArtifactPaths);
     const personProof = await withTimeout(
-      generatePersonCommitmentProof(person, father, mother, runDeployer.address),
+      generatePersonCommitmentProof(person, father, mother, runDeployer.address, {
+        wasm: personProofArtifactPaths.wasm,
+        zkey: personProofArtifactPaths.zkey,
+      }),
       PROOF_TIMEOUT_MS,
       "Person commitment proof generation",
+    );
+    const personProofArtifacts = await hashProofArtifacts(ethers, personProof.artifacts);
+    assertProofArtifactsUnchanged(
+      personProofArtifactsBefore,
+      personProofArtifacts,
+      "Person commitment proof artifact",
     );
     assertCondition(
       personProof.father && personProof.mother,
@@ -974,10 +1842,27 @@ export const main = async () => {
       "Protocol endorsement share did not reach Timelock",
     );
 
+    const disclosureProofArtifactPaths = resolveProofArtifacts(
+      DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+      "Disclosure binding circuit",
+    );
+    const disclosureProofArtifactsBefore = await hashProofArtifacts(
+      ethers,
+      disclosureProofArtifactPaths,
+    );
     const disclosureProof = await withTimeout(
-      generateDisclosureBindingProof(person, runDeployer.address),
+      generateDisclosureBindingProof(person, runDeployer.address, {
+        wasm: disclosureProofArtifactPaths.wasm,
+        zkey: disclosureProofArtifactPaths.zkey,
+      }),
       PROOF_TIMEOUT_MS,
       "Disclosure binding proof generation",
+    );
+    const disclosureProofArtifacts = await hashProofArtifacts(ethers, disclosureProof.artifacts);
+    assertProofArtifactsUnchanged(
+      disclosureProofArtifactsBefore,
+      disclosureProofArtifacts,
+      "Disclosure binding proof artifact",
     );
     const identityCommitment = ethers.zeroPadValue(
       ethers.toBeHex(personProof.person.identityCommitment),
@@ -1042,6 +1927,10 @@ export const main = async () => {
           .connect(runDeployer)
           .addStoryChunk.staticCall(tokenId, 1, 0, "after seal", "", ethers.ZeroHash),
       "Writing a sealed story",
+      {
+        expectedErrorNames: ["StoryAlreadySealed"],
+        expectedSelectors: [STORY_ALREADY_SEALED_SELECTOR],
+      },
     );
     await recordTx(
       "cancel-endorsement",
@@ -1062,6 +1951,12 @@ export const main = async () => {
       storyHash,
       storySealed: true,
       endorsementCancelled: true,
+      proofArtifacts: {
+        personCommitment: { stableDuringGeneration: true, files: personProofArtifacts },
+        disclosureBinding: { stableDuringGeneration: true, files: disclosureProofArtifacts },
+      },
+      governedVerifierRouteUsedByRealProof:
+        (await deepFamily.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate,
     };
     await addStep("real-zk-endorsement-nft-story", report.business);
 
@@ -1077,7 +1972,12 @@ export const main = async () => {
       label: "treasury-transfer",
       target: addresses.token,
       data: token.interface.encodeFunctionData("transfer", [treasuryRecipient, treasuryAmount]),
-      salt: ethers.id(`deepfamily-e2e:${config.runId}:treasury`),
+      salt: deriveTreasuryTransferSalt(ethers, {
+        timelockAddress,
+        tokenAddress: addresses.token,
+        recipient: treasuryRecipient,
+        rawAmount: treasuryAmount,
+      }),
       signers: [ownerA, ownerC],
     });
     await waitForReady(timelock, treasuryOperation.operationId, config.minDelay);
@@ -1123,71 +2023,35 @@ export const main = async () => {
     report.addresses.deepFamilyV2 = v2Address;
     await saveReport();
 
-    const deepFamilyFactory = await ethers.getContractFactory("DeepFamily", {
-      signer: runDeployer,
-      libraries: {
-        PoseidonT5: addresses.poseidonT5,
-        AdultAgeGate: addresses.adultAgeGate,
-      },
-    });
-    const proxyInitData = deepFamilyFactory.interface.encodeFunctionData("initialize", [
-      addresses.token,
-      runDeployer.address,
-    ]);
-    const verificationEntries = [
-      await verificationEntry(hre.artifacts, "E2ETestnetMultisig", multisigAddress, [
-        ownerA.address,
-        ownerB.address,
-        ownerC.address,
-      ]),
-      await verificationEntry(hre.artifacts, "GovernanceTimelock", timelockAddress, [
-        config.minDelay,
-        multisigAddress,
-      ]),
-      await verificationEntry(hre.artifacts, "DeepFamilyToken", addresses.token),
-      await verificationEntry(hre.artifacts, "PoseidonT5", addresses.poseidonT5),
-      await verificationEntry(hre.artifacts, "AdultAgeGate", addresses.adultAgeGate),
-      await verificationEntry(
-        hre.artifacts,
-        "PersonCommitmentVerifier",
-        addresses.personCommitmentVerifier,
-      ),
-      await verificationEntry(
-        hre.artifacts,
-        "DisclosureBindingVerifier",
-        addresses.disclosureBindingVerifier,
-      ),
-      await verificationEntry(
-        hre.artifacts,
-        "Groth16VerifierAdapter",
-        addresses.groth16VerifierAdapter,
-        [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
-      ),
-      await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
-        PoseidonT5: addresses.poseidonT5,
-        AdultAgeGate: addresses.adultAgeGate,
-      }),
-      await verificationEntry(hre.artifacts, "UUPSProxy", addresses.deepFamily, [
-        addresses.deepFamilyImplementation,
-        proxyInitData,
-      ]),
-      await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
-        addresses.deepFamily,
-      ]),
+    const candidateVerificationEntries = [
       await verificationEntry(hre.artifacts, "DeepFamilyV2Mock", v2Address, [], {
         PoseidonT5: addresses.poseidonT5,
         AdultAgeGate: addresses.adultAgeGate,
       }),
     ];
-    let verificationFailures = [];
     if (config.verify) {
-      verificationFailures = await verifyEntries(verificationEntries, report, saveReport);
+      const verificationFailures = await verifyEntries(
+        candidateVerificationEntries,
+        report,
+        saveReport,
+        "upgrade-candidate",
+      );
+      if (verificationFailures.length > 0) {
+        currentStep = "explorer-verification";
+        throw new Error(
+          `${verificationFailures.length} ConfluxScan verification(s) failed before upgrade scheduling; see report`,
+        );
+      }
     }
 
     currentStep = "timelocked-upgrade";
     await expectRevert(
       () => deepFamily.connect(runDeployer).upgradeToAndCall.staticCall(v2Address, "0x"),
       "Direct deployer UUPS upgrade",
+      {
+        expectedErrorNames: ["OwnableUnauthorizedAccount"],
+        expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
+      },
     );
     const implementationBefore = await implementationAddress(
       ethers,
@@ -1198,7 +2062,11 @@ export const main = async () => {
       label: "uups-upgrade",
       target: addresses.deepFamily,
       data: deepFamily.interface.encodeFunctionData("upgradeToAndCall", [v2Address, "0x"]),
-      salt: ethers.id(`deepfamily-e2e:${config.runId}:upgrade`),
+      salt: deriveUpgradeSalt(ethers, {
+        target: addresses.deepFamily,
+        implementation: v2Address,
+        initData: "0x",
+      }),
       signers: [ownerA, ownerB],
     });
     await waitForReady(timelock, upgradeOperation.operationId, config.minDelay);
@@ -1230,7 +2098,7 @@ export const main = async () => {
       "Upgrade changed Token wiring",
     );
     assertCondition(
-      (await deepFamilyV2.verifierRegistry(1, 0)) === addresses.groth16VerifierAdapter &&
+      (await deepFamilyV2.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate &&
         (await deepFamilyV2.verifierRegistry(1, 1)) === addresses.groth16VerifierAdapter,
       "Upgrade changed verifier routes",
     );
@@ -1267,18 +2135,786 @@ export const main = async () => {
       signaturePairs: { schedule: "AB", execute: "AC" },
     };
     await addStep("storage-safe-timelocked-uups-upgrade", report.upgrade);
+
+    currentStep = "governance-lifecycle-migrations";
+    const replacementSafeSaltNonce = BigInt(
+      ethers.id(`deepfamily-e2e:${config.runId}:replacement-safe`),
+    ).toString();
+    const preparedReplacementSafe = await prepareCanonicalSafeDeployment({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+      owners: replacementSafeOwners,
+      saltNonce: replacementSafeSaltNonce,
+    });
+    assertCondition(
+      preparedReplacementSafe.safeAddress !== safeAddress,
+      "Replacement Safe address equals the primary Safe",
+    );
+    assertCondition(
+      (await provider.getCode(preparedReplacementSafe.safeAddress)) === "0x",
+      `Predicted replacement Safe ${preparedReplacementSafe.safeAddress} is already deployed`,
+    );
+    await recordTx(
+      "deploy-replacement-canonical-governance-safe",
+      await runDeployer.sendTransaction(preparedReplacementSafe.deploymentTransaction),
+    );
+    const replacementSafeAddress = preparedReplacementSafe.safeAddress;
+    const replacementSafeProfile = await assertCanonicalSafeProfile({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+      safeAddress: replacementSafeAddress,
+      expectedOwners: replacementSafeOwners,
+      expectedNonce: 0n,
+    });
+    const replacementSafeReader = await connectCanonicalSafe({
+      provider,
+      chainId: EXPECTED_CHAIN_ID,
+      safeAddress: replacementSafeAddress,
+    });
+    const replacementSafeContext = {
+      label: "replacement",
+      safeAddress: replacementSafeAddress,
+      safeReader: replacementSafeReader,
+    };
+    report.addresses.replacementGovernanceSafe = replacementSafeAddress;
+    report.safeInfrastructure.replacement = {
+      saltNonce: replacementSafeSaltNonce,
+      address: replacementSafeAddress,
+      singleton: replacementSafeProfile.singleton,
+      proxyCodeHash: replacementSafeProfile.proxyCodeHash,
+      canonicalProxyCodeHash: replacementSafeProfile.canonicalProxyCodeHash,
+      proxyRuntimeMatched:
+        replacementSafeProfile.proxyCodeHash === replacementSafeProfile.canonicalProxyCodeHash,
+      owners: replacementSafeProfile.owners,
+      threshold: replacementSafeProfile.threshold,
+      nonce: replacementSafeProfile.nonce,
+      modules: replacementSafeProfile.modules,
+      guard: replacementSafeProfile.guard,
+      fallbackHandler: replacementSafeProfile.fallbackHandler,
+    };
+    await saveReport();
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress: replacementSafeAddress,
+      data: abExecution.encodedTransaction,
+      safeInterface,
+      label: "Primary Safe owner signatures against replacement Safe",
+      expectedSafeRevertCodes: ["GS026"],
+    });
+    assertCondition(
+      BigInt(await replacementSafeReader.getNonce()) === 0n,
+      "Rejected primary-owner signatures changed the replacement Safe nonce",
+    );
+    report.safePolicy.primaryOwnerSignaturesRejectedByReplacementSafe = true;
+
+    const replacementTimelockConfig = await resolveTimelockDeploymentConfig({
+      connection,
+      ethers,
+      provider,
+      deployerAddress: runDeployer.address,
+      env: {
+        ...process.env,
+        MIN_DELAY: String(config.minDelay),
+        GOVERNANCE_MULTISIG: replacementSafeAddress,
+      },
+      inspectMultisig: ({ provider: inspectionProvider, address }) =>
+        assertCanonicalSafeProfile({
+          provider: inspectionProvider,
+          chainId: EXPECTED_CHAIN_ID,
+          safeAddress: address,
+          expectedOwners: replacementSafeOwners,
+        }),
+    });
+    const ReplacementTimelockFactory = await ethers.getContractFactory(
+      "GovernanceTimelock",
+      runDeployer,
+    );
+    const replacementTimelock = await ReplacementTimelockFactory.deploy(
+      replacementTimelockConfig.minDelay,
+      replacementTimelockConfig.governanceMultisig,
+    );
+    const replacementTimelockDeploymentTx = replacementTimelock.deploymentTransaction();
+    assertCondition(
+      replacementTimelockDeploymentTx,
+      "Replacement GovernanceTimelock deployment transaction is unavailable",
+    );
+    await recordTx("deploy-replacement-GovernanceTimelock", replacementTimelockDeploymentTx);
+    const replacementTimelockAddress = await replacementTimelock.getAddress();
+    report.addresses.replacementTimelock = replacementTimelockAddress;
+
+    if (config.verify) {
+      const replacementVerificationFailures = await verifyEntries(
+        [
+          {
+            ...(await verificationEntry(
+              hre.artifacts,
+              "GovernanceTimelock",
+              replacementTimelockAddress,
+              [config.minDelay, replacementSafeAddress],
+            )),
+            label: "ReplacementGovernanceTimelock",
+          },
+        ],
+        report,
+        saveReport,
+        "governance-replacements",
+      );
+      if (replacementVerificationFailures.length > 0) {
+        throw new Error(
+          `${replacementVerificationFailures.length} governance replacement verification(s) failed; see report`,
+        );
+      }
+    }
+
+    const originalRoleState = await readExactTimelockRoleState({
+      ethers,
+      timelock,
+      timelockAddress,
+    });
+    const replacementRoleState = await readExactTimelockRoleState({
+      ethers,
+      timelock: replacementTimelock,
+      timelockAddress: replacementTimelockAddress,
+    });
+    assertCondition(
+      originalRoleState.currentMultisig === safeAddress,
+      "Primary Timelock role owner changed before migration",
+    );
+    assertCondition(
+      replacementRoleState.currentMultisig === replacementSafeAddress,
+      "Replacement Timelock role owner mismatch",
+    );
+
+    const multisigMigration = await buildMultisigMigrationOperation({
+      ethers,
+      timelock,
+      timelockAddress,
+      roles: originalRoleState.roles,
+      oldMultisig: safeAddress,
+      newMultisig: replacementSafeAddress,
+    });
+    const updatedRetiredTimelockDelay = BigInt(config.minDelay) + 1n;
+    const delayUpdatePayload = timelock.interface.encodeFunctionData("updateDelay", [
+      updatedRetiredTimelockDelay,
+    ]);
+    const delayUpdateSalt = deriveDelayUpdateSalt(ethers, {
+      timelockAddress,
+      newDelay: updatedRetiredTimelockDelay,
+    });
+    const delayUpdateOperationId = await timelock.hashOperation(
+      timelockAddress,
+      0n,
+      delayUpdatePayload,
+      ZERO_HASH,
+      delayUpdateSalt,
+    );
+    const ownerMigration = await buildOwnerMigrationOperation({
+      ethers,
+      oldTimelock: timelock,
+      oldTimelockAddress: timelockAddress,
+      deepFamily: deepFamilyV2,
+      deepFamilyAddress: addresses.deepFamily,
+      tokenAddress: addresses.token,
+      newTimelockAddress: replacementTimelockAddress,
+    });
+    const postMigrationFee = newFee === 504n ? 505n : newFee + 1n;
+    const postMigrationFeeData = deepFamilyV2.interface.encodeFunctionData("updateEndorsementFee", [
+      postMigrationFee,
+    ]);
+    const postMigrationFeeSalt = deriveGovernanceSalt(ethers, {
+      targetAddress: addresses.deepFamily,
+      calldata: postMigrationFeeData,
+    });
+    const postMigrationFeeOperationId = await replacementTimelock.hashOperation(
+      addresses.deepFamily,
+      0n,
+      postMigrationFeeData,
+      ZERO_HASH,
+      postMigrationFeeSalt,
+    );
+
+    const scheduleBatchThroughSafe = async ({
+      label,
+      targetTimelock,
+      targetTimelockAddress,
+      operation,
+      signers,
+      safeContext,
+    }) => {
+      const calldata = targetTimelock.interface.encodeFunctionData("scheduleBatch", [
+        operation.targets,
+        operation.values,
+        operation.payloads,
+        operation.predecessor,
+        operation.salt,
+        config.minDelay,
+      ]);
+      await executeSafe(
+        `${label}-schedule`,
+        targetTimelockAddress,
+        0n,
+        calldata,
+        signers,
+        safeContext,
+      );
+      assertCondition(
+        await targetTimelock.isOperationPending(operation.operationId),
+        `${label} is not pending`,
+      );
+    };
+    const executeBatchThroughSafe = async ({
+      label,
+      targetTimelock,
+      targetTimelockAddress,
+      operation,
+      signers,
+      safeContext,
+    }) => {
+      const calldata = targetTimelock.interface.encodeFunctionData("executeBatch", [
+        operation.targets,
+        operation.values,
+        operation.payloads,
+        operation.predecessor,
+        operation.salt,
+      ]);
+      await executeSafe(
+        `${label}-execute`,
+        targetTimelockAddress,
+        0n,
+        calldata,
+        signers,
+        safeContext,
+      );
+      assertCondition(
+        await targetTimelock.isOperationDone(operation.operationId),
+        `${label} is not done`,
+      );
+    };
+    const scheduleSingleThroughSafe = async ({
+      label,
+      targetTimelock,
+      targetTimelockAddress,
+      target,
+      data,
+      salt,
+      operationId,
+      signers,
+      safeContext,
+    }) => {
+      const calldata = targetTimelock.interface.encodeFunctionData("schedule", [
+        target,
+        0n,
+        data,
+        ZERO_HASH,
+        salt,
+        config.minDelay,
+      ]);
+      await executeSafe(
+        `${label}-schedule`,
+        targetTimelockAddress,
+        0n,
+        calldata,
+        signers,
+        safeContext,
+      );
+      assertCondition(
+        await targetTimelock.isOperationPending(operationId),
+        `${label} is not pending`,
+      );
+    };
+    const executeSingleThroughSafe = async ({
+      label,
+      targetTimelock,
+      targetTimelockAddress,
+      target,
+      data,
+      salt,
+      operationId,
+      signers,
+      safeContext,
+    }) => {
+      const calldata = targetTimelock.interface.encodeFunctionData("execute", [
+        target,
+        0n,
+        data,
+        ZERO_HASH,
+        salt,
+      ]);
+      await executeSafe(
+        `${label}-execute`,
+        targetTimelockAddress,
+        0n,
+        calldata,
+        signers,
+        safeContext,
+      );
+      assertCondition(await targetTimelock.isOperationDone(operationId), `${label} is not done`);
+    };
+
+    await scheduleBatchThroughSafe({
+      label: "governance-safe-migration",
+      targetTimelock: timelock,
+      targetTimelockAddress: timelockAddress,
+      operation: multisigMigration,
+      signers: [ownerA, ownerB],
+      safeContext: primarySafeContext,
+    });
+    await scheduleSingleThroughSafe({
+      label: "timelock-delay-update",
+      targetTimelock: timelock,
+      targetTimelockAddress: timelockAddress,
+      target: timelockAddress,
+      data: delayUpdatePayload,
+      salt: delayUpdateSalt,
+      operationId: delayUpdateOperationId,
+      signers: [ownerA, ownerC],
+      safeContext: primarySafeContext,
+    });
+    await scheduleBatchThroughSafe({
+      label: "timelock-owner-treasury-migration",
+      targetTimelock: timelock,
+      targetTimelockAddress: timelockAddress,
+      operation: ownerMigration,
+      signers: [ownerB, ownerC],
+      safeContext: primarySafeContext,
+    });
+    await scheduleSingleThroughSafe({
+      label: "post-migration-fee",
+      targetTimelock: replacementTimelock,
+      targetTimelockAddress: replacementTimelockAddress,
+      target: addresses.deepFamily,
+      data: postMigrationFeeData,
+      salt: postMigrationFeeSalt,
+      operationId: postMigrationFeeOperationId,
+      signers: [ownerD, ownerE],
+      safeContext: replacementSafeContext,
+    });
+
+    const oldTreasuryAtOwnerMigrationSchedule = await token.balanceOf(timelockAddress);
+    await recordTx(
+      "migration-window-endorsement-approve",
+      await token.connect(runDeployer).approve(addresses.deepFamily, reward),
+    );
+    await recordTx(
+      "migration-window-endorsement",
+      await deepFamilyV2.connect(runDeployer).endorseVersion(personHash, 1),
+    );
+    const oldTreasuryBeforeOwnerMigration = await token.balanceOf(timelockAddress);
+    assertCondition(
+      oldTreasuryBeforeOwnerMigration - oldTreasuryAtOwnerMigrationSchedule === protocolShare,
+      "Protocol fee received during the owner-migration delay window is incorrect",
+    );
+    await recordTx(
+      "migration-window-cancel-endorsement",
+      await deepFamilyV2.connect(runDeployer).cancelEndorsement(personHash),
+    );
+
+    await Promise.all([
+      waitForReady(timelock, multisigMigration.operationId, config.minDelay),
+      waitForReady(timelock, delayUpdateOperationId, config.minDelay),
+      waitForReady(timelock, ownerMigration.operationId, config.minDelay),
+      waitForReady(replacementTimelock, postMigrationFeeOperationId, config.minDelay),
+    ]);
+
+    // Keep the same preconditions and order enforced by timelock-migrate-owner: the old
+    // Timelock still has its original delay and the original Safe still holds every operational
+    // role when ownership and the complete execution-time treasury balance migrate atomically.
+    const replacementTreasuryBeforeOwnerMigration = await token.balanceOf(
+      replacementTimelockAddress,
+    );
+    await executeBatchThroughSafe({
+      label: "timelock-owner-treasury-migration",
+      targetTimelock: timelock,
+      targetTimelockAddress: timelockAddress,
+      operation: ownerMigration,
+      signers: [ownerB, ownerC],
+      safeContext: primarySafeContext,
+    });
+    const oldTreasuryAfterOwnerMigration = await token.balanceOf(timelockAddress);
+    const replacementTreasuryAfterOwnerMigration = await token.balanceOf(
+      replacementTimelockAddress,
+    );
+    assertCondition(
+      (await deepFamilyV2.owner()) === replacementTimelockAddress,
+      "DeepFamily ownership did not migrate to the replacement Timelock",
+    );
+    assertCondition(oldTreasuryAfterOwnerMigration === 0n, "Retired Timelock still holds DEEP");
+    assertCondition(
+      replacementTreasuryAfterOwnerMigration - replacementTreasuryBeforeOwnerMigration ===
+        oldTreasuryBeforeOwnerMigration,
+      "Replacement Timelock did not receive the complete execution-time DEEP balance",
+    );
+
+    await executeBatchThroughSafe({
+      label: "governance-safe-migration",
+      targetTimelock: timelock,
+      targetTimelockAddress: timelockAddress,
+      operation: multisigMigration,
+      signers: [ownerA, ownerB],
+      safeContext: primarySafeContext,
+    });
+    const migratedRoleState = await readExactTimelockRoleState({
+      ethers,
+      timelock,
+      timelockAddress,
+    });
+    assertCondition(
+      migratedRoleState.currentMultisig === replacementSafeAddress,
+      "Primary Timelock roles did not atomically migrate to the replacement Safe",
+    );
+
+    const unauthorizedOldSafeSalt = ethers.id(`deepfamily-e2e:${config.runId}:old-safe-must-fail`);
+    const unauthorizedOldSafeData = timelock.interface.encodeFunctionData("schedule", [
+      addresses.deepFamily,
+      0n,
+      feeData,
+      ZERO_HASH,
+      unauthorizedOldSafeSalt,
+      config.minDelay,
+    ]);
+    const unauthorizedOldSafeExecution = await signedExecution(
+      timelockAddress,
+      0n,
+      unauthorizedOldSafeData,
+      [ownerA, ownerC],
+      primarySafeContext,
+    );
+    const primaryNonceBeforeUnauthorizedCall = await safeReader.getNonce();
+    await expectSafeSimulationFailure({
+      provider,
+      from: runDeployer.address,
+      safeAddress,
+      data: unauthorizedOldSafeExecution.encodedTransaction,
+      safeInterface,
+      label: "Retired Safe governance call",
+      expectedSafeRevertCodes: ["GS013"],
+    });
+    assertCondition(
+      (await safeReader.getNonce()) === primaryNonceBeforeUnauthorizedCall,
+      "Retired Safe failure simulation changed its nonce",
+    );
+
+    await executeSingleThroughSafe({
+      label: "timelock-delay-update",
+      targetTimelock: timelock,
+      targetTimelockAddress: timelockAddress,
+      target: timelockAddress,
+      data: delayUpdatePayload,
+      salt: delayUpdateSalt,
+      operationId: delayUpdateOperationId,
+      signers: [ownerD, ownerF],
+      safeContext: replacementSafeContext,
+    });
+    assertCondition(
+      (await timelock.getMinDelay()) === updatedRetiredTimelockDelay,
+      "Timelock delay update did not take effect",
+    );
+
+    await executeSingleThroughSafe({
+      label: "post-migration-fee",
+      targetTimelock: replacementTimelock,
+      targetTimelockAddress: replacementTimelockAddress,
+      target: addresses.deepFamily,
+      data: postMigrationFeeData,
+      salt: postMigrationFeeSalt,
+      operationId: postMigrationFeeOperationId,
+      signers: [ownerD, ownerE],
+      safeContext: replacementSafeContext,
+    });
+    assertCondition(
+      (await deepFamilyV2.protocolEndorsementFeeBps()) === postMigrationFee,
+      "Replacement Safe and Timelock could not execute post-migration governance",
+    );
+
+    report.governanceLifecycle = {
+      replacementSafe: replacementSafeAddress,
+      replacementTimelock: replacementTimelockAddress,
+      multisigMigrationOperationId: multisigMigration.operationId,
+      oldSafeRejectedAfterMigration: true,
+      delayUpdateOperationId,
+      previousDelay: config.minDelay,
+      updatedRetiredTimelockDelay,
+      ownerMigrationOperationId: ownerMigration.operationId,
+      ownerAfterMigration: replacementTimelockAddress,
+      treasuryAtOwnerMigrationSchedule: oldTreasuryAtOwnerMigrationSchedule,
+      treasuryBeforeOwnerMigration: oldTreasuryBeforeOwnerMigration,
+      treasuryAfterOwnerMigration: replacementTreasuryAfterOwnerMigration,
+      delayWindowProtocolFeeIncluded: true,
+      retiredTimelockTreasuryEmpty: true,
+      postMigrationFeeOperationId,
+      postMigrationFee,
+      ownerSets: {
+        primary: { labels: ["A", "B", "C"], addresses: primarySafeOwners },
+        replacement: { labels: ["D", "E", "F"], addresses: replacementSafeOwners },
+      },
+      primaryOwnerSignaturesRejectedByReplacementSafe: true,
+      replacementSignaturePairs: {
+        postMigrationFeeSchedule: "DE",
+        retiredTimelockDelayExecute: "DF",
+        postMigrationFeeExecute: "DE",
+      },
+      replacementGovernanceOperational: true,
+    };
+    report.productionParity.sharedGovernanceOperationBuildersMatched = true;
+    await addStep("safe-delay-timelock-and-treasury-migrations", report.governanceLifecycle);
+
+    currentStep = "chain-finality";
+    const lastCriticalBlock = Math.max(
+      ...Object.values(report.transactions).map((receipt) => Number(receipt.blockNumber)),
+    );
+    if (config.requireFinality) {
+      const finalizedBlock = await pollUntil(
+        async () => {
+          const block = await retryBounded(() => provider.getBlock("finalized"), {
+            attempts: 1,
+            timeoutMs: 30_000,
+            label: "finalized head query",
+          });
+          return block && Number(block.number) >= lastCriticalBlock ? block : null;
+        },
+        {
+          timeoutMs: config.finalityTimeoutMs,
+          intervalMs: POLL_INTERVAL_MS,
+          label: `finalized block covering acceptance block ${lastCriticalBlock}`,
+        },
+      );
+      const revalidatedTransactions = [];
+      for (const [label, expectedReceipt] of Object.entries(report.transactions)) {
+        const canonicalReceipt = await retryBounded(
+          () => provider.getTransactionReceipt(expectedReceipt.hash),
+          { label: `finality receipt revalidation for ${label}` },
+        );
+        assertCondition(canonicalReceipt, `${label} receipt disappeared before finality`);
+        assertCondition(Number(canonicalReceipt.status) === 1, `${label} is not successful`);
+        assertCondition(
+          Number(canonicalReceipt.blockNumber) === Number(expectedReceipt.blockNumber),
+          `${label} moved from block ${expectedReceipt.blockNumber} to ` +
+            `${canonicalReceipt.blockNumber}`,
+        );
+        assertCondition(
+          String(canonicalReceipt.blockHash).toLowerCase() ===
+            String(expectedReceipt.blockHash).toLowerCase(),
+          `${label} receipt block hash changed before finality`,
+        );
+        assertCondition(
+          Number(finalizedBlock.number) >= Number(canonicalReceipt.blockNumber),
+          `${label} is above the finalized head`,
+        );
+        const canonicalBlock = await retryBounded(
+          () => provider.getBlock(canonicalReceipt.blockNumber),
+          { label: `canonical block revalidation for ${label}` },
+        );
+        assertCondition(canonicalBlock, `${label} canonical block is unavailable`);
+        assertCondition(
+          String(canonicalBlock.hash).toLowerCase() ===
+            String(canonicalReceipt.blockHash).toLowerCase(),
+          `${label} receipt is no longer in the canonical block at its recorded height`,
+        );
+        revalidatedTransactions.push({
+          label,
+          hash: canonicalReceipt.hash,
+          blockNumber: canonicalReceipt.blockNumber,
+          blockHash: canonicalReceipt.blockHash,
+          status: Number(canonicalReceipt.status),
+        });
+      }
+      report.network.finality = {
+        required: true,
+        status: "passed",
+        lastCriticalBlock,
+        finalizedBlockNumber: finalizedBlock.number,
+        finalizedBlockHash: finalizedBlock.hash,
+        revalidatedTransactionCount: revalidatedTransactions.length,
+        revalidatedTransactions,
+      };
+      report.productionParity.criticalTransactionsFinalized = true;
+      await addStep("critical-transactions-finalized", report.network.finality);
+    } else {
+      report.network.finality = {
+        required: false,
+        status: "skipped-diagnostic",
+        lastCriticalBlock,
+      };
+      await addStep("critical-transactions-finality-skipped", report.network.finality);
+    }
+
+    currentStep = "terminal-governance-state";
+    const terminalRead = (label, operation) =>
+      retryBounded(operation, { attempts: 4, timeoutMs: 60_000, label });
+    const terminalPrimarySafeProfile = await terminalRead("terminal primary Safe profile", () =>
+      assertCanonicalSafeProfile({
+        provider,
+        chainId: EXPECTED_CHAIN_ID,
+        safeAddress,
+        expectedOwners: primarySafeOwners,
+      }),
+    );
+    const terminalReplacementSafeProfile = await terminalRead(
+      "terminal replacement Safe profile",
+      () =>
+        assertCanonicalSafeProfile({
+          provider,
+          chainId: EXPECTED_CHAIN_ID,
+          safeAddress: replacementSafeAddress,
+          expectedOwners: replacementSafeOwners,
+        }),
+    );
+    const terminalPrimaryTimelockRoles = await terminalRead("terminal retired Timelock roles", () =>
+      readExactTimelockRoleState({ ethers, timelock, timelockAddress }),
+    );
+    const terminalReplacementTimelockRoles = await terminalRead(
+      "terminal replacement Timelock roles",
+      () =>
+        readExactTimelockRoleState({
+          ethers,
+          timelock: replacementTimelock,
+          timelockAddress: replacementTimelockAddress,
+        }),
+    );
+    const terminalPrimaryTimelockDelay = await terminalRead("terminal retired Timelock delay", () =>
+      timelock.getMinDelay(),
+    );
+    const terminalReplacementTimelockDelay = await terminalRead(
+      "terminal replacement Timelock delay",
+      () => replacementTimelock.getMinDelay(),
+    );
+    const terminalDeepFamilyOwner = await terminalRead("terminal DeepFamily owner", () =>
+      deepFamilyV2.owner(),
+    );
+    const terminalDeepFamilyImplementation = await terminalRead(
+      "terminal DeepFamily implementation",
+      () => implementationAddress(ethers, provider, addresses.deepFamily),
+    );
+    const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
+      deepFamilyV2.verifierRegistry(1, 0),
+    );
+    const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
+      deepFamilyV2.verifierRegistry(1, 1),
+    );
+    const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
+      deepFamilyV2.protocolEndorsementFeeBps(),
+    );
+    const terminalTokenOwner = await terminalRead("terminal token owner", () => token.owner());
+    const terminalTokenBinding = await terminalRead("terminal token binding", () =>
+      token.deepFamilyContract(),
+    );
+    const terminalDeepFamilyToken = await terminalRead("terminal protocol token binding", () =>
+      deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT(),
+    );
+    const terminalRetiredTreasuryBalance = await terminalRead(
+      "terminal retired treasury balance",
+      () => token.balanceOf(timelockAddress),
+    );
+    assertCondition(
+      ethers.getAddress(terminalPrimaryTimelockRoles.currentMultisig) === replacementSafeAddress,
+      "Retired Timelock terminal governance roles do not belong exclusively to replacement Safe",
+    );
+    assertCondition(
+      ethers.getAddress(terminalReplacementTimelockRoles.currentMultisig) ===
+        replacementSafeAddress,
+      "Replacement Timelock terminal governance roles do not belong exclusively to replacement Safe",
+    );
+    assertCondition(
+      terminalPrimaryTimelockDelay === updatedRetiredTimelockDelay,
+      "Retired Timelock terminal delay mismatch",
+    );
+    assertCondition(
+      terminalReplacementTimelockDelay === BigInt(config.minDelay),
+      "Replacement Timelock terminal delay mismatch",
+    );
+    assertCondition(
+      ethers.getAddress(terminalDeepFamilyOwner) === replacementTimelockAddress,
+      "DeepFamily terminal owner is not replacement Timelock",
+    );
+    assertCondition(
+      ethers.getAddress(terminalDeepFamilyImplementation) === v2Address,
+      "DeepFamily terminal implementation is not the verified V2 candidate",
+    );
+    assertCondition(
+      ethers.getAddress(terminalPersonVerifier) === addresses.governedVerifierCandidate &&
+        ethers.getAddress(terminalDisclosureVerifier) === addresses.groth16VerifierAdapter,
+      "DeepFamily terminal verifier routes changed unexpectedly",
+    );
+    assertCondition(
+      terminalProtocolFee === postMigrationFee,
+      "DeepFamily terminal endorsement fee mismatch",
+    );
+    assertCondition(
+      terminalTokenOwner === ethers.ZeroAddress,
+      "DeepFamilyToken terminal owner must remain renounced",
+    );
+    assertCondition(
+      ethers.getAddress(terminalTokenBinding) === addresses.deepFamily &&
+        ethers.getAddress(terminalDeepFamilyToken) === addresses.token,
+      "DeepFamilyToken terminal two-way binding mismatch",
+    );
+    assertCondition(
+      terminalRetiredTreasuryBalance === 0n,
+      "Retired Timelock terminal DEEP treasury is not empty",
+    );
+    report.terminalGovernanceState = {
+      status: "passed",
+      observedAfterFinality: report.network.finality.status === "passed",
+      observedAtBlock: await provider.getBlockNumber(),
+      safes: {
+        primary: terminalPrimarySafeProfile,
+        replacement: terminalReplacementSafeProfile,
+      },
+      timelocks: {
+        retired: {
+          address: timelockAddress,
+          ...terminalPrimaryTimelockRoles,
+          minDelay: terminalPrimaryTimelockDelay,
+        },
+        replacement: {
+          address: replacementTimelockAddress,
+          ...terminalReplacementTimelockRoles,
+          minDelay: terminalReplacementTimelockDelay,
+        },
+      },
+      deepFamily: {
+        address: addresses.deepFamily,
+        owner: terminalDeepFamilyOwner,
+        implementation: terminalDeepFamilyImplementation,
+        personCommitmentVerifier: terminalPersonVerifier,
+        disclosureBindingVerifier: terminalDisclosureVerifier,
+        protocolEndorsementFeeBps: terminalProtocolFee,
+      },
+      token: {
+        address: addresses.token,
+        owner: terminalTokenOwner,
+        deepFamilyContract: terminalTokenBinding,
+        deepFamilyTokenFromProtocol: terminalDeepFamilyToken,
+      },
+      retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
+    };
+    await addStep("terminal-governance-state-verified", report.terminalGovernanceState);
+
+    currentStep = "source-input-integrity";
+    const acceptanceInputsAfter = await hashAcceptanceInputs(ethers);
+    const gitStateAfter = gitWorkingTreeState();
+    report.sourceState.after = {
+      ...gitStateAfter,
+      acceptanceInputDigest: acceptanceInputsAfter.digest,
+      acceptanceInputs: acceptanceInputsAfter,
+    };
+    report.sourceState.unchanged =
+      gitStateAfter.commit === report.sourceState.commit &&
+      gitStateAfter.clean === report.sourceState.clean &&
+      acceptanceInputsAfter.digest === report.sourceState.acceptanceInputDigest;
+    assertCondition(
+      report.sourceState.unchanged,
+      "Acceptance source inputs or Git commit/clean state changed while the run was in progress",
+    );
+    await addStep("acceptance-source-inputs-unchanged", {
+      commit: gitStateAfter.commit,
+      clean: gitStateAfter.clean,
+      acceptanceInputDigest: acceptanceInputsAfter.digest,
+    });
+
     report.onchain.status = "passed";
     await saveReport();
-
-    // This is an isolated, disposable test system: complete the on-chain upgrade exercise even
-    // when ConfluxScan is temporarily unavailable, but fail the overall release acceptance. A
-    // production upgrade must never use this exception; its candidate verification is a gate.
-    if (config.verify && verificationFailures.length > 0) {
-      currentStep = "explorer-verification";
-      throw new Error(
-        `On-chain acceptance passed, but ${verificationFailures.length} ConfluxScan verification(s) failed; see report`,
-      );
-    }
 
     currentStep = "deployment-directory-integrity";
     const deploymentsAfter = await hashDirectory(ethers, DEPLOYMENTS_DIR);
@@ -1303,6 +2939,8 @@ export const main = async () => {
     else process.env.GOVERNANCE_OWNER = oldGovernanceOwner;
     if (oldGovernanceMultisig === undefined) delete process.env.GOVERNANCE_MULTISIG;
     else process.env.GOVERNANCE_MULTISIG = oldGovernanceMultisig;
+    if (oldGovernanceMultisigProfile === undefined) delete process.env.GOVERNANCE_MULTISIG_PROFILE;
+    else process.env.GOVERNANCE_MULTISIG_PROFILE = oldGovernanceMultisigProfile;
 
     if (funded) {
       try {
@@ -1359,6 +2997,58 @@ export const main = async () => {
       report.error = originalError.message;
     }
     report.finishedAt = nowIso();
+    const releaseReadinessGates = {
+      completedWithoutError: originalError === null && report.status === "passed",
+      cleanReleaseCommit: report.productionParity.cleanReleaseCommit === true,
+      sourceInputsUnchanged: report.sourceState.unchanged === true,
+      explorerVerificationPassed:
+        report.verification.enabled === true && report.verification.status === "passed",
+      finalizedCoveragePassed:
+        report.network.finality.required === true &&
+        report.network.finality.status === "passed" &&
+        report.productionParity.criticalTransactionsFinalized === true,
+      canonicalSafeMatched:
+        report.productionParity.canonicalSafeImplementationMatched === true &&
+        report.productionParity.sameSafeManifestOnChain71And1030 === true &&
+        report.productionParity.mainnetCanonicalSafeInfrastructureMatched === true,
+      productionDeploymentPathsMatched:
+        report.productionParity.sameTimelockArtifactAndConfigResolver === true &&
+        report.productionParity.sameProtocolDeploymentHelper === true &&
+        report.productionParity.sameDeploymentMetadataWriter === true &&
+        report.productionParity.sharedGovernanceOperationBuildersMatched === true &&
+        report.isolatedDeploymentArtifacts.productionWriterExercised === true,
+      productionConfigurationMatched:
+        config.productionMinDelay === config.minDelay &&
+        report.productionParity.productionBuildProfileMatched === true &&
+        report.productionParity.productionSafeProfileMatched === true &&
+        report.productionParity.artifactManifestCaptured === true &&
+        report.productionParity.productionCompilerSettingsMatched === true,
+      onchainChecksPassed: report.onchain.status === "passed",
+      terminalGovernanceStateMatched: report.terminalGovernanceState.status === "passed",
+      deploymentDirectoryUnchanged: report.deploymentsDirectory.unchanged === true,
+      allRecordedStepsPassed: report.steps.every((step) => step.status === "passed"),
+      refundCompleted:
+        report.budget.refund?.status === "passed" || report.budget.refund?.status === "not-needed",
+    };
+    report.releaseReadinessGates = releaseReadinessGates;
+    report.releaseReady =
+      config.acceptanceMode === "release-rehearsal" &&
+      Object.values(releaseReadinessGates).every((passed) => passed === true);
+    if (
+      config.acceptanceMode === "release-rehearsal" &&
+      !report.releaseReady &&
+      originalError === null
+    ) {
+      const failedGates = Object.entries(releaseReadinessGates)
+        .filter(([, passed]) => passed !== true)
+        .map(([name]) => name);
+      originalError = new Error(
+        `release-rehearsal did not satisfy release readiness gates: ${failedGates.join(", ")}`,
+      );
+      report.status = "failed";
+      report.failedStep = "release-readiness";
+      report.error = originalError.message;
+    }
     await saveReport();
     console.log(`[espace-acceptance] report: ${reportPath}`);
   }
@@ -1367,12 +3057,19 @@ export const main = async () => {
     console.error(`[espace-acceptance] FAILED at ${report.failedStep}: ${report.error}`);
     throw new Error(report.error);
   }
-  console.log(`[espace-acceptance] PASSED run ${config.runId}`);
+  if (config.acceptanceMode === "release-rehearsal") {
+    console.log(`[espace-acceptance] RELEASE REHEARSAL PASSED run ${config.runId}`);
+  } else {
+    console.log(`[espace-acceptance] DIAGNOSTIC PASSED run ${config.runId}`);
+  }
 };
 
-main().catch((error) => {
-  console.error(
-    `[espace-acceptance] ${safeErrorMessage(error, [String(process.env.PRIVATE_KEY || "")])}`,
-  );
-  process.exitCode = 1;
-});
+main().then(
+  () => process.exit(0),
+  (error) => {
+    console.error(
+      `[espace-acceptance] ${safeErrorMessage(error, [String(process.env.PRIVATE_KEY || "")])}`,
+    );
+    process.exit(1);
+  },
+);

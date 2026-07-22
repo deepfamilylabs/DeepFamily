@@ -61,7 +61,9 @@ const solidityProfile = () => ({
         // viaIR (Yul pipeline) keeps the shared artifact within the conservative 24,576-byte
         // cross-network budget used by this project. Conflux eSpace permits a larger artifact,
         // but keeping one portable build avoids network-specific production bytecode.
-        viaIR: process.env.VIA_IR !== "false",
+        // One deterministic compiler pipeline is used by diagnostics, release rehearsals and
+        // production deployments so their bytecode manifests are directly comparable.
+        viaIR: true,
         // ReentrancyGuardTransient requires EIP-1153, so this target must not be downgraded.
         evmVersion: SOLIDITY_EVM_VERSION,
         // Emit storage layout so the upgrade-safety checker can diff proxy contracts.
