@@ -28,6 +28,42 @@ import {
 describe("Upgrade tooling & governance deploy path", function () {
   this.timeout(120_000);
 
+  describe("integrated deployment receipt controls", function () {
+    it("rejects invalid confirmation and timeout settings before deploying", async () => {
+      await expect(deployIntegratedSystem(hre, { transactionConfirmations: 0 })).to.be.rejectedWith(
+        "transactionConfirmations must be a positive safe integer",
+      );
+      await expect(deployIntegratedSystem(hre, { transactionTimeoutMs: -1 })).to.be.rejectedWith(
+        "transactionTimeoutMs must be a non-negative safe integer",
+      );
+    });
+
+    it("rejects a non-function receipt callback before deploying", async () => {
+      await expect(deployIntegratedSystem(hre, { onTransactionReceipt: true })).to.be.rejectedWith(
+        "onTransactionReceipt must be a function when provided",
+      );
+    });
+
+    it("publishes every confirmed deployment receipt through the callback", async () => {
+      const connection = await hre.network.connect();
+      const observed = new Map();
+      const deployed = await deployIntegratedSystem(connection, {
+        writeDeployments: false,
+        transactionTimeoutMs: 30_000,
+        onTransactionReceipt: async (label, receipt) => {
+          expect(Number(receipt.status)).to.equal(1);
+          observed.set(label, receipt.hash);
+        },
+      });
+
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(12);
+      expect(observed.size).to.equal(12);
+      for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
+        expect(observed.get(label)).to.equal(receipt.hash);
+      }
+    });
+  });
+
   describe("candidate source-verification guidance", function () {
     const implementation = "0x1234567890abcdef1234567890abcdef12345678";
 

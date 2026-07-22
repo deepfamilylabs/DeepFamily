@@ -18,6 +18,7 @@
     "test:coverage": "node -e \"console.error('test:coverage is not available after Hardhat 3 migration (solidity-coverage is Hardhat 2-only).'); process.exit(1)\"",
     "deploy:net": "hardhat --config hardhat.config.mjs run scripts/deploy-integrated.mjs --network $npm_config_net",
     "deploy:timelock": "hardhat --config hardhat.config.mjs run scripts/deploy-timelock.mjs --network $npm_config_net",
+    "espace:acceptance": "hardhat --config hardhat.config.mjs run scripts/espace-acceptance.mjs --network confluxTestnet",
     "verify:net": "hardhat --config hardhat.config.mjs verify --network $npm_config_net",
     "check-networks": "hardhat --config hardhat.config.mjs networks:check",
     "list-networks": "hardhat --config hardhat.config.mjs networks:list",

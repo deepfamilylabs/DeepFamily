@@ -175,8 +175,11 @@ export const assertImplementationMatchesArtifact = async ({
   const artifact = await hre.artifacts.readArtifact(contractName);
   const libraries = {};
   if (spec?.needsLibraries) {
-    libraries.PoseidonT5 = await readDeploymentAddress(connection, "PoseidonT5");
-    libraries.AdultAgeGate = await readDeploymentAddress(connection, "AdultAgeGate");
+    const explicitLibraries = spec.libraryAddresses;
+    libraries.PoseidonT5 =
+      explicitLibraries?.PoseidonT5 ?? (await readDeploymentAddress(connection, "PoseidonT5"));
+    libraries.AdultAgeGate =
+      explicitLibraries?.AdultAgeGate ?? (await readDeploymentAddress(connection, "AdultAgeGate"));
   }
   let expected = linkDeployedBytecode(artifact, libraries);
   if (spec?.librarySelfAddress) {
