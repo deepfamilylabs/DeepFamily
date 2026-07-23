@@ -13,6 +13,7 @@ import {
   assertSafeExecutionSuccess,
   buildCanonicalSafeAccountConfig,
   buildCanonicalSafeDeploymentConfig,
+  buildCanonicalSafeDeploymentTransaction,
   createCanonicalSafeInterface,
   createCanonicalSafeTransaction,
   getCanonicalSafeDeploymentMetadata,
@@ -127,6 +128,7 @@ describe("canonical Conflux eSpace Safe governance helpers", function () {
     expect(normalizeSafeSaltNonce(0n)).to.equal("0");
     expect(normalizeSafeSaltNonce(42)).to.equal("42");
     expect(normalizeSafeSaltNonce("00042")).to.equal("42");
+    expect(normalizeSafeSaltNonce(ethers.MaxUint256)).to.equal(ethers.MaxUint256.toString());
     expect(buildCanonicalSafeDeploymentConfig({ saltNonce: "42" })).to.deep.equal({
       saltNonce: "42",
       safeVersion: "1.3.0",
@@ -135,7 +137,39 @@ describe("canonical Conflux eSpace Safe governance helpers", function () {
     for (const invalid of [-1, "-1", "1.5", "0x2a", "", Number.MAX_SAFE_INTEGER + 1]) {
       expect(() => normalizeSafeSaltNonce(invalid)).to.throw(/non-negative base-10 integer/);
     }
+    expect(() => normalizeSafeSaltNonce(ethers.MaxUint256 + 1n)).to.throw(/fit in uint256/);
   });
+
+  for (const chainId of [CONFLUX_ESPACE_TESTNET_CHAIN_ID, CONFLUX_ESPACE_MAINNET_CHAIN_ID]) {
+    it(`deterministically encodes the canonical factory/setup call on chain ${chainId}`, function () {
+      const result = buildCanonicalSafeDeploymentTransaction({
+        chainId,
+        owners: OWNERS,
+        saltNonce: "42",
+      });
+      const factoryInterface = new ethers.Interface(result.metadata.proxyFactory.abi);
+      const safeInterface = new ethers.Interface(result.metadata.singleton.abi);
+      const factoryCall = factoryInterface.parseTransaction(result.deploymentTransaction);
+      const setupCall = safeInterface.parseTransaction({ data: factoryCall.args.initializer });
+
+      expect(result.deploymentTransaction.to).to.equal(result.metadata.proxyFactory.address);
+      expect(result.deploymentTransaction.value).to.equal(0n);
+      expect(factoryCall.name).to.equal("createProxyWithNonce");
+      expect(factoryCall.args._singleton).to.equal(result.metadata.singleton.address);
+      expect(factoryCall.args.saltNonce).to.equal(42n);
+      expect(factoryCall.args.initializer).to.equal(result.initializer);
+      expect(setupCall.name).to.equal("setup");
+      expect([...setupCall.args._owners]).to.deep.equal(OWNERS);
+      expect(setupCall.args._threshold).to.equal(2n);
+      expect(setupCall.args.to).to.equal(ethers.ZeroAddress);
+      expect(setupCall.args.data).to.equal("0x");
+      expect(setupCall.args.fallbackHandler).to.equal(result.metadata.fallbackHandler.address);
+      expect(setupCall.args.paymentToken).to.equal(ethers.ZeroAddress);
+      expect(setupCall.args.payment).to.equal(0n);
+      expect(setupCall.args.paymentReceiver).to.equal(ethers.ZeroAddress);
+      expect(Object.isFrozen(result)).to.equal(true);
+    });
+  }
 
   it("adapts an ethers-style provider without changing EIP-1193 providers", async function () {
     const calls = [];

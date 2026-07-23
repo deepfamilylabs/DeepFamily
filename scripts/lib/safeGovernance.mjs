@@ -63,6 +63,13 @@ const normalizeNonzeroAddress = (name, value) => {
   return ethers.getAddress(value);
 };
 
+const normalizeAddress = (name, value) => {
+  if (!ethers.isAddress(value)) {
+    throw new Error(`${name} must be a valid EVM address`);
+  }
+  return ethers.getAddress(value);
+};
+
 const sameAddress = (left, right) => left.toLowerCase() === right.toLowerCase();
 
 const cloneAbi = (abi) => JSON.parse(JSON.stringify(abi));
@@ -206,7 +213,11 @@ export const normalizeSafeSaltNonce = (saltNonce) => {
   if (!DECIMAL_INTEGER_PATTERN.test(raw)) {
     throw new Error("Safe saltNonce must be a non-negative base-10 integer");
   }
-  return BigInt(raw).toString();
+  const normalized = BigInt(raw);
+  if (normalized > ethers.MaxUint256) {
+    throw new Error("Safe saltNonce must fit in uint256");
+  }
+  return normalized.toString();
 };
 
 export const buildCanonicalSafeAccountConfig = ({ chainId, owners }) => {
@@ -231,16 +242,69 @@ export const buildCanonicalSafeDeploymentConfig = ({ saltNonce }) =>
   });
 
 /**
- * Predicts a 2-of-3 Safe and returns the exact canonical factory deployment transaction.
- * The caller/relayer sends deploymentTransaction; owner keys are not needed for deployment.
+ * Deterministically encodes the canonical v1.3.0 setup and ProxyFactory call.
+ *
+ * Protocol Kit deliberately refuses `createSafeDeploymentTransaction()` once the predicted proxy
+ * has code. Status/recovery still need to reconstruct the original immutable calldata, so the
+ * creator compares this encoding byte-for-byte with Protocol Kit before first deployment and uses
+ * the same encoding for later read-only revalidation.
  */
-export const prepareCanonicalSafeDeployment = async ({ provider, chainId, owners, saltNonce }) => {
+export const buildCanonicalSafeDeploymentTransaction = ({ chainId, owners, saltNonce }) => {
   const normalizedChainId = normalizeChainId(chainId);
+  const metadata = getCanonicalSafeDeploymentMetadata(normalizedChainId);
   const safeAccountConfig = buildCanonicalSafeAccountConfig({
     chainId: normalizedChainId,
     owners,
   });
   const safeDeploymentConfig = buildCanonicalSafeDeploymentConfig({ saltNonce });
+  const safeInterface = new ethers.Interface(metadata.singleton.abi);
+  const initializer = safeInterface.encodeFunctionData("setup", [
+    safeAccountConfig.owners,
+    safeAccountConfig.threshold,
+    safeAccountConfig.to,
+    safeAccountConfig.data,
+    safeAccountConfig.fallbackHandler,
+    safeAccountConfig.paymentToken,
+    safeAccountConfig.payment,
+    safeAccountConfig.paymentReceiver,
+  ]);
+  const factoryInterface = new ethers.Interface(metadata.proxyFactory.abi);
+  const deploymentTransaction = Object.freeze({
+    to: metadata.proxyFactory.address,
+    value: 0n,
+    data: factoryInterface.encodeFunctionData("createProxyWithNonce", [
+      metadata.singleton.address,
+      initializer,
+      BigInt(safeDeploymentConfig.saltNonce),
+    ]),
+  });
+  return deepFreeze({
+    deploymentTransaction,
+    initializer,
+    safeAccountConfig,
+    safeDeploymentConfig,
+    metadata,
+  });
+};
+
+/**
+ * Predicts a 2-of-3 Safe and returns the exact canonical factory deployment transaction.
+ * The caller/relayer sends deploymentTransaction; owner keys are not needed for deployment.
+ */
+export const prepareCanonicalSafeDeployment = async ({
+  provider,
+  chainId,
+  owners,
+  saltNonce,
+  allowAlreadyDeployed = false,
+}) => {
+  const normalizedChainId = normalizeChainId(chainId);
+  const { deploymentTransaction, safeAccountConfig, safeDeploymentConfig, metadata } =
+    buildCanonicalSafeDeploymentTransaction({
+      chainId: normalizedChainId,
+      owners,
+      saltNonce,
+    });
   await assertProviderChain(provider, normalizedChainId);
 
   const safe = await Safe.init({
@@ -252,21 +316,29 @@ export const prepareCanonicalSafeDeployment = async ({ provider, chainId, owners
     throw new Error(`Protocol Kit did not select Safe v${CANONICAL_SAFE_VERSION}`);
   }
 
-  const metadata = getCanonicalSafeDeploymentMetadata(normalizedChainId);
   const safeAddress = normalizeNonzeroAddress("predicted Safe address", await safe.getAddress());
-  const rawDeploymentTransaction = await safe.createSafeDeploymentTransaction();
-  const deploymentTransaction = Object.freeze({
-    to: normalizeNonzeroAddress("Safe deployment target", rawDeploymentTransaction.to),
-    value: BigInt(rawDeploymentTransaction.value),
-    data: ethers.hexlify(rawDeploymentTransaction.data),
-  });
-  if (!sameAddress(deploymentTransaction.to, metadata.proxyFactory.address)) {
+  const proxyCode = await asEthersProvider(provider).getCode(safeAddress);
+  if (proxyCode === "0x") {
+    const rawDeploymentTransaction = await safe.createSafeDeploymentTransaction();
+    const protocolKitTransaction = {
+      to: normalizeNonzeroAddress("Safe deployment target", rawDeploymentTransaction.to),
+      value: BigInt(rawDeploymentTransaction.value),
+      data: ethers.hexlify(rawDeploymentTransaction.data),
+    };
+    if (
+      !sameAddress(protocolKitTransaction.to, deploymentTransaction.to) ||
+      protocolKitTransaction.value !== deploymentTransaction.value ||
+      protocolKitTransaction.data.toLowerCase() !== deploymentTransaction.data.toLowerCase()
+    ) {
+      throw new Error(
+        "Protocol Kit Safe deployment transaction differs from the canonical deterministic encoding",
+      );
+    }
+  } else if (!allowAlreadyDeployed) {
     throw new Error(
-      "Protocol Kit Safe deployment transaction does not target the canonical factory",
+      `Predicted Safe ${safeAddress} is already deployed; explicit read-only revalidation mode ` +
+        "is required",
     );
-  }
-  if (deploymentTransaction.value !== 0n || deploymentTransaction.data === "0x") {
-    throw new Error("Protocol Kit returned a malformed Safe deployment transaction");
   }
 
   return Object.freeze({
@@ -437,6 +509,9 @@ export const signCanonicalSafeTransaction = async ({
 export const createCanonicalSafeInterface = (chainId) =>
   new ethers.Interface(getCanonicalSafeDeploymentMetadata(chainId).singleton.abi);
 
+export const createCanonicalSafeProxyFactoryInterface = (chainId) =>
+  new ethers.Interface(getCanonicalSafeDeploymentMetadata(chainId).proxyFactory.abi);
+
 /**
  * A relayed Safe transaction can have receipt status 1 while the inner call failed.
  * Treat only the expected ExecutionSuccess event as success and reject ExecutionFailure.
@@ -511,6 +586,467 @@ const assertCanonicalComponentCode = async ({ provider, componentName, component
     );
   }
   return actualCodeHash;
+};
+
+/**
+ * Verifies the official Safe v1.3.0 singleton, ProxyFactory and fallback handler before any
+ * account deployment is planned. The raw RPC chain id is checked separately from ethers' cached
+ * network view, and the future proxy runtime is obtained from the already code-hash-pinned factory.
+ */
+export const inspectCanonicalSafeInfrastructure = async ({ provider, chainId }) => {
+  const normalizedChainId = normalizeChainId(chainId);
+  const ethersProvider = asEthersProvider(provider);
+  const rawProvider = asEip1193Provider(provider);
+  const rpcChainId = await rawProvider.request({ method: "eth_chainId", params: [] });
+  if (typeof rpcChainId !== "string") {
+    throw new Error(
+      `Safe infrastructure RPC returned an invalid raw chainId: ${String(rpcChainId)}`,
+    );
+  }
+  let normalizedRpcChainId;
+  try {
+    normalizedRpcChainId = BigInt(rpcChainId);
+  } catch {
+    throw new Error(
+      `Safe infrastructure RPC returned an invalid raw chainId: ${String(rpcChainId)}`,
+    );
+  }
+  if (normalizedRpcChainId !== normalizedChainId) {
+    throw new Error(
+      `Safe infrastructure RPC raw chainId mismatch: expected ${normalizedChainId}, ` +
+        `got ${normalizedRpcChainId}`,
+    );
+  }
+  await assertProviderChain(ethersProvider, normalizedChainId);
+
+  const metadata = getCanonicalSafeDeploymentMetadata(normalizedChainId);
+  const components = {};
+  for (const componentName of ["singleton", "proxyFactory", "fallbackHandler"]) {
+    const component = metadata[componentName];
+    const actualCodeHash = await assertCanonicalComponentCode({
+      provider: ethersProvider,
+      componentName,
+      component,
+    });
+    components[componentName] = {
+      address: component.address,
+      expectedCodeHash: component.codeHash,
+      actualCodeHash,
+      matched: true,
+    };
+  }
+
+  const proxyFactory = new ethers.Contract(
+    metadata.proxyFactory.address,
+    metadata.proxyFactory.abi,
+    ethersProvider,
+  );
+  const canonicalProxyRuntimeCode = await proxyFactory.proxyRuntimeCode();
+  if (!ethers.isHexString(canonicalProxyRuntimeCode) || canonicalProxyRuntimeCode === "0x") {
+    throw new Error("Canonical Safe ProxyFactory returned invalid proxy runtime bytecode");
+  }
+
+  return deepFreeze({
+    chainId: normalizedChainId,
+    rpcChainId,
+    components,
+    canonicalProxyCodeHash: ethers.keccak256(canonicalProxyRuntimeCode).toLowerCase(),
+  });
+};
+
+const normalizeHexData = (name, value) => {
+  if (!ethers.isHexString(value)) {
+    throw new Error(`${name} must be a 0x-prefixed hexadecimal value`);
+  }
+  return ethers.hexlify(value);
+};
+
+const normalizeTransactionHash = (name, value) => {
+  if (!ethers.isHexString(value, 32)) {
+    throw new Error(`${name} must be a 32-byte hexadecimal value`);
+  }
+  return value.toLowerCase();
+};
+
+/**
+ * Strictly binds a confirmed factory deployment to its immutable plan and the canonical
+ * ProxyCreation event. This must be used with the original transaction returned by the RPC, not
+ * merely the locally populated request: a successful receipt alone does not prove who sent which
+ * calldata or which Safe proxy the factory created.
+ */
+export const assertCanonicalSafeDeploymentReceipt = ({
+  receipt,
+  transaction,
+  chainId,
+  expectedDeployer,
+  expectedNonce,
+  expectedSafeAddress,
+  expectedDeploymentTransaction,
+}) => {
+  const normalizedChainId = normalizeChainId(chainId);
+  const normalizedDeployer = normalizeNonzeroAddress("expectedDeployer", expectedDeployer);
+  const normalizedExpectedNonce = normalizeUint("expected deployment nonce", expectedNonce);
+  const normalizedSafeAddress = normalizeNonzeroAddress("expectedSafeAddress", expectedSafeAddress);
+  const metadata = getCanonicalSafeDeploymentMetadata(normalizedChainId);
+
+  if (!expectedDeploymentTransaction || typeof expectedDeploymentTransaction !== "object") {
+    throw new Error("Expected Safe deployment transaction is required");
+  }
+  const expectedTarget = normalizeNonzeroAddress(
+    "expected Safe deployment target",
+    expectedDeploymentTransaction.to,
+  );
+  const expectedValue = normalizeUint(
+    "expected Safe deployment value",
+    expectedDeploymentTransaction.value ?? 0n,
+  );
+  const expectedData = normalizeHexData(
+    "expected Safe deployment calldata",
+    expectedDeploymentTransaction.data,
+  );
+  if (!sameAddress(expectedTarget, metadata.proxyFactory.address)) {
+    throw new Error("Expected Safe deployment transaction does not target the canonical factory");
+  }
+  if (expectedValue !== 0n) {
+    throw new Error("Canonical Safe factory deployment value must be zero");
+  }
+
+  const proxyFactoryInterface = createCanonicalSafeProxyFactoryInterface(normalizedChainId);
+  let parsedFactoryCall;
+  try {
+    parsedFactoryCall = proxyFactoryInterface.parseTransaction({
+      data: expectedData,
+      value: expectedValue,
+    });
+  } catch {
+    throw new Error("Expected Safe deployment calldata is not a canonical factory call");
+  }
+  if (parsedFactoryCall?.name !== "createProxyWithNonce") {
+    throw new Error("Canonical Safe deployment must call createProxyWithNonce");
+  }
+  const callSingleton = normalizeNonzeroAddress(
+    "Safe factory call singleton",
+    parsedFactoryCall.args._singleton,
+  );
+  if (!sameAddress(callSingleton, metadata.singleton.address)) {
+    throw new Error("Safe factory call does not use the canonical L2 singleton");
+  }
+  const initializer = normalizeHexData("Safe initializer", parsedFactoryCall.args.initializer);
+  if (initializer === "0x") {
+    throw new Error("Canonical Safe deployment initializer cannot be empty");
+  }
+
+  if (!transaction || typeof transaction !== "object") {
+    throw new Error("Original Safe deployment transaction is required");
+  }
+  const transactionHash = normalizeTransactionHash(
+    "Safe deployment transaction hash",
+    transaction.hash,
+  );
+  if (!ethers.isAddress(transaction.from) || !sameAddress(transaction.from, normalizedDeployer)) {
+    throw new Error("Safe deployment transaction sender does not match the expected deployer");
+  }
+  if (
+    normalizeUint("Safe deployment transaction nonce", transaction.nonce) !==
+    normalizedExpectedNonce
+  ) {
+    throw new Error("Safe deployment transaction nonce does not match the expected nonce");
+  }
+  if (!ethers.isAddress(transaction.to) || !sameAddress(transaction.to, expectedTarget)) {
+    throw new Error("Safe deployment transaction target does not match the canonical factory");
+  }
+  if (normalizeUint("Safe deployment transaction value", transaction.value) !== expectedValue) {
+    throw new Error("Safe deployment transaction value does not match the immutable plan");
+  }
+  const transactionData = normalizeHexData(
+    "Safe deployment transaction calldata",
+    transaction.data,
+  );
+  if (transactionData.toLowerCase() !== expectedData.toLowerCase()) {
+    throw new Error("Safe deployment transaction calldata does not match the immutable plan");
+  }
+  if (
+    normalizeUint("Safe deployment transaction chainId", transaction.chainId) !== normalizedChainId
+  ) {
+    throw new Error("Safe deployment transaction chainId does not match the expected network");
+  }
+
+  if (!receipt || Number(receipt.status) !== 1 || !Array.isArray(receipt.logs)) {
+    throw new Error("Safe factory deployment receipt is missing or reverted");
+  }
+  const receiptHash = normalizeTransactionHash(
+    "Safe deployment receipt transaction hash",
+    receipt.hash ?? receipt.transactionHash,
+  );
+  if (receiptHash !== transactionHash) {
+    throw new Error("Safe deployment receipt does not belong to the original transaction");
+  }
+  if (!ethers.isAddress(receipt.from) || !sameAddress(receipt.from, normalizedDeployer)) {
+    throw new Error("Safe deployment receipt sender does not match the expected deployer");
+  }
+  if (!ethers.isAddress(receipt.to) || !sameAddress(receipt.to, expectedTarget)) {
+    throw new Error("Safe deployment receipt target does not match the canonical factory");
+  }
+  if (receipt.contractAddress != null) {
+    throw new Error("Safe factory call receipt must not contain a top-level contractAddress");
+  }
+
+  const proxyCreationEvents = [];
+  for (const [index, log] of receipt.logs.entries()) {
+    if (
+      !ethers.isAddress(log.address) ||
+      !sameAddress(log.address, metadata.proxyFactory.address)
+    ) {
+      continue;
+    }
+    try {
+      const parsed = proxyFactoryInterface.parseLog(log);
+      if (parsed?.name === "ProxyCreation") {
+        proxyCreationEvents.push({ parsed, index });
+      }
+    } catch {
+      // The factory can emit unrelated logs in future-compatible callers; only ProxyCreation binds
+      // the deployment evidence required here.
+    }
+  }
+  if (proxyCreationEvents.length !== 1) {
+    throw new Error(
+      `Expected exactly one canonical Safe ProxyCreation event; got ${proxyCreationEvents.length}`,
+    );
+  }
+  const [{ parsed: proxyCreation, index: proxyCreationLogIndex }] = proxyCreationEvents;
+  const eventProxy = normalizeNonzeroAddress("ProxyCreation proxy", proxyCreation.args.proxy);
+  const eventSingleton = normalizeNonzeroAddress(
+    "ProxyCreation singleton",
+    proxyCreation.args.singleton,
+  );
+  if (!sameAddress(eventProxy, normalizedSafeAddress)) {
+    throw new Error("ProxyCreation event Safe address does not match the predicted Safe");
+  }
+  if (!sameAddress(eventSingleton, metadata.singleton.address)) {
+    throw new Error("ProxyCreation event singleton is not the canonical L2 singleton");
+  }
+
+  return deepFreeze({
+    chainId: normalizedChainId,
+    transactionHash,
+    deployer: normalizedDeployer,
+    nonce: normalizedExpectedNonce,
+    proxyFactory: metadata.proxyFactory.address,
+    safeAddress: normalizedSafeAddress,
+    singleton: metadata.singleton.address,
+    value: expectedValue,
+    dataHash: ethers.keccak256(expectedData).toLowerCase(),
+    initializerHash: ethers.keccak256(initializer).toLowerCase(),
+    saltNonce: BigInt(parsedFactoryCall.args.saltNonce),
+    proxyCreationLogIndex,
+  });
+};
+
+/**
+ * Replays the public evidence for the production owners' zero-value Safe smoke transaction.
+ * The transaction must be a refund-free CALL with no payload, and the Safe itself must emit one
+ * successful execution result. No owner key or off-chain Safe service is needed for this check.
+ */
+export const assertCanonicalSafeOperationalAcceptance = async ({
+  provider,
+  chainId,
+  safeAddress,
+  expectedTarget,
+  transactionHash,
+}) => {
+  const normalizedChainId = normalizeChainId(chainId);
+  const normalizedSafeAddress = normalizeNonzeroAddress("safeAddress", safeAddress);
+  const normalizedExpectedTarget = normalizeNonzeroAddress("expectedTarget", expectedTarget);
+  const normalizedTransactionHash = normalizeTransactionHash(
+    "Safe operational acceptance transactionHash",
+    transactionHash,
+  );
+  const ethersProvider = asEthersProvider(provider);
+  await assertProviderChain(ethersProvider, normalizedChainId);
+
+  const transaction = await ethersProvider.getTransaction(normalizedTransactionHash);
+  if (!transaction) {
+    throw new Error("Safe operational acceptance transaction is unavailable from the RPC");
+  }
+  const actualTransactionHash = normalizeTransactionHash(
+    "Safe operational acceptance transaction hash",
+    transaction.hash,
+  );
+  if (actualTransactionHash !== normalizedTransactionHash) {
+    throw new Error("Safe operational acceptance RPC transaction hash does not match the request");
+  }
+  if (
+    normalizeUint("Safe operational acceptance transaction chainId", transaction.chainId) !==
+    normalizedChainId
+  ) {
+    throw new Error("Safe operational acceptance transaction chainId is incorrect");
+  }
+  if (!ethers.isAddress(transaction.to) || !sameAddress(transaction.to, normalizedSafeAddress)) {
+    throw new Error("Safe operational acceptance transaction does not target the expected Safe");
+  }
+  if (!ethers.isAddress(transaction.from) || transaction.from === ethers.ZeroAddress) {
+    throw new Error("Safe operational acceptance relayer address is invalid");
+  }
+  if (normalizeUint("Safe operational acceptance outer value", transaction.value) !== 0n) {
+    throw new Error("Safe operational acceptance outer transaction value must be zero");
+  }
+
+  const safeInterface = createCanonicalSafeInterface(normalizedChainId);
+  const transactionData = normalizeHexData(
+    "Safe operational acceptance calldata",
+    transaction.data,
+  );
+  let parsedExecution;
+  try {
+    parsedExecution = safeInterface.parseTransaction({
+      data: transactionData,
+      value: transaction.value,
+    });
+  } catch {
+    throw new Error("Safe operational acceptance calldata is not a valid Safe transaction");
+  }
+  if (parsedExecution?.name !== "execTransaction") {
+    throw new Error("Safe operational acceptance must call execTransaction");
+  }
+
+  const innerTarget = normalizeNonzeroAddress(
+    "Safe operational acceptance inner target",
+    parsedExecution.args.to,
+  );
+  if (!sameAddress(innerTarget, normalizedExpectedTarget)) {
+    throw new Error("Safe operational acceptance inner target is incorrect");
+  }
+  if (BigInt(parsedExecution.args.value) !== 0n) {
+    throw new Error("Safe operational acceptance inner value must be zero");
+  }
+  const innerData = normalizeHexData(
+    "Safe operational acceptance inner data",
+    parsedExecution.args.data,
+  );
+  if (innerData !== "0x") {
+    throw new Error("Safe operational acceptance inner data must be empty");
+  }
+  if (Number(parsedExecution.args.operation) !== OperationType.Call) {
+    throw new Error("Safe operational acceptance must use CALL, not DELEGATECALL");
+  }
+
+  const safeTxGas = BigInt(parsedExecution.args.safeTxGas);
+  const baseGas = BigInt(parsedExecution.args.baseGas);
+  const gasPrice = BigInt(parsedExecution.args.gasPrice);
+  const gasToken = normalizeAddress(
+    "Safe operational acceptance gasToken",
+    parsedExecution.args.gasToken,
+  );
+  const refundReceiver = normalizeAddress(
+    "Safe operational acceptance refundReceiver",
+    parsedExecution.args.refundReceiver,
+  );
+  if (
+    safeTxGas !== 0n ||
+    baseGas !== 0n ||
+    gasPrice !== 0n ||
+    gasToken !== ethers.ZeroAddress ||
+    refundReceiver !== ethers.ZeroAddress
+  ) {
+    throw new Error("Safe operational acceptance refund and payment gas fields must all be zero");
+  }
+
+  const receipt = await ethersProvider.getTransactionReceipt(normalizedTransactionHash);
+  if (!receipt || Number(receipt.status) !== 1 || !Array.isArray(receipt.logs)) {
+    throw new Error("Safe operational acceptance receipt is missing or reverted");
+  }
+  const receiptHash = normalizeTransactionHash(
+    "Safe operational acceptance receipt transaction hash",
+    receipt.hash ?? receipt.transactionHash,
+  );
+  if (receiptHash !== normalizedTransactionHash) {
+    throw new Error("Safe operational acceptance receipt belongs to a different transaction");
+  }
+  if (!ethers.isAddress(receipt.to) || !sameAddress(receipt.to, normalizedSafeAddress)) {
+    throw new Error("Safe operational acceptance receipt does not target the expected Safe");
+  }
+  if (!ethers.isAddress(receipt.from) || !sameAddress(receipt.from, transaction.from)) {
+    throw new Error(
+      "Safe operational acceptance receipt relayer does not match the original transaction",
+    );
+  }
+  if (receipt.contractAddress != null) {
+    throw new Error("Safe operational acceptance receipt must not create a top-level contract");
+  }
+  if (
+    transaction.blockHash != null &&
+    receipt.blockHash != null &&
+    String(transaction.blockHash).toLowerCase() !== String(receipt.blockHash).toLowerCase()
+  ) {
+    throw new Error("Safe operational acceptance transaction and receipt block hashes differ");
+  }
+  if (
+    transaction.blockNumber != null &&
+    receipt.blockNumber != null &&
+    Number(transaction.blockNumber) !== Number(receipt.blockNumber)
+  ) {
+    throw new Error("Safe operational acceptance transaction and receipt block numbers differ");
+  }
+
+  const executionEvents = [];
+  for (const [index, log] of receipt.logs.entries()) {
+    if (!ethers.isAddress(log.address) || !sameAddress(log.address, normalizedSafeAddress)) {
+      continue;
+    }
+    try {
+      const parsed = safeInterface.parseLog(log);
+      if (parsed?.name === "ExecutionSuccess" || parsed?.name === "ExecutionFailure") {
+        executionEvents.push({ parsed, index });
+      }
+    } catch {
+      // Other Safe-address logs do not establish the outcome of execTransaction.
+    }
+  }
+  const failures = executionEvents.filter(({ parsed }) => parsed.name === "ExecutionFailure");
+  const successes = executionEvents.filter(({ parsed }) => parsed.name === "ExecutionSuccess");
+  if (failures.length !== 0) {
+    throw new Error("Safe operational acceptance emitted ExecutionFailure");
+  }
+  if (successes.length !== 1 || executionEvents.length !== 1) {
+    throw new Error(
+      `Expected exactly one Safe operational ExecutionSuccess event; got ${successes.length}`,
+    );
+  }
+  const [{ parsed: success, index: executionSuccessLogIndex }] = successes;
+  const safeTxHash = normalizeTransactionHash(
+    "Safe operational acceptance safeTxHash",
+    success.args.txHash,
+  );
+  const payment = BigInt(success.args.payment);
+  if (payment !== 0n) {
+    throw new Error("Safe operational acceptance ExecutionSuccess payment must be zero");
+  }
+
+  return deepFreeze({
+    chainId: normalizedChainId,
+    transactionHash: normalizedTransactionHash,
+    safeTxHash,
+    safeAddress: normalizedSafeAddress,
+    relayer: ethers.getAddress(transaction.from),
+    innerTarget: normalizedExpectedTarget,
+    operation: Number(parsedExecution.args.operation),
+    value: 0n,
+    data: innerData,
+    safeTxGas,
+    baseGas,
+    gasPrice,
+    gasToken,
+    refundReceiver,
+    payment,
+    executionSuccessLogIndex,
+    receipt: {
+      status: Number(receipt.status),
+      blockNumber: receipt.blockNumber == null ? null : Number(receipt.blockNumber),
+      blockHash: receipt.blockHash ?? null,
+      gasUsed: receipt.gasUsed == null ? null : BigInt(receipt.gasUsed),
+    },
+  });
 };
 
 /**

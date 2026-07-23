@@ -25,7 +25,7 @@ export const readJsonIfExists = async (filePath) => {
   }
 };
 
-export const acquireReleaseLock = async (lockPath, details = {}) => {
+export const acquireReleaseLock = async (lockPath, details = {}, lockLabel = "Mainnet release") => {
   await fs.mkdir(path.dirname(lockPath), { recursive: true });
   let handle;
   try {
@@ -33,7 +33,7 @@ export const acquireReleaseLock = async (lockPath, details = {}) => {
   } catch (error) {
     if (error.code === "EEXIST") {
       throw new Error(
-        `Mainnet release lock already exists at ${lockPath}. Confirm no release process is ` +
+        `${lockLabel} lock already exists at ${lockPath}. Confirm no production process is ` +
           "running before removing a stale lock manually.",
       );
     }
@@ -331,7 +331,11 @@ const checkpointMaximumCost = ({ entry, label }) => {
   return recomputed;
 };
 
-const assertCheckpointReservations = ({ checkpoint, maxCostWei }) => {
+const assertCheckpointReservations = ({
+  checkpoint,
+  maxCostWei,
+  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+}) => {
   const cap =
     maxCostWei == null ? null : parseNonNegativeWei(maxCostWei, "mainnet release maxCostWei");
   const reserved = Object.entries(checkpoint.transactions ?? {}).reduce(
@@ -340,7 +344,7 @@ const assertCheckpointReservations = ({ checkpoint, maxCostWei }) => {
   );
   if (cap != null && reserved > cap) {
     throw new Error(
-      `Checkpoint fee reservations exceed ESPACE_MAINNET_MAX_CFX: reserved ` +
+      `Checkpoint fee reservations exceed ${budgetEnvironmentName}: reserved ` +
         `${ethers.formatEther(reserved)} CFX, cap ${ethers.formatEther(cap)} CFX`,
     );
   }
@@ -383,7 +387,12 @@ const canonicalActualCostWei = ({ entry, receipt, label }) => {
   return { actualCostWei, gasCharged };
 };
 
-const assertCumulativeActualCost = ({ checkpoint, canonicalCosts = new Map(), maxCostWei }) => {
+const assertCumulativeActualCost = ({
+  checkpoint,
+  canonicalCosts = new Map(),
+  maxCostWei,
+  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+}) => {
   if (maxCostWei == null) return;
   const cap = parseNonNegativeWei(maxCostWei, "mainnet release maxCostWei");
   const cumulativeActualCostWei = Object.entries(checkpoint.transactions ?? {}).reduce(
@@ -397,7 +406,7 @@ const assertCumulativeActualCost = ({ checkpoint, canonicalCosts = new Map(), ma
   );
   if (cumulativeActualCostWei > cap) {
     throw new Error(
-      `Confirmed transaction costs exceed ESPACE_MAINNET_MAX_CFX: actual ` +
+      `Confirmed transaction costs exceed ${budgetEnvironmentName}: actual ` +
         `${ethers.formatEther(cumulativeActualCostWei)} CFX, cap ${ethers.formatEther(cap)} CFX`,
     );
   }
@@ -417,6 +426,8 @@ export const createCheckpointedTransactionExecutor = ({
   recoveryTransactions = {},
   expectedNonces = {},
   expectedIntents = {},
+  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  recoveryEnvironmentName = "ESPACE_MAINNET_RECOVERY_TXS",
 }) => {
   if (!provider || !signer || !checkpoint || typeof saveCheckpoint !== "function") {
     throw new Error(
@@ -458,7 +469,11 @@ export const createCheckpointedTransactionExecutor = ({
         });
       }
     }
-    assertCheckpointReservations({ checkpoint, maxCostWei: releaseCostCap });
+    assertCheckpointReservations({
+      checkpoint,
+      maxCostWei: releaseCostCap,
+      budgetEnvironmentName,
+    });
     if (entry && entry.kind !== kind) {
       throw new Error(`${label} checkpoint kind changed from ${entry.kind} to ${kind}`);
     }
@@ -577,7 +592,7 @@ export const createCheckpointedTransactionExecutor = ({
       );
       if (alreadyReserved + maximumCostWei > releaseCostCap) {
         throw new Error(
-          `${label} would exceed ESPACE_MAINNET_MAX_CFX: reserved ` +
+          `${label} would exceed ${budgetEnvironmentName}: reserved ` +
             `${ethers.formatEther(alreadyReserved + maximumCostWei)} CFX, cap ` +
             `${ethers.formatEther(releaseCostCap)} CFX`,
         );
@@ -607,12 +622,20 @@ export const createCheckpointedTransactionExecutor = ({
           signerAddress,
         });
       }
-      assertCheckpointReservations({ checkpoint, maxCostWei: releaseCostCap });
+      assertCheckpointReservations({
+        checkpoint,
+        maxCostWei: releaseCostCap,
+        budgetEnvironmentName,
+      });
       await saveCheckpoint();
     }
 
     if (entry.status === "planned") {
-      assertCheckpointReservations({ checkpoint, maxCostWei: releaseCostCap });
+      assertCheckpointReservations({
+        checkpoint,
+        maxCostWei: releaseCostCap,
+        budgetEnvironmentName,
+      });
       const recoveredHash = recoveryTransactions[label];
       if (recoveredHash) {
         const recoveredTransaction = await provider.getTransaction(recoveredHash);
@@ -636,7 +659,7 @@ export const createCheckpointedTransactionExecutor = ({
           throw new Error(
             `${label} planned nonce ${entry.request.nonce} has already been consumed or is ` +
               "pending. Do not resend it; provide its original hash in " +
-              "ESPACE_MAINNET_RECOVERY_TXS after independently confirming the transaction.",
+              `${recoveryEnvironmentName} after independently confirming the transaction.`,
           );
         }
         const availableBalance = await provider.getBalance(signerAddress);
@@ -645,7 +668,11 @@ export const createCheckpointedTransactionExecutor = ({
             `${label} deployer balance is below its maximum reserved transaction cost`,
           );
         }
-        assertCheckpointReservations({ checkpoint, maxCostWei: releaseCostCap });
+        assertCheckpointReservations({
+          checkpoint,
+          maxCostWei: releaseCostCap,
+          budgetEnvironmentName,
+        });
         const response = await signer.sendTransaction(hydrateRequest(entry.request));
         if (Number(response.nonce) !== entry.request.nonce) {
           throw new Error(`${label} was broadcast with an unexpected nonce`);
@@ -665,7 +692,11 @@ export const createCheckpointedTransactionExecutor = ({
       throw new Error(`${label} checkpoint has unsupported status ${entry.status}`);
     }
     const transaction = await provider.getTransaction(entry.hash);
-    assertCheckpointReservations({ checkpoint, maxCostWei: releaseCostCap });
+    assertCheckpointReservations({
+      checkpoint,
+      maxCostWei: releaseCostCap,
+      budgetEnvironmentName,
+    });
     assertTransactionMatchesPlan({ transaction, planned: entry, signerAddress, label });
     const receipt = await canonicalReceipt({
       provider,
@@ -680,6 +711,7 @@ export const createCheckpointedTransactionExecutor = ({
       checkpoint,
       canonicalCosts: new Map([[label, actualCostWei]]),
       maxCostWei: releaseCostCap,
+      budgetEnvironmentName,
     });
     if (entry.status === "submitted") {
       entry.status = "confirmed";
@@ -699,8 +731,9 @@ export const revalidateCheckpointTransactions = async ({
   timeoutMs,
   saveCheckpoint,
   maxCostWei,
+  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
 }) => {
-  assertCheckpointReservations({ checkpoint, maxCostWei });
+  assertCheckpointReservations({ checkpoint, maxCostWei, budgetEnvironmentName });
   let changed = false;
   const validated = [];
   const canonicalCosts = new Map();
@@ -719,7 +752,12 @@ export const revalidateCheckpointTransactions = async ({
     canonicalCosts.set(label, actualCostWei);
     validated.push({ entry, evidence, actualCostWei });
   }
-  assertCumulativeActualCost({ checkpoint, canonicalCosts, maxCostWei });
+  assertCumulativeActualCost({
+    checkpoint,
+    canonicalCosts,
+    maxCostWei,
+    budgetEnvironmentName,
+  });
   for (const { entry, evidence, actualCostWei } of validated) {
     if (entry.status === "submitted") {
       entry.status = "confirmed";
