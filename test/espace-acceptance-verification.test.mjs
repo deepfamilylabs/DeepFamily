@@ -149,6 +149,7 @@ describe("eSpace acceptance source verification", function () {
 
   it("collects later results, sanitizes final failures, and attaches them to the error", async () => {
     const sensitiveHex = `0x${"ef".repeat(65)}`;
+    const sensitiveUrl = "https://rpc-user:rpc-password@example.invalid/path?token=secret";
     let caught;
     try {
       await verifyAcceptanceContracts({
@@ -162,7 +163,9 @@ describe("eSpace acceptance source verification", function () {
         logger: null,
         sleepFn: async () => {},
         verifyFn: async ({ address: target }) => {
-          if (target === address(5)) throw new Error(`bad calldata ${sensitiveHex}`);
+          if (target === address(5)) {
+            throw new Error(`bad calldata ${sensitiveHex} via ${sensitiveUrl}`);
+          }
           return true;
         },
       });
@@ -174,8 +177,10 @@ describe("eSpace acceptance source verification", function () {
     expect(caught.results).to.have.length(2);
     expect(caught.results[0]).to.include({ status: "failed", attempts: 2 });
     expect(caught.results[0].error).to.include("<redacted-hex-data>");
+    expect(caught.results[0].error).to.include("<redacted-url>");
     expect(caught.results[1]).to.include({ status: "passed", attempts: 1 });
     expect(JSON.stringify(caught.results)).not.to.include(sensitiveHex);
+    expect(JSON.stringify(caught.results)).not.to.include(sensitiveUrl);
   });
 
   it("bounds a hung explorer request and a hung retry delay", async () => {

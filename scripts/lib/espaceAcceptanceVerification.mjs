@@ -8,8 +8,17 @@ const RETRY_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 10_000;
 
 const publicErrorMessage = (error) => {
-  const raw = String(error?.shortMessage || error?.reason || error?.message || error || "unknown");
+  let raw = String(error?.shortMessage || error?.reason || error?.message || error || "unknown");
+  for (const name of ["PRIVATE_KEY", "CONFLUX_RPC_URL", "CONFLUX_TESTNET_RPC_URL"]) {
+    const secret = String(process.env[name] ?? "");
+    if (secret.length >= 4) raw = raw.split(secret).join(`<redacted-${name.toLowerCase()}>`);
+  }
+  const explorerKey = String(process.env.EXPLORER_API_KEY ?? "");
+  if (explorerKey.length >= 8 && explorerKey !== "espace") {
+    raw = raw.split(explorerKey).join("<redacted-explorer-api-key>");
+  }
   return raw
+    .replace(/https?:\/\/[^\s"'<>]+/giu, "<redacted-url>")
     .replace(/0x[0-9a-fA-F]{41,}/g, "<redacted-hex-data>")
     .replace(/\s+/g, " ")
     .slice(0, 500);

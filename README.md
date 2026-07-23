@@ -9,7 +9,7 @@
 [![Node](https://img.shields.io/badge/Node.js-22.10+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
 **A blockchain-based decentralized digital family tree protocol**
-*Leveraging zero-knowledge proofs and community governance for collaborative family history*
+_Leveraging zero-knowledge proofs and community governance for collaborative family history_
 
 [🏗 Architecture](#-architecture) • [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing)
 
@@ -24,6 +24,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 > This is an open-source protocol/tooling suite—feel free to deploy and operate it yourself.
 
 ### Core Principles
+
 - **Zero-Knowledge Privacy**: Private family tree construction with selective disclosure through NFT minting
 - **Globally Accessible**: Borderless family connections accessible from anywhere in the world
 - **Immutable Heritage**: Permanent on-chain storage preserves data across generations
@@ -33,12 +34,14 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 ## Architecture
 
 ### Privacy-Preserving Family Graph
+
 - Build a global family tree graph through parent-child hash connections
 - Zero-knowledge proofs protect privacy — no plaintext personal data stored on-chain
 - Multiple versions per person allow different contributors to record the same individual
 - Supports both collaborative (shared passphrase) and fully private (unique passphrase) modes
 
 ### Endorsement, Incentives & Public Records
+
 - Community endorsement validates data quality across versions
 - Endorsed versions can be minted as permanent on-chain NFT records with biographical data
 - On-chain biographical storage with permanent sealing
@@ -53,24 +56,25 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Contracts Overview
 
-| Contract | Purpose |
-|----------|---------|
-| **DeepFamily.sol** | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding. UUPS-upgradeable behind a proxy |
-| **DeepFamilyReader.sol** | Stateless aggregated/paginated read views over the core protocol |
-| **DeepFamilyToken.sol** | Utility token powering endorsement and incentive mechanics |
-| **GovernanceTimelock.sol** | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending |
-| **PersonCommitmentVerifier.sol** | ZK verifier for person identity and parent commitment proofs |
-| **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs |
-
+| Contract                          | Purpose                                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **DeepFamily.sol**                | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding. UUPS-upgradeable behind a proxy |
+| **DeepFamilyReader.sol**          | Stateless aggregated/paginated read views over the core protocol                                                          |
+| **DeepFamilyToken.sol**           | Utility token powering endorsement and incentive mechanics                                                                |
+| **GovernanceTimelock.sol**        | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending            |
+| **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                              |
+| **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                        |
 
 ## Quick Start
 
 ### Prerequisites
+
 - **Node.js** >= 22.10.0
 - **npm** or **yarn**
 - **Git**
 
 ### One-Command Setup
+
 ```bash
 git clone https://github.com/deepfamilylabs/DeepFamily.git
 cd DeepFamily
@@ -82,6 +86,7 @@ npm run dev:all  # Start local node + deploy + seed data + frontend
 ```
 
 ### Step-by-Step Setup
+
 ```bash
 npm run setup           # Install dependencies
 npm run check           # Run frontend + contract verification
@@ -94,16 +99,17 @@ npm run frontend:dev    # Start frontend dev server
 ```
 
 ### Access Points
+
 - **Frontend dApp**: http://localhost:5173
 - **Local Blockchain RPC**: http://localhost:8545
 
 ### Testing
+
 ```bash
 npm test              # Run all contract tests
 npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check         # Run frontend checks + contract lint/build/test
 ```
-
 
 ## Deployment Guide
 
@@ -125,15 +131,39 @@ parentheses are the network names used by the project scripts and Hardhat tasks.
 Set `CONFLUX_TESTNET_RPC_URL` or `CONFLUX_RPC_URL` to use a managed eSpace RPC; blank values fall
 back to the official public testnet or mainnet endpoint.
 
-### Multi-Network Deployment
+### Recommended eSpace Mainnet release
+
+Use the resumable production orchestrator for a first deployment on Conflux eSpace Mainnet. Its
+default run is read-only: configure the reviewed Safe, exact three-owner allowlist, deployer, delay,
+and CFX ceiling, then run:
+
 ```bash
-# Rehearse on Conflux eSpace Testnet first (both values are required, see below)
+npm run espace:mainnet:release
+```
+
+Every invocation performs a clean production-profile build. Use this same npm command for planning,
+execution, and resumption; do not invoke the lower-level release script directly.
+
+Review the plan with a second operator. Copy the printed digest to
+`ESPACE_MAINNET_PLAN_DIGEST`, set
+`ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute. It
+checkpoints each phase, resumes safely, verifies every contract, waits for finalized coverage, and
+checks the terminal governance state. It uses an existing canonical Safe v1.3.0 2/3 but never reads
+Safe owner keys or performs mainnet business-data tests. The read-only plan is saved separately from
+the final execution report, and repository tests never broadcast eSpace Mainnet transactions. See
+the complete
+[eSpace Mainnet release runbook](docs/espace-mainnet-release.md).
+
+### Manual and other-network deployment
+
+The stepwise commands below remain available for local/testnet work, optional compatibility
+networks, and explicitly reviewed forensic recovery. They are not the recommended first-release
+path on eSpace Mainnet; do not mix them with an active orchestrated release checkpoint.
+
+```bash
+# Stepwise rehearsal on Conflux eSpace Testnet (both values are required, see below)
 GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
   npm run deploy:net --net=confluxTestnet
-
-# Production: use reviewed production addresses on Conflux eSpace Mainnet
-GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
-  npm run deploy:net --net=conflux
 
 # Optional Ethereum compatibility deployment
 GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
@@ -176,8 +206,9 @@ share accumulates at the Timelock address. Holding DEEP does not make the Token 
 owned by the Timelock: `DeepFamilyToken.owner()` remains permanently zero. Treasury spending is a
 separate delayed operation approved through the governance multisig.
 
-The governance examples below use `confluxTestnet` for a safe rehearsal. After validating the full
-flow, replace it with `conflux` and use production addresses for a Conflux eSpace Mainnet deployment.
+The governance examples below use `confluxTestnet` for a stepwise rehearsal. For the initial eSpace
+Mainnet deployment, use `npm run espace:mainnet:release`; direct deployment commands are retained
+for advanced recovery and other supported networks.
 
 ```bash
 MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
@@ -323,11 +354,13 @@ governance task rejects upgrade and ownership-transfer functions. See
 ## Contributing
 
 ### Bug Reports
+
 1. Search existing Issues
 2. Open new issue with reproduction steps & env
 3. Include logs & network details
 
 ### Code
+
 1. Fork
 2. Branch: `git checkout -b feat/your-feature`
 3. Commit: `git commit -am 'feat: add X'`
@@ -335,6 +368,7 @@ governance task rejects upgrade and ownership-transfer functions. See
 5. Open PR
 
 ### Standards
+
 - Prettier + Solhint + lint-staged pre-commit (husky)
 - Conventional Commits
 - Tests required for new features
@@ -344,6 +378,7 @@ governance task rejects upgrade and ownership-transfer functions. See
 ## License
 
 MIT License (see [LICENSE](LICENSE) for full text). Excerpt:
+
 ```
 MIT License
 
@@ -361,6 +396,6 @@ Copyright (c) 2025 DeepFamily
 [![GitHub Stars](https://img.shields.io/github/stars/deepfamilylabs/DeepFamily?style=social)](https://github.com/deepfamilylabs/DeepFamily.git)
 [![GitHub Forks](https://img.shields.io/github/forks/deepfamilylabs/DeepFamily?style=social)](https://github.com/deepfamilylabs/DeepFamily.git)
 
-*Building a shared digital family heritage for humanity*
+_Building a shared digital family heritage for humanity_
 
 </div>

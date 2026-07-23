@@ -8,24 +8,25 @@
 
 ### Critical Constants
 
-| Constant | Value | Purpose & Impact |
-|----------|-------|------------------|
-| `MAX_LONG_TEXT_LENGTH` | 256 | Max length for tags, IPFS CIDs, names, places, stories |
-| `MAX_CHUNK_CONTENT_LENGTH` | 2048 | Story chunk size limit (≈2KB per shard) |
-| `PROTOCOL_FEE_BPS_MAX` | 2000 | Maximum protocol endorsement fee (20%) |
-| `FEE_BPS_DENOMINATOR` | 10000 | Basis-point denominator for fee accounting |
+| Constant                   | Value | Purpose & Impact                                       |
+| -------------------------- | ----- | ------------------------------------------------------ |
+| `MAX_LONG_TEXT_LENGTH`     | 256   | Max length for tags, IPFS CIDs, names, places, stories |
+| `MAX_CHUNK_CONTENT_LENGTH` | 2048  | Story chunk size limit (≈2KB per shard)                |
+| `PROTOCOL_FEE_BPS_MAX`     | 2000  | Maximum protocol endorsement fee (20%)                 |
+| `FEE_BPS_DENOMINATOR`      | 10000 | Basis-point denominator for fee accounting             |
 
 ### Core Data Structures
 
 #### PersonBasicInfo
+
 ```solidity
 struct PersonBasicInfo {
-    bytes32 identityCommitment; // bytes32 form of IdentityCommitment
-    bool isBirthBC;             // Birth era flag
-    uint16 birthYear;           // Birth year (0=unknown)
-    uint8 birthMonth;           // Birth month (1-12, 0=unknown)
-    uint8 birthDay;             // Birth day (1-31, 0=unknown)
-    uint8 gender;               // Gender code (0=unknown, 1=male, 2=female, 3=other, 4-255=custom)
+  bytes32 identityCommitment; // bytes32 form of IdentityCommitment
+  bool isBirthBC; // Birth era flag
+  uint16 birthYear; // Birth year (0=unknown)
+  uint8 birthMonth; // Birth month (1-12, 0=unknown)
+  uint8 birthDay; // Birth day (1-31, 0=unknown)
+  uint8 gender; // Gender code (0=unknown, 1=male, 2=female, 3=other, 4-255=custom)
 }
 ```
 
@@ -40,58 +41,61 @@ The packed field uses non-overlapping bit ranges: `birthYear[25..40]`,
 `birthMonth[17..24]`, `birthDay[9..16]`, `gender[1..8]`, and `isBirthBC[0]`.
 
 #### PersonVersion
+
 ```solidity
 struct PersonVersion {
-    bytes32 personHash;          // keccak256(bytes32(identityCommitment))
-    bytes32 fatherHash;          // Father's person hash
-    bytes32 motherHash;          // Mother's person hash
-    uint256 versionIndex;        // Version index (starts from 1)
-    uint256 fatherVersionIndex;  // Father's version reference (0=unspecified)
-    uint256 motherVersionIndex;  // Mother's version reference (0=unspecified)
-    address addedBy;             // Contributor address (packed with timestamp)
-    uint96 timestamp;            // Addition timestamp (packed with addedBy)
-    string tag;                  // Version tag/description
-    string metadataCID;          // IPFS metadata CID
+  bytes32 personHash; // keccak256(bytes32(identityCommitment))
+  bytes32 fatherHash; // Father's person hash
+  bytes32 motherHash; // Mother's person hash
+  uint256 versionIndex; // Version index (starts from 1)
+  uint256 fatherVersionIndex; // Father's version reference (0=unspecified)
+  uint256 motherVersionIndex; // Mother's version reference (0=unspecified)
+  address addedBy; // Contributor address (packed with timestamp)
+  uint96 timestamp; // Addition timestamp (packed with addedBy)
+  string tag; // Version tag/description
+  string metadataCID; // IPFS metadata CID
 }
 ```
 
 #### PersonCoreInfo
+
 ```solidity
 struct PersonCoreInfo {
-    PersonBasicInfo basicInfo;         // Hash-based identity
-    PersonSupplementInfo supplementInfo; // Human-readable data
+  PersonBasicInfo basicInfo; // Hash-based identity
+  PersonSupplementInfo supplementInfo; // Human-readable data
 }
 
 struct PersonSupplementInfo {
-    string fullName;      // Full name (revealed for NFT)
-    string birthPlace;    // Birth place
-    bool isDeathBC;       // Death era flag
-    uint16 deathYear;     // Death year (0=unknown)
-    uint8 deathMonth;     // Death month (0-12, 0=unknown)
-    uint8 deathDay;       // Death day (0-31, 0=unknown)
-    string deathPlace;    // Death place
-    string story;         // Life story summary
+  string fullName; // Full name (revealed for NFT)
+  string birthPlace; // Birth place
+  bool isDeathBC; // Death era flag
+  uint16 deathYear; // Death year (0=unknown)
+  uint8 deathMonth; // Death month (0-12, 0=unknown)
+  uint8 deathDay; // Death day (0-31, 0=unknown)
+  string deathPlace; // Death place
+  string story; // Life story summary
 }
 ```
 
 #### Story Sharding Structures
+
 ```solidity
 struct StoryChunk {
-    uint256 chunkIndex;   // Chunk index (starts from 0)
-    bytes32 chunkHash;    // keccak256(content)
-    string content;       // Chunk content (≤2048 bytes)
-    uint256 timestamp;    // Creation/update timestamp
-    address editor;       // Last editor address
-    uint8 chunkType;      // Classification (0=narrative, 1=quote, ...)
-    string attachmentCID; // Optional external attachment CID
+  uint256 chunkIndex; // Chunk index (starts from 0)
+  bytes32 chunkHash; // keccak256(content)
+  string content; // Chunk content (≤2048 bytes)
+  uint256 timestamp; // Creation/update timestamp
+  address editor; // Last editor address
+  uint8 chunkType; // Classification (0=narrative, 1=quote, ...)
+  string attachmentCID; // Optional external attachment CID
 }
 
 struct StoryMetadata {
-    uint256 totalChunks;     // Current total chunks
-    bytes32 fullStoryHash;   // Rolling hash keccak(previousHash, chunkIndex, chunkHash)
-    uint256 lastUpdateTime;  // Last update timestamp
-    bool isSealed;           // Immutability flag
-    uint256 totalLength;     // Total character count
+  uint256 totalChunks; // Current total chunks
+  bytes32 fullStoryHash; // Rolling hash keccak(previousHash, chunkIndex, chunkHash)
+  uint256 lastUpdateTime; // Last update timestamp
+  bool isSealed; // Immutability flag
+  uint256 totalLength; // Total character count
 }
 ```
 
@@ -108,6 +112,7 @@ The mint flow also computes a separate `disclosureBinding` from the disclosed fu
 ### Core Functions
 
 #### ZK-Proof Person Addition
+
 ```solidity
 function addPersonVersion(
     ProofEnvelope calldata proof,
@@ -120,6 +125,7 @@ function addPersonVersion(
 ```
 
 **Verification Process**:
+
 1. Validates `publicSignals.submitter == uint256(uint160(msg.sender))`
 2. Calls the registered `PersonCommitmentVerifier`
 3. Wraps each non-zero identity commitment as `keccak256(bytes32(identityCommitment))`
@@ -127,12 +133,14 @@ function addPersonVersion(
 5. Routes to `_addPersonInternal()` for family tree update
 
 **Mining Reward Semantics**:
+
 - Each `personHash` can receive at most one mining reward, on its first version whose proof-derived father and mother identity commitments are both non-zero.
 - A person may be added without parents and claim the one-time reward later when a complete-parent version is submitted.
 - Parent records do not need to exist on-chain. Both parent version indices may remain `0` (“unspecified”).
 - Later versions, including replaying the same proof with a different free-form `tag`, do not mint another reward for that person.
 
 #### Community Endorsement
+
 ```solidity
 function endorseVersion(
     bytes32 personHash,
@@ -141,6 +149,7 @@ function endorseVersion(
 ```
 
 **Endorsement Mechanics**:
+
 - Endorsers pay `recentReward` amount in DEEP utility points (ERC20)
 - `recentReward` is `0` before the first successful mining reward, tracks the most recently minted reward during mining, and returns to `0` when mining rewards end
 - **Fee Distribution**: Majority flows to NFT holder (if minted) or original contributor, with a small protocol share (default 5%, max 20%) for sustainability
@@ -149,6 +158,7 @@ function endorseVersion(
 - Switching endorsements rebalances vote counts
 
 #### NFT Minting with Disclosure Proof
+
 ```solidity
 function mintPersonVersionNFT(
     ProofEnvelope calldata proof,
@@ -160,6 +170,7 @@ function mintPersonVersionNFT(
 ```
 
 **Minting Requirements**:
+
 1. Caller must have endorsed this version
 2. `DisclosureBindingVerifier.verifyProof()` must succeed
 3. `publicSignals.identityCommitment` must match `coreInfo.basicInfo.identityCommitment`
@@ -169,6 +180,7 @@ function mintPersonVersionNFT(
 7. Linked `AdultAgeGate` age validation must pass
 
 #### Story Sharding System
+
 ```solidity
 function addStoryChunk(
     uint256 tokenId,
@@ -182,6 +194,7 @@ function sealStory(uint256 tokenId) external
 ```
 
 **Story Management**:
+
 - Only NFT holders can append chunks
 - Chunks must be added sequentially starting from index 0
 - Content hash validation prevents corruption
@@ -191,17 +204,17 @@ function sealStory(uint256 tokenId) external
 
 **chunkType Mapping**
 
-| Value | Meaning |
-|-------|---------|
-| 0 | Narrative (primary storyline) |
-| 1 | Work / Achievement |
-| 2 | Quote |
-| 3 | Media (photo/audio/video notes) |
-| 4 | Timeline event |
-| 5 | Commentary |
-| 6 | Source / citation |
-| 7 | Correction |
-| 8 | Editorial note |
+| Value | Meaning                         |
+| ----- | ------------------------------- |
+| 0     | Narrative (primary storyline)   |
+| 1     | Work / Achievement              |
+| 2     | Quote                           |
+| 3     | Media (photo/audio/video notes) |
+| 4     | Timeline event                  |
+| 5     | Commentary                      |
+| 6     | Source / citation               |
+| 7     | Correction                      |
+| 8     | Editorial note                  |
 
 ## DeepFamilyReader.sol - Aggregated Read Contract
 
@@ -212,22 +225,26 @@ contract's primitive getters. Write calls continue to target `DeepFamily`.
 ### Query Functions (Paginated)
 
 #### Version Queries
+
 ```solidity
 function getVersionDetails(bytes32 personHash, uint256 versionIndex) external view returns (PersonVersion memory, uint256, uint256)
 function listPersonVersions(bytes32 personHash, uint256 offset, uint256 limit) external view returns (PersonVersion[] memory, uint256, bool, uint256)
 ```
 
 #### Family Tree Queries
+
 ```solidity
 function listChildren(bytes32 parentHash, uint256 parentVersionIndex, uint256 offset, uint256 limit) external view returns (bytes32[] memory, uint256[] memory, uint256, bool, uint256)
 ```
 
 #### NFT Queries
+
 ```solidity
 function getNFTDetails(uint256 tokenId) external view returns (bytes32, uint256, PersonVersion memory, PersonCoreInfo memory, uint256, string memory)
 ```
 
 #### Story Queries
+
 ```solidity
 function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata memory)
 function getStoryChunk(uint256 tokenId, uint256 chunkIndex) external view returns (StoryChunk memory)
@@ -237,18 +254,56 @@ function listStoryChunks(uint256 tokenId, uint256 offset, uint256 limit) externa
 ### Events System
 
 #### Core Events
+
 ```solidity
-event PersonVersionAdded(bytes32 indexed personHash, uint256 indexed versionIndex, address indexed addedBy, uint256 timestamp, bytes32 fatherHash, uint256 fatherVersionIndex, bytes32 motherHash, uint256 motherVersionIndex, string tag);
+event PersonVersionAdded(
+  bytes32 indexed personHash,
+  uint256 indexed versionIndex,
+  address indexed addedBy,
+  uint256 timestamp,
+  bytes32 fatherHash,
+  uint256 fatherVersionIndex,
+  bytes32 motherHash,
+  uint256 motherVersionIndex,
+  string tag
+);
 
-event PersonVersionEndorsed(bytes32 indexed personHash, address indexed endorser, uint256 versionIndex, address recipient, uint256 recipientShare, address protocolRecipient, uint256 protocolShare, uint256 endorsementFee, uint256 timestamp);
+event PersonVersionEndorsed(
+  bytes32 indexed personHash,
+  address indexed endorser,
+  uint256 versionIndex,
+  address recipient,
+  uint256 recipientShare,
+  address protocolRecipient,
+  uint256 protocolShare,
+  uint256 endorsementFee,
+  uint256 timestamp
+);
 
-event EndorsementCancelled(bytes32 indexed personHash, address indexed user, uint256 versionIndex, uint256 timestamp);
+event EndorsementCancelled(
+  bytes32 indexed personHash,
+  address indexed user,
+  uint256 versionIndex,
+  uint256 timestamp
+);
 
-event PersonNFTMinted(bytes32 indexed personHash, uint256 indexed tokenId, address indexed owner, uint256 versionIndex, string tokenURI, uint256 timestamp);
+event PersonNFTMinted(
+  bytes32 indexed personHash,
+  uint256 indexed tokenId,
+  address indexed owner,
+  uint256 versionIndex,
+  string tokenURI,
+  uint256 timestamp
+);
 
 event PersonHashZKVerified(bytes32 indexed personHash, address indexed prover);
 
-event TokenRewardDistributed(address indexed miner, bytes32 indexed personHash, uint256 indexed versionIndex, uint256 reward);
+event TokenRewardDistributed(
+  address indexed miner,
+  bytes32 indexed personHash,
+  uint256 indexed versionIndex,
+  uint256 reward
+);
 
 event TokenURIUpdated(uint256 indexed tokenId, address indexed owner, string oldURI, string newURI);
 
@@ -258,10 +313,24 @@ event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, addre
 ```
 
 #### Story Events
-```solidity
-event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID);
 
-event StorySealed(uint256 indexed tokenId, uint256 totalChunks, bytes32 fullStoryHash, address indexed sealer);
+```solidity
+event StoryChunkAdded(
+  uint256 indexed tokenId,
+  uint256 indexed chunkIndex,
+  bytes32 chunkHash,
+  address indexed editor,
+  uint256 contentLength,
+  uint8 chunkType,
+  string attachmentCID
+);
+
+event StorySealed(
+  uint256 indexed tokenId,
+  uint256 totalChunks,
+  bytes32 fullStoryHash,
+  address indexed sealer
+);
 ```
 
 ### Key Storage Mappings
@@ -281,12 +350,14 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 ### Access Control & Security
 
 #### Permission Model
+
 - **Open Submission**: Anyone can add person versions with valid ZK proofs
 - **Endorsement Gating**: Requires DEEP utility point (ERC20) balance and allowance
 - **NFT Holder Rights**: Exclusive story management and tokenURI updates
 - **Immutability**: Sealed stories cannot be modified by anyone
 
 #### Security Features
+
 - **50+ Custom Errors**: Explicit revert reasons for all failure cases
 - **Reentrancy Guards**: `ReentrancyGuardTransient` (EIP-1153) on all external value transfers
 - **Input Validation**: Comprehensive parameter checking with constraints
@@ -316,7 +387,7 @@ verifiers, the verifier adapter, and the libraries.
 - Upgrades are gated by `_authorizeUpgrade(newImplementation) onlyOwner` on the proxy.
 - Intended production owner is **`GovernanceTimelock`** (an OpenZeppelin `TimelockController`)
   whose `PROPOSER`/`CANCELLER` and `EXECUTOR` roles are held by a **governance multisig**.
-  The multisig approval policy decides *who* can propose or execute; the timelock separately
+  The multisig approval policy decides _who_ can propose or execute; the timelock separately
   enforces a public delay so the community can audit, exit, or cancel before a change lands.
 - The same Timelock is the **DEEP protocol treasury**. Paid endorsements send their protocol share
   to `DeepFamily.owner()`, which is the Timelock in production. A treasury transfer is therefore a
@@ -340,7 +411,24 @@ verifiers, the verifier adapter, and the libraries.
 
 #### Production setup
 
-Deploy the timelock first with one governance multisig. The deploy script requires `MIN_DELAY` and
+The recommended first-release path on Conflux eSpace Mainnet is:
+
+```bash
+npm run espace:mainnet:release
+```
+
+The default invocation is a read-only plan. Review its chain, commit, build, approved deployer,
+canonical Safe v1.3.0 2/3 address and exact three-owner allowlist, delay, CFX ceiling, and digest.
+Copy that digest to `ESPACE_MAINNET_PLAN_DIGEST`, set
+`ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute or resume.
+The orchestrator deploys and validates the Timelock before the protocol, records an atomic
+checkpoint, verifies every source, waits for finalized coverage, and validates the terminal
+governance state. It never reads Safe owner keys and does not write test person/NFT/story data to
+Mainnet. Full configuration and recovery instructions are in the
+[eSpace Mainnet release runbook](espace-mainnet-release.md).
+
+For manual deployment on another supported network, or an explicitly reviewed recovery, deploy the
+timelock first with one governance multisig. The deploy script requires `MIN_DELAY` and
 `GOVERNANCE_MULTISIG` explicitly on every non-local network, validates the delay as a positive safe
 integer, and checks the `getOwners()`/`getThreshold()` state. This confirms the reported threshold
 and owners, but it does not independently attest the multisig implementation or bytecode; verify
@@ -359,7 +447,7 @@ timelock still grants `DEFAULT_ADMIN_ROLE` to itself, so roles can be migrated, 
 and executing a delayed timelock operation. A zero delay is rejected both initially and on updates.
 
 ```bash
-# Example: rehearse the intended 48-hour production delay. Use the actual testnet multisig address.
+# Advanced stepwise example: rehearse the intended 48-hour delay with the actual testnet multisig.
 MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
   npm run deploy:timelock --net=confluxTestnet
 
@@ -367,6 +455,11 @@ MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
 GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
   npm run deploy:net --net=confluxTestnet
 ```
+
+`deploy:timelock`, `deploy:net`, and one-contract `verify:net` do not provide the mainnet
+orchestrator's single release digest, cross-phase checkpoint, automatic complete verification,
+finalized coverage, or terminal-state report. Do not mix manual commands with an active
+`deployments/conflux/mainnet-release-state.json` release.
 
 To verify contracts on ConfluxScan, run for example
 `npm run verify:net --net=confluxTestnet -- 0xContractAddress`, appending constructor arguments
@@ -516,8 +609,8 @@ npx hardhat --config hardhat.config.mjs timelock-migrate-multisig --network conf
 
 Use the same optional `--salt` in both phases. `--delay` may be supplied to the schedule phase but
 cannot be below the current minimum. Update the operator's `GOVERNANCE_MULTISIG` only after the
-execute transaction and final role state are confirmed. Changing owners or threshold *inside the
-same multisig address* is a wallet-internal operation and is not delayed by this Timelock.
+execute transaction and final role state are confirmed. Changing owners or threshold _inside the
+same multisig address_ is a wallet-internal operation and is not delayed by this Timelock.
 
 Change the minimum delay through a Timelock self-call. The update itself is always scheduled using
 the current delay; zero and no-op values are rejected. Raising the delay does not extend operations
@@ -596,7 +689,7 @@ cancelled with `governance-cancel` while the old Timelock still owns `main`.
   (`DeepFamilyV2Mock` must pass) and a negative mock (`UnsafeUpgradeMock` must fail) so the checker
   cannot silently break. It is part of `npm run contracts:check`.
 - The `upgrade-schedule` / `upgrade-execute` Hardhat tasks (`tasks/upgrade-schedule.mjs`,
-  `tasks/upgrade-execute.mjs`) additionally validate the *specific* candidate implementation against
+  `tasks/upgrade-execute.mjs`) additionally validate the _specific_ candidate implementation against
   the proxy baseline and verify the on-chain runtime bytecode (metadata-stripped, library-linked)
   before staging an upgrade through the timelock. When `upgrade-schedule` deploys a candidate, it
   prints an exact source-verification command and exits without scheduling; after explorer
@@ -646,6 +739,7 @@ uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 
 ### Progressive Halving Mechanics
 
 **Cycle Progression**:
+
 - Cycles: 1 → 10 → 100 → 1K → 10K → 100K → 1M → 10M → 100M → Fixed 100M
 - Each cycle completion halves reward via bit shifting: `INITIAL_REWARD >> cycleIndex`
 - Mining stops when the live supply reaches `MAX_SUPPLY` or integer right-shifting makes the next reward zero
@@ -654,40 +748,43 @@ uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 
 - Because the cap checks `totalSupply()`, burns create an equal amount of live-supply headroom; the remaining reward schedule and `totalAdditions` still limit subsequent minting
 
 **Reward Calculation**:
+
 ```solidity
 function getReward(uint256 recordCount) public view returns (uint256) {
-    if (recordCount == 0) revert InvalidRecordCount();
+  if (recordCount == 0) revert InvalidRecordCount();
 
-    uint256 cycleIndex;
-    uint256 countLeft = recordCount;
+  uint256 cycleIndex;
+  uint256 countLeft = recordCount;
 
-    // Determine cycle index based on record count
-    for (uint256 i = 0; i < cycleLengths.length; i++) {
-        uint256 len = cycleLengths[i];
-        if (countLeft <= len) {
-            cycleIndex = i;
-            break;
-        }
-        countLeft -= len;
-
-        // Handle post-9th cycle fixed lengths
-        if (i == cycleLengths.length - 1) {
-            uint256 extraCycles = (countLeft - 1) / FIXED_LENGTH + 1;
-            cycleIndex = i + extraCycles;
-            break;
-        }
+  // Determine cycle index based on record count
+  for (uint256 i = 0; i < cycleLengths.length; i++) {
+    uint256 len = cycleLengths[i];
+    if (countLeft <= len) {
+      cycleIndex = i;
+      break;
     }
+    countLeft -= len;
 
-    return INITIAL_REWARD >> cycleIndex;
+    // Handle post-9th cycle fixed lengths
+    if (i == cycleLengths.length - 1) {
+      uint256 extraCycles = (countLeft - 1) / FIXED_LENGTH + 1;
+      cycleIndex = i + extraCycles;
+      break;
+    }
+  }
+
+  return INITIAL_REWARD >> cycleIndex;
 }
 ```
 
 ### Core Functions
 
 #### Initialization
+
 ```solidity
 function initialize(address _deepFamilyContract) external
 ```
+
 - Performs an explicit owner check and can run only once; the deployer owner exists only before binding
 - Registers authorized DeepFamily contract address
 - Rejects zero addresses, EOAs, contracts that do not expose the expected token binding, and DeepFamily contracts configured for a different token
@@ -697,9 +794,11 @@ function initialize(address _deepFamilyContract) external
 - Prevents unauthorized minting after deployment
 
 #### Mining
+
 ```solidity
 function mint(address miner) external onlyDeepFamilyContract returns (uint256 reward)
 ```
+
 - **Callable only by DeepFamily contract**
 - Checks reward calculation for next addition index
 - Enforces MAX_SUPPLY cap with partial reward if needed
@@ -707,6 +806,7 @@ function mint(address miner) external onlyDeepFamilyContract returns (uint256 re
 - Returns 0 when `MAX_SUPPLY` is reached or the next integer reward is zero
 
 #### View Functions
+
 ```solidity
 function recentReward() external view returns (uint256)  // Latest minted amount
 function getReward(uint256 recordCount) public view returns (uint256)  // Reward for specific index
@@ -714,12 +814,12 @@ function getReward(uint256 recordCount) public view returns (uint256)  // Reward
 
 ### State Variables
 
-| Variable | Type | Purpose |
-|----------|------|---------|
-| `deepFamilyContract` | address | Authorized minting contract |
-| `initialized` | bool | Prevents re-initialization |
-| `totalAdditions` | uint256 | Count of successful reward-generating additions |
-| `recentReward` | uint256 | Latest minted amount (used for endorsement fees) |
+| Variable             | Type    | Purpose                                          |
+| -------------------- | ------- | ------------------------------------------------ |
+| `deepFamilyContract` | address | Authorized minting contract                      |
+| `initialized`        | bool    | Prevents re-initialization                       |
+| `totalAdditions`     | uint256 | Count of successful reward-generating additions  |
+| `recentReward`       | uint256 | Latest minted amount (used for endorsement fees) |
 
 ### Events
 
@@ -730,10 +830,12 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 ### Access Control
 
 **Restricted Functions**:
+
 - `mint()`: Protected by `onlyDeepFamilyContract` modifier
 - `initialize()`: Owner-only before binding; success permanently leaves `owner() == address(0)`
 
 **Security Features**:
+
 - Hard live-supply cap enforcement (never exceeds 100B utility points)
 - Progressive halving ensures controlled supply distribution
 - One-time contract-code and reciprocal token-binding validation
@@ -744,40 +846,45 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 ## ZK Verifier Contracts
 
 ### PersonCommitmentVerifier.sol
+
 **Purpose**: Validates person identity commitments and optional parent commitments for `addPersonVersion()`
 **Public Signals**: 7 values (`identityCommitment`, `fatherIdentityCommitment`, `motherIdentityCommitment`, `submitter`, `schemaVersion`, `cryptoSuiteVersion`, `hashAlgoId`)
 **Verification**: Groth16 proof with circuit `person_commitment.circom`
 
 ### DisclosureBindingVerifier.sol
+
 **Purpose**: Validates mint disclosure binding for `mintPersonVersionNFT()`
 **Public Signals**: 6 values (`identityCommitment`, `disclosureBinding`, `minter`, `schemaVersion`, `cryptoSuiteVersion`, `hashAlgoId`)
 **Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
 Both verifiers are auto-generated from circom circuits. `DeepFamily` calls them through typed interfaces:
+
 ```solidity
 // PersonCommitmentVerifier (7 public signals)
 function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals
+  uint256[2] calldata a,
+  uint256[2][2] calldata b,
+  uint256[2] calldata c,
+  uint256[7] calldata publicSignals
 ) external view returns (bool);
 
 // DisclosureBindingVerifier (6 public signals)
 function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[6] calldata publicSignals
+  uint256[2] calldata a,
+  uint256[2][2] calldata b,
+  uint256[2] calldata c,
+  uint256[6] calldata publicSignals
 ) external view returns (bool);
 ```
 
 ## Contract Security Summary
 
 ### Comprehensive Error Handling
+
 All contracts implement extensive custom error types for precise debugging:
 
 **DeepFamily.sol Errors** (50+ types):
+
 ```solidity
 // Input validation errors
 error InvalidPersonHash();
@@ -797,6 +904,7 @@ error TokenContractNotSet();
 ```
 
 ### Security Patterns
+
 - **Reentrancy Guards**: External value transfers protected via OpenZeppelin `ReentrancyGuardTransient` (EIP-1153 transient storage; proxy-safe, no initializer)
 - **Upgradeability**: `DeepFamily` is a UUPS proxy; upgrades are gated by `_authorizeUpgrade` (timelock-owned) and storage-layout safety checks (see [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups))
 - **Input Validation**: Comprehensive parameter checking with custom constraints
@@ -805,6 +913,7 @@ error TokenContractNotSet();
 - **Domain Separation**: domain constants (1000–1003) in Poseidon inputs + keccak256 wrapping for personHash
 
 ### Gas Optimization Features
+
 - **Struct Packing**: Optimized storage layout (`address` + `uint96` timestamp in single slot)
 - **Paginated Queries**: All list functions support efficient pagination with `MAX_QUERY_PAGE_SIZE`
 - **Event-Driven Architecture**: Frontend synchronization via indexed blockchain events
