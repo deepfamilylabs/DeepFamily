@@ -43,6 +43,12 @@ describe("Upgrade tooling & governance deploy path", function () {
         "onTransactionReceipt must be a function when provided",
       );
       await expect(
+        deployIntegratedSystem(hre, { onTransactionSubmitted: true }),
+      ).to.be.rejectedWith("onTransactionSubmitted must be a function when provided");
+      await expect(deployIntegratedSystem(hre, { transactionExecutor: true })).to.be.rejectedWith(
+        "transactionExecutor must be a function when provided",
+      );
+      await expect(
         deployIntegratedSystem(hre, { deploymentDirectory: "/tmp/unused" }),
       ).to.be.rejectedWith("deploymentDirectory requires writeDeployments=true");
     });

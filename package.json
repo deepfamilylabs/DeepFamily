@@ -19,6 +19,7 @@
     "deploy:net": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-integrated.mjs --network $npm_config_net",
     "deploy:timelock": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-timelock.mjs --network $npm_config_net",
     "espace:acceptance": "hardhat --config hardhat.config.mjs --build-profile production run scripts/espace-acceptance.mjs --network confluxTestnet",
+    "espace:mainnet:release": "node scripts/espace-mainnet-release-command.mjs",
     "verify:net": "hardhat --config hardhat.config.mjs --build-profile production verify --network $npm_config_net",
     "check-networks": "hardhat --config hardhat.config.mjs networks:check",
     "list-networks": "hardhat --config hardhat.config.mjs networks:list",

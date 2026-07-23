@@ -159,8 +159,10 @@ const writeDeployment = async (
   const dir = getNetworkDeploymentsDir(connection, deploymentDirectory);
   await fs.mkdir(dir, { recursive: true });
   const filePath = path.join(dir, `${contractName}.json`);
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
   const payload = { address, ...extra, abi };
-  await fs.writeFile(filePath, JSON.stringify(payload, null, 2));
+  await fs.writeFile(temporaryPath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+  await fs.rename(temporaryPath, filePath);
 };
 
 // Validate the governance-owner address itself satisfies the production-safety invariants.
@@ -170,7 +172,14 @@ const writeDeployment = async (
 // timelock was configured with a real governance window. A multisig should hold the timelock's
 // proposer/canceller/executor roles rather than own the protocol directly, so live deployments
 // intentionally have no non-timelock bypass.
-const assertGovernanceOwnerInvariants = async ({ connection, ethers, artifacts, address }) => {
+const assertGovernanceOwnerInvariants = async ({
+  connection,
+  ethers,
+  artifacts,
+  address,
+  governanceMultisig = process.env.GOVERNANCE_MULTISIG,
+  governanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE,
+}) => {
   if (!artifacts?.readArtifact) {
     throw new Error(
       "Validating GOVERNANCE_OWNER on a live network requires current Hardhat artifacts so " +
@@ -211,7 +220,7 @@ const assertGovernanceOwnerInvariants = async ({ connection, ethers, artifacts, 
     );
   }
 
-  const configuredMultisig = process.env.GOVERNANCE_MULTISIG;
+  const configuredMultisig = governanceMultisig;
   const hasConfiguredMultisig =
     Boolean(configuredMultisig) &&
     ethers.isAddress(configuredMultisig) &&
@@ -229,6 +238,7 @@ const assertGovernanceOwnerInvariants = async ({ connection, ethers, artifacts, 
     provider: ethers.provider,
     address: multisig,
     label: "GOVERNANCE_MULTISIG",
+    profile: governanceMultisigProfile,
   });
 
   const roleEntries = [
@@ -399,15 +409,14 @@ const assertExistingIntegratedWiring = async ({
 };
 
 // Deploy a UUPS proxy: deploy the implementation, then an ERC1967 proxy (UUPSProxy)
-// pointing at it with the encoded initialize() calldata.
-const deployUUPSProxy = async (ethers, deployer, factory, initArgs, waitForDeployment) => {
-  const impl = await factory.deploy();
-  await waitForDeployment("deepFamilyImplementation", impl);
+// pointing at it with the encoded initialize() calldata. `deployContract` is deliberately
+// injected so live release tooling can journal the nonce before each transaction is broadcast.
+const deployUUPSProxy = async (ethers, deployer, factory, initArgs, deployContract) => {
+  const impl = await deployContract("deepFamilyImplementation", factory);
   const implAddress = await impl.getAddress();
   const initData = factory.interface.encodeFunctionData("initialize", initArgs);
   const Proxy = await ethers.getContractFactory("UUPSProxy", deployer);
-  const proxy = await Proxy.deploy(implAddress, initData);
-  await waitForDeployment("deepFamilyProxy", proxy);
+  const proxy = await deployContract("deepFamilyProxy", Proxy, [implAddress, initData]);
   const proxyAddress = await proxy.getAddress();
   return { implAddress, proxyAddress };
 };
@@ -420,8 +429,13 @@ export const deployIntegratedSystem = async (
     artifacts: artifactReader,
     transactionConfirmations = 1,
     transactionTimeoutMs = 0,
+    transactionExecutor,
+    onTransactionSubmitted,
     onTransactionReceipt,
     deploymentDirectory,
+    governanceOwner: configuredGovernanceOwner,
+    governanceMultisig = process.env.GOVERNANCE_MULTISIG,
+    governanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE,
   } = {},
 ) => {
   const connection = await resolveConnection(hreOrConnection);
@@ -436,6 +450,12 @@ export const deployIntegratedSystem = async (
   if (!Number.isSafeInteger(transactionTimeoutMs) || transactionTimeoutMs < 0) {
     throw new Error("transactionTimeoutMs must be a non-negative safe integer");
   }
+  if (transactionExecutor !== undefined && typeof transactionExecutor !== "function") {
+    throw new Error("transactionExecutor must be a function when provided");
+  }
+  if (onTransactionSubmitted !== undefined && typeof onTransactionSubmitted !== "function") {
+    throw new Error("onTransactionSubmitted must be a function when provided");
+  }
   if (onTransactionReceipt !== undefined && typeof onTransactionReceipt !== "function") {
     throw new Error("onTransactionReceipt must be a function when provided");
   }
@@ -443,28 +463,49 @@ export const deployIntegratedSystem = async (
     throw new Error("deploymentDirectory requires writeDeployments=true");
   }
   const transactionReceipts = {};
-  const waitForTransaction = async (label, transaction) => {
-    if (!transaction?.hash) throw new Error(`${label} transaction hash is unavailable`);
-    // ethers v6 removes its transaction/block listeners when this native timeout fires. A
-    // Promise.race wrapper would return control but leave the underlying wait running.
-    const receipt = await transaction.wait(transactionConfirmations, transactionTimeoutMs);
+  const executeTransaction = async (label, transactionRequest, kind = "call") => {
+    let receipt;
+    if (transactionExecutor) {
+      receipt = await transactionExecutor({
+        label,
+        kind,
+        transactionRequest,
+        signer: deployer,
+        transactionConfirmations,
+        transactionTimeoutMs,
+      });
+    } else {
+      const transaction = await deployer.sendTransaction(transactionRequest);
+      if (!transaction?.hash) throw new Error(`${label} transaction hash is unavailable`);
+      await onTransactionSubmitted?.(label, transaction, { kind });
+      // ethers v6 removes its transaction/block listeners when this native timeout fires. A
+      // Promise.race wrapper would return control but leave the underlying wait running.
+      receipt = await transaction.wait(transactionConfirmations, transactionTimeoutMs);
+    }
     if (!receipt) throw new Error(`${label} transaction was not confirmed`);
     if (Number(receipt.status) !== 1) throw new Error(`${label} transaction reverted`);
     transactionReceipts[label] = receipt;
     await onTransactionReceipt?.(label, receipt);
     return receipt;
   };
-  const waitForDeployment = async (label, contract) => {
-    const transaction = contract.deploymentTransaction();
-    if (!transaction) throw new Error(`${label} deployment transaction is unavailable`);
-    await waitForTransaction(label, transaction);
+  const deployContract = async (label, factory, args = []) => {
+    const transactionRequest = await factory.getDeployTransaction(...args);
+    const receipt = await executeTransaction(label, transactionRequest, "deployment");
+    if (!receipt.contractAddress || !ethers.isAddress(receipt.contractAddress)) {
+      throw new Error(`${label} receipt does not contain a deployment address`);
+    }
+    const address = ethers.getAddress(receipt.contractAddress);
+    if ((await ethers.provider.getCode(address)) === "0x") {
+      throw new Error(`${label} has no runtime code at ${address}`);
+    }
+    return factory.attach(address);
   };
 
   // Validate the governance owner up front so a misconfigured live deployment fails before any
   // contracts are created, rather than leaving orphaned modules after a late-stage throw. Local
   // dev networks (edr-simulated / localhost) are exempt and keep the deployer as owner.
   const isLocalDev = isLocalDevNetwork(connection);
-  const governanceOwner = process.env.GOVERNANCE_OWNER;
+  const governanceOwner = configuredGovernanceOwner ?? process.env.GOVERNANCE_OWNER;
   const hasGovernanceOwner =
     Boolean(governanceOwner) &&
     ethers.isAddress(governanceOwner) &&
@@ -482,34 +523,37 @@ export const deployIntegratedSystem = async (
       ethers,
       artifacts: currentArtifacts,
       address: ethers.getAddress(governanceOwner),
+      governanceMultisig,
+      governanceMultisigProfile,
     });
   }
 
   const Token = await ethers.getContractFactory("DeepFamilyToken", deployer);
-  const token = await Token.deploy();
-  await waitForDeployment("deepFamilyToken", token);
+  const token = await deployContract("deepFamilyToken", Token);
 
   const PoseidonT5 = await ethers.getContractFactory("PoseidonT5", deployer);
-  const poseidonT5 = await PoseidonT5.deploy();
-  await waitForDeployment("poseidonT5", poseidonT5);
+  const poseidonT5 = await deployContract("poseidonT5", PoseidonT5);
 
   const AdultAgeGate = await ethers.getContractFactory("AdultAgeGate", deployer);
-  const adultAgeGate = await AdultAgeGate.deploy();
-  await waitForDeployment("adultAgeGate", adultAgeGate);
+  const adultAgeGate = await deployContract("adultAgeGate", AdultAgeGate);
 
   const PersonCommitmentVerifier = await ethers.getContractFactory(
     "PersonCommitmentVerifier",
     deployer,
   );
-  const personCommitmentVerifier = await PersonCommitmentVerifier.deploy();
-  await waitForDeployment("personCommitmentVerifier", personCommitmentVerifier);
+  const personCommitmentVerifier = await deployContract(
+    "personCommitmentVerifier",
+    PersonCommitmentVerifier,
+  );
 
   const DisclosureBindingVerifier = await ethers.getContractFactory(
     "DisclosureBindingVerifier",
     deployer,
   );
-  const nameDisclosureVerifier = await DisclosureBindingVerifier.deploy();
-  await waitForDeployment("disclosureBindingVerifier", nameDisclosureVerifier);
+  const nameDisclosureVerifier = await deployContract(
+    "disclosureBindingVerifier",
+    DisclosureBindingVerifier,
+  );
 
   const tokenAddress = await token.getAddress();
   const poseidonT5Address = await poseidonT5.getAddress();
@@ -521,11 +565,11 @@ export const deployIntegratedSystem = async (
     "Groth16VerifierAdapter",
     deployer,
   );
-  const groth16VerifierAdapter = await Groth16VerifierAdapter.deploy(
-    personCommitmentVerifierAddress,
-    nameDisclosureVerifierAddress,
+  const groth16VerifierAdapter = await deployContract(
+    "groth16VerifierAdapter",
+    Groth16VerifierAdapter,
+    [personCommitmentVerifierAddress, nameDisclosureVerifierAddress],
   );
-  await waitForDeployment("groth16VerifierAdapter", groth16VerifierAdapter);
   const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress();
 
   // Main contract behind a UUPS proxy. initialize() wires the token address.
@@ -542,19 +586,22 @@ export const deployIntegratedSystem = async (
       deployer,
       DeepFamily,
       [tokenAddress, deployerAddress],
-      waitForDeployment,
+      deployContract,
     );
   const deepFamily = await ethers.getContractAt("DeepFamily", deepFamilyAddress, deployer);
 
   const DeepFamilyReader = await ethers.getContractFactory("DeepFamilyReader", deployer);
-  const deepFamilyReader = await DeepFamilyReader.deploy(deepFamilyAddress);
-  await waitForDeployment("deepFamilyReader", deepFamilyReader);
+  const deepFamilyReader = await deployContract("deepFamilyReader", DeepFamilyReader, [
+    deepFamilyAddress,
+  ]);
   const deepFamilyReaderAddress = await deepFamilyReader.getAddress();
 
   const bound = await token.deepFamilyContract().catch(() => ethers.ZeroAddress);
   if (bound === ethers.ZeroAddress) {
-    const tx = await token.initialize(deepFamilyAddress);
-    await waitForTransaction("tokenInitialize", tx);
+    await executeTransaction(
+      "tokenInitialize",
+      await token.initialize.populateTransaction(deepFamilyAddress),
+    );
   }
   const configuredMain = await token.deepFamilyContract();
   const tokenOwner = await token.owner();
@@ -571,22 +618,25 @@ export const deployIntegratedSystem = async (
   // Register the Groth16 adapter under PROOF_SYSTEM_ID_GROTH16_BN254_V1 = 1
   // for both purposes (PersonCommitment = 0, DisclosureBinding = 1). The adapter internally
   // dispatches to the backend verifiers.
-  await waitForTransaction(
-    "setPersonCommitmentVerifier",
-    await deepFamily.setVerifier(
-      GROTH16_PROOF_SYSTEM_ID,
-      PROOF_PURPOSE_PERSON_COMMITMENT,
-      groth16VerifierAdapterAddress,
-    ),
-  );
-  await waitForTransaction(
-    "setDisclosureBindingVerifier",
-    await deepFamily.setVerifier(
-      GROTH16_PROOF_SYSTEM_ID,
-      PROOF_PURPOSE_DISCLOSURE_BINDING,
-      groth16VerifierAdapterAddress,
-    ),
-  );
+  const ensureVerifierRoute = async (label, purpose) => {
+    const current = await deepFamily.verifierRegistry(GROTH16_PROOF_SYSTEM_ID, purpose);
+    if (sameAddress(current, groth16VerifierAdapterAddress)) return;
+    if (!sameAddress(current, ethers.ZeroAddress)) {
+      throw new Error(
+        `${label} route already points at ${current}, expected ${groth16VerifierAdapterAddress}`,
+      );
+    }
+    await executeTransaction(
+      label,
+      await deepFamily.setVerifier.populateTransaction(
+        GROTH16_PROOF_SYSTEM_ID,
+        purpose,
+        groth16VerifierAdapterAddress,
+      ),
+    );
+  };
+  await ensureVerifierRoute("setPersonCommitmentVerifier", PROOF_PURPOSE_PERSON_COMMITMENT);
+  await ensureVerifierRoute("setDisclosureBindingVerifier", PROOF_PURPOSE_DISCLOSURE_BINDING);
 
   // Hand DeepFamily upgrade/configuration ownership to governance (intended: timelock + multisig).
   // DeepFamilyToken already retired its bootstrap owner during initialize(), so it intentionally
@@ -596,10 +646,19 @@ export const deployIntegratedSystem = async (
   // owner is mandatory (validated up front). Local dev networks always keep the deployer as owner
   // so owner-only test/dev flows keep working even if GOVERNANCE_OWNER leaks in from .env.
   if (hasGovernanceOwner && !isLocalDev) {
-    await waitForTransaction(
-      "transferDeepFamilyOwnership",
-      await deepFamily.transferOwnership(governanceOwner),
-    );
+    const currentOwner = await deepFamily.owner();
+    if (!sameAddress(currentOwner, governanceOwner)) {
+      if (!sameAddress(currentOwner, deployerAddress)) {
+        throw new Error(
+          `DeepFamily owner=${currentOwner}; expected deployer ${deployerAddress} or governance ` +
+            `owner ${governanceOwner}`,
+        );
+      }
+      await executeTransaction(
+        "transferDeepFamilyOwnership",
+        await deepFamily.transferOwnership.populateTransaction(governanceOwner),
+      );
+    }
   }
 
   if (writeDeployments) {
