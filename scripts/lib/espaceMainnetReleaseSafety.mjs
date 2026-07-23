@@ -89,6 +89,17 @@ const parseRecoveryTransactions = (value) => {
   return Object.freeze(Object.fromEntries(entries));
 };
 
+const parseSafeAcceptanceTransaction = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!ethers.isHexString(raw, 32)) {
+    throw new Error(
+      "ESPACE_MAINNET_SAFE_ACCEPTANCE_TX must be the finalized outer transaction hash " +
+        "from the real 2-of-3 owner smoke test",
+    );
+  }
+  return raw.toLowerCase();
+};
+
 export const parseMainnetAuthorization = (env = process.env) => {
   const confirmation = String(env.ESPACE_MAINNET_CONFIRM ?? "").trim();
   if (confirmation === "") return Object.freeze({ mode: "plan", confirmation: null });
@@ -208,6 +219,9 @@ export const parseESpaceMainnetReleaseConfig = ({
     maxCfxWei,
     configuredPlanDigest: configuredPlanDigest === "" ? null : configuredPlanDigest.toLowerCase(),
     recoveryTransactions: parseRecoveryTransactions(env.ESPACE_MAINNET_RECOVERY_TXS),
+    safeAcceptanceTransaction: parseSafeAcceptanceTransaction(
+      env.ESPACE_MAINNET_SAFE_ACCEPTANCE_TX,
+    ),
   });
 };
 
@@ -230,6 +244,22 @@ export const deriveMainnetPlanDigest = (fingerprint) =>
   ethers.keccak256(
     ethers.toUtf8Bytes(`deepfamily:espace-mainnet-release:v1:${canonicalJson(fingerprint)}`),
   );
+
+export const assertMainnetReleaseSafeAcceptanceNonce = (nonce) => {
+  let normalized;
+  try {
+    normalized = BigInt(nonce);
+  } catch {
+    throw new Error("Governance Safe acceptance nonce is invalid");
+  }
+  if (normalized !== 1n) {
+    throw new Error(
+      "Governance Safe bootstrap acceptance must be its first and only execution before " +
+        `protocol release; current nonce is ${normalized}`,
+    );
+  }
+  return normalized;
+};
 
 export const assertPlanMatchesCheckpoint = ({ checkpoint, fingerprint, planDigest }) => {
   if (!checkpoint || checkpoint.schemaVersion !== ESPACE_MAINNET_STATE_SCHEMA_VERSION) {

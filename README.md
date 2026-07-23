@@ -133,25 +133,48 @@ back to the official public testnet or mainnet endpoint.
 
 ### Recommended eSpace Mainnet release
 
-Use the resumable production orchestrator for a first deployment on Conflux eSpace Mainnet. Its
-default run is read-only: configure the reviewed Safe, exact three-owner allowlist, deployer, delay,
-and CFX ceiling, then run:
+For a new production governance wallet, first configure three reviewed EOA/hardware-wallet owner
+addresses in their final order, a fixed decimal salt nonce, the approved deployer, and the
+Safe-only CFX/finality limits. Keep `GOVERNANCE_MULTISIG`,
+`ESPACE_MAINNET_SAFE_CONFIRM`, and `ESPACE_MAINNET_SAFE_PLAN_DIGEST` empty, then generate a
+read-only deterministic deployment plan:
+
+```bash
+npm run espace:mainnet:safe
+```
+
+The creator is fixed to canonical Safe v1.3.0 with exactly three ordered EOA owners and a `2/3`
+threshold. Owner order and `ESPACE_MAINNET_SAFE_SALT_NONCE` both affect the predicted address.
+After an independent review, set the printed digest and
+`ESPACE_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030`, then run the same command to deploy
+or resume. It reads only public owner addresses and never accepts an owner private key.
+
+Deployment alone does not prove that the real controllers can sign. Two owners must use their
+external signing workflow to execute the documented refund-free `0 CFX`, empty-calldata `CALL` to
+`ESPACE_MAINNET_EXPECTED_DEPLOYER`. Set its outer transaction hash in
+`ESPACE_MAINNET_SAFE_ACCEPTANCE_TX`, then require this read-only check to pass:
+
+```bash
+npm run espace:mainnet:safe:status
+```
+
+Only then copy the reviewed Safe address to `GOVERNANCE_MULTISIG`. That acceptance must remain the
+Safe's first and only execution (`nonce == 1`) until the protocol release plan and execution
+complete.
+
+Next use the resumable protocol orchestrator. With `ESPACE_MAINNET_CONFIRM` and
+`ESPACE_MAINNET_PLAN_DIGEST` empty, this command is read-only:
 
 ```bash
 npm run espace:mainnet:release
 ```
 
-Every invocation performs a clean production-profile build. Use this same npm command for planning,
-execution, and resumption; do not invoke the lower-level release script directly.
-
-Review the plan with a second operator. Copy the printed digest to
-`ESPACE_MAINNET_PLAN_DIGEST`, set
-`ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute. It
-checkpoints each phase, resumes safely, verifies every contract, waits for finalized coverage, and
-checks the terminal governance state. It uses an existing canonical Safe v1.3.0 2/3 but never reads
-Safe owner keys or performs mainnet business-data tests. The read-only plan is saved separately from
-the final execution report, and repository tests never broadcast eSpace Mainnet transactions. See
-the complete
+Every release invocation performs a clean production-profile build. Review the plan with a second
+operator, copy the printed digest to `ESPACE_MAINNET_PLAN_DIGEST`, set
+`ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute or resume.
+It checkpoints every phase, verifies every contract, waits for finalized coverage, and validates
+the terminal governance state. Repository tests never broadcast eSpace Mainnet transactions. See
+the complete Safe bootstrap, acceptance, release, and recovery procedure in the
 [eSpace Mainnet release runbook](docs/espace-mainnet-release.md).
 
 ### Manual and other-network deployment

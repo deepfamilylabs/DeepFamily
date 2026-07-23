@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 
 import {
   ESPACE_MAINNET_CONFIRMATION,
+  assertMainnetReleaseSafeAcceptanceNonce,
   deriveMainnetPlanDigest,
   parseESpaceMainnetReleaseConfig,
   parseMainnetAuthorization,
@@ -25,6 +26,7 @@ const baseEnv = (overrides = {}) => ({
   ESPACE_MAINNET_MAX_CFX: "12.5",
   ESPACE_MAINNET_CONFIRMATIONS: "2",
   ESPACE_MAINNET_FINALITY_TIMEOUT: "3600",
+  ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: `0x${"ef".repeat(32)}`,
   GOVERNANCE_MULTISIG: SAFE,
   GOVERNANCE_MULTISIG_PROFILE: "conflux-safe-1.3.0-2of3",
   GOVERNANCE_OWNER: "",
@@ -108,6 +110,25 @@ describe("eSpace Mainnet release safety", function () {
       parse({ ESPACE_MAINNET_RECOVERY_TXS: JSON.stringify({ deepFamilyToken: hash }) })
         .recoveryTransactions.deepFamilyToken,
     ).to.equal(hash);
+  });
+
+  it("requires finalized real-owner Safe acceptance evidence before release planning", function () {
+    expect(() => parse({ ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: "" })).to.throw(
+      "real 2-of-3 owner smoke test",
+    );
+    expect(() => parse({ ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: "0x1234" })).to.throw(
+      "real 2-of-3 owner smoke test",
+    );
+    expect(parse().safeAcceptanceTransaction).to.equal(`0x${"ef".repeat(32)}`);
+    expect(assertMainnetReleaseSafeAcceptanceNonce(1n)).to.equal(1n);
+    for (const nonce of [0n, 2n, 99n]) {
+      expect(() => assertMainnetReleaseSafeAcceptanceNonce(nonce)).to.throw(
+        "first and only execution",
+      );
+    }
+    expect(() => assertMainnetReleaseSafeAcceptanceNonce("not-a-nonce")).to.throw(
+      "nonce is invalid",
+    );
   });
 
   it("derives a deterministic digest that changes with any reviewed release input", function () {

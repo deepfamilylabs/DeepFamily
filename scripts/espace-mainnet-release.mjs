@@ -17,8 +17,10 @@ import { formatEther } from "ethers";
  * independently inspect that original hash, then add e.g.:
  *   ESPACE_MAINNET_RECOVERY_TXS='{"deepFamilyProxy":"0x..."}'
  *
- * The runner never creates a Safe or reads Safe-owner keys. See docs/espace-mainnet-release.md for
- * the complete configuration, approval, checkpoint, finality, and recovery procedure.
+ * The runner never creates a Safe or reads Safe-owner keys. Bootstrap one first with
+ * `npm run espace:mainnet:safe`, then verify the real-owner 2-of-3 smoke transaction through
+ * ESPACE_MAINNET_SAFE_ACCEPTANCE_TX. See docs/espace-mainnet-release.md for the complete
+ * configuration, approval, checkpoint, finality, and recovery procedure.
  */
 
 import hre from "hardhat";
@@ -33,6 +35,7 @@ import {
   ESPACE_MAINNET_NETWORK,
   ESPACE_MAINNET_STATE_SCHEMA_VERSION,
   ESPACE_MAINNET_TRANSACTION_LABELS,
+  assertMainnetReleaseSafeAcceptanceNonce,
   assertPlanMatchesCheckpoint,
   deriveMainnetPlanDigest,
   parseESpaceMainnetReleaseConfig,
@@ -56,7 +59,10 @@ import {
   verificationEntry,
   waitForFinalizedTransactions,
 } from "./lib/espaceReleaseEvidence.mjs";
-import { assertCanonicalSafeProfile } from "./lib/safeGovernance.mjs";
+import {
+  assertCanonicalSafeOperationalAcceptance,
+  assertCanonicalSafeProfile,
+} from "./lib/safeGovernance.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
 const ERC1967_IMPLEMENTATION_SLOT =
@@ -66,8 +72,10 @@ const STATE_PATH = path.join(DEPLOYMENTS_DIRECTORY, "mainnet-release-state.json"
 const PLAN_REPORT_PATH = path.join(DEPLOYMENTS_DIRECTORY, "mainnet-release-plan.json");
 const REPORT_PATH = path.join(DEPLOYMENTS_DIRECTORY, "mainnet-release-report.json");
 const LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-release.lock");
+const SHARED_COMMAND_LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-command.lock");
 const COMMAND_LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-release-command.lock");
 const WRAPPER_TOKEN_ENV = "DEEPFAMILY_ESPACE_MAINNET_WRAPPER_TOKEN";
+const SHARED_WRAPPER_TOKEN_ENV = "DEEPFAMILY_ESPACE_MAINNET_COMMAND_WRAPPER_TOKEN";
 const CORE_DEPLOYMENT_FILES = [
   "GovernanceTimelock.json",
   "DeepFamilyToken.json",
@@ -111,12 +119,19 @@ const publicError = (error) => {
 
 const assertReleaseCommandWrapper = async () => {
   const expectedToken = String(process.env[WRAPPER_TOKEN_ENV] ?? "").trim();
-  if (expectedToken === "") {
+  const expectedSharedToken = String(process.env[SHARED_WRAPPER_TOKEN_ENV] ?? "").trim();
+  if (expectedToken === "" || expectedSharedToken === "") {
     throw new Error("Use npm run espace:mainnet:release; direct script execution is forbidden");
   }
-  const commandLock = await readJsonIfExists(COMMAND_LOCK_PATH);
+  const [commandLock, sharedCommandLock] = await Promise.all([
+    readJsonIfExists(COMMAND_LOCK_PATH),
+    readJsonIfExists(SHARED_COMMAND_LOCK_PATH),
+  ]);
   if (!commandLock || commandLock.token !== expectedToken) {
     throw new Error("Mainnet release command wrapper lock is missing or does not match");
+  }
+  if (!sharedCommandLock || sharedCommandLock.token !== expectedSharedToken) {
+    throw new Error("Shared mainnet command wrapper lock is missing or does not match");
   }
 };
 
@@ -160,6 +175,7 @@ const buildFingerprint = ({
   releaseInputs,
   buildState,
   safeProfile,
+  safeOperationalAcceptance,
   deployerNonce,
   plannedAddresses,
   expectedNonces,
@@ -228,6 +244,7 @@ const buildFingerprint = ({
     componentCodeHashes: safeProfile.componentCodeHashes,
     modules: safeProfile.modules,
     guard: safeProfile.guard,
+    operationalAcceptance: safeOperationalAcceptance,
   },
   executionPolicy: {
     confirmations: config.confirmations,
@@ -266,6 +283,71 @@ const deriveExpectedNonces = (startingNonce) =>
   Object.fromEntries(
     ESPACE_MAINNET_TRANSACTION_LABELS.map((label, index) => [label, startingNonce + index]),
   );
+
+const assertProductionControllersAreEoas = async ({ provider, config }) => {
+  const controllers = [
+    ["ESPACE_MAINNET_EXPECTED_DEPLOYER", config.expectedDeployer],
+    ...config.expectedSafeOwners.map((owner, index) => [`Safe owner ${index + 1}`, owner]),
+  ];
+  for (const [label, address] of controllers) {
+    if ((await provider.getCode(address)) !== "0x") {
+      throw new Error(
+        `${label} ${address} has deployed code. The pinned production profile supports ` +
+          "independent EOA/hardware-wallet controllers only.",
+      );
+    }
+  }
+};
+
+const assertFinalizedSafeOperationalAcceptance = async ({ provider, config, safeProfile }) => {
+  const evidence = await assertCanonicalSafeOperationalAcceptance({
+    provider,
+    chainId: ESPACE_MAINNET_CHAIN_ID,
+    safeAddress: config.governanceMultisig,
+    expectedTarget: config.expectedDeployer,
+    transactionHash: config.safeAcceptanceTransaction,
+  });
+  const finality = await waitForFinalizedTransactions({
+    provider,
+    transactions: {
+      safeOwnerOperationalAcceptance: {
+        hash: evidence.transactionHash,
+        receipt: evidence.receipt,
+      },
+    },
+    timeoutMs: config.finalityTimeoutSeconds * 1_000,
+  });
+  assertMainnetReleaseSafeAcceptanceNonce(safeProfile.nonce);
+  await assertCanonicalSafeProfile({
+    provider,
+    chainId: ESPACE_MAINNET_CHAIN_ID,
+    safeAddress: config.governanceMultisig,
+    expectedOwners: config.expectedSafeOwners,
+    expectedNonce: safeProfile.nonce,
+  });
+  return {
+    evidence: {
+      status: "passed",
+      transactionHash: evidence.transactionHash,
+      safeTxHash: evidence.safeTxHash,
+      safeAddress: evidence.safeAddress,
+      relayer: evidence.relayer,
+      innerTarget: evidence.innerTarget,
+      operation: evidence.operation,
+      value: evidence.value,
+      data: evidence.data,
+      safeTxGas: evidence.safeTxGas,
+      baseGas: evidence.baseGas,
+      gasPrice: evidence.gasPrice,
+      gasToken: evidence.gasToken,
+      refundReceiver: evidence.refundReceiver,
+      payment: evidence.payment,
+      receiptBlockNumber: evidence.receipt.blockNumber,
+      receiptBlockHash: evidence.receipt.blockHash,
+    },
+    finality,
+  };
+};
 
 const assertTimelock = async ({ connection, ethers, timelock, address, config }) => {
   await assertImplementationMatchesArtifact({
@@ -498,6 +580,7 @@ const writeReport = async ({
   sourceState,
   releaseInputs,
   buildState,
+  safeOperationalAcceptance = null,
   reportPath = REPORT_PATH,
 }) => {
   const transactions = publicTransactionReport(checkpoint?.transactions);
@@ -525,6 +608,16 @@ const writeReport = async ({
     verification: checkpoint?.verification ?? { status: "not-started", contracts: [] },
     finality: checkpoint?.finality ?? { status: "not-started" },
     terminalState: checkpoint?.terminalState ?? { status: "not-started" },
+    governanceSafeOperationalAcceptance: checkpoint?.fingerprint?.governanceSafe
+      ?.operationalAcceptance
+      ? {
+          ...checkpoint.fingerprint.governanceSafe.operationalAcceptance,
+          finality:
+            safeOperationalAcceptance?.finality ??
+            checkpoint?.safeOperationalAcceptance?.finality ??
+            null,
+        }
+      : null,
     error: checkpoint?.error ?? null,
     secretsPersisted: false,
     safeOwnerSignaturesPersisted: false,
@@ -551,6 +644,7 @@ const revalidateCompletedRelease = async ({
   ) {
     throw new Error("Completed mainnet checkpoint is missing required release evidence");
   }
+
   const recordedLabels = Object.keys(checkpoint.transactions ?? {}).sort();
   const expectedLabels = [...ESPACE_MAINNET_TRANSACTION_LABELS].sort();
   if (
@@ -670,6 +764,12 @@ export const main = async () => {
       "Compiled artifacts/build-info do not match current sources and pinned production settings",
     );
   }
+  await assertProductionControllersAreEoas({ provider, config });
+  const safeOperationalAcceptance = await assertFinalizedSafeOperationalAcceptance({
+    provider,
+    config,
+    safeProfile,
+  });
 
   if (Object.keys(config.recoveryTransactions).length > 0 && config.mode !== "execute") {
     throw new Error("ESPACE_MAINNET_RECOVERY_TXS is accepted only in confirmed execute mode");
@@ -705,6 +805,7 @@ export const main = async () => {
     releaseInputs,
     buildState,
     safeProfile,
+    safeOperationalAcceptance: safeOperationalAcceptance.evidence,
     deployerNonce: startingNonce,
     plannedAddresses,
     expectedNonces,
@@ -717,7 +818,34 @@ export const main = async () => {
     assertPlanMatchesCheckpoint({ checkpoint: existingCheckpoint, fingerprint, planDigest });
   }
   if (config.mode === "plan") {
-    const plan = existingCheckpoint ?? {
+    if (existingCheckpoint) {
+      if (existingCheckpoint.status !== "passed") {
+        throw new Error(
+          `An incomplete protocol release checkpoint (${existingCheckpoint.status}/` +
+            `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. Blank authorization ` +
+            "cannot create a new plan or claim that no transaction was broadcast. Review and " +
+            "resume the existing checkpoint with its approved digest and confirmation.",
+        );
+      }
+      await revalidateCompletedRelease({
+        connection,
+        ethers,
+        provider,
+        config,
+        safeProfile,
+        checkpoint: existingCheckpoint,
+        sourceState,
+        releaseInputs,
+      });
+      console.log("eSpace Mainnet release is already complete; read-only revalidation passed:");
+      console.log(`  DeepFamily: ${existingCheckpoint.addresses.deepFamily}`);
+      console.log(`  Timelock:   ${existingCheckpoint.addresses.timelock}`);
+      console.log(`  Safe:       ${config.governanceMultisig}`);
+      console.log(`  state:      ${STATE_PATH}`);
+      console.log(`  report:     ${REPORT_PATH}`);
+      return;
+    }
+    const plan = {
       schemaVersion: ESPACE_MAINNET_STATE_SCHEMA_VERSION,
       status: "planned",
       phase: "preflight",
@@ -732,6 +860,7 @@ export const main = async () => {
       sourceState,
       releaseInputs,
       buildState,
+      safeOperationalAcceptance,
       reportPath: PLAN_REPORT_PATH,
     });
     console.log("eSpace Mainnet release plan passed (no transaction was broadcast):");
@@ -837,6 +966,7 @@ export const main = async () => {
         verification: { status: "not-started", contracts: [] },
         finality: { status: "not-started" },
         terminalState: { status: "not-started" },
+        safeOperationalAcceptance,
         error: null,
       };
       await writeJsonAtomic(STATE_PATH, checkpoint);
@@ -1101,7 +1231,14 @@ export const main = async () => {
     checkpoint.completedAt ??= nowIso();
     checkpoint.error = null;
     await saveCheckpoint();
-    await writeReport({ checkpoint, config, sourceState, releaseInputs, buildState });
+    await writeReport({
+      checkpoint,
+      config,
+      sourceState,
+      releaseInputs,
+      buildState,
+      safeOperationalAcceptance,
+    });
     console.log("eSpace Mainnet release completed successfully:");
     console.log(`  DeepFamily: ${addresses.deepFamily}`);
     console.log(`  Timelock:   ${timelockAddress}`);
@@ -1115,7 +1252,14 @@ export const main = async () => {
       checkpoint.failedPhase = checkpoint.phase;
       checkpoint.updatedAt = nowIso();
       await writeJsonAtomic(STATE_PATH, checkpoint);
-      await writeReport({ checkpoint, config, sourceState, releaseInputs, buildState });
+      await writeReport({
+        checkpoint,
+        config,
+        sourceState,
+        releaseInputs,
+        buildState,
+        safeOperationalAcceptance,
+      });
     }
     throw error;
   } finally {
