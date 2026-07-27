@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { ethers } from "ethers";
 
-import { readProductionBuildInfoState } from "../scripts/lib/espaceReleaseEvidence.mjs";
+import { readProductionBuildInfoState } from "../scripts/lib/releaseEvidence.mjs";
 
 const PROJECT_BUILD_ID = "solc-0_8_28-project-fixture";
 const POSEIDON_BUILD_ID = "solc-0_8_28-poseidon-fixture";
@@ -156,7 +156,7 @@ const expectRejected = async (operation, pattern) => {
   expect(error.message).to.match(pattern);
 };
 
-describe("eSpace production release build evidence", function () {
+describe("multi-chain production release build evidence", function () {
   let fixture;
 
   beforeEach(async function () {

@@ -1,87 +1,17 @@
-import { spawn } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+/**
+ * Conflux eSpace Mainnet protocol release wrapper:
+ *   npm run espace:mainnet:release
+ *
+ * Plan is the default. Execute/resume requires the reviewed digest and exact confirmation in
+ * docs/espace-mainnet-release.md. Any command-line argument is rejected.
+ */
+import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { runMainnetReleaseCommand } from "./lib/mainnetCommandWrapper.mjs";
 
-import {
-  acquireExclusiveCommandLock,
-  releaseExclusiveCommandLocks,
-} from "./lib/exclusiveCommandLock.mjs";
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SHARED_COMMAND_LOCK_PATH = path.join(ROOT, "deployments", "conflux", ".mainnet-command.lock");
-const COMMAND_LOCK_PATH = path.join(
-  ROOT,
-  "deployments",
-  "conflux",
-  ".mainnet-release-command.lock",
-);
-const HARDHAT_CLI = path.join(ROOT, "node_modules", "hardhat", "dist", "src", "cli.js");
-const WRAPPER_TOKEN_ENV = "DEEPFAMILY_ESPACE_MAINNET_WRAPPER_TOKEN";
-const SHARED_WRAPPER_TOKEN_ENV = "DEEPFAMILY_ESPACE_MAINNET_COMMAND_WRAPPER_TOKEN";
-
-const run = (args, environment) =>
-  new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [HARDHAT_CLI, ...args], {
-      cwd: ROOT,
-      env: environment,
-      stdio: "inherit",
-    });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) resolve();
-      else {
-        reject(
-          new Error(
-            signal
-              ? `Hardhat release phase was terminated by ${signal}`
-              : `Hardhat release phase exited with code ${code}`,
-          ),
-        );
-      }
-    });
-  });
-
-const main = async () => {
-  const sharedLock = await acquireExclusiveCommandLock({
-    lockPath: SHARED_COMMAND_LOCK_PATH,
-    label: "eSpace mainnet production command",
-  });
-  let commandLock;
-  try {
-    commandLock = await acquireExclusiveCommandLock({
-      lockPath: COMMAND_LOCK_PATH,
-      label: "eSpace mainnet release command",
-    });
-    const environment = {
-      ...process.env,
-      [WRAPPER_TOKEN_ENV]: commandLock.token,
-      [SHARED_WRAPPER_TOKEN_ENV]: sharedLock.token,
-    };
-    await run(["--config", "hardhat.config.mjs", "clean"], environment);
-    await run(
-      ["--config", "hardhat.config.mjs", "--build-profile", "production", "compile"],
-      environment,
-    );
-    await run(
-      [
-        "--config",
-        "hardhat.config.mjs",
-        "--build-profile",
-        "production",
-        "--network",
-        "conflux",
-        "run",
-        "--no-compile",
-        "scripts/espace-mainnet-release.mjs",
-      ],
-      environment,
-    );
-  } finally {
-    await releaseExclusiveCommandLocks([commandLock, sharedLock]);
-  }
-};
-
-main().catch((error) => {
+runMainnetReleaseCommand({
+  chainProfile: ESPACE_CHAIN_PROFILE,
+  entryScript: "scripts/espace-mainnet-release.mjs",
+}).catch((error) => {
   console.error(`[espace-mainnet-release-command] ${error.message}`);
   process.exitCode = 1;
 });

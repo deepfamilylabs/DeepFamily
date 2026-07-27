@@ -1,11 +1,17 @@
+// Canonical Safe governance helpers shared by Conflux eSpace and Ethereum.
+import fs from "node:fs/promises";
 import { expect } from "chai";
 import { ethers } from "ethers";
 import {
+  CANONICAL_SAFE_CHAIN_PROFILES,
+  CANONICAL_SAFE_DEPLOYMENT_TYPE,
   CANONICAL_SAFE_OWNER_COUNT,
   CANONICAL_SAFE_THRESHOLD,
   CANONICAL_SAFE_VERSION,
   CONFLUX_ESPACE_MAINNET_CHAIN_ID,
   CONFLUX_ESPACE_TESTNET_CHAIN_ID,
+  ETHEREUM_MAINNET_CHAIN_ID,
+  ETHEREUM_SEPOLIA_CHAIN_ID,
   SAFE_FALLBACK_HANDLER_STORAGE_SLOT,
   SAFE_GUARD_STORAGE_SLOT,
   asEip1193Provider,
@@ -16,6 +22,7 @@ import {
   buildCanonicalSafeDeploymentTransaction,
   createCanonicalSafeInterface,
   createCanonicalSafeTransaction,
+  getCanonicalSafeChainProfile,
   getCanonicalSafeDeploymentMetadata,
   normalizeSafeOwners,
   normalizeSafeSaltNonce,
@@ -42,12 +49,19 @@ const expectRejected = async (operation, pattern) => {
   expect(caught.message).to.match(pattern);
 };
 
-describe("canonical Conflux eSpace Safe governance helpers", function () {
-  it("pins the same official canonical Safe v1.3.0 contracts on testnet and mainnet", function () {
+describe("canonical multi-chain Safe governance helpers", function () {
+  it("pins the official canonical L2 Safe v1.3.0 contracts on both eSpace networks", function () {
     const testnet = getCanonicalSafeDeploymentMetadata(CONFLUX_ESPACE_TESTNET_CHAIN_ID);
     const mainnet = getCanonicalSafeDeploymentMetadata(CONFLUX_ESPACE_MAINNET_CHAIN_ID);
 
     expect(testnet.safeVersion).to.equal(CANONICAL_SAFE_VERSION);
+    expect(testnet.deploymentType).to.equal(CANONICAL_SAFE_DEPLOYMENT_TYPE);
+    expect(testnet.profileId).to.equal("conflux-espace-testnet");
+    expect(testnet.networkFamily).to.equal("conflux-espace");
+    expect(testnet.networkName).to.equal("Conflux eSpace Testnet");
+    expect(testnet.environment).to.equal("testnet");
+    expect(testnet.singletonType).to.equal("l2");
+    expect(testnet.isL1SafeSingleton).to.equal(false);
     expect(testnet.singleton.address).to.equal("0x3E5c63644E683549055b9Be8653de26E0B4CD36E");
     expect(testnet.singleton.codeHash).to.equal(
       "0x21842597390c4c6e3c1239e434a682b054bd9548eee5e9b1d6a4482731023c0f",
@@ -63,8 +77,71 @@ describe("canonical Conflux eSpace Safe governance helpers", function () {
     expect(mainnet.singleton.address).to.equal(testnet.singleton.address);
     expect(mainnet.proxyFactory.address).to.equal(testnet.proxyFactory.address);
     expect(mainnet.fallbackHandler.address).to.equal(testnet.fallbackHandler.address);
+    expect(mainnet.profileId).to.equal("conflux-espace-mainnet");
+    expect(mainnet.environment).to.equal("mainnet");
+    expect(mainnet.singletonType).to.equal("l2");
+    expect(mainnet.isL1SafeSingleton).to.equal(false);
     expect(Object.isFrozen(testnet)).to.equal(true);
-    expect(() => getCanonicalSafeDeploymentMetadata(1)).to.throw(/restricted to Conflux eSpace/);
+  });
+
+  it("pins the same canonical L1 Safe v1.3.0 contracts on Ethereum and Sepolia", function () {
+    const mainnet = getCanonicalSafeDeploymentMetadata(ETHEREUM_MAINNET_CHAIN_ID);
+    const sepolia = getCanonicalSafeDeploymentMetadata(ETHEREUM_SEPOLIA_CHAIN_ID);
+
+    for (const metadata of [mainnet, sepolia]) {
+      expect(metadata.safeVersion).to.equal(CANONICAL_SAFE_VERSION);
+      expect(metadata.deploymentType).to.equal(CANONICAL_SAFE_DEPLOYMENT_TYPE);
+      expect(metadata.networkFamily).to.equal("ethereum");
+      expect(metadata.singletonType).to.equal("l1");
+      expect(metadata.isL1SafeSingleton).to.equal(true);
+      expect(metadata.singleton.address).to.equal("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552");
+      expect(metadata.singleton.codeHash).to.equal(
+        "0xbba688fbdb21ad2bb58bc320638b43d94e7d100f6f3ebaab0a4e4de6304b1c2e",
+      );
+      expect(metadata.proxyFactory.address).to.equal("0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2");
+      expect(metadata.proxyFactory.codeHash).to.equal(
+        "0x337d7f54be11b6ed55fef7b667ea5488db53db8320a05d1146aa4bd169a39a9b",
+      );
+      expect(metadata.fallbackHandler.address).to.equal(
+        "0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4",
+      );
+      expect(metadata.fallbackHandler.codeHash).to.equal(
+        "0x03e69f7ce809e81687c69b19a7d7cca45b6d551ffdec73d9bb87178476de1abf",
+      );
+    }
+    expect(mainnet.profileId).to.equal("ethereum-mainnet");
+    expect(mainnet.networkName).to.equal("Ethereum Mainnet");
+    expect(mainnet.environment).to.equal("mainnet");
+    expect(sepolia.profileId).to.equal("ethereum-sepolia");
+    expect(sepolia.networkName).to.equal("Ethereum Sepolia");
+    expect(sepolia.environment).to.equal("testnet");
+  });
+
+  it("exposes immutable chain profiles and rejects unpinned EVM networks", function () {
+    expect(ETHEREUM_MAINNET_CHAIN_ID).to.equal(1n);
+    expect(ETHEREUM_SEPOLIA_CHAIN_ID).to.equal(11155111n);
+    expect(getCanonicalSafeChainProfile(1)).to.equal(CANONICAL_SAFE_CHAIN_PROFILES["1"]);
+    expect(getCanonicalSafeChainProfile("11155111")).to.equal(
+      CANONICAL_SAFE_CHAIN_PROFILES["11155111"],
+    );
+    expect(Object.isFrozen(CANONICAL_SAFE_CHAIN_PROFILES)).to.equal(true);
+    expect(Object.isFrozen(getCanonicalSafeChainProfile(1))).to.equal(true);
+    expect(() => getCanonicalSafeDeploymentMetadata(31337)).to.throw(
+      /Conflux eSpace.*Ethereum.*31337/,
+    );
+  });
+
+  it("passes the pinned L1/L2 singleton choice into Protocol Kit", async function () {
+    const source = await fs.readFile("scripts/lib/safeGovernance.mjs", "utf8");
+    const prepareStart = source.indexOf("export const prepareCanonicalSafeDeployment");
+    const prepareEnd = source.indexOf("const normalizePrivateKey", prepareStart);
+    const prepareSource = source.slice(prepareStart, prepareEnd);
+    expect(source).to.include("getSafeSingletonDeployments");
+    expect(source).to.include("getSafeL2SingletonDeployments");
+    expect(prepareStart).to.be.greaterThan(-1);
+    expect(prepareEnd).to.be.greaterThan(prepareStart);
+    expect(prepareSource).to.include("isL1SafeSingleton: metadata.isL1SafeSingleton");
+    expect(prepareSource).not.to.include("isL1SafeSingleton: false");
   });
 
   it("locks the expected 2-of-3 extension-free Safe setup", function () {
@@ -140,7 +217,12 @@ describe("canonical Conflux eSpace Safe governance helpers", function () {
     expect(() => normalizeSafeSaltNonce(ethers.MaxUint256 + 1n)).to.throw(/fit in uint256/);
   });
 
-  for (const chainId of [CONFLUX_ESPACE_TESTNET_CHAIN_ID, CONFLUX_ESPACE_MAINNET_CHAIN_ID]) {
+  for (const chainId of [
+    ETHEREUM_MAINNET_CHAIN_ID,
+    CONFLUX_ESPACE_TESTNET_CHAIN_ID,
+    CONFLUX_ESPACE_MAINNET_CHAIN_ID,
+    ETHEREUM_SEPOLIA_CHAIN_ID,
+  ]) {
     it(`deterministically encodes the canonical factory/setup call on chain ${chainId}`, function () {
       const result = buildCanonicalSafeDeploymentTransaction({
         chainId,

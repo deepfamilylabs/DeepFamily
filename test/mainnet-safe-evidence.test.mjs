@@ -5,9 +5,9 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 
 import {
-  hashESpaceMainnetSafeInputs,
+  hashMainnetSafeInputs,
   publicSafeCreatorError,
-} from "../scripts/lib/espaceMainnetSafeEvidence.mjs";
+} from "../scripts/lib/mainnetSafeEvidence.mjs";
 
 const SAFE_INPUT_FILES = Object.freeze([
   "hardhat.config.mjs",
@@ -15,11 +15,16 @@ const SAFE_INPUT_FILES = Object.freeze([
   "package-lock.json",
   "scripts/espace-mainnet-safe-command.mjs",
   "scripts/espace-mainnet-safe.mjs",
-  "scripts/lib/espaceMainnetSafeEvidence.mjs",
-  "scripts/lib/espaceMainnetSafeIntent.mjs",
-  "scripts/lib/espaceMainnetSafeSafety.mjs",
-  "scripts/lib/espaceMainnetReleaseState.mjs",
-  "scripts/lib/espaceReleaseEvidence.mjs",
+  "scripts/ethereum-mainnet-safe-command.mjs",
+  "scripts/ethereum-mainnet-safe.mjs",
+  "scripts/evm-mainnet-safe.mjs",
+  "scripts/lib/chainProfiles.mjs",
+  "scripts/lib/mainnetCommandWrapper.mjs",
+  "scripts/lib/mainnetSafeEvidence.mjs",
+  "scripts/lib/mainnetSafeIntent.mjs",
+  "scripts/lib/mainnetSafeSafety.mjs",
+  "scripts/lib/mainnetReleaseState.mjs",
+  "scripts/lib/releaseEvidence.mjs",
   "scripts/lib/exclusiveCommandLock.mjs",
   "scripts/lib/governanceSafety.mjs",
   "scripts/lib/safeGovernance.mjs",
@@ -33,7 +38,7 @@ const writeInputFixture = async (root) => {
   }
 };
 
-describe("eSpace Mainnet Safe creator evidence", function () {
+describe("multi-chain Mainnet Safe creator evidence", function () {
   let temporaryDirectory;
 
   beforeEach(async function () {
@@ -46,8 +51,8 @@ describe("eSpace Mainnet Safe creator evidence", function () {
   });
 
   it("hashes the complete critical input set deterministically in a fixed order", async function () {
-    const first = await hashESpaceMainnetSafeInputs(ethers, temporaryDirectory);
-    const second = await hashESpaceMainnetSafeInputs(ethers, temporaryDirectory);
+    const first = await hashMainnetSafeInputs(ethers, temporaryDirectory);
+    const second = await hashMainnetSafeInputs(ethers, temporaryDirectory);
 
     expect(Object.keys(first.files)).to.deep.equal(SAFE_INPUT_FILES);
     expect(first).to.deep.equal(second);
@@ -66,10 +71,10 @@ describe("eSpace Mainnet Safe creator evidence", function () {
   });
 
   it("changes the aggregate and only the changed file digest when a critical input changes", async function () {
-    const before = await hashESpaceMainnetSafeInputs(ethers, temporaryDirectory);
+    const before = await hashMainnetSafeInputs(ethers, temporaryDirectory);
     const changedPath = "scripts/lib/safeGovernance.mjs";
     await fs.writeFile(path.join(temporaryDirectory, changedPath), "fixture:changed\n");
-    const after = await hashESpaceMainnetSafeInputs(ethers, temporaryDirectory);
+    const after = await hashMainnetSafeInputs(ethers, temporaryDirectory);
 
     expect(after.digest).not.to.equal(before.digest);
     expect(after.files[changedPath]).not.to.equal(before.files[changedPath]);

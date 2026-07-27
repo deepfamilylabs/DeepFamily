@@ -3,6 +3,7 @@ import hre from "hardhat";
 import {
   DEFAULT_CONFLUX_RPC_URLS,
   resolveConfluxRpcUrls,
+  resolveEthereumRpcUrls,
   SOLIDITY_EVM_VERSION,
 } from "../scripts/lib/hardhatConfig.mjs";
 import { nativeCurrencySymbol, runNetworkCheck } from "../tasks/networks-check.mjs";
@@ -39,10 +40,13 @@ describe("Network tooling", function () {
     expect(hre.config.networks).not.to.have.property("holesky");
 
     const expectedRpcUrls = resolveConfluxRpcUrls(process.env);
+    const expectedEthereumRpcUrls = resolveEthereumRpcUrls(process.env);
     expect(await hre.config.networks.conflux.url.get()).to.equal(expectedRpcUrls.conflux);
     expect(await hre.config.networks.confluxTestnet.url.get()).to.equal(
       expectedRpcUrls.confluxTestnet,
     );
+    expect(await hre.config.networks.mainnet.url.get()).to.equal(expectedEthereumRpcUrls.mainnet);
+    expect(await hre.config.networks.sepolia.url.get()).to.equal(expectedEthereumRpcUrls.sepolia);
 
     expect(SOLIDITY_EVM_VERSION).to.equal("cancun");
     expect(hre.config.solidity.profiles.production).to.deep.equal(

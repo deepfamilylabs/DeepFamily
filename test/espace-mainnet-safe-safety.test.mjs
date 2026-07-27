@@ -11,7 +11,7 @@ import {
   parseESpaceMainnetSafeAuthorization,
   parseESpaceMainnetSafeConfig,
   parseMainnetSafeAuthorization,
-} from "../scripts/lib/espaceMainnetSafeSafety.mjs";
+} from "../scripts/lib/mainnetSafeSafety.mjs";
 import { getCanonicalSafeDeploymentMetadata } from "../scripts/lib/safeGovernance.mjs";
 
 const DEPLOYER = "0x2000000000000000000000000000000000000002";
@@ -194,7 +194,7 @@ describe("eSpace Mainnet Safe creation safety", function () {
   });
 
   it("enforces a positive Safe-only CFX cap and bounded finality settings", function () {
-    expect(parse().maxCfxWei).to.equal(ethers.parseEther("0.25"));
+    expect(parse().maximumCostWei).to.equal(ethers.parseEther("0.25"));
     for (const invalid of ["", "0", "-1", "1e2", "1.0000000000000000001"]) {
       expect(() => parse({ ESPACE_MAINNET_SAFE_MAX_CFX: invalid })).to.throw(
         invalid === "0" ? "greater than zero" : "explicitly set",

@@ -7,11 +7,16 @@ const SAFE_INPUT_FILES = Object.freeze([
   "package-lock.json",
   "scripts/espace-mainnet-safe-command.mjs",
   "scripts/espace-mainnet-safe.mjs",
-  "scripts/lib/espaceMainnetSafeEvidence.mjs",
-  "scripts/lib/espaceMainnetSafeIntent.mjs",
-  "scripts/lib/espaceMainnetSafeSafety.mjs",
-  "scripts/lib/espaceMainnetReleaseState.mjs",
-  "scripts/lib/espaceReleaseEvidence.mjs",
+  "scripts/ethereum-mainnet-safe-command.mjs",
+  "scripts/ethereum-mainnet-safe.mjs",
+  "scripts/evm-mainnet-safe.mjs",
+  "scripts/lib/chainProfiles.mjs",
+  "scripts/lib/mainnetCommandWrapper.mjs",
+  "scripts/lib/mainnetSafeEvidence.mjs",
+  "scripts/lib/mainnetSafeIntent.mjs",
+  "scripts/lib/mainnetSafeSafety.mjs",
+  "scripts/lib/mainnetReleaseState.mjs",
+  "scripts/lib/releaseEvidence.mjs",
   "scripts/lib/exclusiveCommandLock.mjs",
   "scripts/lib/governanceSafety.mjs",
   "scripts/lib/safeGovernance.mjs",
@@ -22,7 +27,7 @@ const SAFE_INPUT_FILES = Object.freeze([
  * A clean commit is also required by the caller; this digest makes the reviewed report explicit
  * about the bytes that were actually executed.
  */
-export const hashESpaceMainnetSafeInputs = async (ethers, root = process.cwd()) => {
+export const hashMainnetSafeInputs = async (ethers, root = process.cwd()) => {
   const files = {};
   const entries = [];
   for (const relativePath of SAFE_INPUT_FILES) {
@@ -42,6 +47,9 @@ export const publicSafeCreatorError = (error, env = process.env) => {
   for (const [name, replacement] of [
     ["PRIVATE_KEY", "[REDACTED_PRIVATE_KEY]"],
     ["CONFLUX_RPC_URL", "[REDACTED_RPC_URL]"],
+    ["ETHEREUM_MAINNET_RPC_URL", "[REDACTED_RPC_URL]"],
+    ["INFURA_API_KEY", "[REDACTED_INFURA_KEY]"],
+    ["EXPLORER_API_KEY", "[REDACTED_EXPLORER_KEY]"],
   ]) {
     const secret = String(env[name] ?? "");
     if (secret.length >= 4) message = message.split(secret).join(replacement);

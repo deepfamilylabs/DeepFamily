@@ -1,4 +1,4 @@
-import { ESPACE_MAINNET_TRANSACTION_LABELS } from "./espaceMainnetReleaseSafety.mjs";
+import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
 
 const PROOF_SYSTEM_GROTH16_BN254_V1 = 1;
 const PROOF_PURPOSE_PERSON_COMMITMENT = 0;
@@ -75,7 +75,7 @@ const normalizeIntent = ({ ethers, label, kind, nonce, from, chainId, to, value,
 };
 
 /**
- * Rebuilds the exact fourteen-transaction eSpace mainnet release intent without a signer or RPC.
+ * Rebuilds the exact fourteen-transaction EVM mainnet release intent without a signer or RPC.
  * The returned order is the approved deployer-nonce order; callers should include its digest in
  * the reviewed plan and pass the intents to the checkpointed transaction executor.
  */
@@ -232,8 +232,8 @@ export const buildMainnetReleaseIntents = async ({
   }
 
   if (
-    intents.length !== ESPACE_MAINNET_TRANSACTION_LABELS.length ||
-    intents.some((intent, index) => intent.label !== ESPACE_MAINNET_TRANSACTION_LABELS[index])
+    intents.length !== MAINNET_TRANSACTION_LABELS.length ||
+    intents.some((intent, index) => intent.label !== MAINNET_TRANSACTION_LABELS[index])
   ) {
     throw new Error("Generated mainnet release intents differ from the approved transaction order");
   }

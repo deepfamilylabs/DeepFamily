@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-import { summarizeProductionBuildInfo } from "./espaceAcceptanceSafety.mjs";
+import { summarizeProductionBuildInfo } from "./acceptanceSafety.mjs";
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 

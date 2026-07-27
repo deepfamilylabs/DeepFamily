@@ -7,7 +7,7 @@ import {
   deriveMainnetPlanDigest,
   parseESpaceMainnetReleaseConfig,
   parseMainnetAuthorization,
-} from "../scripts/lib/espaceMainnetReleaseSafety.mjs";
+} from "../scripts/lib/mainnetReleaseSafety.mjs";
 
 const SAFE = "0x1000000000000000000000000000000000000001";
 const DEPLOYER = "0x2000000000000000000000000000000000000002";

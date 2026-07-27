@@ -1,6 +1,14 @@
+/**
+ * Shared checkpoint and transaction-state helpers for guarded EVM mainnet commands.
+ */
 import fs from "node:fs/promises";
 import path from "node:path";
 import { ethers } from "ethers";
+
+import {
+  GAS_CHARGING_CONFLUX_THREE_QUARTER,
+  GAS_CHARGING_ETHEREUM_RECEIPT,
+} from "./chainProfiles.mjs";
 
 const nowIso = () => new Date().toISOString();
 
@@ -335,6 +343,7 @@ const assertCheckpointReservations = ({
   checkpoint,
   maxCostWei,
   budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  nativeSymbol = "CFX",
 }) => {
   const cap =
     maxCostWei == null ? null : parseNonNegativeWei(maxCostWei, "mainnet release maxCostWei");
@@ -345,25 +354,34 @@ const assertCheckpointReservations = ({
   if (cap != null && reserved > cap) {
     throw new Error(
       `Checkpoint fee reservations exceed ${budgetEnvironmentName}: reserved ` +
-        `${ethers.formatEther(reserved)} CFX, cap ${ethers.formatEther(cap)} CFX`,
+        `${ethers.formatEther(reserved)} ${nativeSymbol}, cap ${ethers.formatEther(cap)} ` +
+        nativeSymbol,
     );
   }
   return reserved;
 };
 
-const chargedGasForReceipt = ({ entry, receipt }) => {
+export const chargedGasForReceipt = ({
+  entry,
+  receipt,
+  gasChargingPolicy = GAS_CHARGING_CONFLUX_THREE_QUARTER,
+}) => {
+  const gasUsed = BigInt(receipt.gasUsed);
+  if (gasChargingPolicy === GAS_CHARGING_ETHEREUM_RECEIPT) return gasUsed;
+  if (gasChargingPolicy !== GAS_CHARGING_CONFLUX_THREE_QUARTER) {
+    throw new Error(`Unsupported gas charging policy: ${String(gasChargingPolicy)}`);
+  }
   const gasLimit = BigInt(entry.request.gasLimit);
   const threeQuarterGasFloor = (gasLimit * 3n + 3n) / 4n;
-  const gasUsed = BigInt(receipt.gasUsed);
   return gasUsed > threeQuarterGasFloor ? gasUsed : threeQuarterGasFloor;
 };
 
-const canonicalActualCostWei = ({ entry, receipt, label }) => {
+const canonicalActualCostWei = ({ entry, receipt, label, gasChargingPolicy }) => {
   const gasPrice = receipt.gasPrice ?? receipt.effectiveGasPrice;
   if (gasPrice == null) {
     throw new Error(`${label} confirmed receipt does not include an effective gas price`);
   }
-  const gasCharged = chargedGasForReceipt({ entry, receipt });
+  const gasCharged = chargedGasForReceipt({ entry, receipt, gasChargingPolicy });
   const actualCostWei = gasCharged * BigInt(gasPrice) + BigInt(entry.request?.value ?? 0n);
   const maximumCostWei = parseNonNegativeWei(
     entry.maximumCostWei,
@@ -392,6 +410,7 @@ const assertCumulativeActualCost = ({
   canonicalCosts = new Map(),
   maxCostWei,
   budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  nativeSymbol = "CFX",
 }) => {
   if (maxCostWei == null) return;
   const cap = parseNonNegativeWei(maxCostWei, "mainnet release maxCostWei");
@@ -407,7 +426,8 @@ const assertCumulativeActualCost = ({
   if (cumulativeActualCostWei > cap) {
     throw new Error(
       `Confirmed transaction costs exceed ${budgetEnvironmentName}: actual ` +
-        `${ethers.formatEther(cumulativeActualCostWei)} CFX, cap ${ethers.formatEther(cap)} CFX`,
+        `${ethers.formatEther(cumulativeActualCostWei)} ${nativeSymbol}, cap ` +
+        `${ethers.formatEther(cap)} ${nativeSymbol}`,
     );
   }
 };
@@ -415,7 +435,8 @@ const assertCumulativeActualCost = ({
 /**
  * Builds the transaction boundary used by the mainnet release. Every transaction is persisted as
  * planned before broadcast, then submitted and confirmed. A consumed planned nonce is never
- * resent; the operator must supply the original hash through ESPACE_MAINNET_RECOVERY_TXS.
+ * resent; the operator must supply the original hash through the selected profile's recovery
+ * environment variable.
  */
 export const createCheckpointedTransactionExecutor = ({
   provider,
@@ -428,6 +449,8 @@ export const createCheckpointedTransactionExecutor = ({
   expectedIntents = {},
   budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
   recoveryEnvironmentName = "ESPACE_MAINNET_RECOVERY_TXS",
+  nativeSymbol = "CFX",
+  gasChargingPolicy = GAS_CHARGING_CONFLUX_THREE_QUARTER,
 }) => {
   if (!provider || !signer || !checkpoint || typeof saveCheckpoint !== "function") {
     throw new Error(
@@ -473,6 +496,7 @@ export const createCheckpointedTransactionExecutor = ({
       checkpoint,
       maxCostWei: releaseCostCap,
       budgetEnvironmentName,
+      nativeSymbol,
     });
     if (entry && entry.kind !== kind) {
       throw new Error(`${label} checkpoint kind changed from ${entry.kind} to ${kind}`);
@@ -593,8 +617,8 @@ export const createCheckpointedTransactionExecutor = ({
       if (alreadyReserved + maximumCostWei > releaseCostCap) {
         throw new Error(
           `${label} would exceed ${budgetEnvironmentName}: reserved ` +
-            `${ethers.formatEther(alreadyReserved + maximumCostWei)} CFX, cap ` +
-            `${ethers.formatEther(releaseCostCap)} CFX`,
+            `${ethers.formatEther(alreadyReserved + maximumCostWei)} ${nativeSymbol}, cap ` +
+            `${ethers.formatEther(releaseCostCap)} ${nativeSymbol}`,
         );
       }
       entry = {
@@ -626,6 +650,7 @@ export const createCheckpointedTransactionExecutor = ({
         checkpoint,
         maxCostWei: releaseCostCap,
         budgetEnvironmentName,
+        nativeSymbol,
       });
       await saveCheckpoint();
     }
@@ -635,6 +660,7 @@ export const createCheckpointedTransactionExecutor = ({
         checkpoint,
         maxCostWei: releaseCostCap,
         budgetEnvironmentName,
+        nativeSymbol,
       });
       const recoveredHash = recoveryTransactions[label];
       if (recoveredHash) {
@@ -672,6 +698,7 @@ export const createCheckpointedTransactionExecutor = ({
           checkpoint,
           maxCostWei: releaseCostCap,
           budgetEnvironmentName,
+          nativeSymbol,
         });
         const response = await signer.sendTransaction(hydrateRequest(entry.request));
         if (Number(response.nonce) !== entry.request.nonce) {
@@ -696,6 +723,7 @@ export const createCheckpointedTransactionExecutor = ({
       checkpoint,
       maxCostWei: releaseCostCap,
       budgetEnvironmentName,
+      nativeSymbol,
     });
     assertTransactionMatchesPlan({ transaction, planned: entry, signerAddress, label });
     const receipt = await canonicalReceipt({
@@ -705,13 +733,19 @@ export const createCheckpointedTransactionExecutor = ({
       timeoutMs: transactionTimeoutMs,
       label,
     });
-    const { actualCostWei, gasCharged } = canonicalActualCostWei({ entry, receipt, label });
+    const { actualCostWei, gasCharged } = canonicalActualCostWei({
+      entry,
+      receipt,
+      label,
+      gasChargingPolicy,
+    });
     const evidence = receiptEvidence(receipt, gasCharged);
     assertCumulativeActualCost({
       checkpoint,
       canonicalCosts: new Map([[label, actualCostWei]]),
       maxCostWei: releaseCostCap,
       budgetEnvironmentName,
+      nativeSymbol,
     });
     if (entry.status === "submitted") {
       entry.status = "confirmed";
@@ -732,8 +766,10 @@ export const revalidateCheckpointTransactions = async ({
   saveCheckpoint,
   maxCostWei,
   budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  nativeSymbol = "CFX",
+  gasChargingPolicy = GAS_CHARGING_CONFLUX_THREE_QUARTER,
 }) => {
-  assertCheckpointReservations({ checkpoint, maxCostWei, budgetEnvironmentName });
+  assertCheckpointReservations({ checkpoint, maxCostWei, budgetEnvironmentName, nativeSymbol });
   let changed = false;
   const validated = [];
   const canonicalCosts = new Map();
@@ -747,7 +783,12 @@ export const revalidateCheckpointTransactions = async ({
       label,
     });
     const receipt = await canonicalReceipt({ provider, entry, confirmations, timeoutMs, label });
-    const { actualCostWei, gasCharged } = canonicalActualCostWei({ entry, receipt, label });
+    const { actualCostWei, gasCharged } = canonicalActualCostWei({
+      entry,
+      receipt,
+      label,
+      gasChargingPolicy,
+    });
     const evidence = receiptEvidence(receipt, gasCharged);
     canonicalCosts.set(label, actualCostWei);
     validated.push({ entry, evidence, actualCostWei });
@@ -757,6 +798,7 @@ export const revalidateCheckpointTransactions = async ({
     canonicalCosts,
     maxCostWei,
     budgetEnvironmentName,
+    nativeSymbol,
   });
   for (const { entry, evidence, actualCostWei } of validated) {
     if (entry.status === "submitted") {

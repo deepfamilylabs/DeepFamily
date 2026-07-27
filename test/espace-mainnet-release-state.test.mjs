@@ -10,7 +10,7 @@ import {
   readJsonIfExists,
   revalidateCheckpointTransactions,
   writeJsonAtomic,
-} from "../scripts/lib/espaceMainnetReleaseState.mjs";
+} from "../scripts/lib/mainnetReleaseState.mjs";
 
 const ADDRESS = "0x2000000000000000000000000000000000000002";
 const HASH = `0x${"34".repeat(32)}`;

@@ -3,8 +3,8 @@ import { expect } from "chai";
 import hre from "hardhat";
 
 import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
-import { buildMainnetReleaseIntents } from "../scripts/lib/espaceMainnetReleaseIntents.mjs";
-import { createCheckpointedTransactionExecutor } from "../scripts/lib/espaceMainnetReleaseState.mjs";
+import { buildMainnetReleaseIntents } from "../scripts/lib/mainnetReleaseIntents.mjs";
+import { createCheckpointedTransactionExecutor } from "../scripts/lib/mainnetReleaseState.mjs";
 
 describe("eSpace Mainnet resumable deployment integration", function () {
   this.timeout(120_000);

@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import {
   ESPACE_E2E_CONFIRMATION,
-  ESPACE_E2E_MODE_DIAGNOSTIC,
-  ESPACE_E2E_MODE_RELEASE_REHEARSAL,
+  ACCEPTANCE_MODE_DIAGNOSTIC,
+  ACCEPTANCE_MODE_RELEASE_REHEARSAL,
   ESPACE_E2E_RELEASE_SAFE_PROFILE,
   deriveAcceptanceWallet,
   deriveAcceptanceWallets,
@@ -16,7 +16,7 @@ import {
   sanitizeRunId,
   summarizeProductionBuildInfo,
   withTimeout,
-} from "../scripts/lib/espaceAcceptanceSafety.mjs";
+} from "../scripts/lib/acceptanceSafety.mjs";
 
 describe("eSpace acceptance safety helpers", function () {
   const basePrivateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -46,13 +46,13 @@ describe("eSpace acceptance safety helpers", function () {
       const result = parseESpaceAcceptanceConfig(baseConfig());
       expect(result.networkName).to.equal("confluxTestnet");
       expect(result.chainId).to.equal(71n);
-      expect(result.acceptanceMode).to.equal(ESPACE_E2E_MODE_DIAGNOSTIC);
+      expect(result.acceptanceMode).to.equal(ACCEPTANCE_MODE_DIAGNOSTIC);
       expect(result.minDelaySeconds).to.equal(30);
       expect(result.productionMinDelaySeconds).to.equal(null);
       expect(result.productionGovernanceMultisigProfile).to.equal(null);
       expect(result.confirmations).to.equal(2);
-      expect(result.maxCfx).to.equal("5");
-      expect(result.maxCfxWei).to.equal(ethers.parseEther("5"));
+      expect(result.maximumCost).to.equal("5");
+      expect(result.maximumCostWei).to.equal(ethers.parseEther("5"));
       expect(result.verify).to.equal(true);
       expect(result.recover).to.equal(false);
       expect(result.requireFinality).to.equal(true);
@@ -62,9 +62,9 @@ describe("eSpace acceptance safety helpers", function () {
 
     it("accepts only the two explicit acceptance modes", function () {
       expect(
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: ESPACE_E2E_MODE_DIAGNOSTIC }))
+        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: ACCEPTANCE_MODE_DIAGNOSTIC }))
           .acceptanceMode,
-      ).to.equal(ESPACE_E2E_MODE_DIAGNOSTIC);
+      ).to.equal(ACCEPTANCE_MODE_DIAGNOSTIC);
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: "release" })),
       ).to.throw(/ESPACE_E2E_MODE.*diagnostic.*release-rehearsal/i);
@@ -72,13 +72,13 @@ describe("eSpace acceptance safety helpers", function () {
 
     it("requires complete release-rehearsal flags and the exact production delay", function () {
       const releaseEnv = {
-        ESPACE_E2E_MODE: ESPACE_E2E_MODE_RELEASE_REHEARSAL,
+        ESPACE_E2E_MODE: ACCEPTANCE_MODE_RELEASE_REHEARSAL,
         ESPACE_E2E_MIN_DELAY: "172800",
         MIN_DELAY: "172800",
         GOVERNANCE_MULTISIG_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
       };
       const result = parseESpaceAcceptanceConfig(baseConfig(releaseEnv));
-      expect(result.acceptanceMode).to.equal(ESPACE_E2E_MODE_RELEASE_REHEARSAL);
+      expect(result.acceptanceMode).to.equal(ACCEPTANCE_MODE_RELEASE_REHEARSAL);
       expect(result.verify).to.equal(true);
       expect(result.requireFinality).to.equal(true);
       expect(result.minDelaySeconds).to.equal(172800);
@@ -99,6 +99,15 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "30" })),
       ).to.throw(/ESPACE_E2E_MIN_DELAY \(172800\).*MIN_DELAY \(30\)/i);
+      expect(() =>
+        parseESpaceAcceptanceConfig(
+          baseConfig({
+            ...releaseEnv,
+            ESPACE_E2E_MIN_DELAY: "30",
+            MIN_DELAY: "30",
+          }),
+        ),
+      ).to.throw(/release-rehearsal requires MIN_DELAY >= 86400 seconds/i);
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, GOVERNANCE_MULTISIG_PROFILE: "" })),
       ).to.throw(/GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1\.3\.0-2of3/i);

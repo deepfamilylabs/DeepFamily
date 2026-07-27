@@ -1,0 +1,14 @@
+/**
+ * Ethereum Mainnet protocol release:
+ *   npm run ethereum:mainnet:release
+ *   ETHEREUM_MAINNET_PLAN_DIGEST=0x... \
+ *   ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1 \
+ *     npm run ethereum:mainnet:release
+ */
+import { ETHEREUM_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { main, publicError } from "./evm-mainnet-release.mjs";
+
+main(ETHEREUM_CHAIN_PROFILE).catch((error) => {
+  console.error(`[ethereum-mainnet-release] ${publicError(error)}`);
+  process.exitCode = 1;
+});
