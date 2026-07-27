@@ -1,20 +1,30 @@
+/**
+ * Shared guarded EVM mainnet Safe configuration and authorization helpers.
+ */
 import { ethers } from "ethers";
 
-import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "./governanceSafety.mjs";
+import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE, getChainProfile } from "./chainProfiles.mjs";
 import {
   CANONICAL_SAFE_OWNER_COUNT,
   CANONICAL_SAFE_THRESHOLD,
   getCanonicalSafeDeploymentMetadata,
 } from "./safeGovernance.mjs";
 
-export const ESPACE_MAINNET_SAFE_NETWORK = "conflux";
-export const ESPACE_MAINNET_SAFE_CHAIN_ID = 1030n;
-export const ESPACE_MAINNET_SAFE_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
-export const ESPACE_MAINNET_SAFE_CONFIRMATION = "conflux-mainnet-safe-chain-1030";
-export const ESPACE_MAINNET_SAFE_STATE_SCHEMA_VERSION = 1;
-export const ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN = "deepfamily:espace-mainnet-safe:v1";
+export const ESPACE_MAINNET_SAFE_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
+export const ESPACE_MAINNET_SAFE_CHAIN_ID = ESPACE_CHAIN_PROFILE.mainnet.chainId;
+export const ESPACE_MAINNET_SAFE_PROFILE = ESPACE_CHAIN_PROFILE.governanceMultisigProfile;
+export const ESPACE_MAINNET_SAFE_CONFIRMATION = ESPACE_CHAIN_PROFILE.mainnet.safeConfirmation;
+export const ETHEREUM_MAINNET_SAFE_NETWORK = ETHEREUM_CHAIN_PROFILE.mainnet.networkName;
+export const ETHEREUM_MAINNET_SAFE_CHAIN_ID = ETHEREUM_CHAIN_PROFILE.mainnet.chainId;
+export const ETHEREUM_MAINNET_SAFE_PROFILE = ETHEREUM_CHAIN_PROFILE.governanceMultisigProfile;
+export const ETHEREUM_MAINNET_SAFE_CONFIRMATION = ETHEREUM_CHAIN_PROFILE.mainnet.safeConfirmation;
+export const MAINNET_SAFE_STATE_SCHEMA_VERSION = 1;
+export const ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN =
+  ESPACE_CHAIN_PROFILE.mainnet.safePlanDigestDomain;
+export const ETHEREUM_MAINNET_SAFE_PLAN_DIGEST_DOMAIN =
+  ETHEREUM_CHAIN_PROFILE.mainnet.safePlanDigestDomain;
 
-const DECIMAL_CFX_PATTERN = /^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/;
+const DECIMAL_NATIVE_PATTERN = /^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/;
 const DECIMAL_INTEGER_PATTERN = /^(?:0|[1-9][0-9]*)$/;
 const GIT_COMMIT_PATTERN = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/;
 
@@ -26,15 +36,22 @@ const deepFreeze = (value) => {
   return value;
 };
 
-const normalizeChainId = (chainId) => {
+const normalizeChainId = (chainId, chainProfile = ESPACE_CHAIN_PROFILE) => {
+  const mainnet = chainProfile.mainnet;
   let normalized;
   try {
     normalized = BigInt(chainId);
   } catch {
-    throw new Error(`eSpace mainnet Safe creation requires chainId 1030; got ${String(chainId)}`);
+    throw new Error(
+      `${chainProfile.displayName} mainnet Safe creation requires chainId ${mainnet.chainId}; ` +
+        `got ${String(chainId)}`,
+    );
   }
-  if (normalized !== ESPACE_MAINNET_SAFE_CHAIN_ID) {
-    throw new Error(`eSpace mainnet Safe creation requires chainId 1030; got ${normalized}`);
+  if (normalized !== mainnet.chainId) {
+    throw new Error(
+      `${chainProfile.displayName} mainnet Safe creation requires chainId ${mainnet.chainId}; ` +
+        `got ${normalized}`,
+    );
   }
   return normalized;
 };
@@ -47,20 +64,23 @@ const requiredAddress = (name, value) => {
   return ethers.getAddress(raw);
 };
 
-const parseExpectedSafeOwners = (value) => {
+const parseExpectedSafeOwners = (
+  value,
+  environmentName = ESPACE_CHAIN_PROFILE.mainnet.safeOwnersEnvironmentName,
+) => {
   const raw = String(value ?? "").trim();
   const owners = raw === "" ? [] : raw.split(",").map((item) => item.trim());
   if (owners.length !== CANONICAL_SAFE_OWNER_COUNT) {
     throw new Error(
-      `ESPACE_MAINNET_SAFE_OWNERS must contain exactly ${CANONICAL_SAFE_OWNER_COUNT} ` +
+      `${environmentName} must contain exactly ${CANONICAL_SAFE_OWNER_COUNT} ` +
         "comma-separated addresses",
     );
   }
   const normalized = owners.map((owner, index) =>
-    requiredAddress(`ESPACE_MAINNET_SAFE_OWNERS[${index}]`, owner),
+    requiredAddress(`${environmentName}[${index}]`, owner),
   );
   if (new Set(normalized.map((owner) => owner.toLowerCase())).size !== normalized.length) {
-    throw new Error("ESPACE_MAINNET_SAFE_OWNERS must contain three distinct addresses");
+    throw new Error(`${environmentName} must contain three distinct addresses`);
   }
   // Safe setup calldata, CREATE2 prediction and the review digest all depend on owner order.
   return Object.freeze(normalized);
@@ -76,55 +96,64 @@ const parseInteger = (name, value, defaultValue, minimum, maximum) => {
   return parsed;
 };
 
-const parseSaltNonce = (value) => {
+const parseSaltNonce = (
+  value,
+  environmentName = ESPACE_CHAIN_PROFILE.mainnet.safeSaltNonceEnvironmentName,
+) => {
   const raw = String(value ?? "").trim();
   if (!DECIMAL_INTEGER_PATTERN.test(raw)) {
     throw new Error(
-      "ESPACE_MAINNET_SAFE_SALT_NONCE must be explicitly set to a canonical unsigned " +
-        "base-10 integer",
+      `${environmentName} must be explicitly set to a canonical unsigned ` + "base-10 integer",
     );
   }
   const saltNonce = BigInt(raw);
   if (saltNonce > ethers.MaxUint256) {
-    throw new Error("ESPACE_MAINNET_SAFE_SALT_NONCE must fit in uint256");
+    throw new Error(`${environmentName} must fit in uint256`);
   }
   return saltNonce.toString();
 };
 
-const parseMaximumCost = (value) => {
-  const maxCfx = String(value ?? "").trim();
-  if (!DECIMAL_CFX_PATTERN.test(maxCfx)) {
+const parseMaximumCost = (
+  value,
+  environmentName = ESPACE_CHAIN_PROFILE.mainnet.safeMaximumCostEnvironmentName,
+) => {
+  const maximumCost = String(value ?? "").trim();
+  if (!DECIMAL_NATIVE_PATTERN.test(maximumCost)) {
     throw new Error(
-      "ESPACE_MAINNET_SAFE_MAX_CFX must be explicitly set to a positive plain decimal " +
+      `${environmentName} must be explicitly set to a positive plain decimal ` +
         "with at most 18 decimals",
     );
   }
-  const maxCfxWei = ethers.parseEther(maxCfx);
-  if (maxCfxWei <= 0n) {
-    throw new Error("ESPACE_MAINNET_SAFE_MAX_CFX must be greater than zero");
+  const maximumCostWei = ethers.parseEther(maximumCost);
+  if (maximumCostWei <= 0n) {
+    throw new Error(`${environmentName} must be greater than zero`);
   }
-  if (maxCfxWei > ethers.MaxUint256) {
-    throw new Error("ESPACE_MAINNET_SAFE_MAX_CFX exceeds uint256");
+  if (maximumCostWei > ethers.MaxUint256) {
+    throw new Error(`${environmentName} exceeds uint256`);
   }
-  return { maxCfx, maxCfxWei };
+  return { maximumCost, maximumCostWei };
 };
 
-const parseRecoveryTransaction = (value) => {
+const parseRecoveryTransaction = (
+  value,
+  environmentName = ESPACE_CHAIN_PROFILE.mainnet.safeRecoveryTransactionEnvironmentName,
+) => {
   const raw = String(value ?? "").trim();
   if (raw === "") return null;
   if (!ethers.isHexString(raw, 32)) {
-    throw new Error("ESPACE_MAINNET_SAFE_RECOVERY_TX must be blank or a 32-byte transaction hash");
+    throw new Error(`${environmentName} must be blank or a 32-byte transaction hash`);
   }
   return raw.toLowerCase();
 };
 
-const parseAcceptanceTransaction = (value) => {
+const parseAcceptanceTransaction = (
+  value,
+  environmentName = ESPACE_CHAIN_PROFILE.mainnet.safeAcceptanceTransactionEnvironmentName,
+) => {
   const raw = String(value ?? "").trim();
   if (raw === "") return null;
   if (!ethers.isHexString(raw, 32)) {
-    throw new Error(
-      "ESPACE_MAINNET_SAFE_ACCEPTANCE_TX must be blank or a 32-byte transaction hash",
-    );
+    throw new Error(`${environmentName} must be blank or a 32-byte transaction hash`);
   }
   return raw.toLowerCase();
 };
@@ -134,9 +163,13 @@ const parseAcceptanceTransaction = (value) => {
  * valid pair is execute mode. This prevents an old digest or confirmation flag from silently
  * changing a later planning run into an execution.
  */
-export const parseESpaceMainnetSafeAuthorization = (env = process.env) => {
-  const confirmation = String(env.ESPACE_MAINNET_SAFE_CONFIRM ?? "").trim();
-  const configuredPlanDigest = String(env.ESPACE_MAINNET_SAFE_PLAN_DIGEST ?? "").trim();
+export const parseMainnetSafeAuthorization = (
+  env = process.env,
+  chainProfile = ESPACE_CHAIN_PROFILE,
+) => {
+  const mainnet = chainProfile.mainnet;
+  const confirmation = String(env[mainnet.safeConfirmationEnvironmentName] ?? "").trim();
+  const configuredPlanDigest = String(env[mainnet.safePlanDigestEnvironmentName] ?? "").trim();
   if (confirmation === "" && configuredPlanDigest === "") {
     return Object.freeze({
       mode: "plan",
@@ -146,18 +179,20 @@ export const parseESpaceMainnetSafeAuthorization = (env = process.env) => {
   }
   if (confirmation === "" || configuredPlanDigest === "") {
     throw new Error(
-      "ESPACE_MAINNET_SAFE_CONFIRM and ESPACE_MAINNET_SAFE_PLAN_DIGEST must either both " +
+      `${mainnet.safeConfirmationEnvironmentName} and ${mainnet.safePlanDigestEnvironmentName} ` +
+        "must either both " +
         "be blank for plan mode or both be set for execute mode",
     );
   }
-  if (confirmation !== ESPACE_MAINNET_SAFE_CONFIRMATION) {
+  if (confirmation !== mainnet.safeConfirmation) {
     throw new Error(
-      `ESPACE_MAINNET_SAFE_CONFIRM must be exactly ${ESPACE_MAINNET_SAFE_CONFIRMATION}`,
+      `${mainnet.safeConfirmationEnvironmentName} must be exactly ${mainnet.safeConfirmation}`,
     );
   }
   if (!ethers.isHexString(configuredPlanDigest, 32)) {
     throw new Error(
-      "ESPACE_MAINNET_SAFE_PLAN_DIGEST must be the 32-byte digest printed by a reviewed plan",
+      `${mainnet.safePlanDigestEnvironmentName} must be the 32-byte digest printed by a ` +
+        "reviewed plan",
     );
   }
   return Object.freeze({
@@ -167,66 +202,98 @@ export const parseESpaceMainnetSafeAuthorization = (env = process.env) => {
   });
 };
 
-// Shorter alias used by command wrappers that must reject bad authorization before opening an RPC.
-export const parseMainnetSafeAuthorization = parseESpaceMainnetSafeAuthorization;
+export const parseESpaceMainnetSafeAuthorization = (env = process.env) =>
+  parseMainnetSafeAuthorization(env, ESPACE_CHAIN_PROFILE);
 
-export const parseESpaceMainnetSafeConfig = ({ env = process.env, networkName, chainId } = {}) => {
+export const parseEthereumMainnetSafeAuthorization = (env = process.env) =>
+  parseMainnetSafeAuthorization(env, ETHEREUM_CHAIN_PROFILE);
+
+export const parseProductionMainnetSafeConfig = ({
+  chainProfile = ESPACE_CHAIN_PROFILE,
+  env = process.env,
+  networkName,
+  chainId,
+} = {}) => {
+  const mainnet = chainProfile.mainnet;
   // Authorization is parsed first so an invalid non-empty confirmation fails before any caller
   // needs to open an RPC connection or load a deployer private key.
-  const authorization = parseMainnetSafeAuthorization(env);
-  if (networkName !== ESPACE_MAINNET_SAFE_NETWORK) {
+  const authorization = parseMainnetSafeAuthorization(env, chainProfile);
+  if (networkName !== mainnet.networkName) {
     throw new Error(
-      `eSpace mainnet Safe creation is restricted to network ${ESPACE_MAINNET_SAFE_NETWORK}; ` +
-        `got ${networkName || "unknown"}`,
+      `${chainProfile.displayName} mainnet Safe creation is restricted to network ` +
+        `${mainnet.networkName}; got ${networkName || "unknown"}`,
     );
   }
-  const normalizedChainId = normalizeChainId(chainId);
+  const normalizedChainId = normalizeChainId(chainId, chainProfile);
 
   const governanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
-  if (governanceMultisigProfile !== ESPACE_MAINNET_SAFE_PROFILE) {
+  if (governanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
     throw new Error(
-      `eSpace mainnet Safe creation requires GOVERNANCE_MULTISIG_PROFILE=` +
-        ESPACE_MAINNET_SAFE_PROFILE,
+      `${chainProfile.displayName} mainnet Safe creation requires GOVERNANCE_MULTISIG_PROFILE=` +
+        chainProfile.governanceMultisigProfile,
     );
   }
   const expectedDeployer = requiredAddress(
-    "ESPACE_MAINNET_EXPECTED_DEPLOYER",
-    env.ESPACE_MAINNET_EXPECTED_DEPLOYER,
+    mainnet.expectedDeployerEnvironmentName,
+    env[mainnet.expectedDeployerEnvironmentName],
   );
-  const expectedSafeOwners = parseExpectedSafeOwners(env.ESPACE_MAINNET_SAFE_OWNERS);
+  const expectedSafeOwners = parseExpectedSafeOwners(
+    env[mainnet.safeOwnersEnvironmentName],
+    mainnet.safeOwnersEnvironmentName,
+  );
   if (expectedSafeOwners.some((owner) => owner.toLowerCase() === expectedDeployer.toLowerCase())) {
-    throw new Error("ESPACE_MAINNET_EXPECTED_DEPLOYER must not be one of the Safe owners");
+    throw new Error(
+      `${mainnet.expectedDeployerEnvironmentName} must not be one of the Safe owners`,
+    );
   }
 
-  const saltNonce = parseSaltNonce(env.ESPACE_MAINNET_SAFE_SALT_NONCE);
+  const saltNonce = parseSaltNonce(
+    env[mainnet.safeSaltNonceEnvironmentName],
+    mainnet.safeSaltNonceEnvironmentName,
+  );
   const governanceMultisigRaw = String(env.GOVERNANCE_MULTISIG ?? "").trim();
   const governanceMultisig =
     governanceMultisigRaw === ""
       ? null
       : requiredAddress("GOVERNANCE_MULTISIG", governanceMultisigRaw);
-  const { maxCfx, maxCfxWei } = parseMaximumCost(env.ESPACE_MAINNET_SAFE_MAX_CFX);
+  const { maximumCost, maximumCostWei } = parseMaximumCost(
+    env[mainnet.safeMaximumCostEnvironmentName],
+    mainnet.safeMaximumCostEnvironmentName,
+  );
   const confirmations = parseInteger(
-    "ESPACE_MAINNET_SAFE_CONFIRMATIONS",
-    env.ESPACE_MAINNET_SAFE_CONFIRMATIONS,
+    mainnet.safeConfirmationsEnvironmentName,
+    env[mainnet.safeConfirmationsEnvironmentName],
     2,
     2,
     100,
   );
   const finalityTimeoutSeconds = parseInteger(
-    "ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT",
-    env.ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT,
+    mainnet.safeFinalityTimeoutEnvironmentName,
+    env[mainnet.safeFinalityTimeoutEnvironmentName],
     3600,
     60,
     604_800,
   );
-  const recoveryTransaction = parseRecoveryTransaction(env.ESPACE_MAINNET_SAFE_RECOVERY_TX);
-  const acceptanceTransaction = parseAcceptanceTransaction(env.ESPACE_MAINNET_SAFE_ACCEPTANCE_TX);
+  const recoveryTransaction = parseRecoveryTransaction(
+    env[mainnet.safeRecoveryTransactionEnvironmentName],
+    mainnet.safeRecoveryTransactionEnvironmentName,
+  );
+  const acceptanceTransaction = parseAcceptanceTransaction(
+    env[mainnet.safeAcceptanceTransactionEnvironmentName],
+    mainnet.safeAcceptanceTransactionEnvironmentName,
+  );
   if (recoveryTransaction !== null && authorization.mode !== "execute") {
-    throw new Error("ESPACE_MAINNET_SAFE_RECOVERY_TX is accepted only in confirmed execute mode");
+    throw new Error(
+      `${mainnet.safeRecoveryTransactionEnvironmentName} is accepted only in confirmed ` +
+        "execute mode",
+    );
   }
 
   return deepFreeze({
     ...authorization,
+    chainProfileId: chainProfile.id,
+    nativeSymbol: chainProfile.nativeSymbol,
+    gasChargingPolicy: mainnet.gasChargingPolicy,
     networkName,
     chainId: normalizedChainId,
     governanceMultisigProfile,
@@ -234,14 +301,20 @@ export const parseESpaceMainnetSafeConfig = ({ env = process.env, networkName, c
     expectedDeployer,
     governanceMultisig,
     saltNonce,
-    maxCfx,
-    maxCfxWei,
+    maximumCost,
+    maximumCostWei,
     confirmations,
     finalityTimeoutSeconds,
     recoveryTransaction,
     acceptanceTransaction,
   });
 };
+
+export const parseESpaceMainnetSafeConfig = (options = {}) =>
+  parseProductionMainnetSafeConfig({ ...options, chainProfile: ESPACE_CHAIN_PROFILE });
+
+export const parseEthereumMainnetSafeConfig = (options = {}) =>
+  parseProductionMainnetSafeConfig({ ...options, chainProfile: ETHEREUM_CHAIN_PROFILE });
 
 const canonicalize = (value, path = "value") => {
   if (typeof value === "bigint") return value.toString();
@@ -321,7 +394,10 @@ const normalizeSafeToolInputs = (safeToolInputs) => {
   };
 };
 
-const normalizeCanonicalInfrastructure = (canonicalInfrastructure) => {
+const normalizeCanonicalInfrastructure = (
+  canonicalInfrastructure,
+  chainProfile = ESPACE_CHAIN_PROFILE,
+) => {
   if (
     !canonicalInfrastructure ||
     typeof canonicalInfrastructure !== "object" ||
@@ -329,15 +405,19 @@ const normalizeCanonicalInfrastructure = (canonicalInfrastructure) => {
   ) {
     throw new Error("canonicalInfrastructure must be a Safe infrastructure inspection");
   }
-  const chainId = normalizeChainId(canonicalInfrastructure.chainId);
+  const chainId = normalizeChainId(canonicalInfrastructure.chainId, chainProfile);
   let rpcChainId;
   try {
     rpcChainId = BigInt(canonicalInfrastructure.rpcChainId);
   } catch {
-    throw new Error("canonicalInfrastructure.rpcChainId must identify chainId 1030");
+    throw new Error(
+      `canonicalInfrastructure.rpcChainId must identify chainId ${chainProfile.mainnet.chainId}`,
+    );
   }
-  if (rpcChainId !== ESPACE_MAINNET_SAFE_CHAIN_ID) {
-    throw new Error("canonicalInfrastructure.rpcChainId must identify chainId 1030");
+  if (rpcChainId !== chainProfile.mainnet.chainId) {
+    throw new Error(
+      `canonicalInfrastructure.rpcChainId must identify chainId ${chainProfile.mainnet.chainId}`,
+    );
   }
 
   const officialMetadata = getCanonicalSafeDeploymentMetadata(chainId);
@@ -395,6 +475,9 @@ const normalizeCanonicalInfrastructure = (canonicalInfrastructure) => {
  */
 export const buildMainnetSafePlanFingerprint = ({
   config,
+  chainProfile: explicitChainProfile = getChainProfile(
+    config?.chainProfileId ?? ESPACE_CHAIN_PROFILE.id,
+  ),
   releaseCommit,
   safeToolInputs,
   deployerNonce,
@@ -403,8 +486,10 @@ export const buildMainnetSafePlanFingerprint = ({
   canonicalInfrastructure,
 }) => {
   if (!config || typeof config !== "object") {
-    throw new Error("A parsed eSpace mainnet Safe config is required");
+    throw new Error("A parsed production mainnet Safe config is required");
   }
+  const chainProfile = explicitChainProfile;
+  const mainnet = chainProfile.mainnet;
   if (!GIT_COMMIT_PATTERN.test(String(releaseCommit ?? ""))) {
     throw new Error("releaseCommit must be a 40- or 64-character hexadecimal Git commit");
   }
@@ -414,7 +499,7 @@ export const buildMainnetSafePlanFingerprint = ({
     "predictedSafeAddress",
     predictedSafeAddress,
   );
-  const infrastructure = normalizeCanonicalInfrastructure(canonicalInfrastructure);
+  const infrastructure = normalizeCanonicalInfrastructure(canonicalInfrastructure, chainProfile);
   if (
     !deploymentTransaction ||
     typeof deploymentTransaction !== "object" ||
@@ -442,18 +527,23 @@ export const buildMainnetSafePlanFingerprint = ({
   }
   const transactionData = ethers.hexlify(deploymentTransaction.data).toLowerCase();
 
-  const normalizedOwners = parseExpectedSafeOwners([...config.expectedSafeOwners].join(","));
+  const normalizedOwners = parseExpectedSafeOwners(
+    [...config.expectedSafeOwners].join(","),
+    mainnet.safeOwnersEnvironmentName,
+  );
   const expectedDeployer = requiredAddress("config.expectedDeployer", config.expectedDeployer);
   if (normalizedOwners.some((owner) => owner.toLowerCase() === expectedDeployer.toLowerCase())) {
     throw new Error("config.expectedDeployer must not be one of the Safe owners");
   }
-  const saltNonce = parseSaltNonce(config.saltNonce);
-  if (config.networkName !== ESPACE_MAINNET_SAFE_NETWORK) {
-    throw new Error("config.networkName must be conflux");
+  const saltNonce = parseSaltNonce(config.saltNonce, mainnet.safeSaltNonceEnvironmentName);
+  if (config.networkName !== mainnet.networkName) {
+    throw new Error(`config.networkName must be ${mainnet.networkName}`);
   }
-  const configChainId = normalizeChainId(config.chainId);
-  if (config.governanceMultisigProfile !== ESPACE_MAINNET_SAFE_PROFILE) {
-    throw new Error(`config.governanceMultisigProfile must be ${ESPACE_MAINNET_SAFE_PROFILE}`);
+  const configChainId = normalizeChainId(config.chainId, chainProfile);
+  if (config.governanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
+    throw new Error(
+      `config.governanceMultisigProfile must be ${chainProfile.governanceMultisigProfile}`,
+    );
   }
   const confirmations = parseInteger("config.confirmations", config.confirmations, 2, 2, 100);
   const finalityTimeoutSeconds = parseInteger(
@@ -463,17 +553,18 @@ export const buildMainnetSafePlanFingerprint = ({
     60,
     604_800,
   );
-  const maxCfxWei = parseNonnegativeInteger("config.maxCfxWei", config.maxCfxWei);
-  if (BigInt(maxCfxWei) <= 0n || BigInt(maxCfxWei) > ethers.MaxUint256) {
-    throw new Error("config.maxCfxWei must be a positive uint256 amount");
+  const maximumCostWei = parseNonnegativeInteger("config.maximumCostWei", config.maximumCostWei);
+  if (BigInt(maximumCostWei) <= 0n || BigInt(maximumCostWei) > ethers.MaxUint256) {
+    throw new Error("config.maximumCostWei must be a positive uint256 amount");
   }
 
   return deepFreeze(
     canonicalize({
-      schemaVersion: ESPACE_MAINNET_SAFE_STATE_SCHEMA_VERSION,
-      domain: ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN,
+      schemaVersion: MAINNET_SAFE_STATE_SCHEMA_VERSION,
+      domain: mainnet.safePlanDigestDomain,
+      chainProfileId: chainProfile.id,
       network: {
-        name: ESPACE_MAINNET_SAFE_NETWORK,
+        name: mainnet.networkName,
         chainId: configChainId,
       },
       releaseCommit: String(releaseCommit).toLowerCase(),
@@ -486,7 +577,7 @@ export const buildMainnetSafePlanFingerprint = ({
         predictedAddress: normalizedPredictedSafeAddress,
         owners: [...normalizedOwners],
         threshold: CANONICAL_SAFE_THRESHOLD,
-        profile: ESPACE_MAINNET_SAFE_PROFILE,
+        profile: chainProfile.governanceMultisigProfile,
         saltNonce,
       },
       canonicalInfrastructure: infrastructure,
@@ -500,7 +591,9 @@ export const buildMainnetSafePlanFingerprint = ({
         confirmations,
         finalityTimeoutSeconds,
         finalityRequired: true,
-        maximumCostWei: maxCfxWei,
+        nativeSymbol: chainProfile.nativeSymbol,
+        gasChargingPolicy: mainnet.gasChargingPolicy,
+        maximumCostWei,
       },
     }),
   );
@@ -509,12 +602,13 @@ export const buildMainnetSafePlanFingerprint = ({
 export const deriveMainnetSafePlanDigest = (fingerprint) =>
   ethers.keccak256(
     ethers.toUtf8Bytes(
-      `${ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN}:${canonicalMainnetSafePlanJson(fingerprint)}`,
+      `${fingerprint?.domain ?? ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN}:` +
+        canonicalMainnetSafePlanJson(fingerprint),
     ),
   );
 
 export const assertMainnetSafePlanMatchesCheckpoint = ({ checkpoint, fingerprint, planDigest }) => {
-  if (!checkpoint || checkpoint.schemaVersion !== ESPACE_MAINNET_SAFE_STATE_SCHEMA_VERSION) {
+  if (!checkpoint || checkpoint.schemaVersion !== MAINNET_SAFE_STATE_SCHEMA_VERSION) {
     throw new Error("Mainnet Safe checkpoint is missing or has an unsupported schema version");
   }
   if (!ethers.isHexString(planDigest, 32)) {

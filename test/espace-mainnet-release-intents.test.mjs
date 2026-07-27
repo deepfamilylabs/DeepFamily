@@ -6,8 +6,8 @@ import { ethers } from "ethers";
 import {
   buildMainnetReleaseIntents,
   deriveMainnetReleaseIntentsDigest,
-} from "../scripts/lib/espaceMainnetReleaseIntents.mjs";
-import { ESPACE_MAINNET_TRANSACTION_LABELS } from "../scripts/lib/espaceMainnetReleaseSafety.mjs";
+} from "../scripts/lib/mainnetReleaseIntents.mjs";
+import { MAINNET_TRANSACTION_LABELS } from "../scripts/lib/mainnetReleaseSafety.mjs";
 
 const DEPLOYER = "0x1000000000000000000000000000000000000001";
 const MULTISIG = "0x2000000000000000000000000000000000000002";
@@ -54,7 +54,7 @@ const constructorData = (intent, artifact) =>
 describe("eSpace Mainnet release transaction intents", function () {
   it("reconstructs the exact ten deployments and four calls in nonce order", async function () {
     const intents = await build();
-    expect(intents.map(({ label }) => label)).to.deep.equal(ESPACE_MAINNET_TRANSACTION_LABELS);
+    expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
     expect(intents).to.have.length(14);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);

@@ -456,6 +456,38 @@ It does not write test person/NFT/story data to Mainnet. Full configuration and 
 instructions are in the
 [eSpace Mainnet release runbook](espace-mainnet-release.md).
 
+Ethereum uses a separate guarded profile rather than changing the eSpace command's network. The
+equivalent fixed entries are:
+
+```bash
+# Destructive Sepolia acceptance; chain ID is fixed to 11155111.
+npm run ethereum:acceptance
+
+# Ethereum Mainnet Safe plan/execute and read-only owner-smoke validation.
+npm run ethereum:mainnet:safe
+npm run ethereum:mainnet:safe:status
+
+# Ethereum Mainnet protocol plan/execute.
+npm run ethereum:mainnet:release
+```
+
+The Ethereum production flow requires
+`GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
+exactly three ordered EOA owners with threshold `2`, ETH budget variables, a real Etherscan API key,
+and the exact chain-1 confirmation strings. The Safe and release commands default to read-only plan
+mode while their respective confirmation/digest pair is blank. Filling the reviewed pair and
+rerunning enters execute/resume mode and broadcasts real Mainnet transactions.
+
+As with eSpace, the repository never accepts a production Safe owner's private key. After Safe
+deployment, two real owners must externally execute the exact refund-free zero-ETH smoke
+transaction. `npm run ethereum:mainnet:safe:status` validates its public outer transaction hash;
+the protocol release requires that smoke transaction to remain the Safe's first and only execution
+(`nonce == 1`).
+
+Complete Ethereum environment, digest review, execution, checkpoint and recovery instructions are
+in the [Ethereum Mainnet release runbook](ethereum-mainnet-release.md). The local Sepolia
+acceptance procedure is in `ethereum-sepolia-acceptance.local.md`.
+
 For manual deployment on another supported network, or an explicitly reviewed recovery, deploy the
 timelock first with one governance multisig. The deploy script requires `MIN_DELAY` and
 `GOVERNANCE_MULTISIG` explicitly on every non-local network, validates the delay as a positive safe
@@ -463,12 +495,23 @@ integer, and checks the `getOwners()`/`getThreshold()` state. This confirms the 
 and owners, but it does not independently attest the multisig implementation or bytecode; verify
 the wallet deployment, signer policy, modules, and guards before funding or transferring ownership.
 
-Conflux eSpace is the primary deployment target: rehearse the complete deployment and governance
-flow on `confluxTestnet`, then use `conflux` with reviewed production addresses for Mainnet. Conflux
-eSpace is an EVM-compatible execution environment within Conflux Network, not an Ethereum L2.
-Ethereum Mainnet and Sepolia remain optional compatibility targets.
+Conflux eSpace is an EVM-compatible execution environment within Conflux Network, not an Ethereum
+L2. Its guarded flow rehearses on `confluxTestnet` and releases on `conflux`; the guarded Ethereum
+flow rehearses on `sepolia` and releases on `mainnet`. EVM compatibility does not make their
+production controls interchangeable. eSpace pins the canonical Safe v1.3.0 L2 singleton, CFX,
+Conflux charging, Conflux RPC/ConfluxScan and `deployments/conflux/`; Ethereum pins the canonical
+Safe v1.3.0 L1 singleton, ETH, receipt `gasUsed`, Sepolia Blockscout, Mainnet Etherscan and
+`deployments/mainnet/`.
 `CONFLUX_TESTNET_RPC_URL` and `CONFLUX_RPC_URL` override the corresponding eSpace RPC endpoint;
 blank or whitespace-only values use the official public endpoints configured in the project.
+`ETHEREUM_SEPOLIA_RPC_URL` and `ETHEREUM_MAINNET_RPC_URL` explicitly select Ethereum endpoints;
+when blank, the project can derive them from `INFURA_API_KEY`.
+
+The named `espace:*` and `ethereum:*` npm entries select immutable profiles in code and verify the
+raw chain ID. Do not invoke lower-level entry scripts with an arbitrary `--network`, copy an
+authorization digest between profiles, or point one profile at another chain. Safe singleton type,
+confirmation string, currency budget, wallet derivation, gas accounting, explorer policy, report
+directory and checkpoints all form part of the reviewed evidence.
 
 The wrapper internally fixes the external admin to `address(0)`, makes role membership enumerable,
 and restricts `grantRole`, `revokeRole`, and `renounceRole` to timelock self-calls. OpenZeppelin's
@@ -488,16 +531,17 @@ GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
 `deploy:timelock`, `deploy:net`, and one-contract `verify:net` do not provide the mainnet
 orchestrator's single release digest, cross-phase checkpoint, automatic complete verification,
 finalized coverage, or terminal-state report. Do not mix manual commands with an active
-`deployments/conflux/mainnet-release-state.json` release.
+guarded checkpoint: `deployments/conflux/mainnet-release-state.json` for eSpace or
+`deployments/mainnet/mainnet-release-state.json` for Ethereum.
 
 To verify contracts on ConfluxScan, run for example
 `npm run verify:net --net=confluxTestnet -- 0xContractAddress`, appending constructor arguments
 when that contract has them.
 When `EXPLORER_API_KEY` is blank, the configuration supplies ConfluxScan's non-secret `espace`
-placeholder automatically. Ethereum Mainnet and Sepolia instead require a real Etherscan key for
-the current invocation, for example
-`EXPLORER_API_KEY=... npm run verify:net --net=sepolia -- 0xContractAddress`.
-Do not reuse the Conflux placeholder for Ethereum verification.
+placeholder automatically. Sepolia uses Hardhat's API-key-free Blockscout provider:
+`npm run verify:net --net=sepolia -- 0xContractAddress`.
+Ethereum Mainnet retains Etherscan and requires a real `EXPLORER_API_KEY`; do not reuse the
+Conflux placeholder for Mainnet verification.
 
 Only in-process simulated networks and the explicitly named `localhost` network permit the local
 defaults (`MIN_DELAY=120` with the deployer as role holder). A remote HTTP network is treated as live

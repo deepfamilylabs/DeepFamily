@@ -1,9 +1,9 @@
 import { expect } from "chai";
-import { verifyAcceptanceContracts } from "../scripts/lib/espaceAcceptanceVerification.mjs";
+import { verifyAcceptanceContracts } from "../scripts/lib/acceptanceVerification.mjs";
 
 const address = (suffix) => `0x${suffix.toString(16).padStart(40, "0")}`;
 
-describe("eSpace acceptance source verification", function () {
+describe("multi-chain acceptance source verification", function () {
   it("verifies entries sequentially and returns only public result metadata", async () => {
     const calls = [];
     const hre = { marker: "hre" };
@@ -39,6 +39,7 @@ describe("eSpace acceptance source verification", function () {
     expect(calls[0].args).to.deep.include({
       address: address(1),
       contract: "contracts/First.sol:First",
+      provider: "etherscan",
     });
     expect(calls[0].args.constructorArgs).to.deep.equal([secretConstructorData]);
     expect(calls[0].receivedHre).to.equal(hre);
@@ -61,6 +62,27 @@ describe("eSpace acceptance source verification", function () {
       },
     ]);
     expect(JSON.stringify(results)).not.to.include(secretConstructorData);
+  });
+
+  it("forwards the selected Blockscout provider without requiring an API key", async () => {
+    const calls = [];
+    const results = await verifyAcceptanceContracts({
+      hre: {},
+      entries: [{ label: "sepolia", address: address(32), contract: "A.sol:A" }],
+      timeoutMs: 1_000,
+      retries: 0,
+      logger: null,
+      verificationProvider: "blockscout",
+      explorerName: "Blockscout",
+      verifyFn: async (args) => {
+        calls.push(args);
+        return true;
+      },
+    });
+
+    expect(calls).to.have.length(1);
+    expect(calls[0]).to.include({ provider: "blockscout" });
+    expect(results[0]).to.include({ status: "passed", attempts: 1 });
   });
 
   it("treats ConfluxScan's already_verified machine status as passed", async () => {
@@ -224,6 +246,7 @@ describe("eSpace acceptance source verification", function () {
         timeoutMs: 1_000,
         entries: [{ label: "one", address: address(8), contract: "F", constructorArgs: {} }],
       },
+      { ...base, timeoutMs: 1_000, verificationProvider: "unknown" },
     ]) {
       let caught;
       try {

@@ -15,37 +15,47 @@ describe("eSpace Mainnet Safe command wiring", function () {
     );
   });
 
-  it("hard-wires the Safe wrapper to Conflux mainnet without compiling unrelated contracts", async function () {
-    const source = await fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8");
-    expect(source).to.include('".mainnet-command.lock"');
-    expect(source).to.include('".mainnet-safe-command.lock"');
-    expect(source).to.include('"--network"');
-    expect(source).to.include('"conflux"');
-    expect(source).to.include('"--no-compile"');
-    expect(source).not.to.include('"compile"');
-    expect(source).not.to.include('"confluxTestnet"');
+  it("hard-wires the Safe entry to the eSpace profile and delegates fixed-network execution", async function () {
+    const [entry, wrapper] = await Promise.all([
+      fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
+      fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
+    ]);
+    expect(entry).to.include("ESPACE_CHAIN_PROFILE");
+    expect(entry).to.include("runMainnetSafeCommand");
+    expect(entry).to.include('"scripts/espace-mainnet-safe.mjs"');
+    expect(entry).not.to.include("--network");
+    expect(entry).not.to.include("process.argv");
+
+    expect(wrapper).to.include('"--network"');
+    expect(wrapper).to.include("chainProfile.mainnet.networkName");
+    expect(wrapper).to.include('"--no-compile"');
+    expect(wrapper).not.to.include('"confluxTestnet"');
   });
 
   it("shares a production-command mutex with the protocol release wrapper", async function () {
-    const [safeWrapper, releaseWrapper, safeRunner, releaseRunner] = await Promise.all([
-      fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
-      fs.readFile("scripts/espace-mainnet-release-command.mjs", "utf8"),
-      fs.readFile("scripts/espace-mainnet-safe.mjs", "utf8"),
-      fs.readFile("scripts/espace-mainnet-release.mjs", "utf8"),
-    ]);
-    expect(safeWrapper).to.include('".mainnet-command.lock"');
-    expect(releaseWrapper).to.include('".mainnet-command.lock"');
-    expect(safeWrapper).to.include("acquireExclusiveCommandLock");
-    expect(releaseWrapper).to.include("acquireExclusiveCommandLock");
-    for (const source of [safeWrapper, releaseWrapper, safeRunner, releaseRunner]) {
-      expect(source).to.include("DEEPFAMILY_ESPACE_MAINNET_COMMAND_WRAPPER_TOKEN");
-    }
+    const [safeWrapper, releaseWrapper, sharedWrapper, safeRunner, releaseRunner] =
+      await Promise.all([
+        fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
+        fs.readFile("scripts/espace-mainnet-release-command.mjs", "utf8"),
+        fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
+        fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8"),
+        fs.readFile("scripts/evm-mainnet-release.mjs", "utf8"),
+      ]);
+    expect(safeWrapper).to.include("runMainnetSafeCommand");
+    expect(releaseWrapper).to.include("runMainnetReleaseCommand");
+    expect(sharedWrapper).to.include('".mainnet-command.lock"');
+    expect(sharedWrapper).to.include("`.mainnet-${kind}-command.lock`");
+    expect(sharedWrapper).to.include("chainProfile.mainnet.deploymentDirectoryName");
+    expect(sharedWrapper).to.include("chainProfile.mainnet.sharedWrapperTokenEnvironmentName");
+    expect(sharedWrapper).to.include("acquireExclusiveCommandLock");
+    expect(safeRunner).to.include("MAINNET_PROFILE.sharedWrapperTokenEnvironmentName");
+    expect(releaseRunner).to.include("MAINNET_PROFILE.sharedWrapperTokenEnvironmentName");
     expect(safeRunner).to.include("SHARED_COMMAND_LOCK_PATH");
     expect(releaseRunner).to.include("SHARED_COMMAND_LOCK_PATH");
   });
 
   it("does not import owner signing or test-wallet derivation into the production creator", async function () {
-    const source = await fs.readFile("scripts/espace-mainnet-safe.mjs", "utf8");
+    const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
     for (const forbidden of [
       "signCanonicalSafeTransaction",
       "deriveAcceptanceWallets",
@@ -60,7 +70,7 @@ describe("eSpace Mainnet Safe command wiring", function () {
   });
 
   it("recomputes the owner/salt prediction during status instead of trusting checkpoint data alone", async function () {
-    const source = await fs.readFile("scripts/espace-mainnet-safe.mjs", "utf8");
+    const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
     const statusStart = source.indexOf("const runStatus =");
     const mainStart = source.indexOf("export const main =", statusStart);
     const statusSource = source.slice(statusStart, mainStart);
@@ -72,12 +82,12 @@ describe("eSpace Mainnet Safe command wiring", function () {
     expect(statusSource).to.include("predictedSafeAddress");
     expect(statusSource).to.include("checkpoint.safeAddress");
     expect(statusSource).to.include("gitWorkingTreeState");
-    expect(statusSource).to.include("hashESpaceMainnetSafeInputs");
+    expect(statusSource).to.include("hashMainnetSafeInputs");
     expect(statusSource).not.to.include("decodedSetupFromFingerprint");
   });
 
   it("does not mislabel an interrupted execution as a fresh no-broadcast plan", async function () {
-    const source = await fs.readFile("scripts/espace-mainnet-safe.mjs", "utf8");
+    const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
     expect(source).to.include("An incomplete Safe deployment checkpoint");
     expect(source).to.include(
       "cannot create a new plan or claim that no transaction was broadcast",
@@ -88,7 +98,7 @@ describe("eSpace Mainnet Safe command wiring", function () {
   });
 
   it("rechecks a hashless factory step after taking the execution lock", async function () {
-    const source = await fs.readFile("scripts/espace-mainnet-safe.mjs", "utf8");
+    const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
     const lockStart = source.indexOf("const releaseLock =");
     const factoryBroadcast = source.indexOf("const receipt = await transactionExecutor", lockStart);
     const lockedSource = source.slice(lockStart, factoryBroadcast);
@@ -101,14 +111,13 @@ describe("eSpace Mainnet Safe command wiring", function () {
   });
 
   it("does not mislabel an interrupted or completed protocol release as a fresh plan", async function () {
-    const source = await fs.readFile("scripts/espace-mainnet-release.mjs", "utf8");
+    const source = await fs.readFile("scripts/evm-mainnet-release.mjs", "utf8");
     expect(source).to.include("An incomplete protocol release checkpoint");
     expect(source).to.include(
       "cannot create a new plan or claim that no transaction was broadcast",
     );
-    expect(source).to.include(
-      "eSpace Mainnet release is already complete; read-only revalidation passed",
-    );
+    expect(source).to.include("Mainnet release is already complete; read-only");
+    expect(source).to.include("revalidation passed");
     expect(source).to.include("governanceSafeOperationalAcceptance");
     expect(source).to.include("safeOperationalAcceptance?.finality");
   });

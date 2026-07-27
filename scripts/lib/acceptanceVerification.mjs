@@ -1,3 +1,6 @@
+/**
+ * Shared live-network source-verification helper.
+ */
 import { verifyContract } from "@nomicfoundation/hardhat-verify/verify";
 
 const DEFAULT_TOTAL_TIMEOUT_MS = 15 * 60 * 1000;
@@ -9,7 +12,14 @@ const MAX_RETRY_DELAY_MS = 10_000;
 
 const publicErrorMessage = (error) => {
   let raw = String(error?.shortMessage || error?.reason || error?.message || error || "unknown");
-  for (const name of ["PRIVATE_KEY", "CONFLUX_RPC_URL", "CONFLUX_TESTNET_RPC_URL"]) {
+  for (const name of [
+    "PRIVATE_KEY",
+    "CONFLUX_RPC_URL",
+    "CONFLUX_TESTNET_RPC_URL",
+    "ETHEREUM_MAINNET_RPC_URL",
+    "ETHEREUM_SEPOLIA_RPC_URL",
+    "INFURA_API_KEY",
+  ]) {
     const secret = String(process.env[name] ?? "");
     if (secret.length >= 4) raw = raw.split(secret).join(`<redacted-${name.toLowerCase()}>`);
   }
@@ -110,7 +120,7 @@ const normalizeEntry = (entry, index) => {
 };
 
 /**
- * Verify an isolated eSpace acceptance deployment sequentially.
+ * Verify an isolated live-network deployment sequentially.
  *
  * `timeoutMs` is a hard deadline for the complete batch. Each individual explorer request is
  * also bounded by `attemptTimeoutMs` (an injectable test/advanced option). Results intentionally
@@ -126,12 +136,20 @@ export const verifyAcceptanceContracts = async ({
   sleepFn = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
   nowFn = Date.now,
   attemptTimeoutMs = DEFAULT_ATTEMPT_TIMEOUT_MS,
+  verificationProvider = "etherscan",
+  explorerName = "ConfluxScan",
 } = {}) => {
   if (!hre) throw new Error("hre is required");
   if (!Array.isArray(entries)) throw new Error("entries must be an array");
   if (typeof verifyFn !== "function") throw new Error("verifyFn must be a function");
   if (typeof sleepFn !== "function") throw new Error("sleepFn must be a function");
   if (typeof nowFn !== "function") throw new Error("nowFn must be a function");
+  if (verificationProvider !== "etherscan" && verificationProvider !== "blockscout") {
+    throw new Error("verificationProvider must be exactly etherscan or blockscout");
+  }
+  if (typeof explorerName !== "string" || explorerName.trim() === "") {
+    throw new Error("explorerName must be a non-empty string");
+  }
 
   positiveSafeInteger(timeoutMs, "timeoutMs");
   positiveSafeInteger(attemptTimeoutMs, "attemptTimeoutMs");
@@ -172,6 +190,7 @@ export const verifyAcceptanceContracts = async ({
                 constructorArgs: entry.constructorArgs,
                 libraries: entry.libraries,
                 contract: entry.contract,
+                provider: verificationProvider,
               },
               hre,
             ),
@@ -189,7 +208,7 @@ export const verifyAcceptanceContracts = async ({
           log(
             logger,
             "log",
-            `[verify] ${entry.label} already verified on ConfluxScan; accepting explorer status`,
+            `[verify] ${entry.label} already verified on ${explorerName}; accepting explorer status`,
           );
           break;
         }
@@ -245,7 +264,7 @@ export const verifyAcceptanceContracts = async ({
   const failed = results.filter((result) => result.status === "failed");
   if (failed.length > 0) {
     const error = new Error(
-      `ConfluxScan verification failed for ${failed.length}/${results.length} contract(s): ` +
+      `${explorerName} verification failed for ${failed.length}/${results.length} contract(s): ` +
         failed.map((result) => result.label).join(", "),
     );
     error.results = results;

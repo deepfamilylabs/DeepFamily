@@ -120,7 +120,7 @@ npm run check         # Run frontend checks + contract lint/build/test
 - Mainnet (`conflux`, chain ID 1030)
 - Testnet (`confluxTestnet`, chain ID 71)
 
-**Optional EVM-compatible targets — Ethereum:**
+**Guarded Ethereum targets:**
 
 - Mainnet (`mainnet`, chain ID 1)
 - Sepolia (`sepolia`, chain ID 11155111)
@@ -130,6 +130,18 @@ EVM-compatible execution environment within Conflux Network, not an Ethereum L2.
 parentheses are the network names used by the project scripts and Hardhat tasks.
 Set `CONFLUX_TESTNET_RPC_URL` or `CONFLUX_RPC_URL` to use a managed eSpace RPC; blank values fall
 back to the official public testnet or mainnet endpoint.
+
+The guarded release commands use explicit, immutable chain profiles rather than treating every EVM
+network as interchangeable:
+
+| Command family | Test / production chain      | Safe singleton           | Currency / gas evidence              | Explorer               |
+| -------------- | ---------------------------- | ------------------------ | ------------------------------------ | ---------------------- |
+| `espace:*`     | eSpace 71 / 1030             | canonical Safe v1.3.0 L2 | CFX / Conflux three-quarter gas rule | ConfluxScan            |
+| `ethereum:*`   | Sepolia 11155111 / Mainnet 1 | canonical Safe v1.3.0 L1 | ETH / receipt `gasUsed`              | Blockscout / Etherscan |
+
+RPC variables, confirmation strings, Safe profile names, budgets, wallet-derivation domains,
+reports, locks, and checkpoints are also separated. Use the named npm entry for the intended chain;
+do not invoke a lower-level script with an arbitrary `--network` to bypass these locks.
 
 ### Recommended eSpace Mainnet release
 
@@ -177,6 +189,53 @@ the terminal governance state. Repository tests never broadcast eSpace Mainnet t
 the complete Safe bootstrap, acceptance, release, and recovery procedure in the
 [eSpace Mainnet release runbook](docs/espace-mainnet-release.md).
 
+### Guarded Ethereum release
+
+Ethereum uses the same reviewed release architecture but a separate Ethereum profile and state.
+First run the destructive Sepolia acceptance suite:
+
+```bash
+ETHEREUM_E2E_CONFIRM=ethereum-sepolia-chain-11155111 \
+ETHEREUM_E2E_MODE=diagnostic \
+npm run ethereum:acceptance
+```
+
+A diagnostic run always reports `releaseReady=false`. Before a production release, rerun from the
+clean release commit with `ETHEREUM_E2E_MODE=release-rehearsal`,
+`GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, verification/finality enabled, and
+`MIN_DELAY` exactly equal to `ETHEREUM_E2E_MIN_DELAY`.
+
+For Mainnet, configure three reviewed public owner addresses and a fixed salt, then leave the Safe
+confirmation/digest pair blank to create a read-only plan:
+
+```bash
+npm run ethereum:mainnet:safe
+```
+
+After independent review, setting
+`ETHEREUM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1` plus the exact printed digest and
+rerunning broadcasts the real Safe factory transaction. Two real owners must then execute the
+documented zero-ETH smoke transaction externally; this repository never accepts owner private
+keys. Record its outer hash and validate it without broadcasting:
+
+```bash
+npm run ethereum:mainnet:safe:status
+```
+
+Finally, leave the release confirmation/digest blank for a read-only protocol plan:
+
+```bash
+npm run ethereum:mainnet:release
+```
+
+Setting `ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1` plus the independently reviewed digest
+and rerunning enters execute/resume mode, broadcasts real Ethereum Mainnet transactions, and spends
+real ETH. A real `EXPLORER_API_KEY` is mandatory for Ethereum Mainnet source verification; Sepolia
+acceptance uses API-key-free Blockscout. See the complete
+environment, owner-smoke, approval, checkpoint, resumption, and recovery procedure in the
+[Ethereum Mainnet release runbook](docs/ethereum-mainnet-release.md). The local Sepolia setup and
+rerun procedure is in `docs/ethereum-sepolia-acceptance.local.md`.
+
 ### Manual and other-network deployment
 
 The stepwise commands below remain available for local/testnet work, optional compatibility
@@ -198,8 +257,8 @@ npm run dev:deploy
 # Verify one eSpace deployment (ConfluxScan uses the built-in non-secret "espace" fallback)
 npm run verify:net --net=confluxTestnet -- 0xContractAddress
 
-# Ethereum verification instead requires a real Etherscan key for that invocation
-EXPLORER_API_KEY=... npm run verify:net --net=sepolia -- 0xContractAddress
+# Sepolia verification uses API-key-free Blockscout
+npm run verify:net --net=sepolia -- 0xContractAddress
 ```
 
 ### Upgradeability & Governance
@@ -371,6 +430,8 @@ governance task rejects upgrade and ownership-transfer functions. See
 ## Documentation
 
 - [Smart Contracts Reference](docs/contracts.md) - Complete contract API and implementation details
+- [Conflux eSpace Mainnet release](docs/espace-mainnet-release.md) - Guarded Safe and release runbook
+- [Ethereum Mainnet release](docs/ethereum-mainnet-release.md) - Guarded Safe and release runbook
 - [Zero-Knowledge Proofs](docs/zk-proofs.md) - ZK proof system and circuit documentation
 - [Frontend Integration](docs/frontend.md) - React component and UI development guide
 

@@ -1,16 +1,23 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { ethers } from "ethers";
 
-export const ESPACE_TESTNET_NAME = "confluxTestnet";
-export const ESPACE_TESTNET_CHAIN_ID = 71n;
-export const ESPACE_E2E_CONFIRMATION = "conflux-testnet-chain-71";
-export const ESPACE_E2E_MODE_DIAGNOSTIC = "diagnostic";
-export const ESPACE_E2E_MODE_RELEASE_REHEARSAL = "release-rehearsal";
-export const ESPACE_E2E_RELEASE_SAFE_PROFILE = "conflux-safe-1.3.0-2of3";
+import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
+import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
+
+export const ESPACE_TESTNET_NAME = ESPACE_CHAIN_PROFILE.acceptance.networkName;
+export const ESPACE_TESTNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.acceptance.chainId;
+export const ESPACE_E2E_CONFIRMATION = ESPACE_CHAIN_PROFILE.acceptance.confirmation;
+export const ACCEPTANCE_MODE_DIAGNOSTIC = "diagnostic";
+export const ACCEPTANCE_MODE_RELEASE_REHEARSAL = "release-rehearsal";
+export const ESPACE_E2E_RELEASE_SAFE_PROFILE = ESPACE_CHAIN_PROFILE.governanceMultisigProfile;
+export const ETHEREUM_TESTNET_NAME = ETHEREUM_CHAIN_PROFILE.acceptance.networkName;
+export const ETHEREUM_TESTNET_CHAIN_ID = ETHEREUM_CHAIN_PROFILE.acceptance.chainId;
+export const ETHEREUM_E2E_CONFIRMATION = ETHEREUM_CHAIN_PROFILE.acceptance.confirmation;
+export const ETHEREUM_E2E_RELEASE_SAFE_PROFILE = ETHEREUM_CHAIN_PROFILE.governanceMultisigProfile;
 
 const SECP256K1_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{7,79}$/;
-const DECIMAL_CFX_PATTERN = /^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/;
+const DECIMAL_NATIVE_PATTERN = /^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/;
 const SECRET_KEY_PATTERN =
   /(?:private.?key|mnemonic|seed(?:phrase)?|signature(?:s)?|proof(?:data)?|passphrase|secret)/iu;
 
@@ -34,12 +41,12 @@ const parseBooleanFlag = (name, value, defaultValue) => {
   return raw === "1";
 };
 
-const parseAcceptanceMode = (value) => {
-  const mode = value === undefined || value === "" ? ESPACE_E2E_MODE_DIAGNOSTIC : String(value);
-  if (mode !== ESPACE_E2E_MODE_DIAGNOSTIC && mode !== ESPACE_E2E_MODE_RELEASE_REHEARSAL) {
+const parseAcceptanceMode = (name, value) => {
+  const mode = value === undefined || value === "" ? ACCEPTANCE_MODE_DIAGNOSTIC : String(value);
+  if (mode !== ACCEPTANCE_MODE_DIAGNOSTIC && mode !== ACCEPTANCE_MODE_RELEASE_REHEARSAL) {
     throw new Error(
-      `ESPACE_E2E_MODE must be exactly ${ESPACE_E2E_MODE_DIAGNOSTIC} or ` +
-        ESPACE_E2E_MODE_RELEASE_REHEARSAL,
+      `${name} must be exactly ${ACCEPTANCE_MODE_DIAGNOSTIC} or ` +
+        ACCEPTANCE_MODE_RELEASE_REHEARSAL,
     );
   }
   return mode;
@@ -57,30 +64,42 @@ const parseRequiredPositiveInteger = (name, value) => {
   return parsed;
 };
 
-export const sanitizeRunId = (value) => {
+export const sanitizeRunId = (
+  value,
+  environmentName = ESPACE_CHAIN_PROFILE.acceptance.runIdEnvironmentName,
+) => {
   const runId = String(value ?? "").trim();
   if (!RUN_ID_PATTERN.test(runId)) {
     throw new Error(
-      "ESPACE_E2E_RUN_ID must be 8-80 characters using only letters, digits, '_' or '-', " +
+      `${environmentName} must be 8-80 characters using only letters, digits, '_' or '-', ` +
         "and must start with a letter or digit",
     );
   }
   return runId;
 };
 
-export const hashRunId = (runId) =>
+export const hashRunId = (runId, chainProfile = ESPACE_CHAIN_PROFILE) =>
   ethers.keccak256(
-    ethers.toUtf8Bytes(`deepfamily:espace-acceptance:run-id:${sanitizeRunId(runId)}`),
+    ethers.toUtf8Bytes(
+      `${chainProfile.acceptance.runIdDigestDomain}:` +
+        sanitizeRunId(runId, chainProfile.acceptance.runIdEnvironmentName),
+    ),
   );
 
-export const runIdReportFileComponent = (runId) => hashRunId(runId).slice(2, 34);
+export const runIdReportFileComponent = (runId, chainProfile = ESPACE_CHAIN_PROFILE) =>
+  hashRunId(runId, chainProfile).slice(2, 34);
 
-export const parseESpaceAcceptanceConfig = ({ env = process.env, networkName, chainId } = {}) => {
-  if (networkName !== ESPACE_TESTNET_NAME) {
+export const parseAcceptanceConfig = ({
+  chainProfile = ESPACE_CHAIN_PROFILE,
+  env = process.env,
+  networkName,
+  chainId,
+} = {}) => {
+  const acceptance = chainProfile.acceptance;
+  if (networkName !== acceptance.networkName) {
     throw new Error(
-      `eSpace acceptance is restricted to network ${ESPACE_TESTNET_NAME}; got ${
-        networkName || "unknown"
-      }`,
+      `${chainProfile.displayName} acceptance is restricted to network ` +
+        `${acceptance.networkName}; got ${networkName || "unknown"}`,
     );
   }
 
@@ -88,82 +107,121 @@ export const parseESpaceAcceptanceConfig = ({ env = process.env, networkName, ch
   try {
     normalizedChainId = BigInt(chainId);
   } catch {
-    throw new Error(`eSpace acceptance requires chainId 71; got ${String(chainId)}`);
-  }
-  if (normalizedChainId !== ESPACE_TESTNET_CHAIN_ID) {
-    throw new Error(`eSpace acceptance requires chainId 71; got ${normalizedChainId}`);
-  }
-
-  if (env.ESPACE_E2E_CONFIRM !== ESPACE_E2E_CONFIRMATION) {
     throw new Error(
-      `Set ESPACE_E2E_CONFIRM=${ESPACE_E2E_CONFIRMATION} to authorize testnet transactions`,
+      `${chainProfile.displayName} acceptance requires chainId ${acceptance.chainId}; got ` +
+        String(chainId),
+    );
+  }
+  if (normalizedChainId !== acceptance.chainId) {
+    throw new Error(
+      `${chainProfile.displayName} acceptance requires chainId ${acceptance.chainId}; got ` +
+        normalizedChainId,
     );
   }
 
-  const acceptanceMode = parseAcceptanceMode(env.ESPACE_E2E_MODE);
-  const minDelaySeconds = parseInteger("ESPACE_E2E_MIN_DELAY", env.ESPACE_E2E_MIN_DELAY, 30, 10);
+  if (env[acceptance.confirmationEnvironmentName] !== acceptance.confirmation) {
+    throw new Error(
+      `Set ${acceptance.confirmationEnvironmentName}=${acceptance.confirmation} ` +
+        "to authorize testnet transactions",
+    );
+  }
+
+  const acceptanceMode = parseAcceptanceMode(
+    acceptance.modeEnvironmentName,
+    env[acceptance.modeEnvironmentName],
+  );
+  const minDelaySeconds = parseInteger(
+    acceptance.minDelayEnvironmentName,
+    env[acceptance.minDelayEnvironmentName],
+    30,
+    10,
+  );
   const confirmations = parseInteger(
-    "ESPACE_E2E_CONFIRMATIONS",
-    env.ESPACE_E2E_CONFIRMATIONS,
+    acceptance.confirmationsEnvironmentName,
+    env[acceptance.confirmationsEnvironmentName],
     2,
     1,
   );
   if (confirmations > 100) {
-    throw new Error("ESPACE_E2E_CONFIRMATIONS must not exceed 100");
+    throw new Error(`${acceptance.confirmationsEnvironmentName} must not exceed 100`);
   }
-  const verify = parseBooleanFlag("ESPACE_E2E_VERIFY", env.ESPACE_E2E_VERIFY, "1");
-  const recover = parseBooleanFlag("ESPACE_E2E_RECOVER", env.ESPACE_E2E_RECOVER, "0");
+  const verify = parseBooleanFlag(
+    acceptance.verifyEnvironmentName,
+    env[acceptance.verifyEnvironmentName],
+    "1",
+  );
+  const recover = parseBooleanFlag(
+    acceptance.recoverEnvironmentName,
+    env[acceptance.recoverEnvironmentName],
+    "0",
+  );
   const requireFinality = parseBooleanFlag(
-    "ESPACE_E2E_REQUIRE_FINALITY",
-    env.ESPACE_E2E_REQUIRE_FINALITY,
+    acceptance.requireFinalityEnvironmentName,
+    env[acceptance.requireFinalityEnvironmentName],
     "1",
   );
   let productionMinDelaySeconds = null;
   let productionGovernanceMultisigProfile = null;
-  if (acceptanceMode === ESPACE_E2E_MODE_RELEASE_REHEARSAL) {
+  if (acceptanceMode === ACCEPTANCE_MODE_RELEASE_REHEARSAL) {
     if (!verify) {
-      throw new Error("release-rehearsal requires ESPACE_E2E_VERIFY=1");
+      throw new Error(`release-rehearsal requires ${acceptance.verifyEnvironmentName}=1`);
     }
     if (!requireFinality) {
-      throw new Error("release-rehearsal requires ESPACE_E2E_REQUIRE_FINALITY=1");
+      throw new Error(`release-rehearsal requires ${acceptance.requireFinalityEnvironmentName}=1`);
     }
     productionMinDelaySeconds = parseRequiredPositiveInteger("MIN_DELAY", env.MIN_DELAY);
     if (productionMinDelaySeconds !== minDelaySeconds) {
       throw new Error(
-        `release-rehearsal requires ESPACE_E2E_MIN_DELAY (${minDelaySeconds}) to equal ` +
+        `release-rehearsal requires ${acceptance.minDelayEnvironmentName} ` +
+          `(${minDelaySeconds}) to equal ` +
           `MIN_DELAY (${productionMinDelaySeconds})`,
       );
     }
-    productionGovernanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
-    if (productionGovernanceMultisigProfile !== ESPACE_E2E_RELEASE_SAFE_PROFILE) {
+    if (productionMinDelaySeconds < MAINNET_MIN_DELAY_FLOOR_SECONDS) {
       throw new Error(
-        `release-rehearsal requires GOVERNANCE_MULTISIG_PROFILE=` + ESPACE_E2E_RELEASE_SAFE_PROFILE,
+        `release-rehearsal requires MIN_DELAY >= ` +
+          `${MAINNET_MIN_DELAY_FLOOR_SECONDS} seconds to match the production minimum`,
+      );
+    }
+    productionGovernanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
+    if (productionGovernanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
+      throw new Error(
+        `release-rehearsal requires GOVERNANCE_MULTISIG_PROFILE=` +
+          chainProfile.governanceMultisigProfile,
       );
     }
   }
   const finalityTimeoutSeconds = parseInteger(
-    "ESPACE_E2E_FINALITY_TIMEOUT",
-    env.ESPACE_E2E_FINALITY_TIMEOUT,
+    acceptance.finalityTimeoutEnvironmentName,
+    env[acceptance.finalityTimeoutEnvironmentName],
     3600,
     60,
   );
 
-  const rawMaxCfx = String(env.ESPACE_E2E_MAX_CFX ?? "5").trim();
-  if (!DECIMAL_CFX_PATTERN.test(rawMaxCfx)) {
-    throw new Error("ESPACE_E2E_MAX_CFX must be a positive plain decimal with at most 18 decimals");
+  const rawMaximumCost = String(env[acceptance.maximumCostEnvironmentName] ?? "5").trim();
+  if (!DECIMAL_NATIVE_PATTERN.test(rawMaximumCost)) {
+    throw new Error(
+      `${acceptance.maximumCostEnvironmentName} must be a positive plain decimal with at most ` +
+        "18 decimals",
+    );
   }
-  const maxCfxWei = ethers.parseEther(rawMaxCfx);
-  if (maxCfxWei <= 0n) {
-    throw new Error("ESPACE_E2E_MAX_CFX must be greater than zero");
+  const maximumCostWei = ethers.parseEther(rawMaximumCost);
+  if (maximumCostWei <= 0n) {
+    throw new Error(`${acceptance.maximumCostEnvironmentName} must be greater than zero`);
   }
 
-  const configuredRunId = String(env.ESPACE_E2E_RUN_ID ?? "").trim();
-  const runId = configuredRunId === "" ? null : sanitizeRunId(configuredRunId);
+  const configuredRunId = String(env[acceptance.runIdEnvironmentName] ?? "").trim();
+  const runId =
+    configuredRunId === "" ? null : sanitizeRunId(configuredRunId, acceptance.runIdEnvironmentName);
   if (recover && runId === null) {
-    throw new Error("ESPACE_E2E_RECOVER=1 requires ESPACE_E2E_RUN_ID");
+    throw new Error(
+      `${acceptance.recoverEnvironmentName}=1 requires ${acceptance.runIdEnvironmentName}`,
+    );
   }
 
   return Object.freeze({
+    chainProfileId: chainProfile.id,
+    nativeSymbol: chainProfile.nativeSymbol,
     acceptanceMode,
     networkName,
     chainId: normalizedChainId,
@@ -175,12 +233,18 @@ export const parseESpaceAcceptanceConfig = ({ env = process.env, networkName, ch
     productionMinDelaySeconds,
     productionGovernanceMultisigProfile,
     finalityTimeoutSeconds,
-    maxCfx: rawMaxCfx,
-    maxCfxWei,
+    maximumCost: rawMaximumCost,
+    maximumCostWei,
     runId,
-    runIdHash: runId === null ? null : hashRunId(runId),
+    runIdHash: runId === null ? null : hashRunId(runId, chainProfile),
   });
 };
+
+export const parseESpaceAcceptanceConfig = (options = {}) =>
+  parseAcceptanceConfig({ ...options, chainProfile: ESPACE_CHAIN_PROFILE });
+
+export const parseEthereumAcceptanceConfig = (options = {}) =>
+  parseAcceptanceConfig({ ...options, chainProfile: ETHEREUM_CHAIN_PROFILE });
 
 /**
  * Summarizes the actual Hardhat build-info inputs used by the acceptance artifacts. This keeps the
@@ -259,29 +323,43 @@ const normalizeBasePrivateKey = (privateKey) => {
   return new ethers.Wallet(value).privateKey;
 };
 
-const deriveScalar = (basePrivateKey, runId, label) => {
+const deriveScalar = (basePrivateKey, runId, label, chainProfile) => {
   const digest = ethers.keccak256(
     ethers.concat([
       ethers.getBytes(basePrivateKey),
-      ethers.toUtf8Bytes(`deepfamily:espace-acceptance:v1:${runId}:${label}`),
+      ethers.toUtf8Bytes(`${chainProfile.acceptance.walletDerivationDomain}:${runId}:${label}`),
     ]),
   );
   const scalar = (BigInt(digest) % (SECP256K1_ORDER - 1n)) + 1n;
   return ethers.zeroPadValue(ethers.toBeHex(scalar), 32);
 };
 
-export const deriveAcceptanceWallet = ({ basePrivateKey, runId, label, provider = null }) => {
+export const deriveAcceptanceWallet = ({
+  basePrivateKey,
+  runId,
+  label,
+  provider = null,
+  chainProfile = ESPACE_CHAIN_PROFILE,
+}) => {
   const normalizedKey = normalizeBasePrivateKey(basePrivateKey);
-  const normalizedRunId = sanitizeRunId(runId);
+  const normalizedRunId = sanitizeRunId(runId, chainProfile.acceptance.runIdEnvironmentName);
   if (!/^[a-z][a-z0-9-]{2,40}$/.test(String(label ?? ""))) {
     throw new Error("Acceptance wallet label is invalid");
   }
-  return new ethers.Wallet(deriveScalar(normalizedKey, normalizedRunId, label), provider);
+  return new ethers.Wallet(
+    deriveScalar(normalizedKey, normalizedRunId, label, chainProfile),
+    provider,
+  );
 };
 
-export const deriveAcceptanceWallets = ({ basePrivateKey, runId, provider = null }) => {
+export const deriveAcceptanceWallets = ({
+  basePrivateKey,
+  runId,
+  provider = null,
+  chainProfile = ESPACE_CHAIN_PROFILE,
+}) => {
   const normalizedKey = normalizeBasePrivateKey(basePrivateKey);
-  const normalizedRunId = sanitizeRunId(runId);
+  const normalizedRunId = sanitizeRunId(runId, chainProfile.acceptance.runIdEnvironmentName);
   const baseAddress = new ethers.Wallet(normalizedKey).address;
   const wallets = {
     runDeployer: deriveAcceptanceWallet({
@@ -289,42 +367,49 @@ export const deriveAcceptanceWallets = ({ basePrivateKey, runId, provider = null
       runId: normalizedRunId,
       label: "run-deployer",
       provider,
+      chainProfile,
     }),
     ownerA: deriveAcceptanceWallet({
       basePrivateKey: normalizedKey,
       runId: normalizedRunId,
       label: "multisig-owner-a",
       provider,
+      chainProfile,
     }),
     ownerB: deriveAcceptanceWallet({
       basePrivateKey: normalizedKey,
       runId: normalizedRunId,
       label: "multisig-owner-b",
       provider,
+      chainProfile,
     }),
     ownerC: deriveAcceptanceWallet({
       basePrivateKey: normalizedKey,
       runId: normalizedRunId,
       label: "multisig-owner-c",
       provider,
+      chainProfile,
     }),
     ownerD: deriveAcceptanceWallet({
       basePrivateKey: normalizedKey,
       runId: normalizedRunId,
       label: "multisig-owner-d",
       provider,
+      chainProfile,
     }),
     ownerE: deriveAcceptanceWallet({
       basePrivateKey: normalizedKey,
       runId: normalizedRunId,
       label: "multisig-owner-e",
       provider,
+      chainProfile,
     }),
     ownerF: deriveAcceptanceWallet({
       basePrivateKey: normalizedKey,
       runId: normalizedRunId,
       label: "multisig-owner-f",
       provider,
+      chainProfile,
     }),
   };
   const addresses = [baseAddress, ...Object.values(wallets).map((wallet) => wallet.address)];

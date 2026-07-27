@@ -1,3 +1,6 @@
+/**
+ * Shared canonical Safe creation-intent validation.
+ */
 import { ethers as checkpointEthers } from "ethers";
 
 import {

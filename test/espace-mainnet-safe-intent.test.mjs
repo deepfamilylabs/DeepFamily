@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 import {
   buildAndValidateSafeCreationIntent,
   assertSafeCreationCheckpointIntent,
-} from "../scripts/lib/espaceMainnetSafeIntent.mjs";
+} from "../scripts/lib/mainnetSafeIntent.mjs";
 import {
   CANONICAL_SAFE_DEPLOYMENT_TYPE,
   CANONICAL_SAFE_VERSION,

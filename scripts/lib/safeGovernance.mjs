@@ -1,8 +1,9 @@
 import Safe from "@safe-global/protocol-kit";
 import {
-  getCompatibilityFallbackHandlerDeployment,
-  getProxyFactoryDeployment,
-  getSafeL2SingletonDeployment,
+  getCompatibilityFallbackHandlerDeployments,
+  getProxyFactoryDeployments,
+  getSafeL2SingletonDeployments,
+  getSafeSingletonDeployments,
 } from "@safe-global/safe-deployments";
 import { OperationType, SigningMethod } from "@safe-global/types-kit";
 import { ethers } from "ethers";
@@ -11,22 +12,61 @@ export const CANONICAL_SAFE_VERSION = "1.3.0";
 export const CANONICAL_SAFE_DEPLOYMENT_TYPE = "canonical";
 export const CANONICAL_SAFE_OWNER_COUNT = 3;
 export const CANONICAL_SAFE_THRESHOLD = 2;
+export const ETHEREUM_MAINNET_CHAIN_ID = 1n;
+export const ETHEREUM_SEPOLIA_CHAIN_ID = 11155111n;
 export const CONFLUX_ESPACE_TESTNET_CHAIN_ID = 71n;
 export const CONFLUX_ESPACE_MAINNET_CHAIN_ID = 1030n;
 export const SAFE_SENTINEL_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const SAFE_FALLBACK_HANDLER_STORAGE_SLOT = ethers.id("fallback_manager.handler.address");
 export const SAFE_GUARD_STORAGE_SLOT = ethers.id("guard_manager.guard.address");
 
-const SUPPORTED_CHAIN_IDS = new Set([
-  CONFLUX_ESPACE_TESTNET_CHAIN_ID,
-  CONFLUX_ESPACE_MAINNET_CHAIN_ID,
-]);
+export const CANONICAL_SAFE_CHAIN_PROFILES = Object.freeze({
+  [ETHEREUM_MAINNET_CHAIN_ID]: Object.freeze({
+    profileId: "ethereum-mainnet",
+    chainId: ETHEREUM_MAINNET_CHAIN_ID,
+    networkFamily: "ethereum",
+    networkName: "Ethereum Mainnet",
+    environment: "mainnet",
+    singletonType: "l1",
+    isL1SafeSingleton: true,
+    deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+  }),
+  [ETHEREUM_SEPOLIA_CHAIN_ID]: Object.freeze({
+    profileId: "ethereum-sepolia",
+    chainId: ETHEREUM_SEPOLIA_CHAIN_ID,
+    networkFamily: "ethereum",
+    networkName: "Ethereum Sepolia",
+    environment: "testnet",
+    singletonType: "l1",
+    isL1SafeSingleton: true,
+    deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+  }),
+  [CONFLUX_ESPACE_TESTNET_CHAIN_ID]: Object.freeze({
+    profileId: "conflux-espace-testnet",
+    chainId: CONFLUX_ESPACE_TESTNET_CHAIN_ID,
+    networkFamily: "conflux-espace",
+    networkName: "Conflux eSpace Testnet",
+    environment: "testnet",
+    singletonType: "l2",
+    isL1SafeSingleton: false,
+    deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+  }),
+  [CONFLUX_ESPACE_MAINNET_CHAIN_ID]: Object.freeze({
+    profileId: "conflux-espace-mainnet",
+    chainId: CONFLUX_ESPACE_MAINNET_CHAIN_ID,
+    networkFamily: "conflux-espace",
+    networkName: "Conflux eSpace Mainnet",
+    environment: "mainnet",
+    singletonType: "l2",
+    isL1SafeSingleton: false,
+    deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+  }),
+});
 const PRIVATE_KEY_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 const DECIMAL_INTEGER_PATTERN = /^[0-9]+$/;
-const COMPONENT_ACCESSORS = Object.freeze({
-  singleton: getSafeL2SingletonDeployment,
-  proxyFactory: getProxyFactoryDeployment,
-  fallbackHandler: getCompatibilityFallbackHandlerDeployment,
+const SHARED_COMPONENT_ACCESSORS = Object.freeze({
+  proxyFactory: getProxyFactoryDeployments,
+  fallbackHandler: getCompatibilityFallbackHandlerDeployments,
 });
 const metadataCache = new Map();
 
@@ -47,14 +87,18 @@ const normalizeChainId = (chainId) => {
   } catch {
     throw new Error(`Safe chainId is invalid: ${String(chainId)}`);
   }
-  if (!SUPPORTED_CHAIN_IDS.has(normalized)) {
+  if (!Object.hasOwn(CANONICAL_SAFE_CHAIN_PROFILES, normalized.toString())) {
     throw new Error(
       `Canonical Safe ${CANONICAL_SAFE_VERSION} governance is restricted to Conflux eSpace ` +
-        `chainIds 71 and 1030; got ${normalized}`,
+        "chainIds 71 and 1030 or Ethereum chainIds 1 and 11155111; " +
+        `got ${normalized}`,
     );
   }
   return normalized;
 };
+
+export const getCanonicalSafeChainProfile = (chainId) =>
+  CANONICAL_SAFE_CHAIN_PROFILES[normalizeChainId(chainId).toString()];
 
 const normalizeNonzeroAddress = (name, value) => {
   if (!ethers.isAddress(value) || value === ethers.ZeroAddress) {
@@ -74,13 +118,13 @@ const sameAddress = (left, right) => left.toLowerCase() === right.toLowerCase();
 
 const cloneAbi = (abi) => JSON.parse(JSON.stringify(abi));
 
-const resolveCanonicalComponent = ({ accessor, componentName, chainId }) => {
+const resolveCanonicalComponent = ({ accessor, componentName, chainId, profile }) => {
   const network = chainId.toString();
   const deployment = accessor({ version: CANONICAL_SAFE_VERSION, network });
   if (!deployment) {
     throw new Error(
       `Official Safe deployment metadata is missing ${componentName} v${CANONICAL_SAFE_VERSION} ` +
-        `for Conflux eSpace chainId ${network}`,
+        `for ${profile.networkName} chainId ${network}`,
     );
   }
   if (!deployment.released || deployment.version !== CANONICAL_SAFE_VERSION) {
@@ -96,8 +140,14 @@ const resolveCanonicalComponent = ({ accessor, componentName, chainId }) => {
     throw new Error(`Official Safe ${componentName} canonical metadata is malformed`);
   }
 
-  const networkAddress = deployment.networkAddresses?.[network];
-  if (typeof networkAddress !== "string" || !sameAddress(networkAddress, canonical.address)) {
+  const networkAddresses = deployment.networkAddresses?.[network];
+  const normalizedNetworkAddresses =
+    typeof networkAddresses === "string"
+      ? [networkAddresses]
+      : Array.isArray(networkAddresses)
+        ? networkAddresses
+        : [];
+  if (!normalizedNetworkAddresses.some((address) => sameAddress(address, canonical.address))) {
     throw new Error(
       `Official Safe ${componentName} deployment for chainId ${network} is not canonical`,
     );
@@ -114,16 +164,30 @@ const resolveCanonicalComponent = ({ accessor, componentName, chainId }) => {
 
 /**
  * Returns the official Safe deployment manifest pinned by this project.
- * Both Conflux eSpace networks intentionally resolve to the same canonical contracts.
+ * Ethereum uses the L1 singleton while Conflux eSpace uses the event-rich L2 singleton.
+ * All four profiles deliberately select the canonical deployment type, including Sepolia where
+ * the plural Safe deployment manifest lists both EIP-155 and canonical addresses.
  */
 export const getCanonicalSafeDeploymentMetadata = (chainId) => {
   const normalizedChainId = normalizeChainId(chainId);
   const cacheKey = normalizedChainId.toString();
   if (!metadataCache.has(cacheKey)) {
+    const profile = getCanonicalSafeChainProfile(normalizedChainId);
+    const componentAccessors = {
+      singleton: profile.isL1SafeSingleton
+        ? getSafeSingletonDeployments
+        : getSafeL2SingletonDeployments,
+      ...SHARED_COMPONENT_ACCESSORS,
+    };
     const components = Object.fromEntries(
-      Object.entries(COMPONENT_ACCESSORS).map(([componentName, accessor]) => [
+      Object.entries(componentAccessors).map(([componentName, accessor]) => [
         componentName,
-        resolveCanonicalComponent({ accessor, componentName, chainId: normalizedChainId }),
+        resolveCanonicalComponent({
+          accessor,
+          componentName,
+          chainId: normalizedChainId,
+          profile,
+        }),
       ]),
     );
     metadataCache.set(
@@ -131,7 +195,13 @@ export const getCanonicalSafeDeploymentMetadata = (chainId) => {
       deepFreeze({
         chainId: normalizedChainId,
         safeVersion: CANONICAL_SAFE_VERSION,
-        deploymentType: CANONICAL_SAFE_DEPLOYMENT_TYPE,
+        deploymentType: profile.deploymentType,
+        profileId: profile.profileId,
+        networkFamily: profile.networkFamily,
+        networkName: profile.networkName,
+        environment: profile.environment,
+        singletonType: profile.singletonType,
+        isL1SafeSingleton: profile.isL1SafeSingleton,
         ...components,
       }),
     );
@@ -309,7 +379,7 @@ export const prepareCanonicalSafeDeployment = async ({
 
   const safe = await Safe.init({
     provider: asEip1193Provider(provider),
-    isL1SafeSingleton: false,
+    isL1SafeSingleton: metadata.isL1SafeSingleton,
     predictedSafe: { safeAccountConfig, safeDeploymentConfig },
   });
   if (safe.getContractVersion() !== CANONICAL_SAFE_VERSION) {
@@ -361,13 +431,14 @@ const normalizePrivateKey = (privateKey) => {
 
 export const connectCanonicalSafe = async ({ provider, chainId, safeAddress, signer }) => {
   const normalizedChainId = normalizeChainId(chainId);
+  const metadata = getCanonicalSafeDeploymentMetadata(normalizedChainId);
   const normalizedSafeAddress = normalizeNonzeroAddress("safeAddress", safeAddress);
   const normalizedSigner = signer === undefined ? undefined : normalizePrivateKey(signer);
   await assertProviderChain(provider, normalizedChainId);
   const safe = await Safe.init({
     provider: asEip1193Provider(provider),
     ...(normalizedSigner === undefined ? {} : { signer: normalizedSigner }),
-    isL1SafeSingleton: false,
+    isL1SafeSingleton: metadata.isL1SafeSingleton,
     safeAddress: normalizedSafeAddress,
   });
   if (safe.getContractVersion() !== CANONICAL_SAFE_VERSION) {
@@ -729,7 +800,9 @@ export const assertCanonicalSafeDeploymentReceipt = ({
     parsedFactoryCall.args._singleton,
   );
   if (!sameAddress(callSingleton, metadata.singleton.address)) {
-    throw new Error("Safe factory call does not use the canonical L2 singleton");
+    throw new Error(
+      `Safe factory call does not use the canonical ${metadata.singletonType.toUpperCase()} singleton`,
+    );
   }
   const initializer = normalizeHexData("Safe initializer", parsedFactoryCall.args.initializer);
   if (initializer === "0x") {
@@ -824,7 +897,9 @@ export const assertCanonicalSafeDeploymentReceipt = ({
     throw new Error("ProxyCreation event Safe address does not match the predicted Safe");
   }
   if (!sameAddress(eventSingleton, metadata.singleton.address)) {
-    throw new Error("ProxyCreation event singleton is not the canonical L2 singleton");
+    throw new Error(
+      `ProxyCreation event singleton is not the canonical ${metadata.singletonType.toUpperCase()} singleton`,
+    );
   }
 
   return deepFreeze({
@@ -1136,7 +1211,9 @@ export const assertCanonicalSafeProfile = async ({
     );
   }
   if (!sameAddress(masterCopy, metadata.singleton.address)) {
-    throw new Error("Governance Safe proxy does not use the canonical L2 singleton");
+    throw new Error(
+      `Governance Safe proxy does not use the canonical ${metadata.singletonType.toUpperCase()} singleton`,
+    );
   }
   const normalizedActualOwners = owners.map((owner) => ethers.getAddress(owner));
   if (

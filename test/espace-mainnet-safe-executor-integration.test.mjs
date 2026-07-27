@@ -2,7 +2,7 @@ import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
 
-import { createCheckpointedTransactionExecutor } from "../scripts/lib/espaceMainnetReleaseState.mjs";
+import { createCheckpointedTransactionExecutor } from "../scripts/lib/mainnetReleaseState.mjs";
 
 describe("eSpace Mainnet Safe factory-call journal integration", function () {
   it("checkpoints one CALL and revalidates it without a second broadcast", async function () {

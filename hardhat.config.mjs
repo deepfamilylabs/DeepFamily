@@ -6,7 +6,11 @@ import hardhatTypechain from "@nomicfoundation/hardhat-typechain";
 import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import "dotenv/config";
 
-import { resolveConfluxRpcUrls, SOLIDITY_EVM_VERSION } from "./scripts/lib/hardhatConfig.mjs";
+import {
+  resolveConfluxRpcUrls,
+  resolveEthereumRpcUrls,
+  SOLIDITY_EVM_VERSION,
+} from "./scripts/lib/hardhatConfig.mjs";
 import addPersonTask from "./tasks/contract-add-person.mjs";
 import endorseTask from "./tasks/contract-endorse.mjs";
 import mintNftTask from "./tasks/contract-mint-nft.mjs";
@@ -35,16 +39,17 @@ import {
 
 const PRIVATE_KEY =
   process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
-const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
-// Hardhat 3 accepts one Etherscan-compatible API key per invocation. ConfluxScan only requires a
-// non-empty placeholder; Ethereum verification deliberately keeps an absent key empty so the
-// operator must explicitly provide a real Etherscan key.
+const HARDHAT_NETWORK_NAME = selectedHardhatNetwork();
+// Sepolia verification uses Blockscout without an API key. Other configured live networks retain
+// their Etherscan-compatible provider: ConfluxScan accepts a non-secret placeholder, while
+// Ethereum Mainnet requires a real Etherscan key.
 const EXPLORER_API_KEY = explorerApiKeyForNetwork(
-  selectedHardhatNetwork(),
+  HARDHAT_NETWORK_NAME,
   process.env.EXPLORER_API_KEY,
 );
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
 const CONFLUX_RPC_URLS = resolveConfluxRpcUrls();
+const ETHEREUM_RPC_URLS = resolveEthereumRpcUrls();
 
 const solidityProfile = () => ({
   // Keep deployment and verification compiler inputs identical across Hardhat build profiles.
@@ -155,7 +160,7 @@ export default {
     // Ethereum test network
     sepolia: {
       type: "http",
-      url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
+      url: ETHEREUM_RPC_URLS.sepolia,
       accounts:
         PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000"
           ? [PRIVATE_KEY]
@@ -168,7 +173,7 @@ export default {
     // Ethereum mainnet
     mainnet: {
       type: "http",
-      url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+      url: ETHEREUM_RPC_URLS.mainnet,
       accounts:
         PRIVATE_KEY !== "0x0000000000000000000000000000000000000000000000000000000000000000"
           ? [PRIVATE_KEY]
@@ -269,10 +274,11 @@ export default {
   // Hardhat 3 contract verification configuration
   verify: {
     blockscout: {
-      enabled: false,
+      enabled: HARDHAT_NETWORK_NAME === "sepolia",
     },
     etherscan: {
       apiKey: EXPLORER_API_KEY,
+      enabled: HARDHAT_NETWORK_NAME !== "sepolia",
     },
     sourcify: {
       enabled: false,

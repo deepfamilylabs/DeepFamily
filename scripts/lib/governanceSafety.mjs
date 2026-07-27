@@ -1,4 +1,8 @@
 import { assertCanonicalSafeProfile } from "./safeGovernance.mjs";
+import {
+  CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE,
+  ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
+} from "./chainProfiles.mjs";
 
 const MULTISIG_INSPECTION_ABI = [
   "function getThreshold() view returns (uint256)",
@@ -6,7 +10,12 @@ const MULTISIG_INSPECTION_ABI = [
 ];
 
 const LOCAL_HTTP_NETWORK_NAMES = new Set(["localhost"]);
-export const CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE = "conflux-safe-1.3.0-2of3";
+export { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE, ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE };
+
+const PROFILE_CHAIN_IDS = Object.freeze({
+  [CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE]: new Set([71n, 1030n]),
+  [ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE]: new Set([1n, 11155111n]),
+});
 
 export const normalizeGovernanceMultisigProfile = (
   profile = process.env.GOVERNANCE_MULTISIG_PROFILE,
@@ -68,8 +77,8 @@ export const assertGovernanceMultisig = async ({ ethers, provider, address, labe
 /**
  * Applies an optional machine-readable production wallet profile on top of the generic multisig
  * interface check. Leaving the profile blank keeps alternative multisig implementations usable;
- * selecting the pinned Conflux Safe profile makes production deployment and migration checks
- * identical to the eSpace release rehearsal.
+ * selecting a pinned Safe profile makes production deployment and migration checks identical to
+ * the matching network's release rehearsal.
  */
 export const assertGovernanceMultisigWithProfile = async ({
   ethers,
@@ -103,14 +112,24 @@ export const assertGovernanceMultisigProfile = async ({
 }) => {
   const normalizedProfile = normalizeGovernanceMultisigProfile(profile);
   if (normalizedProfile === "") return null;
-  if (normalizedProfile !== CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE) {
+  const allowedChainIds = PROFILE_CHAIN_IDS[normalizedProfile];
+  if (!allowedChainIds) {
     throw new Error(
-      `Unsupported GOVERNANCE_MULTISIG_PROFILE=${normalizedProfile}; supported profile: ` +
-        CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE,
+      `Unsupported GOVERNANCE_MULTISIG_PROFILE=${normalizedProfile}; supported profiles: ` +
+        `${CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE}, ${ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE}`,
     );
   }
 
   const network = await provider.getNetwork();
+  if (!allowedChainIds.has(network.chainId)) {
+    const scope =
+      normalizedProfile === CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE
+        ? "restricted to Conflux eSpace chainIds 71 and 1030"
+        : "restricted to Ethereum chainIds 1 and 11155111";
+    throw new Error(
+      `GOVERNANCE_MULTISIG_PROFILE=${normalizedProfile} is ${scope}; got ${network.chainId}`,
+    );
+  }
   const safeProfile = await assertCanonicalSafeProfile({
     provider,
     chainId: network.chainId,

@@ -14,6 +14,13 @@ release wrapper also removes old Hardhat build output and performs a fresh produ
 compilation before invoking the reviewed orchestrator with compilation disabled. The Safe creator
 does not need a protocol compilation; it hashes and binds its own pinned deployment inputs instead.
 
+The eSpace and Ethereum commands share reviewed orchestration internals, but the public entry fixes
+an immutable chain profile. This runbook is only for eSpace Mainnet: Safe v1.3.0 L2 singleton,
+CFX budgets, Conflux gas charging, Conflux RPC/ConfluxScan, eSpace confirmation strings, and
+`deployments/conflux/` state. Do not append an arbitrary `--network` or substitute Ethereum
+environment variables. For Ethereum's Safe v1.3.0 L1 profile and independent state, use the
+[Ethereum Mainnet release runbook](ethereum-mainnet-release.md).
+
 These are production tools, not a mainnet copy of the testnet acceptance suite. The Safe creator
 does not operate the owners' wallets, and the release runner does not create or migrate governance,
 perform an upgrade, or submit person, endorsement, NFT, or story transactions.
@@ -469,3 +476,8 @@ forensic reconstruction, and an explicitly reviewed recovery plan. They are not 
 first-release path on eSpace Mainnet because they do not provide the orchestrator's single
 checkpoint, digest approval, phase resumption, complete verification, finality coverage, and final
 terminal-state report. Do not mix manual and orchestrated deployment in one release state.
+
+Ethereum Mainnet has a separate guarded entry, authorization domain, Etherscan requirement, ETH gas
+accounting, and `deployments/mainnet/` checkpoint tree. Neither EVM compatibility nor identical
+Solidity artifacts makes an eSpace digest, Safe singleton, confirmation string, report, or recovery
+hash valid for Ethereum.

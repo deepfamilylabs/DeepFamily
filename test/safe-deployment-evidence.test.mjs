@@ -1,3 +1,4 @@
+// Canonical Safe deployment evidence shared by every pinned EVM chain profile.
 import { expect } from "chai";
 import { ethers } from "ethers";
 
