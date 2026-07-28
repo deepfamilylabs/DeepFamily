@@ -12,14 +12,23 @@ Features:
 
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { poseidon4 } from "poseidon-lite";
 import { DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC } from "@deepfamily/proof-core";
+import { DISCLOSURE_BINDING_PROOF_DESCRIPTOR } from "../lib/proofDescriptors.js";
 import {
   resolveExistingFile,
   DEFAULT_WASM_CANDIDATES,
   DEFAULT_ZKEY_CANDIDATES,
 } from "./zk-generate-disclosure-binding-proof.mjs";
+import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_VKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
+  __dirname,
+  DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  "vkey",
+);
 
 function normalizeBigIntField(value, label) {
   if (value === undefined || value === null || value === "") {
@@ -121,6 +130,9 @@ function parseArgs(rawArgs) {
       case "--zkey":
         args.zkey = rawArgs[++i];
         break;
+      case "--vkey":
+        args.vkey = rawArgs[++i];
+        break;
       case "--prove":
         args.prove = true;
         break;
@@ -175,7 +187,7 @@ function loadPublicSignals(filePath) {
 
 function printUsage() {
   console.log(`Usage:
-  node tasks/zk-disclosure-binding-check.mjs --input disclosure_binding_input.json [--public disclosure_binding_public.json] [--prove] [--wasm path] [--zkey path]
+  node tasks/zk-disclosure-binding-check.mjs --input disclosure_binding_input.json [--public disclosure_binding_public.json] [--prove] [--wasm path] [--zkey path] [--vkey path]
 `);
 }
 
@@ -226,14 +238,31 @@ async function main() {
       args.zkey,
       DEFAULT_ZKEY_CANDIDATES,
     );
+    const vkeyPath = resolveExistingFile(
+      "disclosure binding verification key",
+      args.vkey,
+      DEFAULT_VKEY_CANDIDATES,
+    );
 
-    console.log("\nRunning groth16.fullProve for confirmation...");
+    console.log("\nRunning groth16.fullProve and independent verification...");
     const snarkjs = await import("snarkjs");
-    const { publicSignals } = await snarkjs.groth16.fullProve(
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
       Object.fromEntries(Object.entries(input).map(([key, value]) => [key, value.toString()])),
       wasmPath,
       zkeyPath,
     );
+    const verificationKey = loadJson(vkeyPath);
+    const proofVerified = await snarkjs.groth16.verify(verificationKey, publicSignals, proof);
+    if (proofVerified !== true) {
+      throw new Error("Generated disclosure binding proof failed verification against the vkey");
+    }
+    console.log("  Generated proof verifies against the committed verification key");
+    const tamperedSignals = [...publicSignals];
+    tamperedSignals[0] = (BigInt(tamperedSignals[0]) + 1n).toString();
+    if ((await snarkjs.groth16.verify(verificationKey, tamperedSignals, proof)) !== false) {
+      throw new Error("Disclosure binding verifier accepted tampered public signals");
+    }
+    console.log("  Tampered public signals are rejected");
 
     const actualSignals = publicSignals.map((value) => value.toString());
     const comparison = comparePublicSignals(expectedSignals, actualSignals);

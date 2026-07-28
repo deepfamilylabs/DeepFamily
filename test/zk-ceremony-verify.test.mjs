@@ -1,0 +1,383 @@
+import { expect } from "chai";
+import { ethers } from "ethers";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { verifyProductionCeremony } from "../scripts/zk-ceremony-verify.mjs";
+import {
+  MINIMUM_PRODUCTION_CONTRIBUTORS,
+  ZK_ARTIFACT_MANIFEST_PATH,
+  ZK_CEREMONY_TRANSCRIPT_PATH,
+  ZK_RELEASE_ARTIFACTS,
+  ZK_TOOLCHAIN_PATHS,
+  buildZkContributionApprovalMessage,
+  sha256File,
+  sha256Text,
+} from "../scripts/lib/zkArtifactTrust.mjs";
+
+const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
+
+const writeRelativeFile = async (root, relativePath, contents) => {
+  const target = artifactPath(root, relativePath);
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, contents);
+  return target;
+};
+
+const writeManifest = async (root, manifest) =>
+  writeRelativeFile(root, ZK_ARTIFACT_MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+
+const writeTranscript = async (root, transcript) =>
+  writeRelativeFile(root, ZK_CEREMONY_TRANSCRIPT_PATH, `${JSON.stringify(transcript, null, 2)}\n`);
+
+const createProductionFixture = async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-zk-ceremony-verify-"));
+  const circuits = {};
+
+  for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {
+    const files = {
+      sourceSha256: spec.source,
+      r1csSha256: spec.builtR1cs,
+      wasmSha256: spec.wasm,
+      zkeySha256: spec.zkey,
+      verificationKeySha256: spec.verificationKey,
+      solidityVerifierSha256: spec.solidityVerifier,
+    };
+    circuits[circuitName] = {};
+    for (const [manifestField, relativePath] of Object.entries(files)) {
+      const target = await writeRelativeFile(
+        root,
+        relativePath,
+        `${circuitName}:${manifestField}:production-fixture\n`,
+      );
+      circuits[circuitName][manifestField] = sha256File(target);
+    }
+  }
+
+  const ptauPath = await writeRelativeFile(
+    root,
+    "ceremony/published-final.ptau",
+    "published powers of tau fixture\n",
+  );
+  const snarkjsVersion = "0.7.5";
+  await writeRelativeFile(
+    root,
+    "node_modules/snarkjs/package.json",
+    `${JSON.stringify({ name: "snarkjs", version: snarkjsVersion })}\n`,
+  );
+  const snarkjsBinary = await writeRelativeFile(
+    root,
+    "node_modules/snarkjs/build/cli.cjs",
+    "fixture snarkjs executable\n",
+  );
+  const snarkjsLink = artifactPath(root, ZK_TOOLCHAIN_PATHS.snarkjsBinary);
+  await fs.mkdir(path.dirname(snarkjsLink), { recursive: true });
+  await fs.symlink(path.relative(path.dirname(snarkjsLink), snarkjsBinary), snarkjsLink);
+  const circomBinary = await writeRelativeFile(
+    root,
+    ZK_TOOLCHAIN_PATHS.circomBinary,
+    "fixture circom executable\n",
+  );
+
+  const ceremonyId = "deepfamily-production-2026-01";
+  const phase1Sha256 = sha256File(ptauPath);
+  const transcriptCircuits = Object.fromEntries(
+    Object.entries(circuits).map(([name, hashes]) => [
+      name,
+      { sourceSha256: hashes.sourceSha256, r1csSha256: hashes.r1csSha256 },
+    ]),
+  );
+  const wallets = Array.from(
+    { length: MINIMUM_PRODUCTION_CONTRIBUTORS },
+    (_, index) =>
+      new ethers.Wallet(
+        `0x${String(index + 21)
+          .padStart(2, "0")
+          .repeat(32)}`,
+      ),
+  );
+  const contributions = [];
+  for (const [index, wallet] of wallets.entries()) {
+    const contribution = {
+      sequence: index + 1,
+      participantId: `participant-${index + 1}`,
+      signerAddress: wallet.address,
+      personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
+      disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+      personCommitmentZkeySha256: sha256Text(`person-contribution-${index + 1}`),
+      disclosureBindingZkeySha256: sha256Text(`disclosure-contribution-${index + 1}`),
+    };
+    contributions.push({
+      ...contribution,
+      signature: await wallet.signMessage(
+        buildZkContributionApprovalMessage({
+          ceremonyId,
+          phase1Sha256,
+          circuits: transcriptCircuits,
+          contribution,
+        }),
+      ),
+    });
+  }
+  const beacon = {
+    name: "deepfamily-public-beacon",
+    hash: sha256Text("public-randomness-beacon"),
+    numIterationsExp: 10,
+    source: "public-randomness-round-12345",
+    personCommitmentContributionHash: "aa".repeat(64),
+    disclosureBindingContributionHash: "bb".repeat(64),
+  };
+  const transcript = {
+    schemaVersion: 1,
+    ceremonyId,
+    phase1Sha256,
+    circuits: transcriptCircuits,
+    contributions,
+    beacon,
+  };
+  const transcriptPath = await writeTranscript(root, transcript);
+  const manifest = {
+    schemaVersion: 2,
+    circomVersion: "2.1.6",
+    snarkjsVersion,
+    toolchain: {
+      circomBinarySha256: sha256File(circomBinary),
+      snarkjsCliSha256: sha256File(snarkjsBinary),
+    },
+    trustedSetup: {
+      status: "production",
+      ceremonyId,
+      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      contributorCount: contributions.length,
+      phase1: {
+        source: "https://example.invalid/published-final.ptau",
+        sha256: phase1Sha256,
+        verified: true,
+      },
+      transcript: {
+        path: ZK_CEREMONY_TRANSCRIPT_PATH,
+        sha256: sha256File(transcriptPath),
+      },
+      beacon: { applied: true, ...beacon },
+    },
+    circuits,
+  };
+  await writeManifest(root, manifest);
+
+  const metadataByCircuit = Object.fromEntries(
+    Object.keys(ZK_RELEASE_ARTIFACTS).map((circuitName) => {
+      const hashField =
+        circuitName === "person_commitment"
+          ? "personCommitmentContributionHash"
+          : "disclosureBindingContributionHash";
+      return [
+        circuitName,
+        {
+          contributionCount: contributions.length + 1,
+          contributions: [
+            ...contributions.map((contribution) => ({
+              type: 0,
+              name: contribution.participantId,
+              contributionHash: contribution[hashField],
+            })),
+            {
+              type: 1,
+              name: beacon.name,
+              contributionHash: beacon[hashField],
+              beaconHash: beacon.hash,
+              numIterationsExp: beacon.numIterationsExp,
+            },
+          ],
+        },
+      ];
+    }),
+  );
+  return { root, manifest, ptauPath, snarkjsBinary, metadataByCircuit };
+};
+
+const captureError = async (operation) => {
+  try {
+    await operation();
+    return null;
+  } catch (error) {
+    return error;
+  }
+};
+
+describe("production ZK ceremony verifier", function () {
+  let fixture;
+
+  beforeEach(async function () {
+    fixture = await createProductionFixture();
+  });
+
+  afterEach(async function () {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  });
+
+  it("runs one Powers of Tau verification and both exact R1CS/zkey binding checks", async function () {
+    const calls = [];
+    const root = await fs.realpath(fixture.root);
+    const ptauPath = path.resolve(fixture.ptauPath);
+    const executable = await fs.realpath(fixture.snarkjsBinary);
+
+    const result = await verifyProductionCeremony({
+      root: fixture.root,
+      ptauPath: fixture.ptauPath,
+      runner: (invocation) => calls.push(invocation),
+      mpcMetadataReader: async (zkeyPath) => {
+        const circuitName = path.basename(zkeyPath, ".zkey");
+        return fixture.metadataByCircuit[circuitName];
+      },
+    });
+
+    expect(calls).to.have.length(3);
+    expect(calls.every((call) => call.executable === executable && call.cwd === root)).to.equal(
+      true,
+    );
+    expect(calls[0].args.slice(0, 2)).to.deep.equal(["powersoftau", "verify"]);
+    expect(path.basename(calls[0].args[2])).to.equal("phase1.ptau");
+    for (const [index, circuitName] of Object.keys(ZK_RELEASE_ARTIFACTS).entries()) {
+      expect(calls[index + 1].args.slice(0, 2)).to.deep.equal(["zkey", "verify"]);
+      expect(path.basename(calls[index + 1].args[2])).to.equal(`${circuitName}.r1cs`);
+      expect(path.basename(calls[index + 1].args[3])).to.equal("phase1.ptau");
+      expect(path.basename(calls[index + 1].args[4])).to.equal(`${circuitName}.zkey`);
+    }
+    expect(result).to.deep.include({
+      status: "passed",
+      ceremonyId: fixture.manifest.trustedSetup.ceremonyId,
+      transcriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
+      contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
+    });
+    expect(result.ptau).to.deep.equal({
+      source: fixture.manifest.trustedSetup.phase1.source,
+      path: ptauPath,
+      sha256: fixture.manifest.trustedSetup.phase1.sha256,
+    });
+  });
+
+  it("rejects a Powers of Tau file whose bytes do not match the manifest", async function () {
+    const calls = [];
+    await fs.appendFile(fixture.ptauPath, "tampered");
+
+    const error = await captureError(() =>
+      verifyProductionCeremony({
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
+        runner: (invocation) => calls.push(invocation),
+      }),
+    );
+    expect(error?.message).to.match(/Published Powers of Tau SHA-256 mismatch/u);
+    expect(calls).to.deep.equal([]);
+  });
+
+  it("rejects an installed snarkjs version that differs from the ceremony manifest", async function () {
+    const calls = [];
+    await writeRelativeFile(
+      fixture.root,
+      "node_modules/snarkjs/package.json",
+      `${JSON.stringify({ name: "snarkjs", version: "0.7.4" })}\n`,
+    );
+
+    const error = await captureError(() =>
+      verifyProductionCeremony({
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
+        runner: (invocation) => calls.push(invocation),
+      }),
+    );
+    expect(error?.message).to.equal(
+      "Installed snarkjs 0.7.4 does not match ceremony manifest 0.7.5",
+    );
+    expect(calls).to.deep.equal([]);
+  });
+
+  it("propagates a runner failure and stops before later zkey checks", async function () {
+    const calls = [];
+    const runnerError = new Error("simulated snarkjs verification failure");
+    let caught;
+
+    try {
+      await verifyProductionCeremony({
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
+        runner: (invocation) => {
+          calls.push(invocation);
+          if (calls.length === 2) throw runnerError;
+        },
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).to.equal(runnerError);
+    expect(calls).to.have.length(2);
+    expect(calls[0].args.slice(0, 2)).to.deep.equal(["powersoftau", "verify"]);
+    expect(calls[1].args.slice(0, 2)).to.deep.equal(["zkey", "verify"]);
+  });
+
+  it("rejects a Powers of Tau path that is a symbolic link", async function () {
+    const calls = [];
+    const originalContents = await fs.readFile(fixture.ptauPath);
+    const target = await writeRelativeFile(
+      fixture.root,
+      "ceremony/published-final-target.ptau",
+      originalContents,
+    );
+    await fs.rm(fixture.ptauPath);
+    await fs.symlink(path.relative(path.dirname(fixture.ptauPath), target), fixture.ptauPath);
+
+    const error = await captureError(() =>
+      verifyProductionCeremony({
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
+        runner: (invocation) => calls.push(invocation),
+      }),
+    );
+    expect(error?.message).to.match(/Published Powers of Tau must be a regular non-symlink file/u);
+    expect(calls).to.deep.equal([]);
+  });
+
+  it("rejects a final zkey whose embedded contribution chain omits participants", async function () {
+    const error = await captureError(() =>
+      verifyProductionCeremony({
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
+        runner: () => {},
+        mpcMetadataReader: async () => ({
+          contributionCount: 1,
+          contributions: [
+            {
+              type: 1,
+              name: fixture.manifest.trustedSetup.beacon.name,
+              contributionHash:
+                fixture.manifest.trustedSetup.beacon.personCommitmentContributionHash,
+              beaconHash: fixture.manifest.trustedSetup.beacon.hash,
+              numIterationsExp: fixture.manifest.trustedSetup.beacon.numIterationsExp,
+            },
+          ],
+        }),
+      }),
+    );
+    expect(error?.message).to.include("must contain exactly 3 participant contributions");
+  });
+
+  it("rejects a mismatched embedded beacon even after mathematical runner checks pass", async function () {
+    const error = await captureError(() =>
+      verifyProductionCeremony({
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
+        runner: () => {},
+        mpcMetadataReader: async (zkeyPath) => {
+          const circuitName = path.basename(zkeyPath, ".zkey");
+          const metadata = structuredClone(fixture.metadataByCircuit[circuitName]);
+          metadata.contributions.at(-1).beaconHash = "ff".repeat(32);
+          return metadata;
+        },
+      }),
+    );
+    expect(error?.message).to.include("embedded beacon hash does not match");
+  });
+});

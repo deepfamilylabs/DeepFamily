@@ -2,6 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
+export const productionBuildLockPath = (root) =>
+  path.join(path.resolve(root), "deployments", ".production-build.lock");
+
 /**
  * Acquires a local-checkout command lock and returns an unguessable ownership token.
  *

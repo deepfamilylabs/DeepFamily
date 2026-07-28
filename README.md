@@ -145,6 +145,12 @@ do not invoke a lower-level script with an arbitrary `--network` to bypass these
 
 ### Recommended eSpace Mainnet release
 
+Production release is blocked until the development Groth16 keys have been replaced through the
+[multi-party ZK ceremony](docs/zk-ceremony.md), `npm run release:preflight` passes, and the exact
+release commit produces an eSpace Testnet `release-rehearsal` report with `releaseReady=true`.
+Set `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` to that archived report; the Mainnet plan validates its
+commit, artifact digest, production delay, ZK status, verification, finality and terminal state.
+
 For a new production governance wallet, first configure three reviewed EOA/hardware-wallet owner
 addresses in their final order, a fixed decimal salt nonce, the approved deployer, and the
 Safe-only CFX/finality limits. Keep `GOVERNANCE_MULTISIG`,
@@ -181,9 +187,14 @@ Next use the resumable protocol orchestrator. With `ESPACE_MAINNET_CONFIRM` and
 npm run espace:mainnet:release
 ```
 
-Every release invocation performs a clean production-profile build. Review the plan with a second
-operator, copy the printed digest to `ESPACE_MAINNET_PLAN_DIGEST`, set
+Every release invocation performs the complete clean `release:preflight` gate. Review the plan with
+a second operator. At least two current Safe owners must sign the complete printed EIP-191
+plan-approval message using their external wallet/hardware-wallet workflow. Copy the printed digest to
+`ESPACE_MAINNET_PLAN_DIGEST`, put the signatures in
+`ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES`, set
 `ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute or resume.
+The repository recovers the owner addresses and rejects a changed plan, report, Safe or owner set;
+it never receives an owner private key.
 It checkpoints every phase, verifies every contract, waits for finalized coverage, and validates
 the terminal governance state. Repository tests never broadcast eSpace Mainnet transactions. See
 the complete Safe bootstrap, acceptance, release, and recovery procedure in the
@@ -192,6 +203,8 @@ the complete Safe bootstrap, acceptance, release, and recovery procedure in the
 ### Guarded Ethereum release
 
 Ethereum uses the same reviewed release architecture but a separate Ethereum profile and state.
+It also requires the production ZK ceremony, `release:preflight`, and an exact Sepolia
+release-rehearsal report selected through `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`.
 First run the destructive Sepolia acceptance suite:
 
 ```bash
@@ -228,8 +241,10 @@ Finally, leave the release confirmation/digest blank for a read-only protocol pl
 npm run ethereum:mainnet:release
 ```
 
-Setting `ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1` plus the independently reviewed digest
-and rerunning enters execute/resume mode, broadcasts real Ethereum Mainnet transactions, and spends
+At least two current Safe owners must sign the complete EIP-191 plan-approval message printed by
+plan mode. Setting `ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1`, the independently reviewed
+digest, and `ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES` to those external signatures before
+rerunning enters execute/resume mode, broadcasts real Ethereum Mainnet transactions, and spends
 real ETH. A real `EXPLORER_API_KEY` is mandatory for Ethereum Mainnet source verification; Sepolia
 acceptance uses API-key-free Blockscout. See the complete
 environment, owner-smoke, approval, checkpoint, resumption, and recovery procedure in the

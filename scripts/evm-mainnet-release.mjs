@@ -22,9 +22,11 @@ import {
   MAINNET_TRANSACTION_LABELS,
   assertMainnetReleaseSafeAcceptanceNonce,
   assertPlanMatchesCheckpoint,
+  buildMainnetPlanApprovalMessage,
   deriveMainnetPlanDigest,
   parseProductionMainnetReleaseConfig,
   parseMainnetAuthorization,
+  verifyMainnetPlanApprovals,
 } from "./lib/mainnetReleaseSafety.mjs";
 import {
   acquireReleaseLock,
@@ -49,6 +51,9 @@ import {
   assertCanonicalSafeProfile,
 } from "./lib/safeGovernance.mjs";
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
+import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
 const ERC1967_IMPLEMENTATION_SLOT =
@@ -199,6 +204,9 @@ const buildFingerprint = ({
   expectedNonces,
   releaseIntents,
   releaseIntentsDigest,
+  zkArtifactTrust,
+  zkCeremonyVerification,
+  testnetReleaseEvidence,
 }) => ({
   schemaVersion: MAINNET_STATE_SCHEMA_VERSION,
   domain: MAINNET_PROFILE.releasePlanDigestDomain,
@@ -207,6 +215,29 @@ const buildFingerprint = ({
   releaseCommit: sourceState.commit,
   releaseInputDigest: releaseInputs.digest,
   artifactDigest: releaseInputs.directories.artifacts.digest,
+  zkArtifacts: {
+    manifestPath: zkArtifactTrust.manifestPath,
+    manifestSha256: zkArtifactTrust.manifestSha256,
+    circomVersion: zkArtifactTrust.circomVersion,
+    snarkjsVersion: zkArtifactTrust.snarkjsVersion,
+    trustedSetupStatus: zkArtifactTrust.trustedSetupStatus,
+    productionReady: zkArtifactTrust.productionReady,
+    ceremonyId: zkArtifactTrust.ceremonyId,
+    contributorCount: zkArtifactTrust.contributorCount,
+    minimumContributors: zkArtifactTrust.minimumContributors,
+    beaconApplied: zkArtifactTrust.beaconApplied,
+    transcriptSha256: zkArtifactTrust.transcriptSha256,
+    artifacts: zkArtifactTrust.artifacts,
+    ceremonyVerification: {
+      status: zkCeremonyVerification.status,
+      ceremonyId: zkCeremonyVerification.ceremonyId,
+      manifestSha256: zkCeremonyVerification.manifestSha256,
+      transcriptSha256: zkCeremonyVerification.transcriptSha256,
+      contributorCount: zkCeremonyVerification.contributorCount,
+      ptauSha256: zkCeremonyVerification.ptau.sha256,
+    },
+  },
+  testnetReleaseEvidence: testnetReleaseEvidence.publicSummary,
   buildInfo: {
     productionSettingsMatched: buildState.productionSettingsMatched,
     sourceContentsMatched: buildState.sourceContentsMatched,
@@ -776,6 +807,15 @@ export const main = async (chainProfile) => {
       );
     }
   }
+  const zkCeremonyVerification = await verifyProductionCeremony({
+    root: process.cwd(),
+    ptauPath: process.env.ZK_PTAU_PATH,
+  });
+  const zkArtifactTrust = inspectZkReleaseArtifacts({
+    root: process.cwd(),
+    requireProduction: true,
+    requireBuiltR1cs: true,
+  });
 
   const [sourceState, releaseInputs, buildState, safeProfile, existingCheckpoint] =
     await Promise.all([
@@ -810,6 +850,15 @@ export const main = async (chainProfile) => {
       "Compiled artifacts/build-info do not match current sources and pinned production settings",
     );
   }
+  const testnetReleaseEvidence = await validateTestnetReleaseEvidence({
+    reportPath: config.testnetReleaseReportPath,
+    repositoryRoot: process.cwd(),
+    expectedTestnetChainId: CHAIN_PROFILE.acceptance.chainId,
+    expectedTestnetNetworkName: CHAIN_PROFILE.acceptance.networkName,
+    mainnetMinDelaySeconds: config.minDelaySeconds,
+    currentCommit: sourceState.commit,
+    expectedAcceptanceInputDigest: releaseInputs.digest,
+  });
   await assertProductionControllersAreEoas({ provider, config });
   const safeOperationalAcceptance = await assertFinalizedSafeOperationalAcceptance({
     provider,
@@ -860,8 +909,16 @@ export const main = async (chainProfile) => {
     expectedNonces,
     releaseIntents,
     releaseIntentsDigest,
+    zkArtifactTrust,
+    zkCeremonyVerification,
+    testnetReleaseEvidence,
   });
   const planDigest = deriveMainnetPlanDigest(fingerprint);
+  const planApprovalMessage = buildMainnetPlanApprovalMessage({
+    chainProfile: CHAIN_PROFILE,
+    planDigest,
+    governanceMultisig: config.governanceMultisig,
+  });
 
   if (existingCheckpoint) {
     assertPlanMatchesCheckpoint({ checkpoint: existingCheckpoint, fingerprint, planDigest });
@@ -903,6 +960,12 @@ export const main = async (chainProfile) => {
       phase: "preflight",
       planDigest,
       fingerprint,
+      approvalRequest: {
+        scheme: "EIP-191",
+        message: planApprovalMessage,
+        messageHash: ethers.hashMessage(planApprovalMessage),
+        requiredSafeOwnerApprovals: safeProfile.threshold,
+      },
       addresses: { governanceSafe: config.governanceMultisig, ...plannedAddresses },
       transactions: {},
     };
@@ -923,12 +986,16 @@ export const main = async (chainProfile) => {
     console.log(`  governance Safe:${config.governanceMultisig}`);
     console.log(`  Timelock:       ${plannedAddresses.timelock}`);
     console.log(`  minDelay:       ${config.minDelaySeconds}s`);
+    console.log(`  testnet report: ${testnetReleaseEvidence.publicSummary.evidenceFile.sha256}`);
     console.log(`  maximum budget: ${config.maximumCost} ${CHAIN_PROFILE.nativeSymbol}`);
     console.log(`  plan digest:    ${plan.planDigest}`);
     console.log(`  report:         ${PLAN_REPORT_PATH}`);
+    console.log("\nRequired EIP-191 message for at least two Safe owners to sign:");
+    console.log(planApprovalMessage);
     console.log("\nAfter reviewing the report, execute or resume with:");
     console.log(
       `  ${MAINNET_PROFILE.planDigestEnvironmentName}=${plan.planDigest} ` +
+        `${MAINNET_PROFILE.planApprovalSignaturesEnvironmentName}='["0x...","0x..."]' ` +
         `${MAINNET_PROFILE.confirmationEnvironmentName}=${MAINNET_PROFILE.confirmation} ` +
         MAINNET_PROFILE.releaseCommand,
     );
@@ -941,6 +1008,14 @@ export const main = async (chainProfile) => {
         "release plan",
     );
   }
+  const planApproval = verifyMainnetPlanApprovals({
+    chainProfile: CHAIN_PROFILE,
+    planDigest,
+    governanceMultisig: config.governanceMultisig,
+    expectedOwners: config.expectedSafeOwners,
+    requiredApprovals: safeProfile.threshold,
+    signatures: config.planApprovalSignatures,
+  });
   if (existingCheckpoint?.status === "passed") {
     await revalidateCompletedRelease({
       connection,
@@ -1018,6 +1093,12 @@ export const main = async (chainProfile) => {
         phase: "preflight-complete",
         planDigest,
         fingerprint,
+        planApproval: {
+          scheme: "EIP-191",
+          messageHash: planApproval.messageHash,
+          requiredApprovals: planApproval.requiredApprovals,
+          approvedOwners: planApproval.approvedOwners,
+        },
         createdAt: nowIso(),
         updatedAt: nowIso(),
         addresses: {
@@ -1035,6 +1116,12 @@ export const main = async (chainProfile) => {
     } else {
       checkpoint.status = "running";
       checkpoint.error = null;
+      checkpoint.planApproval = {
+        scheme: "EIP-191",
+        messageHash: planApproval.messageHash,
+        requiredApprovals: planApproval.requiredApprovals,
+        approvedOwners: planApproval.approvedOwners,
+      };
       checkpoint.updatedAt = nowIso();
       await writeJsonAtomic(STATE_PATH, checkpoint);
     }

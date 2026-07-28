@@ -4,12 +4,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   acquireExclusiveCommandLock,
+  productionBuildLockPath,
   releaseExclusiveCommandLocks,
 } from "./exclusiveCommandLock.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const HARDHAT_CLI = path.join(ROOT, "node_modules", "hardhat", "dist", "src", "cli.js");
-const PRODUCTION_BUILD_LOCK_PATH = path.join(ROOT, "deployments", ".production-build.lock");
+const PRODUCTION_BUILD_LOCK_PATH = productionBuildLockPath(ROOT);
 
 const run = (args, environment, label) =>
   new Promise((resolve, reject) => {
@@ -24,9 +25,30 @@ const run = (args, environment, label) =>
       else {
         reject(
           new Error(
+            signal ? `${label} was terminated by ${signal}` : `${label} exited with code ${code}`,
+          ),
+        );
+      }
+    });
+  });
+
+const runReleasePreflight = (environment) =>
+  new Promise((resolve, reject) => {
+    const npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm";
+    const child = spawn(npmExecutable, ["run", "release:preflight"], {
+      cwd: ROOT,
+      env: environment,
+      stdio: "inherit",
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code === 0) resolve();
+      else {
+        reject(
+          new Error(
             signal
-              ? `${label} was terminated by ${signal}`
-              : `${label} exited with code ${code}`,
+              ? `Production release preflight was terminated by ${signal}`
+              : `Production release preflight exited with code ${code}`,
           ),
         );
       }
@@ -42,11 +64,7 @@ const parseSafeMode = (chainProfile, arguments_) => {
 };
 
 const commandPaths = (chainProfile, kind) => {
-  const directory = path.join(
-    ROOT,
-    "deployments",
-    chainProfile.mainnet.deploymentDirectoryName,
-  );
+  const directory = path.join(ROOT, "deployments", chainProfile.mainnet.deploymentDirectoryName);
   return {
     directory,
     shared: path.join(directory, ".mainnet-command.lock"),
@@ -124,12 +142,9 @@ export const runMainnetReleaseCommand = async ({
       [chainProfile.mainnet.releaseWrapperTokenEnvironmentName]: commandLock.token,
       [chainProfile.mainnet.sharedWrapperTokenEnvironmentName]: sharedLock.token,
     };
-    await run(["--config", "hardhat.config.mjs", "clean"], environment, "Hardhat clean");
-    await run(
-      ["--config", "hardhat.config.mjs", "--build-profile", "production", "compile"],
-      environment,
-      "Hardhat production compile",
-    );
+    // This performs the clean production build plus contract/frontend/ZK/security checks. A
+    // Mainnet plan is not generated unless the complete preflight succeeds in this same command.
+    await runReleasePreflight(environment);
     await run(
       [
         "--config",

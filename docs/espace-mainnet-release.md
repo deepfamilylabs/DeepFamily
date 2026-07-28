@@ -1,18 +1,21 @@
 # Conflux eSpace Mainnet Safe bootstrap and release
 
-The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has two deliberately
-separate tools:
+The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has three deliberately
+separate commands:
 
 - `npm run espace:mainnet:safe` predicts and, after explicit approval, deploys one canonical
   governance Safe through its pinned factory call;
+- `npm run espace:mainnet:safe:status` performs read-only validation of the deployment and the
+  real-owner smoke transaction;
 - `npm run espace:mainnet:release` plans and, after a separate approval, deploys the Timelock and
   protocol, verifies sources, waits for finality, checks terminal governance, and records a
   resumable checkpoint.
 
 Use only these npm commands. Do not invoke either lower-level `.mjs` entry with `hardhat run`. The
-release wrapper also removes old Hardhat build output and performs a fresh production-profile
-compilation before invoking the reviewed orchestrator with compilation disabled. The Safe creator
-does not need a protocol compilation; it hashes and binds its own pinned deployment inputs instead.
+release wrapper holds the shared production-build lock, performs the complete
+`npm run release:preflight` gate, then invokes the reviewed orchestrator with compilation disabled
+without releasing the lock. The Safe creator does not need a protocol compilation; it hashes and
+binds its own pinned deployment inputs instead.
 
 The eSpace and Ethereum commands share reviewed orchestration internals, but the public entry fixes
 an immutable chain profile. This runbook is only for eSpace Mainnet: Safe v1.3.0 L2 singleton,
@@ -89,21 +92,27 @@ keys into this repository.
 
 ## Prerequisites
 
-1. Complete `npm run espace:acceptance` from the same audited release commit on eSpace Testnet and
-   archive its successful report.
-2. Use a clean, isolated checkout of that commit and the reviewed Node/npm versions. Install exact
+1. Complete the production multi-party ZK ceremony in
+   [zk-ceremony.md](./zk-ceremony.md), replace the development proving keys, and run
+   `npm run release:preflight` with the reviewed `ZK_PTAU_PATH`.
+2. Complete `npm run espace:acceptance` from the same audited release commit on eSpace Testnet in
+   `release-rehearsal` mode with the exact production `MIN_DELAY`. Archive only a report whose
+   `status` is `passed`, `releaseReady` is `true`,
+   `zkArtifactTrust.productionReady` is `true`, and `zkCeremonyVerification.status` is `passed`; a
+   30-second diagnostic report is not release evidence.
+3. Use a clean, isolated checkout of that commit and the reviewed Node/npm versions. Install exact
    dependencies with `npm ci --ignore-scripts --no-audit --no-fund`, then complete the repository's
    build, test, frontend, ZK artifact, and storage-layout checks. Do not reuse an untrusted global
    compiler or a mutable development `node_modules` directory.
-3. Have three independent production controllers supply only their final public EOA/hardware-wallet
+4. Have three independent production controllers supply only their final public EOA/hardware-wallet
    addresses in the reviewed order. Confirm that each controller can use the chosen external
    Conflux eSpace signing workflow; do not give any owner key to the deployer or repository.
-4. Choose and record one explicit Safe salt nonce. Fund only the approved deployer EOA with enough
+5. Choose and record one explicit Safe salt nonce. Fund only the approved deployer EOA with enough
    mainnet CFX for the independently reviewed Safe and release ceilings. The Safe itself needs no
    CFX for this bootstrap or protocol deployment.
-5. Use a reliable `CONFLUX_RPC_URL`. A public fallback exists, but a monitored provider is strongly
+6. Use a reliable `CONFLUX_RPC_URL`. A public fallback exists, but a monitored provider is strongly
    preferred for deployment, verification, receipt recovery, and finality checks.
-6. Ensure the release checkout can write `deployments/conflux/`, and arrange an independent archive
+7. Ensure the release checkout can write `deployments/conflux/`, and arrange an independent archive
    for that ignored local directory immediately after completion.
 
 ## Configuration
@@ -115,6 +124,7 @@ Copy `.env.example` to the ignored `.env` file and fill the production values. D
 # Approved factory/release deployer only; never a Safe owner key.
 PRIVATE_KEY=0x...
 CONFLUX_RPC_URL=https://your-reviewed-espace-mainnet-rpc
+ZK_PTAU_PATH=/absolute/path/to/reviewed-production.ptau
 
 # Keep blank until the Safe deployment and real-owner acceptance are independently validated.
 GOVERNANCE_MULTISIG=
@@ -142,8 +152,11 @@ ESPACE_MAINNET_SAFE_ACCEPTANCE_TX=
 ESPACE_MAINNET_MAX_CFX=5
 ESPACE_MAINNET_CONFIRMATIONS=2
 ESPACE_MAINNET_FINALITY_TIMEOUT=3600
+# Exact reviewed release-rehearsal report copied to a regular path inside this checkout.
+ESPACE_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/espace-release-rehearsal.json
 ESPACE_MAINNET_CONFIRM=
 ESPACE_MAINNET_PLAN_DIGEST=
+ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES=
 ESPACE_MAINNET_RECOVERY_TXS=
 ```
 
@@ -151,6 +164,19 @@ For a fresh release, leave `GOVERNANCE_OWNER` empty: the orchestrator deploys
 `GovernanceTimelock`, validates it, and uses that exact address for the integrated protocol
 deployment. Keep `GOVERNANCE_MULTISIG` empty while creating and accepting a new Safe. Setting or
 changing `.env` later never changes chain state.
+
+The protocol release command validates the selected testnet report rather than trusting its file
+name. It requires schema v3, `releaseReady=true`, the current clean commit and artifact-input digest,
+the same `MIN_DELAY`, production ZK evidence, finalized critical transactions, complete source
+verification, terminal governance checks, and refund evidence. A report from another commit,
+diagnostic mode, or the earlier 30-second run is rejected before any Mainnet transaction.
+
+The acceptance runner writes its report beneath its ignored run directory; the example path above
+is not created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file
+inside the release checkout, record and independently compare its SHA-256 with the immutable
+off-machine archive, then set `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` to that relative or absolute
+in-checkout path. Repository-external paths and symbolic links are rejected so that plan bytes and
+owner signatures bind one stable local report.
 
 `EXPLORER_API_KEY` may remain empty for ConfluxScan; the Hardhat configuration supplies its
 non-secret `espace` placeholder. It is not a wallet credential or an authorization key. Do not use
@@ -295,11 +321,18 @@ verification/finality policy, checkpoint location, and plan digest. A second ope
 compare the 14 ordered transaction intent hashes with the approved release record and the chain
 independently. Do not send another Safe transaction after this review.
 
-Only after that review, copy the exact printed digest into `.env` and set the exact chain
-confirmation:
+The plan also prints one exact UTF-8 EIP-191 approval message. At least two of the three current
+production Safe owners must independently compare the plan and archived testnet report, then sign
+that complete message using their normal external hardware-wallet/wallet signing workflow. Do not
+sign only the digest, retype the message, or give an owner key to this repository. Collect the two
+signatures as a one-line JSON array.
+
+Only after that review and owner approval, copy the exact printed digest, signatures and chain
+confirmation into `.env`:
 
 ```dotenv
 ESPACE_MAINNET_PLAN_DIGEST=0x...
+ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
 ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030
 ```
 
@@ -309,9 +342,11 @@ Then run the exact same command (do not replace it with a direct Hardhat/script 
 npm run espace:mainnet:release
 ```
 
-Execution recomputes the plan. Any source, artifact, configuration, deployer, Safe state, or chain
-change that affects the plan invalidates the copied digest and stops before a new
-transaction. Never bypass this by copying a new digest without repeating the review.
+Execution recomputes the plan and recovers each signer from the exact EIP-191 message. It requires
+at least the on-chain Safe threshold of distinct signatures from the configured current owner set.
+Any source, artifact, testnet-report byte, configuration, deployer, Safe state, or chain change
+invalidates the digest or signatures and stops before a new transaction. Never bypass this by
+copying a new digest without repeating the review and owner signatures.
 
 The normal release sequence is:
 
