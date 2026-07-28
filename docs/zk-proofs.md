@@ -424,15 +424,33 @@ npm run zk:dev:refresh
 This rebuilds the circuits, regenerates proving artifacts, re-exports verifier contracts, and refreshes `frontend/public/zk/`.
 It overwrites the checked-in proving artifacts with development keys.
 
-### Production Ceremony
+### Production Setup
 
-Do not use any `zk:dev:*` command for production. Follow the complete multi-party ceremony and
-independent verification runbook in [zk-ceremony.md](./zk-ceremony.md). The final read-only
-cryptographic gate is:
+Do not use any `zk:dev:*` command for production. After the circuits are frozen, start from a clean
+commit and run:
 
 ```bash
-npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
+npm run zk:production:setup
 ```
+
+The command downloads or reuses the repository-pinned public power-13 pTau, generates separate
+OS-CSPRNG Phase 2 entropy for both circuits, creates one contribution per circuit under the explicit
+`single-operator` trust model, applies a local finalization value, exports every release artifact,
+and verifies the result before returning. It does not commit or deploy anything.
+
+Review and commit the manifest, transcript, Solidity verifiers, and frontend ZK artifacts together.
+Then run the full gate from that clean commit:
+
+```bash
+npm run zk:ptau:fetch
+npm run zk:ceremony:verify
+npm run release:preflight
+```
+
+`ZK_PTAU_PATH` is optional. With no override, verification uses
+`tmp/zk-production/powersOfTau28_hez_final_13.ptau`; an override must contain the same file hash
+recorded by the production manifest. The detailed procedure and optional multi-party enhancement
+are documented in [zk-ceremony.md](./zk-ceremony.md).
 
 ### Protocol Versioning Policy
 
@@ -448,12 +466,18 @@ artifacts, while retaining an explicit compatibility or migration path for exist
 
 ### Trusted Setup Status
 
-The proving keys currently checked into `frontend/public/zk/` were produced by a single local
-contributor and are suitable for development and testing only. A production release must replace
-them with artifacts from an auditable multi-party ceremony, publish the contribution transcript and
-artifact hashes, regenerate the Solidity verifiers, and verify that every deployed verifier matches
-the published proving and verification keys. Release-rehearsal and Mainnet release scripts enforce
-this manifest status and cannot deploy the current development keys.
+The proving keys currently checked into `frontend/public/zk/` remain development-only until the
+manifest records a verified production setup. A production release must replace them with
+`npm run zk:production:setup`, publish the generated contribution transcript and artifact hashes,
+regenerate the Solidity verifiers, and verify that every deployed verifier matches the published
+proving and verification keys. The default production policy deliberately trusts one local Phase 2
+operator to destroy both secrets and records that assumption as `trustModel=single-operator`.
+Release-rehearsal and Mainnet release scripts enforce the manifest status and cannot deploy
+development keys.
+
+The ZK contributor count has no relationship to the governance Safe threshold. DeepFamily may use
+one ZK operator while the production governance Safe independently requires three owners and two
+approvals. A multi-party ZK setup may be adopted later as an optional security enhancement.
 
 ## Security Properties
 

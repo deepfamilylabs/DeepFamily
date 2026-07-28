@@ -2811,6 +2811,5 @@
       }
     ]
   },
-  "inputSourceName": "project/contracts/DeepFamily.sol",
-  "buildInfoId": "solc-0_8_28-963ab807134918d9d292e277c06ec88e0d2cc81b"
+  "inputSourceName": "project/contracts/DeepFamily.sol"
 }

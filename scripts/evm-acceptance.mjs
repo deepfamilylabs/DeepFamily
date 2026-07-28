@@ -57,6 +57,7 @@ import { deriveGovernanceSalt } from "../tasks/lib/timelockGovernance.mjs";
 import { deriveDelayUpdateSalt } from "../tasks/timelock-update-delay.mjs";
 import { resolveProductionRpcUrl } from "./lib/hardhatConfig.mjs";
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
@@ -853,7 +854,7 @@ export const main = async (chainProfile) => {
     config.acceptanceMode === "release-rehearsal"
       ? await verifyProductionCeremony({
           root: process.cwd(),
-          ptauPath: process.env.ZK_PTAU_PATH,
+          ptauPath: resolveProductionPtauPath(),
         })
       : null;
   const zkArtifactTrust = inspectZkReleaseArtifacts({

@@ -9,6 +9,13 @@ import {
   TESTNET_RELEASE_REQUIRED_STEPS,
   validateTestnetReleaseEvidence,
 } from "../scripts/lib/testnetReleaseEvidence.mjs";
+import {
+  MINIMUM_MULTI_PARTY_CONTRIBUTORS,
+  MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+  ZK_PRODUCTION_PHASE1,
+  ZK_TRUST_MODEL_MULTI_PARTY,
+  ZK_TRUST_MODEL_SINGLE_OPERATOR,
+} from "../scripts/lib/zkArtifactTrust.mjs";
 
 const COMMIT = "12".repeat(20);
 const INPUT_DIGEST = `0x${"34".repeat(32)}`;
@@ -165,20 +172,31 @@ const validReport = () => ({
   zkArtifactTrust: {
     status: "passed",
     trustedSetupStatus: "production",
+    trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     productionReady: true,
     ceremonyId: "deepfamily-production-2026-01",
     manifestSha256: "11".repeat(32),
     transcriptSha256: "22".repeat(32),
-    phase1Sha256: "33".repeat(32),
-    contributorCount: 3,
+    phase1Source: ZK_PRODUCTION_PHASE1.source,
+    phase1Sha256: ZK_PRODUCTION_PHASE1.sha256,
+    phase1Blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
+    phase1Bytes: ZK_PRODUCTION_PHASE1.bytes,
+    minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+    contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   },
   zkCeremonyVerification: {
     status: "passed",
     ceremonyId: "deepfamily-production-2026-01",
     manifestSha256: "11".repeat(32),
     transcriptSha256: "22".repeat(32),
-    contributorCount: 3,
-    ptau: { sha256: "33".repeat(32) },
+    trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+    minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+    contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+    ptau: {
+      bytes: ZK_PRODUCTION_PHASE1.bytes,
+      sha256: ZK_PRODUCTION_PHASE1.sha256,
+      blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
+    },
   },
   productionParity: {
     canonicalSafeImplementationMatched: true,
@@ -332,6 +350,9 @@ describe("schema v3 testnet release-rehearsal evidence", function () {
     expect(result.publicSummary.zkArtifacts).to.deep.equal({
       status: "passed",
       trustedSetupStatus: "production",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+      minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       productionReady: true,
     });
     expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(1);
@@ -551,6 +572,95 @@ describe("schema v3 testnet release-rehearsal evidence", function () {
       await writeReport(report);
       await expectRejected(() => validate(), pattern);
     }
+  });
+
+  it("accepts a valid multi-party report with at least two declared contributors", async function () {
+    const report = validReport();
+    for (const evidence of [report.zkArtifactTrust, report.zkCeremonyVerification]) {
+      evidence.trustModel = ZK_TRUST_MODEL_MULTI_PARTY;
+      evidence.minimumContributors = MINIMUM_MULTI_PARTY_CONTRIBUTORS;
+      evidence.contributorCount = MINIMUM_MULTI_PARTY_CONTRIBUTORS;
+    }
+    await writeReport(report);
+
+    const result = await validate();
+
+    expect(result.publicSummary.zkArtifacts).to.deep.include({
+      trustModel: ZK_TRUST_MODEL_MULTI_PARTY,
+      contributorCount: MINIMUM_MULTI_PARTY_CONTRIBUTORS,
+      minimumContributors: MINIMUM_MULTI_PARTY_CONTRIBUTORS,
+    });
+  });
+
+  it("cross-checks ZK trustModel, contributor thresholds and Phase 1 evidence", async function () {
+    const cases = [
+      [
+        (report) => (report.zkArtifactTrust.trustModel = "unknown-model"),
+        /zkArtifactTrust\.trustModel is unsupported/iu,
+      ],
+      [
+        (report) => (report.zkArtifactTrust.minimumContributors = 2),
+        /zkArtifactTrust\.minimumContributors must be 1/iu,
+      ],
+      [
+        (report) => (report.zkArtifactTrust.contributorCount = 2),
+        /zkArtifactTrust\.contributorCount must be 1/iu,
+      ],
+      [
+        (report) => (report.zkArtifactTrust.phase1Source = "https://example.invalid/tampered.ptau"),
+        /zkArtifactTrust\.phase1Source/iu,
+      ],
+      [(report) => (report.zkArtifactTrust.phase1Bytes += 1), /zkArtifactTrust\.phase1Bytes/iu],
+      [
+        (report) => (report.zkArtifactTrust.phase1Sha256 = "55".repeat(32)),
+        /zkArtifactTrust\.phase1Sha256/iu,
+      ],
+      [
+        (report) => (report.zkArtifactTrust.phase1Blake2b512 = "66".repeat(64)),
+        /zkArtifactTrust\.phase1Blake2b512/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.trustModel = ZK_TRUST_MODEL_MULTI_PARTY),
+        /zkCeremonyVerification\.trustModel/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.minimumContributors = 2),
+        /zkCeremonyVerification\.minimumContributors/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.contributorCount = 2),
+        /zkCeremonyVerification\.contributorCount/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.ptau.blake2b512 = "55".repeat(64)),
+        /zkCeremonyVerification\.ptau\.blake2b512/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.ptau.bytes += 1),
+        /zkCeremonyVerification\.ptau\.bytes/iu,
+      ],
+    ];
+    for (const [mutate, pattern] of cases) {
+      const report = validReport();
+      mutate(report);
+      await writeReport(report);
+      await expectRejected(() => validate(), pattern);
+    }
+
+    const weakMultiParty = validReport();
+    for (const evidence of [
+      weakMultiParty.zkArtifactTrust,
+      weakMultiParty.zkCeremonyVerification,
+    ]) {
+      evidence.trustModel = ZK_TRUST_MODEL_MULTI_PARTY;
+      evidence.minimumContributors = 1;
+      evidence.contributorCount = 1;
+    }
+    await writeReport(weakMultiParty);
+    await expectRejected(
+      () => validate(),
+      /multi-party contributor counts do not meet the declared threshold/iu,
+    );
   });
 
   it("cross-checks readiness gates against their production parity and build inputs", async function () {

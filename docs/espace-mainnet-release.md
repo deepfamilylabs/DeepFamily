@@ -92,9 +92,12 @@ keys into this repository.
 
 ## Prerequisites
 
-1. Complete the production multi-party ZK ceremony in
-   [zk-ceremony.md](./zk-ceremony.md), replace the development proving keys, and run
-   `npm run release:preflight` with the reviewed `ZK_PTAU_PATH`.
+1. From a clean frozen circuit commit, run `npm run zk:production:setup` as described in
+   [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
+   verifiers, and frontend proving artifacts together, then run `npm run release:preflight` from
+   that clean commit. The default path records one Phase 2 contributor under the explicit
+   `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
+   prerequisite and not related to the Safe's three-owner, 2/3 policy.
 2. Complete `npm run espace:acceptance` from the same audited release commit on eSpace Testnet in
    `release-rehearsal` mode with the exact production `MIN_DELAY`. Archive only a report whose
    `status` is `passed`, `releaseReady` is `true`,
@@ -124,7 +127,8 @@ Copy `.env.example` to the ignored `.env` file and fill the production values. D
 # Approved factory/release deployer only; never a Safe owner key.
 PRIVATE_KEY=0x...
 CONFLUX_RPC_URL=https://your-reviewed-espace-mainnet-rpc
-ZK_PTAU_PATH=/absolute/path/to/reviewed-production.ptau
+# Optional: blank uses tmp/zk-production/powersOfTau28_hez_final_13.ptau.
+ZK_PTAU_PATH=
 
 # Keep blank until the Safe deployment and real-owner acceptance are independently validated.
 GOVERNANCE_MULTISIG=

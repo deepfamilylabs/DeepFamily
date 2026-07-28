@@ -1,430 +1,304 @@
-# DeepFamily Production ZK Ceremony
+# DeepFamily Production ZK Setup
 
-This runbook is the required process for replacing the development Groth16 proving keys with
-production artifacts. It is intentionally separate from the development setup commands.
+This runbook describes how to replace the checked-in development Groth16 keys with production
+artifacts. The normal DeepFamily path is intentionally a single command for the current
+single-developer project:
 
-The repository currently marks its proving keys as `development`. Neither an eSpace/Ethereum
-`release-rehearsal` nor a Mainnet release plan is allowed while that marker remains.
+```bash
+npm run zk:production:setup
+```
 
-## Security objective
+That command creates production artifacts for both circuits, writes an auditable transcript and
+manifest, and verifies the complete result before returning. It does **not** commit files, deploy a
+contract, submit a transaction, or authorize a Mainnet release.
 
-Groth16 requires circuit-specific Phase 2 setup material. A malicious party that retains all setup
-secrets can forge proofs accepted by the verifier. The ceremony is safe if at least one independent
-participant:
+## Trust model
 
-1. generates fresh entropy on a trusted machine;
-2. contributes separately to both DeepFamily circuits;
-3. does not reveal or reuse that entropy; and
-4. securely destroys the entropy and temporary machine state.
+Groth16 needs a circuit-specific Phase 2 setup. Anyone who retains all Phase 2 secrets could forge
+proofs accepted by the matching verifier. DeepFamily therefore records the production trust model
+explicitly:
 
-The final public beacon makes the end of the transcript deterministic and difficult to bias, but it
-does not replace an honest contributor.
+```text
+trustModel = single-operator
+minimumContributors = 1
+contributorCount = 1
+```
 
-DeepFamily requires at least three independent contributors. Five are recommended, including at
-least one participant outside the core development team.
+For this model, production security trusts the operator who runs the setup command to use a
+controlled machine and destroy both circuit-specific Phase 2 secrets after the command exits. This
+is a deliberate and visible trust assumption, not a claim that the proving keys are trustless.
 
-## Roles
+One contribution is sufficient for Groth16. Three contributors are **not** a cryptographic
+requirement. A multi-party ceremony remains a useful optional enhancement when independent
+contributors become available: its benefit is that the final parameters remain safe if at least one
+participant destroys their secret.
 
-Use different people or control domains for these roles:
+ZK contributors and governance signers are separate concepts:
 
-- **Coordinator** — freezes the release commit, prepares the initial files, verifies each handoff,
-  and publishes the transcript. The coordinator must not know contributor entropy.
-- **Contributors** — each runs `snarkjs zkey contribute` on an independently controlled machine.
-- **Independent verifiers** — at least two people reproduce the final checks from a clean checkout.
-- **Release approvers** — compare the published evidence with the Git release commit and approve
-  the testnet rehearsal. They should not rely only on the coordinator's machine.
+- the ZK setup creates proving and verification material;
+- the production Safe uses three owners with a 2/3 threshold to govern contracts;
+- a ZK contributor does not become a Safe owner;
+- the Safe 2/3 policy does not require three ZK contributors.
 
-Do not use the production Safe owners' signing devices as ceremony machines.
+## Fixed Powers of Tau
 
-## Files covered by the ceremony
+Both DeepFamily circuits reuse the same published BN254 Phase 1 file:
 
-Both circuits must always move through the same ceremony round:
+```text
+File:
+powersOfTau28_hez_final_13.ptau
 
-| Circuit            | Frozen R1CS               | Final proving key               |
-| ------------------ | ------------------------- | ------------------------------- |
-| Person commitment  | `person_commitment.r1cs`  | `person_commitment_final.zkey`  |
-| Disclosure binding | `disclosure_binding.r1cs` | `disclosure_binding_final.zkey` |
+Source:
+https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_13.ptau
 
-The production release also binds:
+Capacity:
+2^13 constraints
 
-- circuit source and R1CS SHA-256;
-- browser WASM;
-- final zkey;
-- exported verification key;
-- generated Solidity verifier;
-- the Powers of Tau source and SHA-256;
-- ordered participant IDs and each round's two output zkey hashes;
-- final beacon and transcript SHA-256;
-- exact Circom and snarkjs versions.
+Bytes:
+9,520,280
 
-## 1. Freeze the ceremony commit
+SHA-256:
+95751b5207f20aa822f01109902315c01c15250303feacea2b8aa7dc9fdfeefd
 
-Start from a clean, isolated checkout. Do not run a ceremony from a working directory containing
-uncommitted circuit, dependency, or script changes.
+BLAKE2b-512:
+58efc8bf2834d04768a3d7ffcd8e1e23d461561729beaac4e3e7a47829a1c9066d5320241e124a1a8e8aa6c75be0ba66f65bc8239a0542ed38e11276f6fdb4d9
+```
+
+The setup command downloads this file only when the verified cache is absent. It stores the file at:
+
+```text
+tmp/zk-production/powersOfTau28_hez_final_13.ptau
+```
+
+The downloader rejects redirects, symbolic links, an unexpected byte length, or either hash
+mismatch. An existing cache is rehashed before use. A suspicious existing file is not silently
+replaced.
+
+To populate or validate the cache without generating keys:
+
+```bash
+npm run zk:ptau:fetch
+```
+
+`ZK_PTAU_PATH` is optional for later verification and release commands. When it is empty,
+`zk:ceremony:verify` and `release:preflight` use the pinned cache above. An explicit override must
+still be an ordinary file whose byte length, SHA-256, and BLAKE2b-512 all match the production
+manifest:
+
+```bash
+ZK_PTAU_PATH=/absolute/path/to/the-same-reviewed-file \
+npm run release:preflight
+```
+
+The local `tmp/pot13_final.ptau` generated by `zk:dev:*` is not this reviewed public Phase 1 file
+and must not be promoted to production.
+
+## Before running the command
+
+Run the setup only after the circuit source, public signals, packing rules, dependencies, and
+verifier interface have been frozen for a release candidate. Any later circuit change requires new
+production keys.
+
+Use a clean, controlled checkout:
 
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
 npm run zk:fetch
-npm run zk:build
 git status --short
 git rev-parse HEAD
-sha256sum package-lock.json bin/circom
-sha256sum \
-  zk-artifacts/circuits/person_commitment.r1cs \
-  zk-artifacts/circuits/disclosure_binding.r1cs
 ```
 
-The R1CS hashes must match `circuits/zk-artifacts-manifest.json`. Record the commit and every printed
-hash in the ceremony record. If either circuit changes afterwards, abort the ceremony and restart
-from round zero.
+`git status --short` must have no output. The setup command refuses:
 
-## 2. Select and verify Phase 1
+- a dirty working tree;
+- CI execution;
+- a symbolic-link repository or artifact path;
+- a missing or unexpected pinned toolchain;
+- concurrent pTau download or setup execution;
+- overwriting an existing production manifest.
 
-Use a reviewed, publicly archived BN254 Powers of Tau transcript with capacity of at least power 13.
-Record its permanent source URL, byte size and SHA-256. Do not silently replace a missing download
-with another file carrying the same name.
+The operator should use a machine they control, stop unrelated backup/snapshot tools during the
+run, and avoid terminal recording. No Safe owner private key, funded wallet, CFX, or ETH is needed.
 
-Use task-specific variables:
+## Run the production setup
+
+The default command creates an audit ID automatically:
 
 ```bash
-DF_CEREMONY_DIR=/absolute/path/to/deepfamily-ceremony
-DF_PTAU=/absolute/path/to/reviewed-powers-of-tau.ptau
-export ZK_PTAU_PATH="$DF_PTAU"
-
-sha256sum "$DF_PTAU"
-node_modules/.bin/snarkjs powersoftau verify "$DF_PTAU"
+npm run zk:production:setup
 ```
 
-Two independent verifiers must confirm `Powers Of Tau file OK` and the expected SHA-256. Copy the
-verified file into the immutable ceremony archive or archive a durable URL plus its exact digest.
-
-## 3. Create the initial Phase 2 keys
-
-Only the coordinator performs round zero:
+An optional stable audit ID may be supplied:
 
 ```bash
-mkdir -p "$DF_CEREMONY_DIR/round-0000"
-
-node_modules/.bin/snarkjs groth16 setup \
-  zk-artifacts/circuits/person_commitment.r1cs \
-  "$DF_PTAU" \
-  "$DF_CEREMONY_DIR/round-0000/person_commitment_0000.zkey"
-
-node_modules/.bin/snarkjs groth16 setup \
-  zk-artifacts/circuits/disclosure_binding.r1cs \
-  "$DF_PTAU" \
-  "$DF_CEREMONY_DIR/round-0000/disclosure_binding_0000.zkey"
+npm run zk:production:setup -- \
+  --ceremony-id deepfamily-production-2026-001
 ```
 
-Immediately verify both initial keys and record their hashes:
+Internally the command:
+
+1. validates the clean release commit and development manifest;
+2. downloads or reuses the pinned public power-13 pTau and checks both pinned digests;
+3. compiles `person_commitment` and `disclosure_binding` into a private staging directory;
+4. creates each initial Groth16 zkey;
+5. generates a separate 64-byte OS CSPRNG input for each circuit and supplies it to snarkjs through
+   a private stdin pipe, never through command arguments or environment variables;
+6. embeds one `deepfamily-single-operator` contribution in each zkey;
+7. only after both contributions, generates a separate 32-byte local CSPRNG finalization value and
+   applies it to both zkeys;
+8. exports both verification keys and Solidity verifiers and stages the browser WASM/zkey assets;
+9. reads the real contribution metadata embedded in both final zkeys;
+10. creates `circuits/zk-ceremony-transcript.json` and updates
+    `circuits/zk-artifacts-manifest.json`;
+11. validates the staged schema, pTau mathematics, zkey mathematics, contribution order,
+    finalization metadata, and real proofs before any release file is replaced;
+12. installs every non-manifest artifact, reruns real proofs and the production contract build, and
+    only then installs the manifest as the atomic release commit marker;
+13. rechecks installed artifact hashes and zkey-derived outputs, restoring the previous artifact
+    set if final validation fails.
+
+The local finalization value is accurately recorded as:
+
+```text
+node:crypto.randomBytes(32), generated after both Phase 2 contributions
+```
+
+It closes and identifies the final transcript. It is **not** described as an independent public
+randomness event and does not remove the single-operator trust assumption.
+
+The secret Phase 2 inputs are not placed in shell history, process arguments, environment
+variables, the transcript, or normal command output. The operator must still protect the machine
+during execution and destroy VM snapshots, swap copies, backups, or other recoverable state that
+could contain those secrets.
+
+## Generated evidence
+
+The production manifest records:
+
+- `status: production`;
+- `trustModel: single-operator`;
+- the explicit single-operator warning;
+- the fixed pTau source, byte length, SHA-256, BLAKE2b-512, and verification status;
+- the exact Circom and snarkjs toolchain;
+- the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for both circuits;
+- the transcript and local finalization hashes.
+
+The schema-v2 transcript records:
+
+- the release ceremony ID;
+- the same `single-operator` trust model;
+- both source and R1CS hashes;
+- the one operator contribution name;
+- the two embedded BLAKE2b-512 contribution hashes;
+- the finalization value, exponent, source, and embedded finalization contribution hashes.
+
+The single-operator transcript intentionally has no generated EVM identity signature. An ephemeral
+self-generated wallet signature would not prove independent participation or improve the trust
+model.
+
+## Review and commit
+
+Success leaves the generated release files uncommitted so that they can be reviewed. Do not run
+`release:preflight` yet: it requires a clean commit.
+
+First inspect the result:
 
 ```bash
-node_modules/.bin/snarkjs zkey verify \
-  zk-artifacts/circuits/person_commitment.r1cs \
-  "$DF_PTAU" \
-  "$DF_CEREMONY_DIR/round-0000/person_commitment_0000.zkey"
+git status --short
+git diff --stat
+git diff -- \
+  circuits/zk-artifacts-manifest.json \
+  circuits/zk-ceremony-transcript.json \
+  contracts/PersonCommitmentVerifier.sol \
+  contracts/DisclosureBindingVerifier.sol
 
-node_modules/.bin/snarkjs zkey verify \
-  zk-artifacts/circuits/disclosure_binding.r1cs \
-  "$DF_PTAU" \
-  "$DF_CEREMONY_DIR/round-0000/disclosure_binding_0000.zkey"
-
-sha256sum "$DF_CEREMONY_DIR/round-0000/"*.zkey
-```
-
-## 4. Run each independent contribution
-
-For round `N`, the participant receives:
-
-- the frozen commit ID and R1CS hashes;
-- the reviewed Powers of Tau file or its durable source and hash;
-- both zkeys from round `N-1`;
-- the complete signed/hash-chained transcript through round `N-1`.
-
-Before contributing, the participant independently verifies every input hash and both input zkeys.
-The participant then runs the following on an isolated machine:
-
-```bash
-node_modules/.bin/snarkjs zkey contribute \
-  person_commitment_previous.zkey \
-  person_commitment_next.zkey \
-  --name="public-participant-id" \
-  -v
-
-node_modules/.bin/snarkjs zkey contribute \
-  disclosure_binding_previous.zkey \
-  disclosure_binding_next.zkey \
-  --name="public-participant-id" \
-  -v
-```
-
-Important contributor rules:
-
-- Enter entropy interactively. Never pass it using `-e`, an environment variable, a shell history,
-  a CI secret, a chat message, or the transcript.
-- Use different fresh entropy for the two circuits.
-- Do not reuse an OS image snapshot or entropy from another participant.
-- Save the public snarkjs contribution hashes and output-file SHA-256 values.
-- Sign the exact EIP-191 approval message described in step 7 with the contributor's previously
-  agreed checksummed EVM address. Each contributor must use a distinct address. The private signing
-  key never enters this repository or the coordinator's machine.
-- Destroy entropy, swap, shell history containing sensitive input, and the temporary ceremony
-  environment before publishing the output.
-
-The coordinator verifies both returned zkeys before accepting the round:
-
-```bash
-node_modules/.bin/snarkjs zkey verify \
-  zk-artifacts/circuits/person_commitment.r1cs \
-  "$DF_PTAU" \
-  person_commitment_next.zkey
-
-node_modules/.bin/snarkjs zkey verify \
-  zk-artifacts/circuits/disclosure_binding.r1cs \
-  "$DF_PTAU" \
-  disclosure_binding_next.zkey
-
-sha256sum person_commitment_next.zkey disclosure_binding_next.zkey
-```
-
-Never accept only one circuit from a participant. Never renumber, replace, or edit an accepted
-round. If a participant fails, retain the previous valid round and give that exact round to a new
-participant.
-
-## 5. Apply the final public beacon
-
-Before contributions start, publish how the future beacon value will be selected. It must come from
-a public event that is unknown until after the last contribution. Record the source and extraction
-rule in advance.
-
-After the minimum contributor count is met, derive a 64-hex-character beacon and run:
-
-```bash
-node_modules/.bin/snarkjs zkey beacon \
-  person_commitment_last.zkey \
-  person_commitment_final.zkey \
-  0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  10 \
-  --name="deepfamily-public-beacon"
-
-node_modules/.bin/snarkjs zkey beacon \
-  disclosure_binding_last.zkey \
-  disclosure_binding_final.zkey \
-  0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  10 \
-  --name="deepfamily-public-beacon"
-```
-
-The displayed value is only a format example; never use it for a real ceremony. Replace it with the
-value derived from the pre-announced public event. The value `10` is `numIterationsExp`, meaning
-`2^10` beacon iterations; it is not a plain iteration count. DeepFamily accepts an exponent from
-10 through 63, and the chosen value becomes immutable release evidence.
-
-Verify both final zkeys again and record their hashes.
-
-## 6. Export release artifacts
-
-Copy the final zkeys to the explicit build paths, export verification keys and Solidity verifiers,
-and sync only the known artifact paths:
-
-```bash
-cp person_commitment_final.zkey \
-  zk-artifacts/circuits/person_commitment_final.zkey
-cp disclosure_binding_final.zkey \
-  zk-artifacts/circuits/disclosure_binding_final.zkey
-
-node_modules/.bin/snarkjs zkey export verificationkey \
-  zk-artifacts/circuits/person_commitment_final.zkey \
-  zk-artifacts/circuits/person_commitment.vkey.json
-node_modules/.bin/snarkjs zkey export verificationkey \
-  zk-artifacts/circuits/disclosure_binding_final.zkey \
-  zk-artifacts/circuits/disclosure_binding.vkey.json
-
-npm run zk:verifier
-npm run zk:sync
-```
-
-The sync command uses explicit source paths and no longer accepts the first recursively discovered
-file with a matching name.
-
-## 7. Publish the production manifest
-
-Update `circuits/zk-artifacts-manifest.json` only after all prior checks pass:
-
-- set `trustedSetup.status` to `production`;
-- assign a unique `ceremonyId`;
-- record the reviewed Phase 1 source, SHA-256 and `verified: true`;
-- create `circuits/zk-ceremony-transcript.json` with at least three distinct participant IDs and
-  distinct signer addresses in exact contribution order;
-- record each participant's two embedded snarkjs BLAKE2b-512 contribution hashes and two output
-  zkey SHA-256 values, then obtain that participant's EIP-191 signature;
-- record the final beacon source, value, iteration exponent and both embedded beacon contribution
-  hashes;
-- publish the canonical transcript, then record its path and SHA-256 in the manifest;
-- replace every circuit artifact hash with the final release hash.
-
-The production `trustedSetup` shape in `circuits/zk-artifacts-manifest.json` is:
-
-```json
-{
-  "trustedSetup": {
-    "status": "production",
-    "ceremonyId": "deepfamily-production-2026-001",
-    "minimumContributors": 3,
-    "contributorCount": 3,
-    "phase1": {
-      "source": "https://permanent.example/reviewed.ptau",
-      "sha256": "64-lowercase-hex-characters",
-      "verified": true
-    },
-    "transcript": {
-      "path": "circuits/zk-ceremony-transcript.json",
-      "sha256": "64-lowercase-hex-characters"
-    },
-    "beacon": {
-      "applied": true,
-      "name": "deepfamily-public-beacon",
-      "hash": "64-lowercase-hex-characters",
-      "numIterationsExp": 10,
-      "source": "pre-announced public randomness event",
-      "personCommitmentContributionHash": "128-lowercase-hex-characters",
-      "disclosureBindingContributionHash": "128-lowercase-hex-characters"
-    }
-  }
-}
-```
-
-The canonical two-space JSON transcript, with exactly one trailing newline, has this shape:
-
-```json
-{
-  "schemaVersion": 1,
-  "ceremonyId": "deepfamily-production-2026-001",
-  "phase1Sha256": "64-lowercase-hex-characters",
-  "circuits": {
-    "person_commitment": {
-      "sourceSha256": "64-lowercase-hex-characters",
-      "r1csSha256": "64-lowercase-hex-characters"
-    },
-    "disclosure_binding": {
-      "sourceSha256": "64-lowercase-hex-characters",
-      "r1csSha256": "64-lowercase-hex-characters"
-    }
-  },
-  "contributions": [
-    {
-      "sequence": 1,
-      "participantId": "participant-001",
-      "signerAddress": "0xChecksummedContributorAddress",
-      "personCommitmentContributionHash": "128-lowercase-hex-characters",
-      "disclosureBindingContributionHash": "128-lowercase-hex-characters",
-      "personCommitmentZkeySha256": "64-lowercase-hex-characters",
-      "disclosureBindingZkeySha256": "64-lowercase-hex-characters",
-      "signature": "0xEip191Signature"
-    }
-  ],
-  "beacon": {
-    "name": "deepfamily-public-beacon",
-    "hash": "64-lowercase-hex-characters",
-    "numIterationsExp": 10,
-    "source": "pre-announced public randomness event",
-    "personCommitmentContributionHash": "128-lowercase-hex-characters",
-    "disclosureBindingContributionHash": "128-lowercase-hex-characters"
-  }
-}
-```
-
-For each contribution, the signed UTF-8 message is the literal prefix
-`deepfamily:zk-ceremony-contribution:v1:` followed immediately by canonical minified JSON with
-sorted object keys containing `schemaVersion`, `ceremonyId`, `phase1Sha256`, the complete
-`circuits` object and that contribution object without `signature`. The release checker reconstructs
-this message, recovers the EIP-191 signer and requires it to equal `signerAddress`; a copied,
-reordered or edited record is rejected. Contributors should compare the complete message on an
-independent display before signing it with their normal wallet/hardware-wallet workflow.
-
-The examples abbreviate the full manifest and contribution list. Do not delete the manifest's
-schema, toolchain, tool-version or circuit hash fields. Both JSON files must be ordinary files
-inside the checkout, not symlinks.
-
-## 8. Run the cryptographic verification gate
-
-From the exact release checkout:
-
-```bash
-npm run zk:ceremony:verify -- --ptau "$DF_PTAU"
+npm run zk:ceremony:verify
 npm run zk:artifacts:check
 npm run zk:check
 ```
 
-The ceremony command fails unless:
-
-- the checked-in manifest is marked production;
-- at least three unique participant IDs and EIP-191 signer addresses are recorded;
-- every signed transcript record is valid and the transcript hash matches the manifest;
-- every committed source/WASM/zkey/vkey/verifier hash matches;
-- the pinned Circom and snarkjs executable hashes match;
-- the supplied Powers of Tau hash matches;
-- `snarkjs powersoftau verify` succeeds;
-- both `snarkjs zkey verify` commands bind the final keys to the frozen R1CS and Powers of Tau;
-- each final zkey's embedded Phase 2 metadata contains the exact ordered participant names and
-  contribution hashes, followed by exactly one matching named beacon.
-
-`zk:check` also generates a proof for each circuit and independently verifies it against the
-committed verification key.
-
-## 9. Independent reproduction and release commit
-
-Two independent verifiers must repeat step 8 from clean checkouts and compare:
-
-- Git commit;
-- package lock and tool versions;
-- ceremony manifest and transcript hashes;
-- all R1CS/WASM/zkey/vkey/verifier hashes;
-- embedded contribution chain reported by snarkjs;
-- final proof verification results.
-
-Commit the final manifest, frontend proving artifacts and generated Solidity verifiers together.
-Tag that commit as the release candidate. Any later change to a covered file invalidates the
-ceremony release candidate.
-
-Then run:
+Review the large binary assets by comparing their hashes with the manifest rather than attempting
+to render their bytes. Commit the manifest, transcript, verifiers, and frontend proving artifacts
+together:
 
 ```bash
-ZK_PTAU_PATH="$DF_PTAU" npm run release:preflight
+git add \
+  circuits/zk-artifacts-manifest.json \
+  circuits/zk-ceremony-transcript.json \
+  contracts/PersonCommitmentVerifier.sol \
+  contracts/DisclosureBindingVerifier.sol \
+  frontend/public/zk
+
+git commit -m "chore: install production zk artifacts"
 ```
 
-The preflight requires a clean production ceremony manifest and executes the complete contract,
-frontend, localization, ZK, XSS-sink and dependency checks.
+The ignored `zk-artifacts/circuits/` build outputs and pinned pTau cache must also be copied into
+the controlled release archive. A clean Git status alone does not archive ignored files.
 
-## 10. Testnet and Mainnet sequence
+From a clean checkout of the new commit, restore the exact dependencies and pTau cache, rebuild, and
+run the complete gate:
+
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+npm run zk:fetch
+npm run zk:ptau:fetch
+npm run release:preflight
+```
+
+`release:preflight` checks the clean commit before and after the build, verifies both proofs and all
+published hashes, validates the single-operator transcript against the real zkey metadata, and runs
+the complete contract, frontend, localization, XSS, storage, and dependency checks.
+
+## Testnet and Mainnet sequence
 
 Only after `release:preflight` passes:
 
-1. run eSpace Testnet in `release-rehearsal` mode with the real production `MIN_DELAY`;
-2. run Sepolia in `release-rehearsal` mode as well when Ethereum is a release target;
-3. accept only the network-specific report with `status=passed`, `releaseReady=true`,
+1. run the target testnet acceptance command in `release-rehearsal` mode with the real production
+   Timelock delay;
+2. accept only a report with `status=passed`, `releaseReady=true`,
    `zkArtifactTrust.productionReady=true`, and `zkCeremonyVerification.status=passed`;
-4. copy the exact reviewed report into a regular, non-symlink path inside the release checkout and
-   record its SHA-256 in the external release archive;
-5. prepare and prove control of the production Safe;
-6. generate the Mainnet release plan;
-7. have at least two current Safe owners sign the exact printed EIP-191 plan-approval message;
-8. execute only with the unchanged plan digest, signatures and chain confirmation.
+3. archive that exact report with the release commit and ZK evidence;
+4. prepare and validate the production governance Safe;
+5. generate the read-only Mainnet release plan;
+6. obtain the required Safe-owner approvals over the exact plan;
+7. execute only the unchanged reviewed plan.
 
-Both the testnet release-rehearsal and Mainnet release tooling reject development-only ZK artifacts.
+The Safe remains a separate 2/3 governance control. The testnet/Mainnet release tools validate the
+recorded ZK trust model but do not reinterpret one ZK contributor as one governance signer.
 
-## Abort and restart conditions
+## Optional multi-party enhancement
 
-Abort the ceremony and restart from round zero when:
+When independent contributors are available, DeepFamily may perform a traditional sequential
+multi-party Phase 2 ceremony instead of the default command:
 
-- circuit source or R1CS changes;
-- the Phase 1 file or its hash is uncertain;
-- a zkey/hash handoff cannot be reproduced;
-- a contributor used shared, logged or recoverable entropy;
-- a contribution order is ambiguous;
-- fewer than three independent contributors remain valid;
-- the beacon source differs from the pre-announced rule;
-- `powersoftau verify`, `zkey verify`, proof verification, or artifact comparison fails;
-- the final release manifest cannot be reproduced by independent verifiers.
+```text
+initial zkeys
+  -> participant A contributes independently to both circuits
+  -> participant B contributes independently to both circuits
+  -> optional further participants
+  -> pre-announced public finalization beacon
+  -> final production zkeys
+```
 
-Never “repair” the transcript by editing hashes or contribution order.
+Each participant should verify the incoming R1CS, pTau, zkeys, and transcript; use separate fresh
+entropy for the two circuits; return both outputs together; sign the exact public contribution
+record; and destroy their secret environment. The existing signed multi-party transcript format
+remains supported.
+
+This is an optional strengthening, not a current release prerequisite and not tied to the Safe
+owner count. If a multi-party setup is selected, use a separately reviewed coordinator procedure
+and do not claim completion merely by generating several keys on one operator's machine.
+
+## Restart conditions
+
+Generate a new production setup before release when:
+
+- either circuit source or R1CS changes;
+- public-signal or packing semantics change;
+- the selected pTau or its hash is uncertain;
+- the operator believes Phase 2 secrets may have been retained or exposed;
+- a zkey, transcript, verifier, or artifact hash cannot be reproduced;
+- any pTau, zkey, proof, or artifact verification fails.
+
+Never repair a transcript by manually changing hashes or contribution order. Fix the cause and
+regenerate the complete artifact set.

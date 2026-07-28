@@ -59,9 +59,12 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 
 ## Prerequisites
 
-1. Complete the production multi-party ZK ceremony in
-   [zk-ceremony.md](./zk-ceremony.md), replace the development proving keys, and run
-   `npm run release:preflight` with the reviewed `ZK_PTAU_PATH`.
+1. From a clean frozen circuit commit, run `npm run zk:production:setup` as described in
+   [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
+   verifiers, and frontend proving artifacts together, then run `npm run release:preflight` from
+   that clean commit. The default path records one Phase 2 contributor under the explicit
+   `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
+   prerequisite and not related to the Safe's three-owner, 2/3 policy.
 2. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia using the exact
    production `MIN_DELAY`, and archive its successful release-rehearsal report. A diagnostic report
    with `releaseReady=false` is useful for development but is not release evidence. Require
@@ -88,7 +91,8 @@ Copy `.env.example` to the ignored `.env` and protect it. Never commit `.env`.
 PRIVATE_KEY=0x...
 ETHEREUM_MAINNET_RPC_URL=https://your-reviewed-ethereum-mainnet-rpc
 EXPLORER_API_KEY=your-real-etherscan-api-key
-ZK_PTAU_PATH=/absolute/path/to/reviewed-production.ptau
+# Optional: blank uses tmp/zk-production/powersOfTau28_hez_final_13.ptau.
+ZK_PTAU_PATH=
 
 # Production policy.
 GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3

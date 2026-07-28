@@ -8,8 +8,9 @@
   },
   "trustedSetup": {
     "status": "development",
+    "trustModel": "single-operator",
     "warning": "Single local contributor with public fixed entropy; development and testing only.",
-    "minimumContributors": 3,
+    "minimumContributors": 1,
     "contributorCount": 1,
     "beaconApplied": false,
     "transcriptSha256": null

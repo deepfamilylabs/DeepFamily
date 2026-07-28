@@ -3,10 +3,28 @@ import fs from "node:fs";
 import path from "node:path";
 import { ethers } from "ethers";
 
+import {
+  PRODUCTION_PTAU_BLAKE2B512,
+  PRODUCTION_PTAU_BYTES,
+  PRODUCTION_PTAU_SHA256,
+  PRODUCTION_PTAU_URL,
+} from "./productionPtau.mjs";
+
 export const ZK_ARTIFACT_MANIFEST_PATH = "circuits/zk-artifacts-manifest.json";
 export const ZK_CEREMONY_TRANSCRIPT_PATH = "circuits/zk-ceremony-transcript.json";
-export const MINIMUM_PRODUCTION_CONTRIBUTORS = 3;
+export const ZK_TRUST_MODEL_SINGLE_OPERATOR = "single-operator";
+export const ZK_TRUST_MODEL_MULTI_PARTY = "multi-party";
+export const MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS = 1;
+export const MINIMUM_MULTI_PARTY_CONTRIBUTORS = 2;
+// Kept as a compatibility alias for callers that only need the lowest valid production count.
+export const MINIMUM_PRODUCTION_CONTRIBUTORS = MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS;
 export const ZK_CONTRIBUTION_APPROVAL_DOMAIN = "deepfamily:zk-ceremony-contribution:v1";
+export const ZK_PRODUCTION_PHASE1 = Object.freeze({
+  source: PRODUCTION_PTAU_URL,
+  bytes: PRODUCTION_PTAU_BYTES,
+  sha256: PRODUCTION_PTAU_SHA256,
+  blake2b512: PRODUCTION_PTAU_BLAKE2B512,
+});
 export const ZK_TOOLCHAIN_PATHS = Object.freeze({
   circomBinary: "bin/circom",
   snarkjsBinary:
@@ -126,6 +144,38 @@ const assertBlake2b512 = (value, label) => {
   return value;
 };
 
+const validateTrustModelCounts = (setup, label) => {
+  if (setup.trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR) {
+    if (
+      setup.minimumContributors !== MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS ||
+      setup.contributorCount !== MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS
+    ) {
+      throw new Error(
+        `${label} single-operator trustModel requires exactly one declared contributor`,
+      );
+    }
+    return;
+  }
+  if (setup.trustModel === ZK_TRUST_MODEL_MULTI_PARTY) {
+    if (
+      !Number.isSafeInteger(setup.minimumContributors) ||
+      setup.minimumContributors < MINIMUM_MULTI_PARTY_CONTRIBUTORS ||
+      !Number.isSafeInteger(setup.contributorCount) ||
+      setup.contributorCount < setup.minimumContributors
+    ) {
+      throw new Error(
+        `${label} multi-party trustModel requires at least ` +
+          `${MINIMUM_MULTI_PARTY_CONTRIBUTORS} contributors and contributorCount >= minimumContributors`,
+      );
+    }
+    return;
+  }
+  throw new Error(
+    `trustedSetup.trustModel must be exactly ${ZK_TRUST_MODEL_SINGLE_OPERATOR} or ` +
+      ZK_TRUST_MODEL_MULTI_PARTY,
+  );
+};
+
 const assertFileHash = (root, relativePath, expectedHash, label) => {
   const filePath = path.join(root, relativePath);
   let stats;
@@ -184,6 +234,7 @@ const validateDevelopmentSetup = (setup) => {
     setup,
     [
       "status",
+      "trustModel",
       "warning",
       "minimumContributors",
       "contributorCount",
@@ -195,22 +246,22 @@ const validateDevelopmentSetup = (setup) => {
   if (typeof setup.warning !== "string" || setup.warning.trim().length < 20) {
     throw new Error("trustedSetup.warning must explain the development-only trust boundary");
   }
-  if (setup.minimumContributors !== MINIMUM_PRODUCTION_CONTRIBUTORS) {
-    throw new Error(`trustedSetup.minimumContributors must be ${MINIMUM_PRODUCTION_CONTRIBUTORS}`);
+  if (setup.trustModel !== ZK_TRUST_MODEL_SINGLE_OPERATOR) {
+    throw new Error("development trustedSetup.trustModel must be exactly single-operator");
   }
-  if (!Number.isSafeInteger(setup.contributorCount) || setup.contributorCount < 0) {
-    throw new Error("trustedSetup.contributorCount must be a non-negative safe integer");
-  }
+  validateTrustModelCounts(setup, "development trustedSetup");
   if (setup.beaconApplied !== false || setup.transcriptSha256 !== null) {
     throw new Error("development trustedSetup must not claim a beacon or production transcript");
   }
 };
 
-const validateProductionSetup = (setup) => {
+const validateProductionSetup = (setup, expectedPhase1) => {
   assertExactKeys(
     setup,
     [
       "status",
+      "trustModel",
+      "warning",
       "ceremonyId",
       "minimumContributors",
       "contributorCount",
@@ -223,22 +274,31 @@ const validateProductionSetup = (setup) => {
   if (typeof setup.ceremonyId !== "string" || !CEREMONY_ID_PATTERN.test(setup.ceremonyId)) {
     throw new Error("trustedSetup.ceremonyId has an unsafe or ambiguous format");
   }
-  if (
-    setup.minimumContributors !== MINIMUM_PRODUCTION_CONTRIBUTORS ||
-    setup.contributorCount < setup.minimumContributors
-  ) {
-    throw new Error(
-      `production trustedSetup requires at least ${MINIMUM_PRODUCTION_CONTRIBUTORS} contributors`,
-    );
+  if (typeof setup.warning !== "string" || setup.warning.trim().length < 20) {
+    throw new Error("trustedSetup.warning must explain the production trust boundary");
   }
+  validateTrustModelCounts(setup, "production trustedSetup");
   assertPositiveSafeInteger(setup.contributorCount, "trustedSetup.contributorCount");
 
   const phase1 = assertPlainObject(setup.phase1, "trustedSetup.phase1");
-  assertExactKeys(phase1, ["source", "sha256", "verified"], "trustedSetup.phase1");
+  assertExactKeys(
+    phase1,
+    ["source", "bytes", "sha256", "blake2b512", "verified"],
+    "trustedSetup.phase1",
+  );
   if (typeof phase1.source !== "string" || phase1.source.trim().length < 8) {
     throw new Error("trustedSetup.phase1.source must identify the published Powers of Tau");
   }
+  assertPositiveSafeInteger(phase1.bytes, "trustedSetup.phase1.bytes");
   assertSha256(phase1.sha256, "trustedSetup.phase1.sha256");
+  assertBlake2b512(phase1.blake2b512, "trustedSetup.phase1.blake2b512");
+  for (const field of ["source", "bytes", "sha256", "blake2b512"]) {
+    if (phase1[field] !== expectedPhase1[field]) {
+      throw new Error(
+        `trustedSetup.phase1.${field} does not match the pinned production Powers of Tau`,
+      );
+    }
+  }
   if (phase1.verified !== true) {
     throw new Error("trustedSetup.phase1.verified must be true");
   }
@@ -265,8 +325,8 @@ const validateProductionSetup = (setup) => {
     "trustedSetup.beacon",
   );
   if (beacon.applied !== true) throw new Error("trustedSetup.beacon.applied must be true");
-  if (beacon.name !== "deepfamily-public-beacon") {
-    throw new Error("trustedSetup.beacon.name must be exactly deepfamily-public-beacon");
+  if (typeof beacon.name !== "string" || !PARTICIPANT_ID_PATTERN.test(beacon.name)) {
+    throw new Error("trustedSetup.beacon.name has an unsafe or ambiguous format");
   }
   assertSha256(beacon.hash, "trustedSetup.beacon.hash");
   if (
@@ -277,7 +337,7 @@ const validateProductionSetup = (setup) => {
     throw new Error("trustedSetup.beacon.numIterationsExp must be an integer between 10 and 63");
   }
   if (typeof beacon.source !== "string" || beacon.source.trim().length < 8) {
-    throw new Error("trustedSetup.beacon.source must identify the public randomness source");
+    throw new Error("trustedSetup.beacon.source must identify the randomness source");
   }
   assertBlake2b512(
     beacon.personCommitmentContributionHash,
@@ -304,15 +364,42 @@ export const buildZkContributionApprovalMessage = ({
     contribution,
   });
 
-const validateProductionTranscript = ({ transcript, manifest }) => {
+export const validateProductionTranscript = ({ transcript, manifest }) => {
   assertPlainObject(transcript, "ZK ceremony transcript");
-  assertExactKeys(
-    transcript,
-    ["schemaVersion", "ceremonyId", "phase1Sha256", "circuits", "contributions", "beacon"],
-    "ZK ceremony transcript",
-  );
-  if (transcript.schemaVersion !== 1) {
-    throw new Error("ZK ceremony transcript schemaVersion must be 1");
+  const singleOperatorTranscript = transcript.schemaVersion === 2;
+  if (singleOperatorTranscript) {
+    assertExactKeys(
+      transcript,
+      [
+        "schemaVersion",
+        "trustModel",
+        "ceremonyId",
+        "phase1Sha256",
+        "circuits",
+        "contributions",
+        "beacon",
+      ],
+      "ZK ceremony transcript",
+    );
+    if (
+      transcript.trustModel !== ZK_TRUST_MODEL_SINGLE_OPERATOR ||
+      transcript.trustModel !== manifest.trustedSetup.trustModel
+    ) {
+      throw new Error(
+        "ZK ceremony transcript schemaVersion 2 requires matching single-operator trustModel",
+      );
+    }
+  } else if (transcript.schemaVersion === 1) {
+    assertExactKeys(
+      transcript,
+      ["schemaVersion", "ceremonyId", "phase1Sha256", "circuits", "contributions", "beacon"],
+      "ZK ceremony transcript",
+    );
+    if (manifest.trustedSetup.trustModel !== ZK_TRUST_MODEL_MULTI_PARTY) {
+      throw new Error("ZK ceremony transcript schemaVersion 1 requires multi-party trustModel");
+    }
+  } else {
+    throw new Error("ZK ceremony transcript schemaVersion must be 1 or 2");
   }
   if (transcript.ceremonyId !== manifest.trustedSetup.ceremonyId) {
     throw new Error("ZK ceremony transcript ceremonyId does not match the manifest");
@@ -361,18 +448,22 @@ const validateProductionTranscript = ({ transcript, manifest }) => {
   const contributions = transcript.contributions.map((entry, index) => {
     const label = `ZK ceremony transcript contributions[${index}]`;
     const contribution = assertPlainObject(entry, label);
+    const embeddedContributionKeys = [
+      "sequence",
+      "participantId",
+      "personCommitmentContributionHash",
+      "disclosureBindingContributionHash",
+    ];
+    const signedMultiPartyKeys = [
+      ...embeddedContributionKeys,
+      "personCommitmentZkeySha256",
+      "disclosureBindingZkeySha256",
+      "signerAddress",
+      "signature",
+    ];
     assertExactKeys(
       contribution,
-      [
-        "sequence",
-        "participantId",
-        "signerAddress",
-        "personCommitmentContributionHash",
-        "disclosureBindingContributionHash",
-        "personCommitmentZkeySha256",
-        "disclosureBindingZkeySha256",
-        "signature",
-      ],
+      singleOperatorTranscript ? embeddedContributionKeys : signedMultiPartyKeys,
       label,
     );
     if (contribution.sequence !== index + 1) {
@@ -389,20 +480,6 @@ const validateProductionTranscript = ({ transcript, manifest }) => {
     }
     participantIds.add(contribution.participantId);
 
-    let signerAddress;
-    try {
-      signerAddress = ethers.getAddress(contribution.signerAddress);
-    } catch {
-      throw new Error(`${label}.signerAddress must be a nonzero EVM address`);
-    }
-    if (signerAddress === ethers.ZeroAddress || signerAddress !== contribution.signerAddress) {
-      throw new Error(`${label}.signerAddress must be a checksummed nonzero EVM address`);
-    }
-    if (signerAddresses.has(signerAddress.toLowerCase())) {
-      throw new Error("ZK ceremony transcript signer addresses must be unique");
-    }
-    signerAddresses.add(signerAddress.toLowerCase());
-
     assertBlake2b512(
       contribution.personCommitmentContributionHash,
       `${label}.personCommitmentContributionHash`,
@@ -411,35 +488,58 @@ const validateProductionTranscript = ({ transcript, manifest }) => {
       contribution.disclosureBindingContributionHash,
       `${label}.disclosureBindingContributionHash`,
     );
-    assertSha256(contribution.personCommitmentZkeySha256, `${label}.personCommitmentZkeySha256`);
-    assertSha256(contribution.disclosureBindingZkeySha256, `${label}.disclosureBindingZkeySha256`);
-    let normalizedSignature;
-    try {
-      normalizedSignature = ethers.Signature.from(contribution.signature).serialized;
-    } catch {
-      throw new Error(`${label}.signature must be a valid EIP-191 signature`);
+    if (!singleOperatorTranscript) {
+      assertSha256(contribution.personCommitmentZkeySha256, `${label}.personCommitmentZkeySha256`);
+      assertSha256(
+        contribution.disclosureBindingZkeySha256,
+        `${label}.disclosureBindingZkeySha256`,
+      );
     }
     const signedContribution = Object.fromEntries(
       Object.entries(contribution).filter(([key]) => key !== "signature"),
     );
-    const message = buildZkContributionApprovalMessage({
-      ceremonyId: transcript.ceremonyId,
-      phase1Sha256: transcript.phase1Sha256,
-      circuits: transcriptCircuits,
-      contribution: signedContribution,
-    });
-    let recovered;
-    try {
-      recovered = ethers.getAddress(ethers.verifyMessage(message, normalizedSignature));
-    } catch {
-      throw new Error(`${label}.signature cannot be recovered`);
-    }
-    if (recovered !== signerAddress) {
-      throw new Error(`${label}.signature is not from signerAddress`);
+    let approvalMessageHash = null;
+    if (!singleOperatorTranscript) {
+      let signerAddress;
+      try {
+        signerAddress = ethers.getAddress(contribution.signerAddress);
+      } catch {
+        throw new Error(`${label}.signerAddress must be a nonzero EVM address`);
+      }
+      if (signerAddress === ethers.ZeroAddress || signerAddress !== contribution.signerAddress) {
+        throw new Error(`${label}.signerAddress must be a checksummed nonzero EVM address`);
+      }
+      if (signerAddresses.has(signerAddress.toLowerCase())) {
+        throw new Error("ZK ceremony transcript signer addresses must be unique");
+      }
+      signerAddresses.add(signerAddress.toLowerCase());
+
+      let normalizedSignature;
+      try {
+        normalizedSignature = ethers.Signature.from(contribution.signature).serialized;
+      } catch {
+        throw new Error(`${label}.signature must be a valid EIP-191 signature`);
+      }
+      const message = buildZkContributionApprovalMessage({
+        ceremonyId: transcript.ceremonyId,
+        phase1Sha256: transcript.phase1Sha256,
+        circuits: transcriptCircuits,
+        contribution: signedContribution,
+      });
+      let recovered;
+      try {
+        recovered = ethers.getAddress(ethers.verifyMessage(message, normalizedSignature));
+      } catch {
+        throw new Error(`${label}.signature cannot be recovered`);
+      }
+      if (recovered !== signerAddress) {
+        throw new Error(`${label}.signature is not from signerAddress`);
+      }
+      approvalMessageHash = ethers.hashMessage(message);
     }
     return Object.freeze({
       ...signedContribution,
-      approvalMessageHash: ethers.hashMessage(message),
+      approvalMessageHash,
     });
   });
 
@@ -479,7 +579,10 @@ const validateProductionTranscript = ({ transcript, manifest }) => {
   });
 };
 
-export const validateZkArtifactManifest = (manifest, { requireProduction = false } = {}) => {
+export const validateZkArtifactManifest = (
+  manifest,
+  { requireProduction = false, expectedProductionPhase1 = ZK_PRODUCTION_PHASE1 } = {},
+) => {
   assertPlainObject(manifest, "ZK artifact manifest");
   assertExactKeys(
     manifest,
@@ -504,8 +607,9 @@ export const validateZkArtifactManifest = (manifest, { requireProduction = false
 
   const setup = assertPlainObject(manifest.trustedSetup, "trustedSetup");
   if (setup.status === "development") validateDevelopmentSetup(setup);
-  else if (setup.status === "production") validateProductionSetup(setup);
-  else throw new Error("trustedSetup.status must be exactly development or production");
+  else if (setup.status === "production") {
+    validateProductionSetup(setup, expectedProductionPhase1);
+  } else throw new Error("trustedSetup.status must be exactly development or production");
   if (requireProduction && setup.status !== "production") {
     throw new Error(
       "Production release is blocked: checked-in ZK proving keys are marked development-only",
@@ -539,6 +643,7 @@ export const inspectZkReleaseArtifacts = ({
   root = process.cwd(),
   requireProduction = false,
   requireBuiltR1cs = false,
+  expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
 } = {}) => {
   const resolvedRoot = path.resolve(root);
   if (fs.realpathSync(resolvedRoot) !== resolvedRoot) {
@@ -546,7 +651,7 @@ export const inspectZkReleaseArtifacts = ({
   }
   const manifestPath = path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH);
   const { parsed: manifest, raw } = readJsonStrict(manifestPath, "ZK artifact manifest");
-  validateZkArtifactManifest(manifest, { requireProduction });
+  validateZkArtifactManifest(manifest, { requireProduction, expectedProductionPhase1 });
   const toolchain = Object.freeze({
     circom: assertFileHash(
       resolvedRoot,
@@ -629,12 +734,20 @@ export const inspectZkReleaseArtifacts = ({
     snarkjsVersion: manifest.snarkjsVersion,
     toolchain,
     trustedSetupStatus: manifest.trustedSetup.status,
+    trustModel: manifest.trustedSetup.trustModel,
+    trustWarning: manifest.trustedSetup.warning,
     productionReady: manifest.trustedSetup.status === "production",
     ceremonyId: manifest.trustedSetup.ceremonyId ?? null,
     contributorCount: manifest.trustedSetup.contributorCount,
     minimumContributors: manifest.trustedSetup.minimumContributors,
     phase1Sha256:
       manifest.trustedSetup.status === "production" ? manifest.trustedSetup.phase1.sha256 : null,
+    phase1Blake2b512:
+      manifest.trustedSetup.status === "production"
+        ? manifest.trustedSetup.phase1.blake2b512
+        : null,
+    phase1Bytes:
+      manifest.trustedSetup.status === "production" ? manifest.trustedSetup.phase1.bytes : null,
     phase1Source:
       manifest.trustedSetup.status === "production" ? manifest.trustedSetup.phase1.source : null,
     beaconApplied:

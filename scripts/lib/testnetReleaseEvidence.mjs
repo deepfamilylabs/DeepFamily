@@ -5,6 +5,13 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
+import {
+  MINIMUM_MULTI_PARTY_CONTRIBUTORS,
+  MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+  ZK_PRODUCTION_PHASE1,
+  ZK_TRUST_MODEL_MULTI_PARTY,
+  ZK_TRUST_MODEL_SINGLE_OPERATOR,
+} from "./zkArtifactTrust.mjs";
 
 export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 3;
 export const TESTNET_RELEASE_READINESS_GATES = Object.freeze([
@@ -781,6 +788,64 @@ const requireProductionZkEvidence = (report) => {
   );
   requireExact(zkArtifactTrust.productionReady, true, "zkArtifactTrust.productionReady");
   requireExact(
+    zkArtifactTrust.phase1Source,
+    ZK_PRODUCTION_PHASE1.source,
+    "zkArtifactTrust.phase1Source",
+  );
+  requireExact(
+    requireSafeInteger(zkArtifactTrust.phase1Bytes, "zkArtifactTrust.phase1Bytes", 1),
+    ZK_PRODUCTION_PHASE1.bytes,
+    "zkArtifactTrust.phase1Bytes",
+  );
+  requireExact(
+    zkArtifactTrust.phase1Sha256,
+    ZK_PRODUCTION_PHASE1.sha256,
+    "zkArtifactTrust.phase1Sha256",
+  );
+  requireExact(
+    zkArtifactTrust.phase1Blake2b512,
+    ZK_PRODUCTION_PHASE1.blake2b512,
+    "zkArtifactTrust.phase1Blake2b512",
+  );
+  const trustModel = requireNonemptyString(
+    zkArtifactTrust.trustModel,
+    "zkArtifactTrust.trustModel",
+    40,
+  );
+  const minimumContributors = requireSafeInteger(
+    zkArtifactTrust.minimumContributors,
+    "zkArtifactTrust.minimumContributors",
+    1,
+  );
+  const contributorCount = requireSafeInteger(
+    zkArtifactTrust.contributorCount,
+    "zkArtifactTrust.contributorCount",
+    1,
+  );
+  if (trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR) {
+    requireExact(
+      minimumContributors,
+      MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+      "zkArtifactTrust.minimumContributors",
+    );
+    requireExact(
+      contributorCount,
+      MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+      "zkArtifactTrust.contributorCount",
+    );
+  } else if (trustModel === ZK_TRUST_MODEL_MULTI_PARTY) {
+    if (
+      minimumContributors < MINIMUM_MULTI_PARTY_CONTRIBUTORS ||
+      contributorCount < minimumContributors
+    ) {
+      throw new Error(
+        "zkArtifactTrust multi-party contributor counts do not meet the declared threshold",
+      );
+    }
+  } else {
+    throw new Error("zkArtifactTrust.trustModel is unsupported");
+  }
+  requireExact(
     requireRecord(report.productionParity, "productionParity").productionTrustedSetupMatched,
     true,
     "productionParity.productionTrustedSetupMatched",
@@ -807,15 +872,35 @@ const requireProductionZkEvidence = (report) => {
     zkArtifactTrust.transcriptSha256,
     "zkCeremonyVerification.transcriptSha256",
   );
+  requireExact(ceremony.trustModel, trustModel, "zkCeremonyVerification.trustModel");
   requireExact(
-    requireSafeInteger(ceremony.contributorCount, "zkCeremonyVerification.contributorCount", 3),
-    requireSafeInteger(zkArtifactTrust.contributorCount, "zkArtifactTrust.contributorCount", 3),
+    requireSafeInteger(
+      ceremony.minimumContributors,
+      "zkCeremonyVerification.minimumContributors",
+      1,
+    ),
+    minimumContributors,
+    "zkCeremonyVerification.minimumContributors",
+  );
+  requireExact(
+    requireSafeInteger(ceremony.contributorCount, "zkCeremonyVerification.contributorCount", 1),
+    contributorCount,
     "zkCeremonyVerification.contributorCount",
   );
   requireExact(
     requireRecord(ceremony.ptau, "zkCeremonyVerification.ptau").sha256,
     zkArtifactTrust.phase1Sha256,
     "zkCeremonyVerification.ptau.sha256",
+  );
+  requireExact(
+    ceremony.ptau.blake2b512,
+    zkArtifactTrust.phase1Blake2b512,
+    "zkCeremonyVerification.ptau.blake2b512",
+  );
+  requireExact(
+    requireSafeInteger(ceremony.ptau.bytes, "zkCeremonyVerification.ptau.bytes", 1),
+    requireSafeInteger(zkArtifactTrust.phase1Bytes, "zkArtifactTrust.phase1Bytes", 1),
+    "zkCeremonyVerification.ptau.bytes",
   );
   return zkArtifactTrust;
 };
@@ -964,6 +1049,9 @@ export const validateTestnetReleaseEvidence = async ({
     zkArtifacts: {
       status: zkArtifactTrust.status,
       trustedSetupStatus: zkArtifactTrust.trustedSetupStatus,
+      trustModel: zkArtifactTrust.trustModel,
+      contributorCount: zkArtifactTrust.contributorCount,
+      minimumContributors: zkArtifactTrust.minimumContributors,
       productionReady: zkArtifactTrust.productionReady,
     },
     verification: {

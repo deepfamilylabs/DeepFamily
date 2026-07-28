@@ -8,8 +8,10 @@ import {
   MINIMUM_PRODUCTION_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
   ZK_CEREMONY_TRANSCRIPT_PATH,
+  ZK_PRODUCTION_PHASE1,
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
+  ZK_TRUST_MODEL_SINGLE_OPERATOR,
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
@@ -27,6 +29,7 @@ const writeRelativeFile = async (root, relativePath, contents) => {
 
 const developmentSetup = () => ({
   status: "development",
+  trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
   warning: "Single local contributor fixture; development and testing only.",
   minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
   contributorCount: 1,
@@ -37,12 +40,13 @@ const developmentSetup = () => ({
 const productionSetup = () => {
   return {
     status: "production",
+    trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+    warning: "Single operator must destroy every circuit-specific Phase 2 secret.",
     ceremonyId: "deepfamily-production-2026-01",
     minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
     contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
     phase1: {
-      source: "https://example.invalid/published-final.ptau",
-      sha256: sha256Text("published-powers-of-tau"),
+      ...ZK_PRODUCTION_PHASE1,
       verified: true,
     },
     transcript: {
@@ -160,8 +164,10 @@ describe("development ZK manifest updater", function () {
     expect(evidence).to.include({
       status: "passed",
       trustedSetupStatus: "development",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
       productionReady: false,
       contributorCount: 1,
+      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
     });
     for (const circuitName of Object.keys(ZK_RELEASE_ARTIFACTS)) {
       expect(evidence.artifacts[circuitName].r1cs.sha256).to.equal(
