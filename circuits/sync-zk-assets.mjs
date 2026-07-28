@@ -4,17 +4,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import * as snarkjs from "snarkjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const logger = {
-  info: (...args) => console.log(...args),
-  warn: (...args) => console.warn(...args),
-  error: (...args) => console.error(...args),
-  debug: (...args) => (console.debug ? console.debug(...args) : console.log(...args)),
-};
 
 const projectRoot = path.resolve(__dirname, "..");
 const artifactsDir = path.join(projectRoot, "zk-artifacts", "circuits");
@@ -58,52 +50,33 @@ export async function syncZkAssets({
   destinationDirectory = targetDir,
   output = console,
   copyArtifact = (sourcePath, destinationPath) => fs.promises.copyFile(sourcePath, destinationPath),
-  exportVerificationKey = (zkeyPath) => snarkjs.zKey.exportVerificationKey(zkeyPath, logger),
 } = {}) {
   output.log("Syncing circuit artifacts to frontend/public/zk ...");
 
+  const copyPlan = FILES_TO_COPY.map((entry) => ({
+    ...entry,
+    sourcePath: path.join(sourceDirectory, entry.source),
+    destinationPath: path.join(destinationDirectory, entry.destination),
+  }));
+  const failedFiles = copyPlan
+    .filter(({ sourcePath }) => !fs.existsSync(sourcePath))
+    .map(({ sourcePath }) => sourcePath);
+
+  if (failedFiles.length > 0) {
+    failedFiles.forEach((filePath) => output.error(`Missing artifact: ${filePath}`));
+    output.error("Refusing to partially synchronize incomplete circuit artifacts.");
+    return { exitCode: 1, failedFiles };
+  }
+
   await ensureDirectoryExists(destinationDirectory);
 
-  const failedFiles = [];
-
-  for (const entry of FILES_TO_COPY) {
-    const destinationPath = path.join(destinationDirectory, entry.destination);
-    const sourcePath = path.join(sourceDirectory, entry.source);
-
-    if (!fs.existsSync(sourcePath) && entry.destination.endsWith(".vkey.json")) {
-      const circuitBase = entry.destination.replace(".vkey.json", "");
-      const zkeyName = `${circuitBase}_final.zkey`;
-      const zkeyPath = path.join(sourceDirectory, zkeyName);
-
-      if (fs.existsSync(zkeyPath)) {
-        try {
-          output.log(`Generating ${entry.destination} from ${zkeyPath}`);
-          const verificationKey = await exportVerificationKey(zkeyPath);
-          await fs.promises.writeFile(
-            sourcePath,
-            `${JSON.stringify(verificationKey, null, 2)}\n`,
-            "utf8",
-          );
-        } catch (error) {
-          output.error(`Failed to generate ${entry.destination}: ${error.message}`);
-          failedFiles.push(sourcePath);
-          continue;
-        }
-      }
-    }
-
-    if (!fs.existsSync(sourcePath)) {
-      failedFiles.push(sourcePath);
-      output.error(`Missing artifact: ${sourcePath}`);
-      continue;
-    }
-
+  for (const entry of copyPlan) {
     try {
-      await copyArtifact(sourcePath, destinationPath);
-      output.log(`Copied ${path.basename(sourcePath)} -> ${destinationPath}`);
+      await copyArtifact(entry.sourcePath, entry.destinationPath);
+      output.log(`Copied ${path.basename(entry.sourcePath)} -> ${entry.destinationPath}`);
     } catch (error) {
       output.error(`Failed to copy ${entry.destination}: ${error.message}`);
-      failedFiles.push(sourcePath);
+      failedFiles.push(entry.sourcePath);
     }
   }
 
