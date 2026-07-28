@@ -8,24 +8,29 @@ import { fileURLToPath } from "node:url";
 
 import {
   ZK_RELEASE_ARTIFACTS,
+  ZK_PRODUCTION_PHASE1,
   inspectZkReleaseArtifacts,
   sha256File,
 } from "./lib/zkArtifactTrust.mjs";
+import { inspectPtauFile, resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { readZkeyMpcMetadata } from "./lib/zkeyMpcMetadata.mjs";
 
 const usage = () => {
   console.log(`Usage:
+  npm run zk:ceremony:verify
   npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
 
 The command is read-only. It requires a production ceremony manifest, verifies every checked-in
 artifact hash, verifies the Powers of Tau transcript, and cryptographically binds each final zkey
-to the frozen R1CS and the supplied Powers of Tau file.`);
+to the frozen R1CS and the supplied Powers of Tau file. With no --ptau option it uses the pinned
+cache populated by npm run zk:ptau:fetch or npm run zk:production:setup.`);
 };
 
 const parseArguments = (argv) => {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
+  if (argv.length === 0) return { help: false, ptauPath: undefined };
   if (argv.length !== 2 || argv[0] !== "--ptau" || argv[1].trim() === "") {
-    throw new Error("Exactly --ptau <path> is required");
+    throw new Error("Usage: npm run zk:ceremony:verify -- [--ptau <path>]");
   }
   return { help: false, ptauPath: argv[1] };
 };
@@ -175,29 +180,44 @@ export const verifyProductionCeremony = async ({
   ptauPath,
   runner = defaultRunner,
   mpcMetadataReader = readZkeyMpcMetadata,
+  expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
 } = {}) => {
-  if (typeof ptauPath !== "string" || ptauPath.trim() === "") {
-    throw new Error("ptauPath is required");
-  }
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (typeof mpcMetadataReader !== "function") {
     throw new Error("mpcMetadataReader must be a function");
   }
 
   const resolvedRoot = fs.realpathSync(root);
-  const resolvedPtau = path.resolve(ptauPath);
+  const selectedPtauPath =
+    typeof ptauPath === "string" && ptauPath.trim() !== ""
+      ? ptauPath
+      : resolveProductionPtauPath({ root: resolvedRoot });
+  const resolvedPtau = path.resolve(selectedPtauPath);
   requireRegularFile(resolvedPtau, "Published Powers of Tau");
 
   const evidence = inspectZkReleaseArtifacts({
     root: resolvedRoot,
     requireProduction: true,
     requireBuiltR1cs: true,
+    expectedProductionPhase1,
   });
-  const actualPtauSha256 = sha256File(resolvedPtau);
-  if (actualPtauSha256 !== evidence.phase1Sha256) {
+  const actualPtau = await inspectPtauFile(resolvedPtau);
+  if (actualPtau.sha256 !== evidence.phase1Sha256) {
     throw new Error(
       `Published Powers of Tau SHA-256 mismatch; expected ${evidence.phase1Sha256}, ` +
-        `got ${actualPtauSha256}`,
+        `got ${actualPtau.sha256}`,
+    );
+  }
+  if (actualPtau.blake2b512 !== evidence.phase1Blake2b512) {
+    throw new Error(
+      `Published Powers of Tau BLAKE2b-512 mismatch; expected ${evidence.phase1Blake2b512}, ` +
+        `got ${actualPtau.blake2b512}`,
+    );
+  }
+  if (actualPtau.bytes !== evidence.phase1Bytes) {
+    throw new Error(
+      `Published Powers of Tau size mismatch; expected ${evidence.phase1Bytes}, ` +
+        `got ${actualPtau.bytes}`,
     );
   }
 
@@ -238,7 +258,7 @@ export const verifyProductionCeremony = async ({
       });
       const metadata = await mpcMetadataReader(files.zkeyPath);
       assertMpcMetadataMatchesTranscript({ circuitName, metadata, evidence });
-      console.log(`${circuitName}: R1CS / Powers of Tau / signed MPC transcript / beacon verified`);
+      console.log(`${circuitName}: R1CS / Powers of Tau / MPC transcript / beacon verified`);
     }
     assertSnapshotUnchanged({ snapshot, evidence });
   } finally {
@@ -250,11 +270,15 @@ export const verifyProductionCeremony = async ({
     ceremonyId: evidence.ceremonyId,
     manifestSha256: evidence.manifestSha256,
     transcriptSha256: evidence.transcriptSha256,
+    trustModel: evidence.trustModel,
     contributorCount: evidence.contributorCount,
+    minimumContributors: evidence.minimumContributors,
     ptau: {
       source: evidence.phase1Source,
       path: resolvedPtau,
-      sha256: actualPtauSha256,
+      bytes: actualPtau.bytes,
+      sha256: actualPtau.sha256,
+      blake2b512: actualPtau.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
   });
@@ -269,7 +293,8 @@ export const main = async (argv = process.argv.slice(2)) => {
   const result = await verifyProductionCeremony({ ptauPath: parsed.ptauPath });
   console.log(
     `Production ZK ceremony verified: ${result.ceremonyId}, ` +
-      `${result.contributorCount} contributors, manifest ${result.manifestSha256}`,
+      `${result.trustModel}, ${result.contributorCount} contributor(s), ` +
+      `manifest ${result.manifestSha256}`,
   );
 };
 

@@ -95,6 +95,7 @@ const releaseArtifactEvidence = inspectZkReleaseArtifacts({
 });
 console.log(
   `ZK release manifest: ${releaseArtifactEvidence.trustedSetupStatus}, ` +
+    `${releaseArtifactEvidence.trustModel}, ` +
     releaseArtifactEvidence.manifestSha256,
 );
 if (manifest.circomVersion !== CIRCOM_VERSION) {

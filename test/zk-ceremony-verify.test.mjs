@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { ethers } from "ethers";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,10 +10,11 @@ import {
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
-  buildZkContributionApprovalMessage,
+  ZK_TRUST_MODEL_SINGLE_OPERATOR,
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -81,45 +81,26 @@ const createProductionFixture = async () => {
   );
 
   const ceremonyId = "deepfamily-production-2026-01";
-  const phase1Sha256 = sha256File(ptauPath);
+  const phase1 = await inspectPtauFile(ptauPath);
+  const phase1Sha256 = phase1.sha256;
+  const expectedProductionPhase1 = {
+    source: "https://example.invalid/published-final.ptau",
+    bytes: phase1.bytes,
+    sha256: phase1.sha256,
+    blake2b512: phase1.blake2b512,
+  };
   const transcriptCircuits = Object.fromEntries(
     Object.entries(circuits).map(([name, hashes]) => [
       name,
       { sourceSha256: hashes.sourceSha256, r1csSha256: hashes.r1csSha256 },
     ]),
   );
-  const wallets = Array.from(
-    { length: MINIMUM_PRODUCTION_CONTRIBUTORS },
-    (_, index) =>
-      new ethers.Wallet(
-        `0x${String(index + 21)
-          .padStart(2, "0")
-          .repeat(32)}`,
-      ),
-  );
-  const contributions = [];
-  for (const [index, wallet] of wallets.entries()) {
-    const contribution = {
-      sequence: index + 1,
-      participantId: `participant-${index + 1}`,
-      signerAddress: wallet.address,
-      personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
-      disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
-      personCommitmentZkeySha256: sha256Text(`person-contribution-${index + 1}`),
-      disclosureBindingZkeySha256: sha256Text(`disclosure-contribution-${index + 1}`),
-    };
-    contributions.push({
-      ...contribution,
-      signature: await wallet.signMessage(
-        buildZkContributionApprovalMessage({
-          ceremonyId,
-          phase1Sha256,
-          circuits: transcriptCircuits,
-          contribution,
-        }),
-      ),
-    });
-  }
+  const contributions = Array.from({ length: MINIMUM_PRODUCTION_CONTRIBUTORS }, (_, index) => ({
+    sequence: index + 1,
+    participantId: `participant-${index + 1}`,
+    personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
+    disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+  }));
   const beacon = {
     name: "deepfamily-public-beacon",
     hash: sha256Text("public-randomness-beacon"),
@@ -129,7 +110,8 @@ const createProductionFixture = async () => {
     disclosureBindingContributionHash: "bb".repeat(64),
   };
   const transcript = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     ceremonyId,
     phase1Sha256,
     circuits: transcriptCircuits,
@@ -147,12 +129,13 @@ const createProductionFixture = async () => {
     },
     trustedSetup: {
       status: "production",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      warning: "Single operator must destroy every circuit-specific Phase 2 secret.",
       ceremonyId,
       minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
       contributorCount: contributions.length,
       phase1: {
-        source: "https://example.invalid/published-final.ptau",
-        sha256: phase1Sha256,
+        ...expectedProductionPhase1,
         verified: true,
       },
       transcript: {
@@ -193,7 +176,14 @@ const createProductionFixture = async () => {
       ];
     }),
   );
-  return { root, manifest, ptauPath, snarkjsBinary, metadataByCircuit };
+  return {
+    root,
+    manifest,
+    ptauPath,
+    snarkjsBinary,
+    metadataByCircuit,
+    expectedProductionPhase1,
+  };
 };
 
 const captureError = async (operation) => {
@@ -224,6 +214,7 @@ describe("production ZK ceremony verifier", function () {
 
     const result = await verifyProductionCeremony({
       root: fixture.root,
+      expectedProductionPhase1: fixture.expectedProductionPhase1,
       ptauPath: fixture.ptauPath,
       runner: (invocation) => calls.push(invocation),
       mpcMetadataReader: async (zkeyPath) => {
@@ -248,13 +239,17 @@ describe("production ZK ceremony verifier", function () {
       status: "passed",
       ceremonyId: fixture.manifest.trustedSetup.ceremonyId,
       transcriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
       contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
       circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
     });
     expect(result.ptau).to.deep.equal({
       source: fixture.manifest.trustedSetup.phase1.source,
       path: ptauPath,
+      bytes: fixture.manifest.trustedSetup.phase1.bytes,
       sha256: fixture.manifest.trustedSetup.phase1.sha256,
+      blake2b512: fixture.manifest.trustedSetup.phase1.blake2b512,
     });
   });
 
@@ -265,6 +260,7 @@ describe("production ZK ceremony verifier", function () {
     const error = await captureError(() =>
       verifyProductionCeremony({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: (invocation) => calls.push(invocation),
       }),
@@ -284,6 +280,7 @@ describe("production ZK ceremony verifier", function () {
     const error = await captureError(() =>
       verifyProductionCeremony({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: (invocation) => calls.push(invocation),
       }),
@@ -302,6 +299,7 @@ describe("production ZK ceremony verifier", function () {
     try {
       await verifyProductionCeremony({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: (invocation) => {
           calls.push(invocation);
@@ -332,6 +330,7 @@ describe("production ZK ceremony verifier", function () {
     const error = await captureError(() =>
       verifyProductionCeremony({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: (invocation) => calls.push(invocation),
       }),
@@ -344,6 +343,7 @@ describe("production ZK ceremony verifier", function () {
     const error = await captureError(() =>
       verifyProductionCeremony({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: () => {},
         mpcMetadataReader: async () => ({
@@ -361,13 +361,14 @@ describe("production ZK ceremony verifier", function () {
         }),
       }),
     );
-    expect(error?.message).to.include("must contain exactly 3 participant contributions");
+    expect(error?.message).to.include("must contain exactly 1 participant contributions");
   });
 
   it("rejects a mismatched embedded beacon even after mathematical runner checks pass", async function () {
     const error = await captureError(() =>
       verifyProductionCeremony({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: () => {},
         mpcMetadataReader: async (zkeyPath) => {

@@ -5,7 +5,8 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
+import { ZK_PRODUCTION_PHASE1, inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
@@ -58,8 +59,9 @@ export const runReleasePreflight = async ({
   root = process.cwd(),
   runner = defaultRunner,
   commands = RELEASE_PREFLIGHT_COMMANDS,
-  ptauPath = process.env.ZK_PTAU_PATH,
+  ptauPath,
   mpcMetadataReader,
+  expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
 } = {}) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (!Array.isArray(commands)) throw new Error("commands must be an array");
@@ -70,6 +72,7 @@ export const runReleasePreflight = async ({
     root,
     requireProduction: true,
     requireBuiltR1cs: false,
+    expectedProductionPhase1,
   });
 
   for (const [executable, args] of commands) {
@@ -77,9 +80,10 @@ export const runReleasePreflight = async ({
   }
   const ceremonyVerification = await verifyProductionCeremony({
     root,
-    ptauPath,
+    ptauPath: ptauPath ?? resolveProductionPtauPath({ root }),
     runner,
     mpcMetadataReader,
+    expectedProductionPhase1,
   });
 
   const finishedCommit = assertCleanGitState({ root, runner, stage: "after checks" });
@@ -90,6 +94,7 @@ export const runReleasePreflight = async ({
     root,
     requireProduction: true,
     requireBuiltR1cs: true,
+    expectedProductionPhase1,
   });
   if (finalZkEvidence.manifestSha256 !== initialZkEvidence.manifestSha256) {
     throw new Error("ZK artifact manifest changed while release preflight was running");
@@ -99,6 +104,9 @@ export const runReleasePreflight = async ({
     status: "passed",
     releaseCommit,
     zkCeremonyId: finalZkEvidence.ceremonyId,
+    zkTrustModel: finalZkEvidence.trustModel,
+    zkContributorCount: finalZkEvidence.contributorCount,
+    zkMinimumContributors: finalZkEvidence.minimumContributors,
     zkManifestSha256: finalZkEvidence.manifestSha256,
     zkTranscriptSha256: ceremonyVerification.transcriptSha256,
     ptauSha256: ceremonyVerification.ptau.sha256,
@@ -111,6 +119,10 @@ export const main = async () => {
   console.log("Production release preflight passed:");
   console.log(`  release commit: ${result.releaseCommit}`);
   console.log(`  ZK ceremony:    ${result.zkCeremonyId}`);
+  console.log(
+    `  ZK trust:       ${result.zkTrustModel}, ` +
+      `${result.zkContributorCount}/${result.zkMinimumContributors} contributor(s)`,
+  );
   console.log(`  ZK manifest:    ${result.zkManifestSha256}`);
 };
 

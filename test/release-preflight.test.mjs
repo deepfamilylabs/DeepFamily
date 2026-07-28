@@ -1,10 +1,8 @@
 import { expect } from "chai";
-import { ethers } from "ethers";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { RELEASE_PREFLIGHT_COMMANDS, runReleasePreflight } from "../scripts/release-preflight.mjs";
 import {
@@ -13,12 +11,12 @@ import {
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
-  buildZkContributionApprovalMessage,
+  ZK_TRUST_MODEL_SINGLE_OPERATOR,
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
 
@@ -87,45 +85,26 @@ const createProductionFixture = async () => {
   );
 
   const ceremonyId = "deepfamily-production-2026-01";
-  const phase1Sha256 = sha256File(ptauPath);
+  const phase1 = await inspectPtauFile(ptauPath);
+  const phase1Sha256 = phase1.sha256;
+  const expectedProductionPhase1 = {
+    source: "https://example.invalid/published-final.ptau",
+    bytes: phase1.bytes,
+    sha256: phase1.sha256,
+    blake2b512: phase1.blake2b512,
+  };
   const transcriptCircuits = Object.fromEntries(
     Object.entries(circuits).map(([name, hashes]) => [
       name,
       { sourceSha256: hashes.sourceSha256, r1csSha256: hashes.r1csSha256 },
     ]),
   );
-  const wallets = Array.from(
-    { length: MINIMUM_PRODUCTION_CONTRIBUTORS },
-    (_, index) =>
-      new ethers.Wallet(
-        `0x${String(index + 31)
-          .padStart(2, "0")
-          .repeat(32)}`,
-      ),
-  );
-  const contributions = [];
-  for (const [index, wallet] of wallets.entries()) {
-    const contribution = {
-      sequence: index + 1,
-      participantId: `participant-${index + 1}`,
-      signerAddress: wallet.address,
-      personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
-      disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
-      personCommitmentZkeySha256: sha256Text(`person-contribution-${index + 1}`),
-      disclosureBindingZkeySha256: sha256Text(`disclosure-contribution-${index + 1}`),
-    };
-    contributions.push({
-      ...contribution,
-      signature: await wallet.signMessage(
-        buildZkContributionApprovalMessage({
-          ceremonyId,
-          phase1Sha256,
-          circuits: transcriptCircuits,
-          contribution,
-        }),
-      ),
-    });
-  }
+  const contributions = Array.from({ length: MINIMUM_PRODUCTION_CONTRIBUTORS }, (_, index) => ({
+    sequence: index + 1,
+    participantId: `participant-${index + 1}`,
+    personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
+    disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+  }));
   const beacon = {
     name: "deepfamily-public-beacon",
     hash: sha256Text("public-randomness-beacon"),
@@ -135,7 +114,8 @@ const createProductionFixture = async () => {
     disclosureBindingContributionHash: "bb".repeat(64),
   };
   const transcript = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     ceremonyId,
     phase1Sha256,
     circuits: transcriptCircuits,
@@ -153,12 +133,13 @@ const createProductionFixture = async () => {
     },
     trustedSetup: {
       status: "production",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      warning: "Single operator must destroy every circuit-specific Phase 2 secret.",
       ceremonyId,
       minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
       contributorCount: contributions.length,
       phase1: {
-        source: "https://example.invalid/published-final.ptau",
-        sha256: phase1Sha256,
+        ...expectedProductionPhase1,
         verified: true,
       },
       transcript: {
@@ -199,7 +180,15 @@ const createProductionFixture = async () => {
       ];
     }),
   );
-  return { root, manifest, manifestPath, ptauPath, snarkjsBinary, metadataByCircuit };
+  return {
+    root,
+    manifest,
+    manifestPath,
+    ptauPath,
+    snarkjsBinary,
+    metadataByCircuit,
+    expectedProductionPhase1,
+  };
 };
 
 const commandLabel = ({ executable, args }) => `${executable} ${args.join(" ")}`;
@@ -265,13 +254,24 @@ describe("production release preflight", function () {
     return fixture;
   };
 
-  it("blocks the current development manifest before running any npm command", async function () {
+  it("blocks an explicit development manifest before running any npm command", async function () {
+    const fixture = await productionFixture();
+    fixture.manifest.trustedSetup = {
+      status: "development",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      warning: "Single local contributor with public fixed entropy; development and testing only.",
+      minimumContributors: 1,
+      contributorCount: 1,
+      beaconApplied: false,
+      transcriptSha256: null,
+    };
+    await writeManifest(fixture.root, fixture.manifest);
     const fake = createFakeRunner();
 
     const error = await captureError(() =>
       runReleasePreflight({
-        root: PROJECT_ROOT,
-        ptauPath: path.join(PROJECT_ROOT, "tmp", "unused.ptau"),
+        root: fixture.root,
+        ptauPath: fixture.ptauPath,
         runner: fake.runner,
       }),
     );
@@ -293,6 +293,7 @@ describe("production release preflight", function () {
 
     const result = await runReleasePreflight({
       root: fixture.root,
+      expectedProductionPhase1: fixture.expectedProductionPhase1,
       ptauPath: fixture.ptauPath,
       runner: fake.runner,
       mpcMetadataReader: metadataReaderFor(fixture),
@@ -329,6 +330,9 @@ describe("production release preflight", function () {
       status: "passed",
       releaseCommit: COMMIT,
       zkCeremonyId: fixture.manifest.trustedSetup.ceremonyId,
+      zkTrustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      zkContributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      zkMinimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
       zkManifestSha256: sha256File(fixture.manifestPath),
       zkTranscriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
       ptauSha256: fixture.manifest.trustedSetup.phase1.sha256,
@@ -345,6 +349,7 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
       }),
@@ -366,6 +371,7 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
         mpcMetadataReader: metadataReaderFor(fixture),
@@ -384,8 +390,8 @@ describe("production release preflight", function () {
       onInvocation: (_invocation, state) => {
         if (state.kind === "status" && state.index === 1) {
           const changed = JSON.parse(fsSync.readFileSync(fixture.manifestPath, "utf8"));
-          changed.trustedSetup.phase1.source =
-            "https://example.invalid/changed-published-final.ptau";
+          changed.trustedSetup.warning =
+            "Changed trust warning after ceremony verification must invalidate preflight.";
           fsSync.writeFileSync(fixture.manifestPath, `${JSON.stringify(changed, null, 2)}\n`);
         }
       },
@@ -394,6 +400,7 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
         mpcMetadataReader: metadataReaderFor(fixture),
@@ -418,6 +425,7 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
         mpcMetadataReader: metadataReaderFor(fixture),
@@ -426,7 +434,7 @@ describe("production release preflight", function () {
     expect(error?.message).to.match(/person_commitment zkey SHA-256 mismatch/u);
   });
 
-  it("fails when ZK_PTAU_PATH is missing", async function () {
+  it("falls back to the pinned cache and fails closed when it is unavailable", async function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner();
     const previousPtauPath = process.env.ZK_PTAU_PATH;
@@ -436,11 +444,14 @@ describe("production release preflight", function () {
       const error = await captureError(() =>
         runReleasePreflight({
           root: fixture.root,
+          expectedProductionPhase1: fixture.expectedProductionPhase1,
           runner: fake.runner,
           mpcMetadataReader: metadataReaderFor(fixture),
         }),
       );
-      expect(error?.message).to.equal("ptauPath is required");
+      expect(error?.message).to.match(
+        /Published Powers of Tau is unavailable:.*tmp\/zk-production/u,
+      );
     } finally {
       if (previousPtauPath === undefined) delete process.env.ZK_PTAU_PATH;
       else process.env.ZK_PTAU_PATH = previousPtauPath;

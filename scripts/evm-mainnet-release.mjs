@@ -51,6 +51,7 @@ import {
   assertCanonicalSafeProfile,
 } from "./lib/safeGovernance.mjs";
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
@@ -221,10 +222,16 @@ const buildFingerprint = ({
     circomVersion: zkArtifactTrust.circomVersion,
     snarkjsVersion: zkArtifactTrust.snarkjsVersion,
     trustedSetupStatus: zkArtifactTrust.trustedSetupStatus,
+    trustModel: zkArtifactTrust.trustModel,
+    trustWarning: zkArtifactTrust.trustWarning,
     productionReady: zkArtifactTrust.productionReady,
     ceremonyId: zkArtifactTrust.ceremonyId,
     contributorCount: zkArtifactTrust.contributorCount,
     minimumContributors: zkArtifactTrust.minimumContributors,
+    phase1Source: zkArtifactTrust.phase1Source,
+    phase1Bytes: zkArtifactTrust.phase1Bytes,
+    phase1Sha256: zkArtifactTrust.phase1Sha256,
+    phase1Blake2b512: zkArtifactTrust.phase1Blake2b512,
     beaconApplied: zkArtifactTrust.beaconApplied,
     transcriptSha256: zkArtifactTrust.transcriptSha256,
     artifacts: zkArtifactTrust.artifacts,
@@ -233,8 +240,11 @@ const buildFingerprint = ({
       ceremonyId: zkCeremonyVerification.ceremonyId,
       manifestSha256: zkCeremonyVerification.manifestSha256,
       transcriptSha256: zkCeremonyVerification.transcriptSha256,
+      trustModel: zkCeremonyVerification.trustModel,
       contributorCount: zkCeremonyVerification.contributorCount,
+      minimumContributors: zkCeremonyVerification.minimumContributors,
       ptauSha256: zkCeremonyVerification.ptau.sha256,
+      ptauBlake2b512: zkCeremonyVerification.ptau.blake2b512,
     },
   },
   testnetReleaseEvidence: testnetReleaseEvidence.publicSummary,
@@ -809,7 +819,7 @@ export const main = async (chainProfile) => {
   }
   const zkCeremonyVerification = await verifyProductionCeremony({
     root: process.cwd(),
-    ptauPath: process.env.ZK_PTAU_PATH,
+    ptauPath: resolveProductionPtauPath(),
   });
   const zkArtifactTrust = inspectZkReleaseArtifacts({
     root: process.cwd(),

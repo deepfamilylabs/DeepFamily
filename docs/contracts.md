@@ -447,10 +447,13 @@ confirmation count, finality timeout, and recovery mapping:
 npm run espace:mainnet:release
 ```
 
-Before this command can plan a release, the development proving keys must have been replaced by the
-production ceremony described in [zk-ceremony.md](zk-ceremony.md), `npm run release:preflight` must
-pass, and `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v3
-`releaseReady=true` rehearsal report from the current commit and production `MIN_DELAY`.
+Before this command can plan a release, the development proving keys must have been replaced with
+`npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
+artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
+that clean commit, and `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v3
+`releaseReady=true` rehearsal report from the current commit and production `MIN_DELAY`. The
+default ZK setup records one Phase 2 contributor under `trustModel=single-operator`; this is
+independent of the three-owner, 2/3 governance Safe.
 
 With `ESPACE_MAINNET_CONFIRM` and `ESPACE_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
 After review, at least two current Safe owners sign the complete printed EIP-191 plan-approval
@@ -481,7 +484,7 @@ npm run ethereum:mainnet:release
 The Ethereum production flow requires
 `GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
 exactly three ordered EOA owners with threshold `2`, ETH budget variables, a real Etherscan API key,
-the exact chain-1 confirmation strings, production ceremony artifacts, and an exact Sepolia
+the exact chain-1 confirmation strings, reviewed production ZK setup artifacts, and an exact Sepolia
 release-rehearsal report in `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands
 default to read-only plan mode while their respective confirmation/digest pair is blank. Protocol
 execution additionally requires `ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct

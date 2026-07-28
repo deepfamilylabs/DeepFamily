@@ -145,9 +145,13 @@ do not invoke a lower-level script with an arbitrary `--network` to bypass these
 
 ### Recommended eSpace Mainnet release
 
-Production release is blocked until the development Groth16 keys have been replaced through the
-[multi-party ZK ceremony](docs/zk-ceremony.md), `npm run release:preflight` passes, and the exact
-release commit produces an eSpace Testnet `release-rehearsal` report with `releaseReady=true`.
+Production release is blocked until the development Groth16 keys have been replaced with
+`npm run zk:production:setup`, the generated artifacts have been reviewed and committed together,
+`npm run release:preflight` passes from that clean commit, and the exact release commit produces an
+eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default setup reuses the
+pinned public power-13 pTau and records one local Phase 2 contributor under the explicit
+`single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
+a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
 Set `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` to that archived report; the Mainnet plan validates its
 commit, artifact digest, production delay, ZK status, verification, finality and terminal state.
 
@@ -203,8 +207,9 @@ the complete Safe bootstrap, acceptance, release, and recovery procedure in the
 ### Guarded Ethereum release
 
 Ethereum uses the same reviewed release architecture but a separate Ethereum profile and state.
-It also requires the production ZK ceremony, `release:preflight`, and an exact Sepolia
-release-rehearsal report selected through `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`.
+It also requires the reviewed production ZK setup commit, `release:preflight`, and an exact Sepolia
+release-rehearsal report selected through `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`. The ZK
+contributor count is unrelated to the three-owner, 2/3 production Safe policy.
 First run the destructive Sepolia acceptance suite:
 
 ```bash

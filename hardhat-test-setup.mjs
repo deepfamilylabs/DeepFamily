@@ -7,6 +7,17 @@ import { ensureIntegratedSystem } from "./hardhat/integratedDeployment.mjs";
 const originalGovernanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
 delete process.env.GOVERNANCE_MULTISIG_PROFILE;
 
+// Tests and task integrations can create additional Hardhat 3 connections. Track every connection
+// created through the shared HRE so the root teardown closes all EDR workers instead of relying on
+// a forced process.exit(), which would hide Mocha's eventual non-zero failure status.
+const originalNetworkConnect = hre.network.connect.bind(hre.network);
+const trackedTestConnections = new Set();
+hre.network.connect = async (...args) => {
+  const testConnection = await originalNetworkConnect(...args);
+  trackedTestConnections.add(testConnection);
+  return testConnection;
+};
+
 const getOrCreateTestConnection = async () => {
   if (!globalThis.__deepfamilyTestConnectionPromise) {
     globalThis.__deepfamilyTestConnectionPromise = hre.network.connect();
@@ -21,14 +32,23 @@ hre.ethers = connection.ethers;
 hre.networkHelpers = connection.networkHelpers;
 
 // Global cleanup function
+let cleanupPromise;
 const cleanupConnection = async () => {
-  if (globalThis.__deepfamilyTestConnectionPromise) {
-    try {
-      const conn = await globalThis.__deepfamilyTestConnectionPromise;
-      await conn?.close?.();
-    } catch {}
-    globalThis.__deepfamilyTestConnectionPromise = null;
+  if (!cleanupPromise) {
+    cleanupPromise = (async () => {
+      const connections = [...trackedTestConnections];
+      trackedTestConnections.clear();
+      globalThis.__deepfamilyTestConnectionPromise = null;
+
+      await Promise.allSettled(
+        connections.map(async (testConnection) => {
+          await testConnection?.close?.();
+        }),
+      );
+    })();
   }
+
+  await cleanupPromise;
 };
 
 // Register cleanup for test completion
@@ -40,21 +60,19 @@ if (typeof after === "function") {
       process.env.GOVERNANCE_MULTISIG_PROFILE = originalGovernanceMultisigProfile;
     }
     await cleanupConnection();
-    // Force exit to prevent hanging
-    setTimeout(() => process.exit(0), 50);
   });
 }
 
 // Process-level cleanup hooks
 if (typeof process !== "undefined" && process.on) {
-  process.on("beforeExit", cleanupConnection);
+  process.once("beforeExit", cleanupConnection);
   process.on("SIGINT", async () => {
     await cleanupConnection();
-    process.exit(0);
+    process.exit(130);
   });
   process.on("SIGTERM", async () => {
     await cleanupConnection();
-    process.exit(0);
+    process.exit(143);
   });
 }
 

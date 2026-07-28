@@ -68,6 +68,8 @@
     "seed:net": "hardhat --config hardhat.config.mjs run scripts/seed-historical.mjs --network $npm_config_net",
     "check:root": "hardhat --config hardhat.config.mjs run scripts/check-root.mjs --network $npm_config_net",
     "zk:fetch": "node scripts/fetch-circom.mjs",
+    "zk:ptau:fetch": "node scripts/fetch-production-ptau.mjs",
+    "zk:production:setup": "node scripts/zk-production-setup.mjs",
     "zk:build:person": "bash -lc 'set -e; mkdir -p zk-artifacts/circuits && bin/circom circuits/person_commitment.circom --r1cs --wasm --sym -l node_modules -l node_modules/circomlib/circuits -o zk-artifacts/circuits'",
     "zk:build:disclosure": "bash -lc 'set -e; mkdir -p zk-artifacts/circuits && bin/circom circuits/disclosure_binding.circom --r1cs --wasm --sym -l node_modules -l node_modules/circomlib/circuits -o zk-artifacts/circuits'",
     "zk:build": "npm run zk:build:person && npm run zk:build:disclosure",
