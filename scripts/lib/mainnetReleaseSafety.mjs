@@ -32,6 +32,7 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
 
 const DECIMAL_NATIVE_PATTERN = /^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/;
 const TRANSACTION_LABEL_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{1,79}$/;
+const MAINNET_PLAN_APPROVAL_SCHEMA_VERSION = 1;
 
 const parseInteger = (name, value, defaultValue, minimum, maximum) => {
   const raw = value === undefined || value === "" ? String(defaultValue) : String(value).trim();
@@ -111,6 +112,47 @@ const parseSafeAcceptanceTransaction = (
     );
   }
   return raw.toLowerCase();
+};
+
+const parsePlanApprovalSignatures = ({ value, environmentName, authorizationMode, ownerCount }) => {
+  const raw = String(value ?? "").trim();
+  if (authorizationMode === "plan") {
+    if (raw !== "") {
+      throw new Error(
+        `Leave ${environmentName} blank while generating a plan; owners sign the printed plan ` +
+          "approval message afterwards",
+      );
+    }
+    return Object.freeze([]);
+  }
+  if (raw === "") {
+    throw new Error(
+      `${environmentName} must contain approval signatures from the reviewed plan's Safe owners`,
+    );
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${environmentName} must be a JSON array of EIP-191 signatures`);
+  }
+  if (!Array.isArray(parsed) || parsed.length < 2 || parsed.length > ownerCount) {
+    throw new Error(
+      `${environmentName} must contain between 2 and ${ownerCount} EIP-191 signatures`,
+    );
+  }
+  const signatures = parsed.map((signature, index) => {
+    if (typeof signature !== "string") {
+      throw new Error(`${environmentName}[${index}] must be an EIP-191 signature`);
+    }
+    try {
+      return ethers.Signature.from(signature).serialized;
+    } catch {
+      throw new Error(`${environmentName}[${index}] must be a valid EIP-191 signature`);
+    }
+  });
+  return Object.freeze(signatures);
 };
 
 export const parseMainnetAuthorization = (
@@ -239,6 +281,18 @@ export const parseProductionMainnetReleaseConfig = ({
   if (authorization.mode === "plan" && configuredPlanDigest !== "") {
     throw new Error(`Leave ${mainnet.planDigestEnvironmentName} blank while generating a plan`);
   }
+  const testnetReleaseReportPath = String(
+    env[mainnet.testnetReleaseReportEnvironmentName] ?? "",
+  ).trim();
+  if (testnetReleaseReportPath.length > 4_096) {
+    throw new Error(`${mainnet.testnetReleaseReportEnvironmentName} is too long`);
+  }
+  const planApprovalSignatures = parsePlanApprovalSignatures({
+    value: env[mainnet.planApprovalSignaturesEnvironmentName],
+    environmentName: mainnet.planApprovalSignaturesEnvironmentName,
+    authorizationMode: authorization.mode,
+    ownerCount: expectedSafeOwners.length,
+  });
 
   return Object.freeze({
     ...authorization,
@@ -257,6 +311,8 @@ export const parseProductionMainnetReleaseConfig = ({
     maximumCost,
     maximumCostWei,
     configuredPlanDigest: configuredPlanDigest === "" ? null : configuredPlanDigest.toLowerCase(),
+    planApprovalSignatures,
+    testnetReleaseReportPath: testnetReleaseReportPath === "" ? null : testnetReleaseReportPath,
     recoveryTransactions: parseRecoveryTransactions(
       env[mainnet.recoveryTransactionsEnvironmentName],
       mainnet.recoveryTransactionsEnvironmentName,
@@ -296,6 +352,104 @@ export const deriveMainnetPlanDigest = (fingerprint) =>
         canonicalJson(fingerprint),
     ),
   );
+
+export const buildMainnetPlanApprovalMessage = ({
+  chainProfile = ESPACE_CHAIN_PROFILE,
+  planDigest,
+  governanceMultisig,
+}) => {
+  const mainnet = chainProfile.mainnet;
+  if (!ethers.isHexString(planDigest, 32)) {
+    throw new Error("Mainnet plan approval requires a 32-byte plan digest");
+  }
+  const normalizedSafe = requiredAddress("governanceMultisig", governanceMultisig);
+  return (
+    `${mainnet.releasePlanApprovalDomain}:` +
+    canonicalJson({
+      schemaVersion: MAINNET_PLAN_APPROVAL_SCHEMA_VERSION,
+      statement:
+        "I reviewed and approve this exact DeepFamily Mainnet initial-release plan for execution.",
+      chainProfileId: chainProfile.id,
+      mainnetChainId: mainnet.chainId,
+      governanceMultisig: normalizedSafe,
+      planDigest: planDigest.toLowerCase(),
+    })
+  );
+};
+
+export const verifyMainnetPlanApprovals = ({
+  chainProfile = ESPACE_CHAIN_PROFILE,
+  planDigest,
+  governanceMultisig,
+  expectedOwners,
+  requiredApprovals,
+  signatures,
+}) => {
+  if (!Array.isArray(expectedOwners) || expectedOwners.length === 0) {
+    throw new Error("Mainnet plan approval requires the expected Safe owner set");
+  }
+  const normalizedOwners = expectedOwners.map((owner, index) =>
+    requiredAddress(`expectedOwners[${index}]`, owner),
+  );
+  if (
+    new Set(normalizedOwners.map((owner) => owner.toLowerCase())).size !== normalizedOwners.length
+  ) {
+    throw new Error("Mainnet plan approval Safe owners must be distinct");
+  }
+  if (
+    !Number.isSafeInteger(requiredApprovals) ||
+    requiredApprovals < 2 ||
+    requiredApprovals > normalizedOwners.length
+  ) {
+    throw new Error("Mainnet plan approval threshold is invalid");
+  }
+  if (!Array.isArray(signatures) || signatures.length < requiredApprovals) {
+    throw new Error(
+      `Mainnet execution requires at least ${requiredApprovals} Safe-owner plan approvals`,
+    );
+  }
+
+  const message = buildMainnetPlanApprovalMessage({
+    chainProfile,
+    planDigest,
+    governanceMultisig,
+  });
+  const allowedOwners = new Map(normalizedOwners.map((owner) => [owner.toLowerCase(), owner]));
+  const approvedOwners = new Map();
+  for (const [index, signature] of signatures.entries()) {
+    let recovered;
+    try {
+      recovered = ethers.getAddress(ethers.verifyMessage(message, signature));
+    } catch {
+      throw new Error(`Mainnet plan approval signature ${index} is invalid`);
+    }
+    const expectedOwner = allowedOwners.get(recovered.toLowerCase());
+    if (!expectedOwner) {
+      throw new Error(
+        `Mainnet plan approval signature ${index} is not from an expected Safe owner`,
+      );
+    }
+    if (approvedOwners.has(recovered.toLowerCase())) {
+      throw new Error(`Mainnet plan approval contains a duplicate signature from ${recovered}`);
+    }
+    approvedOwners.set(recovered.toLowerCase(), expectedOwner);
+  }
+  if (approvedOwners.size < requiredApprovals) {
+    throw new Error(
+      `Mainnet execution requires at least ${requiredApprovals} distinct Safe-owner approvals`,
+    );
+  }
+
+  return Object.freeze({
+    schemaVersion: MAINNET_PLAN_APPROVAL_SCHEMA_VERSION,
+    message,
+    messageHash: ethers.hashMessage(message),
+    requiredApprovals,
+    approvedOwners: Object.freeze(
+      [...approvedOwners.values()].sort((left, right) => left.localeCompare(right)),
+    ),
+  });
+};
 
 export const assertMainnetReleaseSafeAcceptanceNonce = (nonce) => {
   let normalized;

@@ -31,6 +31,11 @@ const DEFAULT_ZKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
   PERSON_COMMITMENT_PROOF_DESCRIPTOR,
   "zkey",
 );
+const DEFAULT_VKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
+  __dirname,
+  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+  "vkey",
+);
 
 function normalizeBigIntField(value, label, { defaultValue } = {}) {
   const normalizedValue = value ?? defaultValue;
@@ -72,26 +77,38 @@ function validatePersonCommitmentInput(raw) {
     birthMonth: normalizeBigIntField(raw.birthMonth, "birthMonth"),
     birthDay: normalizeBigIntField(raw.birthDay, "birthDay"),
     gender: normalizeBigIntField(raw.gender, "gender"),
-    fatherNameField: normalizeBigIntField(raw.fatherNameField, "fatherNameField", { defaultValue: 0 }),
+    fatherNameField: normalizeBigIntField(raw.fatherNameField, "fatherNameField", {
+      defaultValue: 0,
+    }),
     fatherDerivedSecretField: normalizeBigIntField(
       raw.fatherDerivedSecretField,
       "fatherDerivedSecretField",
       { defaultValue: 0 },
     ),
     fatherIsBirthBC: normalizeBit(raw.fatherIsBirthBC, "fatherIsBirthBC", { defaultValue: 0 }),
-    fatherBirthYear: normalizeBigIntField(raw.fatherBirthYear, "fatherBirthYear", { defaultValue: 0 }),
-    fatherBirthMonth: normalizeBigIntField(raw.fatherBirthMonth, "fatherBirthMonth", { defaultValue: 0 }),
+    fatherBirthYear: normalizeBigIntField(raw.fatherBirthYear, "fatherBirthYear", {
+      defaultValue: 0,
+    }),
+    fatherBirthMonth: normalizeBigIntField(raw.fatherBirthMonth, "fatherBirthMonth", {
+      defaultValue: 0,
+    }),
     fatherBirthDay: normalizeBigIntField(raw.fatherBirthDay, "fatherBirthDay", { defaultValue: 0 }),
     fatherGender: normalizeBigIntField(raw.fatherGender, "fatherGender", { defaultValue: 0 }),
-    motherNameField: normalizeBigIntField(raw.motherNameField, "motherNameField", { defaultValue: 0 }),
+    motherNameField: normalizeBigIntField(raw.motherNameField, "motherNameField", {
+      defaultValue: 0,
+    }),
     motherDerivedSecretField: normalizeBigIntField(
       raw.motherDerivedSecretField,
       "motherDerivedSecretField",
       { defaultValue: 0 },
     ),
     motherIsBirthBC: normalizeBit(raw.motherIsBirthBC, "motherIsBirthBC", { defaultValue: 0 }),
-    motherBirthYear: normalizeBigIntField(raw.motherBirthYear, "motherBirthYear", { defaultValue: 0 }),
-    motherBirthMonth: normalizeBigIntField(raw.motherBirthMonth, "motherBirthMonth", { defaultValue: 0 }),
+    motherBirthYear: normalizeBigIntField(raw.motherBirthYear, "motherBirthYear", {
+      defaultValue: 0,
+    }),
+    motherBirthMonth: normalizeBigIntField(raw.motherBirthMonth, "motherBirthMonth", {
+      defaultValue: 0,
+    }),
     motherBirthDay: normalizeBigIntField(raw.motherBirthDay, "motherBirthDay", { defaultValue: 0 }),
     motherGender: normalizeBigIntField(raw.motherGender, "motherGender", { defaultValue: 0 }),
     hasFather: normalizeBit(raw.hasFather, "hasFather", { defaultValue: 0 }),
@@ -105,11 +122,7 @@ function validatePersonCommitmentInput(raw) {
 
 function packBirthGenderField({ birthYear, birthMonth, birthDay, gender, isBirthBC }) {
   return (
-    (birthYear << 25n) |
-    (birthMonth << 17n) |
-    (birthDay << 9n) |
-    (gender << 1n) |
-    (isBirthBC & 1n)
+    (birthYear << 25n) | (birthMonth << 17n) | (birthDay << 9n) | (gender << 1n) | (isBirthBC & 1n)
   );
 }
 
@@ -130,18 +143,8 @@ function computeIdentityCommitmentFromFields(
     gender,
     isBirthBC,
   });
-  const nameSecretCommitment = poseidon4([
-    1001n,
-    nameField,
-    derivedSecretField,
-    suiteCommitment,
-  ]);
-  return poseidon4([
-    1002n,
-    nameSecretCommitment,
-    packedBirthGenderField,
-    suiteCommitment,
-  ]);
+  const nameSecretCommitment = poseidon4([1001n, nameField, derivedSecretField, suiteCommitment]);
+  return poseidon4([1002n, nameSecretCommitment, packedBirthGenderField, suiteCommitment]);
 }
 
 async function computeExpectedSignals(input) {
@@ -279,6 +282,9 @@ function parseArgs(rawArgs) {
       case "--zkey":
         args.zkey = rawArgs[++i];
         break;
+      case "--vkey":
+        args.vkey = rawArgs[++i];
+        break;
       case "--submitter":
         args.submitter = rawArgs[++i];
         break;
@@ -305,7 +311,7 @@ function formatSignalsForLog(signals) {
 
 function printUsage() {
   console.log(`Usage:
-  node tasks/zk-person-hash-check.mjs --input person_commitment_input.json [--public person_commitment_public.json] [--prove] [--wasm path] [--zkey path]
+  node tasks/zk-person-hash-check.mjs --input person_commitment_input.json [--public person_commitment_public.json] [--prove] [--wasm path] [--zkey path] [--vkey path]
 `);
 }
 
@@ -359,13 +365,34 @@ async function main() {
       args.zkey,
       DEFAULT_ZKEY_CANDIDATES,
     );
+    const vkeyPath = resolveExistingFile(
+      "person commitment verification key",
+      args.vkey,
+      DEFAULT_VKEY_CANDIDATES,
+    );
 
-    console.log("\nRunning groth16.fullProve for confirmation...");
+    console.log("\nRunning groth16.fullProve and independent verification...");
     const snarkjs = await import("snarkjs");
     const circuitInput = Object.fromEntries(
       Object.entries(input).map(([key, value]) => [key, value.toString()]),
     );
-    const { publicSignals } = await snarkjs.groth16.fullProve(circuitInput, wasmPath, zkeyPath);
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      circuitInput,
+      wasmPath,
+      zkeyPath,
+    );
+    const verificationKey = loadJson(vkeyPath);
+    const proofVerified = await snarkjs.groth16.verify(verificationKey, publicSignals, proof);
+    if (proofVerified !== true) {
+      throw new Error("Generated person commitment proof failed verification against the vkey");
+    }
+    console.log("  Generated proof verifies against the committed verification key");
+    const tamperedSignals = [...publicSignals];
+    tamperedSignals[0] = (BigInt(tamperedSignals[0]) + 1n).toString();
+    if ((await snarkjs.groth16.verify(verificationKey, tamperedSignals, proof)) !== false) {
+      throw new Error("Person commitment verifier accepted tampered public signals");
+    }
+    console.log("  Tampered public signals are rejected");
 
     const actualSignals = publicSignals.map((value) => value.toString());
     const comparison = comparePublicSignals(expectedSignals, actualSignals);

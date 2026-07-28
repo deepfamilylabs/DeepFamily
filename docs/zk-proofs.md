@@ -274,13 +274,13 @@ function addPersonVersion(
 
 ```solidity
 struct PersonProofPublicSignals {
-    uint256 identityCommitment;
-    uint256 fatherIdentityCommitment;
-    uint256 motherIdentityCommitment;
-    uint256 submitter;
-    uint256 schemaVersion;
-    uint256 cryptoSuiteVersion;
-    uint256 hashAlgoId;
+  uint256 identityCommitment;
+  uint256 fatherIdentityCommitment;
+  uint256 motherIdentityCommitment;
+  uint256 submitter;
+  uint256 schemaVersion;
+  uint256 cryptoSuiteVersion;
+  uint256 hashAlgoId;
 }
 ```
 
@@ -312,12 +312,12 @@ function mintPersonVersionNFT(
 
 ```solidity
 struct DisclosureBindingPublicSignals {
-    uint256 identityCommitment;
-    uint256 disclosureBinding;
-    uint256 minter;
-    uint256 schemaVersion;
-    uint256 cryptoSuiteVersion;
-    uint256 hashAlgoId;
+  uint256 identityCommitment;
+  uint256 disclosureBinding;
+  uint256 minter;
+  uint256 schemaVersion;
+  uint256 cryptoSuiteVersion;
+  uint256 hashAlgoId;
 }
 ```
 
@@ -370,8 +370,14 @@ Repository location:
 From repo root:
 
 ```bash
+npm run zk:fetch
 npm run zk:build
 ```
+
+`zk:fetch` installs only the repository-pinned Circom 2.1.6 Linux x64 binary after checking its
+fixed SHA-256. It refuses to replace an unexpected file or symbolic link. On another platform,
+install the same reviewed compiler through an explicit platform-specific process and update the
+release policy before treating its output as production evidence.
 
 Or individually:
 
@@ -380,19 +386,22 @@ npm run zk:build:person
 npm run zk:build:disclosure
 ```
 
-### Generate Trusted Setup Artifacts
+### Generate Development Setup Artifacts
 
 ```bash
-npm run zk:ptau
-npm run zk:setup
+npm run zk:dev:ptau
+npm run zk:dev:setup
 ```
 
 Or individually:
 
 ```bash
-npm run zk:setup:person
-npm run zk:setup:disclosure
+npm run zk:dev:setup:person
+npm run zk:dev:setup:disclosure
 ```
+
+These commands deliberately identify their output as development-only. They use one local
+contributor and public command-line entropy, and must never create production proving keys.
 
 ### Export Solidity Verifiers
 
@@ -406,13 +415,24 @@ npm run zk:verifier
 npm run zk:sync
 ```
 
-### Full Refresh
+### Development Full Refresh
 
 ```bash
-npm run zk:refresh
+npm run zk:dev:refresh
 ```
 
 This rebuilds the circuits, regenerates proving artifacts, re-exports verifier contracts, and refreshes `frontend/public/zk/`.
+It overwrites the checked-in proving artifacts with development keys.
+
+### Production Ceremony
+
+Do not use any `zk:dev:*` command for production. Follow the complete multi-party ceremony and
+independent verification runbook in [zk-ceremony.md](./zk-ceremony.md). The final read-only
+cryptographic gate is:
+
+```bash
+npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
+```
 
 ### Protocol Versioning Policy
 
@@ -432,7 +452,8 @@ The proving keys currently checked into `frontend/public/zk/` were produced by a
 contributor and are suitable for development and testing only. A production release must replace
 them with artifacts from an auditable multi-party ceremony, publish the contribution transcript and
 artifact hashes, regenerate the Solidity verifiers, and verify that every deployed verifier matches
-the published proving and verification keys.
+the published proving and verification keys. Release-rehearsal and Mainnet release scripts enforce
+this manifest status and cannot deploy the current development keys.
 
 ## Security Properties
 

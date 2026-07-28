@@ -339,7 +339,7 @@ Do not reintroduce IPFS hashing runtime wrappers for metadata CID generation unl
 
   ```bash
   npm run security:audit       # prod dependency audit (root + frontend)
-  npm run security:xss-scan    # grep-based XSS sink check
+  npm run security:xss-scan    # TypeScript AST XSS sink check; symlinks fail closed
   ```
 
 - From `frontend/`: `npm run csp:scan` runs a Playwright-based route scan to collect CSP violations.

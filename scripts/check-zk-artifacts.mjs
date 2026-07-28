@@ -6,12 +6,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CIRCOM_LINUX_X64_SHA256, CIRCOM_VERSION } from "./fetch-circom.mjs";
+import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), "..");
 const manifestPath = path.join(projectRoot, "circuits", "zk-artifacts-manifest.json");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
 
 const circuits = [
   {
@@ -84,13 +85,24 @@ const snarkjsBinary = absolute(
   process.platform === "win32" ? "node_modules/.bin/snarkjs.cmd" : "node_modules/.bin/snarkjs",
 );
 const renameVerifierScript = absolute("scripts/rename-zk-verifier.mjs");
+const circomBinary = absolute("bin/circom");
 
 requireFile(snarkjsBinary, "snarkjs CLI (run `npm install` first)");
-if (!packageJson.scripts?.["zk:fetch"]?.includes(`/v${manifest.circomVersion}/`)) {
+requireFile(circomBinary, "pinned Circom compiler (run `npm run zk:fetch` first)");
+const releaseArtifactEvidence = inspectZkReleaseArtifacts({
+  root: projectRoot,
+  requireBuiltR1cs: true,
+});
+console.log(
+  `ZK release manifest: ${releaseArtifactEvidence.trustedSetupStatus}, ` +
+    releaseArtifactEvidence.manifestSha256,
+);
+if (manifest.circomVersion !== CIRCOM_VERSION) {
   throw new Error(
-    `Circom download version does not match manifest version ${manifest.circomVersion}`,
+    `Pinned Circom ${CIRCOM_VERSION} does not match manifest version ${manifest.circomVersion}`,
   );
 }
+assertHash(circomBinary, CIRCOM_LINUX_X64_SHA256, "Pinned Circom compiler");
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-zk-artifacts-"));
 

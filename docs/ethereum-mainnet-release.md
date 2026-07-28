@@ -35,14 +35,14 @@ The Safe deployment proves that the reviewed proxy and configuration exist. It d
 the intended controllers possess usable keys. Before protocol release, two real owners must sign
 and execute one refund-free Safe smoke transaction whose inner fields are exactly:
 
-| Safe field                         | Required value                        |
-| ---------------------------------- | ------------------------------------- |
-| `to`                               | `ETHEREUM_MAINNET_EXPECTED_DEPLOYER`  |
-| `value`                            | `0` ETH                               |
-| `data`                             | `0x`                                  |
-| `operation`                        | `CALL` (`0`)                          |
-| `safeTxGas`, `baseGas`, `gasPrice` | all `0`                               |
-| `gasToken`, `refundReceiver`       | zero address                          |
+| Safe field                         | Required value                       |
+| ---------------------------------- | ------------------------------------ |
+| `to`                               | `ETHEREUM_MAINNET_EXPECTED_DEPLOYER` |
+| `value`                            | `0` ETH                              |
+| `data`                             | `0x`                                 |
+| `operation`                        | `CALL` (`0`)                         |
+| `safeTxGas`, `baseGas`, `gasPrice` | all `0`                              |
+| `gasToken`, `refundReceiver`       | zero address                         |
 
 The outer transaction must also carry zero ETH, succeed, emit exactly one `ExecutionSuccess`, emit
 no `ExecutionFailure`, and reach the configured finality requirement. Record the **outer**
@@ -59,19 +59,24 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 
 ## Prerequisites
 
-1. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia and archive its
-   successful release-rehearsal report. A diagnostic report with `releaseReady=false` is useful for
-   development but is not release evidence.
-2. Use a clean, isolated checkout of the reviewed commit with exact dependencies and complete the
+1. Complete the production multi-party ZK ceremony in
+   [zk-ceremony.md](./zk-ceremony.md), replace the development proving keys, and run
+   `npm run release:preflight` with the reviewed `ZK_PTAU_PATH`.
+2. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia using the exact
+   production `MIN_DELAY`, and archive its successful release-rehearsal report. A diagnostic report
+   with `releaseReady=false` is useful for development but is not release evidence. Require
+   `zkArtifactTrust.productionReady=true` and `zkCeremonyVerification.status=passed` in the accepted
+   report.
+3. Use a clean, isolated checkout of the reviewed commit with exact dependencies and complete the
    contract, frontend, ZK artifact, and storage-layout checks.
-3. Obtain the final public addresses of three independent EOA/hardware-wallet controllers in their
+4. Obtain the final public addresses of three independent EOA/hardware-wallet controllers in their
    reviewed order. Confirm that the external signing workflow is configured for chain ID `1`.
-4. Choose one decimal Safe salt nonce and never change the salt or owner order after plan approval.
-5. Reserve a dedicated deployer EOA, fund it only to the independently approved ceilings, and use a
+5. Choose one decimal Safe salt nonce and never change the salt or owner order after plan approval.
+6. Reserve a dedicated deployer EOA, fund it only to the independently approved ceilings, and use a
    reliable `ETHEREUM_MAINNET_RPC_URL` or reviewed Infura endpoint.
-6. Configure a real Etherscan key in `EXPLORER_API_KEY`. Ethereum release execution requires source
+7. Configure a real Etherscan key in `EXPLORER_API_KEY`. Ethereum release execution requires source
    verification and does not accept the non-secret ConfluxScan `espace` placeholder.
-7. Arrange immutable off-machine storage for the complete ignored `deployments/mainnet/`
+8. Arrange immutable off-machine storage for the complete ignored `deployments/mainnet/`
    directory, release logs, review record, and explorer evidence.
 
 ## Environment configuration
@@ -83,6 +88,7 @@ Copy `.env.example` to the ignored `.env` and protect it. Never commit `.env`.
 PRIVATE_KEY=0x...
 ETHEREUM_MAINNET_RPC_URL=https://your-reviewed-ethereum-mainnet-rpc
 EXPLORER_API_KEY=your-real-etherscan-api-key
+ZK_PTAU_PATH=/absolute/path/to/reviewed-production.ptau
 
 # Production policy.
 GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3
@@ -110,10 +116,24 @@ ETHEREUM_MAINNET_SAFE_ACCEPTANCE_TX=
 ETHEREUM_MAINNET_MAX_ETH=1
 ETHEREUM_MAINNET_CONFIRMATIONS=2
 ETHEREUM_MAINNET_FINALITY_TIMEOUT=3600
+# Exact reviewed Sepolia report copied to a regular path inside this checkout.
+ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/ethereum-release-rehearsal.json
 ETHEREUM_MAINNET_CONFIRM=
 ETHEREUM_MAINNET_PLAN_DIGEST=
+ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 ETHEREUM_MAINNET_RECOVERY_TXS=
 ```
+
+The protocol release command validates the selected Sepolia report's schema, release-ready status,
+clean commit and artifact-input digest, `MIN_DELAY`, production ZK evidence, source verification,
+finality, terminal governance state and refund evidence. A diagnostic or another commit's report is
+rejected before any Mainnet transaction.
+
+The acceptance runner's original ignored report path is run-specific; the example path is not
+created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file inside the
+release checkout, compare its SHA-256 against the immutable off-machine archive, and point
+`ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT` at that in-checkout file. External paths and symlinks are
+rejected so the reviewed report bytes are included in the plan and Safe-owner signatures.
 
 Choose the two ETH ceilings from reviewed estimates plus a documented margin; they are hard
 authorization ceilings, not spending targets. `ETHEREUM_MAINNET_SAFE_MAX_ETH` covers only the Safe
@@ -215,6 +235,7 @@ Leave both release authorization values blank:
 ```dotenv
 ETHEREUM_MAINNET_CONFIRM=
 ETHEREUM_MAINNET_PLAN_DIGEST=
+ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 ```
 
 Run:
@@ -223,8 +244,9 @@ Run:
 npm run ethereum:mainnet:release
 ```
 
-The wrapper obtains per-chain and shared production-build locks, cleans old Hardhat output,
-compiles with the production profile, and invokes the Mainnet engine with compilation disabled.
+The wrapper obtains per-chain and shared production-build locks, runs the complete
+`npm run release:preflight` gate, and invokes the Mainnet engine with compilation disabled without
+releasing the shared build lock.
 Plan mode makes chain reads and writes:
 
 ```text
@@ -233,14 +255,21 @@ deployments/mainnet/mainnet-release-plan.json
 
 It does not broadcast. Review the chain and raw chain ID, commit/build inputs, deployer, accepted
 Safe and owner order, Safe nonce `1`, Timelock delay, ETH ceiling, expected contracts, mandatory
-Etherscan/finality policy, checkpoint directory, all ordered transaction intents, and digest.
+Etherscan/finality policy, checkpoint directory, all ordered transaction intents, testnet evidence,
+and digest. The command also prints one exact UTF-8 EIP-191 approval message.
 
 ### B2. Execute or resume the reviewed release
 
-After a second operator approves the exact plan, set:
+At least two current production Safe owners must independently review the exact plan and selected
+Sepolia report, then sign the complete printed EIP-191 message with their external
+hardware-wallet/wallet workflow. The repository accepts only the resulting signatures and never
+their private keys. Do not sign only the digest or retype the message.
+
+After collecting the signatures, set:
 
 ```dotenv
 ETHEREUM_MAINNET_PLAN_DIGEST=0x...
+ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
 ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1
 ```
 
@@ -250,8 +279,10 @@ Run the same command:
 npm run ethereum:mainnet:release
 ```
 
-This execute phase broadcasts real Ethereum Mainnet transactions and spends ETH. The release
-recomputes all inputs before sending. It deploys and validates `GovernanceTimelock`, deploys and
+This execute phase first recomputes the plan and requires distinct valid signatures from at least
+the on-chain Safe threshold of configured owners. A changed plan digest, Safe address, or owner set
+invalidates the signatures before any broadcast. It then broadcasts real Ethereum Mainnet
+transactions and spends ETH. The release deploys and validates `GovernanceTimelock`, deploys and
 wires the protocol system, hands `DeepFamily` ownership to the Timelock, verifies every contract on
 Etherscan, waits for finality, re-reads receipts and block hashes, checks proxy/verifier/Token/
 Reader/Timelock/treasury invariants, and writes its terminal report. It does not create person,

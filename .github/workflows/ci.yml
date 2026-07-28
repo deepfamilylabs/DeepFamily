@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 jobs:
   build-test:
@@ -40,13 +40,16 @@ jobs:
       - name: Lint (solhint)
         run: npm run lint
 
-      - name: Frontend checks
-        run: npm run frontend:check
-
       - name: Build (compile contracts)
         run: npm run build
         env:
           CONTRACT_SIZER_STRICT: "false"
+
+      - name: Frontend checks
+        run: npm run frontend:check
+
+      - name: Check committed frontend ABIs
+        run: git diff --exit-code -- frontend/src/abi
 
       - name: Check storage layouts
         run: npm run storage:check

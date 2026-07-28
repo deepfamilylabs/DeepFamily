@@ -32,6 +32,7 @@ import {
   runIdReportFileComponent,
   summarizeProductionBuildInfo,
 } from "./lib/acceptanceSafety.mjs";
+import { assertAcceptanceReleaseRehearsalWrapper } from "./lib/acceptanceCommandWrapper.mjs";
 import {
   CANONICAL_SAFE_DEPLOYMENT_TYPE,
   CANONICAL_SAFE_VERSION,
@@ -56,6 +57,8 @@ import { deriveGovernanceSalt } from "../tasks/lib/timelockGovernance.mjs";
 import { deriveDelayUpdateSalt } from "../tasks/timelock-update-delay.mjs";
 import { resolveProductionRpcUrl } from "./lib/hardhatConfig.mjs";
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
 const { generatePersonCommitmentProof } = personCommitmentProof;
 const { generateDisclosureBindingProof } = disclosureBindingProof;
@@ -703,6 +706,18 @@ export const main = async (chainProfile) => {
         "to authorize testnet transactions",
     );
   }
+  const requestedMode = String(
+    process.env[ACCEPTANCE_PROFILE.modeEnvironmentName] ?? "diagnostic",
+  ).trim();
+  if (requestedMode === "release-rehearsal") {
+    // This must pass before opening the RPC. The wrapper keeps the production-build lock held from
+    // the complete preflight through this --no-compile acceptance run.
+    await assertAcceptanceReleaseRehearsalWrapper({
+      chainProfile: CHAIN_PROFILE,
+      environment: process.env,
+      root: process.cwd(),
+    });
+  }
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const provider = ethers.provider;
@@ -834,6 +849,18 @@ export const main = async (chainProfile) => {
     artifactsFileCount: acceptanceInputs.directories.artifacts.fileCount,
     artifactsDigest: acceptanceInputs.directories.artifacts.digest,
   };
+  const zkCeremonyVerification =
+    config.acceptanceMode === "release-rehearsal"
+      ? await verifyProductionCeremony({
+          root: process.cwd(),
+          ptauPath: process.env.ZK_PTAU_PATH,
+        })
+      : null;
+  const zkArtifactTrust = inspectZkReleaseArtifacts({
+    root: process.cwd(),
+    requireProduction: config.acceptanceMode === "release-rehearsal",
+    requireBuiltR1cs: true,
+  });
   const report = {
     schemaVersion: 3,
     mode: "acceptance",
@@ -852,6 +879,8 @@ export const main = async (chainProfile) => {
       acceptanceInputs,
     },
     buildState,
+    zkArtifactTrust,
+    zkCeremonyVerification,
     network: {
       name: connection.networkName,
       chainId: network.chainId,
@@ -918,6 +947,8 @@ export const main = async (chainProfile) => {
       artifactManifestCaptured:
         buildState.artifactsFileCount > 0 && buildState.buildInfoFileCount > 0,
       productionCompilerSettingsMatched: buildState.productionSettingsMatched,
+      productionTrustedSetupMatched: zkArtifactTrust.productionReady,
+      productionCeremonyVerified: zkCeremonyVerification?.status === "passed",
       ownerKeysRepresentIndependentHumans: false,
       hardwareWalletAndUiCovered: false,
     },
@@ -1030,6 +1061,10 @@ export const main = async (chainProfile) => {
       "Isolated deployment-metadata directory is not empty for this run ID",
     );
     await addStep("production-build-manifest-preflight", buildState);
+    await addStep("zk-artifact-trust-preflight", {
+      artifactTrust: zkArtifactTrust,
+      ceremonyVerification: zkCeremonyVerification,
+    });
 
     if (config.acceptanceMode === "release-rehearsal") {
       currentStep = "acceptance-mode-preflight";
@@ -1049,6 +1084,7 @@ export const main = async (chainProfile) => {
         productionMinDelaySeconds: config.productionMinDelay,
         productionGovernanceMultisigProfile: config.productionGovernanceMultisigProfile,
         buildState,
+        zkArtifactTrust,
       });
     }
 
@@ -3158,7 +3194,11 @@ export const main = async (chainProfile) => {
         report.productionParity.productionBuildProfileMatched === true &&
         report.productionParity.productionSafeProfileMatched === true &&
         report.productionParity.artifactManifestCaptured === true &&
-        report.productionParity.productionCompilerSettingsMatched === true,
+        report.productionParity.productionCompilerSettingsMatched === true &&
+        report.productionParity.productionTrustedSetupMatched === true &&
+        report.productionParity.productionCeremonyVerified === true &&
+        report.zkCeremonyVerification?.status === "passed" &&
+        report.zkArtifactTrust.productionReady === true,
       onchainChecksPassed: report.onchain.status === "passed",
       terminalGovernanceStateMatched: report.terminalGovernanceState.status === "passed",
       deploymentDirectoryUnchanged: report.deploymentsDirectory.unchanged === true,

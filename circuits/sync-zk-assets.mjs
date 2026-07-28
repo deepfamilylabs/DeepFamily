@@ -20,110 +20,116 @@ const projectRoot = path.resolve(__dirname, "..");
 const artifactsDir = path.join(projectRoot, "zk-artifacts", "circuits");
 const targetDir = path.join(projectRoot, "frontend", "public", "zk");
 
-const filesToCopy = [
-  "disclosure_binding_final.zkey",
-  "disclosure_binding.vkey.json",
-  "disclosure_binding.wasm",
-  "person_commitment_final.zkey",
-  "person_commitment.vkey.json",
-  "person_commitment.wasm",
-];
+export const FILES_TO_COPY = Object.freeze(
+  [
+    {
+      source: "disclosure_binding_final.zkey",
+      destination: "disclosure_binding_final.zkey",
+    },
+    {
+      source: "disclosure_binding.vkey.json",
+      destination: "disclosure_binding.vkey.json",
+    },
+    {
+      source: "disclosure_binding_js/disclosure_binding.wasm",
+      destination: "disclosure_binding.wasm",
+    },
+    {
+      source: "person_commitment_final.zkey",
+      destination: "person_commitment_final.zkey",
+    },
+    {
+      source: "person_commitment.vkey.json",
+      destination: "person_commitment.vkey.json",
+    },
+    {
+      source: "person_commitment_js/person_commitment.wasm",
+      destination: "person_commitment.wasm",
+    },
+  ].map((entry) => Object.freeze(entry)),
+);
 
 async function ensureDirectoryExists(directory) {
   await fs.promises.mkdir(directory, { recursive: true });
 }
 
-async function findFile(baseDir, fileName) {
-  const stack = [baseDir];
+export async function syncZkAssets({
+  sourceDirectory = artifactsDir,
+  destinationDirectory = targetDir,
+  output = console,
+  copyArtifact = (sourcePath, destinationPath) => fs.promises.copyFile(sourcePath, destinationPath),
+  exportVerificationKey = (zkeyPath) => snarkjs.zKey.exportVerificationKey(zkeyPath, logger),
+} = {}) {
+  output.log("Syncing circuit artifacts to frontend/public/zk ...");
 
-  while (stack.length > 0) {
-    const currentDir = stack.pop();
-    let entries;
+  await ensureDirectoryExists(destinationDirectory);
 
-    try {
-      entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        continue;
-      }
-      throw error;
-    }
+  const failedFiles = [];
 
-    for (const entry of entries) {
-      const resolved = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(resolved);
-      } else if (entry.name === fileName) {
-        return resolved;
-      }
-    }
-  }
+  for (const entry of FILES_TO_COPY) {
+    const destinationPath = path.join(destinationDirectory, entry.destination);
+    const sourcePath = path.join(sourceDirectory, entry.source);
 
-  return null;
-}
-
-async function copyFile(src, dest) {
-  await fs.promises.copyFile(src, dest);
-  console.log(`Copied ${path.basename(src)} -> ${dest}`);
-}
-
-async function main() {
-  console.log("Syncing circuit artifacts to frontend/public/zk ...");
-
-  await ensureDirectoryExists(targetDir);
-
-  const missingFiles = [];
-
-  for (const fileName of filesToCopy) {
-    const destinationPath = path.join(targetDir, fileName);
-    let sourcePath = await findFile(artifactsDir, fileName);
-
-    if (!sourcePath && fileName.endsWith(".vkey.json")) {
-      const circuitBase = fileName.replace(".vkey.json", "");
+    if (!fs.existsSync(sourcePath) && entry.destination.endsWith(".vkey.json")) {
+      const circuitBase = entry.destination.replace(".vkey.json", "");
       const zkeyName = `${circuitBase}_final.zkey`;
-      const zkeyPath = await findFile(artifactsDir, zkeyName);
+      const zkeyPath = path.join(sourceDirectory, zkeyName);
 
-      if (zkeyPath) {
+      if (fs.existsSync(zkeyPath)) {
         try {
-          sourcePath = path.join(artifactsDir, fileName);
-          console.log(`Generating ${fileName} from ${zkeyPath}`);
-          const verificationKey = await snarkjs.zKey.exportVerificationKey(zkeyPath, logger);
+          output.log(`Generating ${entry.destination} from ${zkeyPath}`);
+          const verificationKey = await exportVerificationKey(zkeyPath);
           await fs.promises.writeFile(
             sourcePath,
             `${JSON.stringify(verificationKey, null, 2)}\n`,
             "utf8",
           );
         } catch (error) {
-          console.error(`Failed to generate ${fileName}:`, error.message);
-          sourcePath = null;
+          output.error(`Failed to generate ${entry.destination}: ${error.message}`);
+          failedFiles.push(sourcePath);
+          continue;
         }
       }
     }
 
-    if (!sourcePath) {
-      missingFiles.push(path.join(artifactsDir, fileName));
-      console.error(`Missing artifact: ${path.join(artifactsDir, fileName)}`);
+    if (!fs.existsSync(sourcePath)) {
+      failedFiles.push(sourcePath);
+      output.error(`Missing artifact: ${sourcePath}`);
       continue;
     }
 
     try {
-      await copyFile(sourcePath, destinationPath);
+      await copyArtifact(sourcePath, destinationPath);
+      output.log(`Copied ${path.basename(sourcePath)} -> ${destinationPath}`);
     } catch (error) {
-      console.error(`Failed to copy ${fileName}:`, error.message);
-      missingFiles.push(sourcePath);
+      output.error(`Failed to copy ${entry.destination}: ${error.message}`);
+      failedFiles.push(sourcePath);
     }
   }
 
-  if (missingFiles.length > 0) {
-    console.error("Finished with missing artifacts:");
-    missingFiles.forEach((filePath) => console.error(`  - ${filePath}`));
-    process.exitCode = 1;
-    return;
+  if (failedFiles.length > 0) {
+    output.error("Finished with missing or failed artifacts:");
+    failedFiles.forEach((filePath) => output.error(`  - ${filePath}`));
+    return { exitCode: 1, failedFiles };
   }
 
-  console.log("Circuit artifacts synchronized successfully.");
+  output.log("Circuit artifacts synchronized successfully.");
+  return { exitCode: 0, failedFiles };
 }
 
-main().catch((error) => {
-  console.error("Unexpected error while syncing artifacts:", error);
-});
+export async function main(options) {
+  const result = await syncZkAssets(options);
+  return result.exitCode;
+}
+
+const scriptPath = fileURLToPath(import.meta.url);
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
+  main()
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((error) => {
+      console.error("Unexpected error while syncing artifacts:", error);
+      process.exitCode = 1;
+    });
+}

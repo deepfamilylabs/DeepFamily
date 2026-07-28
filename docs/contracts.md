@@ -447,8 +447,15 @@ confirmation count, finality timeout, and recovery mapping:
 npm run espace:mainnet:release
 ```
 
+Before this command can plan a release, the development proving keys must have been replaced by the
+production ceremony described in [zk-ceremony.md](zk-ceremony.md), `npm run release:preflight` must
+pass, and `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v3
+`releaseReady=true` rehearsal report from the current commit and production `MIN_DELAY`.
+
 With `ESPACE_MAINNET_CONFIRM` and `ESPACE_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
-After review, set the printed digest plus
+After review, at least two current Safe owners sign the complete printed EIP-191 plan-approval
+message externally. Set the printed digest, the resulting JSON signature array in
+`ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES`, plus
 `ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030` and rerun to execute or resume. The
 orchestrator deploys and validates the Timelock before the protocol, records an atomic checkpoint,
 verifies every source, waits for finalized coverage, and validates the terminal governance state.
@@ -474,9 +481,13 @@ npm run ethereum:mainnet:release
 The Ethereum production flow requires
 `GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
 exactly three ordered EOA owners with threshold `2`, ETH budget variables, a real Etherscan API key,
-and the exact chain-1 confirmation strings. The Safe and release commands default to read-only plan
-mode while their respective confirmation/digest pair is blank. Filling the reviewed pair and
-rerunning enters execute/resume mode and broadcasts real Mainnet transactions.
+the exact chain-1 confirmation strings, production ceremony artifacts, and an exact Sepolia
+release-rehearsal report in `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands
+default to read-only plan mode while their respective confirmation/digest pair is blank. Protocol
+execution additionally requires `ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct
+valid EIP-191 signatures from at least two current Safe owners over the exact printed approval
+message. Filling the reviewed authorization values and rerunning enters execute/resume mode and
+broadcasts real Mainnet transactions.
 
 As with eSpace, the repository never accepts a production Safe owner's private key. After Safe
 deployment, two real owners must externally execute the exact refund-free zero-ETH smoke

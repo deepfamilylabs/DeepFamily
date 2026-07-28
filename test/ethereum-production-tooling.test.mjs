@@ -68,6 +68,7 @@ const ethereumSafeEnv = (overrides = {}) => ({
 const ethereumReleaseEnv = (overrides = {}) => ({
   ETHEREUM_MAINNET_CONFIRM: "",
   ETHEREUM_MAINNET_PLAN_DIGEST: "",
+  ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES: "",
   ETHEREUM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
   ETHEREUM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
   ETHEREUM_MAINNET_MAX_ETH: "2",
@@ -154,13 +155,11 @@ describe("Ethereum production tooling profiles", function () {
   it("exposes only explicit npm entry points with fixed Hardhat networks", async function () {
     const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
     expect(packageJson.scripts).to.include({
-      "espace:acceptance":
-        "hardhat --config hardhat.config.mjs --build-profile production run scripts/espace-acceptance.mjs --network confluxTestnet",
+      "espace:acceptance": "node scripts/espace-acceptance-command.mjs",
       "espace:mainnet:safe": "node scripts/espace-mainnet-safe-command.mjs",
       "espace:mainnet:safe:status": "node scripts/espace-mainnet-safe-command.mjs --status",
       "espace:mainnet:release": "node scripts/espace-mainnet-release-command.mjs",
-      "ethereum:acceptance":
-        "hardhat --config hardhat.config.mjs --build-profile production run scripts/ethereum-acceptance.mjs --network sepolia",
+      "ethereum:acceptance": "node scripts/ethereum-acceptance-command.mjs",
       "ethereum:mainnet:safe": "node scripts/ethereum-mainnet-safe-command.mjs",
       "ethereum:mainnet:safe:status": "node scripts/ethereum-mainnet-safe-command.mjs --status",
       "ethereum:mainnet:release": "node scripts/ethereum-mainnet-release-command.mjs",
@@ -228,6 +227,7 @@ describe("Ethereum production tooling profiles", function () {
       "ETHEREUM_MAINNET_SAFE_ACCEPTANCE_TX",
       "ETHEREUM_MAINNET_CONFIRM",
       "ETHEREUM_MAINNET_PLAN_DIGEST",
+      "ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES",
       "ETHEREUM_MAINNET_MAX_ETH",
       "ETHEREUM_MAINNET_CONFIRMATIONS",
       "ETHEREUM_MAINNET_FINALITY_TIMEOUT",
@@ -541,13 +541,15 @@ describe("Ethereum production tooling profiles", function () {
   });
 
   it("keeps thin wrappers profile-only and derives network, state directory and locks centrally", async function () {
-    const [shared, espaceSafe, espaceRelease, ethereumSafe, ethereumRelease] = await Promise.all([
-      fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
-      fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
-      fs.readFile("scripts/espace-mainnet-release-command.mjs", "utf8"),
-      fs.readFile("scripts/ethereum-mainnet-safe-command.mjs", "utf8"),
-      fs.readFile("scripts/ethereum-mainnet-release-command.mjs", "utf8"),
-    ]);
+    const [shared, locks, espaceSafe, espaceRelease, ethereumSafe, ethereumRelease] =
+      await Promise.all([
+        fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
+        fs.readFile("scripts/lib/exclusiveCommandLock.mjs", "utf8"),
+        fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
+        fs.readFile("scripts/espace-mainnet-release-command.mjs", "utf8"),
+        fs.readFile("scripts/ethereum-mainnet-safe-command.mjs", "utf8"),
+        fs.readFile("scripts/ethereum-mainnet-release-command.mjs", "utf8"),
+      ]);
 
     for (const [source, profileName] of [
       [espaceSafe, "ESPACE_CHAIN_PROFILE"],
@@ -566,7 +568,8 @@ describe("Ethereum production tooling profiles", function () {
     expect(shared).to.include("`.mainnet-${kind}-command.lock`");
     expect(shared).to.include("arguments_.length !== 0");
     expect(shared).to.include("PRODUCTION_BUILD_LOCK_PATH");
-    expect(shared).to.include('".production-build.lock"');
+    expect(shared).to.include("productionBuildLockPath(ROOT)");
+    expect(locks).to.include('".production-build.lock"');
     expect(shared).not.to.include("npm_config_net");
   });
 });

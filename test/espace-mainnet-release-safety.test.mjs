@@ -1,12 +1,15 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 
+import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
 import {
   ESPACE_MAINNET_CONFIRMATION,
   assertMainnetReleaseSafeAcceptanceNonce,
+  buildMainnetPlanApprovalMessage,
   deriveMainnetPlanDigest,
   parseESpaceMainnetReleaseConfig,
   parseMainnetAuthorization,
+  verifyMainnetPlanApprovals,
 } from "../scripts/lib/mainnetReleaseSafety.mjs";
 
 const SAFE = "0x1000000000000000000000000000000000000001";
@@ -17,10 +20,23 @@ const OWNERS = [
   "0x5000000000000000000000000000000000000005",
 ];
 const PLAN_DIGEST = `0x${"ab".repeat(32)}`;
+const PLACEHOLDER_APPROVAL_SIGNATURES = JSON.stringify([
+  ethers.Signature.from({
+    r: `0x${"01".repeat(32)}`,
+    s: `0x${"02".repeat(32)}`,
+    v: 27,
+  }).serialized,
+  ethers.Signature.from({
+    r: `0x${"03".repeat(32)}`,
+    s: `0x${"04".repeat(32)}`,
+    v: 28,
+  }).serialized,
+]);
 
 const baseEnv = (overrides = {}) => ({
   ESPACE_MAINNET_CONFIRM: "",
   ESPACE_MAINNET_PLAN_DIGEST: "",
+  ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES: "",
   ESPACE_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
   ESPACE_MAINNET_SAFE_OWNERS: OWNERS.join(","),
   ESPACE_MAINNET_MAX_CFX: "12.5",
@@ -47,6 +63,7 @@ describe("eSpace Mainnet release safety", function () {
     const config = parse({
       ESPACE_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
       ESPACE_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+      ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES,
     });
     expect(config.mode).to.equal("execute");
     expect(config.configuredPlanDigest).to.equal(PLAN_DIGEST);
@@ -146,5 +163,137 @@ describe("eSpace Mainnet release safety", function () {
     expect(deriveMainnetPlanDigest({ ...fingerprint, owners: [...OWNERS].reverse() })).not.to.equal(
       first,
     );
+  });
+
+  it("requires execute-mode plan approvals and forbids stale approvals in plan mode", function () {
+    expect(() =>
+      parse({
+        ESPACE_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
+        ESPACE_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+      }),
+    ).to.throw("PLAN_APPROVAL_SIGNATURES must contain approval signatures");
+    expect(() =>
+      parse({ ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES }),
+    ).to.throw("blank while generating a plan");
+  });
+
+  it("cryptographically requires distinct approvals from the expected Safe owners", async function () {
+    const ownerWallets = [
+      new ethers.Wallet(`0x${"11".repeat(32)}`),
+      new ethers.Wallet(`0x${"22".repeat(32)}`),
+      new ethers.Wallet(`0x${"33".repeat(32)}`),
+    ];
+    const ownerAddresses = ownerWallets.map((wallet) => wallet.address);
+    const message = buildMainnetPlanApprovalMessage({
+      planDigest: PLAN_DIGEST,
+      governanceMultisig: SAFE,
+    });
+    const signatures = await Promise.all(
+      ownerWallets.slice(0, 2).map((wallet) => wallet.signMessage(message)),
+    );
+    const approval = verifyMainnetPlanApprovals({
+      planDigest: PLAN_DIGEST,
+      governanceMultisig: SAFE,
+      expectedOwners: ownerAddresses,
+      requiredApprovals: 2,
+      signatures,
+    });
+    expect(approval.requiredApprovals).to.equal(2);
+    expect(approval.approvedOwners).to.have.members(ownerAddresses.slice(0, 2));
+    expect(approval.messageHash).to.equal(ethers.hashMessage(message));
+
+    expect(() =>
+      verifyMainnetPlanApprovals({
+        planDigest: PLAN_DIGEST,
+        governanceMultisig: SAFE,
+        expectedOwners: ownerAddresses,
+        requiredApprovals: 2,
+        signatures: [signatures[0], signatures[0]],
+      }),
+    ).to.throw("duplicate signature");
+    const outsider = new ethers.Wallet(`0x${"44".repeat(32)}`);
+    const outsiderSignature = await outsider.signMessage(message);
+    expect(() =>
+      verifyMainnetPlanApprovals({
+        planDigest: PLAN_DIGEST,
+        governanceMultisig: SAFE,
+        expectedOwners: ownerAddresses,
+        requiredApprovals: 2,
+        signatures: [signatures[0], outsiderSignature],
+      }),
+    ).to.throw("not from an expected Safe owner");
+    expect(() =>
+      verifyMainnetPlanApprovals({
+        planDigest: PLAN_DIGEST,
+        governanceMultisig: SAFE,
+        expectedOwners: ownerAddresses,
+        requiredApprovals: 2,
+        signatures: [signatures[0]],
+      }),
+    ).to.throw("at least 2 Safe-owner plan approvals");
+  });
+
+  it("binds Safe-owner approvals to the exact plan digest and production Safe", async function () {
+    const ownerWallets = [
+      new ethers.Wallet(`0x${"55".repeat(32)}`),
+      new ethers.Wallet(`0x${"66".repeat(32)}`),
+      new ethers.Wallet(`0x${"77".repeat(32)}`),
+    ];
+    const message = buildMainnetPlanApprovalMessage({
+      planDigest: PLAN_DIGEST,
+      governanceMultisig: SAFE,
+    });
+    const signatures = await Promise.all(
+      ownerWallets.slice(0, 2).map((wallet) => wallet.signMessage(message)),
+    );
+    for (const changed of [
+      { planDigest: `0x${"cd".repeat(32)}`, governanceMultisig: SAFE },
+      {
+        planDigest: PLAN_DIGEST,
+        governanceMultisig: "0x9000000000000000000000000000000000000009",
+      },
+    ]) {
+      expect(() =>
+        verifyMainnetPlanApprovals({
+          ...changed,
+          expectedOwners: ownerWallets.map((wallet) => wallet.address),
+          requiredApprovals: 2,
+          signatures,
+        }),
+      ).to.throw("not from an expected Safe owner");
+    }
+  });
+
+  it("rejects replaying plan approvals across eSpace and Ethereum profiles", async function () {
+    const owners = [
+      new ethers.Wallet(`0x${"81".repeat(32)}`),
+      new ethers.Wallet(`0x${"82".repeat(32)}`),
+      new ethers.Wallet(`0x${"83".repeat(32)}`),
+    ];
+    const ownerAddresses = owners.map((wallet) => wallet.address);
+    const scenarios = [
+      [ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE],
+      [ETHEREUM_CHAIN_PROFILE, ESPACE_CHAIN_PROFILE],
+    ];
+    for (const [signedProfile, replayedProfile] of scenarios) {
+      const message = buildMainnetPlanApprovalMessage({
+        chainProfile: signedProfile,
+        planDigest: PLAN_DIGEST,
+        governanceMultisig: SAFE,
+      });
+      const signatures = await Promise.all(
+        owners.slice(0, 2).map((wallet) => wallet.signMessage(message)),
+      );
+      expect(() =>
+        verifyMainnetPlanApprovals({
+          chainProfile: replayedProfile,
+          planDigest: PLAN_DIGEST,
+          governanceMultisig: SAFE,
+          expectedOwners: ownerAddresses,
+          requiredApprovals: 2,
+          signatures,
+        }),
+      ).to.throw("not from an expected Safe owner");
+    }
   });
 });
