@@ -110,25 +110,33 @@ describe("ZK frontend artifact synchronization", function () {
     );
   });
 
-  it("fails closed without masking verification-key generation errors", async function () {
+  it("fails closed instead of implicitly generating a missing verification key", async function () {
     const { sourceDirectory, destinationDirectory } = await createFixture();
     const failedSource = path.join(sourceDirectory, "disclosure_binding.vkey.json");
     await fs.rm(failedSource);
     const { output, stderr } = createOutput();
+    let copyCount = 0;
 
     const result = await syncZkAssets({
       sourceDirectory,
       destinationDirectory,
       output,
-      exportVerificationKey: async () => {
-        throw new Error("simulated verification-key failure");
+      copyArtifact: async () => {
+        copyCount += 1;
       },
     });
 
     expect(result.exitCode).to.equal(1);
     expect(result.failedFiles).to.deep.equal([failedSource]);
-    expect(stderr).to.include(
-      "Failed to generate disclosure_binding.vkey.json: simulated verification-key failure",
-    );
+    expect(stderr).to.include(`Missing artifact: ${failedSource}`);
+    expect(stderr).to.include("Refusing to partially synchronize incomplete circuit artifacts.");
+    expect(copyCount).to.equal(0);
+    let accessError;
+    try {
+      await fs.access(destinationDirectory);
+    } catch (error) {
+      accessError = error;
+    }
+    expect(accessError).to.include({ code: "ENOENT" });
   });
 });

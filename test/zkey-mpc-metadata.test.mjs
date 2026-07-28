@@ -4,22 +4,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readZkeyMpcMetadata } from "../scripts/lib/zkeyMpcMetadata.mjs";
+import { DEVELOPMENT_CONTRIBUTOR_NAME } from "../scripts/zk-dev-refresh.mjs";
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("zkey MPC metadata reader", function () {
-  for (const [name, expectedContributionHash] of [
-    [
-      "person_commitment",
-      "b7bace0468cee81c5f3b35aa656f08df5d03eabf63ff80f1c361dda0b846756b" +
-        "e60a360ecfe77165f03a03e55bb3a282a543300239d78bddc6fff98267060abc",
-    ],
-    [
-      "disclosure_binding",
-      "0c47de1e667ab329eb20d9ef9ec040be09697395a83a70a8a1fec83524795610" +
-        "c3bbec73e724376f8e1d9f4e6667d9a6b0217ca727d7516a0ed03769042d0535",
-    ],
-  ]) {
+  for (const name of ["person_commitment", "disclosure_binding"]) {
     it(`reads the real committed ${name} Groth16 MPC section`, async function () {
       const manifest = JSON.parse(
         await fs.readFile(
@@ -37,11 +27,11 @@ describe("zkey MPC metadata reader", function () {
         expect(metadata.contributions[0]).to.include({
           sequence: 1,
           type: 0,
-          name: "1st",
-          contributionHash: expectedContributionHash,
+          name: DEVELOPMENT_CONTRIBUTOR_NAME,
           beaconHash: null,
           numIterationsExp: null,
         });
+        expect(metadata.contributions[0].contributionHash).to.match(/^[0-9a-f]{128}$/u);
       } else {
         expect(manifest.trustedSetup.status).to.equal("production");
         const transcript = JSON.parse(

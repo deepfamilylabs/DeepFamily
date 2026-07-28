@@ -365,12 +365,31 @@ Repository location:
 
 ## Development Workflow
 
-### Build Circuits
+### Supported commands
+
+Only the following top-level ZK commands are supported for routine development and release work:
+
+| Command                       | Purpose                                                     |
+| ----------------------------- | ----------------------------------------------------------- |
+| `npm run zk:fetch`            | Install and verify the pinned Circom compiler               |
+| `npm run zk:ptau:fetch`       | Download or verify the fixed-digest public Phase 1 pTau     |
+| `npm run zk:build`            | Compile both circuits into local build artifacts            |
+| `npm run zk:dev:refresh`      | Regenerate the complete development artifact set            |
+| `npm run zk:production:setup` | Generate and verify production Phase 2 artifacts            |
+| `npm run zk:check`            | Generate and verify real proofs for both circuits           |
+| `npm run zk:artifacts:check`  | Rebuild and cross-check all published artifacts             |
+| `npm run zk:ceremony:verify`  | Verify production setup evidence and cryptographic metadata |
+
+Circuit-specific build, setup, verifier-export, copy, proof-check, and manifest operations are
+implementation details of these commands rather than separate user-facing npm entries.
+
+### Fetch and build
 
 From repo root:
 
 ```bash
 npm run zk:fetch
+npm run zk:ptau:fetch
 npm run zk:build
 ```
 
@@ -379,41 +398,15 @@ fixed SHA-256. It refuses to replace an unexpected file or symbolic link. On ano
 install the same reviewed compiler through an explicit platform-specific process and update the
 release policy before treating its output as production evidence.
 
-Or individually:
+Both development and production use the same pinned public power-13 Phase 1 file:
 
-```bash
-npm run zk:build:person
-npm run zk:build:disclosure
+```text
+tmp/zk-production/powersOfTau28_hez_final_13.ptau
 ```
 
-### Generate Development Setup Artifacts
-
-```bash
-npm run zk:dev:ptau
-npm run zk:dev:setup
-```
-
-Or individually:
-
-```bash
-npm run zk:dev:setup:person
-npm run zk:dev:setup:disclosure
-```
-
-These commands deliberately identify their output as development-only. They use one local
-contributor and public command-line entropy, and must never create production proving keys.
-
-### Export Solidity Verifiers
-
-```bash
-npm run zk:verifier
-```
-
-### Sync Frontend Artifacts
-
-```bash
-npm run zk:sync
-```
+The downloader validates its expected byte length, SHA-256, and BLAKE2b-512 before use. Sharing
+this reviewed Phase 1 file does not make the two setup modes equivalent: security also depends on
+the circuit-specific Phase 2 contributions.
 
 ### Development Full Refresh
 
@@ -421,13 +414,25 @@ npm run zk:sync
 npm run zk:dev:refresh
 ```
 
-This rebuilds the circuits, regenerates proving artifacts, re-exports verifier contracts, and refreshes `frontend/public/zk/`.
-It overwrites the checked-in proving artifacts with development keys.
+This is a self-contained development workflow. It fetches or verifies the shared pTau, compiles
+both circuits, regenerates both development zkeys and verification keys, exports both Solidity
+verifiers, copies the complete browser artifact set to `frontend/public/zk/`, and updates the
+development manifest.
+
+The development Phase 2 flow deliberately uses one operator and hard-coded public entropy. This
+supplies no independent secret contribution, and the operator may retain the circuit-specific toxic
+waste. These keys are therefore suitable only for local development and tests even though their
+Phase 1 input is the same reviewed pTau used by production. The command overwrites the checked-in
+proving artifacts with keys whose manifest status remains `development`.
+
+The copy stage only copies already-generated WASM, zkey, and verification-key files. If any source
+artifact is missing, it fails explicitly instead of generating or exporting another file as an
+undocumented side effect.
 
 ### Production Setup
 
-Do not use any `zk:dev:*` command for production. After the circuits are frozen, start from a clean
-commit and run:
+Do not use `zk:dev:refresh` for production. After the circuits are frozen, start from a clean commit
+and run:
 
 ```bash
 npm run zk:production:setup

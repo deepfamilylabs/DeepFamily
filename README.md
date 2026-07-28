@@ -111,6 +111,34 @@ npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check         # Run frontend checks + contract lint/build/test
 ```
 
+### ZK Artifact Workflow
+
+The supported ZK command surface is intentionally limited to these eight entries:
+
+| Command                       | Purpose                                                           |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `npm run zk:fetch`            | Install and verify the repository-pinned Circom binary            |
+| `npm run zk:ptau:fetch`       | Download or verify the pinned public Phase 1 pTau cache           |
+| `npm run zk:build`            | Compile both circuits                                             |
+| `npm run zk:dev:refresh`      | Rebuild every development artifact from a self-contained workflow |
+| `npm run zk:production:setup` | Generate and verify the production Phase 2 artifacts              |
+| `npm run zk:check`            | Generate and verify real proofs for both circuits                 |
+| `npm run zk:artifacts:check`  | Rebuild and validate the complete artifact set                    |
+| `npm run zk:ceremony:verify`  | Verify the production pTau, zkeys, transcript, and trust metadata |
+
+Development and production reuse the same fixed-digest public Phase 1 pTau at
+`tmp/zk-production/powersOfTau28_hez_final_13.ptau`. This removes the old locally generated
+development pTau, but it does **not** make development keys safe for production:
+`zk:dev:refresh` deliberately uses a single-operator Phase 2 flow with hard-coded public entropy
+and records a `development` manifest. It downloads or validates the shared pTau when needed,
+compiles both circuits, generates both development zkeys and verification keys, exports the
+Solidity verifiers, copies the required frontend assets, and updates the development manifest.
+
+Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or
+verification key is missing. It never silently generates a missing artifact during the copy step.
+See [ZK proofs](docs/zk-proofs.md) and the
+[production ZK setup runbook](docs/zk-ceremony.md) for the development and release procedures.
+
 ## Deployment Guide
 
 ### Supported Networks
