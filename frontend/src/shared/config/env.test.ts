@@ -60,7 +60,9 @@ describe("readListEnv", () => {
 describe("shouldShowNodeModeToggle", () => {
   it("reads the node-mode env flag", () => {
     vi.stubEnv("VITE_SHOW_NODE_MODE_TOGGLE", "1");
-
     expect(shouldShowNodeModeToggle()).toBe(true);
+
+    vi.stubEnv("VITE_SHOW_NODE_MODE_TOGGLE", "0");
+    expect(shouldShowNodeModeToggle()).toBe(false);
   });
 });
