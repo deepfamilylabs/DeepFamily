@@ -6,7 +6,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CIRCOM_LINUX_X64_SHA256, CIRCOM_VERSION } from "./fetch-circom.mjs";
+import {
+  CIRCOM_CANONICAL_POLICY,
+  CIRCOM_LINUX_X64_SHA256,
+  CIRCOM_VERSION,
+} from "./lib/circomToolchain.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -85,10 +89,10 @@ const snarkjsBinary = absolute(
   process.platform === "win32" ? "node_modules/.bin/snarkjs.cmd" : "node_modules/.bin/snarkjs",
 );
 const renameVerifierScript = absolute("scripts/rename-zk-verifier.mjs");
-const circomBinary = absolute("bin/circom");
+const circomBinary = absolute(CIRCOM_CANONICAL_POLICY.binaryPath);
 
 requireFile(snarkjsBinary, "snarkjs CLI (run `npm install` first)");
-requireFile(circomBinary, "pinned Circom compiler (run `npm run zk:fetch` first)");
+requireFile(circomBinary, "canonical Circom compiler (run `npm run zk:fetch` first)");
 const releaseArtifactEvidence = inspectZkReleaseArtifacts({
   root: projectRoot,
   requireBuiltR1cs: true,
@@ -103,7 +107,7 @@ if (manifest.circomVersion !== CIRCOM_VERSION) {
     `Pinned Circom ${CIRCOM_VERSION} does not match manifest version ${manifest.circomVersion}`,
   );
 }
-assertHash(circomBinary, CIRCOM_LINUX_X64_SHA256, "Pinned Circom compiler");
+assertHash(circomBinary, CIRCOM_LINUX_X64_SHA256, "Pinned canonical Circom compiler");
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-zk-artifacts-"));
 

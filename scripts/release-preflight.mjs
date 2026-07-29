@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { assertCanonicalCircomHost } from "./lib/circomToolchain.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { ZK_PRODUCTION_PHASE1, inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
@@ -57,6 +58,8 @@ const assertCleanGitState = ({ root, runner, stage }) => {
 
 export const runReleasePreflight = async ({
   root = process.cwd(),
+  platform = process.platform,
+  arch = process.arch,
   runner = defaultRunner,
   commands = RELEASE_PREFLIGHT_COMMANDS,
   ptauPath,
@@ -65,6 +68,7 @@ export const runReleasePreflight = async ({
 } = {}) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (!Array.isArray(commands)) throw new Error("commands must be an array");
+  assertCanonicalCircomHost({ platform, arch, operation: "Release preflight" });
 
   const releaseCommit = assertCleanGitState({ root, runner, stage: "before checks" });
   // Fail before expensive checks when development-only proving keys are still checked in.

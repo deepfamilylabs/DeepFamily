@@ -15,6 +15,19 @@ import {
 
 const fixtureRoot = path.resolve("/fixture/deepfamily");
 
+const captureError = async (operation) => {
+  try {
+    await operation();
+    return null;
+  } catch (error) {
+    return error;
+  }
+};
+
+const inspectFixtureCompiler = async ({ root, platform }) => ({
+  path: path.join(root, "bin", platform === "win32" ? "circom.exe" : "circom"),
+});
+
 describe("public ZK command surface", function () {
   it("exposes only the eight supported top-level npm commands", function () {
     const packageJson = JSON.parse(
@@ -74,7 +87,13 @@ describe("parameterized ZK command wrappers", function () {
 
   describe("zk-build", function () {
     it("builds the fixed person command without a shell", function () {
-      expect(buildZkBuildCommands({ root: fixtureRoot, circuit: "person" })).to.deep.equal([
+      expect(
+        buildZkBuildCommands({
+          root: fixtureRoot,
+          circuit: "person",
+          platform: "linux",
+        }),
+      ).to.deep.equal([
         {
           circuit: "person",
           executable: path.join(fixtureRoot, "bin", "circom"),
@@ -83,6 +102,7 @@ describe("parameterized ZK command wrappers", function () {
             "--r1cs",
             "--wasm",
             "--sym",
+            "--O2",
             "-l",
             "node_modules",
             "-l",
@@ -95,17 +115,34 @@ describe("parameterized ZK command wrappers", function () {
       ]);
     });
 
-    it("runs person before disclosure and creates the output directory first", function () {
+    it("uses the Windows Circom executable name on win32", function () {
+      const [command] = buildZkBuildCommands({
+        root: fixtureRoot,
+        circuit: "person",
+        platform: "win32",
+      });
+
+      expect(command.executable).to.equal(path.join(fixtureRoot, "bin", "circom.exe"));
+    });
+
+    it("inspects the compiler, then creates the output directory and runs in order", async function () {
       const events = [];
-      const commands = runZkBuild({
+      const commands = await runZkBuild({
         root: fixtureRoot,
         circuit: "all",
+        platform: "linux",
+        arch: "x64",
+        compilerInspector: async ({ root, platform, arch }) => {
+          events.push(["inspect", root, platform, arch]);
+          return inspectFixtureCompiler({ root, platform });
+        },
         directoryCreator: (directory) => events.push(["mkdir", directory]),
         runner: (command) => events.push(["run", command.circuit]),
       });
 
       expect(commands.map(({ circuit }) => circuit)).to.deep.equal(["person", "disclosure"]);
       expect(events).to.deep.equal([
+        ["inspect", fixtureRoot, "linux", "x64"],
         ["mkdir", path.join(fixtureRoot, "zk-artifacts", "circuits")],
         ["run", "person"],
         ["run", "disclosure"],
@@ -113,27 +150,60 @@ describe("parameterized ZK command wrappers", function () {
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
     });
 
-    it("propagates a compiler error and does not run the next circuit", function () {
+    it("propagates a compiler execution error and does not run the next circuit", async function () {
       const failure = new Error("circom failed");
       const seen = [];
-      expect(() =>
+      const error = await captureError(() =>
         runZkBuild({
           root: fixtureRoot,
+          platform: "linux",
+          arch: "x64",
+          compilerInspector: inspectFixtureCompiler,
           directoryCreator: () => {},
           runner: (command) => {
             seen.push(command.circuit);
             throw failure;
           },
         }),
-      ).to.throw(failure);
+      );
+
+      expect(error).to.equal(failure);
       expect(seen).to.deep.equal(["person"]);
     });
 
-    it("validates injected collaborators before making changes", function () {
-      expect(() => runZkBuild({ runner: null })).to.throw(/runner must be a function/);
-      expect(() => runZkBuild({ directoryCreator: null })).to.throw(
-        /directoryCreator must be a function/,
+    it("propagates an inspection error before creating directories or running commands", async function () {
+      const failure = new Error("compiler provenance mismatch");
+      const events = [];
+      const error = await captureError(() =>
+        runZkBuild({
+          root: fixtureRoot,
+          platform: "linux",
+          arch: "x64",
+          compilerInspector: async () => {
+            throw failure;
+          },
+          directoryCreator: () => events.push("mkdir"),
+          runner: () => events.push("run"),
+        }),
       );
+
+      expect(error).to.equal(failure);
+      expect(events).to.deep.equal([]);
+    });
+
+    it("validates injected collaborators before making changes", async function () {
+      const runnerError = await captureError(() => runZkBuild({ runner: null }));
+      expect(runnerError?.message).to.match(/runner must be a function/);
+
+      const directoryCreatorError = await captureError(() =>
+        runZkBuild({ directoryCreator: null }),
+      );
+      expect(directoryCreatorError?.message).to.match(/directoryCreator must be a function/);
+
+      const compilerInspectorError = await captureError(() =>
+        runZkBuild({ compilerInspector: null }),
+      );
+      expect(compilerInspectorError?.message).to.match(/compilerInspector must be a function/);
     });
   });
 

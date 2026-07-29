@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import {
@@ -9,6 +8,7 @@ import {
   ensureProductionPtau,
   productionPtauPath,
 } from "../scripts/lib/productionPtau.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const fixtureBytes = Buffer.from("hermetic public phase-1 fixture");
 const expected = Object.freeze({
@@ -28,7 +28,7 @@ describe("pinned production Powers of Tau cache", function () {
   let root;
 
   beforeEach(async function () {
-    root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-production-ptau-"));
+    root = await createCanonicalTemporaryDirectory("deepfamily-production-ptau-");
   });
 
   afterEach(async function () {

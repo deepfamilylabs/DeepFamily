@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { expect } from "chai";
 
@@ -16,6 +15,7 @@ import {
   ZK_TRUST_MODEL_MULTI_PARTY,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const COMMIT = "12".repeat(20);
 const INPUT_DIGEST = `0x${"34".repeat(32)}`;
@@ -308,8 +308,8 @@ describe("schema v3 testnet release-rehearsal evidence", function () {
   };
 
   beforeEach(async function () {
-    repositoryRoot = await fs.mkdtemp(
-      path.join(os.tmpdir(), "deepfamily-testnet-release-evidence-"),
+    repositoryRoot = await createCanonicalTemporaryDirectory(
+      "deepfamily-testnet-release-evidence-",
     );
     reportPath = path.join(repositoryRoot, "archive", "release-rehearsal.json");
   });
@@ -424,8 +424,8 @@ describe("schema v3 testnet release-rehearsal evidence", function () {
 
   it("rejects an external archive by default and accepts one only through the explicit opt-in", async function () {
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
-    const externalRoot = await fs.mkdtemp(
-      path.join(os.tmpdir(), "deepfamily-external-release-archive-"),
+    const externalRoot = await createCanonicalTemporaryDirectory(
+      "deepfamily-external-release-archive-",
     );
     const externalReportPath = path.join(externalRoot, "release.json");
     try {

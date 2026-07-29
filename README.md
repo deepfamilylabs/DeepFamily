@@ -117,7 +117,7 @@ The supported ZK command surface is intentionally limited to these eight entries
 
 | Command                       | Purpose                                                           |
 | ----------------------------- | ----------------------------------------------------------------- |
-| `npm run zk:fetch`            | Install and verify the repository-pinned Circom binary            |
+| `npm run zk:fetch`            | Install the native and canonical Linux amd64 Circom compilers     |
 | `npm run zk:ptau:fetch`       | Download or verify the pinned public Phase 1 pTau cache           |
 | `npm run zk:build`            | Compile both circuits                                             |
 | `npm run zk:dev:refresh`      | Rebuild every development artifact from a self-contained workflow |
@@ -125,6 +125,26 @@ The supported ZK command surface is intentionally limited to these eight entries
 | `npm run zk:check`            | Generate and verify real proofs for both circuits                 |
 | `npm run zk:artifacts:check`  | Rebuild and validate the complete artifact set                    |
 | `npm run zk:ceremony:verify`  | Verify the production pTau, zkeys, transcript, and trust metadata |
+
+`zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
+(`bin/circom.exe` on Windows) and is used by local builds. The canonical release compiler is always
+the reviewed official Linux amd64 binary at `bin/circom-release-linux-amd64`; native builds never
+replace it.
+
+| Host                           | Native compiler installed by `zk:fetch` | Additional requirement |
+| ------------------------------ | --------------------------------------- | ---------------------- |
+| Linux, macOS, or Windows x64   | Pinned official release asset           | None                   |
+| Linux, macOS, or Windows arm64 | Build from the pinned source commit     | `git` and Cargo/Rust   |
+
+Every native compiler must report the repository-pinned Circom version. All circuit compilation
+uses explicit `--O2`, and artifact checks compare the resulting R1CS and WASM hashes with the
+reviewed manifest and published files. Matching versions alone do not make cross-platform output
+release evidence.
+
+Local development and diagnostic checks may run on any supported host above.
+`zk:production:setup` and `release:preflight` are restricted to Linux x64 and use the canonical
+`bin/circom-release-linux-amd64` compiler. Run those release gates in a controlled Linux x64
+environment even when development was performed on macOS, Windows, or arm64.
 
 Development and production reuse the same fixed-digest public Phase 1 pTau at
 `tmp/zk-production/powersOfTau28_hez_final_13.ptau`. This removes the old locally generated

@@ -1,6 +1,5 @@
 import { expect } from "chai";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import { verifyProductionCeremony } from "../scripts/zk-ceremony-verify.mjs";
@@ -15,6 +14,7 @@ import {
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -32,7 +32,7 @@ const writeTranscript = async (root, transcript) =>
   writeRelativeFile(root, ZK_CEREMONY_TRANSCRIPT_PATH, `${JSON.stringify(transcript, null, 2)}\n`);
 
 const createProductionFixture = async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-zk-ceremony-verify-"));
+  const root = await createCanonicalTemporaryDirectory("deepfamily-zk-ceremony-verify-");
   const circuits = {};
 
   for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {

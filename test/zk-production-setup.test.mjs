@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import { runZkeyContributionFromStdin } from "../scripts/zk-contribute-from-stdin.mjs";
@@ -11,23 +10,91 @@ import {
   SINGLE_OPERATOR_BEACON_NAME,
   SINGLE_OPERATOR_PARTICIPANT_ID,
   assertSingleOperatorMetadata,
+  buildProductionCircuitCompileCommand,
   buildStagedProofValidationCommands,
   installProductionArtifacts,
+  runSingleOperatorProductionSetup,
   runSecretContribution,
 } from "../scripts/lib/zkProductionSetup.mjs";
+import {
+  CIRCOM_CANONICAL_POLICY,
+  CIRCOM_LINUX_X64_SHA256,
+  CIRCOM_VERSION,
+} from "../scripts/lib/circomToolchain.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 describe("single-operator production ZK setup safety", function () {
   let root;
   let stage;
 
   beforeEach(async function () {
-    root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-production-setup-"));
-    stage = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-production-stage-"));
+    root = await createCanonicalTemporaryDirectory("deepfamily-production-setup-");
+    stage = await createCanonicalTemporaryDirectory("deepfamily-production-stage-");
   });
 
   afterEach(async function () {
     await fs.rm(root, { recursive: true, force: true });
     await fs.rm(stage, { recursive: true, force: true });
+  });
+
+  it("builds production circuits only with the canonical compiler and explicit O2", function () {
+    const command = buildProductionCircuitCompileCommand({
+      root,
+      stageBuild: stage,
+      circuitName: "person_commitment",
+    });
+
+    expect(command.executable).to.equal(path.join(root, CIRCOM_CANONICAL_POLICY.binaryPath));
+    expect(command.args).to.include("--O2");
+    expect(command.args).to.include(path.join(root, "circuits", "person_commitment.circom"));
+    expect(command.cwd).to.equal(root);
+  });
+
+  it("rejects noncanonical hosts before touching the checkout", async function () {
+    let captureRunnerCalled = false;
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        root,
+        env: {},
+        platform: "darwin",
+        arch: "arm64",
+        captureRunner: () => {
+          captureRunnerCalled = true;
+          return "";
+        },
+      }),
+    );
+
+    expect(error?.message).to.equal("Production ZK setup requires the canonical linux-x64 host");
+    expect(captureRunnerCalled).to.equal(false);
+  });
+
+  it("rejects a manifest-selected canonical compiler digest before installing the pTau", async function () {
+    let ptauInstallerCalled = false;
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        root,
+        env: {},
+        platform: "linux",
+        arch: "x64",
+        captureRunner: ({ args }) => (args[0] === "rev-parse" ? "a".repeat(40) : ""),
+        artifactInspector: () => ({
+          circomVersion: CIRCOM_VERSION,
+          toolchain: { circom: { sha256: "0".repeat(64) } },
+          trustedSetupStatus: "development",
+        }),
+        ptauInstaller: async () => {
+          ptauInstallerCalled = true;
+          throw new Error("pTau installation must not run");
+        },
+      }),
+    );
+
+    expect(error?.message).to.equal(
+      `Production ZK setup canonical Circom SHA-256 mismatch; expected ` +
+        `${CIRCOM_LINUX_X64_SHA256}, got ${"0".repeat(64)}`,
+    );
+    expect(ptauInstallerCalled).to.equal(false);
   });
 
   it("pipes Phase 2 entropy through stdin without exposing it in argv or env", async function () {
@@ -378,5 +445,14 @@ const expectMissing = async (filePath) => {
     throw new Error(`Expected file to be missing: ${filePath}`);
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
+  }
+};
+
+const captureError = async (operation) => {
+  try {
+    await operation();
+    return null;
+  } catch (error) {
+    return error;
   }
 };

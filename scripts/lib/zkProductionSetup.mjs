@@ -7,6 +7,13 @@ import path from "node:path";
 
 import { renameZkVerifierFile } from "../rename-zk-verifier.mjs";
 import {
+  CIRCOM_ARTIFACT_FLAGS,
+  CIRCOM_CANONICAL_POLICY,
+  CIRCOM_LINUX_X64_SHA256,
+  CIRCOM_VERSION,
+  assertCanonicalCircomHost,
+} from "./circomToolchain.mjs";
+import {
   ZK_ARTIFACT_MANIFEST_PATH,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
@@ -353,24 +360,30 @@ export const installProductionArtifacts = async ({
   }
 };
 
-const compileCircuit = async ({ root, stageBuild, circuitName, runner }) => {
-  const source = path.join(root, SETUP_CIRCUITS[circuitName].source);
-  await runner({
-    executable: path.join(root, "bin", "circom"),
-    args: [
-      source,
-      "--r1cs",
-      "--wasm",
-      "--sym",
+export const buildProductionCircuitCompileCommand = ({ root, stageBuild, circuitName }) => {
+  const circuit = SETUP_CIRCUITS[circuitName];
+  if (circuit === undefined) {
+    throw new Error(`Unsupported production ZK circuit: ${circuitName}`);
+  }
+  const resolvedRoot = path.resolve(root);
+  return Object.freeze({
+    executable: path.join(resolvedRoot, CIRCOM_CANONICAL_POLICY.binaryPath),
+    args: Object.freeze([
+      path.join(resolvedRoot, circuit.source),
+      ...CIRCOM_ARTIFACT_FLAGS,
       "-l",
-      path.join(root, "node_modules"),
+      path.join(resolvedRoot, "node_modules"),
       "-l",
-      path.join(root, "node_modules", "circomlib", "circuits"),
+      path.join(resolvedRoot, "node_modules", "circomlib", "circuits"),
       "-o",
       stageBuild,
-    ],
-    cwd: root,
+    ]),
+    cwd: resolvedRoot,
   });
+};
+
+const compileCircuit = async ({ root, stageBuild, circuitName, runner }) => {
+  await runner(buildProductionCircuitCompileCommand({ root, stageBuild, circuitName }));
 };
 
 const generateCircuitKeys = async ({
@@ -683,30 +696,57 @@ export const runSingleOperatorProductionSetup = async ({
   root = process.cwd(),
   ceremonyId = createCeremonyId(),
   env = process.env,
+  platform = process.platform,
+  arch = process.arch,
   runner = defaultProductionSetupRunner,
   captureRunner = defaultCaptureRunner,
   randomBytesFn = randomBytes,
   metadataReader = readZkeyMpcMetadata,
   ptauInstaller = ensureProductionPtau,
+  artifactInspector = inspectZkReleaseArtifacts,
   preCommitValidator = defaultPreCommitValidator,
   postCommitValidator = defaultPostCommitValidator,
 } = {}) => {
   if (String(env.CI ?? "").toLowerCase() === "true") {
     throw new Error("Production ZK setup must be run interactively outside CI");
   }
-  if (typeof runner !== "function" || typeof captureRunner !== "function") {
-    throw new Error("Production ZK setup runners must be functions");
+  assertCanonicalCircomHost({ platform, arch, operation: "Production ZK setup" });
+  if (
+    typeof runner !== "function" ||
+    typeof captureRunner !== "function" ||
+    typeof artifactInspector !== "function"
+  ) {
+    throw new Error("Production ZK setup collaborators must be functions");
   }
   const resolvedRoot = fs.realpathSync(root);
   if (resolvedRoot !== path.resolve(root)) {
     throw new Error("Production ZK setup root must not traverse a symlink");
   }
   const releaseCommit = assertCleanGitState({ root: resolvedRoot, captureRunner });
-  const initialEvidence = inspectZkReleaseArtifacts({
+  const initialEvidence = artifactInspector({
     root: resolvedRoot,
     requireProduction: false,
     requireBuiltR1cs: false,
   });
+  if (initialEvidence.circomVersion !== CIRCOM_VERSION) {
+    throw new Error(
+      `Production ZK setup requires Circom ${CIRCOM_VERSION}; ` +
+        `manifest declares ${initialEvidence.circomVersion}`,
+    );
+  }
+  if (initialEvidence.toolchain?.circom?.sha256 !== CIRCOM_LINUX_X64_SHA256) {
+    throw new Error(
+      `Production ZK setup canonical Circom SHA-256 mismatch; expected ` +
+        `${CIRCOM_LINUX_X64_SHA256}, got ${initialEvidence.toolchain?.circom?.sha256 ?? "missing"}`,
+    );
+  }
+  try {
+    fs.accessSync(path.join(resolvedRoot, CIRCOM_CANONICAL_POLICY.binaryPath), fs.constants.X_OK);
+  } catch (error) {
+    throw new Error("Production ZK setup canonical Circom compiler is not executable", {
+      cause: error,
+    });
+  }
   if (initialEvidence.trustedSetupStatus !== "development") {
     throw new Error("Refusing to overwrite an existing production ZK trusted setup");
   }
