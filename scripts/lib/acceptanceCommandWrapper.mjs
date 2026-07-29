@@ -9,6 +9,7 @@ import {
   productionBuildLockPath,
   releaseExclusiveCommandLocks,
 } from "./exclusiveCommandLock.mjs";
+import { normalizePortableCommand, sanitizeReleaseEnvironment } from "./portableCommand.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -94,6 +95,7 @@ export const runAcceptanceCommand = async ({
   if (!["diagnostic", "release-rehearsal"].includes(mode)) {
     throw new Error(`${acceptance.modeEnvironmentName} must be diagnostic or release-rehearsal`);
   }
+  const sanitizedEnvironment = sanitizeReleaseEnvironment(environment);
 
   const runHardhat = async (childEnvironment) => {
     const hardhatArguments = [
@@ -117,7 +119,7 @@ export const runAcceptanceCommand = async ({
   };
 
   if (mode === "diagnostic") {
-    await runHardhat(environment);
+    await runHardhat(sanitizedEnvironment);
     return;
   }
 
@@ -133,12 +135,17 @@ export const runAcceptanceCommand = async ({
       label: "shared production build",
     });
     const childEnvironment = {
-      ...environment,
+      ...sanitizedEnvironment,
       [acceptance.wrapperTokenEnvironmentName]: commandLock.token,
     };
-    await childRunner({
-      executable: process.platform === "win32" ? "npm.cmd" : "npm",
+    const preflightCommand = normalizePortableCommand({
+      executable: "npm",
       args: ["run", "release:preflight"],
+      platform: process.platform,
+      env: childEnvironment,
+    });
+    await childRunner({
+      ...preflightCommand,
       environment: childEnvironment,
       label: "Production release preflight",
     });

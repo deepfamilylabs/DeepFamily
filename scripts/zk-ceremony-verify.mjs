@@ -2,7 +2,6 @@
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +12,14 @@ import {
   sha256File,
 } from "./lib/zkArtifactTrust.mjs";
 import { inspectPtauFile, resolveProductionPtauPath } from "./lib/productionPtau.mjs";
+import { sanitizeReleaseEnvironment } from "./lib/portableCommand.mjs";
+import { createPrivateTemporaryDirectory } from "./lib/privateTemporaryDirectory.mjs";
+import {
+  assertSnarkjsRuntimeHash,
+  buildSnarkjsCommand,
+  resolveSnarkjsCliPath,
+  snapshotSnarkjsRuntime,
+} from "./lib/snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./lib/zkeyMpcMetadata.mjs";
 
 const usage = () => {
@@ -35,9 +42,10 @@ const parseArguments = (argv) => {
   return { help: false, ptauPath: argv[1] };
 };
 
-const defaultRunner = ({ executable, args, cwd }) =>
+const defaultRunner = ({ executable, args, cwd, env }) =>
   execFileSync(executable, args, {
     cwd,
+    env,
     stdio: "inherit",
   });
 
@@ -94,10 +102,15 @@ const assertMpcMetadataMatchesTranscript = ({ circuitName, metadata, evidence })
   }
 };
 
-const createCeremonySnapshot = ({ resolvedRoot, resolvedPtau, evidence }) => {
-  const snapshotRoot = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-zk-verify-"));
+const createCeremonySnapshot = async ({
+  resolvedRoot,
+  resolvedPtau,
+  evidence,
+  privateDirectoryFactory,
+  runtimeSnapshotter,
+}) => {
+  const snapshotRoot = await privateDirectoryFactory({ prefix: "deepfamily-zk-verify-" });
   try {
-    fs.chmodSync(snapshotRoot, 0o700);
     const ptauPath = path.join(snapshotRoot, "phase1.ptau");
     fs.copyFileSync(resolvedPtau, ptauPath, fs.constants.COPYFILE_EXCL);
     if (sha256File(ptauPath) !== evidence.phase1Sha256) {
@@ -122,7 +135,20 @@ const createCeremonySnapshot = ({ resolvedRoot, resolvedPtau, evidence }) => {
       }
       circuits[circuitName] = Object.freeze({ r1csPath, zkeyPath });
     }
-    return Object.freeze({ root: snapshotRoot, ptauPath, circuits: Object.freeze(circuits) });
+    const runtime =
+      evidence.schemaVersion >= 3
+        ? runtimeSnapshotter({
+            root: resolvedRoot,
+            destinationRoot: path.join(snapshotRoot, "snarkjs-runtime"),
+            expectedSha256: evidence.toolchain.snarkjsRuntime.sha256,
+          })
+        : Object.freeze({ root: resolvedRoot, sha256: null });
+    return Object.freeze({
+      root: snapshotRoot,
+      ptauPath,
+      circuits: Object.freeze(circuits),
+      runtime,
+    });
   } catch (error) {
     fs.rmSync(snapshotRoot, { recursive: true, force: true });
     throw error;
@@ -140,6 +166,12 @@ const assertSnapshotUnchanged = ({ snapshot, evidence }) => {
     if (sha256File(files.zkeyPath) !== evidence.artifacts[circuitName].zkey.sha256) {
       throw new Error(`${circuitName} snapshot zkey changed while checks were running`);
     }
+  }
+  if (snapshot.runtime.sha256 !== null) {
+    assertSnarkjsRuntimeHash({
+      root: snapshot.runtime.root,
+      expectedSha256: snapshot.runtime.sha256,
+    });
   }
 };
 
@@ -159,39 +191,30 @@ const requireRegularFile = (filePath, label) => {
   return stats;
 };
 
-const requireExecutable = (filePath, expectedRoot, label) => {
-  let resolved;
-  try {
-    resolved = fs.realpathSync(filePath);
-  } catch (error) {
-    throw new Error(`${label} is unavailable: ${filePath}`, { cause: error });
-  }
-  const stats = fs.statSync(resolved);
-  if (!stats.isFile()) throw new Error(`${label} must resolve to a regular file: ${filePath}`);
-  const allowedRoot = `${fs.realpathSync(expectedRoot)}${path.sep}`;
-  if (!resolved.startsWith(allowedRoot)) {
-    throw new Error(`${label} resolves outside the installed dependency directory`);
-  }
-  return resolved;
-};
-
 export const verifyProductionCeremony = async ({
   root = process.cwd(),
   ptauPath,
+  env = process.env,
   runner = defaultRunner,
   mpcMetadataReader = readZkeyMpcMetadata,
+  privateDirectoryFactory = createPrivateTemporaryDirectory,
+  runtimeSnapshotter = snapshotSnarkjsRuntime,
   expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
 } = {}) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (typeof mpcMetadataReader !== "function") {
     throw new Error("mpcMetadataReader must be a function");
   }
+  if (typeof privateDirectoryFactory !== "function" || typeof runtimeSnapshotter !== "function") {
+    throw new Error("ceremony snapshot collaborators must be functions");
+  }
 
   const resolvedRoot = fs.realpathSync(root);
+  const commandEnvironment = sanitizeReleaseEnvironment(env);
   const selectedPtauPath =
     typeof ptauPath === "string" && ptauPath.trim() !== ""
       ? ptauPath
-      : resolveProductionPtauPath({ root: resolvedRoot });
+      : resolveProductionPtauPath({ root: resolvedRoot, env: commandEnvironment });
   const resolvedPtau = path.resolve(selectedPtauPath);
   requireRegularFile(resolvedPtau, "Published Powers of Tau");
 
@@ -230,31 +253,34 @@ export const verifyProductionCeremony = async ({
         evidence.snarkjsVersion,
     );
   }
-  const snarkjsBinary = path.join(
-    resolvedRoot,
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "snarkjs.cmd" : "snarkjs",
-  );
-  const resolvedSnarkjsBinary = requireExecutable(
-    snarkjsBinary,
-    path.join(resolvedRoot, "node_modules"),
-    "snarkjs CLI",
-  );
+  const snarkjsCli = resolveSnarkjsCliPath({ root: resolvedRoot });
+  requireRegularFile(snarkjsCli, "snarkjs CLI");
 
-  const snapshot = createCeremonySnapshot({ resolvedRoot, resolvedPtau, evidence });
+  const snapshot = await createCeremonySnapshot({
+    resolvedRoot,
+    resolvedPtau,
+    evidence,
+    privateDirectoryFactory,
+    runtimeSnapshotter,
+  });
   try {
     runner({
-      executable: resolvedSnarkjsBinary,
-      args: ["powersoftau", "verify", snapshot.ptauPath],
-      cwd: resolvedRoot,
+      ...buildSnarkjsCommand({
+        root: snapshot.runtime.root,
+        cwd: resolvedRoot,
+        args: ["powersoftau", "verify", snapshot.ptauPath],
+      }),
+      env: commandEnvironment,
     });
     for (const circuitName of Object.keys(ZK_RELEASE_ARTIFACTS)) {
       const files = snapshot.circuits[circuitName];
       runner({
-        executable: resolvedSnarkjsBinary,
-        args: ["zkey", "verify", files.r1csPath, snapshot.ptauPath, files.zkeyPath],
-        cwd: resolvedRoot,
+        ...buildSnarkjsCommand({
+          root: snapshot.runtime.root,
+          cwd: resolvedRoot,
+          args: ["zkey", "verify", files.r1csPath, snapshot.ptauPath, files.zkeyPath],
+        }),
+        env: commandEnvironment,
       });
       const metadata = await mpcMetadataReader(files.zkeyPath);
       assertMpcMetadataMatchesTranscript({ circuitName, metadata, evidence });
@@ -273,6 +299,7 @@ export const verifyProductionCeremony = async ({
     trustModel: evidence.trustModel,
     contributorCount: evidence.contributorCount,
     minimumContributors: evidence.minimumContributors,
+    compiler: evidence.compiler,
     ptau: {
       source: evidence.phase1Source,
       path: resolvedPtau,

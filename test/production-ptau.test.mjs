@@ -7,7 +7,9 @@ import {
   PRODUCTION_PTAU_FILE_NAME,
   ensureProductionPtau,
   productionPtauPath,
+  resolveProductionPtauPath,
 } from "../scripts/lib/productionPtau.mjs";
+import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const fixtureBytes = Buffer.from("hermetic public phase-1 fixture");
@@ -35,6 +37,26 @@ describe("pinned production Powers of Tau cache", function () {
     await fs.rm(root, { recursive: true, force: true });
   });
 
+  it("resolves Windows ZK_PTAU_PATH case-insensitively and rejects ambiguous entries", function () {
+    expect(
+      resolveProductionPtauPath({
+        root,
+        platform: "win32",
+        env: { zk_ptau_path: "ceremony/reviewed.ptau" },
+      }),
+    ).to.equal(path.join(root, "ceremony", "reviewed.ptau"));
+    expect(() =>
+      resolveProductionPtauPath({
+        root,
+        platform: "win32",
+        env: {
+          ZK_PTAU_PATH: "ceremony/first.ptau",
+          zk_ptau_path: "ceremony/second.ptau",
+        },
+      }),
+    ).to.throw("duplicate ZK_PTAU_PATH entries");
+  });
+
   it("downloads atomically and validates size, SHA-256 and BLAKE2b-512", async function () {
     let requested;
     let options;
@@ -58,7 +80,7 @@ describe("pinned production Powers of Tau cache", function () {
       ...expected,
     });
     expect(await fs.readFile(destination)).to.deep.equal(fixtureBytes);
-    expect((await fs.stat(destination)).mode & 0o777).to.equal(0o600);
+    expectRegularFileWithPosixMode(await fs.lstat(destination), 0o600);
     const cacheFiles = await fs.readdir(path.dirname(destination));
     expect(cacheFiles).to.deep.equal([PRODUCTION_PTAU_FILE_NAME]);
   });

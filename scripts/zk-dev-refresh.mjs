@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { syncZkAssets } from "../circuits/sync-zk-assets.mjs";
 import { ensureProductionPtau } from "./lib/productionPtau.mjs";
-import { ZK_TOOLCHAIN_PATHS } from "./lib/zkArtifactTrust.mjs";
+import { buildSnarkjsCommand } from "./lib/snarkjsToolchain.mjs";
 import {
   assertDevelopmentManifest,
   updateDevelopmentManifest,
@@ -36,7 +36,6 @@ const absolute = (root, relativePath) => path.join(root, ...relativePath.split("
 
 export const buildDevelopmentSetupCommands = ({ root, ptauPath, temporaryDirectory } = {}) => {
   const resolvedRoot = path.resolve(root);
-  const snarkjsBinary = absolute(resolvedRoot, ZK_TOOLCHAIN_PATHS.snarkjsBinary);
   const renameVerifierScript = absolute(resolvedRoot, "scripts/rename-zk-verifier.mjs");
   const artifactDirectory = absolute(resolvedRoot, "zk-artifacts/circuits");
 
@@ -46,8 +45,8 @@ export const buildDevelopmentSetupCommands = ({ root, ptauPath, temporaryDirecto
     const verificationKey = path.join(artifactDirectory, `${circuit.name}.vkey.json`);
     const verifierPath = absolute(resolvedRoot, circuit.verifierPath);
     return [
-      {
-        executable: snarkjsBinary,
+      buildSnarkjsCommand({
+        root: resolvedRoot,
         args: [
           "groth16",
           "setup",
@@ -55,9 +54,9 @@ export const buildDevelopmentSetupCommands = ({ root, ptauPath, temporaryDirecto
           ptauPath,
           initialZkey,
         ],
-      },
-      {
-        executable: snarkjsBinary,
+      }),
+      buildSnarkjsCommand({
+        root: resolvedRoot,
         args: [
           "zkey",
           "contribute",
@@ -67,15 +66,15 @@ export const buildDevelopmentSetupCommands = ({ root, ptauPath, temporaryDirecto
           "-v",
           `-e=${DEVELOPMENT_PUBLIC_ENTROPY}`,
         ],
-      },
-      {
-        executable: snarkjsBinary,
+      }),
+      buildSnarkjsCommand({
+        root: resolvedRoot,
         args: ["zkey", "export", "verificationkey", finalZkey, verificationKey],
-      },
-      {
-        executable: snarkjsBinary,
+      }),
+      buildSnarkjsCommand({
+        root: resolvedRoot,
         args: ["zkey", "export", "solidityverifier", finalZkey, verifierPath],
-      },
+      }),
       {
         executable: process.execPath,
         args: [renameVerifierScript, verifierPath, circuit.verifierContractName],

@@ -3,7 +3,17 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { RELEASE_PREFLIGHT_COMMANDS, runReleasePreflight } from "../scripts/release-preflight.mjs";
+import {
+  RELEASE_PREFLIGHT_COMMANDS,
+  defaultRunner,
+  runReleasePreflight,
+} from "../scripts/release-preflight.mjs";
+import {
+  CIRCOM_VERSION,
+  localCircomBinaryPath,
+  resolveLocalCircomTarget,
+} from "../scripts/lib/circomToolchain.mjs";
+import { CIRCOM_OVERRIDE_ENV } from "../scripts/lib/circomCompilerOverride.mjs";
 import {
   MINIMUM_PRODUCTION_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
@@ -15,10 +25,20 @@ import {
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
+import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
+const SUPPORTED_RUNTIMES = Object.freeze([
+  Object.freeze({ platform: "linux", arch: "x64", libc: "glibc" }),
+  Object.freeze({ platform: "linux", arch: "x64", libc: "musl" }),
+  Object.freeze({ platform: "darwin", arch: "x64" }),
+  Object.freeze({ platform: "win32", arch: "x64" }),
+  Object.freeze({ platform: "linux", arch: "arm64", libc: "glibc" }),
+  Object.freeze({ platform: "linux", arch: "arm64", libc: "musl" }),
+  Object.freeze({ platform: "darwin", arch: "arm64" }),
+]);
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -68,16 +88,17 @@ const createProductionFixture = async () => {
   await writeRelativeFile(
     root,
     "node_modules/snarkjs/package.json",
-    `${JSON.stringify({ name: "snarkjs", version: snarkjsVersion })}\n`,
+    `${JSON.stringify({
+      name: "snarkjs",
+      version: snarkjsVersion,
+      main: "build/cli.cjs",
+    })}\n`,
   );
-  const snarkjsBinary = await writeRelativeFile(
+  const snarkjsCli = await writeRelativeFile(
     root,
-    "node_modules/snarkjs/build/cli.cjs",
+    ZK_TOOLCHAIN_PATHS.snarkjsCli,
     "fixture snarkjs executable\n",
   );
-  const snarkjsLink = artifactPath(root, ZK_TOOLCHAIN_PATHS.snarkjsBinary);
-  await fs.mkdir(path.dirname(snarkjsLink), { recursive: true });
-  await fs.symlink(path.relative(path.dirname(snarkjsLink), snarkjsBinary), snarkjsLink);
   const circomBinary = await writeRelativeFile(
     root,
     ZK_TOOLCHAIN_PATHS.circomBinary,
@@ -124,12 +145,13 @@ const createProductionFixture = async () => {
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     circomVersion: "2.1.6",
     snarkjsVersion,
     toolchain: {
       circomBinarySha256: sha256File(circomBinary),
-      snarkjsCliSha256: sha256File(snarkjsBinary),
+      snarkjsCliSha256: sha256File(snarkjsCli),
+      snarkjsRuntimeSha256: inspectSnarkjsRuntime({ root }).sha256,
     },
     trustedSetup: {
       status: "production",
@@ -185,7 +207,7 @@ const createProductionFixture = async () => {
     manifest,
     manifestPath,
     ptauPath,
-    snarkjsBinary,
+    snarkjsCli,
     metadataByCircuit,
     expectedProductionPhase1,
   };
@@ -204,6 +226,31 @@ const captureError = async (operation) => {
     return error;
   }
 };
+
+const inspectFixtureCompiler = async ({ root, platform, arch, libc, report }) => {
+  const target = resolveLocalCircomTarget({ platform, arch, libc, report });
+  return Object.freeze({
+    path: path.join(root, localCircomBinaryPath({ platform })),
+    target: target.id,
+    strategy: target.strategy,
+    sha256: target.strategy === "official-binary" ? target.sha256 : "ab".repeat(32),
+    version: CIRCOM_VERSION,
+    libcEvidence: target.libcEvidence ?? null,
+  });
+};
+
+const buildFixtureSourceCompiler = async ({ target }) => ({
+  bytes: Buffer.from(`fresh source compiler for ${target.id}\n`),
+  cargoVersion: "cargo 1.88.0 fixture",
+  rustcVersion: "rustc 1.88.0 fixture",
+});
+
+const runWithFixtureCompiler = (options) =>
+  runReleasePreflight({
+    compilerInspector: inspectFixtureCompiler,
+    compilerSourceBuilder: buildFixtureSourceCompiler,
+    ...options,
+  });
 
 const createFakeRunner = ({
   commits = [COMMIT, COMMIT],
@@ -254,20 +301,285 @@ describe("production release preflight", function () {
     return fixture;
   };
 
-  it("rejects a noncanonical host before invoking any runner", async function () {
-    const fake = createFakeRunner();
+  it("does not auto-load the Git-ignored repository .env file", function () {
+    const source = fsSync.readFileSync("scripts/release-preflight.mjs", "utf8");
+    expect(source).not.to.include('import "dotenv/config"');
+  });
 
+  it("accepts Linux glibc/musl, macOS, and Windows x64 execution runtimes", async function () {
+    for (const runtime of SUPPORTED_RUNTIMES) {
+      const fixture = await productionFixture();
+      const fake = createFakeRunner();
+
+      const result = await runWithFixtureCompiler({
+        root: fixture.root,
+        ...runtime,
+        commands: [],
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
+        ptauPath: fixture.ptauPath,
+        runner: fake.runner,
+        mpcMetadataReader: metadataReaderFor(fixture),
+      });
+
+      expect(result.status, `${runtime.platform}/${runtime.arch}`).to.equal("passed");
+    }
+  });
+
+  it("requires x64 Node when the host is Windows ARM64", async function () {
+    const fake = createFakeRunner();
     const error = await captureError(() =>
       runReleasePreflight({
         root: "/fixture/deepfamily",
-        platform: "darwin",
+        platform: "win32",
         arch: "arm64",
         runner: fake.runner,
       }),
     );
 
-    expect(error?.message).to.equal("Release preflight requires the canonical linux-x64 host");
+    expect(error?.message).to.include("requires the x64 build of Node.js");
+    expect(error?.message).to.include("node -p process.arch");
     expect(fake.calls).to.deep.equal([]);
+  });
+
+  it("fresh-builds source targets and passes only the private compiler to nested ZK builds", async function () {
+    const fixture = await productionFixture();
+    let cachedCompilerInspected = false;
+    let compilerPathDuringCheck;
+    let sourceEnvironment;
+    const fake = createFakeRunner({
+      onInvocation: (invocation, state) => {
+        if (state.kind === "command" && invocation.executable === "npm") {
+          if (invocation.args[1] === "zk:artifacts:check") {
+            compilerPathDuringCheck = invocation.env?.[CIRCOM_OVERRIDE_ENV.path];
+            expect(fsSync.existsSync(compilerPathDuringCheck)).to.equal(true);
+            expect(invocation.env[CIRCOM_OVERRIDE_ENV.target]).to.equal("darwin-arm64");
+            expect(invocation.env[CIRCOM_OVERRIDE_ENV.sha256]).to.match(/^[0-9a-f]{64}$/u);
+          } else {
+            expect(invocation.env?.[CIRCOM_OVERRIDE_ENV.path]).to.equal(undefined);
+          }
+        }
+      },
+    });
+
+    await runReleasePreflight({
+      root: fixture.root,
+      platform: "darwin",
+      arch: "arm64",
+      commands: [
+        ["npm", ["run", "contracts:check"]],
+        ["npm", ["run", "zk:artifacts:check"]],
+      ],
+      compilerInspector: async () => {
+        cachedCompilerInspected = true;
+        throw new Error("cached source compiler must not execute");
+      },
+      compilerSourceBuilder: async (options) => {
+        sourceEnvironment = options.env;
+        return buildFixtureSourceCompiler(options);
+      },
+      env: {
+        FIXTURE: "preserved",
+        NODE_OPTIONS: "--require=/untrusted/node-hook.cjs",
+        npm_config_script_shell: "/untrusted/shell",
+        [CIRCOM_OVERRIDE_ENV.path]: "/untrusted/cached/circom",
+        [CIRCOM_OVERRIDE_ENV.sha256]: "0".repeat(64),
+        [CIRCOM_OVERRIDE_ENV.target]: "untrusted-target",
+      },
+      expectedProductionPhase1: fixture.expectedProductionPhase1,
+      ptauPath: fixture.ptauPath,
+      runner: fake.runner,
+      mpcMetadataReader: metadataReaderFor(fixture),
+    });
+
+    expect(cachedCompilerInspected).to.equal(false);
+    expect(sourceEnvironment).to.deep.equal({ FIXTURE: "preserved" });
+    expect(Object.isFrozen(sourceEnvironment)).to.equal(true);
+    expect(compilerPathDuringCheck).to.be.a("string");
+    expect(fsSync.existsSync(compilerPathDuringCheck)).to.equal(false);
+  });
+
+  it("runs Windows npm commands through the real npm CLI with Node", async function () {
+    const root = await createCanonicalTemporaryDirectory("deepfamily-release-runner-");
+    fixtures.push({ root });
+    const npmCli = await writeRelativeFile(
+      root,
+      "toolchain/npm-cli.js",
+      "process.stdout.write(JSON.stringify(process.argv.slice(2)));",
+    );
+
+    const output = defaultRunner({
+      executable: "npm",
+      args: ["run", "frontend:check"],
+      cwd: root,
+      capture: true,
+      platform: "win32",
+      env: { npm_execpath: npmCli },
+    });
+
+    expect(JSON.parse(output)).to.deep.equal(["run", "frontend:check"]);
+  });
+
+  it("passes a sanitized environment to Git, npm, and ceremony subprocesses", async function () {
+    const fixture = await productionFixture();
+    const fake = createFakeRunner();
+    const untrustedEnvironment = {
+      PATH: "/trusted/bin",
+      RELEASE_VALUE: "preserved",
+      NODE_OPTIONS: "--require=/untrusted/node-hook.cjs",
+      node_path: "/untrusted/node-modules",
+      LD_PRELOAD: "/untrusted/native-hook.so",
+      ld_library_path: "/untrusted/native-libraries",
+      DYLD_INSERT_LIBRARIES: "/untrusted/native-hook.dylib",
+      dyld_library_path: "/untrusted/native-libraries",
+      NPM_CONFIG_SCRIPT_SHELL: "/untrusted/shell",
+      npm_config_node_options: "--require=/untrusted/npm-hook.cjs",
+      GIT_CONFIG_COUNT: "1",
+      git_config_key_0: "core.fsmonitor",
+      DOTENV_CONFIG_PATH: "/untrusted/.env",
+    };
+
+    await runWithFixtureCompiler({
+      root: fixture.root,
+      platform: "linux",
+      arch: "x64",
+      commands: [["npm", ["run", "contracts:check"]]],
+      env: untrustedEnvironment,
+      expectedProductionPhase1: fixture.expectedProductionPhase1,
+      ptauPath: fixture.ptauPath,
+      runner: fake.runner,
+      mpcMetadataReader: metadataReaderFor(fixture),
+    });
+
+    expect(fake.calls).not.to.be.empty;
+    for (const invocation of fake.calls) {
+      expect(invocation.env, commandLabel(invocation)).to.deep.equal({
+        PATH: "/trusted/bin",
+        RELEASE_VALUE: "preserved",
+      });
+      expect(Object.isFrozen(invocation.env), commandLabel(invocation)).to.equal(true);
+    }
+  });
+
+  it("rejects an unsupported host before compiler inspection or any runner", async function () {
+    const fake = createFakeRunner();
+    let inspected = false;
+
+    const error = await captureError(() =>
+      runReleasePreflight({
+        root: "/fixture/deepfamily",
+        platform: "freebsd",
+        arch: "riscv64",
+        compilerInspector: async () => {
+          inspected = true;
+          throw new Error("compiler inspection must not run");
+        },
+        runner: fake.runner,
+      }),
+    );
+
+    expect(error?.message).to.include("Unsupported Circom host freebsd/riscv64");
+    expect(inspected).to.equal(false);
+    expect(fake.calls).to.deep.equal([]);
+  });
+
+  it("fails on compiler provenance, hash, or version errors before any runner", async function () {
+    for (const [runtime, message] of [
+      [
+        { platform: "darwin", arch: "arm64" },
+        "Circom source-build provenance sourceCommit mismatch",
+      ],
+      [{ platform: "linux", arch: "x64" }, "Existing circom does not match the pinned SHA-256"],
+      [
+        { platform: "win32", arch: "x64" },
+        'Installed Circom compiler version mismatch; expected "circom compiler 2.1.6"',
+      ],
+    ]) {
+      const fake = createFakeRunner();
+      const target = resolveLocalCircomTarget(runtime);
+      const error = await captureError(() =>
+        runReleasePreflight({
+          root: "/fixture/deepfamily",
+          ...runtime,
+          compilerInspector:
+            target.strategy === "official-binary"
+              ? async () => {
+                  throw new Error(message);
+                }
+              : inspectFixtureCompiler,
+          compilerSourceBuilder:
+            target.strategy === "pinned-source"
+              ? async () => {
+                  throw new Error(message);
+                }
+              : buildFixtureSourceCompiler,
+          runner: fake.runner,
+        }),
+      );
+
+      expect(error?.message).to.equal(message);
+      expect(fake.calls, `${runtime.platform}/${runtime.arch}`).to.deep.equal([]);
+    }
+  });
+
+  it("rejects inconsistent local compiler evidence before any runner", async function () {
+    const cases = [
+      {
+        label: "path",
+        mutate: (evidence) => ({ ...evidence, path: `${evidence.path}.unexpected` }),
+        message: "unexpected target evidence",
+      },
+      {
+        label: "target",
+        mutate: (evidence) => ({ ...evidence, target: "darwin-x64" }),
+        message: "unexpected target evidence",
+      },
+      {
+        label: "strategy",
+        mutate: (evidence) => ({ ...evidence, strategy: "pinned-source" }),
+        message: "unexpected target evidence",
+      },
+      {
+        label: "version",
+        mutate: (evidence) => ({ ...evidence, version: "2.1.5" }),
+        message: "unexpected version",
+      },
+      {
+        label: "libc",
+        mutate: (evidence) => ({
+          ...evidence,
+          libcEvidence: { ...evidence.libcEvidence, family: "musl" },
+        }),
+        message: "unexpected libc evidence",
+      },
+      {
+        label: "digest format",
+        mutate: (evidence) => ({ ...evidence, sha256: "AB".repeat(32) }),
+        message: "invalid SHA-256 digest",
+      },
+      {
+        label: "official digest",
+        mutate: (evidence) => ({ ...evidence, sha256: "ab".repeat(32) }),
+        message: "does not match the pinned target SHA-256",
+      },
+    ];
+
+    for (const testCase of cases) {
+      const fake = createFakeRunner();
+      const error = await captureError(() =>
+        runReleasePreflight({
+          root: "/fixture/deepfamily",
+          platform: "linux",
+          arch: "x64",
+          libc: "glibc",
+          compilerInspector: async (runtime) =>
+            testCase.mutate(await inspectFixtureCompiler(runtime)),
+          runner: fake.runner,
+        }),
+      );
+
+      expect(error?.message, testCase.label).to.include(testCase.message);
+      expect(fake.calls, testCase.label).to.deep.equal([]);
+    }
   });
 
   it("blocks an explicit development manifest before running any npm command", async function () {
@@ -285,7 +597,7 @@ describe("production release preflight", function () {
     const fake = createFakeRunner();
 
     const error = await captureError(() =>
-      runReleasePreflight({
+      runWithFixtureCompiler({
         root: fixture.root,
         platform: "linux",
         arch: "x64",
@@ -307,9 +619,8 @@ describe("production release preflight", function () {
   it("runs all checks in order, then verifies Powers of Tau and both final zkeys", async function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner();
-    const snarkjsBinary = await fs.realpath(fixture.snarkjsBinary);
 
-    const result = await runReleasePreflight({
+    const result = await runWithFixtureCompiler({
       root: fixture.root,
       platform: "linux",
       arch: "x64",
@@ -331,19 +642,25 @@ describe("production release preflight", function () {
       "git rev-parse HEAD",
       "git status --porcelain=v1 --untracked-files=all",
     ]);
-    expect(path.dirname(fake.calls[2 + RELEASE_PREFLIGHT_COMMANDS.length].args[2])).to.match(
+    expect(path.dirname(fake.calls[2 + RELEASE_PREFLIGHT_COMMANDS.length].args[3])).to.match(
       /deepfamily-zk-verify-/u,
     );
     expect(
       fake.calls.filter(
         ({ executable, args }) =>
-          executable === snarkjsBinary && args[0] === "powersoftau" && args[1] === "verify",
+          executable === process.execPath &&
+          args[0]?.endsWith(ZK_TOOLCHAIN_PATHS.snarkjsCli) &&
+          args[1] === "powersoftau" &&
+          args[2] === "verify",
       ),
     ).to.have.lengthOf(1);
     expect(
       fake.calls.filter(
         ({ executable, args }) =>
-          executable === snarkjsBinary && args[0] === "zkey" && args[1] === "verify",
+          executable === process.execPath &&
+          args[0]?.endsWith(ZK_TOOLCHAIN_PATHS.snarkjsCli) &&
+          args[1] === "zkey" &&
+          args[2] === "verify",
       ),
     ).to.have.lengthOf(2);
     expect(result).to.deep.equal({
@@ -367,7 +684,7 @@ describe("production release preflight", function () {
     const fake = createFakeRunner({ statuses: [" M contracts/DeepFamily.sol"] });
 
     const error = await captureError(() =>
-      runReleasePreflight({
+      runWithFixtureCompiler({
         root: fixture.root,
         platform: "linux",
         arch: "x64",
@@ -391,7 +708,7 @@ describe("production release preflight", function () {
     const fake = createFakeRunner({ commits: [COMMIT, CHANGED_COMMIT] });
 
     const error = await captureError(() =>
-      runReleasePreflight({
+      runWithFixtureCompiler({
         root: fixture.root,
         platform: "linux",
         arch: "x64",
@@ -422,7 +739,7 @@ describe("production release preflight", function () {
     });
 
     const error = await captureError(() =>
-      runReleasePreflight({
+      runWithFixtureCompiler({
         root: fixture.root,
         platform: "linux",
         arch: "x64",
@@ -449,7 +766,7 @@ describe("production release preflight", function () {
     });
 
     const error = await captureError(() =>
-      runReleasePreflight({
+      runWithFixtureCompiler({
         root: fixture.root,
         platform: "linux",
         arch: "x64",
@@ -470,7 +787,7 @@ describe("production release preflight", function () {
 
     try {
       const error = await captureError(() =>
-        runReleasePreflight({
+        runWithFixtureCompiler({
           root: fixture.root,
           platform: "linux",
           arch: "x64",

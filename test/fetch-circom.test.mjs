@@ -7,6 +7,7 @@ import path from "node:path";
 import {
   CIRCOM_CANONICAL_POLICY,
   CIRCOM_VERSION,
+  assertLocalCircomInstallation,
   buildPinnedCircomFromSource,
   buildCircomInstallPlan,
   installCircomToolchains,
@@ -15,21 +16,42 @@ import {
 import {
   CIRCOM_SOURCE_COMMIT,
   CIRCOM_SOURCE_REPOSITORY,
+  CIRCOM_TARGET_POLICIES,
   CIRCOM_TARGETS,
+  detectLinuxLibcEvidence,
   localCircomBinaryPath,
   resolveLocalCircomTarget,
 } from "../scripts/lib/circomToolchain.mjs";
+import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const expectedVersionOutput = `circom compiler ${CIRCOM_VERSION}`;
 const supportedRuntimes = [
-  { platform: "linux", arch: "x64", strategy: "official-binary" },
-  { platform: "darwin", arch: "x64", strategy: "official-binary" },
-  { platform: "win32", arch: "x64", strategy: "official-binary" },
-  { platform: "linux", arch: "arm64", strategy: "pinned-source" },
-  { platform: "darwin", arch: "arm64", strategy: "pinned-source" },
-  { platform: "win32", arch: "arm64", strategy: "pinned-source" },
+  {
+    id: "linux-x64",
+    platform: "linux",
+    arch: "x64",
+    libc: "glibc",
+    strategy: "official-binary",
+  },
+  {
+    id: "linux-x64-musl",
+    platform: "linux",
+    arch: "x64",
+    libc: "musl",
+    strategy: "pinned-source",
+  },
+  { id: "darwin-x64", platform: "darwin", arch: "x64", strategy: "official-binary" },
+  { id: "win32-x64", platform: "win32", arch: "x64", strategy: "official-binary" },
+  {
+    id: "linux-arm64",
+    platform: "linux",
+    arch: "arm64",
+    libc: "glibc",
+    strategy: "pinned-source",
+  },
+  { id: "darwin-arm64", platform: "darwin", arch: "arm64", strategy: "pinned-source" },
 ];
 
 const officialBytes = Buffer.from("hermetic official Circom fixture");
@@ -60,23 +82,76 @@ describe("pinned Circom installer", function () {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  it("resolves all six supported targets and rejects unsupported hosts", function () {
-    expect(Object.keys(CIRCOM_TARGETS)).to.deep.equal(
-      supportedRuntimes.map(({ platform, arch }) => `${platform}-${arch}`),
-    );
+  it("detects glibc and musl from the Node process report header", function () {
+    const glibc = detectLinuxLibcEvidence({
+      report: {
+        getReport: () => ({ header: { glibcVersionRuntime: " 2.39 " } }),
+      },
+    });
+    const musl = detectLinuxLibcEvidence({
+      report: {
+        getReport: () => ({ header: {} }),
+      },
+    });
+
+    expect(glibc).to.deep.equal({
+      family: "glibc",
+      version: "2.39",
+      source: "process.report.header.glibcVersionRuntime",
+    });
+    expect(musl).to.deep.equal({
+      family: "musl",
+      version: null,
+      source: "process.report.header.glibcVersionRuntime",
+    });
+    expect(Object.isFrozen(glibc)).to.equal(true);
+    expect(Object.isFrozen(musl)).to.equal(true);
+
+    expect(
+      resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "x64",
+        report: { header: { glibcVersionRuntime: "2.36" } },
+      }),
+    ).to.include({
+      id: "linux-x64",
+      strategy: "official-binary",
+    });
+    expect(
+      resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "x64",
+        report: { header: {} },
+      }),
+    ).to.include({
+      id: "linux-x64-musl",
+      strategy: "pinned-source",
+    });
+  });
+
+  it("resolves every supported target and rejects unsupported hosts or libc families", function () {
+    expect(Object.keys(CIRCOM_TARGETS)).to.deep.equal(supportedRuntimes.map(({ id }) => id));
 
     for (const runtime of supportedRuntimes) {
-      const key = `${runtime.platform}-${runtime.arch}`;
       const target = resolveLocalCircomTarget(runtime);
 
-      expect(target).to.equal(CIRCOM_TARGETS[key]);
       expect(target).to.include({
-        id: key,
+        id: runtime.id,
         platform: runtime.platform,
         arch: runtime.arch,
         strategy: runtime.strategy,
       });
       expect(Object.isFrozen(target)).to.equal(true);
+      if (runtime.platform === "linux") {
+        expect(target.libcEvidence).to.deep.equal({
+          family: runtime.libc,
+          version: null,
+          source: "explicit-libc",
+        });
+        expect(Object.isFrozen(target.libcEvidence)).to.equal(true);
+      } else {
+        expect(target).to.equal(CIRCOM_TARGETS[runtime.id]);
+      }
 
       if (runtime.strategy === "official-binary") {
         expect(target.url).to.equal(
@@ -93,6 +168,36 @@ describe("pinned Circom installer", function () {
       "Unsupported Circom host freebsd/riscv64; supported targets: " +
         Object.keys(CIRCOM_TARGETS).join(", "),
     );
+    expect(() =>
+      resolveLocalCircomTarget({
+        version: "9.9.9",
+        platform: "linux",
+        arch: "x64",
+      }),
+    ).to.throw("Unsupported Circom version policy 9.9.9");
+    expect(() =>
+      resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "x64",
+        libc: "uclibc",
+      }),
+    ).to.throw("Unsupported Linux libc uclibc; expected glibc or musl");
+    expect(() =>
+      resolveLocalCircomTarget({
+        platform: "darwin",
+        arch: "arm64",
+        libc: "musl",
+      }),
+    ).to.throw("A libc override is only valid for Linux hosts, got darwin");
+  });
+
+  it("keeps the Circom 2.1.6 source policy bound to its historical repository and commit", function () {
+    for (const targetId of ["linux-x64-musl", "linux-arm64", "darwin-arm64"]) {
+      expect(CIRCOM_TARGET_POLICIES["2.1.6"][targetId]).to.include({
+        repository: "https://github.com/iden3/circom.git",
+        commit: "57b18f68794189753964bfb6e18e64385fed9c2c",
+      });
+    }
   });
 
   it("builds canonical and local install paths for every supported target", function () {
@@ -109,7 +214,7 @@ describe("pinned Circom installer", function () {
       });
       expect(local).to.deep.equal({
         role: "local",
-        target: CIRCOM_TARGETS[`${runtime.platform}-${runtime.arch}`],
+        target: resolveLocalCircomTarget(runtime),
         destinationRelativePath: localCircomBinaryPath(runtime),
         verifyVersion: true,
       });
@@ -143,6 +248,7 @@ describe("pinned Circom installer", function () {
       projectRoot: root,
       platform: "linux",
       arch: "x64",
+      libc: "glibc",
       installer,
     });
 
@@ -153,13 +259,34 @@ describe("pinned Circom installer", function () {
     expect(results.map(({ role }) => role)).to.deep.equal(["canonical-release", "local"]);
   });
 
+  it("keeps the canonical glibc compiler while planning a source build for Linux x64 musl", function () {
+    const [canonical, local] = buildCircomInstallPlan({
+      platform: "linux",
+      arch: "x64",
+      libc: "musl",
+    });
+
+    expect(canonical.target).to.equal(CIRCOM_CANONICAL_POLICY.target);
+    expect(canonical.target.id).to.equal("linux-x64");
+    expect(canonical.target.strategy).to.equal("official-binary");
+    expect(local.target).to.include({
+      id: "linux-x64-musl",
+      strategy: "pinned-source",
+    });
+    expect(local.target.libcEvidence).to.deep.equal({
+      family: "musl",
+      version: null,
+      source: "explicit-libc",
+    });
+  });
+
   it("builds arm64 from the exact source commit with locked Cargo dependencies", async function () {
-    const target = CIRCOM_TARGETS["win32-arm64"];
+    const target = CIRCOM_TARGETS["darwin-arm64"];
     const temporaryRoot = path.join(root, "source-build");
     const commands = [];
     let removedDirectory;
-    const commandRunner = async ({ executable, args, cwd, capture = false }) => {
-      commands.push({ executable, args: [...args], cwd, capture });
+    const commandRunner = async ({ executable, args, cwd, capture = false, env }) => {
+      commands.push({ executable, args: [...args], cwd, capture, env });
       if (executable === "git" && args[0] === "init") {
         await fs.mkdir(args[1], { recursive: true });
         return;
@@ -176,16 +303,26 @@ describe("pinned Circom installer", function () {
       if (executable === "cargo" && args[0] === "build") {
         const outputDirectory = path.join(cwd, "target", "release");
         await fs.mkdir(outputDirectory, { recursive: true });
-        await fs.writeFile(path.join(outputDirectory, "circom.exe"), sourceBytes);
+        await fs.writeFile(path.join(outputDirectory, "circom"), sourceBytes);
         return;
       }
-      if (path.basename(executable) === "circom.exe") {
+      if (path.basename(executable) === "circom") {
         return `${expectedVersionOutput}\n`;
       }
     };
 
     const built = await buildPinnedCircomFromSource({
       target,
+      env: {
+        FIXTURE_SAFE: "preserved",
+        NODE_OPTIONS: "--require=/untrusted/node-hook.cjs",
+        LD_PRELOAD: "/untrusted/preload.so",
+        NPM_CONFIG_SCRIPT_SHELL: "/untrusted/shell",
+        GIT_CONFIG_COUNT: "9",
+        RUSTC_WRAPPER: "/untrusted/rust-wrapper",
+        CARGO_HOME: "/untrusted/cargo-home",
+        CC: "/untrusted/compiler",
+      },
       commandRunner,
       temporaryDirectoryFactory: async () => {
         await fs.mkdir(temporaryRoot);
@@ -214,9 +351,25 @@ describe("pinned Circom installer", function () {
           executable === "cargo" && args.join(" ") === "build --release --locked",
       ),
     ).to.equal(true);
-    expect(commands.some(({ executable }) => path.basename(executable) === "circom.exe")).to.equal(
+    expect(commands.some(({ executable }) => path.basename(executable) === "circom")).to.equal(
       true,
     );
+    for (const { env } of commands) {
+      expect(env.FIXTURE_SAFE).to.equal("preserved");
+      for (const blocked of [
+        "NODE_OPTIONS",
+        "LD_PRELOAD",
+        "NPM_CONFIG_SCRIPT_SHELL",
+        "RUSTC_WRAPPER",
+        "CC",
+      ]) {
+        expect(env).not.to.have.property(blocked);
+      }
+      expect(env.GIT_CONFIG_COUNT).to.equal("1");
+      expect(env.GIT_CONFIG_KEY_0).to.equal("core.hooksPath");
+      expect(env.GIT_CONFIG_VALUE_0).to.equal(path.join(temporaryRoot, "empty-git-hooks"));
+      expect(env.CARGO_HOME).to.equal(path.join(temporaryRoot, "cargo-home"));
+    }
     expect(removedDirectory).to.equal(temporaryRoot);
     await expectFileMissing(temporaryRoot);
   });
@@ -250,7 +403,7 @@ describe("pinned Circom installer", function () {
       sha256: officialTarget.sha256,
     });
     expect(sha256(await fs.readFile(installed))).to.equal(officialTarget.sha256);
-    expect((await fs.stat(installed)).mode & 0o777).to.equal(0o755);
+    expectRegularFileWithPosixMode(await fs.lstat(installed), 0o755);
   });
 
   it("reuses an exact official binary without downloading it again", async function () {
@@ -280,7 +433,7 @@ describe("pinned Circom installer", function () {
     });
   });
 
-  it("repairs the executable mode before validating a reused compiler version", async function () {
+  it("repairs the POSIX executable mode before validating a reused compiler version", async function () {
     const destinationRelativePath = "bin/circom-official-mode-repair";
     const installed = path.join(root, destinationRelativePath);
     await installPinnedCircom({
@@ -300,13 +453,13 @@ describe("pinned Circom installer", function () {
         throw new Error("download must not run");
       },
       versionRunner: (executable) => {
-        expect(fsSync.statSync(executable).mode & 0o777).to.equal(0o755);
+        expectRegularFileWithPosixMode(fsSync.lstatSync(executable), 0o755);
         return expectedVersionOutput;
       },
     });
 
     expect(result.status).to.equal("already-installed");
-    expect((await fs.stat(installed)).mode & 0o777).to.equal(0o755);
+    expectRegularFileWithPosixMode(await fs.lstat(installed), 0o755);
   });
 
   it("rejects a bad official download without installing it", async function () {
@@ -414,8 +567,8 @@ describe("pinned Circom installer", function () {
       cargoVersion: sourceMetadata.cargoVersion,
       binarySha256: sha256(sourceBytes),
     });
-    expect((await fs.stat(installed)).mode & 0o777).to.equal(0o755);
-    expect((await fs.stat(provenancePath)).mode & 0o777).to.equal(0o644);
+    expectRegularFileWithPosixMode(await fs.lstat(installed), 0o755);
+    expectRegularFileWithPosixMode(await fs.lstat(provenancePath), 0o644);
   });
 
   it("reuses a source build only when its binary and provenance remain exact", async function () {
@@ -443,6 +596,43 @@ describe("pinned Circom installer", function () {
       target: sourceTarget.id,
       sha256: sha256(sourceBytes),
     });
+  });
+
+  it("returns musl libc evidence when inspecting a Linux x64 source build", async function () {
+    const target = resolveLocalCircomTarget({
+      platform: "linux",
+      arch: "x64",
+      libc: "musl",
+    });
+    await installPinnedCircom({
+      projectRoot: root,
+      target,
+      destinationRelativePath: "bin/circom",
+      sourceBuilder: async () => ({ bytes: sourceBytes, ...sourceMetadata }),
+      versionRunner: () => expectedVersionOutput,
+    });
+
+    const evidence = await assertLocalCircomInstallation({
+      root,
+      platform: "linux",
+      arch: "x64",
+      libc: "musl",
+      versionRunner: () => expectedVersionOutput,
+    });
+
+    expect(evidence).to.deep.equal({
+      path: path.join(root, "bin", "circom"),
+      target: "linux-x64-musl",
+      strategy: "pinned-source",
+      sha256: sha256(sourceBytes),
+      version: CIRCOM_VERSION,
+      libcEvidence: {
+        family: "musl",
+        version: null,
+        source: "explicit-libc",
+      },
+    });
+    expect(Object.isFrozen(evidence)).to.equal(true);
   });
 
   it("rejects tampering with either a source-built binary or its provenance", async function () {

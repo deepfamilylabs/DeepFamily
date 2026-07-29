@@ -11,6 +11,7 @@ import {
   revalidateCheckpointTransactions,
   writeJsonAtomic,
 } from "../scripts/lib/mainnetReleaseState.mjs";
+import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
 
 const ADDRESS = "0x2000000000000000000000000000000000000002";
 const HASH = `0x${"34".repeat(32)}`;
@@ -469,15 +470,14 @@ describe("eSpace Mainnet release checkpoint state", function () {
     expect(run.checkpoint.transactions.deployModule.status).to.equal("planned");
   });
 
-  it("writes private checkpoint files atomically and prevents concurrent execution", async function () {
+  it("writes checkpoint files atomically with private POSIX permissions and locks", async function () {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-mainnet-state-"));
     const statePath = path.join(directory, "state.json");
     const lockPath = path.join(directory, "release.lock");
     try {
       await writeJsonAtomic(statePath, { amount: 1n });
       expect(await readJsonIfExists(statePath)).to.deep.equal({ amount: "1" });
-      const mode = (await fs.stat(statePath)).mode & 0o777;
-      expect(mode).to.equal(0o600);
+      expectRegularFileWithPosixMode(await fs.lstat(statePath), 0o600);
       const release = await acquireReleaseLock(lockPath, { planDigest: HASH });
       await expectRejects(() => acquireReleaseLock(lockPath), "already exists");
       await release();

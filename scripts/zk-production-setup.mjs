@@ -11,6 +11,8 @@ const usage = () => {
   npm run zk:production:setup -- --ceremony-id <stable-audit-id>
 
 Creates both production Groth16 proving keys with:
+  - a hash-verified official compiler or fresh pinned-source private build for this host;
+  - canonical R1CS/WASM hashes checked before either Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file;
   - one local Phase 2 operator using OS CSPRNG entropy per circuit;
   - one finalization beacon generated only after both contributions;

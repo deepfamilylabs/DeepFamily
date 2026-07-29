@@ -11,7 +11,8 @@ import {
   CIRCOM_LINUX_X64_SHA256,
   CIRCOM_VERSION,
 } from "./lib/circomToolchain.mjs";
-import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { buildSnarkjsCommand, resolveSnarkjsCliPath } from "./lib/snarkjsToolchain.mjs";
+import { inspectZkReleaseArtifacts, sha256CanonicalTextFile } from "./lib/zkArtifactTrust.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), "..");
@@ -66,9 +67,10 @@ function assertHash(filePath, expected, label) {
   }
 }
 
-function assertSameFile(actualPath, expectedPath, label) {
-  const actual = sha256(actualPath);
-  const expected = sha256(expectedPath);
+function assertSameFile(actualPath, expectedPath, label, { canonicalText = false } = {}) {
+  const hash = canonicalText ? (filePath) => sha256CanonicalTextFile(filePath, label) : sha256;
+  const actual = hash(actualPath);
+  const expected = hash(expectedPath);
   if (actual !== expected) {
     throw new Error(
       `${label} is stale or was generated from a different artifact\n` +
@@ -85,13 +87,11 @@ function run(command, args) {
   });
 }
 
-const snarkjsBinary = absolute(
-  process.platform === "win32" ? "node_modules/.bin/snarkjs.cmd" : "node_modules/.bin/snarkjs",
-);
+const snarkjsCli = resolveSnarkjsCliPath({ root: projectRoot });
 const renameVerifierScript = absolute("scripts/rename-zk-verifier.mjs");
 const circomBinary = absolute(CIRCOM_CANONICAL_POLICY.binaryPath);
 
-requireFile(snarkjsBinary, "snarkjs CLI (run `npm install` first)");
+requireFile(snarkjsCli, "snarkjs CLI (run `npm install` first)");
 requireFile(circomBinary, "canonical Circom compiler (run `npm run zk:fetch` first)");
 const releaseArtifactEvidence = inspectZkReleaseArtifacts({
   root: projectRoot,
@@ -137,12 +137,21 @@ try {
 
     const exportedVkey = path.join(tempDir, `${circuit.name}.vkey.json`);
     const exportedVerifier = path.join(tempDir, `${circuit.verifierContractName}.sol`);
-    run(snarkjsBinary, ["zkey", "export", "verificationkey", committedZkey, exportedVkey]);
-    run(snarkjsBinary, ["zkey", "export", "solidityverifier", committedZkey, exportedVerifier]);
+    for (const args of [
+      ["zkey", "export", "verificationkey", committedZkey, exportedVkey],
+      ["zkey", "export", "solidityverifier", committedZkey, exportedVerifier],
+    ]) {
+      const command = buildSnarkjsCommand({ root: projectRoot, args });
+      run(command.executable, command.args);
+    }
     run(process.execPath, [renameVerifierScript, exportedVerifier, circuit.verifierContractName]);
 
-    assertSameFile(exportedVkey, committedVkey, `${circuit.name} verification key`);
-    assertSameFile(exportedVerifier, verifier, `${circuit.name} Solidity verifier`);
+    assertSameFile(exportedVkey, committedVkey, `${circuit.name} verification key`, {
+      canonicalText: true,
+    });
+    assertSameFile(exportedVerifier, verifier, `${circuit.name} Solidity verifier`, {
+      canonicalText: true,
+    });
     console.log(
       `${circuit.name}: compiled R1CS/WASM and zkey-derived vkey/Solidity verifier match`,
     );

@@ -138,8 +138,21 @@ const downloadPinnedPtau = async ({ destination, fetchImpl, source, expected }) 
 export const productionPtauPath = (root = process.cwd()) =>
   path.join(path.resolve(root), PRODUCTION_PTAU_RELATIVE_PATH);
 
-export const resolveProductionPtauPath = ({ root = process.cwd(), env = process.env } = {}) => {
-  const configured = String(env.ZK_PTAU_PATH ?? "").trim();
+export const resolveProductionPtauPath = ({
+  root = process.cwd(),
+  env = process.env,
+  platform = process.platform,
+} = {}) => {
+  if (env === null || typeof env !== "object" || Array.isArray(env)) {
+    throw new TypeError("Powers of Tau environment must be an object");
+  }
+  const matches = Object.entries(env).filter(([name]) =>
+    platform === "win32" ? name.toUpperCase() === "ZK_PTAU_PATH" : name === "ZK_PTAU_PATH",
+  );
+  if (matches.length > 1) {
+    throw new Error("Windows environment contains duplicate ZK_PTAU_PATH entries");
+  }
+  const configured = String(matches[0]?.[1] ?? "").trim();
   return configured === "" ? productionPtauPath(root) : path.resolve(root, configured);
 };
 

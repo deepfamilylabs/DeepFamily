@@ -7,6 +7,7 @@ import {
   acquireExclusiveCommandLock,
   releaseExclusiveCommandLocks,
 } from "../scripts/lib/exclusiveCommandLock.mjs";
+import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
 
 describe("production command lock", function () {
   let temporaryDirectory;
@@ -19,18 +20,16 @@ describe("production command lock", function () {
     await fs.rm(temporaryDirectory, { recursive: true, force: true });
   });
 
-  it("creates a private exclusive lock and removes it only once", async function () {
+  it("creates an exclusive lock with private POSIX permissions and removes it once", async function () {
     const lockPath = path.join(temporaryDirectory, ".mainnet-command.lock");
     const lock = await acquireExclusiveCommandLock({
       lockPath,
       label: "test production command",
     });
     const persisted = JSON.parse(await fs.readFile(lockPath, "utf8"));
-    const mode = (await fs.stat(lockPath)).mode & 0o777;
-
     expect(persisted.token).to.equal(lock.token);
     expect(persisted.pid).to.equal(process.pid);
-    expect(mode).to.equal(0o600);
+    expectRegularFileWithPosixMode(await fs.lstat(lockPath), 0o600);
 
     await lock.release();
     await lock.release();

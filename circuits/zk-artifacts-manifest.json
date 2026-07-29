@@ -1,10 +1,11 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "circomVersion": "2.1.6",
   "snarkjsVersion": "0.7.5",
   "toolchain": {
     "circomBinarySha256": "f3958483caaaa0cdd3912df5049e2e635eab4d09b9a66807be9633d547859f12",
-    "snarkjsCliSha256": "092c70dbf8bef02b666456db7429127aa51c5dbfce91cef038638d7da3bfdcea"
+    "snarkjsCliSha256": "092c70dbf8bef02b666456db7429127aa51c5dbfce91cef038638d7da3bfdcea",
+    "snarkjsRuntimeSha256": "e87cacfed501e647159827dffe534033f9c2b368a3875796958be82b3d573189"
   },
   "trustedSetup": {
     "status": "development",

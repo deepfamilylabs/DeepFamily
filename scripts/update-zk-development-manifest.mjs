@@ -9,9 +9,11 @@ import {
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
   inspectZkReleaseArtifacts,
+  sha256CanonicalTextFile,
   sha256File,
   validateZkArtifactManifest,
 } from "./lib/zkArtifactTrust.mjs";
+import { inspectSnarkjsRuntime, resolveSnarkjsCliPath } from "./lib/snarkjsToolchain.mjs";
 
 const writeJsonAtomic = (filePath, value) => {
   const temporaryPath = `${filePath}.${process.pid}.tmp`;
@@ -35,22 +37,28 @@ export const assertDevelopmentManifest = ({ root = process.cwd() } = {}) => {
 export const updateDevelopmentManifest = ({ root = process.cwd() } = {}) => {
   const manifestPath = path.join(root, ZK_ARTIFACT_MANIFEST_PATH);
   const manifest = assertDevelopmentManifest({ root });
+  manifest.schemaVersion = 3;
 
   for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {
     manifest.circuits[circuitName] = {
-      sourceSha256: sha256File(path.join(root, spec.source)),
+      sourceSha256: sha256CanonicalTextFile(path.join(root, spec.source), `${circuitName} source`),
       r1csSha256: sha256File(path.join(root, spec.builtR1cs)),
       wasmSha256: sha256File(path.join(root, spec.wasm)),
       zkeySha256: sha256File(path.join(root, spec.zkey)),
-      verificationKeySha256: sha256File(path.join(root, spec.verificationKey)),
-      solidityVerifierSha256: sha256File(path.join(root, spec.solidityVerifier)),
+      verificationKeySha256: sha256CanonicalTextFile(
+        path.join(root, spec.verificationKey),
+        `${circuitName} verification key`,
+      ),
+      solidityVerifierSha256: sha256CanonicalTextFile(
+        path.join(root, spec.solidityVerifier),
+        `${circuitName} Solidity verifier`,
+      ),
     };
   }
   manifest.toolchain = {
     circomBinarySha256: sha256File(path.join(root, ZK_TOOLCHAIN_PATHS.circomBinary)),
-    snarkjsCliSha256: sha256File(
-      fs.realpathSync(path.join(root, ZK_TOOLCHAIN_PATHS.snarkjsBinary)),
-    ),
+    snarkjsCliSha256: sha256File(resolveSnarkjsCliPath({ root })),
+    snarkjsRuntimeSha256: inspectSnarkjsRuntime({ root }).sha256,
   };
   writeJsonAtomic(manifestPath, manifest);
   return inspectZkReleaseArtifacts({

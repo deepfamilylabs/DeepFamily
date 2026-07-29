@@ -7,6 +7,7 @@ import {
   productionBuildLockPath,
   releaseExclusiveCommandLocks,
 } from "./exclusiveCommandLock.mjs";
+import { normalizePortableCommand, sanitizeReleaseEnvironment } from "./portableCommand.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const HARDHAT_CLI = path.join(ROOT, "node_modules", "hardhat", "dist", "src", "cli.js");
@@ -34,8 +35,13 @@ const run = (args, environment, label) =>
 
 const runReleasePreflight = (environment) =>
   new Promise((resolve, reject) => {
-    const npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm";
-    const child = spawn(npmExecutable, ["run", "release:preflight"], {
+    const command = normalizePortableCommand({
+      executable: "npm",
+      args: ["run", "release:preflight"],
+      platform: process.platform,
+      env: environment,
+    });
+    const child = spawn(command.executable, command.args, {
       cwd: ROOT,
       env: environment,
       stdio: "inherit",
@@ -63,8 +69,12 @@ const parseSafeMode = (chainProfile, arguments_) => {
   );
 };
 
-const commandPaths = (chainProfile, kind) => {
-  const directory = path.join(ROOT, "deployments", chainProfile.mainnet.deploymentDirectoryName);
+const commandPaths = (chainProfile, kind, root = ROOT) => {
+  const directory = path.join(
+    path.resolve(root),
+    "deployments",
+    chainProfile.mainnet.deploymentDirectoryName,
+  );
   return {
     directory,
     shared: path.join(directory, ".mainnet-command.lock"),
@@ -76,9 +86,12 @@ export const runMainnetSafeCommand = async ({
   chainProfile,
   arguments_ = process.argv.slice(2),
   entryScript,
+  environment = process.env,
+  hardhatRunner = run,
+  root = ROOT,
 }) => {
   const mode = parseSafeMode(chainProfile, arguments_);
-  const paths = commandPaths(chainProfile, "safe");
+  const paths = commandPaths(chainProfile, "safe", root);
   const sharedLock = await acquireExclusiveCommandLock({
     lockPath: paths.shared,
     label: `${chainProfile.displayName} mainnet production command`,
@@ -89,13 +102,13 @@ export const runMainnetSafeCommand = async ({
       lockPath: paths.command,
       label: `${chainProfile.displayName} mainnet Safe command`,
     });
-    const environment = {
-      ...process.env,
+    const childEnvironment = {
+      ...sanitizeReleaseEnvironment(environment),
       [chainProfile.mainnet.safeWrapperTokenEnvironmentName]: commandLock.token,
       [chainProfile.mainnet.sharedWrapperTokenEnvironmentName]: sharedLock.token,
       [chainProfile.mainnet.safeWrapperModeEnvironmentName]: mode,
     };
-    await run(
+    await hardhatRunner(
       [
         "--config",
         "hardhat.config.mjs",
@@ -105,7 +118,7 @@ export const runMainnetSafeCommand = async ({
         "--no-compile",
         entryScript,
       ],
-      environment,
+      childEnvironment,
       `${chainProfile.displayName} mainnet Safe phase`,
     );
   } finally {
@@ -117,11 +130,15 @@ export const runMainnetReleaseCommand = async ({
   chainProfile,
   arguments_ = process.argv.slice(2),
   entryScript,
+  environment = process.env,
+  hardhatRunner = run,
+  preflightRunner = runReleasePreflight,
+  root = ROOT,
 }) => {
   if (arguments_.length !== 0) {
     throw new Error(`Usage: ${chainProfile.mainnet.releaseCommand}`);
   }
-  const paths = commandPaths(chainProfile, "release");
+  const paths = commandPaths(chainProfile, "release", root);
   const sharedLock = await acquireExclusiveCommandLock({
     lockPath: paths.shared,
     label: `${chainProfile.displayName} mainnet production command`,
@@ -134,18 +151,19 @@ export const runMainnetReleaseCommand = async ({
       label: `${chainProfile.displayName} mainnet release command`,
     });
     buildLock = await acquireExclusiveCommandLock({
-      lockPath: PRODUCTION_BUILD_LOCK_PATH,
+      lockPath:
+        path.resolve(root) === ROOT ? PRODUCTION_BUILD_LOCK_PATH : productionBuildLockPath(root),
       label: "shared production build",
     });
-    const environment = {
-      ...process.env,
+    const childEnvironment = {
+      ...sanitizeReleaseEnvironment(environment),
       [chainProfile.mainnet.releaseWrapperTokenEnvironmentName]: commandLock.token,
       [chainProfile.mainnet.sharedWrapperTokenEnvironmentName]: sharedLock.token,
     };
     // This performs the clean production build plus contract/frontend/ZK/security checks. A
     // Mainnet plan is not generated unless the complete preflight succeeds in this same command.
-    await runReleasePreflight(environment);
-    await run(
+    await preflightRunner(childEnvironment);
+    await hardhatRunner(
       [
         "--config",
         "hardhat.config.mjs",
@@ -157,7 +175,7 @@ export const runMainnetReleaseCommand = async ({
         "--no-compile",
         entryScript,
       ],
-      environment,
+      childEnvironment,
       `${chainProfile.displayName} mainnet release phase`,
     );
   } finally {

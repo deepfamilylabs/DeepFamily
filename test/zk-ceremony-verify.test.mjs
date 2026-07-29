@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { verifyProductionCeremony } from "../scripts/zk-ceremony-verify.mjs";
+import { CIRCOM_VERSION, resolveLocalCircomTarget } from "../scripts/lib/circomToolchain.mjs";
 import {
   MINIMUM_PRODUCTION_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
@@ -14,6 +15,7 @@ import {
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
+import { inspectSnarkjsRuntime, resolveSnarkjsCliPath } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
@@ -64,16 +66,17 @@ const createProductionFixture = async () => {
   await writeRelativeFile(
     root,
     "node_modules/snarkjs/package.json",
-    `${JSON.stringify({ name: "snarkjs", version: snarkjsVersion })}\n`,
+    `${JSON.stringify({
+      name: "snarkjs",
+      version: snarkjsVersion,
+      main: "build/cli.cjs",
+    })}\n`,
   );
-  const snarkjsBinary = await writeRelativeFile(
+  const snarkjsCli = await writeRelativeFile(
     root,
-    "node_modules/snarkjs/build/cli.cjs",
+    ZK_TOOLCHAIN_PATHS.snarkjsCli,
     "fixture snarkjs executable\n",
   );
-  const snarkjsLink = artifactPath(root, ZK_TOOLCHAIN_PATHS.snarkjsBinary);
-  await fs.mkdir(path.dirname(snarkjsLink), { recursive: true });
-  await fs.symlink(path.relative(path.dirname(snarkjsLink), snarkjsBinary), snarkjsLink);
   const circomBinary = await writeRelativeFile(
     root,
     ZK_TOOLCHAIN_PATHS.circomBinary,
@@ -109,9 +112,25 @@ const createProductionFixture = async () => {
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
   };
+  const compilerTarget = resolveLocalCircomTarget({
+    platform: "linux",
+    arch: "x64",
+    libc: "glibc",
+  });
+  const compiler = {
+    version: CIRCOM_VERSION,
+    target: compilerTarget.id,
+    platform: compilerTarget.platform,
+    arch: compilerTarget.arch,
+    strategy: compilerTarget.strategy,
+    binarySha256: compilerTarget.sha256,
+    libcEvidence: compilerTarget.libcEvidence,
+    sourceBuild: null,
+  };
   const transcript = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+    compiler,
     ceremonyId,
     phase1Sha256,
     circuits: transcriptCircuits,
@@ -120,12 +139,13 @@ const createProductionFixture = async () => {
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     circomVersion: "2.1.6",
     snarkjsVersion,
     toolchain: {
       circomBinarySha256: sha256File(circomBinary),
-      snarkjsCliSha256: sha256File(snarkjsBinary),
+      snarkjsCliSha256: sha256File(snarkjsCli),
+      snarkjsRuntimeSha256: inspectSnarkjsRuntime({ root }).sha256,
     },
     trustedSetup: {
       status: "production",
@@ -179,8 +199,10 @@ const createProductionFixture = async () => {
   return {
     root,
     manifest,
+    transcript,
+    compiler,
     ptauPath,
-    snarkjsBinary,
+    snarkjsCli,
     metadataByCircuit,
     expectedProductionPhase1,
   };
@@ -210,7 +232,6 @@ describe("production ZK ceremony verifier", function () {
     const calls = [];
     const root = await fs.realpath(fixture.root);
     const ptauPath = path.resolve(fixture.ptauPath);
-    const executable = await fs.realpath(fixture.snarkjsBinary);
 
     const result = await verifyProductionCeremony({
       root: fixture.root,
@@ -224,16 +245,24 @@ describe("production ZK ceremony verifier", function () {
     });
 
     expect(calls).to.have.length(3);
-    expect(calls.every((call) => call.executable === executable && call.cwd === root)).to.equal(
-      true,
-    );
-    expect(calls[0].args.slice(0, 2)).to.deep.equal(["powersoftau", "verify"]);
-    expect(path.basename(calls[0].args[2])).to.equal("phase1.ptau");
+    const snapshotSnarkjsCli = calls[0].args[0];
+    expect(
+      calls.every(
+        (call) =>
+          call.executable === process.execPath &&
+          call.args[0] === snapshotSnarkjsCli &&
+          call.cwd === root,
+      ),
+    ).to.equal(true);
+    expect(snapshotSnarkjsCli).not.to.equal(resolveSnarkjsCliPath({ root }));
+    expect(snapshotSnarkjsCli.endsWith(ZK_TOOLCHAIN_PATHS.snarkjsCli)).to.equal(true);
+    expect(calls[0].args.slice(1, 3)).to.deep.equal(["powersoftau", "verify"]);
+    expect(path.basename(calls[0].args[3])).to.equal("phase1.ptau");
     for (const [index, circuitName] of Object.keys(ZK_RELEASE_ARTIFACTS).entries()) {
-      expect(calls[index + 1].args.slice(0, 2)).to.deep.equal(["zkey", "verify"]);
-      expect(path.basename(calls[index + 1].args[2])).to.equal(`${circuitName}.r1cs`);
-      expect(path.basename(calls[index + 1].args[3])).to.equal("phase1.ptau");
-      expect(path.basename(calls[index + 1].args[4])).to.equal(`${circuitName}.zkey`);
+      expect(calls[index + 1].args.slice(1, 3)).to.deep.equal(["zkey", "verify"]);
+      expect(path.basename(calls[index + 1].args[3])).to.equal(`${circuitName}.r1cs`);
+      expect(path.basename(calls[index + 1].args[4])).to.equal("phase1.ptau");
+      expect(path.basename(calls[index + 1].args[5])).to.equal(`${circuitName}.zkey`);
     }
     expect(result).to.deep.include({
       status: "passed",
@@ -242,6 +271,7 @@ describe("production ZK ceremony verifier", function () {
       trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
       contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
       minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      compiler: fixture.compiler,
       circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
     });
     expect(result.ptau).to.deep.equal({
@@ -251,6 +281,58 @@ describe("production ZK ceremony verifier", function () {
       sha256: fixture.manifest.trustedSetup.phase1.sha256,
       blake2b512: fixture.manifest.trustedSetup.phase1.blake2b512,
     });
+  });
+
+  it("passes a sanitized environment to every snarkjs verification subprocess", async function () {
+    const calls = [];
+    await verifyProductionCeremony({
+      root: fixture.root,
+      expectedProductionPhase1: fixture.expectedProductionPhase1,
+      ptauPath: fixture.ptauPath,
+      env: {
+        PATH: "/trusted/bin",
+        RELEASE_VALUE: "preserved",
+        NODE_OPTIONS: "--require=/untrusted/node-hook.cjs",
+        node_path: "/untrusted/node-modules",
+        LD_PRELOAD: "/untrusted/native-hook.so",
+        dYlD_insert_libraries: "/untrusted/native-hook.dylib",
+        NPM_CONFIG_SCRIPT_SHELL: "/untrusted/shell",
+        npm_config_node_options: "--require=/untrusted/npm-hook.cjs",
+        GIT_CONFIG_COUNT: "1",
+        dotenv_config_path: "/untrusted/.env",
+      },
+      runner: (invocation) => calls.push(invocation),
+      mpcMetadataReader: async (zkeyPath) =>
+        fixture.metadataByCircuit[path.basename(zkeyPath, ".zkey")],
+    });
+
+    expect(calls).to.have.length(3);
+    for (const invocation of calls) {
+      expect(invocation.env).to.deep.equal({
+        PATH: "/trusted/bin",
+        RELEASE_VALUE: "preserved",
+      });
+      expect(Object.isFrozen(invocation.env)).to.equal(true);
+    }
+  });
+
+  it("continues to verify a legacy schema-v2 single-operator transcript", async function () {
+    fixture.transcript.schemaVersion = 2;
+    delete fixture.transcript.compiler;
+    const transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
+    fixture.manifest.trustedSetup.transcript.sha256 = sha256File(transcriptPath);
+    await writeManifest(fixture.root, fixture.manifest);
+
+    const result = await verifyProductionCeremony({
+      root: fixture.root,
+      expectedProductionPhase1: fixture.expectedProductionPhase1,
+      ptauPath: fixture.ptauPath,
+      runner: () => {},
+      mpcMetadataReader: async (zkeyPath) =>
+        fixture.metadataByCircuit[path.basename(zkeyPath, ".zkey")],
+    });
+
+    expect(result.compiler).to.equal(null);
   });
 
   it("rejects a Powers of Tau file whose bytes do not match the manifest", async function () {
@@ -274,8 +356,16 @@ describe("production ZK ceremony verifier", function () {
     await writeRelativeFile(
       fixture.root,
       "node_modules/snarkjs/package.json",
-      `${JSON.stringify({ name: "snarkjs", version: "0.7.4" })}\n`,
+      `${JSON.stringify({
+        name: "snarkjs",
+        version: "0.7.4",
+        main: "build/cli.cjs",
+      })}\n`,
     );
+    fixture.manifest.toolchain.snarkjsRuntimeSha256 = inspectSnarkjsRuntime({
+      root: fixture.root,
+    }).sha256;
+    await writeManifest(fixture.root, fixture.manifest);
 
     const error = await captureError(() =>
       verifyProductionCeremony({
@@ -312,8 +402,8 @@ describe("production ZK ceremony verifier", function () {
 
     expect(caught).to.equal(runnerError);
     expect(calls).to.have.length(2);
-    expect(calls[0].args.slice(0, 2)).to.deep.equal(["powersoftau", "verify"]);
-    expect(calls[1].args.slice(0, 2)).to.deep.equal(["zkey", "verify"]);
+    expect(calls[0].args.slice(1, 3)).to.deep.equal(["powersoftau", "verify"]);
+    expect(calls[1].args.slice(1, 3)).to.deep.equal(["zkey", "verify"]);
   });
 
   it("rejects a Powers of Tau path that is a symbolic link", async function () {
