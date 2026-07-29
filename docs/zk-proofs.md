@@ -395,25 +395,35 @@ npm run zk:build
 
 `zk:fetch` installs two separate compiler roles:
 
-- the current host's native compiler at `bin/circom` (`bin/circom.exe` on Windows), used by
-  `zk:build` and development refreshes;
+- the current host's reusable native compiler at `bin/circom` (`bin/circom.exe` on Windows), used
+  by development refreshes and diagnostic builds;
 - the canonical official Linux amd64 release binary at
-  `bin/circom-release-linux-amd64`, used only by production and release gates.
+  `bin/circom-release-linux-amd64`, retained as the reviewed audit reference.
 
 Both roles use the same repository-pinned Circom version. Installation follows this support matrix:
 
-| Host                           | Native installation strategy   | Prerequisites        | Production release host |
-| ------------------------------ | ------------------------------ | -------------------- | ----------------------- |
-| Linux x64                      | Pinned official release asset  | None                 | Yes                     |
-| macOS x64                      | Pinned official release asset  | None                 | No                      |
-| Windows x64                    | Pinned official release asset  | None                 | No                      |
-| Linux, macOS, or Windows arm64 | Build the pinned source commit | `git` and Cargo/Rust | No                      |
+| Host/runtime                                | Installation strategy                         | Prerequisites                               | Production release host |
+| ------------------------------------------- | --------------------------------------------- | ------------------------------------------- | ----------------------- |
+| Linux x64 with glibc                        | Pinned official release asset                 | None                                        | Yes                     |
+| Linux x64 with musl (including Alpine)      | Build the pinned source commit                | `git`, Rust/Cargo, musl C build toolchain   | Yes                     |
+| macOS x64                                   | Pinned official release asset                 | macOS 12+                                   | Yes                     |
+| Windows x64                                 | Pinned official release asset                 | Visual C++ 2015–2022 Redistributable        | Yes                     |
+| Linux arm64                                 | Build the pinned source commit                | `git`, Rust/Cargo, native linker toolchain  | Yes                     |
+| macOS arm64                                 | Build the pinned source commit                | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                     |
+| Windows 11 ARM64 host with x64 Node 22.10.0 | Pinned Windows x64 asset through OS emulation | x64 Node and Visual C++ x64 runtime         | Yes                     |
 
-Official x64 assets are accepted only when their fixed SHA-256 matches. An arm64 build checks out
-the pinned source repository commit, builds it with Cargo, verifies the exact compiler version, and
-records local provenance. The installer refuses to replace unexpected files or symbolic links.
+Official x64 assets are accepted only when their fixed SHA-256 matches. Linux libc is detected from
+Node's process report; x64 musl and native arm64 Circom runtimes check out the pinned source
+repository commit, build it with locked Cargo dependencies, verify the exact compiler version, and
+record local provenance. The installer refuses to replace unexpected files or symbolic links.
 Regardless of the host, the separately downloaded canonical release binary must match the fixed
-Linux amd64 digest.
+Linux amd64 glibc digest.
+
+On a Windows 11 ARM64 host, install x64 Node, reinstall dependencies, and confirm
+`node -p process.arch` prints `x64`. Windows then runs the complete workflow through its x64
+emulation and `zk:fetch` selects the fixed-hash Windows x64 Circom asset. Native Windows ARM64 Node
+is not a supported host: no Circom target is registered for `win32-arm64`, so `zk:fetch` fails
+closed with an unsupported-host error instead of selecting a foreign-architecture compiler.
 
 All circuit compilation passes `--O2` explicitly, so a compiler release cannot silently change the
 constraint system by changing its default optimization level. `zk:artifacts:check` compares the
@@ -422,10 +432,23 @@ The native compiler's output must therefore match the hashes reviewed for the ca
 toolchain; version equality alone is insufficient release evidence. On a non-Linux host the check
 validates the canonical binary's fixed digest but does not execute that foreign-platform binary.
 
-Local development and diagnostic acceptance may use any supported native compiler.
-`zk:production:setup` and `release:preflight` fail unless the host is Linux x64 and the canonical
-`bin/circom-release-linux-amd64` binary matches its fixed digest. Developers on another platform
-must run these release-only commands in a controlled Linux x64 environment.
+Local development and diagnostic acceptance may use the reusable native compiler installed by
+`zk:fetch`. For a source target, `zk:production:setup` and `release:preflight` instead ignore that
+gitignored cache and perform a fresh locked build of the pinned commit in private staging. These
+source builds remove inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker, and
+package-discovery overrides, use private Cargo/XDG homes, and disable ambient Git configuration and
+hooks. Production setup checks all four R1CS/WASM hashes against the reviewed manifest and only
+then permits either Groth16 Setup or Phase 2 contribution. The ceremony transcript records the
+actual compiler target, strategy, version, binary hash, Linux libc evidence, pinned source commit,
+and Cargo/Rust versions. The compiler and pTau live in the user's private OS temporary directory,
+and their inputs are rechecked immediately before each Groth16 setup and again before installation.
+The canonical `bin/circom-release-linux-amd64` file remains a fixed-digest audit reference and is
+not executed on a foreign platform.
+
+Release-only temporary roots are validated as current-user-only before use. POSIX roots must be
+owned by the current UID with mode `0700`. Windows roots have ACL inheritance and existing access
+rules removed, are assigned to the current user SID with the sole full-control rule, and are
+re-read to verify that policy; hardening failure aborts and removes the directory.
 
 Both development and production use the same pinned public power-13 Phase 1 file:
 
@@ -461,7 +484,7 @@ undocumented side effect.
 ### Production Setup
 
 Do not use `zk:dev:refresh` for production. After the circuits are frozen, start from a clean commit
-on a Linux x64 host and run:
+on any supported host and run:
 
 ```bash
 npm run zk:production:setup
@@ -471,6 +494,20 @@ The command downloads or reuses the repository-pinned public power-13 pTau, gene
 OS-CSPRNG Phase 2 entropy for both circuits, creates one contribution per circuit under the explicit
 `single-operator` trust model, applies a local finalization value, exports every release artifact,
 and verifies the result before returning. It does not commit or deploy anything.
+
+The current artifact manifest is schema v3. It hashes the installed snarkjs runtime as a logical
+production dependency graph using each package's content, identity, version, and logical dependency
+path, so the digest does not depend on the checkout location or whether npm physically nested or
+hoisted an equivalent graph. Production setup copies only the verified runtime into private
+staging, makes its package files read-only on POSIX, and executes snarkjs from that snapshot. Before
+the contribution helper reads either secret, it re-hashes the snapshot and runs without inherited
+release injection variables, so hashing only the CLI file is not treated as sufficient production
+evidence.
+
+Schema-v2 manifests remain readable for legacy compatibility inspection and ceremony verification,
+but they cannot start `zk:production:setup` or pass `release:preflight`. The latter creates and
+re-checks its own private schema-v3 snarkjs runtime snapshot for the cryptographic verification
+commands.
 
 Review and commit the manifest, transcript, Solidity verifiers, and frontend ZK artifacts together.
 Then run the full gate from that clean commit:

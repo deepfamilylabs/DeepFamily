@@ -11,9 +11,12 @@ import {
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
+  sha256CanonicalTextFile,
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { SNARKJS_CLI_PATH, inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
+import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const MANIFEST_MODE = 0o640;
@@ -108,24 +111,34 @@ const createDevelopmentFixture = async () => {
   );
   const snarkjsCli = await writeRelativeFile(
     root,
-    "node_modules/snarkjs/build/cli.cjs",
+    ZK_TOOLCHAIN_PATHS.snarkjsCli,
     "fresh fixture snarkjs CLI\n",
   );
-  const snarkjsLink = artifactPath(root, ZK_TOOLCHAIN_PATHS.snarkjsBinary);
-  await fs.mkdir(path.dirname(snarkjsLink), { recursive: true });
-  await fs.symlink(path.relative(path.dirname(snarkjsLink), snarkjsCli), snarkjsLink);
+  await writeRelativeFile(
+    root,
+    "node_modules/snarkjs/package.json",
+    `${JSON.stringify({
+      name: "snarkjs",
+      version: "0.7.5",
+      main: "build/cli.cjs",
+    })}\n`,
+  );
+  await writeRelativeFile(root, "node_modules/.bin/snarkjs", "non-Windows shim bytes\n");
+  await writeRelativeFile(root, "node_modules/.bin/snarkjs.cmd", "Windows shim bytes\r\n");
   const expectedToolchain = {
     circomBinarySha256: sha256File(circomBinary),
     snarkjsCliSha256: sha256File(snarkjsCli),
+    snarkjsRuntimeSha256: inspectSnarkjsRuntime({ root }).sha256,
   };
 
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     circomVersion: "2.1.6",
     snarkjsVersion: "0.7.5",
     toolchain: {
       circomBinarySha256: sha256Text("stale-circom-toolchain"),
       snarkjsCliSha256: sha256Text("stale-snarkjs-toolchain"),
+      snarkjsRuntimeSha256: sha256Text("stale-snarkjs-runtime"),
     },
     trustedSetup: developmentSetup(),
     circuits: staleHashes,
@@ -150,17 +163,16 @@ describe("development ZK manifest updater", function () {
     await fs.rm(fixture.root, { recursive: true, force: true });
   });
 
-  it("updates every fixed artifact hash while preserving metadata and file mode", async function () {
+  it("updates artifact hashes while preserving metadata and the POSIX file mode", async function () {
     const metadataBefore = manifestMetadata(fixture.manifest);
 
     const evidence = updateDevelopmentManifest({ root: fixture.root });
     const updated = JSON.parse(await fs.readFile(fixture.manifestPath, "utf8"));
-    const mode = (await fs.stat(fixture.manifestPath)).mode & 0o777;
-
     expect(updated.circuits).to.deep.equal(fixture.expectedHashes);
     expect(updated.toolchain).to.deep.equal(fixture.expectedToolchain);
+    expect(ZK_TOOLCHAIN_PATHS.snarkjsCli).to.equal(SNARKJS_CLI_PATH);
     expect(manifestMetadata(updated)).to.deep.equal(metadataBefore);
-    expect(mode).to.equal(MANIFEST_MODE);
+    expectRegularFileWithPosixMode(await fs.lstat(fixture.manifestPath), MANIFEST_MODE);
     expect(evidence).to.include({
       status: "passed",
       trustedSetupStatus: "development",
@@ -176,7 +188,7 @@ describe("development ZK manifest updater", function () {
     }
   });
 
-  it("rejects a production manifest without changing its bytes or file mode", async function () {
+  it("rejects a production manifest without changing its bytes or POSIX file mode", async function () {
     fixture.manifest.trustedSetup = productionSetup();
     const original = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
     await fs.writeFile(fixture.manifestPath, original);
@@ -186,7 +198,7 @@ describe("development ZK manifest updater", function () {
       "Refusing to rewrite a production ceremony manifest with development artifact hashes",
     );
     expect(await fs.readFile(fixture.manifestPath, "utf8")).to.equal(original);
-    expect((await fs.stat(fixture.manifestPath)).mode & 0o777).to.equal(MANIFEST_MODE);
+    expectRegularFileWithPosixMode(await fs.lstat(fixture.manifestPath), MANIFEST_MODE);
   });
 
   it("leaves the manifest unchanged when a required artifact is missing", async function () {
@@ -199,6 +211,36 @@ describe("development ZK manifest updater", function () {
       /ENOENT|no such file/iu,
     );
     expect(await fs.readFile(fixture.manifestPath, "utf8")).to.equal(original);
-    expect((await fs.stat(fixture.manifestPath)).mode & 0o777).to.equal(MANIFEST_MODE);
+    expectRegularFileWithPosixMode(await fs.lstat(fixture.manifestPath), MANIFEST_MODE);
+  });
+
+  it("normalizes CRLF source, verification key, and Solidity hashes to canonical LF", async function () {
+    for (const spec of Object.values(ZK_RELEASE_ARTIFACTS)) {
+      for (const relativePath of [spec.source, spec.verificationKey, spec.solidityVerifier]) {
+        const filePath = artifactPath(fixture.root, relativePath);
+        const lf = await fs.readFile(filePath, "utf8");
+        await fs.writeFile(filePath, lf.replaceAll("\n", "\r\n"));
+      }
+    }
+
+    updateDevelopmentManifest({ root: fixture.root });
+    const updated = JSON.parse(await fs.readFile(fixture.manifestPath, "utf8"));
+
+    for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {
+      expect(updated.circuits[circuitName]).to.include({
+        sourceSha256: sha256CanonicalTextFile(artifactPath(fixture.root, spec.source)),
+        verificationKeySha256: sha256CanonicalTextFile(
+          artifactPath(fixture.root, spec.verificationKey),
+        ),
+        solidityVerifierSha256: sha256CanonicalTextFile(
+          artifactPath(fixture.root, spec.solidityVerifier),
+        ),
+      });
+      expect(updated.circuits[circuitName]).to.include({
+        sourceSha256: fixture.expectedHashes[circuitName].sourceSha256,
+        verificationKeySha256: fixture.expectedHashes[circuitName].verificationKeySha256,
+        solidityVerifierSha256: fixture.expectedHashes[circuitName].solidityVerifierSha256,
+      });
+    }
   });
 });

@@ -58,3 +58,98 @@ jobs:
         run: npm test
         env:
           REPORT_GAS: "true"
+
+  zk-native-platforms:
+    name: ZK native (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            node_arch: arm64
+          - name: macos-x64
+            os: macos-15-intel
+            node_arch: x64
+          - name: macos-arm64
+            os: macos-15
+            node_arch: arm64
+          - name: windows-x64
+            os: windows-latest
+            node_arch: x64
+          - name: windows-arm64-host-x64-node
+            os: windows-11-arm
+            node_arch: x64
+            windows_arm_host: true
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.10.0
+          architecture: ${{ matrix.node_arch }}
+
+      - name: Check Node execution architecture
+        run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('Expected ${{ matrix.node_arch }}, got ' + process.arch)"
+
+      - name: Check Windows ARM64 host
+        if: matrix.windows_arm_host
+        shell: pwsh
+        run: |
+          if ("${{ runner.arch }}" -ne "ARM64") {
+            throw "Expected a Windows ARM64 host"
+          }
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install native and canonical Circom compilers
+        run: npm run zk:fetch
+
+      - name: Check native ZK artifacts and real proofs
+        run: npm run zk:artifacts:check && npm run zk:check
+
+      - name: Compile contracts on the target runtime
+        run: npm run build
+        env:
+          CONTRACT_SIZER_STRICT: "false"
+
+      - name: Run cross-platform tests
+        run: npm test
+
+  zk-linux-musl:
+    name: ZK native (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64-musl
+            os: ubuntu-latest
+          - name: linux-arm64-musl
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Alpine/musl compiler, artifacts, proofs, and tests
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            node:22.10.0-alpine \
+            sh -lc '
+              apk add --no-cache build-base cargo git python3 rust &&
+              git config --global --add safe.directory /workspace &&
+              npm ci --no-audit --no-fund &&
+              npm run zk:fetch &&
+              npm run zk:artifacts:check &&
+              npm run zk:check &&
+              CONTRACT_SIZER_STRICT=false npm run build &&
+              npm test
+            '

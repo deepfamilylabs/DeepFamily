@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { assertLocalCircomInstallation } from "./fetch-circom.mjs";
+import { inspectCircomCompilerOverride } from "./lib/circomCompilerOverride.mjs";
 import { CIRCOM_ARTIFACT_FLAGS, localCircomBinaryPath } from "./lib/circomToolchain.mjs";
 import { parseCircuitArguments, selectCircuitNames } from "./lib/zkCircuitSelection.mjs";
 
@@ -37,9 +38,13 @@ export const buildZkBuildCommands = ({
   root = process.cwd(),
   circuit = "all",
   platform = process.platform,
+  compilerPath,
 } = {}) => {
   const resolvedRoot = path.resolve(root);
-  const executable = path.join(resolvedRoot, localCircomBinaryPath({ platform }));
+  const executable = compilerPath ?? path.join(resolvedRoot, localCircomBinaryPath({ platform }));
+  if (!path.isAbsolute(executable)) {
+    throw new Error("ZK build compiler path must be absolute");
+  }
   return Object.freeze(
     selectCircuitNames(circuit).map((name) =>
       Object.freeze({
@@ -65,9 +70,13 @@ export const runZkBuild = async ({
   circuit = "all",
   platform = process.platform,
   arch = process.arch,
+  libc,
+  report,
+  env = process.env,
   runner = defaultRunner,
   directoryCreator = defaultDirectoryCreator,
   compilerInspector = assertLocalCircomInstallation,
+  overrideInspector = inspectCircomCompilerOverride,
 } = {}) => {
   if (typeof runner !== "function") {
     throw new TypeError("runner must be a function");
@@ -78,10 +87,20 @@ export const runZkBuild = async ({
   if (typeof compilerInspector !== "function") {
     throw new TypeError("compilerInspector must be a function");
   }
+  if (typeof overrideInspector !== "function") {
+    throw new TypeError("overrideInspector must be a function");
+  }
 
   const resolvedRoot = path.resolve(root);
-  const compiler = await compilerInspector({ root: resolvedRoot, platform, arch });
-  const commands = buildZkBuildCommands({ root: resolvedRoot, circuit, platform });
+  const compiler =
+    (await overrideInspector({ env, platform, arch, libc, report })) ??
+    (await compilerInspector({ root: resolvedRoot, platform, arch, libc, report }));
+  const commands = buildZkBuildCommands({
+    root: resolvedRoot,
+    circuit,
+    platform,
+    compilerPath: compiler.path,
+  });
   if (commands.some(({ executable }) => executable !== compiler.path)) {
     throw new Error("Inspected local Circom path does not match the compiler build command");
   }

@@ -204,6 +204,11 @@ describe("parameterized ZK command wrappers", function () {
         runZkBuild({ compilerInspector: null }),
       );
       expect(compilerInspectorError?.message).to.match(/compilerInspector must be a function/);
+
+      const overrideInspectorError = await captureError(() =>
+        runZkBuild({ overrideInspector: null }),
+      );
+      expect(overrideInspectorError?.message).to.match(/overrideInspector must be a function/);
     });
   });
 

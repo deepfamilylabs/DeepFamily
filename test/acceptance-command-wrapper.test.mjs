@@ -13,6 +13,7 @@ import {
   acquireExclusiveCommandLock,
   productionBuildLockPath,
 } from "../scripts/lib/exclusiveCommandLock.mjs";
+import { normalizePortableCommand } from "../scripts/lib/portableCommand.mjs";
 
 const runFixture = async ({
   chainProfile,
@@ -32,6 +33,7 @@ const runFixture = async ({
           : "scripts/ethereum-acceptance.mjs",
       arguments_,
       environment: {
+        ...process.env,
         [acceptance.confirmationEnvironmentName]: acceptance.confirmation,
         [acceptance.modeEnvironmentName]: mode,
         ...overrides,
@@ -72,17 +74,50 @@ describe("acceptance command wrapper", function () {
     it(`requires the complete preflight before ${chainProfile.id} release rehearsal`, async function () {
       const calls = await runFixture({ chainProfile, mode: "release-rehearsal" });
       expect(calls).to.have.length(2);
+      const expectedPreflight = normalizePortableCommand({
+        executable: "npm",
+        args: ["run", "release:preflight"],
+        platform: process.platform,
+        env: calls[0].environment,
+      });
       expect(calls[0]).to.include({
-        executable: process.platform === "win32" ? "npm.cmd" : "npm",
+        executable: expectedPreflight.executable,
         label: "Production release preflight",
       });
-      expect(calls[0].args).to.deep.equal(["run", "release:preflight"]);
+      expect(calls[0].args).to.deep.equal(expectedPreflight.args);
       expect(calls[1].args).to.include("--no-compile");
       const tokenName = chainProfile.acceptance.wrapperTokenEnvironmentName;
       expect(calls[0].environment[tokenName]).to.be.a("string").and.not.equal("");
       expect(calls[1].environment[tokenName]).to.equal(calls[0].environment[tokenName]);
     });
   }
+
+  it("sanitizes diagnostic and release-rehearsal child environments", async function () {
+    const injected = {
+      RELEASE_VALUE: "preserved",
+      NODE_OPTIONS: "--require=/untrusted/node-hook.cjs",
+      node_path: "/untrusted/node-modules",
+      LD_PRELOAD: "/untrusted/native-hook.so",
+      dYlD_insert_libraries: "/untrusted/native-hook.dylib",
+      NPM_CONFIG_SCRIPT_SHELL: "/untrusted/shell",
+      npm_config_node_options: "--require=/untrusted/npm-hook.cjs",
+      GIT_CONFIG_COUNT: "1",
+      dotenv_config_path: "/untrusted/.env",
+    };
+    for (const mode of ["diagnostic", "release-rehearsal"]) {
+      const calls = await runFixture({
+        chainProfile: ESPACE_CHAIN_PROFILE,
+        mode,
+        overrides: injected,
+      });
+      for (const invocation of calls) {
+        expect(invocation.environment.RELEASE_VALUE).to.equal("preserved");
+        for (const name of Object.keys(injected).filter((name) => name !== "RELEASE_VALUE")) {
+          expect(invocation.environment, `${mode}: ${name}`).not.to.have.property(name);
+        }
+      }
+    }
+  });
 
   it("fails before spawning for a missing confirmation, invalid mode or arguments", async function () {
     const calls = [];

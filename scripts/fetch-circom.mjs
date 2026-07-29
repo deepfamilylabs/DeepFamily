@@ -3,7 +3,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +14,7 @@ import {
   localCircomBinaryPath,
   resolveLocalCircomTarget,
 } from "./lib/circomToolchain.mjs";
+import { createPrivateTemporaryDirectory } from "./lib/privateTemporaryDirectory.mjs";
 
 export { CIRCOM_CANONICAL_POLICY, CIRCOM_LINUX_X64_SHA256, CIRCOM_LINUX_X64_URL, CIRCOM_VERSION };
 
@@ -38,9 +38,10 @@ const defaultVersionRunner = (executable) =>
     }),
   ).trim();
 
-const defaultCommandRunner = ({ executable, args, cwd, capture = false }) =>
+const defaultCommandRunner = ({ executable, args, cwd, capture = false, env = process.env }) =>
   execFileSync(executable, args, {
     cwd,
+    env,
     encoding: capture ? "utf8" : undefined,
     stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
   });
@@ -223,8 +224,10 @@ const installFileExclusive = async ({ destination, bytes, mode }) => {
 
 export const buildPinnedCircomFromSource = async ({
   target,
+  env = process.env,
   commandRunner = defaultCommandRunner,
-  temporaryDirectoryFactory = () => fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-circom-source-")),
+  temporaryDirectoryFactory = () =>
+    createPrivateTemporaryDirectory({ prefix: "deepfamily-circom-source-" }),
   temporaryDirectoryRemover = (directory) => fs.rm(directory, { recursive: true, force: true }),
 } = {}) => {
   if (target?.strategy !== "pinned-source") {
@@ -233,25 +236,63 @@ export const buildPinnedCircomFromSource = async ({
   const temporaryRoot = await temporaryDirectoryFactory();
   const sourceDirectory = path.join(temporaryRoot, "source");
   try {
+    const sourceEnvironment = Object.fromEntries(
+      Object.entries(env).filter(
+        ([name]) =>
+          !/^(?:GIT_|CARGO_|NODE_|LD_|DYLD_|NPM_CONFIG_)/iu.test(name) &&
+          !/^(?:RUSTC|RUSTC_WRAPPER|RUSTC_WORKSPACE_WRAPPER|RUSTFLAGS|RUSTDOC|RUSTDOCFLAGS)$/iu.test(
+            name,
+          ) &&
+          !/^(?:CC|CXX|AR|RANLIB|CFLAGS|CXXFLAGS|CPPFLAGS|LDFLAGS|MAKEFLAGS)$/iu.test(name) &&
+          !/^(?:PKG_CONFIG|BINDGEN_EXTRA_CLANG_ARGS)/iu.test(name),
+      ),
+    );
+    const cargoHome = path.join(temporaryRoot, "cargo-home");
+    const xdgConfigHome = path.join(temporaryRoot, "xdg-config");
+    const emptyHooks = path.join(temporaryRoot, "empty-git-hooks");
+    const gitGlobalConfig = path.join(temporaryRoot, "git-global.config");
+    const gitSystemConfig = path.join(temporaryRoot, "git-system.config");
+    await Promise.all([
+      fs.mkdir(cargoHome, { mode: 0o700 }),
+      fs.mkdir(xdgConfigHome, { mode: 0o700 }),
+      fs.mkdir(emptyHooks, { mode: 0o700 }),
+      fs.writeFile(gitGlobalConfig, "", { flag: "wx", mode: 0o600 }),
+      fs.writeFile(gitSystemConfig, "", { flag: "wx", mode: 0o600 }),
+    ]);
+    Object.assign(sourceEnvironment, {
+      CARGO_HOME: cargoHome,
+      CARGO_INCREMENTAL: "0",
+      GIT_CONFIG_GLOBAL: gitGlobalConfig,
+      GIT_CONFIG_SYSTEM: gitSystemConfig,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "core.hooksPath",
+      GIT_CONFIG_VALUE_0: emptyHooks,
+      XDG_CONFIG_HOME: xdgConfigHome,
+    });
     await commandRunner({
       executable: "git",
       args: ["init", sourceDirectory],
       cwd: temporaryRoot,
+      env: sourceEnvironment,
     });
     await commandRunner({
       executable: "git",
       args: ["remote", "add", "origin", target.repository],
       cwd: sourceDirectory,
+      env: sourceEnvironment,
     });
     await commandRunner({
       executable: "git",
       args: ["fetch", "--depth", "1", "origin", target.commit],
       cwd: sourceDirectory,
+      env: sourceEnvironment,
     });
     await commandRunner({
       executable: "git",
       args: ["checkout", "--detach", "FETCH_HEAD"],
       cwd: sourceDirectory,
+      env: sourceEnvironment,
     });
     const sourceCommit = String(
       await commandRunner({
@@ -259,6 +300,7 @@ export const buildPinnedCircomFromSource = async ({
         args: ["rev-parse", "HEAD"],
         cwd: sourceDirectory,
         capture: true,
+        env: sourceEnvironment,
       }),
     ).trim();
     if (sourceCommit !== target.commit) {
@@ -273,6 +315,7 @@ export const buildPinnedCircomFromSource = async ({
         args: ["--version"],
         cwd: sourceDirectory,
         capture: true,
+        env: sourceEnvironment,
       }),
     ).trim();
     const rustcVersion = String(
@@ -281,12 +324,14 @@ export const buildPinnedCircomFromSource = async ({
         args: ["--version"],
         cwd: sourceDirectory,
         capture: true,
+        env: sourceEnvironment,
       }),
     ).trim();
     await commandRunner({
       executable: "cargo",
       args: ["build", "--release", "--locked"],
       cwd: sourceDirectory,
+      env: sourceEnvironment,
     });
 
     const builtBinary = path.join(
@@ -301,6 +346,7 @@ export const buildPinnedCircomFromSource = async ({
         args: ["--version"],
         cwd: sourceDirectory,
         capture: true,
+        env: sourceEnvironment,
       }),
       "Source-built Circom compiler",
     );
@@ -418,8 +464,10 @@ export const installPinnedCircom = async ({
 export const buildCircomInstallPlan = ({
   platform = process.platform,
   arch = process.arch,
+  libc,
+  report,
 } = {}) => {
-  const localTarget = resolveLocalCircomTarget({ platform, arch });
+  const localTarget = resolveLocalCircomTarget({ platform, arch, libc, report });
   return Object.freeze([
     Object.freeze({
       role: "canonical-release",
@@ -440,20 +488,24 @@ export const installCircomToolchains = async ({
   projectRoot = process.cwd(),
   platform = process.platform,
   arch = process.arch,
+  libc,
+  report,
   installer = installPinnedCircom,
   download = defaultDownload,
   sourceBuilder = buildPinnedCircomFromSource,
   versionRunner = defaultVersionRunner,
 } = {}) => {
   const results = [];
-  for (const item of buildCircomInstallPlan({ platform, arch })) {
+  for (const item of buildCircomInstallPlan({ platform, arch, libc, report })) {
     const result = await installer({
       projectRoot,
       target: item.target,
       destinationRelativePath: item.destinationRelativePath,
       verifyVersion: item.verifyVersion,
       download:
-        item.role === "local" && item.target === CIRCOM_CANONICAL_POLICY.target
+        item.role === "local" &&
+        item.target.id === CIRCOM_CANONICAL_POLICY.target.id &&
+        item.target.strategy === CIRCOM_CANONICAL_POLICY.target.strategy
           ? async () => fs.readFile(results[0].path)
           : download,
       sourceBuilder,
@@ -468,9 +520,11 @@ export const assertLocalCircomInstallation = async ({
   root = process.cwd(),
   platform = process.platform,
   arch = process.arch,
+  libc,
+  report,
   versionRunner = defaultVersionRunner,
 } = {}) => {
-  const target = resolveLocalCircomTarget({ platform, arch });
+  const target = resolveLocalCircomTarget({ platform, arch, libc, report });
   const prepared = await assertCanonicalRootAndBin(root);
   const destination = resolveDestination({
     ...prepared,
@@ -491,6 +545,7 @@ export const assertLocalCircomInstallation = async ({
     strategy: target.strategy,
     sha256: evidence.binarySha256,
     version: CIRCOM_VERSION,
+    libcEvidence: target.libcEvidence ?? null,
   });
 };
 

@@ -9,6 +9,7 @@ import {
   ZK_PRODUCTION_PHASE1,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { resolveSnarkjsCliPath } from "../scripts/lib/snarkjsToolchain.mjs";
 import {
   DEVELOPMENT_CIRCUITS,
   DEVELOPMENT_CONTRIBUTOR_NAME,
@@ -44,12 +45,13 @@ describe("development ZK refresh", function () {
       ]),
     );
     const manifest = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       circomVersion: "2.1.6",
       snarkjsVersion: "0.7.5",
       toolchain: {
         circomBinarySha256: "a".repeat(64),
         snarkjsCliSha256: "b".repeat(64),
+        snarkjsRuntimeSha256: "9".repeat(64),
       },
       trustedSetup: {
         status: "production",
@@ -232,13 +234,19 @@ describe("development ZK refresh", function () {
     });
 
     expect(commands).to.have.length(DEVELOPMENT_CIRCUITS.length * 5);
+    const snarkjsCli = resolveSnarkjsCliPath({ root });
     for (let index = 0; index < DEVELOPMENT_CIRCUITS.length; index += 1) {
       const circuit = DEVELOPMENT_CIRCUITS[index];
       const [setup, contribute, exportVkey, exportVerifier, renameVerifier] = commands.slice(
         index * 5,
         index * 5 + 5,
       );
-      expect(setup.args).to.deep.equal([
+      for (const command of [setup, contribute, exportVkey, exportVerifier]) {
+        expect(command.executable).to.equal(process.execPath);
+        expect(command.args[0]).to.equal(snarkjsCli);
+        expect(command.cwd).to.equal(root);
+      }
+      expect(setup.args.slice(1)).to.deep.equal([
         "groth16",
         "setup",
         path.join(root, "zk-artifacts/circuits", `${circuit.name}.r1cs`),
@@ -247,8 +255,9 @@ describe("development ZK refresh", function () {
       ]);
       expect(contribute.args).to.include(`--name=${DEVELOPMENT_CONTRIBUTOR_NAME}`);
       expect(contribute.args).to.include(`-e=${DEVELOPMENT_PUBLIC_ENTROPY}`);
-      expect(exportVkey.args.slice(0, 3)).to.deep.equal(["zkey", "export", "verificationkey"]);
-      expect(exportVerifier.args.slice(0, 3)).to.deep.equal(["zkey", "export", "solidityverifier"]);
+      expect(exportVkey.args.slice(1, 4)).to.deep.equal(["zkey", "export", "verificationkey"]);
+      expect(exportVerifier.args.slice(1, 4)).to.deep.equal(["zkey", "export", "solidityverifier"]);
+      expect(renameVerifier.executable).to.equal(process.execPath);
       expect(renameVerifier.args.at(-1)).to.equal(circuit.verifierContractName);
     }
   });

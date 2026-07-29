@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { CIRCOM_VERSION, resolveLocalCircomTarget } from "../scripts/lib/circomToolchain.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_PRODUCTION_CONTRIBUTORS,
@@ -16,9 +17,11 @@ import {
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
   buildZkContributionApprovalMessage,
   inspectZkReleaseArtifacts,
+  readCanonicalJsonFile,
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { SNARKJS_CLI_PATH, inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
@@ -41,6 +44,8 @@ const createProductionFixture = async ({
   contributorCount = trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR
     ? MINIMUM_PRODUCTION_CONTRIBUTORS
     : MINIMUM_MULTI_PARTY_CONTRIBUTORS,
+  singleOperatorSchemaVersion = 3,
+  compilerRuntime = { platform: "linux", arch: "x64" },
 } = {}) => {
   const root = await createCanonicalTemporaryDirectory("deepfamily-zk-artifact-trust-");
   const circuits = {};
@@ -73,12 +78,33 @@ const createProductionFixture = async ({
   );
   const snarkjsCli = await writeRelativeFile(
     root,
-    "node_modules/snarkjs/build/cli.cjs",
+    ZK_TOOLCHAIN_PATHS.snarkjsCli,
     "fixture snarkjs CLI\n",
   );
-  const snarkjsLink = artifactPath(root, ZK_TOOLCHAIN_PATHS.snarkjsBinary);
-  await fs.mkdir(path.dirname(snarkjsLink), { recursive: true });
-  await fs.symlink(path.relative(path.dirname(snarkjsLink), snarkjsCli), snarkjsLink);
+  await writeRelativeFile(
+    root,
+    "node_modules/snarkjs/package.json",
+    `${JSON.stringify({
+      name: "snarkjs",
+      version: "0.7.5",
+      main: "build/cli.cjs",
+      dependencies: { "fixture-snark-dependency": "1.0.0" },
+    })}\n`,
+  );
+  await writeRelativeFile(
+    root,
+    "node_modules/fixture-snark-dependency/package.json",
+    `${JSON.stringify({
+      name: "fixture-snark-dependency",
+      version: "1.0.0",
+      main: "index.js",
+    })}\n`,
+  );
+  await writeRelativeFile(
+    root,
+    "node_modules/fixture-snark-dependency/index.js",
+    "module.exports = 'fixture runtime dependency';\n",
+  );
 
   const ceremonyId = "deepfamily-production-2026-01";
   const phase1Contents = "published-powers-of-tau";
@@ -143,9 +169,34 @@ const createProductionFixture = async ({
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
   };
+  const compilerTarget = resolveLocalCircomTarget(compilerRuntime);
+  const compiler = {
+    version: CIRCOM_VERSION,
+    target: compilerTarget.id,
+    platform: compilerTarget.platform,
+    arch: compilerTarget.arch,
+    strategy: compilerTarget.strategy,
+    binarySha256:
+      compilerTarget.strategy === "official-binary"
+        ? compilerTarget.sha256
+        : sha256Text(`source-built-${compilerTarget.id}`),
+    libcEvidence: compilerTarget.libcEvidence ?? null,
+    sourceBuild:
+      compilerTarget.strategy === "pinned-source"
+        ? {
+            repository: compilerTarget.repository,
+            commit: compilerTarget.commit,
+            cargoVersion: "cargo 1.88.0 fixture",
+            rustcVersion: "rustc 1.88.0 fixture",
+          }
+        : null,
+  };
   const transcript = {
-    schemaVersion: trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? 2 : 1,
+    schemaVersion: trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? singleOperatorSchemaVersion : 1,
     ...(trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? { trustModel } : {}),
+    ...(trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR && singleOperatorSchemaVersion === 3
+      ? { compiler }
+      : {}),
     ceremonyId,
     phase1Sha256,
     circuits: transcriptCircuits,
@@ -154,12 +205,13 @@ const createProductionFixture = async ({
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     circomVersion: "2.1.6",
     snarkjsVersion: "0.7.5",
     toolchain: {
       circomBinarySha256: sha256File(circomBinary),
       snarkjsCliSha256: sha256File(snarkjsCli),
+      snarkjsRuntimeSha256: inspectSnarkjsRuntime({ root }).sha256,
     },
     trustedSetup: {
       status: "production",
@@ -187,7 +239,7 @@ const createProductionFixture = async ({
     circuits,
   };
   await writeManifest(root, manifest);
-  return { root, manifest, transcript, expectedProductionPhase1 };
+  return { root, manifest, transcript, compiler, expectedProductionPhase1 };
 };
 
 const inspectProductionFixture = (fixture) =>
@@ -217,7 +269,7 @@ describe("ZK artifact trust", function () {
 
       expect(result).to.include({
         status: "passed",
-        schemaVersion: 2,
+        schemaVersion: 3,
         trustedSetupStatus: "development",
         trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
         productionReady: false,
@@ -255,12 +307,12 @@ describe("ZK artifact trust", function () {
       fixture = await createProductionFixture(options);
     };
 
-    it("accepts a single-operator production manifest with one contribution and a beacon", function () {
+    it("accepts a schema-v3 single-operator transcript with compiler evidence", function () {
       const result = inspectProductionFixture(fixture);
 
       expect(result).to.include({
         status: "passed",
-        schemaVersion: 2,
+        schemaVersion: 3,
         trustedSetupStatus: "production",
         trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
         productionReady: true,
@@ -276,6 +328,17 @@ describe("ZK artifact trust", function () {
         "personCommitmentContributionHash",
         "disclosureBindingContributionHash",
       ]);
+      expect(fixture.transcript.schemaVersion).to.equal(3);
+      expect(fixture.transcript.compiler).to.deep.equal(fixture.compiler);
+      expect(result.compiler).to.deep.equal(fixture.compiler);
+      expect(result.transcript.record.compiler).to.deep.equal(fixture.compiler);
+      expect(result.toolchain.snarkjs).to.deep.include({
+        path: SNARKJS_CLI_PATH,
+        sha256: fixture.manifest.toolchain.snarkjsCliSha256,
+      });
+      expect(result.toolchain.snarkjsRuntime.sha256).to.equal(
+        fixture.manifest.toolchain.snarkjsRuntimeSha256,
+      );
       for (const artifact of Object.values(result.artifacts)) {
         expect(artifact).to.have.keys([
           "source",
@@ -290,6 +353,177 @@ describe("ZK artifact trust", function () {
           expect(evidence.bytes).to.be.greaterThan(0);
         }
       }
+    });
+
+    it("accepts canonical CRLF checkout text with LF-normalized evidence hashes", async function () {
+      const transcriptLf = `${JSON.stringify(fixture.transcript, null, 2)}\n`;
+      const manifestLf = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
+      const expectedTranscriptSha256 = sha256Text(transcriptLf);
+      const expectedManifestSha256 = sha256Text(manifestLf);
+      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
+      const transcriptPath = artifactPath(fixture.root, ZK_CEREMONY_TRANSCRIPT_PATH);
+
+      expect(fixture.manifest.trustedSetup.transcript.sha256).to.equal(expectedTranscriptSha256);
+      for (const spec of Object.values(ZK_RELEASE_ARTIFACTS)) {
+        for (const relativePath of [spec.source, spec.verificationKey, spec.solidityVerifier]) {
+          const filePath = artifactPath(fixture.root, relativePath);
+          const lf = await fs.readFile(filePath, "utf8");
+          await fs.writeFile(filePath, lf.replaceAll("\n", "\r\n"));
+        }
+      }
+      await fs.writeFile(transcriptPath, transcriptLf.replaceAll("\n", "\r\n"));
+      await fs.writeFile(manifestPath, manifestLf.replaceAll("\n", "\r\n"));
+
+      const result = inspectProductionFixture(fixture);
+      expect(readCanonicalJsonFile(manifestPath).raw).to.equal(manifestLf);
+      expect(readCanonicalJsonFile(transcriptPath).raw).to.equal(transcriptLf);
+      expect(result.manifestSha256).to.equal(expectedManifestSha256);
+      expect(result.transcriptSha256).to.equal(expectedTranscriptSha256);
+      expect(result.transcript.sha256).to.equal(expectedTranscriptSha256);
+      expect(result.transcript.bytes).to.equal(Buffer.byteLength(transcriptLf));
+    });
+
+    it("rejects non-canonical indentation and duplicate JSON keys", async function () {
+      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
+      const invalidDocuments = [
+        `${JSON.stringify(fixture.manifest)}\n`,
+        '{\n  "schemaVersion": 2,\n  "schemaVersion": 2\n}\n',
+      ];
+
+      for (const contents of invalidDocuments) {
+        await fs.writeFile(manifestPath, contents);
+        expect(() => readCanonicalJsonFile(manifestPath, "fixture JSON")).to.throw(
+          "fixture JSON must use canonical two-space JSON with one trailing newline and no duplicate keys",
+        );
+      }
+    });
+
+    it("rejects mixed line endings and isolated carriage returns", async function () {
+      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
+      const manifestLf = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
+      const invalidDocuments = [manifestLf.replace("\n", "\r\n"), manifestLf.replace("\n", "\r")];
+
+      for (const contents of invalidDocuments) {
+        await fs.writeFile(manifestPath, contents);
+        expect(() => readCanonicalJsonFile(manifestPath, "fixture JSON")).to.throw(
+          "fixture JSON must use uniform LF or CRLF line endings",
+        );
+      }
+    });
+
+    it("continues to accept a legacy schema-v2 single-operator transcript", async function () {
+      await replaceFixture({ singleOperatorSchemaVersion: 2 });
+
+      const result = inspectProductionFixture(fixture);
+
+      expect(fixture.transcript).not.to.have.property("compiler");
+      expect(result.compiler).to.equal(null);
+      expect(result.transcript.record.compiler).to.equal(null);
+    });
+
+    it("can inspect a legacy schema-v2 manifest without claiming runtime-graph evidence", async function () {
+      fixture.manifest.schemaVersion = 2;
+      delete fixture.manifest.toolchain.snarkjsRuntimeSha256;
+      await writeManifest(fixture.root, fixture.manifest);
+
+      const result = inspectProductionFixture(fixture);
+
+      expect(result.schemaVersion).to.equal(2);
+      expect(result.toolchain.snarkjsRuntime).to.equal(null);
+    });
+
+    it("validates schema-v3 compiler evidence for every supported target and Linux libc", async function () {
+      for (const compilerRuntime of [
+        { platform: "linux", arch: "x64", libc: "glibc" },
+        { platform: "linux", arch: "x64", libc: "musl" },
+        { platform: "darwin", arch: "x64" },
+        { platform: "win32", arch: "x64" },
+        { platform: "linux", arch: "arm64", libc: "glibc" },
+        { platform: "darwin", arch: "arm64" },
+      ]) {
+        await replaceFixture({ compilerRuntime });
+        const result = inspectProductionFixture(fixture);
+
+        expect(result.compiler).to.deep.equal(fixture.compiler);
+      }
+    });
+
+    it("rejects source-build compiler evidence that is not bound to the pinned commit", async function () {
+      await replaceFixture({ compilerRuntime: { platform: "darwin", arch: "arm64" } });
+      fixture.transcript.compiler.sourceBuild.commit = "0".repeat(40);
+      const transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
+      fixture.manifest.trustedSetup.transcript.sha256 = sha256File(transcriptPath);
+      await writeManifest(fixture.root, fixture.manifest);
+
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "compiler.sourceBuild does not match the pinned source",
+      );
+    });
+
+    it("rejects invalid schema-v3 compiler identity, digest, and version evidence", async function () {
+      const originalCompiler = structuredClone(fixture.compiler);
+      const rewriteTranscript = async () => {
+        const transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
+        fixture.manifest.trustedSetup.transcript.sha256 = sha256File(transcriptPath);
+        await writeManifest(fixture.root, fixture.manifest);
+      };
+
+      fixture.transcript.compiler.binarySha256 = "00".repeat(32);
+      await rewriteTranscript();
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "official compiler binarySha256 does not match the pinned target",
+      );
+
+      fixture.transcript.compiler.binarySha256 = originalCompiler.binarySha256;
+      fixture.transcript.compiler.libcEvidence = {
+        ...fixture.transcript.compiler.libcEvidence,
+        family: "uclibc",
+      };
+      await rewriteTranscript();
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "compiler.libcEvidence.family must be glibc or musl",
+      );
+
+      fixture.transcript.compiler.libcEvidence = originalCompiler.libcEvidence;
+      fixture.transcript.compiler.version = "2.1.5";
+      await rewriteTranscript();
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "compiler version does not match the manifest",
+      );
+
+      fixture.transcript.compiler.version = originalCompiler.version;
+      fixture.transcript.compiler.platform = "freebsd";
+      fixture.transcript.compiler.libcEvidence = null;
+      await rewriteTranscript();
+      expect(() => inspectProductionFixture(fixture)).to.throw("Unsupported Circom host");
+    });
+
+    it("rejects a symbolic link in place of the real snarkjs package CLI", async function () {
+      const cliPath = artifactPath(fixture.root, ZK_TOOLCHAIN_PATHS.snarkjsCli);
+      const contents = await fs.readFile(cliPath);
+      const target = await writeRelativeFile(
+        fixture.root,
+        "node_modules/snarkjs/build/fixture-cli-target.cjs",
+        contents,
+      );
+      await fs.rm(cliPath);
+      await fs.symlink(path.relative(path.dirname(cliPath), target), cliPath);
+
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        /Installed snarkjs CLI must be a regular non-symlink file/u,
+      );
+    });
+
+    it("rejects tampering anywhere in the snarkjs production dependency closure", async function () {
+      await writeRelativeFile(
+        fixture.root,
+        "node_modules/fixture-snark-dependency/index.js",
+        "module.exports = 'tampered runtime dependency';\n",
+      );
+
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "Installed snarkjs runtime SHA-256 mismatch",
+      );
     });
 
     it("rejects fixture Phase 1 metadata unless the caller supplies the exact expected production identity", function () {
