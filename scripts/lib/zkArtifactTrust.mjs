@@ -9,6 +9,7 @@ import {
   PRODUCTION_PTAU_SHA256,
   PRODUCTION_PTAU_URL,
 } from "./productionPtau.mjs";
+import { CIRCOM_CANONICAL_BINARY_PATH, localCircomBinaryPath } from "./circomToolchain.mjs";
 
 export const ZK_ARTIFACT_MANIFEST_PATH = "circuits/zk-artifacts-manifest.json";
 export const ZK_CEREMONY_TRANSCRIPT_PATH = "circuits/zk-ceremony-transcript.json";
@@ -26,7 +27,9 @@ export const ZK_PRODUCTION_PHASE1 = Object.freeze({
   blake2b512: PRODUCTION_PTAU_BLAKE2B512,
 });
 export const ZK_TOOLCHAIN_PATHS = Object.freeze({
-  circomBinary: "bin/circom",
+  // The manifest binds the reviewed Linux x64 release binary, never a host-specific local build.
+  circomBinary: CIRCOM_CANONICAL_BINARY_PATH,
+  localCircomBinary: localCircomBinaryPath(),
   snarkjsBinary:
     process.platform === "win32" ? "node_modules/.bin/snarkjs.cmd" : "node_modules/.bin/snarkjs",
 });
@@ -657,7 +660,7 @@ export const inspectZkReleaseArtifacts = ({
       resolvedRoot,
       ZK_TOOLCHAIN_PATHS.circomBinary,
       manifest.toolchain.circomBinarySha256,
-      "Pinned Circom compiler",
+      "Pinned canonical Circom compiler",
     ),
     snarkjs: assertExecutableHash(
       resolvedRoot,

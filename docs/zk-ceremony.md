@@ -100,11 +100,40 @@ manifest. That supplies no independent secret contribution, and the operator may
 circuit-specific toxic waste. `npm run zk:production:setup` instead creates fresh OS-CSPRNG Phase 2
 inputs and records the explicit production trust model described above.
 
+## Circom host and release compiler
+
+`npm run zk:fetch` installs two separate copies of the same repository-pinned Circom version:
+
+- a native compiler at `bin/circom` (`bin/circom.exe` on Windows) for development;
+- the canonical official Linux amd64 compiler at
+  `bin/circom-release-linux-amd64` for production setup and release verification.
+
+The native compiler support matrix is:
+
+| Host                           | Installation strategy          | Prerequisites        | May run release gates |
+| ------------------------------ | ------------------------------ | -------------------- | --------------------- |
+| Linux x64                      | Pinned official release asset  | None                 | Yes                   |
+| macOS x64                      | Pinned official release asset  | None                 | No                    |
+| Windows x64                    | Pinned official release asset  | None                 | No                    |
+| Linux, macOS, or Windows arm64 | Build the pinned source commit | `git` and Cargo/Rust | No                    |
+
+Official assets must match their fixed SHA-256. Source builds must come from the pinned commit and
+report the exact pinned compiler version. Every circuit compilation passes `--O2` explicitly, and
+the artifact gate compares rebuilt R1CS and WASM output hashes with the reviewed manifest and
+published files. A native compiler is therefore suitable for development only until its output has
+passed those comparisons; matching the version string alone is not release evidence.
+
+Both `zk:production:setup` and `release:preflight` fail closed on any host other than Linux x64.
+They use the canonical `bin/circom-release-linux-amd64` binary, not the native compiler. If normal
+development happens on another platform, move the reviewed commit and required caches to a
+controlled Linux x64 environment before creating production keys or running the final release
+gate.
+
 ## Before running the command
 
 Run the setup only after the circuit source, public signals, packing rules, dependencies, and
 verifier interface have been frozen for a release candidate. Any later circuit change requires new
-production keys.
+production keys. The controlled checkout must run on Linux x64.
 
 Use a clean, controlled checkout:
 
@@ -146,7 +175,8 @@ Internally the command:
 
 1. validates the clean release commit and development manifest;
 2. downloads or reuses the pinned public power-13 pTau and checks both pinned digests;
-3. compiles `person_commitment` and `disclosure_binding` into a private staging directory;
+3. compiles `person_commitment` and `disclosure_binding` with the canonical Linux amd64 compiler
+   and explicit `--O2` into a private staging directory;
 4. creates each initial Groth16 zkey;
 5. generates a separate 64-byte OS CSPRNG input for each circuit and supplies it to snarkjs through
    a private stdin pipe, never through command arguments or environment variables;
@@ -252,9 +282,11 @@ npm run zk:ptau:fetch
 npm run release:preflight
 ```
 
-`release:preflight` checks the clean commit before and after the build, verifies both proofs and all
-published hashes, validates the single-operator transcript against the real zkey metadata, and runs
-the complete contract, frontend, localization, XSS, storage, and dependency checks.
+`release:preflight` runs only on Linux x64. It checks the canonical compiler digest and the clean
+commit before and after the build, verifies that the explicit-`--O2` R1CS and WASM output hashes
+match the reviewed artifacts, verifies both proofs and all published hashes, validates the
+single-operator transcript against the real zkey metadata, and runs the complete contract,
+frontend, localization, XSS, storage, and dependency checks.
 
 ## Testnet and Mainnet sequence
 

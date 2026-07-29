@@ -5,6 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { assertLocalCircomInstallation } from "./fetch-circom.mjs";
+import { CIRCOM_ARTIFACT_FLAGS, localCircomBinaryPath } from "./lib/circomToolchain.mjs";
 import { parseCircuitArguments, selectCircuitNames } from "./lib/zkCircuitSelection.mjs";
 
 const OUTPUT_DIRECTORY = path.join("zk-artifacts", "circuits");
@@ -31,9 +33,13 @@ const defaultDirectoryCreator = (directory) => {
 
 export const parseArguments = parseCircuitArguments;
 
-export const buildZkBuildCommands = ({ root = process.cwd(), circuit = "all" } = {}) => {
+export const buildZkBuildCommands = ({
+  root = process.cwd(),
+  circuit = "all",
+  platform = process.platform,
+} = {}) => {
   const resolvedRoot = path.resolve(root);
-  const executable = path.join(resolvedRoot, "bin", "circom");
+  const executable = path.join(resolvedRoot, localCircomBinaryPath({ platform }));
   return Object.freeze(
     selectCircuitNames(circuit).map((name) =>
       Object.freeze({
@@ -41,9 +47,9 @@ export const buildZkBuildCommands = ({ root = process.cwd(), circuit = "all" } =
         executable,
         args: Object.freeze([
           CIRCUIT_SOURCES[name],
-          "--r1cs",
-          "--wasm",
-          "--sym",
+          // Circom 2.2 changed its default to O1. Keep the reviewed Groth16 constraint system
+          // stable across compiler upgrades by making the intended optimization explicit.
+          ...CIRCOM_ARTIFACT_FLAGS,
           ...INCLUDE_ARGUMENTS,
           "-o",
           OUTPUT_DIRECTORY,
@@ -54,11 +60,14 @@ export const buildZkBuildCommands = ({ root = process.cwd(), circuit = "all" } =
   );
 };
 
-export const runZkBuild = ({
+export const runZkBuild = async ({
   root = process.cwd(),
   circuit = "all",
+  platform = process.platform,
+  arch = process.arch,
   runner = defaultRunner,
   directoryCreator = defaultDirectoryCreator,
+  compilerInspector = assertLocalCircomInstallation,
 } = {}) => {
   if (typeof runner !== "function") {
     throw new TypeError("runner must be a function");
@@ -66,12 +75,19 @@ export const runZkBuild = ({
   if (typeof directoryCreator !== "function") {
     throw new TypeError("directoryCreator must be a function");
   }
+  if (typeof compilerInspector !== "function") {
+    throw new TypeError("compilerInspector must be a function");
+  }
 
   const resolvedRoot = path.resolve(root);
-  const commands = buildZkBuildCommands({ root: resolvedRoot, circuit });
+  const compiler = await compilerInspector({ root: resolvedRoot, platform, arch });
+  const commands = buildZkBuildCommands({ root: resolvedRoot, circuit, platform });
+  if (commands.some(({ executable }) => executable !== compiler.path)) {
+    throw new Error("Inspected local Circom path does not match the compiler build command");
+  }
   directoryCreator(path.join(resolvedRoot, OUTPUT_DIRECTORY));
   for (const command of commands) {
-    runner(command);
+    await runner(command);
   }
   return commands;
 };
@@ -84,7 +100,7 @@ Compiles the selected Circom circuit with the repository's fixed R1CS, WASM, sym
 include-path and output settings. The default is --circuit all.`);
 };
 
-export const main = (argv = process.argv.slice(2)) => {
+export const main = async (argv = process.argv.slice(2)) => {
   const parsed = parseArguments(argv);
   if (parsed.help) {
     printUsage();
@@ -97,10 +113,8 @@ const isMain =
   process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMain) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(`[zk-build] ${error.message}`);
     process.exitCode = 1;
-  }
+  });
 }

@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import { RELEASE_PREFLIGHT_COMMANDS, runReleasePreflight } from "../scripts/release-preflight.mjs";
@@ -16,6 +15,7 @@ import {
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
@@ -36,7 +36,7 @@ const writeTranscript = async (root, transcript) =>
   writeRelativeFile(root, ZK_CEREMONY_TRANSCRIPT_PATH, `${JSON.stringify(transcript, null, 2)}\n`);
 
 const createProductionFixture = async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-release-preflight-"));
+  const root = await createCanonicalTemporaryDirectory("deepfamily-release-preflight-");
   const circuits = {};
 
   for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {
@@ -254,6 +254,22 @@ describe("production release preflight", function () {
     return fixture;
   };
 
+  it("rejects a noncanonical host before invoking any runner", async function () {
+    const fake = createFakeRunner();
+
+    const error = await captureError(() =>
+      runReleasePreflight({
+        root: "/fixture/deepfamily",
+        platform: "darwin",
+        arch: "arm64",
+        runner: fake.runner,
+      }),
+    );
+
+    expect(error?.message).to.equal("Release preflight requires the canonical linux-x64 host");
+    expect(fake.calls).to.deep.equal([]);
+  });
+
   it("blocks an explicit development manifest before running any npm command", async function () {
     const fixture = await productionFixture();
     fixture.manifest.trustedSetup = {
@@ -271,6 +287,8 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        platform: "linux",
+        arch: "x64",
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
       }),
@@ -293,6 +311,8 @@ describe("production release preflight", function () {
 
     const result = await runReleasePreflight({
       root: fixture.root,
+      platform: "linux",
+      arch: "x64",
       expectedProductionPhase1: fixture.expectedProductionPhase1,
       ptauPath: fixture.ptauPath,
       runner: fake.runner,
@@ -349,6 +369,8 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        platform: "linux",
+        arch: "x64",
         expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
@@ -371,6 +393,8 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        platform: "linux",
+        arch: "x64",
         expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
@@ -400,6 +424,8 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        platform: "linux",
+        arch: "x64",
         expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
@@ -425,6 +451,8 @@ describe("production release preflight", function () {
     const error = await captureError(() =>
       runReleasePreflight({
         root: fixture.root,
+        platform: "linux",
+        arch: "x64",
         expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
@@ -444,6 +472,8 @@ describe("production release preflight", function () {
       const error = await captureError(() =>
         runReleasePreflight({
           root: fixture.root,
+          platform: "linux",
+          arch: "x64",
           expectedProductionPhase1: fixture.expectedProductionPhase1,
           runner: fake.runner,
           mpcMetadataReader: metadataReaderFor(fixture),

@@ -2,7 +2,6 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import {
@@ -20,6 +19,7 @@ import {
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -42,7 +42,7 @@ const createProductionFixture = async ({
     ? MINIMUM_PRODUCTION_CONTRIBUTORS
     : MINIMUM_MULTI_PARTY_CONTRIBUTORS,
 } = {}) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-zk-artifact-trust-"));
+  const root = await createCanonicalTemporaryDirectory("deepfamily-zk-artifact-trust-");
   const circuits = {};
 
   for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {

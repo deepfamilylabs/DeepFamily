@@ -1,6 +1,5 @@
 import { expect } from "chai";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import { updateDevelopmentManifest } from "../scripts/update-zk-development-manifest.mjs";
@@ -15,6 +14,7 @@ import {
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
+import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const MANIFEST_MODE = 0o640;
 
@@ -73,7 +73,7 @@ const manifestMetadata = (manifest) => ({
 });
 
 const createDevelopmentFixture = async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-zk-development-manifest-"));
+  const root = await createCanonicalTemporaryDirectory("deepfamily-zk-development-manifest-");
   const expectedHashes = {};
   const staleHashes = {};
 

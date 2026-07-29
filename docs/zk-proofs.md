@@ -371,7 +371,7 @@ Only the following top-level ZK commands are supported for routine development a
 
 | Command                       | Purpose                                                     |
 | ----------------------------- | ----------------------------------------------------------- |
-| `npm run zk:fetch`            | Install and verify the pinned Circom compiler               |
+| `npm run zk:fetch`            | Install the native and canonical release Circom compilers   |
 | `npm run zk:ptau:fetch`       | Download or verify the fixed-digest public Phase 1 pTau     |
 | `npm run zk:build`            | Compile both circuits into local build artifacts            |
 | `npm run zk:dev:refresh`      | Regenerate the complete development artifact set            |
@@ -393,10 +393,39 @@ npm run zk:ptau:fetch
 npm run zk:build
 ```
 
-`zk:fetch` installs only the repository-pinned Circom 2.1.6 Linux x64 binary after checking its
-fixed SHA-256. It refuses to replace an unexpected file or symbolic link. On another platform,
-install the same reviewed compiler through an explicit platform-specific process and update the
-release policy before treating its output as production evidence.
+`zk:fetch` installs two separate compiler roles:
+
+- the current host's native compiler at `bin/circom` (`bin/circom.exe` on Windows), used by
+  `zk:build` and development refreshes;
+- the canonical official Linux amd64 release binary at
+  `bin/circom-release-linux-amd64`, used only by production and release gates.
+
+Both roles use the same repository-pinned Circom version. Installation follows this support matrix:
+
+| Host                           | Native installation strategy   | Prerequisites        | Production release host |
+| ------------------------------ | ------------------------------ | -------------------- | ----------------------- |
+| Linux x64                      | Pinned official release asset  | None                 | Yes                     |
+| macOS x64                      | Pinned official release asset  | None                 | No                      |
+| Windows x64                    | Pinned official release asset  | None                 | No                      |
+| Linux, macOS, or Windows arm64 | Build the pinned source commit | `git` and Cargo/Rust | No                      |
+
+Official x64 assets are accepted only when their fixed SHA-256 matches. An arm64 build checks out
+the pinned source repository commit, builds it with Cargo, verifies the exact compiler version, and
+records local provenance. The installer refuses to replace unexpected files or symbolic links.
+Regardless of the host, the separately downloaded canonical release binary must match the fixed
+Linux amd64 digest.
+
+All circuit compilation passes `--O2` explicitly, so a compiler release cannot silently change the
+constraint system by changing its default optimization level. `zk:artifacts:check` compares the
+rebuilt R1CS hash with the manifest and the rebuilt WASM bytes with the published browser artifact.
+The native compiler's output must therefore match the hashes reviewed for the canonical Linux
+toolchain; version equality alone is insufficient release evidence. On a non-Linux host the check
+validates the canonical binary's fixed digest but does not execute that foreign-platform binary.
+
+Local development and diagnostic acceptance may use any supported native compiler.
+`zk:production:setup` and `release:preflight` fail unless the host is Linux x64 and the canonical
+`bin/circom-release-linux-amd64` binary matches its fixed digest. Developers on another platform
+must run these release-only commands in a controlled Linux x64 environment.
 
 Both development and production use the same pinned public power-13 Phase 1 file:
 
@@ -432,7 +461,7 @@ undocumented side effect.
 ### Production Setup
 
 Do not use `zk:dev:refresh` for production. After the circuits are frozen, start from a clean commit
-and run:
+on a Linux x64 host and run:
 
 ```bash
 npm run zk:production:setup
