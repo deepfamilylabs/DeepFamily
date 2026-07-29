@@ -1,5 +1,5 @@
 export function getViteEnv(): Record<string, unknown> {
-  return ((import.meta as any).env || {}) as Record<string, unknown>;
+  return (import.meta.env || {}) as Record<string, unknown>;
 }
 
 export function readStringEnv(value: unknown, fallback = ""): string {
