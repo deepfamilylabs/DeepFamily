@@ -40,18 +40,10 @@ const CIRCOM_2_1_6_TARGETS = Object.freeze({
     asset: "circom-linux-amd64",
     sha256: "f3958483caaaa0cdd3912df5049e2e635eab4d09b9a66807be9633d547859f12",
   }),
-  "linux-x64-musl": sourceTarget({
+  "darwin-arm64": sourceTarget({
     ...CIRCOM_2_1_6_SOURCE,
-    id: "linux-x64-musl",
-    platform: "linux",
-    arch: "x64",
-  }),
-  "darwin-x64": officialTarget({
-    version: "2.1.6",
     platform: "darwin",
-    arch: "x64",
-    asset: "circom-macos-amd64",
-    sha256: "e4f651620b9e675f343464403b37ba21896a0d88b967f1fe9d7989f0e6e797bc",
+    arch: "arm64",
   }),
   "win32-x64": officialTarget({
     version: "2.1.6",
@@ -60,22 +52,9 @@ const CIRCOM_2_1_6_TARGETS = Object.freeze({
     asset: "circom-windows-amd64.exe",
     sha256: "d7d96da34cdee7318ddba6b7795543c97f5bde871832827e067920ddfed5457e",
   }),
-  "linux-arm64": sourceTarget({
-    ...CIRCOM_2_1_6_SOURCE,
-    platform: "linux",
-    arch: "arm64",
-  }),
-  "darwin-arm64": sourceTarget({
-    ...CIRCOM_2_1_6_SOURCE,
-    platform: "darwin",
-    arch: "arm64",
-  }),
 });
 
-/**
- * Historical policies remain addressable by transcript compiler version so upgrading the active
- * Circom pin does not invalidate an already published production ceremony.
- */
+/** Version-indexed target policies bind compiler evidence to this repository's supported set. */
 export const CIRCOM_TARGET_POLICIES = Object.freeze({
   "2.1.6": CIRCOM_2_1_6_TARGETS,
 });
@@ -84,6 +63,9 @@ export const CIRCOM_TARGETS = CIRCOM_TARGET_POLICIES[CIRCOM_VERSION];
 if (CIRCOM_TARGETS === undefined) {
   throw new Error(`No Circom target policy is registered for version ${CIRCOM_VERSION}`);
 }
+
+export const CIRCOM_RUNTIME_TARGET_ALLOWLIST = Object.freeze(Object.keys(CIRCOM_TARGETS));
+const CIRCOM_RUNTIME_TARGET_SET = new Set(CIRCOM_RUNTIME_TARGET_ALLOWLIST);
 
 export const CIRCOM_CANONICAL_POLICY = Object.freeze({
   id: `circom-${CIRCOM_VERSION}-official-linux-x64`,
@@ -148,17 +130,76 @@ const resolveLinuxLibcEvidence = ({ platform, libc, report }) => {
   });
 };
 
+const assertSupportedLinuxLibc = ({ platform, libcEvidence }) => {
+  if (platform === "linux" && libcEvidence.family !== "glibc") {
+    throw new Error(
+      `Unsupported Linux libc ${libcEvidence.family}; the supported Linux runtime is x64 with glibc`,
+    );
+  }
+};
+
+const assertRuntimeTargetAllowed = ({ platform, arch, key }) => {
+  if (!CIRCOM_RUNTIME_TARGET_SET.has(key)) {
+    throw new Error(
+      `Unsupported Circom host ${platform}/${arch}; supported runtime targets: ` +
+        CIRCOM_RUNTIME_TARGET_ALLOWLIST.join(", "),
+    );
+  }
+};
+
+const isWindowsArm64Host = (env) =>
+  env !== null &&
+  typeof env === "object" &&
+  !Array.isArray(env) &&
+  Object.entries(env).some(
+    ([name, value]) =>
+      ["PROCESSOR_ARCHITECTURE", "PROCESSOR_ARCHITEW6432"].includes(name.toUpperCase()) &&
+      String(value).toLowerCase() === "arm64",
+  );
+
+const assertSupportedWindowsHost = ({ platform, env }) => {
+  if (platform === "win32" && isWindowsArm64Host(env)) {
+    throw new Error(
+      "Unsupported Windows ARM64 host, including x64 Node.js emulation; " +
+        "the supported Windows runtime is x64 Node.js on an x64 host",
+    );
+  }
+};
+
 export const circomTargetKey = ({
   platform = process.platform,
   arch = process.arch,
   libc,
   report,
+  env = process.env,
 } = {}) => {
+  assertSupportedWindowsHost({ platform, env });
   const libcEvidence = resolveLinuxLibcEvidence({ platform, libc, report });
-  if (platform === "linux" && arch === "x64" && libcEvidence.family === "musl") {
-    return "linux-x64-musl";
+  assertSupportedLinuxLibc({ platform, libcEvidence });
+  const key = `${platform}-${arch}`;
+  assertRuntimeTargetAllowed({ platform, arch, key });
+  return key;
+};
+
+/** Resolve an immutable target policy for validating compiler evidence. */
+export const resolveCircomTargetPolicy = ({ version, platform, arch, libc, report }) => {
+  const targets = CIRCOM_TARGET_POLICIES[version];
+  if (targets === undefined) {
+    throw new Error(`Unsupported Circom version policy ${version}`);
   }
-  return `${platform}-${arch}`;
+  const libcEvidence = resolveLinuxLibcEvidence({ platform, libc, report });
+  assertSupportedLinuxLibc({ platform, libcEvidence });
+  const key = `${platform}-${arch}`;
+  const target = targets[key];
+  if (target === undefined) {
+    throw new Error(`Unsupported Circom host ${platform}/${arch} in policy ${version}`);
+  }
+  return platform === "linux"
+    ? Object.freeze({
+        ...target,
+        libcEvidence,
+      })
+    : target;
 };
 
 export const resolveLocalCircomTarget = ({
@@ -167,30 +208,16 @@ export const resolveLocalCircomTarget = ({
   arch = process.arch,
   libc,
   report,
+  env = process.env,
 } = {}) => {
   const targets = CIRCOM_TARGET_POLICIES[version];
   if (targets === undefined) {
     throw new Error(`Unsupported Circom version policy ${version}`);
   }
-  const libcEvidence = resolveLinuxLibcEvidence({ platform, libc, report });
-  const key =
-    platform === "linux" && arch === "x64" && libcEvidence.family === "musl"
-      ? "linux-x64-musl"
-      : `${platform}-${arch}`;
-  const target = targets[key];
-  if (target === undefined) {
-    throw new Error(
-      `Unsupported Circom host ${platform}/${arch}; supported targets: ${Object.keys(targets).join(
-        ", ",
-      )}`,
-    );
-  }
-  return platform === "linux"
-    ? Object.freeze({
-        ...target,
-        libcEvidence,
-      })
-    : target;
+  assertSupportedWindowsHost({ platform, env });
+  const key = circomTargetKey({ platform, arch, libc, report, env });
+  assertRuntimeTargetAllowed({ platform, arch, key });
+  return resolveCircomTargetPolicy({ version, platform, arch, libc, report });
 };
 
 export const localCircomBinaryPath = ({ platform = process.platform } = {}) =>

@@ -32,12 +32,8 @@ const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
 const SUPPORTED_RUNTIMES = Object.freeze([
   Object.freeze({ platform: "linux", arch: "x64", libc: "glibc" }),
-  Object.freeze({ platform: "linux", arch: "x64", libc: "musl" }),
-  Object.freeze({ platform: "darwin", arch: "x64" }),
-  Object.freeze({ platform: "win32", arch: "x64" }),
-  Object.freeze({ platform: "linux", arch: "arm64", libc: "glibc" }),
-  Object.freeze({ platform: "linux", arch: "arm64", libc: "musl" }),
   Object.freeze({ platform: "darwin", arch: "arm64" }),
+  Object.freeze({ platform: "win32", arch: "x64" }),
 ]);
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
@@ -213,7 +209,7 @@ const createProductionFixture = async () => {
   };
 };
 
-const commandLabel = ({ executable, args }) => `${executable} ${args.join(" ")}`;
+const commandLabel = ({ executable, args }) => `${path.basename(executable)} ${args.join(" ")}`;
 
 const metadataReaderFor = (fixture) => async (zkeyPath) =>
   fixture.metadataByCircuit[path.basename(zkeyPath, ".zkey")];
@@ -263,7 +259,7 @@ const createFakeRunner = ({
   const runner = (invocation) => {
     calls.push(invocation);
     if (
-      invocation.executable === "git" &&
+      path.basename(invocation.executable) === "git" &&
       invocation.args[0] === "rev-parse" &&
       invocation.args[1] === "HEAD"
     ) {
@@ -272,7 +268,7 @@ const createFakeRunner = ({
       return `${commits[Math.min(index, commits.length - 1)]}\n`;
     }
     if (
-      invocation.executable === "git" &&
+      path.basename(invocation.executable) === "git" &&
       invocation.args[0] === "status" &&
       invocation.args[1] === "--porcelain=v1"
     ) {
@@ -306,7 +302,7 @@ describe("production release preflight", function () {
     expect(source).not.to.include('import "dotenv/config"');
   });
 
-  it("accepts Linux glibc/musl, macOS, and Windows x64 execution runtimes", async function () {
+  it("accepts Linux x64/glibc, Darwin arm64, and Windows x64 execution runtimes", async function () {
     for (const runtime of SUPPORTED_RUNTIMES) {
       const fixture = await productionFixture();
       const fake = createFakeRunner();
@@ -325,20 +321,33 @@ describe("production release preflight", function () {
     }
   });
 
-  it("requires x64 Node when the host is Windows ARM64", async function () {
-    const fake = createFakeRunner();
-    const error = await captureError(() =>
-      runReleasePreflight({
-        root: "/fixture/deepfamily",
-        platform: "win32",
+  it("rejects native and x64-emulated Node on Windows ARM64 hosts", async function () {
+    for (const runtime of [
+      {
         arch: "arm64",
-        runner: fake.runner,
-      }),
-    );
+        env: { PROCESSOR_ARCHITECTURE: "ARM64" },
+      },
+      {
+        arch: "x64",
+        env: {
+          PROCESSOR_ARCHITECTURE: "AMD64",
+          PROCESSOR_ARCHITEW6432: "ARM64",
+        },
+      },
+    ]) {
+      const fake = createFakeRunner();
+      const error = await captureError(() =>
+        runReleasePreflight({
+          root: "/fixture/deepfamily",
+          platform: "win32",
+          ...runtime,
+          runner: fake.runner,
+        }),
+      );
 
-    expect(error?.message).to.include("requires the x64 build of Node.js");
-    expect(error?.message).to.include("node -p process.arch");
-    expect(fake.calls).to.deep.equal([]);
+      expect(error?.message).to.include("does not support Windows ARM64 hosts");
+      expect(fake.calls).to.deep.equal([]);
+    }
   });
 
   it("fresh-builds source targets and passes only the private compiler to nested ZK builds", async function () {
@@ -482,7 +491,7 @@ describe("production release preflight", function () {
     expect(fake.calls).to.deep.equal([]);
   });
 
-  it("fails on compiler provenance, hash, or version errors before any runner", async function () {
+  it("fails on compiler provenance, hash, or version errors after the release gates", async function () {
     for (const [runtime, message] of [
       [
         { platform: "darwin", arch: "arm64" },
@@ -494,12 +503,14 @@ describe("production release preflight", function () {
         'Installed Circom compiler version mismatch; expected "circom compiler 2.1.6"',
       ],
     ]) {
+      const fixture = await productionFixture();
       const fake = createFakeRunner();
       const target = resolveLocalCircomTarget(runtime);
       const error = await captureError(() =>
         runReleasePreflight({
-          root: "/fixture/deepfamily",
+          root: fixture.root,
           ...runtime,
+          expectedProductionPhase1: fixture.expectedProductionPhase1,
           compilerInspector:
             target.strategy === "official-binary"
               ? async () => {
@@ -517,11 +528,14 @@ describe("production release preflight", function () {
       );
 
       expect(error?.message).to.equal(message);
-      expect(fake.calls, `${runtime.platform}/${runtime.arch}`).to.deep.equal([]);
+      expect(fake.calls.map(commandLabel), `${runtime.platform}/${runtime.arch}`).to.deep.equal([
+        "git rev-parse HEAD",
+        "git status --porcelain=v1 --untracked-files=all",
+      ]);
     }
   });
 
-  it("rejects inconsistent local compiler evidence before any runner", async function () {
+  it("rejects inconsistent local compiler evidence after the release gates", async function () {
     const cases = [
       {
         label: "path",
@@ -530,7 +544,7 @@ describe("production release preflight", function () {
       },
       {
         label: "target",
-        mutate: (evidence) => ({ ...evidence, target: "darwin-x64" }),
+        mutate: (evidence) => ({ ...evidence, target: "unsupported-target" }),
         message: "unexpected target evidence",
       },
       {
@@ -564,13 +578,15 @@ describe("production release preflight", function () {
     ];
 
     for (const testCase of cases) {
+      const fixture = await productionFixture();
       const fake = createFakeRunner();
       const error = await captureError(() =>
         runReleasePreflight({
-          root: "/fixture/deepfamily",
+          root: fixture.root,
           platform: "linux",
           arch: "x64",
           libc: "glibc",
+          expectedProductionPhase1: fixture.expectedProductionPhase1,
           compilerInspector: async (runtime) =>
             testCase.mutate(await inspectFixtureCompiler(runtime)),
           runner: fake.runner,
@@ -578,7 +594,10 @@ describe("production release preflight", function () {
       );
 
       expect(error?.message, testCase.label).to.include(testCase.message);
-      expect(fake.calls, testCase.label).to.deep.equal([]);
+      expect(fake.calls.map(commandLabel), testCase.label).to.deep.equal([
+        "git rev-parse HEAD",
+        "git status --porcelain=v1 --untracked-files=all",
+      ]);
     }
   });
 
@@ -595,12 +614,18 @@ describe("production release preflight", function () {
     };
     await writeManifest(fixture.root, fixture.manifest);
     const fake = createFakeRunner();
+    let sourceBuildCalled = false;
 
     const error = await captureError(() =>
-      runWithFixtureCompiler({
+      runReleasePreflight({
         root: fixture.root,
-        platform: "linux",
-        arch: "x64",
+        platform: "darwin",
+        arch: "arm64",
+        compilerSourceBuilder: async () => {
+          sourceBuildCalled = true;
+          throw new Error("compiler source build must not run");
+        },
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
         runner: fake.runner,
       }),
@@ -608,12 +633,45 @@ describe("production release preflight", function () {
     expect(error?.message).to.equal(
       "Production release is blocked: checked-in ZK proving keys are marked development-only",
     );
+    expect(sourceBuildCalled).to.equal(false);
 
     expect(fake.calls.map(commandLabel)).to.deep.equal([
       "git rev-parse HEAD",
       "git status --porcelain=v1 --untracked-files=all",
     ]);
     expect(fake.calls.some(({ executable }) => executable === "npm")).to.equal(false);
+  });
+
+  it("requires schemaVersion 3 before starting a compiler source build", async function () {
+    const fixture = await productionFixture();
+    fixture.manifest.schemaVersion = 2;
+    delete fixture.manifest.toolchain.snarkjsRuntimeSha256;
+    await writeManifest(fixture.root, fixture.manifest);
+    const fake = createFakeRunner();
+    let sourceBuildCalled = false;
+
+    const error = await captureError(() =>
+      runReleasePreflight({
+        root: fixture.root,
+        platform: "darwin",
+        arch: "arm64",
+        compilerSourceBuilder: async () => {
+          sourceBuildCalled = true;
+          throw new Error("compiler source build must not run");
+        },
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
+        runner: fake.runner,
+      }),
+    );
+
+    expect(error?.message).to.equal(
+      "Release preflight requires ZK manifest schemaVersion 3 with a reviewed snarkjs runtime graph",
+    );
+    expect(sourceBuildCalled).to.equal(false);
+    expect(fake.calls.map(commandLabel)).to.deep.equal([
+      "git rev-parse HEAD",
+      "git status --porcelain=v1 --untracked-files=all",
+    ]);
   });
 
   it("runs all checks in order, then verifies Powers of Tau and both final zkeys", async function () {
@@ -682,6 +740,7 @@ describe("production release preflight", function () {
   it("rejects an initially dirty Git working tree before npm or ZK verification", async function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner({ statuses: [" M contracts/DeepFamily.sol"] });
+    let compilerInspected = false;
 
     const error = await captureError(() =>
       runWithFixtureCompiler({
@@ -690,12 +749,17 @@ describe("production release preflight", function () {
         arch: "x64",
         expectedProductionPhase1: fixture.expectedProductionPhase1,
         ptauPath: fixture.ptauPath,
+        compilerInspector: async () => {
+          compilerInspected = true;
+          throw new Error("compiler inspection must not run");
+        },
         runner: fake.runner,
       }),
     );
     expect(error?.message).to.equal(
       "Release preflight requires a clean Git working tree (before checks)",
     );
+    expect(compilerInspected).to.equal(false);
 
     expect(fake.calls.map(commandLabel)).to.deep.equal([
       "git rev-parse HEAD",
@@ -797,7 +861,7 @@ describe("production release preflight", function () {
         }),
       );
       expect(error?.message).to.match(
-        /Published Powers of Tau is unavailable:.*tmp\/zk-production/u,
+        /Published Powers of Tau is unavailable:.*tmp[\\/]zk-production/u,
       );
     } finally {
       if (previousPtauPath === undefined) delete process.env.ZK_PTAU_PATH;

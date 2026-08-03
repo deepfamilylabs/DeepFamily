@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { CIRCOM_VERSION, resolveLocalCircomTarget } from "../scripts/lib/circomToolchain.mjs";
+import { CIRCOM_VERSION, resolveCircomTargetPolicy } from "../scripts/lib/circomToolchain.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_PRODUCTION_CONTRIBUTORS,
@@ -169,7 +169,10 @@ const createProductionFixture = async ({
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
   };
-  const compilerTarget = resolveLocalCircomTarget(compilerRuntime);
+  const compilerTarget = resolveCircomTargetPolicy({
+    version: CIRCOM_VERSION,
+    ...compilerRuntime,
+  });
   const compiler = {
     version: CIRCOM_VERSION,
     target: compilerTarget.id,
@@ -432,14 +435,11 @@ describe("ZK artifact trust", function () {
       expect(result.toolchain.snarkjsRuntime).to.equal(null);
     });
 
-    it("validates schema-v3 compiler evidence for every supported target and Linux libc", async function () {
+    it("validates schema-v3 compiler evidence for every supported Circom 2.1.6 target", async function () {
       for (const compilerRuntime of [
         { platform: "linux", arch: "x64", libc: "glibc" },
-        { platform: "linux", arch: "x64", libc: "musl" },
-        { platform: "darwin", arch: "x64" },
-        { platform: "win32", arch: "x64" },
-        { platform: "linux", arch: "arm64", libc: "glibc" },
         { platform: "darwin", arch: "arm64" },
+        { platform: "win32", arch: "x64" },
       ]) {
         await replaceFixture({ compilerRuntime });
         const result = inspectProductionFixture(fixture);

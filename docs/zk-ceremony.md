@@ -111,15 +111,11 @@ inputs and records the explicit production trust model described above.
 
 The compiler support matrix is:
 
-| Host/runtime                                | Installation strategy                         | Prerequisites                               | May run release gates |
-| ------------------------------------------- | --------------------------------------------- | ------------------------------------------- | --------------------- |
-| Linux x64 with glibc                        | Pinned official release asset                 | None                                        | Yes                   |
-| Linux x64 with musl (including Alpine)      | Build the pinned source commit                | `git`, Rust/Cargo, musl C build toolchain   | Yes                   |
-| macOS x64                                   | Pinned official release asset                 | macOS 12+                                   | Yes                   |
-| Windows x64                                 | Pinned official release asset                 | Visual C++ 2015–2022 Redistributable        | Yes                   |
-| Linux arm64                                 | Build the pinned source commit                | `git`, Rust/Cargo, native linker toolchain  | Yes                   |
-| macOS arm64                                 | Build the pinned source commit                | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                   |
-| Windows 11 ARM64 host with x64 Node 22.10.0 | Pinned Windows x64 asset through OS emulation | x64 Node and Visual C++ x64 runtime         | Yes                   |
+| Host/runtime         | Installation strategy          | Prerequisites                               | May run release gates |
+| -------------------- | ------------------------------ | ------------------------------------------- | --------------------- |
+| Linux x64 with glibc | Pinned official release asset  | None                                        | Yes                   |
+| macOS arm64          | Build the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                   |
+| Windows x64          | Pinned official release asset  | Visual C++ 2015–2022 Redistributable        | Yes                   |
 
 Official assets must match their fixed SHA-256. Source builds must come from the pinned commit and
 report the exact pinned compiler version. Every circuit compilation passes `--O2` explicitly, and
@@ -127,32 +123,37 @@ the artifact gate compares rebuilt R1CS and WASM output hashes with the reviewed
 published files. A native compiler is therefore suitable for development only until its output has
 passed those comparisons; matching the version string alone is not release evidence.
 
-Both `zk:production:setup` and `release:preflight` support every release-gate runtime above. Linux
-libc is detected from Node's process report: Linux x64 with glibc uses the pinned official asset,
-while Linux x64 with musl and every Linux arm64 runtime build the pinned source commit. Release
-gates never execute a reusable source-built compiler from `bin/`: they perform a fresh locked build
-of the pinned commit in the current user's private OS temporary directory and bind its binary hash,
-source commit, Cargo, and Rust versions into the evidence. The source builder removes inherited
-Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker, and package-discovery overrides. It
-uses private Cargo/XDG homes, empty Git system/global configuration files, and an empty hooks
-directory. Before any Groth16 Setup or Phase 2 contribution, production setup compiles both
+Both `zk:production:setup` and `release:preflight` support the three release-gate runtimes above.
+Linux libc is detected from Node's process report: Linux x64 with glibc uses the pinned official
+asset, while musl is rejected explicitly. Windows ARM64 hosts remain unsupported even with x64 Node
+emulation. The macOS arm64 release gates never execute the reusable
+source-built compiler from `bin/`: they perform a fresh locked build of the pinned commit in the
+current user's protected build directory and bind its binary hash, source commit, Cargo, and Rust
+versions into the evidence. The source builder rejects external ancestor Cargo configuration,
+removes inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker, and
+package-discovery overrides. It resolves Git/Cargo/Rustc to protected absolute executables and uses
+a controlled PATH, private home/Cargo/XDG/temporary directories, empty Git system/global
+configuration files, and an empty hooks directory. The resulting compiler is copied into the
+private release stage. Before any Groth16 Setup or Phase 2 contribution, production setup compiles both
 circuits and verifies every staged R1CS/WASM hash against the reviewed manifest. The canonical
 Linux amd64 glibc binary remains a fixed-digest reference; other runtimes hash it but never execute
 it. The schema-v3 ceremony transcript records which native compiler and Linux libc evidence
 actually produced the staged circuits.
+
+Production setup reads the contribution helper and its local dependency from the exact
+release-commit Git blobs. It verifies their Git object IDs while staging and their SHA-256 digests
+both before creating Phase 2 entropy and immediately before passing that entropy to the helper
+process.
 
 Every release-only temporary root is hardened before use. On POSIX it must be a real directory
 owned by the current user with mode `0700`. On Windows the command disables ACL inheritance,
 removes existing access rules, sets the current user SID as owner and sole full-control principal,
 then re-reads and validates that ACL. Failure removes the temporary root and aborts the operation.
 
-On Windows, invoke these entry points through `npm run` so child npm commands use the real npm
-JavaScript CLI. On Windows 11 ARM64, use x64 Node, reinstall dependencies under that runtime, and
-confirm `node -p process.arch` prints `x64`; the full workflow then uses Windows' built-in x64
-emulation. Native Windows ARM64 Node is not a supported host: no Circom target is registered for
-`win32-arm64`, so `zk:fetch` fails closed with an unsupported-host error. CI therefore runs the
-complete Windows ARM64-host workflow with x64 Node. The complete preflight test suite must also run in an
-environment permitted to create symbolic links (for example, Windows Developer Mode). Repository
+On Windows x64, invoke these entry points through `npm run` so child npm commands use the real npm
+JavaScript CLI. The complete preflight test suite must run in an environment permitted to create
+symbolic links (for example, Windows Developer Mode). CI uses GitHub's `ubuntu-latest` x64/glibc
+runner and also exercises macOS arm64 and Windows x64. Repository
 `.gitattributes` keeps hashed circuit and source text on canonical LF line endings across operating
 systems. The strict manifest/transcript reader also accepts an older checkout containing uniform
 CRLF and normalizes it to LF before calculating evidence hashes; mixed line endings remain invalid.
@@ -277,8 +278,7 @@ The schema-v3 transcript records:
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 `platform` and `architecture` describe the Node/compiler execution runtime, not a hardware
-attestation. A Windows 11 ARM64 host using the required x64 Node runtime therefore records
-`win32`/`x64`.
+attestation.
 
 The single-operator transcript intentionally has no generated EVM identity signature. An ephemeral
 self-generated wallet signature would not prove independent participation or improve the trust

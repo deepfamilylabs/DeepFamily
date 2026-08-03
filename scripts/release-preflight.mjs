@@ -5,7 +5,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assertLocalCircomInstallation, buildPinnedCircomFromSource } from "./fetch-circom.mjs";
+import {
+  assertLocalCircomInstallation,
+  buildPinnedCircomFromSource,
+  resolveTrustedSourceBuildTool,
+} from "./fetch-circom.mjs";
 import {
   buildCircomOverrideEnvironment,
   withoutCircomOverrideEnvironment,
@@ -59,10 +63,10 @@ export const defaultRunner = ({
   });
 };
 
-const assertCleanGitState = ({ root, runner, stage, env }) => {
+const assertCleanGitState = ({ root, runner, stage, env, gitExecutable }) => {
   const commit = String(
     runner({
-      executable: "git",
+      executable: gitExecutable,
       args: ["rev-parse", "HEAD"],
       cwd: root,
       capture: true,
@@ -71,7 +75,7 @@ const assertCleanGitState = ({ root, runner, stage, env }) => {
   ).trim();
   const status = String(
     runner({
-      executable: "git",
+      executable: gitExecutable,
       args: ["status", "--porcelain=v1", "--untracked-files=all"],
       cwd: root,
       capture: true,
@@ -98,6 +102,7 @@ export const runReleasePreflight = async ({
   commands = RELEASE_PREFLIGHT_COMMANDS,
   compilerInspector = assertLocalCircomInstallation,
   compilerSourceBuilder = buildPinnedCircomFromSource,
+  gitToolResolver = resolveTrustedSourceBuildTool,
   privateDirectoryFactory = createPrivateTemporaryDirectory,
   ptauPath,
   mpcMetadataReader,
@@ -111,13 +116,39 @@ export const runReleasePreflight = async ({
   if (typeof compilerSourceBuilder !== "function") {
     throw new Error("compilerSourceBuilder must be a function");
   }
+  if (typeof gitToolResolver !== "function") {
+    throw new Error("gitToolResolver must be a function");
+  }
   if (typeof privateDirectoryFactory !== "function") {
     throw new Error("privateDirectoryFactory must be a function");
   }
-  assertReleaseRuntimeCompatibility({ platform, arch, operation: "Release preflight" });
+  assertReleaseRuntimeCompatibility({ platform, arch, env, operation: "Release preflight" });
 
   const localTarget = resolveLocalCircomTarget({ platform, arch, libc, report });
   const baseEnvironment = withoutCircomOverrideEnvironment(sanitizeReleaseEnvironment(env));
+  const gitExecutable = await gitToolResolver({ name: "git" });
+  if (typeof gitExecutable !== "string" || !path.isAbsolute(gitExecutable)) {
+    throw new Error("Release preflight Git resolver must return an absolute path");
+  }
+  const releaseCommit = assertCleanGitState({
+    root,
+    runner,
+    stage: "before checks",
+    env: baseEnvironment,
+    gitExecutable,
+  });
+  // Refuse an unreviewed artifact set before inspecting or building any local compiler.
+  const initialZkEvidence = inspectZkReleaseArtifacts({
+    root,
+    requireProduction: true,
+    requireBuiltR1cs: false,
+    expectedProductionPhase1,
+  });
+  if (initialZkEvidence.schemaVersion !== 3) {
+    throw new Error(
+      "Release preflight requires ZK manifest schemaVersion 3 with a reviewed snarkjs runtime graph",
+    );
+  }
   let compilerStageRoot;
   try {
     let localCompiler;
@@ -184,25 +215,6 @@ export const runReleasePreflight = async ({
         ? buildCircomOverrideEnvironment({ env: baseEnvironment, compiler: localCompiler })
         : baseEnvironment;
 
-    const releaseCommit = assertCleanGitState({
-      root,
-      runner,
-      stage: "before checks",
-      env: baseEnvironment,
-    });
-    // Fail before expensive checks when development-only proving keys are still checked in.
-    const initialZkEvidence = inspectZkReleaseArtifacts({
-      root,
-      requireProduction: true,
-      requireBuiltR1cs: false,
-      expectedProductionPhase1,
-    });
-    if (initialZkEvidence.schemaVersion !== 3) {
-      throw new Error(
-        "Release preflight requires ZK manifest schemaVersion 3 with a reviewed snarkjs runtime graph",
-      );
-    }
-
     for (const [executable, args] of commands) {
       const usesCircom =
         executable === "npm" && args[0] === "run" && args[1] === "zk:artifacts:check";
@@ -228,6 +240,7 @@ export const runReleasePreflight = async ({
       runner,
       stage: "after checks",
       env: baseEnvironment,
+      gitExecutable,
     });
     if (finishedCommit !== releaseCommit) {
       throw new Error("Release commit changed while preflight was running");

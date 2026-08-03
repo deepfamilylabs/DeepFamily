@@ -15,10 +15,15 @@ export function normalizeFrontendArtifact(artifact) {
   if (artifact === null || typeof artifact !== "object" || Array.isArray(artifact)) {
     throw new Error("Contract artifact must be a JSON object");
   }
-  // Hardhat's buildInfoId changes when any source in the shared compiler input changes, even when
-  // this contract's ABI and bytecode are identical. It is release evidence for root artifacts, but
-  // frontend runtime code neither uses nor verifies it, so copying it makes clean builds dirty.
-  const { buildInfoId: _buildInfoId, ...stableArtifact } = artifact;
+  // Hardhat's buildInfoId and Solidity's immutable-reference AST IDs can change when another source
+  // in the shared compiler input changes, even when this contract's ABI and bytecode are identical.
+  // They remain available in the root release artifacts; frontend runtime code uses neither field,
+  // so copying them makes clean builds dirty without adding runtime evidence.
+  const {
+    buildInfoId: _buildInfoId,
+    immutableReferences: _immutableReferences,
+    ...stableArtifact
+  } = artifact;
   return stableArtifact;
 }
 

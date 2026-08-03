@@ -23,13 +23,20 @@ export const sanitizeReleaseEnvironment = (env = process.env) => {
 export const assertReleaseRuntimeCompatibility = ({
   platform = process.platform,
   arch = process.arch,
+  env = process.env,
   operation = "Release operation",
 } = {}) => {
-  if (platform === "win32" && arch === "arm64") {
+  if (platform !== "win32") return;
+
+  const nativeHostArchitecture = String(
+    readWindowsEnvironmentValue(env, "PROCESSOR_ARCHITEW6432") ??
+      readWindowsEnvironmentValue(env, "PROCESSOR_ARCHITECTURE") ??
+      "",
+  ).toLowerCase();
+  if (arch === "arm64" || nativeHostArchitecture === "arm64") {
     throw new Error(
-      `${operation} on a Windows ARM64 host requires the x64 build of Node.js because ` +
-        "Hardhat's pinned native dependencies do not publish Windows ARM64 binaries. " +
-        "Install Node.js x64, reinstall dependencies, and confirm `node -p process.arch` prints x64.",
+      `${operation} does not support Windows ARM64 hosts, including x64 Node.js emulation; ` +
+        "the supported Windows runtime is x64 Node.js on an x64 host.",
     );
   }
 };

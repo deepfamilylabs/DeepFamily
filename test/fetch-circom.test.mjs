@@ -1,7 +1,9 @@
 import { expect } from "chai";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import {
@@ -12,12 +14,15 @@ import {
   buildCircomInstallPlan,
   installCircomToolchains,
   installPinnedCircom,
+  resolveTrustedSourceBuildTool,
 } from "../scripts/fetch-circom.mjs";
 import {
   CIRCOM_SOURCE_COMMIT,
   CIRCOM_SOURCE_REPOSITORY,
+  CIRCOM_RUNTIME_TARGET_ALLOWLIST,
   CIRCOM_TARGET_POLICIES,
   CIRCOM_TARGETS,
+  circomTargetKey,
   detectLinuxLibcEvidence,
   localCircomBinaryPath,
   resolveLocalCircomTarget,
@@ -35,25 +40,9 @@ const supportedRuntimes = [
     libc: "glibc",
     strategy: "official-binary",
   },
-  {
-    id: "linux-x64-musl",
-    platform: "linux",
-    arch: "x64",
-    libc: "musl",
-    strategy: "pinned-source",
-  },
-  { id: "darwin-x64", platform: "darwin", arch: "x64", strategy: "official-binary" },
-  { id: "win32-x64", platform: "win32", arch: "x64", strategy: "official-binary" },
-  {
-    id: "linux-arm64",
-    platform: "linux",
-    arch: "arm64",
-    libc: "glibc",
-    strategy: "pinned-source",
-  },
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", strategy: "pinned-source" },
+  { id: "win32-x64", platform: "win32", arch: "x64", strategy: "official-binary" },
 ];
-
 const officialBytes = Buffer.from("hermetic official Circom fixture");
 const officialTarget = Object.freeze({
   id: "fixture-official-linux-x64",
@@ -82,7 +71,7 @@ describe("pinned Circom installer", function () {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  it("detects glibc and musl from the Node process report header", function () {
+  it("detects glibc and musl but accepts only the supported glibc runtime", function () {
     const glibc = detectLinuxLibcEvidence({
       report: {
         getReport: () => ({ header: { glibcVersionRuntime: " 2.39 " } }),
@@ -117,20 +106,18 @@ describe("pinned Circom installer", function () {
       id: "linux-x64",
       strategy: "official-binary",
     });
-    expect(
+    expect(() =>
       resolveLocalCircomTarget({
         platform: "linux",
         arch: "x64",
         report: { header: {} },
       }),
-    ).to.include({
-      id: "linux-x64-musl",
-      strategy: "pinned-source",
-    });
+    ).to.throw("Unsupported Linux libc musl; the supported Linux runtime is x64 with glibc");
   });
 
   it("resolves every supported target and rejects unsupported hosts or libc families", function () {
-    expect(Object.keys(CIRCOM_TARGETS)).to.deep.equal(supportedRuntimes.map(({ id }) => id));
+    expect(CIRCOM_RUNTIME_TARGET_ALLOWLIST).to.deep.equal(supportedRuntimes.map(({ id }) => id));
+    expect(Object.isFrozen(CIRCOM_RUNTIME_TARGET_ALLOWLIST)).to.equal(true);
 
     for (const runtime of supportedRuntimes) {
       const target = resolveLocalCircomTarget(runtime);
@@ -165,8 +152,8 @@ describe("pinned Circom installer", function () {
     }
 
     expect(() => resolveLocalCircomTarget({ platform: "freebsd", arch: "riscv64" })).to.throw(
-      "Unsupported Circom host freebsd/riscv64; supported targets: " +
-        Object.keys(CIRCOM_TARGETS).join(", "),
+      "Unsupported Circom host freebsd/riscv64; supported runtime targets: " +
+        CIRCOM_RUNTIME_TARGET_ALLOWLIST.join(", "),
     );
     expect(() =>
       resolveLocalCircomTarget({
@@ -189,15 +176,53 @@ describe("pinned Circom installer", function () {
         libc: "musl",
       }),
     ).to.throw("A libc override is only valid for Linux hosts, got darwin");
+    expect(() =>
+      resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "x64",
+        libc: "musl",
+      }),
+    ).to.throw("Unsupported Linux libc musl; the supported Linux runtime is x64 with glibc");
+    expect(() =>
+      resolveLocalCircomTarget({
+        platform: "linux",
+        arch: "arm64",
+        libc: "glibc",
+      }),
+    ).to.throw("Unsupported Circom host linux/arm64");
+    expect(() =>
+      resolveLocalCircomTarget({
+        platform: "darwin",
+        arch: "x64",
+      }),
+    ).to.throw("Unsupported Circom host darwin/x64");
+    expect(() => circomTargetKey({ platform: "darwin", arch: "x64" })).to.throw(
+      "Unsupported Circom host darwin/x64",
+    );
+    expect(() => circomTargetKey({ platform: "linux", arch: "arm64", libc: "glibc" })).to.throw(
+      "Unsupported Circom host linux/arm64",
+    );
+    expect(() =>
+      resolveLocalCircomTarget({
+        platform: "win32",
+        arch: "x64",
+        env: {
+          PROCESSOR_ARCHITECTURE: "AMD64",
+          PROCESSOR_ARCHITEW6432: "ARM64",
+        },
+      }),
+    ).to.throw("Unsupported Windows ARM64 host, including x64 Node.js emulation");
   });
 
-  it("keeps the Circom 2.1.6 source policy bound to its historical repository and commit", function () {
-    for (const targetId of ["linux-x64-musl", "linux-arm64", "darwin-arm64"]) {
-      expect(CIRCOM_TARGET_POLICIES["2.1.6"][targetId]).to.include({
-        repository: "https://github.com/iden3/circom.git",
-        commit: "57b18f68794189753964bfb6e18e64385fed9c2c",
-      });
-    }
+  it("registers only the three supported Circom 2.1.6 targets", function () {
+    expect(Object.keys(CIRCOM_TARGET_POLICIES["2.1.6"])).to.deep.equal(
+      supportedRuntimes.map(({ id }) => id),
+    );
+    expect(CIRCOM_TARGETS).to.equal(CIRCOM_TARGET_POLICIES["2.1.6"]);
+    expect(CIRCOM_TARGET_POLICIES["2.1.6"]["darwin-arm64"]).to.include({
+      repository: "https://github.com/iden3/circom.git",
+      commit: "57b18f68794189753964bfb6e18e64385fed9c2c",
+    });
   });
 
   it("builds canonical and local install paths for every supported target", function () {
@@ -259,48 +284,56 @@ describe("pinned Circom installer", function () {
     expect(results.map(({ role }) => role)).to.deep.equal(["canonical-release", "local"]);
   });
 
-  it("keeps the canonical glibc compiler while planning a source build for Linux x64 musl", function () {
-    const [canonical, local] = buildCircomInstallPlan({
-      platform: "linux",
-      arch: "x64",
-      libc: "musl",
-    });
-
-    expect(canonical.target).to.equal(CIRCOM_CANONICAL_POLICY.target);
-    expect(canonical.target.id).to.equal("linux-x64");
-    expect(canonical.target.strategy).to.equal("official-binary");
-    expect(local.target).to.include({
-      id: "linux-x64-musl",
-      strategy: "pinned-source",
-    });
-    expect(local.target.libcEvidence).to.deep.equal({
-      family: "musl",
-      version: null,
-      source: "explicit-libc",
-    });
+  it("refuses to plan a compiler installation for Linux x64 musl", function () {
+    expect(() =>
+      buildCircomInstallPlan({
+        platform: "linux",
+        arch: "x64",
+        libc: "musl",
+      }),
+    ).to.throw("Unsupported Linux libc musl; the supported Linux runtime is x64 with glibc");
   });
 
-  it("builds arm64 from the exact source commit with locked Cargo dependencies", async function () {
+  it("refuses to plan installations for unsupported targets", function () {
+    for (const runtime of [
+      { platform: "darwin", arch: "x64" },
+      { platform: "linux", arch: "arm64", libc: "glibc" },
+    ]) {
+      expect(() => buildCircomInstallPlan(runtime)).to.throw("Unsupported Circom host");
+    }
+  });
+
+  it("builds macOS arm64 from the exact source commit with locked Cargo dependencies", async function () {
     const target = CIRCOM_TARGETS["darwin-arm64"];
     const temporaryRoot = path.join(root, "source-build");
     const commands = [];
+    const fixtureTools = Object.fromEntries(
+      ["git", "cargo", "rustc"].map((name) => [
+        name,
+        process.platform === "win32"
+          ? path.join(root, "trusted-tools", `${name}.exe`)
+          : path.join("/usr/bin", name),
+      ]),
+    );
+    if (process.platform === "win32") await fs.mkdir(path.dirname(fixtureTools.git));
     let removedDirectory;
     const commandRunner = async ({ executable, args, cwd, capture = false, env }) => {
       commands.push({ executable, args: [...args], cwd, capture, env });
-      if (executable === "git" && args[0] === "init") {
+      const toolName = path.basename(executable).replace(/\.exe$/u, "");
+      if (toolName === "git" && args[0] === "init") {
         await fs.mkdir(args[1], { recursive: true });
         return;
       }
-      if (executable === "git" && args[0] === "rev-parse") {
+      if (toolName === "git" && args[0] === "rev-parse") {
         return `${target.commit}\n`;
       }
-      if (executable === "cargo" && args[0] === "--version") {
+      if (toolName === "cargo" && args[0] === "--version") {
         return "cargo 1.89.0 (fixture)\n";
       }
-      if (executable === "rustc") {
+      if (toolName === "rustc") {
         return "rustc 1.89.0 (fixture)\n";
       }
-      if (executable === "cargo" && args[0] === "build") {
+      if (toolName === "cargo" && args[0] === "build") {
         const outputDirectory = path.join(cwd, "target", "release");
         await fs.mkdir(outputDirectory, { recursive: true });
         await fs.writeFile(path.join(outputDirectory, "circom"), sourceBytes);
@@ -315,18 +348,33 @@ describe("pinned Circom installer", function () {
       target,
       env: {
         FIXTURE_SAFE: "preserved",
+        HOME: "/untrusted/source-home",
+        PATH: path.join(root, "node_modules", ".bin"),
+        TMPDIR: "/untrusted/source-tmp",
         NODE_OPTIONS: "--require=/untrusted/node-hook.cjs",
         LD_PRELOAD: "/untrusted/preload.so",
         NPM_CONFIG_SCRIPT_SHELL: "/untrusted/shell",
         GIT_CONFIG_COUNT: "9",
+        RUSTUP_TOOLCHAIN: "nightly-untrusted",
+        RUSTUP_HOME: "/untrusted/rustup-home",
+        RUSTC_BOOTSTRAP: "1",
+        RUSTC_LINKER: "/untrusted/linker",
         RUSTC_WRAPPER: "/untrusted/rust-wrapper",
+        RUST_PATH: "/untrusted/rust-path",
+        RUST_TARGET_PATH: "/untrusted/rust-targets",
         CARGO_HOME: "/untrusted/cargo-home",
         CC: "/untrusted/compiler",
       },
       commandRunner,
-      temporaryDirectoryFactory: async () => {
+      toolPathResolver: async ({ name }) => fixtureTools[name],
+      sourceBuildBaseDirectory: root,
+      temporaryDirectoryFactory: async ({ baseDirectory }) => {
+        expect(baseDirectory).to.equal(root);
         await fs.mkdir(temporaryRoot);
         return temporaryRoot;
+      },
+      sourceBuildDirectoryValidator: async ({ sourceDirectory }) => {
+        expect(sourceDirectory).to.equal(path.join(temporaryRoot, "source"));
       },
       temporaryDirectoryRemover: async (directory) => {
         removedDirectory = directory;
@@ -342,13 +390,14 @@ describe("pinned Circom installer", function () {
     expect(
       commands.some(
         ({ executable, args }) =>
-          executable === "git" && args.join(" ") === `fetch --depth 1 origin ${target.commit}`,
+          executable === fixtureTools.git &&
+          args.join(" ") === `fetch --depth 1 origin ${target.commit}`,
       ),
     ).to.equal(true);
     expect(
       commands.some(
         ({ executable, args }) =>
-          executable === "cargo" && args.join(" ") === "build --release --locked",
+          executable === fixtureTools.cargo && args.join(" ") === "build --release --locked",
       ),
     ).to.equal(true);
     expect(commands.some(({ executable }) => path.basename(executable) === "circom")).to.equal(
@@ -360,7 +409,13 @@ describe("pinned Circom installer", function () {
         "NODE_OPTIONS",
         "LD_PRELOAD",
         "NPM_CONFIG_SCRIPT_SHELL",
+        "RUSTUP_TOOLCHAIN",
+        "RUSTUP_HOME",
+        "RUSTC_BOOTSTRAP",
+        "RUSTC_LINKER",
         "RUSTC_WRAPPER",
+        "RUST_PATH",
+        "RUST_TARGET_PATH",
         "CC",
       ]) {
         expect(env).not.to.have.property(blocked);
@@ -369,10 +424,194 @@ describe("pinned Circom installer", function () {
       expect(env.GIT_CONFIG_KEY_0).to.equal("core.hooksPath");
       expect(env.GIT_CONFIG_VALUE_0).to.equal(path.join(temporaryRoot, "empty-git-hooks"));
       expect(env.CARGO_HOME).to.equal(path.join(temporaryRoot, "cargo-home"));
+      expect(env.HOME).to.equal(path.join(temporaryRoot, "source-home"));
+      expect(env.TMPDIR).to.equal(path.join(temporaryRoot, "tmp"));
+      expect(env.TMP).to.equal(path.join(temporaryRoot, "tmp"));
+      expect(env.TEMP).to.equal(path.join(temporaryRoot, "tmp"));
+      expect(env.RUSTC).to.equal(fixtureTools.rustc);
+      expect(env.PATH.split(path.delimiter)).to.include(path.dirname(fixtureTools.cargo));
+      expect(env.PATH).not.to.include("node_modules");
     }
     expect(removedDirectory).to.equal(temporaryRoot);
     await expectFileMissing(temporaryRoot);
   });
+
+  it("ignores executable PATH wrappers and resolves only protected absolute build tools", async function () {
+    if (process.platform === "win32") this.skip();
+
+    const attackerDirectory = path.join(root, "node_modules", ".bin");
+    const markerDirectory = path.join(root, "path-wrapper-markers");
+    await fs.mkdir(attackerDirectory, { recursive: true });
+    await fs.mkdir(markerDirectory);
+    for (const name of ["git", "cargo", "rustc"]) {
+      const marker = path.join(markerDirectory, name);
+      const wrapper = path.join(attackerDirectory, name);
+      await fs.writeFile(wrapper, `#!/bin/sh\nprintf attacked > '${marker}'\nexit 0\n`, {
+        mode: 0o755,
+      });
+      await fs.chmod(wrapper, 0o755);
+    }
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = attackerDirectory;
+    try {
+      for (const name of ["git", "cargo", "rustc"]) {
+        let executable;
+        try {
+          executable = await resolveTrustedSourceBuildTool({ name });
+        } catch (error) {
+          expect(error.message).to.include(`Unable to find a trusted absolute ${name}`);
+          continue;
+        }
+        expect(path.isAbsolute(executable)).to.equal(true);
+        expect(path.dirname(executable)).not.to.equal(attackerDirectory);
+        execFileSync(executable, ["--version"], {
+          env: { HOME: os.userInfo().homedir, PATH: "/usr/bin:/bin" },
+          stdio: "ignore",
+        });
+      }
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH;
+      else process.env.PATH = originalPath;
+    }
+
+    for (const name of ["git", "cargo", "rustc"]) {
+      await expectFileMissing(path.join(markerDirectory, name));
+    }
+  });
+
+  it("resolves rustup hardlink proxies before isolating HOME", async function () {
+    if (process.platform === "win32") this.skip();
+
+    const realHome = await fs.realpath(path.resolve(os.userInfo().homedir));
+    const trustedHome = await fs.mkdtemp(path.join(realHome, ".deepfamily-rustup-hardlink-"));
+    try {
+      const proxyDirectory = path.join(trustedHome, ".cargo", "bin");
+      const toolchainDirectory = path.join(trustedHome, ".rustup", "toolchains", "fixture", "bin");
+      await fs.mkdir(proxyDirectory, { recursive: true, mode: 0o700 });
+      await fs.mkdir(toolchainDirectory, { recursive: true, mode: 0o700 });
+      const rustup = path.join(proxyDirectory, "rustup");
+      const cargoProxy = path.join(proxyDirectory, "cargo");
+      const rustcProxy = path.join(proxyDirectory, "rustc");
+      const actualCargo = path.join(toolchainDirectory, "cargo");
+      const actualRustc = path.join(toolchainDirectory, "rustc");
+      await fs.writeFile(
+        rustup,
+        '#!/bin/sh\ncase "$1:$2" in\n  which:cargo) printf "%s\\n" "$HOME/.rustup/toolchains/fixture/bin/cargo" ;;\n  which:rustc) printf "%s\\n" "$HOME/.rustup/toolchains/fixture/bin/rustc" ;;\n  *) exit 64 ;;\nesac\n',
+        { mode: 0o755 },
+      );
+      await fs.chmod(rustup, 0o755);
+      await fs.link(rustup, cargoProxy);
+      await fs.link(rustup, rustcProxy);
+      for (const executable of [actualCargo, actualRustc]) {
+        await fs.writeFile(executable, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+        await fs.chmod(executable, 0o755);
+      }
+
+      const [rustupState, cargoProxyState, rustcProxyState] = await Promise.all(
+        [rustup, cargoProxy, rustcProxy].map((filePath) => fs.stat(filePath)),
+      );
+      expect(cargoProxyState.ino).to.equal(rustupState.ino);
+      expect(rustcProxyState.ino).to.equal(rustupState.ino);
+
+      expect(
+        await resolveTrustedSourceBuildTool({ name: "cargo", homeDirectory: trustedHome }),
+      ).to.equal(await fs.realpath(actualCargo));
+      expect(
+        await resolveTrustedSourceBuildTool({ name: "rustc", homeDirectory: trustedHome }),
+      ).to.equal(await fs.realpath(actualRustc));
+    } finally {
+      await fs.rm(trustedHome, { recursive: true, force: true });
+    }
+  });
+
+  it("uses a persistent user-owned base instead of the OS temporary directory by default", async function () {
+    const sentinel = new Error("stop after observing the source-build base");
+    let observedBaseDirectory;
+
+    const error = await captureError(() =>
+      buildPinnedCircomFromSource({
+        target: CIRCOM_TARGETS["darwin-arm64"],
+        temporaryDirectoryFactory: async ({ baseDirectory }) => {
+          observedBaseDirectory = baseDirectory;
+          throw sentinel;
+        },
+      }),
+    );
+
+    expect(error).to.equal(sentinel);
+    expect(observedBaseDirectory).to.equal(
+      path.join(
+        await fs.realpath(path.resolve(os.userInfo().homedir)),
+        ".deepfamily",
+        "circom-source-builds",
+      ),
+    );
+    expect(observedBaseDirectory).to.not.equal(os.tmpdir());
+  });
+
+  it("rejects a source-build base with a group-writable POSIX ancestor", async function () {
+    if (process.platform === "win32") this.skip();
+
+    const unsafeAncestor = path.join(root, "group-writable-source-parent");
+    const configuredBase = path.join(unsafeAncestor, "source-builds");
+    await fs.mkdir(unsafeAncestor, { mode: 0o700 });
+    await fs.chmod(unsafeAncestor, 0o770);
+    let commands = 0;
+
+    const error = await captureError(() =>
+      buildPinnedCircomFromSource({
+        target: CIRCOM_TARGETS["darwin-arm64"],
+        sourceBuildBaseDirectory: configuredBase,
+        commandRunner: async () => {
+          commands += 1;
+        },
+      }),
+    );
+
+    expect(error, "expected writable ancestor rejection").to.be.an("error");
+    expect(error.message).to.include("must not be group- or other-writable");
+    expect(error.message).to.include(unsafeAncestor);
+    expect(commands).to.equal(0);
+  });
+
+  for (const cargoConfigName of ["config", "config.toml"]) {
+    it(`rejects an ancestor .cargo/${cargoConfigName} outside the source checkout`, async function () {
+      const configuredBase = path.join(root, `cargo-${cargoConfigName.replace(".", "-")}-base`);
+      const temporaryRoot = path.join(configuredBase, "private-source-build");
+      const cargoConfigPath = path.join(root, ".cargo", cargoConfigName);
+      await fs.mkdir(path.dirname(cargoConfigPath), { recursive: true, mode: 0o700 });
+      await fs.writeFile(cargoConfigPath, "[build]\nrustc-wrapper = '/untrusted/wrapper'\n");
+      await fs.mkdir(configuredBase, { mode: 0o700 });
+      let commands = 0;
+      let removedDirectory;
+
+      const error = await captureError(() =>
+        buildPinnedCircomFromSource({
+          target: CIRCOM_TARGETS["darwin-arm64"],
+          sourceBuildBaseDirectory: configuredBase,
+          temporaryDirectoryFactory: async () => {
+            await fs.mkdir(temporaryRoot, { mode: 0o700 });
+            return temporaryRoot;
+          },
+          temporaryDirectoryRemover: async (directory) => {
+            removedDirectory = directory;
+            await fs.rm(directory, { recursive: true, force: true });
+          },
+          commandRunner: async () => {
+            commands += 1;
+          },
+        }),
+      );
+
+      expect(error, "expected ancestor Cargo config rejection").to.be.an("error");
+      expect(error.message).to.include("Cargo configuration outside its source directory");
+      expect(error.message).to.include(cargoConfigPath);
+      expect(commands).to.equal(0);
+      expect(removedDirectory).to.equal(temporaryRoot);
+      await expectFileMissing(temporaryRoot);
+    });
+  }
 
   it("installs an official binary only when its pinned digest and version match", async function () {
     const destinationRelativePath = "bin/circom-official-fixture";
@@ -598,41 +837,21 @@ describe("pinned Circom installer", function () {
     });
   });
 
-  it("returns musl libc evidence when inspecting a Linux x64 source build", async function () {
-    const target = resolveLocalCircomTarget({
-      platform: "linux",
-      arch: "x64",
-      libc: "musl",
-    });
-    await installPinnedCircom({
-      projectRoot: root,
-      target,
-      destinationRelativePath: "bin/circom",
-      sourceBuilder: async () => ({ bytes: sourceBytes, ...sourceMetadata }),
-      versionRunner: () => expectedVersionOutput,
-    });
+  it("rejects Linux x64 musl when inspecting a local compiler", async function () {
+    const error = await captureError(() =>
+      assertLocalCircomInstallation({
+        root,
+        platform: "linux",
+        arch: "x64",
+        libc: "musl",
+        versionRunner: () => expectedVersionOutput,
+      }),
+    );
 
-    const evidence = await assertLocalCircomInstallation({
-      root,
-      platform: "linux",
-      arch: "x64",
-      libc: "musl",
-      versionRunner: () => expectedVersionOutput,
-    });
-
-    expect(evidence).to.deep.equal({
-      path: path.join(root, "bin", "circom"),
-      target: "linux-x64-musl",
-      strategy: "pinned-source",
-      sha256: sha256(sourceBytes),
-      version: CIRCOM_VERSION,
-      libcEvidence: {
-        family: "musl",
-        version: null,
-        source: "explicit-libc",
-      },
-    });
-    expect(Object.isFrozen(evidence)).to.equal(true);
+    expect(error, "expected unsupported musl rejection").to.be.an("error");
+    expect(error.message).to.equal(
+      "Unsupported Linux libc musl; the supported Linux runtime is x64 with glibc",
+    );
   });
 
   it("rejects tampering with either a source-built binary or its provenance", async function () {
