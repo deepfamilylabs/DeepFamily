@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -21,6 +22,7 @@ import {
   installProductionArtifacts,
   runSingleOperatorProductionSetup,
   runSecretContribution,
+  snapshotProductionContributionHelper,
 } from "../scripts/lib/zkProductionSetup.mjs";
 import {
   CIRCOM_LINUX_X64_SHA256,
@@ -30,6 +32,52 @@ import {
 } from "../scripts/lib/circomToolchain.mjs";
 import { inspectSnarkjsRuntime, snapshotSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
+
+const REVIEWED_CONTRIBUTION_HELPER = 'import "./lib/snarkjsToolchain.mjs";\n';
+const REVIEWED_SNARKJS_TOOLCHAIN = "export const reviewedToolchain = true;\n";
+const FIXTURE_RELEASE_COMMIT = "a".repeat(40);
+
+const gitBlobObjectId = (bytes) =>
+  createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+
+const createFixtureGitCaptureRunner = ({
+  helper = REVIEWED_CONTRIBUTION_HELPER,
+  dependency = REVIEWED_SNARKJS_TOOLCHAIN,
+} = {}) => {
+  const committed = new Map(
+    [
+      ["scripts/zk-contribute-from-stdin.mjs", helper],
+      ["scripts/lib/snarkjsToolchain.mjs", dependency],
+    ].map(([relativePath, contents]) => {
+      const bytes = Buffer.from(contents);
+      return [relativePath, { bytes, objectId: gitBlobObjectId(bytes) }];
+    }),
+  );
+  return ({ args }) => {
+    if (args[0] === "rev-parse") return FIXTURE_RELEASE_COMMIT;
+    if (args[0] === "status") return "";
+    if (args[0] === "ls-tree") {
+      const relativePath = args.at(-1);
+      const blob = committed.get(relativePath);
+      if (blob === undefined) return Buffer.alloc(0);
+      return Buffer.from(`100644 blob ${blob.objectId}\t${relativePath}\0`);
+    }
+    if (args[0] === "cat-file") {
+      const objectId = args.at(-1);
+      return [...committed.values()].find((entry) => entry.objectId === objectId)?.bytes;
+    }
+    throw new Error(`Unexpected fixture Git command: ${args.join(" ")}`);
+  };
+};
+
+const installContributionHelperFixture = async (root) => {
+  const helperPath = path.join(root, "scripts", "zk-contribute-from-stdin.mjs");
+  const dependencyPath = path.join(root, "scripts", "lib", "snarkjsToolchain.mjs");
+  await fs.mkdir(path.dirname(dependencyPath), { recursive: true });
+  await fs.writeFile(helperPath, REVIEWED_CONTRIBUTION_HELPER);
+  await fs.writeFile(dependencyPath, REVIEWED_SNARKJS_TOOLCHAIN);
+  return { helperPath, dependencyPath };
+};
 
 describe("single-operator production ZK setup safety", function () {
   let root;
@@ -45,18 +93,30 @@ describe("single-operator production ZK setup safety", function () {
     await fs.rm(stage, { recursive: true, force: true });
   });
 
-  it("requires x64 Node when the host is Windows ARM64", async function () {
-    const error = await captureError(() =>
-      runSingleOperatorProductionSetup({
-        root,
-        env: {},
-        platform: "win32",
+  it("rejects native and x64-emulated Node on Windows ARM64 hosts", async function () {
+    for (const runtime of [
+      {
         arch: "arm64",
-      }),
-    );
+        env: { PROCESSOR_ARCHITECTURE: "ARM64" },
+      },
+      {
+        arch: "x64",
+        env: {
+          PROCESSOR_ARCHITECTURE: "AMD64",
+          PROCESSOR_ARCHITEW6432: "ARM64",
+        },
+      },
+    ]) {
+      const error = await captureError(() =>
+        runSingleOperatorProductionSetup({
+          root,
+          platform: "win32",
+          ...runtime,
+        }),
+      );
 
-    expect(error?.message).to.include("requires the x64 build of Node.js");
-    expect(error?.message).to.include("node -p process.arch");
+      expect(error?.message).to.include("does not support Windows ARM64 hosts");
+    }
   });
 
   it("uses the inspected native compiler path on Darwin arm64 and Windows", function () {
@@ -220,54 +280,13 @@ describe("single-operator production ZK setup safety", function () {
     expect(records.manifest.toolchain).to.deep.equal(canonicalToolchain);
   });
 
-  it("records Linux musl as a pinned-source compiler target", function () {
-    const libcEvidence = {
-      family: "musl",
-      version: null,
-      source: "process.report.header.glibcVersionRuntime",
-    };
-    expect(
-      buildProductionCompilerEvidence({
-        compiler: {
-          version: CIRCOM_VERSION,
-          target: "linux-x64-musl",
-          strategy: "pinned-source",
-          sha256: "44".repeat(32),
-          libcEvidence,
-          sourceBuild: {
-            repository: CIRCOM_SOURCE_REPOSITORY,
-            commit: CIRCOM_SOURCE_COMMIT,
-            cargoVersion: "cargo 1.88.0 fixture",
-            rustcVersion: "rustc 1.88.0 fixture",
-          },
-        },
-        platform: "linux",
-        arch: "x64",
-      }),
-    ).to.deep.equal({
-      version: CIRCOM_VERSION,
-      target: "linux-x64-musl",
-      platform: "linux",
-      arch: "x64",
-      strategy: "pinned-source",
-      binarySha256: "44".repeat(32),
-      libcEvidence,
-      sourceBuild: {
-        repository: CIRCOM_SOURCE_REPOSITORY,
-        commit: CIRCOM_SOURCE_COMMIT,
-        cargoVersion: "cargo 1.88.0 fixture",
-        rustcVersion: "rustc 1.88.0 fixture",
-      },
-    });
-  });
-
   it("rejects a manifest-selected canonical compiler digest before installing the pTau", async function () {
     let ptauInstallerCalled = false;
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
         root,
         env: {},
-        captureRunner: ({ args }) => (args[0] === "rev-parse" ? "a".repeat(40) : ""),
+        captureRunner: createFixtureGitCaptureRunner(),
         artifactInspector: () => ({
           circomVersion: CIRCOM_VERSION,
           toolchain: { circom: { sha256: "0".repeat(64) } },
@@ -299,7 +318,7 @@ describe("single-operator production ZK setup safety", function () {
       runSingleOperatorProductionSetup({
         root,
         env: {},
-        captureRunner: ({ args }) => (args[0] === "rev-parse" ? "a".repeat(40) : ""),
+        captureRunner: createFixtureGitCaptureRunner(),
         artifactInspector: () => ({
           circomVersion: CIRCOM_VERSION,
           toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
@@ -395,6 +414,7 @@ describe("single-operator production ZK setup safety", function () {
     const manifestRaw = `${JSON.stringify(manifest, null, 2)}\n`;
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
     await fs.writeFile(manifestPath, manifestRaw);
+    await installContributionHelperFixture(root);
     await fs.mkdir(path.dirname(compilerPath), { recursive: true });
     await fs.writeFile(compilerPath, compilerContents);
 
@@ -406,7 +426,7 @@ describe("single-operator production ZK setup safety", function () {
         env: {},
         platform: "darwin",
         arch: "arm64",
-        captureRunner: ({ args }) => (args[0] === "rev-parse" ? "a".repeat(40) : ""),
+        captureRunner: createFixtureGitCaptureRunner(),
         artifactInspector: () => ({
           circomVersion: CIRCOM_VERSION,
           toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
@@ -470,9 +490,242 @@ describe("single-operator production ZK setup safety", function () {
     ]);
   });
 
+  it("uses release-commit helper blobs when a source builder mutates the workspace helper", async function () {
+    const compilerContents = "fixture source compiler\n";
+    const setupDirectory = path.join(root, "setup");
+    const ptauPath = path.join(setupDirectory, "fixture.ptau");
+    const ptauContents = "fixture ptau\n";
+    const compiledBytes = {
+      person_commitment: { r1cs: "person-r1cs\n", wasm: "person-wasm\n" },
+      disclosure_binding: { r1cs: "disclosure-r1cs\n", wasm: "disclosure-wasm\n" },
+    };
+    const manifest = {
+      schemaVersion: 3,
+      toolchain: { snarkjsRuntimeSha256: "78".repeat(32) },
+      circuits: Object.fromEntries(
+        Object.entries(compiledBytes).map(([circuitName, bytes]) => [
+          circuitName,
+          {
+            r1csSha256: sha256Text(bytes.r1cs),
+            wasmSha256: sha256Text(bytes.wasm),
+          },
+        ]),
+      ),
+    };
+    const manifestPath = path.join(root, ZK_ARTIFACT_MANIFEST_PATH);
+    const manifestRaw = `${JSON.stringify(manifest, null, 2)}\n`;
+    await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+    await fs.writeFile(manifestPath, manifestRaw);
+    const workspaceHelper = await installContributionHelperFixture(root);
+
+    let contributionInvocation;
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        root,
+        env: {},
+        platform: "darwin",
+        arch: "arm64",
+        captureRunner: createFixtureGitCaptureRunner(),
+        artifactInspector: () => ({
+          circomVersion: CIRCOM_VERSION,
+          toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
+          trustedSetupStatus: "development",
+          manifestSha256: sha256Text(manifestRaw),
+        }),
+        compilerInspector: async () => {
+          throw new Error("cached source-built compiler must not execute");
+        },
+        compilerSourceBuilder: async () => {
+          await fs.writeFile(workspaceHelper.helperPath, "// source-builder tampering\n");
+          await fs.writeFile(workspaceHelper.dependencyPath, "// dependency tampering\n");
+          return {
+            bytes: Buffer.from(compilerContents),
+            cargoVersion: "cargo 1.88.0 fixture",
+            rustcVersion: "rustc 1.88.0 fixture",
+          };
+        },
+        runtimeSnapshotter: ({ destinationRoot, expectedSha256 }) => ({
+          root: destinationRoot,
+          sha256: expectedSha256,
+        }),
+        ptauInstaller: async () => {
+          await fs.mkdir(setupDirectory, { recursive: true });
+          await fs.writeFile(ptauPath, ptauContents);
+          return {
+            path: ptauPath,
+            source: "https://example.invalid/fixture.ptau",
+            bytes: Buffer.byteLength(ptauContents),
+            sha256: sha256Text(ptauContents),
+            blake2b512: createHash("blake2b512").update(ptauContents).digest("hex"),
+          };
+        },
+        randomBytesFn: (length) => Buffer.alloc(length, 0x5a),
+        runner: async (command) => {
+          if (command.args[0]?.endsWith(".circom")) {
+            const circuitName = path.basename(command.args[0], ".circom");
+            const stageBuild = command.args[command.args.indexOf("-o") + 1];
+            const circuit = compiledBytes[circuitName];
+            await fs.mkdir(path.join(stageBuild, `${circuitName}_js`), { recursive: true });
+            await fs.writeFile(path.join(stageBuild, `${circuitName}.r1cs`), circuit.r1cs);
+            await fs.writeFile(
+              path.join(stageBuild, `${circuitName}_js`, `${circuitName}.wasm`),
+              circuit.wasm,
+            );
+            return;
+          }
+          if (command.args[0]?.endsWith("zk-contribute-from-stdin.mjs")) {
+            const helperPath = command.args[0];
+            const dependencyPath = path.join(
+              path.dirname(helperPath),
+              "lib",
+              "snarkjsToolchain.mjs",
+            );
+            contributionInvocation = {
+              helperPath,
+              helperContents: await fs.readFile(helperPath, "utf8"),
+              helperMode: (await fs.stat(helperPath)).mode & 0o777,
+              dependencyContents: await fs.readFile(dependencyPath, "utf8"),
+              dependencyMode: (await fs.stat(dependencyPath)).mode & 0o777,
+            };
+            throw new Error("stop after snapshotted contribution helper invocation");
+          }
+        },
+      }),
+    );
+
+    expect(error?.message).to.equal("stop after snapshotted contribution helper invocation");
+    expect(contributionInvocation.helperPath).not.to.equal(workspaceHelper.helperPath);
+    expect(contributionInvocation.helperPath).to.include(
+      `${path.sep}contribution-helper${path.sep}scripts${path.sep}`,
+    );
+    expect(contributionInvocation).to.include({
+      helperContents: REVIEWED_CONTRIBUTION_HELPER,
+      dependencyContents: REVIEWED_SNARKJS_TOOLCHAIN,
+    });
+    expect(contributionInvocation.helperMode & 0o222).to.equal(0);
+    expect(contributionInvocation.dependencyMode & 0o222).to.equal(0);
+    expect(await fs.readFile(workspaceHelper.helperPath, "utf8")).to.equal(
+      "// source-builder tampering\n",
+    );
+  });
+
+  it("snapshots helper bytes from the release commit instead of the working tree", async function () {
+    const workspaceHelper = await installContributionHelperFixture(root);
+    await fs.writeFile(workspaceHelper.helperPath, "// uncommitted helper replacement\n");
+    await fs.writeFile(workspaceHelper.dependencyPath, "// uncommitted dependency replacement\n");
+
+    const snapshot = await snapshotProductionContributionHelper({
+      root,
+      stageRoot: stage,
+      releaseCommit: FIXTURE_RELEASE_COMMIT,
+      gitExecutable: path.join(root, "trusted-git"),
+      env: {},
+      captureRunner: createFixtureGitCaptureRunner(),
+    });
+
+    expect(await fs.readFile(snapshot.helperPath, "utf8")).to.equal(REVIEWED_CONTRIBUTION_HELPER);
+    expect(await fs.readFile(snapshot.dependencyPath, "utf8")).to.equal(REVIEWED_SNARKJS_TOOLCHAIN);
+    expect(snapshot.releaseCommit).to.equal(FIXTURE_RELEASE_COMMIT);
+  });
+
+  it("rejects an actual helper snapshot changed by the source builder before entropy exists", async function () {
+    const snapshot = await snapshotProductionContributionHelper({
+      root,
+      stageRoot: stage,
+      releaseCommit: FIXTURE_RELEASE_COMMIT,
+      gitExecutable: path.join(root, "trusted-git"),
+      env: {},
+      captureRunner: createFixtureGitCaptureRunner(),
+    });
+    const sourceBuilder = async () => {
+      await fs.chmod(snapshot.dependencyPath, 0o600);
+      await fs.writeFile(snapshot.dependencyPath, "// malicious source-build replacement\n");
+      return {
+        bytes: Buffer.from("fixture compiler"),
+        cargoVersion: "cargo fixture",
+        rustcVersion: "rustc fixture",
+      };
+    };
+    await sourceBuilder();
+
+    let entropyRequested = false;
+    let runnerCalled = false;
+    const error = await captureError(() =>
+      runSecretContribution({
+        runner: async () => {
+          runnerCalled = true;
+        },
+        cwd: root,
+        oldZkey: path.join(stage, "old.zkey"),
+        newZkey: path.join(stage, "new.zkey"),
+        randomBytesFn: (length) => {
+          entropyRequested = true;
+          return Buffer.alloc(length);
+        },
+        contributionHelperSnapshot: snapshot,
+        runtimeRoot: stage,
+        snarkjsRuntimeSha256: "79".repeat(32),
+        env: {},
+      }),
+    );
+
+    expect(error?.message).to.include(
+      "scripts/lib/snarkjsToolchain.mjs snapshot changed before execution",
+    );
+    expect(entropyRequested).to.equal(false);
+    expect(runnerCalled).to.equal(false);
+  });
+
+  it("rechecks helper blobs after entropy generation and wipes entropy on TOCTOU tampering", async function () {
+    const snapshot = await snapshotProductionContributionHelper({
+      root,
+      stageRoot: stage,
+      releaseCommit: FIXTURE_RELEASE_COMMIT,
+      gitExecutable: path.join(root, "trusted-git"),
+      env: {},
+      captureRunner: createFixtureGitCaptureRunner(),
+    });
+    const entropy = Buffer.alloc(64, 0x5a);
+    let runnerCalled = false;
+
+    const error = await captureError(() =>
+      runSecretContribution({
+        runner: async () => {
+          runnerCalled = true;
+        },
+        cwd: root,
+        oldZkey: path.join(stage, "old.zkey"),
+        newZkey: path.join(stage, "new.zkey"),
+        randomBytesFn: () => {
+          fsSync.chmodSync(snapshot.helperPath, 0o600);
+          fsSync.writeFileSync(snapshot.helperPath, "// entropy-time replacement\n");
+          return entropy;
+        },
+        contributionHelperSnapshot: snapshot,
+        runtimeRoot: stage,
+        snarkjsRuntimeSha256: "7a".repeat(32),
+        env: {},
+      }),
+    );
+
+    expect(error?.message).to.include(
+      "scripts/zk-contribute-from-stdin.mjs snapshot changed before execution",
+    );
+    expect(runnerCalled).to.equal(false);
+    expect(entropy.every((value) => value === 0)).to.equal(true);
+  });
+
   it("pipes Phase 2 entropy through stdin without exposing it in argv or env", async function () {
     const entropy = Buffer.alloc(64, 0x5a);
     const runtimeSha256 = "45".repeat(32);
+    const snapshot = await snapshotProductionContributionHelper({
+      root,
+      stageRoot: stage,
+      releaseCommit: FIXTURE_RELEASE_COMMIT,
+      gitExecutable: path.join(root, "trusted-git"),
+      env: {},
+      captureRunner: createFixtureGitCaptureRunner(),
+    });
     let invocation;
     await runSecretContribution({
       runner: async (value) => {
@@ -488,6 +741,7 @@ describe("single-operator production ZK setup safety", function () {
         expect(length).to.equal(64);
         return entropy;
       },
+      contributionHelperSnapshot: snapshot,
       snarkjsRuntimeSha256: runtimeSha256,
       env: {
         FIXTURE_SAFE: "preserved",
@@ -498,7 +752,7 @@ describe("single-operator production ZK setup safety", function () {
     const expectedSecret = Buffer.alloc(64, 0x5a).toString("hex");
     expect(invocation.executable).to.equal(process.execPath);
     expect(invocation.args).to.deep.equal([
-      path.join(root, "scripts", "zk-contribute-from-stdin.mjs"),
+      snapshot.helperPath,
       "/fixture/old.zkey",
       "/fixture/new.zkey",
       SINGLE_OPERATOR_PARTICIPANT_ID,

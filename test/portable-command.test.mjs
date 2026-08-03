@@ -67,11 +67,12 @@ describe("portable child-process commands", function () {
     }
   });
 
-  it("supports Windows ARM64 hosts through an x64 Node execution runtime", function () {
+  it("accepts an x64 Windows host and rejects native or emulated Windows ARM64", function () {
     expect(() =>
       assertReleaseRuntimeCompatibility({
         platform: "win32",
         arch: "x64",
+        env: { PROCESSOR_ARCHITECTURE: "AMD64" },
         operation: "Fixture release",
       }),
     ).not.to.throw();
@@ -79,9 +80,21 @@ describe("portable child-process commands", function () {
       assertReleaseRuntimeCompatibility({
         platform: "win32",
         arch: "arm64",
+        env: { PROCESSOR_ARCHITECTURE: "ARM64" },
         operation: "Fixture release",
       }),
-    ).to.throw("requires the x64 build of Node.js");
+    ).to.throw("does not support Windows ARM64 hosts");
+    expect(() =>
+      assertReleaseRuntimeCompatibility({
+        platform: "win32",
+        arch: "x64",
+        env: {
+          PROCESSOR_ARCHITECTURE: "AMD64",
+          PROCESSOR_ARCHITEW6432: "ARM64",
+        },
+        operation: "Fixture release",
+      }),
+    ).to.throw("including x64 Node.js emulation");
   });
 
   it("runs the real npm JavaScript CLI through Node on Windows", async function () {

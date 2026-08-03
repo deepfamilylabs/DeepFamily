@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 import {
   CIRCOM_CANONICAL_BINARY_PATH,
   localCircomBinaryPath,
-  resolveLocalCircomTarget,
+  resolveCircomTargetPolicy,
 } from "./circomToolchain.mjs";
 import {
   PRODUCTION_PTAU_BLAKE2B512,
@@ -457,7 +457,7 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
       } else if (compilerRecord.libcEvidence !== null) {
         throw new Error("ZK ceremony transcript non-Linux compiler must not declare libc evidence");
       }
-      const target = resolveLocalCircomTarget({
+      const target = resolveCircomTargetPolicy({
         version: compilerRecord.version,
         platform: compilerRecord.platform,
         arch: compilerRecord.arch,

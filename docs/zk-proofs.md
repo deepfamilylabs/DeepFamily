@@ -402,28 +402,24 @@ npm run zk:build
 
 Both roles use the same repository-pinned Circom version. Installation follows this support matrix:
 
-| Host/runtime                                | Installation strategy                         | Prerequisites                               | Production release host |
-| ------------------------------------------- | --------------------------------------------- | ------------------------------------------- | ----------------------- |
-| Linux x64 with glibc                        | Pinned official release asset                 | None                                        | Yes                     |
-| Linux x64 with musl (including Alpine)      | Build the pinned source commit                | `git`, Rust/Cargo, musl C build toolchain   | Yes                     |
-| macOS x64                                   | Pinned official release asset                 | macOS 12+                                   | Yes                     |
-| Windows x64                                 | Pinned official release asset                 | Visual C++ 2015–2022 Redistributable        | Yes                     |
-| Linux arm64                                 | Build the pinned source commit                | `git`, Rust/Cargo, native linker toolchain  | Yes                     |
-| macOS arm64                                 | Build the pinned source commit                | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                     |
-| Windows 11 ARM64 host with x64 Node 22.10.0 | Pinned Windows x64 asset through OS emulation | x64 Node and Visual C++ x64 runtime         | Yes                     |
+| Host/runtime         | Installation strategy          | Prerequisites                               | Production release host |
+| -------------------- | ------------------------------ | ------------------------------------------- | ----------------------- |
+| Linux x64 with glibc | Pinned official release asset  | None                                        | Yes                     |
+| macOS arm64          | Build the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                     |
+| Windows x64          | Pinned official release asset  | Visual C++ 2015–2022 Redistributable        | Yes                     |
 
 Official x64 assets are accepted only when their fixed SHA-256 matches. Linux libc is detected from
-Node's process report; x64 musl and native arm64 Circom runtimes check out the pinned source
-repository commit, build it with locked Cargo dependencies, verify the exact compiler version, and
-record local provenance. The installer refuses to replace unexpected files or symbolic links.
+Node's process report and musl is rejected explicitly. Windows ARM64 hosts remain unsupported even
+with x64 Node emulation. The macOS arm64 runtime checks out the pinned
+source repository commit, builds it with locked Cargo dependencies, verifies the exact compiler
+version, and records local provenance. The installer refuses to replace unexpected files or
+symbolic links.
 Regardless of the host, the separately downloaded canonical release binary must match the fixed
 Linux amd64 glibc digest.
 
-On a Windows 11 ARM64 host, install x64 Node, reinstall dependencies, and confirm
-`node -p process.arch` prints `x64`. Windows then runs the complete workflow through its x64
-emulation and `zk:fetch` selects the fixed-hash Windows x64 Circom asset. Native Windows ARM64 Node
-is not a supported host: no Circom target is registered for `win32-arm64`, so `zk:fetch` fails
-closed with an unsupported-host error instead of selecting a foreign-architecture compiler.
+Linux x64 with glibc, macOS arm64, and Windows x64 are the only supported host/runtime pairs. Other
+platform and architecture combinations fail closed instead of selecting a foreign toolchain. CI
+uses GitHub's `ubuntu-latest` x64/glibc runner and separately exercises macOS arm64 and Windows x64.
 
 All circuit compilation passes `--O2` explicitly, so a compiler release cannot silently change the
 constraint system by changing its default optimization level. `zk:artifacts:check` compares the
@@ -434,16 +430,25 @@ validates the canonical binary's fixed digest but does not execute that foreign-
 
 Local development and diagnostic acceptance may use the reusable native compiler installed by
 `zk:fetch`. For a source target, `zk:production:setup` and `release:preflight` instead ignore that
-gitignored cache and perform a fresh locked build of the pinned commit in private staging. These
-source builds remove inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker, and
-package-discovery overrides, use private Cargo/XDG homes, and disable ambient Git configuration and
-hooks. Production setup checks all four R1CS/WASM hashes against the reviewed manifest and only
+gitignored cache and perform a fresh locked build of the pinned commit in an isolated per-user
+build directory. These
+source checkouts live under a protected per-user build directory, reject external ancestor Cargo
+configuration, remove inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker, and
+package-discovery overrides, resolve Git/Cargo/Rustc to protected absolute executables, and use a
+controlled PATH with private home/Cargo/XDG/temporary directories. Ambient Git configuration and
+hooks are disabled. The resulting compiler is copied into private release staging. Production setup checks all
+four R1CS/WASM hashes against the reviewed manifest and only
 then permits either Groth16 Setup or Phase 2 contribution. The ceremony transcript records the
 actual compiler target, strategy, version, binary hash, Linux libc evidence, pinned source commit,
 and Cargo/Rust versions. The compiler and pTau live in the user's private OS temporary directory,
 and their inputs are rechecked immediately before each Groth16 setup and again before installation.
 The canonical `bin/circom-release-linux-amd64` file remains a fixed-digest audit reference and is
 not executed on a foreign platform.
+
+The Phase 2 contribution helper and its local dependency are reconstructed from the exact release
+commit's Git blobs. Their object IDs are checked when staged, and their SHA-256 digests are verified
+once before entropy generation and again immediately before the entropy pipe is handed to the child
+process.
 
 Release-only temporary roots are validated as current-user-only before use. POSIX roots must be
 owned by the current UID with mode `0700`. Windows roots have ACL inheritance and existing access

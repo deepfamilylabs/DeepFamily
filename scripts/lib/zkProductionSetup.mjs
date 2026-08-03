@@ -1,10 +1,14 @@
 import { spawn, execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
-import { assertLocalCircomInstallation, buildPinnedCircomFromSource } from "../fetch-circom.mjs";
+import {
+  assertLocalCircomInstallation,
+  buildPinnedCircomFromSource,
+  resolveTrustedSourceBuildTool,
+} from "../fetch-circom.mjs";
 import { renameZkVerifierFile } from "../rename-zk-verifier.mjs";
 import {
   CIRCOM_ARTIFACT_FLAGS,
@@ -59,11 +63,11 @@ const SETUP_CIRCUITS = Object.freeze({
   }),
 });
 
-const defaultCaptureRunner = ({ executable, args, cwd, env = process.env }) =>
+const defaultCaptureRunner = ({ executable, args, cwd, env = process.env, encoding = "utf8" }) =>
   execFileSync(executable, args, {
     cwd,
     env,
-    encoding: "utf8",
+    encoding,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -108,10 +112,15 @@ export const defaultProductionSetupRunner = ({
   });
 };
 
-const assertCleanGitState = ({ root, env, captureRunner = defaultCaptureRunner }) => {
+const assertCleanGitState = ({
+  root,
+  env,
+  gitExecutable,
+  captureRunner = defaultCaptureRunner,
+}) => {
   const commit = String(
     captureRunner({
-      executable: "git",
+      executable: gitExecutable,
       args: ["rev-parse", "HEAD"],
       cwd: root,
       env,
@@ -119,7 +128,7 @@ const assertCleanGitState = ({ root, env, captureRunner = defaultCaptureRunner }
   ).trim();
   const status = String(
     captureRunner({
-      executable: "git",
+      executable: gitExecutable,
       args: ["status", "--porcelain=v1", "--untracked-files=all"],
       cwd: root,
       env,
@@ -281,6 +290,7 @@ export const runSecretContribution = async ({
   oldZkey,
   newZkey,
   randomBytesFn,
+  contributionHelperSnapshot,
   runtimeRoot = cwd,
   snarkjsRuntimeSha256,
   env = process.env,
@@ -288,18 +298,24 @@ export const runSecretContribution = async ({
   if (!/^[0-9a-f]{64}$/u.test(snarkjsRuntimeSha256 ?? "")) {
     throw new Error("Phase 2 contribution requires the reviewed snarkjs runtime SHA-256");
   }
+  const initialHelper = await verifyProductionContributionHelperSnapshot(
+    contributionHelperSnapshot,
+  );
+  let resolvedContributionHelperPath = initialHelper.helperPath;
   const entropy = requireRandomBytes(randomBytesFn, 64, "Phase 2 entropy");
   let stdin;
   try {
     stdin = encodeLowerHexLine(entropy);
     entropy.fill(0);
+    const verified = await verifyProductionContributionHelperSnapshot(contributionHelperSnapshot);
+    resolvedContributionHelperPath = verified.helperPath;
     await runner({
       // snarkjs's interactive readline prompt can miss stdin that was already closed by a parent
       // process. This short-lived helper consumes the complete pipe first and calls the library
       // API directly, keeping the secret out of argv, environment variables, and the filesystem.
       executable: process.execPath,
       args: [
-        path.join(cwd, "scripts", "zk-contribute-from-stdin.mjs"),
+        resolvedContributionHelperPath,
         oldZkey,
         newZkey,
         SINGLE_OPERATOR_PARTICIPANT_ID,
@@ -373,6 +389,181 @@ const requireRegularNonSymlink = async (filePath, label) => {
     throw new Error(`${label} path must not traverse a symlink: ${filePath}`);
   }
   return state;
+};
+
+const PRODUCTION_CONTRIBUTION_HELPER_FILES = Object.freeze([
+  "scripts/zk-contribute-from-stdin.mjs",
+  "scripts/lib/snarkjsToolchain.mjs",
+]);
+
+const asCapturedBytes = (value, label) => {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (typeof value === "string") return Buffer.from(value, "utf8");
+  throw new Error(`${label} runner must return bytes or a string`);
+};
+
+const readReleaseGitBlob = ({
+  root,
+  releaseCommit,
+  relativePath,
+  gitExecutable,
+  env,
+  captureRunner,
+}) => {
+  const treeOutput = asCapturedBytes(
+    captureRunner({
+      executable: gitExecutable,
+      args: ["ls-tree", "-z", releaseCommit, "--", relativePath],
+      cwd: root,
+      env,
+      encoding: null,
+    }),
+    `Production contribution helper ${relativePath} Git tree`,
+  );
+  const entries = treeOutput.toString("utf8").split("\0");
+  if (entries.at(-1) !== "") {
+    throw new Error(
+      `Production contribution helper ${relativePath} Git tree is not NUL-terminated`,
+    );
+  }
+  entries.pop();
+  if (entries.length !== 1) {
+    throw new Error(
+      `Production contribution helper ${relativePath} must be one committed Git blob`,
+    );
+  }
+  const tab = entries[0].indexOf("\t");
+  const metadata = entries[0].slice(0, tab).split(" ");
+  const committedPath = entries[0].slice(tab + 1);
+  const [mode, type, objectId] = metadata;
+  if (
+    tab < 0 ||
+    committedPath !== relativePath ||
+    !["100644", "100755"].includes(mode) ||
+    type !== "blob" ||
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(objectId ?? "")
+  ) {
+    throw new Error(`Production contribution helper ${relativePath} must be a regular Git blob`);
+  }
+  const bytes = asCapturedBytes(
+    captureRunner({
+      executable: gitExecutable,
+      args: ["cat-file", "blob", objectId],
+      cwd: root,
+      env,
+      encoding: null,
+    }),
+    `Production contribution helper ${relativePath} Git blob`,
+  );
+  const objectHash = createHash(objectId.length === 40 ? "sha1" : "sha256")
+    .update(`blob ${bytes.length}\0`)
+    .update(bytes)
+    .digest("hex");
+  if (objectHash !== objectId) {
+    throw new Error(`Production contribution helper ${relativePath} Git blob hash mismatch`);
+  }
+  return Buffer.from(bytes);
+};
+
+export const snapshotProductionContributionHelper = async ({
+  root,
+  stageRoot,
+  releaseCommit,
+  gitExecutable,
+  env,
+  captureRunner = defaultCaptureRunner,
+}) => {
+  if (!/^[0-9a-f]{40}$/u.test(releaseCommit ?? "")) {
+    throw new Error("Production contribution helper snapshot requires the release Git commit");
+  }
+  if (typeof gitExecutable !== "string" || !path.isAbsolute(gitExecutable)) {
+    throw new Error("Production contribution helper snapshot requires an absolute Git executable");
+  }
+  const snapshotRoot = path.join(stageRoot, "contribution-helper");
+  const copied = {};
+  const files = [];
+  for (const relativePath of PRODUCTION_CONTRIBUTION_HELPER_FILES) {
+    const destination = path.join(snapshotRoot, ...relativePath.split("/"));
+    const bytes = readReleaseGitBlob({
+      root,
+      releaseCommit,
+      relativePath,
+      gitExecutable,
+      env,
+      captureRunner,
+    });
+    await fsp.mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
+    await fsp.writeFile(destination, bytes, { flag: "wx", mode: 0o400 });
+    const expectedSha256 = createHash("sha256").update(bytes).digest("hex");
+    if (sha256File(destination) !== expectedSha256) {
+      throw new Error(
+        `Production contribution helper ${relativePath} changed while it was being snapshotted`,
+      );
+    }
+    await fsp.chmod(destination, 0o400);
+    copied[relativePath] = destination;
+    files.push(
+      Object.freeze({
+        relativePath,
+        path: destination,
+        bytes: bytes.length,
+        sha256: expectedSha256,
+      }),
+    );
+  }
+  return Object.freeze({
+    root: snapshotRoot,
+    helperPath: copied["scripts/zk-contribute-from-stdin.mjs"],
+    dependencyPath: copied["scripts/lib/snarkjsToolchain.mjs"],
+    releaseCommit,
+    files: Object.freeze(files),
+  });
+};
+
+export const verifyProductionContributionHelperSnapshot = async (snapshot) => {
+  if (
+    snapshot === null ||
+    typeof snapshot !== "object" ||
+    !Array.isArray(snapshot.files) ||
+    snapshot.files.length !== PRODUCTION_CONTRIBUTION_HELPER_FILES.length
+  ) {
+    throw new Error("Production contribution helper snapshot evidence is invalid");
+  }
+  const snapshotRoot = path.resolve(snapshot.root);
+  const expectedPaths = new Set(PRODUCTION_CONTRIBUTION_HELPER_FILES);
+  for (const file of snapshot.files) {
+    if (!expectedPaths.delete(file.relativePath)) {
+      throw new Error("Production contribution helper snapshot contains unexpected files");
+    }
+    const expectedPath = path.join(snapshotRoot, ...file.relativePath.split("/"));
+    if (path.resolve(file.path) !== expectedPath) {
+      throw new Error(`Production contribution helper ${file.relativePath} path mismatch`);
+    }
+    const state = await requireRegularNonSymlink(
+      expectedPath,
+      `Production contribution helper ${file.relativePath} snapshot`,
+    );
+    if (state.size !== file.bytes || sha256File(expectedPath) !== file.sha256) {
+      throw new Error(
+        `Production contribution helper ${file.relativePath} snapshot changed before execution`,
+      );
+    }
+    if (process.platform !== "win32" && (state.mode & 0o222) !== 0) {
+      throw new Error(
+        `Production contribution helper ${file.relativePath} snapshot must be read-only`,
+      );
+    }
+  }
+  if (expectedPaths.size !== 0) {
+    throw new Error("Production contribution helper snapshot is incomplete");
+  }
+  return Object.freeze({
+    helperPath: path.join(snapshotRoot, "scripts", "zk-contribute-from-stdin.mjs"),
+    dependencyPath: path.join(snapshotRoot, "scripts", "lib", "snarkjsToolchain.mjs"),
+  });
 };
 
 const safeDestinationPath = async (root, relativePath) => {
@@ -693,6 +884,7 @@ const generateCircuitKeys = async ({
   randomBytesFn,
   metadataReader,
   contributionEnvironment,
+  contributionHelperSnapshot,
   runtimeRoot,
 }) => {
   const { circuitName, r1cs, wasm } = compiledCircuit;
@@ -722,6 +914,7 @@ const generateCircuitKeys = async ({
     oldZkey: initialZkey,
     newZkey: contributedZkey,
     randomBytesFn,
+    contributionHelperSnapshot,
     runtimeRoot,
     snarkjsRuntimeSha256: initialManifest.toolchain.snarkjsRuntimeSha256,
     env: contributionEnvironment,
@@ -1064,6 +1257,7 @@ export const runSingleOperatorProductionSetup = async ({
   artifactInspector = inspectZkReleaseArtifacts,
   compilerInspector = assertLocalCircomInstallation,
   compilerSourceBuilder = buildPinnedCircomFromSource,
+  gitToolResolver = resolveTrustedSourceBuildTool,
   runtimeSnapshotter = snapshotSnarkjsRuntime,
   privateDirectoryFactory = createPrivateTemporaryDirectory,
   preCommitValidator = defaultPreCommitValidator,
@@ -1078,6 +1272,7 @@ export const runSingleOperatorProductionSetup = async ({
     typeof artifactInspector !== "function" ||
     typeof compilerInspector !== "function" ||
     typeof compilerSourceBuilder !== "function" ||
+    typeof gitToolResolver !== "function" ||
     typeof runtimeSnapshotter !== "function" ||
     typeof privateDirectoryFactory !== "function"
   ) {
@@ -1086,6 +1281,7 @@ export const runSingleOperatorProductionSetup = async ({
   assertReleaseRuntimeCompatibility({
     platform,
     arch,
+    env,
     operation: "Production ZK setup",
   });
   const localTarget = resolveLocalCircomTarget({ platform, arch, libc, report });
@@ -1094,9 +1290,14 @@ export const runSingleOperatorProductionSetup = async ({
     throw new Error("Production ZK setup root must not traverse a symlink");
   }
   const baseEnvironment = withoutCircomOverrideEnvironment(sanitizeReleaseEnvironment(env));
+  const gitExecutable = await gitToolResolver({ name: "git" });
+  if (typeof gitExecutable !== "string" || !path.isAbsolute(gitExecutable)) {
+    throw new Error("Production ZK setup Git resolver must return an absolute path");
+  }
   const releaseCommit = assertCleanGitState({
     root: resolvedRoot,
     env: baseEnvironment,
+    gitExecutable,
     captureRunner,
   });
   const initialEvidence = artifactInspector({
@@ -1189,6 +1390,15 @@ export const runSingleOperatorProductionSetup = async ({
     await fsp.mkdir(path.join(stageRoot, "keys"), { recursive: true, mode: 0o700 });
     await fsp.mkdir(path.join(stageRoot, "release"), { recursive: true, mode: 0o700 });
     await fsp.mkdir(stageBuild, { recursive: true, mode: 0o700 });
+    // Snapshot the reviewed entropy-handling code before a source build can mutate workspace files.
+    const contributionHelper = await snapshotProductionContributionHelper({
+      root: resolvedRoot,
+      stageRoot,
+      releaseCommit,
+      gitExecutable,
+      env: baseEnvironment,
+      captureRunner,
+    });
     const privateCompiler = await preparePrivateProductionCompiler({
       target: localTarget,
       inspectedCompiler,
@@ -1240,6 +1450,7 @@ export const runSingleOperatorProductionSetup = async ({
         randomBytesFn,
         metadataReader,
         contributionEnvironment: baseEnvironment,
+        contributionHelperSnapshot: contributionHelper,
         runtimeRoot: snarkjsRuntime.root,
       });
     }

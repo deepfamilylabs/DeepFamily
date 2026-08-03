@@ -2799,17 +2799,5 @@
       ]
     }
   },
-  "immutableReferences": {
-    "4446": [
-      {
-        "length": 32,
-        "start": 9503
-      },
-      {
-        "length": 32,
-        "start": 9728
-      }
-    ]
-  },
   "inputSourceName": "project/contracts/DeepFamily.sol"
 }

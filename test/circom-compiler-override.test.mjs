@@ -77,7 +77,7 @@ describe("release Circom compiler override", function () {
     expect(() => inspect({ [CIRCOM_OVERRIDE_ENV.path]: compilerPath })).to.throw(
       "override environment is incomplete",
     );
-    expect(() => inspect({ ...base, [CIRCOM_OVERRIDE_ENV.target]: "linux-arm64" })).to.throw(
+    expect(() => inspect({ ...base, [CIRCOM_OVERRIDE_ENV.target]: "linux-x64" })).to.throw(
       "does not match the native source target",
     );
     await fs.writeFile(compilerPath, "tampered private compiler\n");
