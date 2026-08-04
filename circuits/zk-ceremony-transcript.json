@@ -15,7 +15,7 @@
     },
     "sourceBuild": null
   },
-  "ceremonyId": "deepfamily-single-operator-20260804T093627Z",
+  "ceremonyId": "deepfamily-single-operator-20260804T103721Z",
   "phase1Sha256": "95751b5207f20aa822f01109902315c01c15250303feacea2b8aa7dc9fdfeefd",
   "circuits": {
     "person_commitment": {
@@ -31,16 +31,16 @@
     {
       "sequence": 1,
       "participantId": "deepfamily-single-operator",
-      "personCommitmentContributionHash": "e10107e8c195413b69b5efe853188894cfff24037fcaab98251b2099e18ea3f7c4af3007bb45b656bbaa4545775404f209e3853d70dc3a018bb643a5d95b1b1b",
-      "disclosureBindingContributionHash": "edba95ca8b9743eeab22fc27fc5c94fdd879d0e38ce3c1afcc424fe0b581dff921aaf83da0b4b92e1d06edeabe007d296feb4d1a1139762e6193fe5a424867c3"
+      "personCommitmentContributionHash": "2e3ce33a1958dfa63630bbfc5021a77cef918dbc0d29da22acd368e5cea8718304a6dcb781697bde20eef46310c1bafa8e4868e174b8f00bffafebbc183b29e6",
+      "disclosureBindingContributionHash": "47ed26fd1f8499bc270e3d815a9c994a683f4ca310e6474dfd315f285fef98fc1594455c8e146477617a954f475ed09c62961fe3b8e00340acee4371bb32d8da"
     }
   ],
   "beacon": {
     "name": "deepfamily-single-operator-finalization",
-    "hash": "8f2f4c19ec1ae6f3f640f6135ac62bd0b472fb01a15b4c1c7a147e0f656df939",
+    "hash": "f13aaf702298f199d8404e135bcddd39d516c0c18a392215767c1144108c45c9",
     "numIterationsExp": 10,
     "source": "node:crypto.randomBytes(32), generated after both Phase 2 contributions",
-    "personCommitmentContributionHash": "9541ccf8f67e932e9f39a5922c81460545f94441d517650fbf73491f83eb0b5bb282e66192efd8722d7976a4defa07cb309269d33c24a899bd1a25077ca85ea4",
-    "disclosureBindingContributionHash": "b9b61596e8c32913c0b403764d23f685beb543d22cf34c05ee28b0277e409fc7c39d5e902885fad6bb16bf341a1b2f6928a1303884539cf96627eecb51f70d32"
+    "personCommitmentContributionHash": "7efb7c05cd39f6e6f63266a2abd88f293ad9743e3e3b95a234425a9924e6eb41af938f31003ab13b83cb0622a6ce8c20efc745c60ca9fb4c9e7f4784c94a12b9",
+    "disclosureBindingContributionHash": "0f69763681750b5f9629cd3e4558d8293988ddda619a82495ddb3202908164a9d445f5f2c6c2fd1d9bf63eec99a0a09da7f0845b5bb7f1367e1baf1dc8ec1446"
   }
 }
