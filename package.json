@@ -55,7 +55,7 @@
     "frontend:locales:usage": "npm run locales:usage --workspace deepfamily-frontend",
     "frontend:locales:check": "npm run locales:check --workspace deepfamily-frontend",
     "security:audit": "npm audit --omit=dev",
-    "security:audit:all": "npm audit",
+    "security:audit:all": "node scripts/check-npm-audit.mjs",
     "security:xss-scan": "node scripts/check-xss-sinks.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "dev:node": "fuser -k 8545/tcp 2>/dev/null; hardhat --config hardhat.config.mjs node --hostname 127.0.0.1 --port 8545",
@@ -108,10 +108,10 @@
     "@types/node": ">=18.0.0",
     "chai": "^5.1.2",
     "circomlib": "^2.0.5",
-    "concurrently": "^9.2.0",
+    "concurrently": "^9.2.4",
     "cross-env": "^7.0.3",
-    "ethers": "^6.16.0",
-    "hardhat": "^3.1.0",
+    "ethers": "^6.17.0",
+    "hardhat": "^3.12.0",
     "husky": "^9.0.0",
     "keccak256-circom": "git+https://github.com/vocdoni/keccak256-circom.git",
     "lint-staged": "^15.0.0",
@@ -144,11 +144,7 @@
     "diff": "8.0.3",
     "elliptic": "6.6.1",
     "serialize-javascript": "7.0.5",
-    "underscore": "1.13.8",
-    "zksync-ethers": {
-      "elliptic": "6.6.1",
-      "ws": "7.5.10"
-    }
+    "underscore": "1.13.8"
   },
   "dependencies": {
     "@deepfamily/proof-core": "0.1.0",
