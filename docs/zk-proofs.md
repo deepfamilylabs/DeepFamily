@@ -518,6 +518,11 @@ but they cannot start `zk:production:setup` or pass `release:preflight`. The lat
 re-checks its own private schema-v3 snarkjs runtime snapshot for the cryptographic verification
 commands.
 
+When a reviewed dependency update changes that runtime graph after production setup, do not remove
+the production evidence or edit only its digest. Use the explicit hash-bound rotation procedure in
+[zk-ceremony.md](zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change); it validates the
+old bundle and creates fresh Phase 2 contributions, finalization, keys, and verifiers.
+
 Review and commit the manifest, transcript, Solidity verifiers, and frontend ZK artifacts together.
 Then run the full gate from that clean commit:
 

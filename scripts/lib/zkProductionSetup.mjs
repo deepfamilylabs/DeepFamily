@@ -886,6 +886,7 @@ const generateCircuitKeys = async ({
   contributionEnvironment,
   contributionHelperSnapshot,
   runtimeRoot,
+  snarkjsRuntimeSha256,
 }) => {
   const { circuitName, r1cs, wasm } = compiledCircuit;
   const keyDirectory = path.join(stageRoot, "keys");
@@ -916,7 +917,7 @@ const generateCircuitKeys = async ({
     randomBytesFn,
     contributionHelperSnapshot,
     runtimeRoot,
-    snarkjsRuntimeSha256: initialManifest.toolchain.snarkjsRuntimeSha256,
+    snarkjsRuntimeSha256,
     env: contributionEnvironment,
   });
   const contributedMetadata = await metadataReader(contributedZkey);
@@ -999,6 +1000,7 @@ export const buildTranscriptAndManifest = async ({
   ptau,
   circuits,
   beaconHash,
+  snarkjsRuntimeSha256 = initialManifest.toolchain.snarkjsRuntimeSha256,
 }) => {
   const circuitEvidence = Object.fromEntries(
     Object.entries(circuits).map(([circuitName, circuit]) => {
@@ -1077,7 +1079,10 @@ export const buildTranscriptAndManifest = async ({
     schemaVersion: initialManifest.schemaVersion,
     circomVersion: initialManifest.circomVersion,
     snarkjsVersion: initialManifest.snarkjsVersion,
-    toolchain: initialManifest.toolchain,
+    toolchain: {
+      ...initialManifest.toolchain,
+      snarkjsRuntimeSha256,
+    },
     trustedSetup: {
       status: "production",
       trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
@@ -1244,6 +1249,9 @@ const defaultPostCommitValidator = async ({
 export const runSingleOperatorProductionSetup = async ({
   root = process.cwd(),
   ceremonyId = createCeremonyId(),
+  rotate = false,
+  expectedCurrentManifestSha256,
+  expectedSnarkjsRuntimeSha256,
   env = process.env,
   platform = process.platform,
   arch = process.arch,
@@ -1263,6 +1271,24 @@ export const runSingleOperatorProductionSetup = async ({
   preCommitValidator = defaultPreCommitValidator,
   postCommitValidator = defaultPostCommitValidator,
 } = {}) => {
+  const rotationEvidenceProvided =
+    expectedCurrentManifestSha256 !== undefined || expectedSnarkjsRuntimeSha256 !== undefined;
+  if (typeof rotate !== "boolean") {
+    throw new Error("Production ZK setup rotate option must be a boolean");
+  }
+  if (!rotate && rotationEvidenceProvided) {
+    throw new Error("Production ZK rotation hashes require the explicit rotate option");
+  }
+  if (rotate) {
+    for (const [label, digest] of [
+      ["current manifest", expectedCurrentManifestSha256],
+      ["new snarkjs runtime", expectedSnarkjsRuntimeSha256],
+    ]) {
+      if (typeof digest !== "string" || !/^[0-9a-f]{64}$/u.test(digest)) {
+        throw new Error(`Production ZK rotation expected ${label} SHA-256 is invalid`);
+      }
+    }
+  }
   if (String(env.CI ?? "").toLowerCase() === "true") {
     throw new Error("Production ZK setup must be run interactively outside CI");
   }
@@ -1300,10 +1326,27 @@ export const runSingleOperatorProductionSetup = async ({
     gitExecutable,
     captureRunner,
   });
+  const initialManifestPath = path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH);
+  let initialManifestDocument = null;
+  if (rotate) {
+    initialManifestDocument = readCanonicalJsonFile(
+      initialManifestPath,
+      "Initial ZK artifact manifest",
+    );
+  }
+  let initialManifestSha256 =
+    initialManifestDocument === null ? null : sha256Text(initialManifestDocument.raw);
+  if (rotate && initialManifestSha256 !== expectedCurrentManifestSha256) {
+    throw new Error(
+      `Production ZK rotation current manifest SHA-256 mismatch; expected ` +
+        `${expectedCurrentManifestSha256}, got ${initialManifestSha256}`,
+    );
+  }
   const initialEvidence = artifactInspector({
     root: resolvedRoot,
-    requireProduction: false,
+    requireProduction: rotate,
     requireBuiltR1cs: false,
+    ...(rotate ? { productionRotationRuntimeSha256: expectedSnarkjsRuntimeSha256 } : {}),
   });
   if (initialEvidence.circomVersion !== CIRCOM_VERSION) {
     throw new Error(
@@ -1317,24 +1360,61 @@ export const runSingleOperatorProductionSetup = async ({
         `${CIRCOM_LINUX_X64_SHA256}, got ${initialEvidence.toolchain?.circom?.sha256 ?? "missing"}`,
     );
   }
-  if (initialEvidence.trustedSetupStatus !== "development") {
+  if (!rotate && initialEvidence.trustedSetupStatus !== "development") {
     throw new Error("Refusing to overwrite an existing production ZK trusted setup");
   }
-  const { parsed: initialManifest, raw: initialManifestRaw } = readCanonicalJsonFile(
-    path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH),
+  if (initialManifestDocument === null) {
+    initialManifestDocument = readCanonicalJsonFile(
+      initialManifestPath,
+      "Initial ZK artifact manifest",
+    );
+    initialManifestSha256 = sha256Text(initialManifestDocument.raw);
+  }
+  const { parsed: initialManifest } = initialManifestDocument;
+  const { raw: validatedManifestRaw } = readCanonicalJsonFile(
+    initialManifestPath,
     "Initial ZK artifact manifest",
   );
-  const initialManifestSha256 = sha256Text(initialManifestRaw);
-  if (initialManifestSha256 !== initialEvidence.manifestSha256) {
+  const validatedManifestSha256 = sha256Text(validatedManifestRaw);
+  if (validatedManifestSha256 !== initialManifestSha256) {
+    throw new Error(
+      `Production ZK setup initial manifest changed during validation; expected ` +
+        `${initialManifestSha256}, got ${validatedManifestSha256}`,
+    );
+  }
+  if (validatedManifestSha256 !== initialEvidence.manifestSha256) {
     throw new Error(
       `Production ZK setup initial manifest changed after validation; expected ` +
-        `${initialEvidence.manifestSha256 ?? "missing"}, got ${initialManifestSha256}`,
+        `${initialEvidence.manifestSha256 ?? "missing"}, got ${validatedManifestSha256}`,
+    );
+  }
+  if (rotate && validatedManifestSha256 !== expectedCurrentManifestSha256) {
+    throw new Error(
+      `Production ZK rotation current manifest SHA-256 mismatch; expected ` +
+        `${expectedCurrentManifestSha256}, got ${validatedManifestSha256}`,
     );
   }
   if (initialManifest.schemaVersion !== 3) {
     throw new Error(
       "Production ZK setup requires manifest schemaVersion 3; refresh the development artifacts first",
     );
+  }
+  if (rotate) {
+    if (
+      initialManifest.trustedSetup.status !== "production" ||
+      initialManifest.trustedSetup.trustModel !== ZK_TRUST_MODEL_SINGLE_OPERATOR ||
+      initialManifest.trustedSetup.minimumContributors !== 1 ||
+      initialManifest.trustedSetup.contributorCount !== 1
+    ) {
+      throw new Error(
+        "Production ZK rotation requires an existing single-operator production manifest with exactly one contributor",
+      );
+    }
+    if (initialManifest.toolchain.snarkjsRuntimeSha256 === expectedSnarkjsRuntimeSha256) {
+      throw new Error(
+        "Production ZK rotation requires a new snarkjs runtime SHA-256 that differs from the current manifest",
+      );
+    }
   }
   let inspectedCompiler = null;
   if (localTarget.strategy === "official-binary") {
@@ -1364,6 +1444,12 @@ export const runSingleOperatorProductionSetup = async ({
     }
   }
   const resolvedCeremonyId = assertCeremonyId(ceremonyId);
+  if (rotate && resolvedCeremonyId === initialManifest.trustedSetup.ceremonyId) {
+    throw new Error("Production ZK rotation requires a new ceremonyId");
+  }
+  const reviewedSnarkjsRuntimeSha256 = rotate
+    ? expectedSnarkjsRuntimeSha256
+    : initialManifest.toolchain.snarkjsRuntimeSha256;
   const ptau = await ptauInstaller({ root: resolvedRoot });
   const setupDirectory = path.dirname(ptau.path);
   const lockPath = path.join(setupDirectory, ".setup.lock");
@@ -1409,7 +1495,7 @@ export const runSingleOperatorProductionSetup = async ({
     const snarkjsRuntime = runtimeSnapshotter({
       root: resolvedRoot,
       destinationRoot: path.join(stageRoot, "snarkjs-runtime"),
-      expectedSha256: initialManifest.toolchain.snarkjsRuntimeSha256,
+      expectedSha256: reviewedSnarkjsRuntimeSha256,
       platform,
     });
     compilerEvidence = buildProductionCompilerEvidence({
@@ -1452,6 +1538,7 @@ export const runSingleOperatorProductionSetup = async ({
         contributionEnvironment: baseEnvironment,
         contributionHelperSnapshot: contributionHelper,
         runtimeRoot: snarkjsRuntime.root,
+        snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
       });
     }
 
@@ -1486,6 +1573,7 @@ export const runSingleOperatorProductionSetup = async ({
       ptau,
       circuits: finalized,
       beaconHash,
+      snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
     });
     const entries = buildInstallEntries({
       circuits: finalized,

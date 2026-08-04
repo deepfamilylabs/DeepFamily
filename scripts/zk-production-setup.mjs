@@ -9,6 +9,10 @@ const usage = () => {
   console.log(`Usage:
   npm run zk:production:setup
   npm run zk:production:setup -- --ceremony-id <stable-audit-id>
+  npm run zk:production:setup -- --rotate \\
+    --expected-current-manifest-sha256 <current-production-manifest-sha256> \\
+    --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \\
+    [--ceremony-id <new-stable-audit-id>]
 
 Creates both production Groth16 proving keys with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
@@ -18,19 +22,63 @@ Creates both production Groth16 proving keys with:
   - one finalization beacon generated only after both contributions;
   - a schema-validated single-operator transcript and production manifest.
 
-The command requires a clean Git working tree, refuses to overwrite a production manifest, stages
-all outputs before installation, and restores the previous artifact set if final validation fails.
-It intentionally records that production security trusts the operator to destroy both Phase 2
-secrets.`);
+The default command requires a development manifest and refuses to overwrite production artifacts.
+The explicit --rotate form accepts only a valid existing schema-v3 single-operator production
+manifest and requires reviewed hashes for both that manifest and the newly installed snarkjs
+runtime graph. Both forms require a clean Git working tree, stage all outputs before installation,
+and restore the previous artifact set if final validation fails. They intentionally record that
+production security trusts the operator to destroy both Phase 2 secrets.`);
 };
 
-const parseArguments = (argv) => {
+const USAGE_ERROR =
+  "Usage: npm run zk:production:setup -- [--ceremony-id <stable-audit-id>] or " +
+  "--rotate --expected-current-manifest-sha256 <sha256> " +
+  "--expected-snarkjs-runtime-sha256 <sha256> [--ceremony-id <new-stable-audit-id>]";
+
+export const parseArguments = (argv) => {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
-  if (argv.length === 0) return { help: false, ceremonyId: undefined };
-  if (argv.length === 2 && argv[0] === "--ceremony-id" && argv[1].trim() !== "") {
-    return { help: false, ceremonyId: argv[1] };
+  const parsed = {
+    help: false,
+    rotate: false,
+    ceremonyId: undefined,
+    expectedCurrentManifestSha256: undefined,
+    expectedSnarkjsRuntimeSha256: undefined,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === "--rotate") {
+      if (parsed.rotate) throw new Error(USAGE_ERROR);
+      parsed.rotate = true;
+      continue;
+    }
+    const field =
+      argument === "--ceremony-id"
+        ? "ceremonyId"
+        : argument === "--expected-current-manifest-sha256"
+          ? "expectedCurrentManifestSha256"
+          : argument === "--expected-snarkjs-runtime-sha256"
+            ? "expectedSnarkjsRuntimeSha256"
+            : null;
+    if (field === null || parsed[field] !== undefined) throw new Error(USAGE_ERROR);
+    const value = argv[index + 1];
+    if (typeof value !== "string" || value.trim() === "" || value.startsWith("--")) {
+      throw new Error(USAGE_ERROR);
+    }
+    parsed[field] = value;
+    index += 1;
   }
-  throw new Error("Usage: npm run zk:production:setup -- [--ceremony-id <stable-audit-id>]");
+  const hasRotationEvidence =
+    parsed.expectedCurrentManifestSha256 !== undefined ||
+    parsed.expectedSnarkjsRuntimeSha256 !== undefined;
+  if (
+    (parsed.rotate &&
+      (parsed.expectedCurrentManifestSha256 === undefined ||
+        parsed.expectedSnarkjsRuntimeSha256 === undefined)) ||
+    (!parsed.rotate && hasRotationEvidence)
+  ) {
+    throw new Error(USAGE_ERROR);
+  }
+  return parsed;
 };
 
 export const main = async (argv = process.argv.slice(2)) => {
@@ -40,11 +88,15 @@ export const main = async (argv = process.argv.slice(2)) => {
     return;
   }
   console.warn(
-    "Starting single-operator production ZK setup. Keep this machine isolated and destroy " +
+    `Starting single-operator production ZK ${parsed.rotate ? "rotation" : "setup"}. ` +
+      "Keep this machine isolated and destroy " +
       "all Phase 2 entropy after the process exits.",
   );
   const result = await runSingleOperatorProductionSetup({
     ceremonyId: parsed.ceremonyId,
+    rotate: parsed.rotate,
+    expectedCurrentManifestSha256: parsed.expectedCurrentManifestSha256,
+    expectedSnarkjsRuntimeSha256: parsed.expectedSnarkjsRuntimeSha256,
   });
   console.log("Production ZK setup completed and verified:");
   console.log(`  ceremony:   ${result.ceremonyId}`);
