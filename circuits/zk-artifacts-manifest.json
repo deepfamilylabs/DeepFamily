@@ -8,30 +8,49 @@
     "snarkjsRuntimeSha256": "e87cacfed501e647159827dffe534033f9c2b368a3875796958be82b3d573189"
   },
   "trustedSetup": {
-    "status": "development",
+    "status": "production",
     "trustModel": "single-operator",
-    "warning": "Single local contributor with public fixed entropy; development and testing only.",
+    "warning": "Production security trusts one operator to destroy both circuit-specific Phase 2 secrets.",
+    "ceremonyId": "deepfamily-single-operator-20260804T093627Z",
     "minimumContributors": 1,
     "contributorCount": 1,
-    "beaconApplied": false,
-    "transcriptSha256": null
+    "phase1": {
+      "source": "https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_13.ptau",
+      "bytes": 9520280,
+      "sha256": "95751b5207f20aa822f01109902315c01c15250303feacea2b8aa7dc9fdfeefd",
+      "blake2b512": "58efc8bf2834d04768a3d7ffcd8e1e23d461561729beaac4e3e7a47829a1c9066d5320241e124a1a8e8aa6c75be0ba66f65bc8239a0542ed38e11276f6fdb4d9",
+      "verified": true
+    },
+    "transcript": {
+      "path": "circuits/zk-ceremony-transcript.json",
+      "sha256": "b321498c4b9f903a25ed143acc047267fee15c68561087a96c7b17e72acdb1e5"
+    },
+    "beacon": {
+      "applied": true,
+      "name": "deepfamily-single-operator-finalization",
+      "hash": "8f2f4c19ec1ae6f3f640f6135ac62bd0b472fb01a15b4c1c7a147e0f656df939",
+      "numIterationsExp": 10,
+      "source": "node:crypto.randomBytes(32), generated after both Phase 2 contributions",
+      "personCommitmentContributionHash": "9541ccf8f67e932e9f39a5922c81460545f94441d517650fbf73491f83eb0b5bb282e66192efd8722d7976a4defa07cb309269d33c24a899bd1a25077ca85ea4",
+      "disclosureBindingContributionHash": "b9b61596e8c32913c0b403764d23f685beb543d22cf34c05ee28b0277e409fc7c39d5e902885fad6bb16bf341a1b2f6928a1303884539cf96627eecb51f70d32"
+    }
   },
   "circuits": {
     "person_commitment": {
       "sourceSha256": "a524df0e78d09ccb7e1340f75fe72649c15879eb4d82401df3993d96d28c92f6",
       "r1csSha256": "6fd8036b197df526da6e23a435453c74a5db1090815b8e3c658f1c7d9351013b",
       "wasmSha256": "6011906acc57c44833686a4e7f95e4d8048be6fb8f85689e0c1b1586b041ccd2",
-      "zkeySha256": "c22016246724e6ffcde780b95830200003f1e77cbc6699d48da9a6d432cf07d3",
-      "verificationKeySha256": "d228bf75ffd7e2618976faf4e233620a027df68e5f1065615029137116bd3a18",
-      "solidityVerifierSha256": "8fa114cd1f9e8943abc0be670107618c5015635da2c146891bbe7bb245d0ddc1"
+      "zkeySha256": "fd22f8e839942cc7ee47ebef7ce0844a649953271416c46286b7c77a9d50eb41",
+      "verificationKeySha256": "f1e0b736579b0c2e4a1bd316fc958a7d9b727a4b9f802f528ff88cac5a0d09ee",
+      "solidityVerifierSha256": "a9268059c5d9ba1d5c8f8084270a7527d45d02e15b9cbe90fbeeedbec790f66b"
     },
     "disclosure_binding": {
       "sourceSha256": "e726e33f80b0086a90bfc1b1ce937bd1e6197fabd9f4389bb8e166a4b6bed9e1",
       "r1csSha256": "15c2b2b7f78914d306668def6505d6a51663827b7497707e38606eb3ae6ed2b2",
       "wasmSha256": "9c84b0d4f2fbc51243e84f2d4f01397c36cc24dfa987fc5c052bfa5f6511b460",
-      "zkeySha256": "7e096d2aa4f40baaaeba0f274da61620b0becc9957a81e85fae2c5ca07b9b003",
-      "verificationKeySha256": "1e26537a6368a6d11052c21e04a8e6b2a33136c8514d0f26678a5db275e91157",
-      "solidityVerifierSha256": "1945b5fac409a6894ce36df7d6adf57837e5693415aba15922a942b59962c6f3"
+      "zkeySha256": "ad071b41243c0605e43b79b170ade90f3a75295934313b327554c2cb462ececc",
+      "verificationKeySha256": "240b74531ee9e6ffdcfd25c5407975262627de19f30922e5829befa700eb86c0",
+      "solidityVerifierSha256": "6c537aa72a15fd5fdf44fc02c29591b03681ce02797619ef883d7dcb226d4aff"
     }
   }
 }
