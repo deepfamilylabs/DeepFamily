@@ -140,7 +140,7 @@ const createProductionFixture = async () => {
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
     schemaVersion: 3,
-    circomVersion: "2.1.6",
+    circomVersion: "2.2.3",
     snarkjsVersion,
     toolchain: {
       circomBinarySha256: sha256File(circomBinary),

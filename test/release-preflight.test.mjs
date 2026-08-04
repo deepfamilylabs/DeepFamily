@@ -142,7 +142,7 @@ const createProductionFixture = async () => {
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
     schemaVersion: 3,
-    circomVersion: "2.1.6",
+    circomVersion: "2.2.3",
     snarkjsVersion,
     toolchain: {
       circomBinarySha256: sha256File(circomBinary),
@@ -500,7 +500,7 @@ describe("production release preflight", function () {
       [{ platform: "linux", arch: "x64" }, "Existing circom does not match the pinned SHA-256"],
       [
         { platform: "win32", arch: "x64" },
-        'Installed Circom compiler version mismatch; expected "circom compiler 2.1.6"',
+        'Installed Circom compiler version mismatch; expected "circom compiler 2.2.3"',
       ],
     ]) {
       const fixture = await productionFixture();

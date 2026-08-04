@@ -1,9 +1,9 @@
 {
   "schemaVersion": 3,
-  "circomVersion": "2.1.6",
+  "circomVersion": "2.2.3",
   "snarkjsVersion": "0.7.5",
   "toolchain": {
-    "circomBinarySha256": "f3958483caaaa0cdd3912df5049e2e635eab4d09b9a66807be9633d547859f12",
+    "circomBinarySha256": "85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3",
     "snarkjsCliSha256": "092c70dbf8bef02b666456db7429127aa51c5dbfce91cef038638d7da3bfdcea",
     "snarkjsRuntimeSha256": "e87cacfed501e647159827dffe534033f9c2b368a3875796958be82b3d573189"
   },
@@ -18,17 +18,17 @@
   },
   "circuits": {
     "person_commitment": {
-      "sourceSha256": "ee9fea9646dcadf47d69c2fadd667b843de71b6287e9b0a8027c366a67211787",
+      "sourceSha256": "a524df0e78d09ccb7e1340f75fe72649c15879eb4d82401df3993d96d28c92f6",
       "r1csSha256": "6fd8036b197df526da6e23a435453c74a5db1090815b8e3c658f1c7d9351013b",
-      "wasmSha256": "78ea75057249d169b9a93f5cd4e41055d32416d491ac035e0a856d79b039979e",
+      "wasmSha256": "6011906acc57c44833686a4e7f95e4d8048be6fb8f85689e0c1b1586b041ccd2",
       "zkeySha256": "c22016246724e6ffcde780b95830200003f1e77cbc6699d48da9a6d432cf07d3",
       "verificationKeySha256": "d228bf75ffd7e2618976faf4e233620a027df68e5f1065615029137116bd3a18",
       "solidityVerifierSha256": "8fa114cd1f9e8943abc0be670107618c5015635da2c146891bbe7bb245d0ddc1"
     },
     "disclosure_binding": {
-      "sourceSha256": "7e3ad67bd2edcb7fd0ec0d0673970bdb2d27467d67c9a5a8d6bdb1a6edf79e24",
+      "sourceSha256": "e726e33f80b0086a90bfc1b1ce937bd1e6197fabd9f4389bb8e166a4b6bed9e1",
       "r1csSha256": "15c2b2b7f78914d306668def6505d6a51663827b7497707e38606eb3ae6ed2b2",
-      "wasmSha256": "ced8e09c94de8ba5acd19b15d38cd4070d0dbb37efd308bcbbfdd131d9c5a9f4",
+      "wasmSha256": "9c84b0d4f2fbc51243e84f2d4f01397c36cc24dfa987fc5c052bfa5f6511b460",
       "zkeySha256": "7e096d2aa4f40baaaeba0f274da61620b0becc9957a81e85fae2c5ca07b9b003",
       "verificationKeySha256": "1e26537a6368a6d11052c21e04a8e6b2a33136c8514d0f26678a5db275e91157",
       "solidityVerifierSha256": "1945b5fac409a6894ce36df7d6adf57837e5693415aba15922a942b59962c6f3"

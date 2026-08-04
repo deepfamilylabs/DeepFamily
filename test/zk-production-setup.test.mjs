@@ -133,6 +133,7 @@ describe("single-operator production ZK setup safety", function () {
 
       expect(command.executable).to.equal(compilerPath);
       expect(command.args).to.include("--O2");
+      expect(command.args[command.args.indexOf("--sanity_check") + 1]).to.equal("2");
       expect(command.args).to.include(path.join(root, "circuits", "person_commitment.circom"));
       expect(command.cwd).to.equal(root);
     }
