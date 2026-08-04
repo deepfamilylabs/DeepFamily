@@ -220,9 +220,12 @@ network as interchangeable:
 | `espace:*`     | eSpace 71 / 1030             | canonical Safe v1.3.0 L2 | CFX / Conflux three-quarter gas rule | ConfluxScan            |
 | `ethereum:*`   | Sepolia 11155111 / Mainnet 1 | canonical Safe v1.3.0 L1 | ETH / receipt `gasUsed`              | Blockscout / Etherscan |
 
-RPC variables, confirmation strings, Safe profile names, budgets, wallet-derivation domains,
-reports, locks, and checkpoints are also separated. Use the named npm entry for the intended chain;
-do not invoke a lower-level script with an arbitrary `--network` to bypass these locks.
+RPC endpoints, expected confirmation values, Safe profiles, native-currency units,
+wallet-derivation domains, report contents, locks, and checkpoints remain chain-bound. The guarded
+runners share the `EVM_E2E_*` and `EVM_MAINNET_*` setting names because the named npm command
+selects the immutable profile; the selected profile still rejects another chain's confirmation,
+report, recovery evidence, or authorization. Do not invoke a lower-level script with an arbitrary
+`--network` to bypass these locks, and never persist a native-token budget while switching chains.
 
 ### Recommended eSpace Mainnet release
 
@@ -233,13 +236,13 @@ eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default 
 pinned public power-13 pTau and records one local Phase 2 contributor under the explicit
 `single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
 a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
-Set `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` to that archived report; the Mainnet plan validates its
+Set `EVM_MAINNET_TESTNET_RELEASE_REPORT` to that archived report; the Mainnet plan validates its
 commit, artifact digest, production delay, ZK status, verification, finality and terminal state.
 
 For a new production governance wallet, first configure three reviewed EOA/hardware-wallet owner
-addresses in their final order, a fixed decimal salt nonce, the approved deployer, and the
-Safe-only CFX/finality limits. Keep `GOVERNANCE_MULTISIG`,
-`ESPACE_MAINNET_SAFE_CONFIRM`, and `ESPACE_MAINNET_SAFE_PLAN_DIGEST` empty, then generate a
+addresses in their final order, a fixed decimal salt nonce, the approved deployer, the Safe-only
+CFX limit, and the shared Mainnet finality policy. Keep `GOVERNANCE_MULTISIG`,
+`EVM_MAINNET_SAFE_CONFIRM`, and `EVM_MAINNET_SAFE_PLAN_DIGEST` empty, then generate a
 read-only deterministic deployment plan:
 
 ```bash
@@ -247,15 +250,15 @@ npm run espace:mainnet:safe
 ```
 
 The creator is fixed to canonical Safe v1.3.0 with exactly three ordered EOA owners and a `2/3`
-threshold. Owner order and `ESPACE_MAINNET_SAFE_SALT_NONCE` both affect the predicted address.
+threshold. Owner order and `EVM_MAINNET_SAFE_SALT_NONCE` both affect the predicted address.
 After an independent review, set the printed digest and
-`ESPACE_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030`, then run the same command to deploy
+`EVM_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030`, then run the same command to deploy
 or resume. It reads only public owner addresses and never accepts an owner private key.
 
 Deployment alone does not prove that the real controllers can sign. Two owners must use their
 external signing workflow to execute the documented refund-free `0 CFX`, empty-calldata `CALL` to
-`ESPACE_MAINNET_EXPECTED_DEPLOYER`. Set its outer transaction hash in
-`ESPACE_MAINNET_SAFE_ACCEPTANCE_TX`, then require this read-only check to pass:
+`EVM_MAINNET_EXPECTED_DEPLOYER`. Set its outer transaction hash in
+`EVM_MAINNET_SAFE_ACCEPTANCE_TX`, then require this read-only check to pass:
 
 ```bash
 npm run espace:mainnet:safe:status
@@ -265,8 +268,8 @@ Only then copy the reviewed Safe address to `GOVERNANCE_MULTISIG`. That acceptan
 Safe's first and only execution (`nonce == 1`) until the protocol release plan and execution
 complete.
 
-Next use the resumable protocol orchestrator. With `ESPACE_MAINNET_CONFIRM` and
-`ESPACE_MAINNET_PLAN_DIGEST` empty, this command is read-only:
+Next use the resumable protocol orchestrator. With `EVM_MAINNET_CONFIRM` and
+`EVM_MAINNET_PLAN_DIGEST` empty, this command is read-only:
 
 ```bash
 npm run espace:mainnet:release
@@ -275,9 +278,9 @@ npm run espace:mainnet:release
 Every release invocation performs the complete clean `release:preflight` gate. Review the plan with
 a second operator. At least two current Safe owners must sign the complete printed EIP-191
 plan-approval message using their external wallet/hardware-wallet workflow. Copy the printed digest to
-`ESPACE_MAINNET_PLAN_DIGEST`, put the signatures in
-`ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES`, set
-`ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute or resume.
+`EVM_MAINNET_PLAN_DIGEST`, put the signatures in
+`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES`, set
+`EVM_MAINNET_CONFIRM=conflux-mainnet-chain-1030`, and run the same command to execute or resume.
 The repository recovers the owner addresses and rejects a changed plan, report, Safe or owner set;
 it never receives an owner private key.
 It checkpoints every phase, verifies every contract, waits for finalized coverage, and validates
@@ -289,20 +292,20 @@ the complete Safe bootstrap, acceptance, release, and recovery procedure in the
 
 Ethereum uses the same reviewed release architecture but a separate Ethereum profile and state.
 It also requires the reviewed production ZK setup commit, `release:preflight`, and an exact Sepolia
-release-rehearsal report selected through `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`. The ZK
+release-rehearsal report selected through `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The ZK
 contributor count is unrelated to the three-owner, 2/3 production Safe policy.
 First run the destructive Sepolia acceptance suite:
 
 ```bash
-ETHEREUM_E2E_CONFIRM=ethereum-sepolia-chain-11155111 \
-ETHEREUM_E2E_MODE=diagnostic \
+EVM_E2E_CONFIRM=ethereum-sepolia-chain-11155111 \
+EVM_E2E_MODE=diagnostic \
 npm run ethereum:acceptance
 ```
 
 A diagnostic run always reports `releaseReady=false`. Before a production release, rerun from the
-clean release commit with `ETHEREUM_E2E_MODE=release-rehearsal`,
+clean release commit with `EVM_E2E_MODE=release-rehearsal`,
 `GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, verification/finality enabled, and
-`MIN_DELAY` exactly equal to `ETHEREUM_E2E_MIN_DELAY`.
+`MIN_DELAY` exactly equal to `EVM_E2E_MIN_DELAY`.
 
 For Mainnet, configure three reviewed public owner addresses and a fixed salt, then leave the Safe
 confirmation/digest pair blank to create a read-only plan:
@@ -312,7 +315,7 @@ npm run ethereum:mainnet:safe
 ```
 
 After independent review, setting
-`ETHEREUM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1` plus the exact printed digest and
+`EVM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1` plus the exact printed digest and
 rerunning broadcasts the real Safe factory transaction. Two real owners must then execute the
 documented zero-ETH smoke transaction externally; this repository never accepts owner private
 keys. Record its outer hash and validate it without broadcasting:
@@ -328,8 +331,8 @@ npm run ethereum:mainnet:release
 ```
 
 At least two current Safe owners must sign the complete EIP-191 plan-approval message printed by
-plan mode. Setting `ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1`, the independently reviewed
-digest, and `ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES` to those external signatures before
+plan mode. Setting `EVM_MAINNET_CONFIRM=ethereum-mainnet-chain-1`, the independently reviewed
+digest, and `EVM_MAINNET_PLAN_APPROVAL_SIGNATURES` to those external signatures before
 rerunning enters execute/resume mode, broadcasts real Ethereum Mainnet transactions, and spends
 real ETH. A real `EXPLORER_API_KEY` is mandatory for Ethereum Mainnet source verification; Sepolia
 acceptance uses API-key-free Blockscout. See the complete

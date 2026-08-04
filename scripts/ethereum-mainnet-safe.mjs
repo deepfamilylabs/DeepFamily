@@ -1,8 +1,8 @@
 /**
  * Ethereum Mainnet Safe:
  *   npm run ethereum:mainnet:safe
- *   ETHEREUM_MAINNET_SAFE_PLAN_DIGEST=0x... \
- *   ETHEREUM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1 \
+ *   EVM_MAINNET_SAFE_PLAN_DIGEST=0x... \
+ *   EVM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1 \
  *     npm run ethereum:mainnet:safe
  *   npm run ethereum:mainnet:safe:status
  */

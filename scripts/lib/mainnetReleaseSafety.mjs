@@ -255,11 +255,6 @@ export const parseProductionMainnetReleaseConfig = ({
     60,
     604_800,
   );
-  for (const name of [mainnet.verifyEnvironmentName, mainnet.requireFinalityEnvironmentName]) {
-    const value = String(env[name] ?? "1").trim();
-    if (value !== "1") throw new Error(`${name} is mandatory and must be exactly 1`);
-  }
-
   const maximumCost = String(env[mainnet.maximumCostEnvironmentName] ?? "").trim();
   if (!DECIMAL_NATIVE_PATTERN.test(maximumCost)) {
     throw new Error(
