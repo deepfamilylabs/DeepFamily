@@ -26,14 +26,14 @@ const RECOVERY_TX = `0x${"cd".repeat(32)}`;
 const RELEASE_COMMIT = "12".repeat(20);
 
 const baseEnv = (overrides = {}) => ({
-  ESPACE_MAINNET_SAFE_CONFIRM: "",
-  ESPACE_MAINNET_SAFE_PLAN_DIGEST: "",
-  ESPACE_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
-  ESPACE_MAINNET_SAFE_OWNERS: OWNERS.join(","),
-  ESPACE_MAINNET_SAFE_SALT_NONCE: "123456789",
-  ESPACE_MAINNET_SAFE_MAX_CFX: "0.25",
-  ESPACE_MAINNET_SAFE_CONFIRMATIONS: "2",
-  ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT: "3600",
+  EVM_MAINNET_SAFE_CONFIRM: "",
+  EVM_MAINNET_SAFE_PLAN_DIGEST: "",
+  EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
+  EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
+  EVM_MAINNET_SAFE_SALT_NONCE: "123456789",
+  EVM_MAINNET_SAFE_MAX_NATIVE: "0.25",
+  EVM_MAINNET_CONFIRMATIONS: "2",
+  EVM_MAINNET_FINALITY_TIMEOUT: "3600",
   GOVERNANCE_MULTISIG_PROFILE: "conflux-safe-1.3.0-2of3",
   ...overrides,
 });
@@ -105,8 +105,8 @@ describe("eSpace Mainnet Safe creation safety", function () {
 
   it("requires the exact confirmation and a 32-byte reviewed digest for execute mode", function () {
     const config = parse({
-      ESPACE_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
-      ESPACE_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST.toUpperCase().replace("0X", "0x"),
+      EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
+      EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST.toUpperCase().replace("0X", "0x"),
     });
     expect(config.mode).to.equal("execute");
     expect(config.confirmation).to.equal(ESPACE_MAINNET_SAFE_CONFIRMATION);
@@ -115,32 +115,32 @@ describe("eSpace Mainnet Safe creation safety", function () {
     expect(() =>
       parseESpaceMainnetSafeAuthorization(
         baseEnv({
-          ESPACE_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
-          ESPACE_MAINNET_SAFE_PLAN_DIGEST: "",
+          EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
+          EVM_MAINNET_SAFE_PLAN_DIGEST: "",
         }),
       ),
     ).to.throw("must either both be blank");
     expect(() =>
       parseESpaceMainnetSafeAuthorization(
         baseEnv({
-          ESPACE_MAINNET_SAFE_CONFIRM: "",
-          ESPACE_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
+          EVM_MAINNET_SAFE_CONFIRM: "",
+          EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
         }),
       ),
     ).to.throw("must either both be blank");
     expect(() =>
       parseESpaceMainnetSafeAuthorization(
         baseEnv({
-          ESPACE_MAINNET_SAFE_CONFIRM: "yes",
-          ESPACE_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
+          EVM_MAINNET_SAFE_CONFIRM: "yes",
+          EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
         }),
       ),
     ).to.throw(`must be exactly ${ESPACE_MAINNET_SAFE_CONFIRMATION}`);
     expect(() =>
       parseESpaceMainnetSafeAuthorization(
         baseEnv({
-          ESPACE_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
-          ESPACE_MAINNET_SAFE_PLAN_DIGEST: "0x1234",
+          EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
+          EVM_MAINNET_SAFE_PLAN_DIGEST: "0x1234",
         }),
       ),
     ).to.throw("32-byte digest");
@@ -157,66 +157,64 @@ describe("eSpace Mainnet Safe creation safety", function () {
   });
 
   it("requires exactly three distinct nonzero owners and preserves reviewed input order", function () {
-    expect(() => parse({ ESPACE_MAINNET_SAFE_OWNERS: OWNERS.slice(0, 2).join(",") })).to.throw(
+    expect(() => parse({ EVM_MAINNET_SAFE_OWNERS: OWNERS.slice(0, 2).join(",") })).to.throw(
       "exactly 3",
     );
     expect(() =>
-      parse({ ESPACE_MAINNET_SAFE_OWNERS: [OWNERS[0], OWNERS[0], OWNERS[2]].join(",") }),
+      parse({ EVM_MAINNET_SAFE_OWNERS: [OWNERS[0], OWNERS[0], OWNERS[2]].join(",") }),
     ).to.throw("three distinct");
     expect(() =>
       parse({
-        ESPACE_MAINNET_SAFE_OWNERS: [OWNERS[0], ethers.ZeroAddress, OWNERS[2]].join(","),
+        EVM_MAINNET_SAFE_OWNERS: [OWNERS[0], ethers.ZeroAddress, OWNERS[2]].join(","),
       }),
     ).to.throw("nonzero EVM address");
-    expect(() => parse({ ESPACE_MAINNET_EXPECTED_DEPLOYER: OWNERS[1] })).to.throw(
+    expect(() => parse({ EVM_MAINNET_EXPECTED_DEPLOYER: OWNERS[1] })).to.throw(
       "must not be one of the Safe owners",
     );
 
     const reviewedOrder = [OWNERS[2], OWNERS[0], OWNERS[1]];
     expect(
-      parse({ ESPACE_MAINNET_SAFE_OWNERS: reviewedOrder.join(",") }).expectedSafeOwners,
+      parse({ EVM_MAINNET_SAFE_OWNERS: reviewedOrder.join(",") }).expectedSafeOwners,
     ).to.deep.equal(reviewedOrder.map(ethers.getAddress));
   });
 
   it("requires an explicit canonical decimal uint256 salt", function () {
-    expect(parse({ ESPACE_MAINNET_SAFE_SALT_NONCE: "0" }).saltNonce).to.equal("0");
-    expect(
-      parse({ ESPACE_MAINNET_SAFE_SALT_NONCE: ethers.MaxUint256.toString() }).saltNonce,
-    ).to.equal(ethers.MaxUint256.toString());
+    expect(parse({ EVM_MAINNET_SAFE_SALT_NONCE: "0" }).saltNonce).to.equal("0");
+    expect(parse({ EVM_MAINNET_SAFE_SALT_NONCE: ethers.MaxUint256.toString() }).saltNonce).to.equal(
+      ethers.MaxUint256.toString(),
+    );
     for (const invalid of ["", "-1", "+1", "01", "1.0", "1e3", "0x01"]) {
-      expect(() => parse({ ESPACE_MAINNET_SAFE_SALT_NONCE: invalid })).to.throw(
+      expect(() => parse({ EVM_MAINNET_SAFE_SALT_NONCE: invalid })).to.throw(
         "must be explicitly set",
       );
     }
     expect(() =>
-      parse({ ESPACE_MAINNET_SAFE_SALT_NONCE: (ethers.MaxUint256 + 1n).toString() }),
+      parse({ EVM_MAINNET_SAFE_SALT_NONCE: (ethers.MaxUint256 + 1n).toString() }),
     ).to.throw("fit in uint256");
   });
 
   it("enforces a positive Safe-only CFX cap and bounded finality settings", function () {
     expect(parse().maximumCostWei).to.equal(ethers.parseEther("0.25"));
     for (const invalid of ["", "0", "-1", "1e2", "1.0000000000000000001"]) {
-      expect(() => parse({ ESPACE_MAINNET_SAFE_MAX_CFX: invalid })).to.throw(
+      expect(() => parse({ EVM_MAINNET_SAFE_MAX_NATIVE: invalid })).to.throw(
         invalid === "0" ? "greater than zero" : "explicitly set",
       );
     }
-    expect(() => parse({ ESPACE_MAINNET_SAFE_CONFIRMATIONS: "1" })).to.throw("between 2 and 100");
-    expect(() => parse({ ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT: "59" })).to.throw(
-      "between 60 and 604800",
-    );
+    expect(() => parse({ EVM_MAINNET_CONFIRMATIONS: "1" })).to.throw("between 2 and 100");
+    expect(() => parse({ EVM_MAINNET_FINALITY_TIMEOUT: "59" })).to.throw("between 60 and 604800");
   });
 
   it("accepts a recovery hash only in confirmed execute mode", function () {
     expect(parse().recoveryTransaction).to.equal(null);
-    expect(() => parse({ ESPACE_MAINNET_SAFE_RECOVERY_TX: "0x12" })).to.throw("blank or a 32-byte");
-    expect(() => parse({ ESPACE_MAINNET_SAFE_RECOVERY_TX: RECOVERY_TX })).to.throw(
+    expect(() => parse({ EVM_MAINNET_SAFE_RECOVERY_TX: "0x12" })).to.throw("blank or a 32-byte");
+    expect(() => parse({ EVM_MAINNET_SAFE_RECOVERY_TX: RECOVERY_TX })).to.throw(
       "only in confirmed execute mode",
     );
     expect(
       parse({
-        ESPACE_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
-        ESPACE_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
-        ESPACE_MAINNET_SAFE_RECOVERY_TX: RECOVERY_TX.toUpperCase().replace("0X", "0x"),
+        EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
+        EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
+        EVM_MAINNET_SAFE_RECOVERY_TX: RECOVERY_TX.toUpperCase().replace("0X", "0x"),
       }).recoveryTransaction,
     ).to.equal(RECOVERY_TX);
   });
@@ -233,10 +231,10 @@ describe("eSpace Mainnet Safe creation safety", function () {
     expect(parse().acceptanceTransaction).to.equal(null);
     expect(
       parse({
-        ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: RECOVERY_TX.toUpperCase().replace("0X", "0x"),
+        EVM_MAINNET_SAFE_ACCEPTANCE_TX: RECOVERY_TX.toUpperCase().replace("0X", "0x"),
       }).acceptanceTransaction,
     ).to.equal(RECOVERY_TX);
-    expect(() => parse({ ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: "0x12" })).to.throw(
+    expect(() => parse({ EVM_MAINNET_SAFE_ACCEPTANCE_TX: "0x12" })).to.throw(
       "blank or a 32-byte transaction hash",
     );
   });
@@ -299,18 +297,18 @@ describe("eSpace Mainnet Safe creation safety", function () {
       },
       {
         config: parse({
-          ESPACE_MAINNET_SAFE_OWNERS: [...OWNERS].reverse().join(","),
+          EVM_MAINNET_SAFE_OWNERS: [...OWNERS].reverse().join(","),
         }),
       },
-      { config: parse({ ESPACE_MAINNET_SAFE_SALT_NONCE: "123456790" }) },
+      { config: parse({ EVM_MAINNET_SAFE_SALT_NONCE: "123456790" }) },
       {
         config: parse({
-          ESPACE_MAINNET_EXPECTED_DEPLOYER: "0x7000000000000000000000000000000000000007",
+          EVM_MAINNET_EXPECTED_DEPLOYER: "0x7000000000000000000000000000000000000007",
         }),
       },
-      { config: parse({ ESPACE_MAINNET_SAFE_MAX_CFX: "0.26" }) },
-      { config: parse({ ESPACE_MAINNET_SAFE_CONFIRMATIONS: "3" }) },
-      { config: parse({ ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT: "3601" }) },
+      { config: parse({ EVM_MAINNET_SAFE_MAX_NATIVE: "0.26" }) },
+      { config: parse({ EVM_MAINNET_CONFIRMATIONS: "3" }) },
+      { config: parse({ EVM_MAINNET_FINALITY_TIMEOUT: "3601" }) },
     ];
     for (const change of changedInputs) {
       const changed = buildMainnetSafePlanFingerprint({ ...args, ...change });

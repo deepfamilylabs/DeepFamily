@@ -413,7 +413,9 @@ verifiers, the verifier adapter, and the libraries.
 
 For a new Conflux eSpace Mainnet governance wallet, configure the approved deployer, exactly three
 distinct EOA/hardware-wallet owner addresses in their final order, a fixed
-`ESPACE_MAINNET_SAFE_SALT_NONCE`, and a separate Safe factory-call budget. Keep the Safe
+`EVM_MAINNET_SAFE_SALT_NONCE`, and a separate Safe factory-call budget in
+`EVM_MAINNET_SAFE_MAX_NATIVE`. The `espace:mainnet:*` command interprets that shared setting as CFX;
+set it explicitly for the current plan/execution rather than carrying it across chains. Keep the Safe
 authorization pair and `GOVERNANCE_MULTISIG` empty, then generate a read-only plan:
 
 ```bash
@@ -422,14 +424,14 @@ npm run espace:mainnet:safe
 
 The creator supports only canonical Safe v1.3.0, the exact ordered three-owner setup, and threshold
 `2`. Owner order and salt both change the deterministic address. After independent review, set the
-printed `ESPACE_MAINNET_SAFE_PLAN_DIGEST` and exact
-`ESPACE_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030`, then run the same command to deploy
+printed `EVM_MAINNET_SAFE_PLAN_DIGEST` and exact
+`EVM_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030`, then run the same command to deploy
 or safely resume the one factory call. The creator reads only public addresses; owner private keys,
 signatures, seed phrases, and keystores must remain in the controllers' external signing system.
 
 Before protocol release, two real owners must externally execute the documented refund-free
-`0 CFX`, empty-calldata `CALL` to `ESPACE_MAINNET_EXPECTED_DEPLOYER`. Put the outer transaction
-hash in `ESPACE_MAINNET_SAFE_ACCEPTANCE_TX` and run:
+`0 CFX`, empty-calldata `CALL` to `EVM_MAINNET_EXPECTED_DEPLOYER`. Put the outer transaction
+hash in `EVM_MAINNET_SAFE_ACCEPTANCE_TX` and run:
 
 ```bash
 npm run espace:mainnet:safe:status
@@ -450,16 +452,16 @@ npm run espace:mainnet:release
 Before this command can plan a release, the development proving keys must have been replaced with
 `npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
 artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
-that clean commit, and `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v3
+that clean commit, and `EVM_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v3
 `releaseReady=true` rehearsal report from the current commit and production `MIN_DELAY`. The
 default ZK setup records one Phase 2 contributor under `trustModel=single-operator`; this is
 independent of the three-owner, 2/3 governance Safe.
 
-With `ESPACE_MAINNET_CONFIRM` and `ESPACE_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
+With `EVM_MAINNET_CONFIRM` and `EVM_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
 After review, at least two current Safe owners sign the complete printed EIP-191 plan-approval
 message externally. Set the printed digest, the resulting JSON signature array in
-`ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES`, plus
-`ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030` and rerun to execute or resume. The
+`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES`, plus
+`EVM_MAINNET_CONFIRM=conflux-mainnet-chain-1030` and rerun to execute or resume. The
 orchestrator deploys and validates the Timelock before the protocol, records an atomic checkpoint,
 verifies every source, waits for finalized coverage, and validates the terminal governance state.
 It does not write test person/NFT/story data to Mainnet. Full configuration and recovery
@@ -483,11 +485,12 @@ npm run ethereum:mainnet:release
 
 The Ethereum production flow requires
 `GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
-exactly three ordered EOA owners with threshold `2`, ETH budget variables, a real Etherscan API key,
+exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
+`EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
 the exact chain-1 confirmation strings, reviewed production ZK setup artifacts, and an exact Sepolia
-release-rehearsal report in `ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands
+release-rehearsal report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands
 default to read-only plan mode while their respective confirmation/digest pair is blank. Protocol
-execution additionally requires `ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct
+execution additionally requires `EVM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct
 valid EIP-191 signatures from at least two current Safe owners over the exact printed approval
 message. Filling the reviewed authorization values and rerunning enters execute/resume mode and
 broadcasts real Mainnet transactions.

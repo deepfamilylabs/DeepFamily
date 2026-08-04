@@ -57,6 +57,70 @@ const pathExists = async (filePath) => {
 };
 
 describe("acceptance command wrapper", function () {
+  it("shares public EVM settings while keeping chain identities and wrapper tokens isolated", function () {
+    const espace = ESPACE_CHAIN_PROFILE.acceptance;
+    const ethereum = ETHEREUM_CHAIN_PROFILE.acceptance;
+    const publicEnvironmentNames = {
+      envPrefix: "EVM_E2E",
+      confirmationEnvironmentName: "EVM_E2E_CONFIRM",
+      modeEnvironmentName: "EVM_E2E_MODE",
+      minDelayEnvironmentName: "EVM_E2E_MIN_DELAY",
+      confirmationsEnvironmentName: "EVM_E2E_CONFIRMATIONS",
+      maximumCostEnvironmentName: "EVM_E2E_MAX_NATIVE",
+      runIdEnvironmentName: "EVM_E2E_RUN_ID",
+      recoverEnvironmentName: "EVM_E2E_RECOVER",
+      verifyEnvironmentName: "EVM_E2E_VERIFY",
+      requireFinalityEnvironmentName: "EVM_E2E_REQUIRE_FINALITY",
+      finalityTimeoutEnvironmentName: "EVM_E2E_FINALITY_TIMEOUT",
+    };
+
+    expect(espace).to.include(publicEnvironmentNames);
+    expect(ethereum).to.include(publicEnvironmentNames);
+    expect(espace.confirmation).not.to.equal(ethereum.confirmation);
+    expect(espace.runIdDigestDomain).not.to.equal(ethereum.runIdDigestDomain);
+    expect(espace.walletDerivationDomain).not.to.equal(ethereum.walletDerivationDomain);
+    expect(espace.wrapperTokenEnvironmentName).to.equal("DEEPFAMILY_ESPACE_E2E_WRAPPER_TOKEN");
+    expect(ethereum.wrapperTokenEnvironmentName).to.equal("DEEPFAMILY_ETHEREUM_E2E_WRAPPER_TOKEN");
+
+    const mainnetPublicEnvironmentNames = {
+      expectedDeployerEnvironmentName: "EVM_MAINNET_EXPECTED_DEPLOYER",
+      safeOwnersEnvironmentName: "EVM_MAINNET_SAFE_OWNERS",
+      safeSaltNonceEnvironmentName: "EVM_MAINNET_SAFE_SALT_NONCE",
+      safeMaximumCostEnvironmentName: "EVM_MAINNET_SAFE_MAX_NATIVE",
+      safeConfirmationsEnvironmentName: "EVM_MAINNET_CONFIRMATIONS",
+      safeFinalityTimeoutEnvironmentName: "EVM_MAINNET_FINALITY_TIMEOUT",
+      safeConfirmationEnvironmentName: "EVM_MAINNET_SAFE_CONFIRM",
+      safePlanDigestEnvironmentName: "EVM_MAINNET_SAFE_PLAN_DIGEST",
+      safeRecoveryTransactionEnvironmentName: "EVM_MAINNET_SAFE_RECOVERY_TX",
+      safeAcceptanceTransactionEnvironmentName: "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
+      confirmationEnvironmentName: "EVM_MAINNET_CONFIRM",
+      planDigestEnvironmentName: "EVM_MAINNET_PLAN_DIGEST",
+      planApprovalSignaturesEnvironmentName: "EVM_MAINNET_PLAN_APPROVAL_SIGNATURES",
+      maximumCostEnvironmentName: "EVM_MAINNET_MAX_NATIVE",
+      confirmationsEnvironmentName: "EVM_MAINNET_CONFIRMATIONS",
+      finalityTimeoutEnvironmentName: "EVM_MAINNET_FINALITY_TIMEOUT",
+      recoveryTransactionsEnvironmentName: "EVM_MAINNET_RECOVERY_TXS",
+      testnetReleaseReportEnvironmentName: "EVM_MAINNET_TESTNET_RELEASE_REPORT",
+    };
+    expect(ESPACE_CHAIN_PROFILE.mainnet).to.include(mainnetPublicEnvironmentNames);
+    expect(ETHEREUM_CHAIN_PROFILE.mainnet).to.include(mainnetPublicEnvironmentNames);
+    expect(ESPACE_CHAIN_PROFILE.mainnet.safeConfirmation).not.to.equal(
+      ETHEREUM_CHAIN_PROFILE.mainnet.safeConfirmation,
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet.confirmation).not.to.equal(
+      ETHEREUM_CHAIN_PROFILE.mainnet.confirmation,
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet.safePlanDigestDomain).not.to.equal(
+      ETHEREUM_CHAIN_PROFILE.mainnet.safePlanDigestDomain,
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet.releasePlanDigestDomain).not.to.equal(
+      ETHEREUM_CHAIN_PROFILE.mainnet.releasePlanDigestDomain,
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet.releasePlanApprovalDomain).not.to.equal(
+      ETHEREUM_CHAIN_PROFILE.mainnet.releasePlanApprovalDomain,
+    );
+  });
+
   for (const chainProfile of [ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE]) {
     it(`runs ${chainProfile.id} diagnostics without the production preflight`, async function () {
       const calls = await runFixture({ chainProfile });
@@ -130,14 +194,14 @@ describe("acceptance command wrapper", function () {
       { environment: {} },
       {
         environment: {
-          ESPACE_E2E_CONFIRM: ESPACE_CHAIN_PROFILE.acceptance.confirmation,
-          ESPACE_E2E_MODE: "unsafe",
+          EVM_E2E_CONFIRM: ESPACE_CHAIN_PROFILE.acceptance.confirmation,
+          EVM_E2E_MODE: "unsafe",
         },
       },
       {
         environment: {
-          ESPACE_E2E_CONFIRM: ESPACE_CHAIN_PROFILE.acceptance.confirmation,
-          ESPACE_E2E_MODE: "diagnostic",
+          EVM_E2E_CONFIRM: ESPACE_CHAIN_PROFILE.acceptance.confirmation,
+          EVM_E2E_MODE: "diagnostic",
         },
         arguments_: ["--network", "mainnet"],
       },

@@ -17,6 +17,11 @@ three ordered EOA owners, threshold `2`, Etherscan verification, ETH budgets, Et
 accounting, and `deployments/mainnet/` checkpoints. Environment variables can supply approved
 addresses, limits, and authorization, but cannot change those profile properties.
 
+The eSpace and Ethereum production commands share the public `EVM_MAINNET_*` setting names. The
+named command fixes their chain, confirmation domain, native unit, and evidence requirements;
+before switching command families, clear and replace every identity, budget, authorization,
+report, and recovery value rather than reusing it across chains.
+
 These commands have not, merely by existing or by passing repository tests, deployed anything on
 Ethereum Mainnet. Plan mode makes RPC reads and writes local plan files but does not broadcast.
 Execute mode sends real Ethereum transactions and spends real ETH.
@@ -27,7 +32,7 @@ Execute mode sends real Ethereum transactions and spends real ETH.
 call and the protocol deployment. It must not be a Safe-owner key.
 
 The repository accepts only the three owners' public addresses through
-`ETHEREUM_MAINNET_SAFE_OWNERS`. It never accepts, derives, imports, stores, or signs with a
+`EVM_MAINNET_SAFE_OWNERS`. It never accepts, derives, imports, stores, or signs with a
 production owner's private key, seed phrase, keystore, hardware-wallet secret, or Safe signature.
 The three controllers must use an independently approved external Safe signing workflow.
 
@@ -35,18 +40,18 @@ The Safe deployment proves that the reviewed proxy and configuration exist. It d
 the intended controllers possess usable keys. Before protocol release, two real owners must sign
 and execute one refund-free Safe smoke transaction whose inner fields are exactly:
 
-| Safe field                         | Required value                       |
-| ---------------------------------- | ------------------------------------ |
-| `to`                               | `ETHEREUM_MAINNET_EXPECTED_DEPLOYER` |
-| `value`                            | `0` ETH                              |
-| `data`                             | `0x`                                 |
-| `operation`                        | `CALL` (`0`)                         |
-| `safeTxGas`, `baseGas`, `gasPrice` | all `0`                              |
-| `gasToken`, `refundReceiver`       | zero address                         |
+| Safe field                         | Required value                  |
+| ---------------------------------- | ------------------------------- |
+| `to`                               | `EVM_MAINNET_EXPECTED_DEPLOYER` |
+| `value`                            | `0` ETH                         |
+| `data`                             | `0x`                            |
+| `operation`                        | `CALL` (`0`)                    |
+| `safeTxGas`, `baseGas`, `gasPrice` | all `0`                         |
+| `gasToken`, `refundReceiver`       | zero address                    |
 
 The outer transaction must also carry zero ETH, succeed, emit exactly one `ExecutionSuccess`, emit
 no `ExecutionFailure`, and reach the configured finality requirement. Record the **outer**
-transaction hash in `ETHEREUM_MAINNET_SAFE_ACCEPTANCE_TX`.
+transaction hash in `EVM_MAINNET_SAFE_ACCEPTANCE_TX`.
 
 This smoke transaction must be the new Safe's first and only execution. The release planner
 requires Safe nonce `1`; after smoke acceptance, do not submit any other Safe transaction or change
@@ -97,35 +102,35 @@ ZK_PTAU_PATH=
 # Production policy.
 GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3
 MIN_DELAY=172800
+EVM_MAINNET_CONFIRMATIONS=2
+EVM_MAINNET_FINALITY_TIMEOUT=3600
 # Keep blank for a fresh orchestrated release.
 GOVERNANCE_OWNER=
 # Keep blank until Safe deployment and owner smoke validation have passed.
 GOVERNANCE_MULTISIG=
 
 # Public deployer and owner identities.
-ETHEREUM_MAINNET_EXPECTED_DEPLOYER=0x...
-ETHEREUM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
+EVM_MAINNET_EXPECTED_DEPLOYER=0x...
+EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 
 # Safe factory phase.
-ETHEREUM_MAINNET_SAFE_SALT_NONCE=2026072401
-ETHEREUM_MAINNET_SAFE_MAX_ETH=0.1
-ETHEREUM_MAINNET_SAFE_CONFIRMATIONS=2
-ETHEREUM_MAINNET_SAFE_FINALITY_TIMEOUT=3600
-ETHEREUM_MAINNET_SAFE_CONFIRM=
-ETHEREUM_MAINNET_SAFE_PLAN_DIGEST=
-ETHEREUM_MAINNET_SAFE_RECOVERY_TX=
-ETHEREUM_MAINNET_SAFE_ACCEPTANCE_TX=
+EVM_MAINNET_SAFE_SALT_NONCE=2026072401
+# Set explicitly for this operation; ethereum:mainnet:safe interprets the value as ETH.
+EVM_MAINNET_SAFE_MAX_NATIVE=0.1
+EVM_MAINNET_SAFE_CONFIRM=
+EVM_MAINNET_SAFE_PLAN_DIGEST=
+EVM_MAINNET_SAFE_RECOVERY_TX=
+EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 
 # Protocol release phase.
-ETHEREUM_MAINNET_MAX_ETH=1
-ETHEREUM_MAINNET_CONFIRMATIONS=2
-ETHEREUM_MAINNET_FINALITY_TIMEOUT=3600
+# Set explicitly for this operation; ethereum:mainnet:release interprets the value as ETH.
+EVM_MAINNET_MAX_NATIVE=1
 # Exact reviewed Sepolia report copied to a regular path inside this checkout.
-ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/ethereum-release-rehearsal.json
-ETHEREUM_MAINNET_CONFIRM=
-ETHEREUM_MAINNET_PLAN_DIGEST=
-ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES=
-ETHEREUM_MAINNET_RECOVERY_TXS=
+EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/ethereum-release-rehearsal.json
+EVM_MAINNET_CONFIRM=
+EVM_MAINNET_PLAN_DIGEST=
+EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
+EVM_MAINNET_RECOVERY_TXS=
 ```
 
 The protocol release command validates the selected Sepolia report's schema, release-ready status,
@@ -136,13 +141,15 @@ rejected before any Mainnet transaction.
 The acceptance runner's original ignored report path is run-specific; the example path is not
 created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file inside the
 release checkout, compare its SHA-256 against the immutable off-machine archive, and point
-`ETHEREUM_MAINNET_TESTNET_RELEASE_REPORT` at that in-checkout file. External paths and symlinks are
+`EVM_MAINNET_TESTNET_RELEASE_REPORT` at that in-checkout file. External paths and symlinks are
 rejected so the reviewed report bytes are included in the plan and Safe-owner signatures.
 
 Choose the two ETH ceilings from reviewed estimates plus a documented margin; they are hard
-authorization ceilings, not spending targets. `ETHEREUM_MAINNET_SAFE_MAX_ETH` covers only the Safe
-factory transaction. `ETHEREUM_MAINNET_MAX_ETH` separately covers the protocol release. The runner
-requires the deployer to cover the applicable ceiling and rechecks funds before broadcasts.
+authorization ceilings, not spending targets. `EVM_MAINNET_SAFE_MAX_NATIVE` covers only the Safe
+factory transaction. `EVM_MAINNET_MAX_NATIVE` separately covers the protocol release. The Ethereum
+commands interpret both as ETH; set them explicitly for each operation and never carry populated
+values across chains. The runner requires the deployer to cover the applicable ceiling and rechecks
+funds before broadcasts.
 Ethereum charged gas is accounted from the receipt as
 `gasUsed × effectiveGasPrice`; the Conflux three-quarter gas-limit rule is not used.
 
@@ -157,8 +164,8 @@ Leave the following values blank:
 
 ```dotenv
 GOVERNANCE_MULTISIG=
-ETHEREUM_MAINNET_SAFE_CONFIRM=
-ETHEREUM_MAINNET_SAFE_PLAN_DIGEST=
+EVM_MAINNET_SAFE_CONFIRM=
+EVM_MAINNET_SAFE_PLAN_DIGEST=
 ```
 
 Run:
@@ -186,8 +193,8 @@ printed plan digest.
 After independent approval, set the exact output values:
 
 ```dotenv
-ETHEREUM_MAINNET_SAFE_PLAN_DIGEST=0x...
-ETHEREUM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1
+EVM_MAINNET_SAFE_PLAN_DIGEST=0x...
+EVM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1
 ```
 
 Set `PRIVATE_KEY` to the approved deployer key and run the same command:
@@ -211,7 +218,7 @@ signatures. A non-owner relayer may submit an already authorized Safe transactio
 After it is finalized, record its outer transaction hash:
 
 ```dotenv
-ETHEREUM_MAINNET_SAFE_ACCEPTANCE_TX=0x...
+EVM_MAINNET_SAFE_ACCEPTANCE_TX=0x...
 ```
 
 Run:
@@ -237,9 +244,9 @@ Keep the Safe frozen at nonce `1` until the protocol release completes.
 Leave both release authorization values blank:
 
 ```dotenv
-ETHEREUM_MAINNET_CONFIRM=
-ETHEREUM_MAINNET_PLAN_DIGEST=
-ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES=
+EVM_MAINNET_CONFIRM=
+EVM_MAINNET_PLAN_DIGEST=
+EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 ```
 
 Run:
@@ -272,9 +279,9 @@ their private keys. Do not sign only the digest or retype the message.
 After collecting the signatures, set:
 
 ```dotenv
-ETHEREUM_MAINNET_PLAN_DIGEST=0x...
-ETHEREUM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
-ETHEREUM_MAINNET_CONFIRM=ethereum-mainnet-chain-1
+EVM_MAINNET_PLAN_DIGEST=0x...
+EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
+EVM_MAINNET_CONFIRM=ethereum-mainnet-chain-1
 ```
 
 Run the same command:
@@ -326,7 +333,7 @@ recover and independently validate the exact chain, sender, nonce, target, value
 and proxy result. Then set:
 
 ```dotenv
-ETHEREUM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
+EVM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
 ```
 
 Keep the original Safe digest/confirmation and rerun `npm run ethereum:mainnet:safe`. The recovery
@@ -336,7 +343,7 @@ broadcast.
 For a hashless planned protocol phase, use the exact label printed by the runner:
 
 ```dotenv
-ETHEREUM_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
+EVM_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
 ```
 
 Keep the original release digest/confirmation and rerun `npm run ethereum:mainnet:release`.

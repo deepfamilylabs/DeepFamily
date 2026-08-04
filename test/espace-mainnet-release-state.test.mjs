@@ -332,7 +332,7 @@ describe("eSpace Mainnet release checkpoint state", function () {
           timeoutMs: 1_000,
           maxCostWei: 199n,
         }),
-      "Checkpoint fee reservations exceed ESPACE_MAINNET_MAX_CFX",
+      "Checkpoint fee reservations exceed EVM_MAINNET_MAX_NATIVE",
     );
   });
 
@@ -355,7 +355,7 @@ describe("eSpace Mainnet release checkpoint state", function () {
 
   it("stops before broadcast when the cumulative worst-case fee exceeds the cap", async function () {
     const run = fixture({ cap: 199n });
-    await expectRejects(run.execute, "would exceed ESPACE_MAINNET_MAX_CFX");
+    await expectRejects(run.execute, "would exceed EVM_MAINNET_MAX_NATIVE");
     expect(run.sends()).to.equal(0);
   });
 

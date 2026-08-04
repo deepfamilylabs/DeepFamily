@@ -125,14 +125,14 @@ describe("eSpace Mainnet Safe command wiring", function () {
   it("documents every Safe-specific authorization, budget and recovery input", async function () {
     const example = await fs.readFile(".env.example", "utf8");
     for (const name of [
-      "ESPACE_MAINNET_SAFE_SALT_NONCE",
-      "ESPACE_MAINNET_SAFE_MAX_CFX",
-      "ESPACE_MAINNET_SAFE_CONFIRMATIONS",
-      "ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT",
-      "ESPACE_MAINNET_SAFE_CONFIRM",
-      "ESPACE_MAINNET_SAFE_PLAN_DIGEST",
-      "ESPACE_MAINNET_SAFE_RECOVERY_TX",
-      "ESPACE_MAINNET_SAFE_ACCEPTANCE_TX",
+      "EVM_MAINNET_SAFE_SALT_NONCE",
+      "EVM_MAINNET_SAFE_MAX_NATIVE",
+      "EVM_MAINNET_CONFIRMATIONS",
+      "EVM_MAINNET_FINALITY_TIMEOUT",
+      "EVM_MAINNET_SAFE_CONFIRM",
+      "EVM_MAINNET_SAFE_PLAN_DIGEST",
+      "EVM_MAINNET_SAFE_RECOVERY_TX",
+      "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
     ]) {
       expect(example, name).to.include(`${name}=`);
     }

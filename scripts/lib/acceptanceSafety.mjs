@@ -198,7 +198,8 @@ export const parseAcceptanceConfig = ({
     60,
   );
 
-  const rawMaximumCost = String(env[acceptance.maximumCostEnvironmentName] ?? "5").trim();
+  const configuredMaximumCost = String(env[acceptance.maximumCostEnvironmentName] ?? "").trim();
+  const rawMaximumCost = configuredMaximumCost || acceptance.defaultMaximumCost;
   if (!DECIMAL_NATIVE_PATTERN.test(rawMaximumCost)) {
     throw new Error(
       `${acceptance.maximumCostEnvironmentName} must be a positive plain decimal with at most ` +
@@ -208,6 +209,14 @@ export const parseAcceptanceConfig = ({
   const maximumCostWei = ethers.parseEther(rawMaximumCost);
   if (maximumCostWei <= 0n) {
     throw new Error(`${acceptance.maximumCostEnvironmentName} must be greater than zero`);
+  }
+  const maximumCostCeilingWei = ethers.parseEther(acceptance.maximumCostCeiling);
+  if (maximumCostWei > maximumCostCeilingWei) {
+    throw new Error(
+      `${acceptance.maximumCostEnvironmentName} must not exceed ` +
+        `${acceptance.maximumCostCeiling} ${chainProfile.nativeSymbol} for ` +
+        `${chainProfile.displayName} acceptance`,
+    );
   }
 
   const configuredRunId = String(env[acceptance.runIdEnvironmentName] ?? "").trim();

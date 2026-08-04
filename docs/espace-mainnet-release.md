@@ -21,7 +21,8 @@ The eSpace and Ethereum commands share reviewed orchestration internals, but the
 an immutable chain profile. This runbook is only for eSpace Mainnet: Safe v1.3.0 L2 singleton,
 CFX budgets, Conflux gas charging, Conflux RPC/ConfluxScan, eSpace confirmation strings, and
 `deployments/conflux/` state. Do not append an arbitrary `--network` or substitute Ethereum
-environment variables. For Ethereum's Safe v1.3.0 L1 profile and independent state, use the
+values into the shared `EVM_MAINNET_*` settings. For Ethereum's Safe v1.3.0 L1 profile and
+independent state, use the
 [Ethereum Mainnet release runbook](ethereum-mainnet-release.md).
 
 These are production tools, not a mainnet copy of the testnet acceptance suite. The Safe creator
@@ -34,7 +35,7 @@ The Safe creator and release runner support exactly the pinned
 `conflux-safe-1.3.0-2of3` profile: canonical Safe v1.3.0, exactly three distinct ordered EOA owners,
 and threshold `2`. Contract owners and a different owner count or threshold are deliberately
 unsupported. The configured owner order is part of setup calldata, deterministic address
-prediction, and the plan digest. `ESPACE_MAINNET_SAFE_SALT_NONCE` is an explicit decimal
+prediction, and the plan digest. `EVM_MAINNET_SAFE_SALT_NONCE` is an explicit decimal
 `uint256`; choose it once and never change either the salt or owner order during planning,
 deployment, recovery, and status validation.
 
@@ -47,18 +48,18 @@ Deploying the proxy proves only that the reviewed bytecode and setup are on chai
 that the three named people or devices control their keys. Before release, two real owners must use
 an external signing workflow to execute one refund-free Safe transaction whose inner call is:
 
-| Safe field                         | Required value                     |
-| ---------------------------------- | ---------------------------------- |
-| `to`                               | `ESPACE_MAINNET_EXPECTED_DEPLOYER` |
-| `value`                            | `0` CFX                            |
-| `data`                             | `0x`                               |
-| `operation`                        | `CALL` (`0`)                       |
-| `safeTxGas`, `baseGas`, `gasPrice` | all `0`                            |
-| `gasToken`, `refundReceiver`       | zero address                       |
+| Safe field                         | Required value                  |
+| ---------------------------------- | ------------------------------- |
+| `to`                               | `EVM_MAINNET_EXPECTED_DEPLOYER` |
+| `value`                            | `0` CFX                         |
+| `data`                             | `0x`                            |
+| `operation`                        | `CALL` (`0`)                    |
+| `safeTxGas`, `baseGas`, `gasPrice` | all `0`                         |
+| `gasToken`, `refundReceiver`       | zero address                    |
 
 The outer transaction must also carry zero CFX, succeed, emit exactly one `ExecutionSuccess`, emit
 no `ExecutionFailure`, and become finalized. Record its outer transaction hash in
-`ESPACE_MAINNET_SAFE_ACCEPTANCE_TX`; `npm run espace:mainnet:safe:status` replays and validates that
+`EVM_MAINNET_SAFE_ACCEPTANCE_TX`; `npm run espace:mainnet:safe:status` replays and validates that
 public evidence without any owner key.
 
 The release runner requires that acceptance to be the Safe's first and only execution, so the Safe
@@ -134,34 +135,34 @@ ZK_PTAU_PATH=
 GOVERNANCE_MULTISIG=
 GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1.3.0-2of3
 MIN_DELAY=172800
+EVM_MAINNET_CONFIRMATIONS=2
+EVM_MAINNET_FINALITY_TIMEOUT=3600
 # Must remain empty for a fresh orchestrated protocol release.
 GOVERNANCE_OWNER=
 
 # Public identities shared by Safe creation and protocol release.
-ESPACE_MAINNET_EXPECTED_DEPLOYER=0x...
-ESPACE_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
+EVM_MAINNET_EXPECTED_DEPLOYER=0x...
+EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 
 # Safe creation: owner order and this explicit decimal uint256 determine the address.
-ESPACE_MAINNET_SAFE_SALT_NONCE=2026072301
-ESPACE_MAINNET_SAFE_MAX_CFX=0.2
-ESPACE_MAINNET_SAFE_CONFIRMATIONS=2
-ESPACE_MAINNET_SAFE_FINALITY_TIMEOUT=3600
-ESPACE_MAINNET_SAFE_CONFIRM=
-ESPACE_MAINNET_SAFE_PLAN_DIGEST=
-ESPACE_MAINNET_SAFE_RECOVERY_TX=
+EVM_MAINNET_SAFE_SALT_NONCE=2026072301
+# Set explicitly for this operation; espace:mainnet:safe interprets the value as CFX.
+EVM_MAINNET_SAFE_MAX_NATIVE=0.2
+EVM_MAINNET_SAFE_CONFIRM=
+EVM_MAINNET_SAFE_PLAN_DIGEST=
+EVM_MAINNET_SAFE_RECOVERY_TX=
 # Fill only after two real owners complete the documented external smoke transaction.
-ESPACE_MAINNET_SAFE_ACCEPTANCE_TX=
+EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 
-# Protocol release: separate budget, finality policy, authorization, and recovery evidence.
-ESPACE_MAINNET_MAX_CFX=5
-ESPACE_MAINNET_CONFIRMATIONS=2
-ESPACE_MAINNET_FINALITY_TIMEOUT=3600
+# Protocol release: separate budget, authorization and recovery; shared finality policy is above.
+# Set explicitly for this operation; espace:mainnet:release interprets the value as CFX.
+EVM_MAINNET_MAX_NATIVE=5
 # Exact reviewed release-rehearsal report copied to a regular path inside this checkout.
-ESPACE_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/espace-release-rehearsal.json
-ESPACE_MAINNET_CONFIRM=
-ESPACE_MAINNET_PLAN_DIGEST=
-ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES=
-ESPACE_MAINNET_RECOVERY_TXS=
+EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/espace-release-rehearsal.json
+EVM_MAINNET_CONFIRM=
+EVM_MAINNET_PLAN_DIGEST=
+EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
+EVM_MAINNET_RECOVERY_TXS=
 ```
 
 For a fresh release, leave `GOVERNANCE_OWNER` empty: the orchestrator deploys
@@ -178,7 +179,7 @@ diagnostic mode, or the earlier 30-second run is rejected before any Mainnet tra
 The acceptance runner writes its report beneath its ignored run directory; the example path above
 is not created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file
 inside the release checkout, record and independently compare its SHA-256 with the immutable
-off-machine archive, then set `ESPACE_MAINNET_TESTNET_RELEASE_REPORT` to that relative or absolute
+off-machine archive, then set `EVM_MAINNET_TESTNET_RELEASE_REPORT` to that relative or absolute
 in-checkout path. Repository-external paths and symbolic links are rejected so that plan bytes and
 owner signatures bind one stable local report.
 
@@ -186,8 +187,9 @@ owner signatures bind one stable local report.
 non-secret `espace` placeholder. It is not a wallet credential or an authorization key. Do not use
 that placeholder for an Ethereum verification invocation.
 
-`ESPACE_MAINNET_SAFE_MAX_CFX` covers only the one Safe factory call.
-`ESPACE_MAINNET_MAX_CFX` separately covers the protocol release. Neither is a target to spend.
+`EVM_MAINNET_SAFE_MAX_NATIVE` covers only the one Safe factory call.
+`EVM_MAINNET_MAX_NATIVE` separately covers the protocol release. The eSpace commands interpret both
+as CFX. Neither is a target to spend, and neither should remain populated when switching chains.
 Choose each from a reviewed gas estimate plus a documented margin; do not set either to the
 deployer's whole balance. The deployer must hold at least the applicable full ceiling before
 execution or resumption. Before every individual broadcast, the runner also requires enough
@@ -196,10 +198,10 @@ Final receipts record both `gasUsed` and Conflux `gasCharged`; actual cost uses
 `max(gasUsed, ceil(3 × gasLimit / 4)) × effectiveGasPrice`, rather than the Ethereum-only
 `gasUsed × effectiveGasPrice` assumption.
 
-The Safe-specific `*_CONFIRMATIONS`, `*_FINALITY_TIMEOUT`, budget, confirmation/digest pair, and
-single recovery hash are independent from the release variables with similar names. Never copy a
-Safe plan digest into the release digest or use one operation's budget/recovery evidence for the
-other.
+The receipt/finality policy is shared through `EVM_MAINNET_CONFIRMATIONS` and
+`EVM_MAINNET_FINALITY_TIMEOUT`, but the Safe budget, confirmation/digest pair, and single recovery
+hash remain independent from the protocol release variables with similar names. Never copy a Safe
+plan digest into the release digest or use one operation's budget/recovery evidence for the other.
 
 ## Create and validate the production Safe
 
@@ -209,8 +211,8 @@ Confirm that these three values are empty:
 
 ```dotenv
 GOVERNANCE_MULTISIG=
-ESPACE_MAINNET_SAFE_CONFIRM=
-ESPACE_MAINNET_SAFE_PLAN_DIGEST=
+EVM_MAINNET_SAFE_CONFIRM=
+EVM_MAINNET_SAFE_PLAN_DIGEST=
 ```
 
 `PRIVATE_KEY` is not needed for this read-only phase. Run:
@@ -243,11 +245,11 @@ plan and a fresh independent review.
 After approval, copy the exact printed digest and exact confirmation string:
 
 ```dotenv
-ESPACE_MAINNET_SAFE_PLAN_DIGEST=0x...
-ESPACE_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030
+EVM_MAINNET_SAFE_PLAN_DIGEST=0x...
+EVM_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030
 ```
 
-Set `PRIVATE_KEY` only to the approved `ESPACE_MAINNET_EXPECTED_DEPLOYER` key and run the same
+Set `PRIVATE_KEY` only to the approved `EVM_MAINNET_EXPECTED_DEPLOYER` key and run the same
 command:
 
 ```bash
@@ -281,7 +283,7 @@ After the transaction succeeds and is available through the reviewed RPC, record
 transaction hash:
 
 ```dotenv
-ESPACE_MAINNET_SAFE_ACCEPTANCE_TX=0x...
+EVM_MAINNET_SAFE_ACCEPTANCE_TX=0x...
 ```
 
 Then run the read-only validator:
@@ -311,7 +313,7 @@ will reject that Safe state; stop and obtain a new reviewed operational decision
 
 ## Plan, approve, and execute the protocol release
 
-First run the command with `ESPACE_MAINNET_CONFIRM` and `ESPACE_MAINNET_PLAN_DIGEST` empty:
+First run the command with `EVM_MAINNET_CONFIRM` and `EVM_MAINNET_PLAN_DIGEST` empty:
 
 ```bash
 npm run espace:mainnet:release
@@ -335,9 +337,9 @@ Only after that review and owner approval, copy the exact printed digest, signat
 confirmation into `.env`:
 
 ```dotenv
-ESPACE_MAINNET_PLAN_DIGEST=0x...
-ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
-ESPACE_MAINNET_CONFIRM=conflux-mainnet-chain-1030
+EVM_MAINNET_PLAN_DIGEST=0x...
+EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
+EVM_MAINNET_CONFIRM=conflux-mainnet-chain-1030
 ```
 
 Then run the exact same command (do not replace it with a direct Hardhat/script invocation):
@@ -443,10 +445,10 @@ value, calldata, receipt, and resulting contract address.
 For the Safe creator's single factory call, set only the independently verified hash:
 
 ```dotenv
-ESPACE_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
+EVM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
 ```
 
-Keep the same reviewed `ESPACE_MAINNET_SAFE_PLAN_DIGEST`, exact Safe confirmation string, owner
+Keep the same reviewed `EVM_MAINNET_SAFE_PLAN_DIGEST`, exact Safe confirmation string, owner
 order, salt, deployer, and all other Safe inputs, then rerun:
 
 ```bash
@@ -464,7 +466,7 @@ For protocol release, supply independently verified missing hashes as a one-line
 keys are the exact transaction labels printed in the failure message:
 
 ```dotenv
-ESPACE_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
+EVM_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
 ```
 
 Run the same command again. Recovery input does not authorize a new transaction: it only lets the

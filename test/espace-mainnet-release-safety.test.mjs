@@ -5,6 +5,7 @@ import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/cha
 import {
   ESPACE_MAINNET_CONFIRMATION,
   assertMainnetReleaseSafeAcceptanceNonce,
+  assertPlanMatchesCheckpoint,
   buildMainnetPlanApprovalMessage,
   deriveMainnetPlanDigest,
   parseESpaceMainnetReleaseConfig,
@@ -34,15 +35,15 @@ const PLACEHOLDER_APPROVAL_SIGNATURES = JSON.stringify([
 ]);
 
 const baseEnv = (overrides = {}) => ({
-  ESPACE_MAINNET_CONFIRM: "",
-  ESPACE_MAINNET_PLAN_DIGEST: "",
-  ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES: "",
-  ESPACE_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
-  ESPACE_MAINNET_SAFE_OWNERS: OWNERS.join(","),
-  ESPACE_MAINNET_MAX_CFX: "12.5",
-  ESPACE_MAINNET_CONFIRMATIONS: "2",
-  ESPACE_MAINNET_FINALITY_TIMEOUT: "3600",
-  ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: `0x${"ef".repeat(32)}`,
+  EVM_MAINNET_CONFIRM: "",
+  EVM_MAINNET_PLAN_DIGEST: "",
+  EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: "",
+  EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
+  EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
+  EVM_MAINNET_MAX_NATIVE: "12.5",
+  EVM_MAINNET_CONFIRMATIONS: "2",
+  EVM_MAINNET_FINALITY_TIMEOUT: "3600",
+  EVM_MAINNET_SAFE_ACCEPTANCE_TX: `0x${"ef".repeat(32)}`,
   GOVERNANCE_MULTISIG: SAFE,
   GOVERNANCE_MULTISIG_PROFILE: "conflux-safe-1.3.0-2of3",
   GOVERNANCE_OWNER: "",
@@ -61,16 +62,16 @@ describe("eSpace Mainnet release safety", function () {
   it("uses blank confirmation for plan mode and the exact mainnet string for execute mode", function () {
     expect(parseMainnetAuthorization(baseEnv()).mode).to.equal("plan");
     const config = parse({
-      ESPACE_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
-      ESPACE_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
-      ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES,
+      EVM_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
+      EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+      EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES,
     });
     expect(config.mode).to.equal("execute");
     expect(config.configuredPlanDigest).to.equal(PLAN_DIGEST);
   });
 
   it("rejects a wrong non-empty confirmation before release configuration is accepted", function () {
-    expect(() => parseMainnetAuthorization(baseEnv({ ESPACE_MAINNET_CONFIRM: "yes" }))).to.throw(
+    expect(() => parseMainnetAuthorization(baseEnv({ EVM_MAINNET_CONFIRM: "yes" }))).to.throw(
       "blank for a read-only plan",
     );
   });
@@ -86,23 +87,23 @@ describe("eSpace Mainnet release safety", function () {
     expect(() => parse({ GOVERNANCE_MULTISIG_PROFILE: "" })).to.throw(
       "requires GOVERNANCE_MULTISIG_PROFILE",
     );
-    expect(() => parse({ ESPACE_MAINNET_SAFE_OWNERS: OWNERS.slice(0, 2).join(",") })).to.throw(
+    expect(() => parse({ EVM_MAINNET_SAFE_OWNERS: OWNERS.slice(0, 2).join(",") })).to.throw(
       "exactly three",
     );
     expect(() =>
-      parse({ ESPACE_MAINNET_SAFE_OWNERS: [OWNERS[0], OWNERS[0], OWNERS[2]].join(",") }),
+      parse({ EVM_MAINNET_SAFE_OWNERS: [OWNERS[0], OWNERS[0], OWNERS[2]].join(",") }),
     ).to.throw("three distinct");
-    expect(() => parse({ ESPACE_MAINNET_EXPECTED_DEPLOYER: OWNERS[1] })).to.throw(
+    expect(() => parse({ EVM_MAINNET_EXPECTED_DEPLOYER: OWNERS[1] })).to.throw(
       "must not be one of the Safe owners",
     );
   });
 
   it("enforces the production delay floor, finality, verification and an explicit budget", function () {
     expect(() => parse({ MIN_DELAY: "86399" })).to.throw("between 86400");
-    expect(() => parse({ ESPACE_MAINNET_VERIFY: "0" })).to.throw("mandatory");
-    expect(() => parse({ ESPACE_MAINNET_REQUIRE_FINALITY: "0" })).to.throw("mandatory");
-    expect(() => parse({ ESPACE_MAINNET_MAX_CFX: "" })).to.throw("explicitly set");
-    expect(() => parse({ ESPACE_MAINNET_CONFIRMATIONS: "1" })).to.throw("between 2 and 100");
+    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property("verifyEnvironmentName");
+    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property("requireFinalityEnvironmentName");
+    expect(() => parse({ EVM_MAINNET_MAX_NATIVE: "" })).to.throw("explicitly set");
+    expect(() => parse({ EVM_MAINNET_CONFIRMATIONS: "1" })).to.throw("between 2 and 100");
   });
 
   it("forbids force-new and a caller-supplied governance owner", function () {
@@ -111,29 +112,29 @@ describe("eSpace Mainnet release safety", function () {
   });
 
   it("strictly parses recovery transaction hashes without accepting arbitrary JSON", function () {
-    expect(() => parse({ ESPACE_MAINNET_RECOVERY_TXS: "[]" })).to.throw("JSON object");
-    expect(() => parse({ ESPACE_MAINNET_RECOVERY_TXS: '{"bad label":"0x12"}' })).to.throw(
+    expect(() => parse({ EVM_MAINNET_RECOVERY_TXS: "[]" })).to.throw("JSON object");
+    expect(() => parse({ EVM_MAINNET_RECOVERY_TXS: '{"bad label":"0x12"}' })).to.throw(
       "invalid label",
     );
     expect(() =>
       parse({
-        ESPACE_MAINNET_RECOVERY_TXS: JSON.stringify({
+        EVM_MAINNET_RECOVERY_TXS: JSON.stringify({
           unknownReleaseStep: `0x${"12".repeat(32)}`,
         }),
       }),
     ).to.throw("unknown release label");
     const hash = `0x${"12".repeat(32)}`;
     expect(
-      parse({ ESPACE_MAINNET_RECOVERY_TXS: JSON.stringify({ deepFamilyToken: hash }) })
+      parse({ EVM_MAINNET_RECOVERY_TXS: JSON.stringify({ deepFamilyToken: hash }) })
         .recoveryTransactions.deepFamilyToken,
     ).to.equal(hash);
   });
 
   it("requires finalized real-owner Safe acceptance evidence before release planning", function () {
-    expect(() => parse({ ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: "" })).to.throw(
+    expect(() => parse({ EVM_MAINNET_SAFE_ACCEPTANCE_TX: "" })).to.throw(
       "real 2-of-3 owner smoke test",
     );
-    expect(() => parse({ ESPACE_MAINNET_SAFE_ACCEPTANCE_TX: "0x1234" })).to.throw(
+    expect(() => parse({ EVM_MAINNET_SAFE_ACCEPTANCE_TX: "0x1234" })).to.throw(
       "real 2-of-3 owner smoke test",
     );
     expect(parse().safeAcceptanceTransaction).to.equal(`0x${"ef".repeat(32)}`);
@@ -165,15 +166,49 @@ describe("eSpace Mainnet release safety", function () {
     );
   });
 
+  it("rejects replaying a release plan digest across eSpace and Ethereum profiles", function () {
+    const reviewedInputs = {
+      schemaVersion: 1,
+      governanceMultisig: SAFE,
+      expectedDeployer: DEPLOYER,
+      expectedSafeOwners: OWNERS,
+    };
+    const espaceFingerprint = {
+      ...reviewedInputs,
+      domain: ESPACE_CHAIN_PROFILE.mainnet.releasePlanDigestDomain,
+      chainProfileId: ESPACE_CHAIN_PROFILE.id,
+      chainId: ESPACE_CHAIN_PROFILE.mainnet.chainId,
+    };
+    const ethereumFingerprint = {
+      ...reviewedInputs,
+      domain: ETHEREUM_CHAIN_PROFILE.mainnet.releasePlanDigestDomain,
+      chainProfileId: ETHEREUM_CHAIN_PROFILE.id,
+      chainId: ETHEREUM_CHAIN_PROFILE.mainnet.chainId,
+    };
+    const espaceDigest = deriveMainnetPlanDigest(espaceFingerprint);
+    expect(deriveMainnetPlanDigest(ethereumFingerprint)).not.to.equal(espaceDigest);
+    expect(() =>
+      assertPlanMatchesCheckpoint({
+        checkpoint: {
+          schemaVersion: 1,
+          planDigest: espaceDigest,
+          fingerprint: ethereumFingerprint,
+        },
+        fingerprint: ethereumFingerprint,
+        planDigest: espaceDigest,
+      }),
+    ).to.throw("Current release inputs do not match the approved plan digest");
+  });
+
   it("requires execute-mode plan approvals and forbids stale approvals in plan mode", function () {
     expect(() =>
       parse({
-        ESPACE_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
-        ESPACE_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+        EVM_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
+        EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
       }),
     ).to.throw("PLAN_APPROVAL_SIGNATURES must contain approval signatures");
     expect(() =>
-      parse({ ESPACE_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES }),
+      parse({ EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES }),
     ).to.throw("blank while generating a plan");
   });
 

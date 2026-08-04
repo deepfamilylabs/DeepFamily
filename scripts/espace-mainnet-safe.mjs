@@ -1,8 +1,8 @@
 /**
  * Conflux eSpace Mainnet Safe:
  *   npm run espace:mainnet:safe
- *   ESPACE_MAINNET_SAFE_PLAN_DIGEST=0x... \
- *   ESPACE_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030 \
+ *   EVM_MAINNET_SAFE_PLAN_DIGEST=0x... \
+ *   EVM_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030 \
  *     npm run espace:mainnet:safe
  *   npm run espace:mainnet:safe:status
  */

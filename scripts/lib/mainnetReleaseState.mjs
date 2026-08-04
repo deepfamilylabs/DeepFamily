@@ -342,7 +342,7 @@ const checkpointMaximumCost = ({ entry, label }) => {
 const assertCheckpointReservations = ({
   checkpoint,
   maxCostWei,
-  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  budgetEnvironmentName = "EVM_MAINNET_MAX_NATIVE",
   nativeSymbol = "CFX",
 }) => {
   const cap =
@@ -409,7 +409,7 @@ const assertCumulativeActualCost = ({
   checkpoint,
   canonicalCosts = new Map(),
   maxCostWei,
-  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  budgetEnvironmentName = "EVM_MAINNET_MAX_NATIVE",
   nativeSymbol = "CFX",
 }) => {
   if (maxCostWei == null) return;
@@ -447,8 +447,8 @@ export const createCheckpointedTransactionExecutor = ({
   recoveryTransactions = {},
   expectedNonces = {},
   expectedIntents = {},
-  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
-  recoveryEnvironmentName = "ESPACE_MAINNET_RECOVERY_TXS",
+  budgetEnvironmentName = "EVM_MAINNET_MAX_NATIVE",
+  recoveryEnvironmentName = "EVM_MAINNET_RECOVERY_TXS",
   nativeSymbol = "CFX",
   gasChargingPolicy = GAS_CHARGING_CONFLUX_THREE_QUARTER,
 }) => {
@@ -765,7 +765,7 @@ export const revalidateCheckpointTransactions = async ({
   timeoutMs,
   saveCheckpoint,
   maxCostWei,
-  budgetEnvironmentName = "ESPACE_MAINNET_MAX_CFX",
+  budgetEnvironmentName = "EVM_MAINNET_MAX_NATIVE",
   nativeSymbol = "CFX",
   gasChargingPolicy = GAS_CHARGING_CONFLUX_THREE_QUARTER,
 }) => {

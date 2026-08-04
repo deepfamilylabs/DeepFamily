@@ -1,6 +1,6 @@
 /**
  * Destructive Ethereum Sepolia acceptance (fixed network sepolia / chain ID 11155111):
- *   ETHEREUM_E2E_CONFIRM=ethereum-sepolia-chain-11155111 npm run ethereum:acceptance
+ *   EVM_E2E_CONFIRM=ethereum-sepolia-chain-11155111 npm run ethereum:acceptance
  *
  * See docs/ethereum-sepolia-acceptance.local.md for diagnostic, release-rehearsal and recovery use.
  */

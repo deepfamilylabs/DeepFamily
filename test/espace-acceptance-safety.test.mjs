@@ -23,7 +23,7 @@ describe("eSpace acceptance safety helpers", function () {
   const runId = "acceptance-run-20260721";
   const baseConfig = (overrides = {}) => ({
     env: {
-      ESPACE_E2E_CONFIRM: ESPACE_E2E_CONFIRMATION,
+      EVM_E2E_CONFIRM: ESPACE_E2E_CONFIRMATION,
       ...overrides,
     },
     networkName: "confluxTestnet",
@@ -62,18 +62,18 @@ describe("eSpace acceptance safety helpers", function () {
 
     it("accepts only the two explicit acceptance modes", function () {
       expect(
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: ACCEPTANCE_MODE_DIAGNOSTIC }))
+        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MODE: ACCEPTANCE_MODE_DIAGNOSTIC }))
           .acceptanceMode,
       ).to.equal(ACCEPTANCE_MODE_DIAGNOSTIC);
-      expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MODE: "release" })),
-      ).to.throw(/ESPACE_E2E_MODE.*diagnostic.*release-rehearsal/i);
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MODE: "release" }))).to.throw(
+        /EVM_E2E_MODE.*diagnostic.*release-rehearsal/i,
+      );
     });
 
     it("requires complete release-rehearsal flags and the exact production delay", function () {
       const releaseEnv = {
-        ESPACE_E2E_MODE: ACCEPTANCE_MODE_RELEASE_REHEARSAL,
-        ESPACE_E2E_MIN_DELAY: "172800",
+        EVM_E2E_MODE: ACCEPTANCE_MODE_RELEASE_REHEARSAL,
+        EVM_E2E_MIN_DELAY: "172800",
         MIN_DELAY: "172800",
         GOVERNANCE_MULTISIG_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
       };
@@ -86,24 +86,22 @@ describe("eSpace acceptance safety helpers", function () {
       expect(result.productionGovernanceMultisigProfile).to.equal(ESPACE_E2E_RELEASE_SAFE_PROFILE);
 
       expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, ESPACE_E2E_VERIFY: "0" })),
-      ).to.throw(/release-rehearsal requires ESPACE_E2E_VERIFY=1/i);
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, EVM_E2E_VERIFY: "0" })),
+      ).to.throw(/release-rehearsal requires EVM_E2E_VERIFY=1/i);
       expect(() =>
-        parseESpaceAcceptanceConfig(
-          baseConfig({ ...releaseEnv, ESPACE_E2E_REQUIRE_FINALITY: "0" }),
-        ),
-      ).to.throw(/release-rehearsal requires ESPACE_E2E_REQUIRE_FINALITY=1/i);
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, EVM_E2E_REQUIRE_FINALITY: "0" })),
+      ).to.throw(/release-rehearsal requires EVM_E2E_REQUIRE_FINALITY=1/i);
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "" })),
       ).to.throw(/MIN_DELAY.*explicitly set.*positive/i);
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "30" })),
-      ).to.throw(/ESPACE_E2E_MIN_DELAY \(172800\).*MIN_DELAY \(30\)/i);
+      ).to.throw(/EVM_E2E_MIN_DELAY \(172800\).*MIN_DELAY \(30\)/i);
       expect(() =>
         parseESpaceAcceptanceConfig(
           baseConfig({
             ...releaseEnv,
-            ESPACE_E2E_MIN_DELAY: "30",
+            EVM_E2E_MIN_DELAY: "30",
             MIN_DELAY: "30",
           }),
         ),
@@ -120,51 +118,51 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() => parseESpaceAcceptanceConfig({ ...baseConfig(), chainId: 1030 })).to.throw(
         /chainId 71/i,
       );
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_CONFIRM: "yes" }))).to.throw(
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_CONFIRM: "yes" }))).to.throw(
         new RegExp(ESPACE_E2E_CONFIRMATION),
       );
     });
 
     it("validates delay, confirmations, budget and binary flags", function () {
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MIN_DELAY: "9" }))).to.throw(
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MIN_DELAY: "9" }))).to.throw(
         /MIN_DELAY.*>= 10/i,
       );
       expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_CONFIRMATIONS: "0" })),
+        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_CONFIRMATIONS: "0" })),
       ).to.throw(/CONFIRMATIONS.*>= 1/i);
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MAX_CFX: "0" }))).to.throw(
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MAX_NATIVE: "0" }))).to.throw(
         /greater than zero/i,
       );
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MAX_CFX: "1e2" }))).to.throw(
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MAX_NATIVE: "1e2" }))).to.throw(
         /positive plain decimal/i,
       );
       expect(
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_MIN_DELAY: "172800" })).minDelaySeconds,
+        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MIN_DELAY: "172800" })).minDelaySeconds,
       ).to.equal(172800);
       expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_CONFIRMATIONS: "101" })),
+        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_CONFIRMATIONS: "101" })),
       ).to.throw(/must not exceed 100/i);
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_VERIFY: "true" }))).to.throw(
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_VERIFY: "true" }))).to.throw(
         /exactly 0 or 1/i,
       );
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_RECOVER: "yes" }))).to.throw(
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_RECOVER: "yes" }))).to.throw(
         /exactly 0 or 1/i,
       );
       expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_REQUIRE_FINALITY: "yes" })),
+        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_REQUIRE_FINALITY: "yes" })),
       ).to.throw(/exactly 0 or 1/i);
       expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_FINALITY_TIMEOUT: "59" })),
+        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_FINALITY_TIMEOUT: "59" })),
       ).to.throw(/FINALITY_TIMEOUT.*>= 60/i);
     });
 
     it("requires a safe run ID in recovery mode", function () {
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ ESPACE_E2E_RECOVER: "1" }))).to.throw(
-        /requires ESPACE_E2E_RUN_ID/i,
+      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_RECOVER: "1" }))).to.throw(
+        /requires EVM_E2E_RUN_ID/i,
       );
 
       const result = parseESpaceAcceptanceConfig(
-        baseConfig({ ESPACE_E2E_RECOVER: "1", ESPACE_E2E_RUN_ID: runId }),
+        baseConfig({ EVM_E2E_RECOVER: "1", EVM_E2E_RUN_ID: runId }),
       );
       expect(result.recover).to.equal(true);
       expect(result.runId).to.equal(runId);

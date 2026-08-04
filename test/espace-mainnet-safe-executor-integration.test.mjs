@@ -40,8 +40,8 @@ describe("eSpace Mainnet Safe factory-call journal integration", function () {
       maxCostWei: ethers.parseEther("1"),
       expectedNonces: { createGovernanceSafe: startingNonce },
       expectedIntents: [intent],
-      budgetEnvironmentName: "ESPACE_MAINNET_SAFE_MAX_CFX",
-      recoveryEnvironmentName: "ESPACE_MAINNET_SAFE_RECOVERY_TX",
+      budgetEnvironmentName: "EVM_MAINNET_SAFE_MAX_NATIVE",
+      recoveryEnvironmentName: "EVM_MAINNET_SAFE_RECOVERY_TX",
     });
 
     const firstReceipt = await executor({
