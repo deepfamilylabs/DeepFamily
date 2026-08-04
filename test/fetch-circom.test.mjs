@@ -214,14 +214,22 @@ describe("pinned Circom installer", function () {
     ).to.throw("Unsupported Windows ARM64 host, including x64 Node.js emulation");
   });
 
-  it("registers only the three supported Circom 2.1.6 targets", function () {
-    expect(Object.keys(CIRCOM_TARGET_POLICIES["2.1.6"])).to.deep.equal(
+  it("registers only the three supported Circom 2.2.3 targets", function () {
+    expect(Object.keys(CIRCOM_TARGET_POLICIES["2.2.3"])).to.deep.equal(
       supportedRuntimes.map(({ id }) => id),
     );
-    expect(CIRCOM_TARGETS).to.equal(CIRCOM_TARGET_POLICIES["2.1.6"]);
-    expect(CIRCOM_TARGET_POLICIES["2.1.6"]["darwin-arm64"]).to.include({
+    expect(CIRCOM_TARGETS).to.equal(CIRCOM_TARGET_POLICIES["2.2.3"]);
+    expect(CIRCOM_TARGET_POLICIES["2.2.3"]["linux-x64"]).to.include({
+      asset: "circom-linux-amd64",
+      sha256: "85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3",
+    });
+    expect(CIRCOM_TARGET_POLICIES["2.2.3"]["darwin-arm64"]).to.include({
       repository: "https://github.com/iden3/circom.git",
-      commit: "57b18f68794189753964bfb6e18e64385fed9c2c",
+      commit: "ad44e915a12bb047b05745c2884aad9cc8326bc6",
+    });
+    expect(CIRCOM_TARGET_POLICIES["2.2.3"]["win32-x64"]).to.include({
+      asset: "circom-windows-amd64.exe",
+      sha256: "e43f132ee6f0aa79b705beceb59c2a7e6a54d7bdeab917ca34e9fc1951d185e1",
     });
   });
 

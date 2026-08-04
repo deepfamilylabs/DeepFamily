@@ -209,7 +209,7 @@ const createProductionFixture = async ({
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
     schemaVersion: 3,
-    circomVersion: "2.1.6",
+    circomVersion: "2.2.3",
     snarkjsVersion: "0.7.5",
     toolchain: {
       circomBinarySha256: sha256File(circomBinary),
@@ -435,7 +435,7 @@ describe("ZK artifact trust", function () {
       expect(result.toolchain.snarkjsRuntime).to.equal(null);
     });
 
-    it("validates schema-v3 compiler evidence for every supported Circom 2.1.6 target", async function () {
+    it("validates schema-v3 compiler evidence for every supported Circom 2.2.3 target", async function () {
       for (const compilerRuntime of [
         { platform: "linux", arch: "x64", libc: "glibc" },
         { platform: "darwin", arch: "arm64" },

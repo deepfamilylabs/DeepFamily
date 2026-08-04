@@ -103,6 +103,8 @@ describe("parameterized ZK command wrappers", function () {
             "--wasm",
             "--sym",
             "--O2",
+            "--sanity_check",
+            "2",
             "-l",
             "node_modules",
             "-l",

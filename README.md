@@ -139,13 +139,18 @@ execute it as a foreign-platform binary.
 | macOS arm64          | Build from the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools |
 | Windows x64          | Pinned official release asset       | Visual C++ 2015–2022 Redistributable        |
 
+Upstream publishes no official macOS arm64 binary for the pinned Circom version, so the Apple
+Silicon target is built from the repository-pinned source commit with locked Cargo dependencies.
+
 These are the only supported host/runtime pairs. Linux libc is detected from Node's process report;
 musl is rejected explicitly, as are all unsupported platform and architecture combinations. Windows
 ARM64 hosts are unsupported even when running x64 Node.js under emulation. CI uses GitHub's
 `ubuntu-latest` x64/glibc runner and separately exercises macOS arm64 and Windows x64.
 
-Every selected compiler must report the repository-pinned Circom version and pass its target-specific
-binary or source-provenance checks. All circuit compilation uses explicit `--O2`.
+Every selected compiler must report the repository-pinned Circom version and pass its
+target-specific binary or source-provenance checks. All circuit compilation uses explicit
+`--O2 --sanity_check 2`, pinning both the optimization and sanity-check levels instead of relying
+on compiler defaults.
 For official targets, `zk:production:setup` snapshots the hash-verified compiler. For the macOS
 arm64 source target it ignores the reusable development compiler and performs a fresh locked build
 of the pinned source commit under the user's protected build directory. The source builder rejects

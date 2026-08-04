@@ -46,7 +46,7 @@ describe("development ZK refresh", function () {
     );
     const manifest = {
       schemaVersion: 3,
-      circomVersion: "2.1.6",
+      circomVersion: "2.2.3",
       snarkjsVersion: "0.7.5",
       toolchain: {
         circomBinarySha256: "a".repeat(64),

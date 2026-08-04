@@ -102,7 +102,7 @@ inputs and records the explicit production trust model described above.
 
 ## Circom host and release compiler
 
-`npm run zk:fetch` installs two separate copies of the same repository-pinned Circom version:
+`npm run zk:fetch` installs two separate copies of repository-pinned Circom 2.2.3:
 
 - a reusable native compiler at `bin/circom` (`bin/circom.exe` on Windows) for development and
   diagnostic builds;
@@ -117,11 +117,15 @@ The compiler support matrix is:
 | macOS arm64          | Build the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                   |
 | Windows x64          | Pinned official release asset  | Visual C++ 2015–2022 Redistributable        | Yes                   |
 
+Circom 2.2.3 does not publish an official macOS arm64 binary, so the Apple Silicon target is built
+from the repository-pinned source commit with locked Cargo dependencies.
+
 Official assets must match their fixed SHA-256. Source builds must come from the pinned commit and
-report the exact pinned compiler version. Every circuit compilation passes `--O2` explicitly, and
-the artifact gate compares rebuilt R1CS and WASM output hashes with the reviewed manifest and
-published files. A native compiler is therefore suitable for development only until its output has
-passed those comparisons; matching the version string alone is not release evidence.
+report exactly Circom 2.2.3. Every circuit compilation passes `--O2 --sanity_check 2` explicitly,
+pinning both the optimization and sanity-check levels. The artifact gate compares rebuilt R1CS and
+WASM output hashes with the reviewed manifest and published files. A native compiler is therefore
+suitable for development only until its output has passed those comparisons; matching the version
+string alone is not release evidence.
 
 Both `zk:production:setup` and `release:preflight` support the three release-gate runtimes above.
 Linux libc is detected from Node's process report: Linux x64 with glibc uses the pinned official
@@ -210,7 +214,7 @@ Internally the command:
 2. downloads or reuses the pinned public power-13 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
    pTau into the current user's private OS temporary directory and compiles both circuits there
-   with explicit `--O2`;
+   with explicit `--O2 --sanity_check 2`;
 4. verifies all staged R1CS/WASM hashes against the reviewed manifest, then—and only then—creates
    either initial Groth16 zkey; each circuit and the pTau are checked again immediately before its
    setup;
@@ -336,11 +340,11 @@ npm run release:preflight
 `release:preflight` runs on every release-gate runtime in the support matrix and requires a
 schema-v3 manifest. It validates the official native compiler identity or performs a fresh,
 environment-isolated private build for a source target, validates the canonical reference digest,
-checks the clean commit before and after the build, verifies that the explicit-`--O2` R1CS and WASM
-output hashes match the reviewed artifacts, runs the ceremony's snarkjs verification from a private
-runtime snapshot, verifies both real proofs and all published hashes, validates the single-operator
-transcript against the real zkey metadata, and runs the complete contract, frontend, localization,
-XSS, storage, and dependency checks.
+checks the clean commit before and after the build, verifies that the R1CS and WASM produced with
+explicit `--O2 --sanity_check 2` match the reviewed artifact hashes, runs the ceremony's snarkjs
+verification from a private runtime snapshot, verifies both real proofs and all published hashes,
+validates the single-operator transcript against the real zkey metadata, and runs the complete
+contract, frontend, localization, XSS, storage, and dependency checks.
 
 ## Testnet and Mainnet sequence
 

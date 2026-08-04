@@ -1,12 +1,19 @@
-export const CIRCOM_VERSION = "2.1.6";
-const CIRCOM_2_1_6_SOURCE = Object.freeze({
+export const CIRCOM_VERSION = "2.2.3";
+const CIRCOM_2_2_3_SOURCE = Object.freeze({
   repository: "https://github.com/iden3/circom.git",
-  commit: "57b18f68794189753964bfb6e18e64385fed9c2c",
+  commit: "ad44e915a12bb047b05745c2884aad9cc8326bc6",
 });
-export const CIRCOM_SOURCE_REPOSITORY = CIRCOM_2_1_6_SOURCE.repository;
-export const CIRCOM_SOURCE_COMMIT = CIRCOM_2_1_6_SOURCE.commit;
+export const CIRCOM_SOURCE_REPOSITORY = CIRCOM_2_2_3_SOURCE.repository;
+export const CIRCOM_SOURCE_COMMIT = CIRCOM_2_2_3_SOURCE.commit;
 export const CIRCOM_CANONICAL_BINARY_PATH = "bin/circom-release-linux-amd64";
-export const CIRCOM_ARTIFACT_FLAGS = Object.freeze(["--r1cs", "--wasm", "--sym", "--O2"]);
+export const CIRCOM_ARTIFACT_FLAGS = Object.freeze([
+  "--r1cs",
+  "--wasm",
+  "--sym",
+  "--O2",
+  "--sanity_check",
+  "2",
+]);
 
 const releaseAssetUrl = (version, asset) =>
   `https://github.com/iden3/circom/releases/download/v${version}/${asset}`;
@@ -32,31 +39,31 @@ const sourceTarget = ({ platform, arch, repository, commit, id = `${platform}-${
     commit,
   });
 
-const CIRCOM_2_1_6_TARGETS = Object.freeze({
+const CIRCOM_2_2_3_TARGETS = Object.freeze({
   "linux-x64": officialTarget({
-    version: "2.1.6",
+    version: "2.2.3",
     platform: "linux",
     arch: "x64",
     asset: "circom-linux-amd64",
-    sha256: "f3958483caaaa0cdd3912df5049e2e635eab4d09b9a66807be9633d547859f12",
+    sha256: "85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3",
   }),
   "darwin-arm64": sourceTarget({
-    ...CIRCOM_2_1_6_SOURCE,
+    ...CIRCOM_2_2_3_SOURCE,
     platform: "darwin",
     arch: "arm64",
   }),
   "win32-x64": officialTarget({
-    version: "2.1.6",
+    version: "2.2.3",
     platform: "win32",
     arch: "x64",
     asset: "circom-windows-amd64.exe",
-    sha256: "d7d96da34cdee7318ddba6b7795543c97f5bde871832827e067920ddfed5457e",
+    sha256: "e43f132ee6f0aa79b705beceb59c2a7e6a54d7bdeab917ca34e9fc1951d185e1",
   }),
 });
 
 /** Version-indexed target policies bind compiler evidence to this repository's supported set. */
 export const CIRCOM_TARGET_POLICIES = Object.freeze({
-  "2.1.6": CIRCOM_2_1_6_TARGETS,
+  "2.2.3": CIRCOM_2_2_3_TARGETS,
 });
 
 export const CIRCOM_TARGETS = CIRCOM_TARGET_POLICIES[CIRCOM_VERSION];

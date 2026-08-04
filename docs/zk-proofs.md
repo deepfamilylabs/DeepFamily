@@ -400,13 +400,16 @@ npm run zk:build
 - the canonical official Linux amd64 release binary at
   `bin/circom-release-linux-amd64`, retained as the reviewed audit reference.
 
-Both roles use the same repository-pinned Circom version. Installation follows this support matrix:
+Both roles use repository-pinned Circom 2.2.3. Installation follows this support matrix:
 
 | Host/runtime         | Installation strategy          | Prerequisites                               | Production release host |
 | -------------------- | ------------------------------ | ------------------------------------------- | ----------------------- |
 | Linux x64 with glibc | Pinned official release asset  | None                                        | Yes                     |
 | macOS arm64          | Build the pinned source commit | `git`, Rust/Cargo, Xcode Command Line Tools | Yes                     |
 | Windows x64          | Pinned official release asset  | Visual C++ 2015–2022 Redistributable        | Yes                     |
+
+Circom 2.2.3 does not publish an official macOS arm64 binary, so the Apple Silicon target is built
+from the repository-pinned source commit with locked Cargo dependencies.
 
 Official x64 assets are accepted only when their fixed SHA-256 matches. Linux libc is detected from
 Node's process report and musl is rejected explicitly. Windows ARM64 hosts remain unsupported even
@@ -421,12 +424,13 @@ Linux x64 with glibc, macOS arm64, and Windows x64 are the only supported host/r
 platform and architecture combinations fail closed instead of selecting a foreign toolchain. CI
 uses GitHub's `ubuntu-latest` x64/glibc runner and separately exercises macOS arm64 and Windows x64.
 
-All circuit compilation passes `--O2` explicitly, so a compiler release cannot silently change the
-constraint system by changing its default optimization level. `zk:artifacts:check` compares the
-rebuilt R1CS hash with the manifest and the rebuilt WASM bytes with the published browser artifact.
-The native compiler's output must therefore match the hashes reviewed for the canonical Linux
-toolchain; version equality alone is insufficient release evidence. On a non-Linux host the check
-validates the canonical binary's fixed digest but does not execute that foreign-platform binary.
+All circuit compilation passes `--O2 --sanity_check 2` explicitly, so a compiler release cannot
+silently change the optimization or sanity-check levels through new defaults. `zk:artifacts:check`
+compares the rebuilt R1CS hash with the manifest and the rebuilt WASM bytes with the published
+browser artifact. The native compiler's output must therefore match the hashes reviewed for the
+canonical Linux toolchain; version equality alone is insufficient release evidence. On a non-Linux
+host the check validates the canonical binary's fixed digest but does not execute that
+foreign-platform binary.
 
 Local development and diagnostic acceptance may use the reusable native compiler installed by
 `zk:fetch`. For a source target, `zk:production:setup` and `release:preflight` instead ignore that

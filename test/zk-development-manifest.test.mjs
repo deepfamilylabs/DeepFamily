@@ -133,7 +133,7 @@ const createDevelopmentFixture = async () => {
 
   const manifest = {
     schemaVersion: 3,
-    circomVersion: "2.1.6",
+    circomVersion: "2.2.3",
     snarkjsVersion: "0.7.5",
     toolchain: {
       circomBinarySha256: sha256Text("stale-circom-toolchain"),
