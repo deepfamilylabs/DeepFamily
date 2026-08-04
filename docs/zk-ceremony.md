@@ -188,7 +188,8 @@ git rev-parse HEAD
 - a symbolic-link repository or artifact path;
 - a missing or unexpected pinned toolchain;
 - concurrent pTau download or setup execution;
-- overwriting an existing production manifest.
+- overwriting an existing production manifest unless the explicit, hash-bound rotation mode below
+  is used.
 
 The operator should use a machine they control, stop unrelated backup/snapshot tools during the
 run, and avoid terminal recording. No Safe owner private key, funded wallet, CFX, or ETH is needed.
@@ -208,9 +209,46 @@ npm run zk:production:setup -- \
   --ceremony-id deepfamily-production-2026-001
 ```
 
+### Rotate after a reviewed snarkjs runtime change
+
+Do not delete or downgrade a valid production manifest just because the committed dependency graph
+changed. First review and commit the dependency change, install exactly that clean commit, and
+record both inputs printed by these read-only commands:
+
+```bash
+node --input-type=module -e "import { readCanonicalJsonFile, sha256Text } from './scripts/lib/zkArtifactTrust.mjs'; const { raw } = readCanonicalJsonFile('circuits/zk-artifacts-manifest.json'); console.log(sha256Text(raw));"
+node --input-type=module -e "import { inspectSnarkjsRuntime } from './scripts/lib/snarkjsToolchain.mjs'; console.log(inspectSnarkjsRuntime().sha256);"
+```
+
+After independently reviewing those exact digests, rotate with a new ceremony ID:
+
+```bash
+npm run zk:production:setup -- \
+  --rotate \
+  --expected-current-manifest-sha256 <current-production-manifest-sha256> \
+  --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \
+  --ceremony-id <new-stable-audit-id>
+```
+
+The two expected digests are mandatory with `--rotate` and are rejected without it. Rotation only
+accepts an existing schema-v3 `production` manifest using the one-contributor `single-operator`
+trust model. It rejects a development or multi-party baseline, a reused ceremony ID, and a runtime
+digest equal to the current manifest. Before generating entropy it verifies the old canonical
+manifest digest, transcript, source, WASM, zkeys, verification keys, Solidity verifiers, compiler,
+snarkjs version/CLI, and pinned pTau identity. It then recompiles both circuits and requires the
+source/R1CS/WASM hashes to remain unchanged, snapshots the explicitly reviewed new runtime, and
+runs both Phase 2 setups, contributions, and finalization from scratch. The staged and rollback
+rules are identical to the initial setup.
+
+Fresh Phase 2 randomness changes both zkeys, verification keys, and generated verifier contracts.
+Treat the result as a new cryptographic release: review and commit the complete bundle together,
+then redeploy the verifiers and update any governed references through the normal release process.
+The circuit WASM and R1CS are expected to stay unchanged for this runtime-only rotation.
+
 Internally the command:
 
-1. validates the clean release commit and development manifest;
+1. validates the clean release commit and development manifest, or the explicitly hash-bound
+   production baseline in rotation mode;
 2. downloads or reuses the pinned public power-13 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
    pTau into the current user's private OS temporary directory and compiles both circuits there
@@ -219,9 +257,9 @@ Internally the command:
    either initial Groth16 zkey; each circuit and the pTau are checked again immediately before its
    setup;
 5. hashes the logical installed snarkjs production dependency graph—each package's content,
-   identity, version, and logical dependency path—and compares it with the schema-v3 manifest; it
-   copies only that verified runtime into private staging, makes package files read-only on POSIX,
-   and executes snarkjs from the snapshot;
+   identity, version, and logical dependency path—and compares it with the schema-v3 manifest or
+   the explicit reviewed rotation digest; it copies only that verified runtime into private
+   staging, makes package files read-only on POSIX, and executes snarkjs from the snapshot;
 6. before reading either secret, re-hashes that private runtime snapshot, strips inherited release
    injection variables from the helper environment, and supplies a separate 64-byte OS CSPRNG input
    for each circuit through a private stdin pipe, never through command arguments, environment

@@ -526,6 +526,56 @@ describe("ZK artifact trust", function () {
       );
     });
 
+    it("requires an explicit expected digest to inspect a new runtime for production rotation", async function () {
+      const manifestRuntimeSha256 = fixture.manifest.toolchain.snarkjsRuntimeSha256;
+      await writeRelativeFile(
+        fixture.root,
+        "node_modules/fixture-snark-dependency/index.js",
+        "module.exports = 'reviewed replacement runtime dependency';\n",
+      );
+      const replacementRuntimeSha256 = inspectSnarkjsRuntime({ root: fixture.root }).sha256;
+
+      expect(replacementRuntimeSha256).not.to.equal(manifestRuntimeSha256);
+      expect(() => inspectProductionFixture(fixture)).to.throw(
+        "Installed snarkjs runtime SHA-256 mismatch",
+      );
+      expect(() =>
+        inspectZkReleaseArtifacts({
+          root: fixture.root,
+          productionRotationRuntimeSha256: replacementRuntimeSha256,
+          expectedProductionPhase1: fixture.expectedProductionPhase1,
+        }),
+      ).to.throw("requires a schema-v3 production manifest inspection");
+
+      const result = inspectZkReleaseArtifacts({
+        root: fixture.root,
+        requireProduction: true,
+        requireBuiltR1cs: true,
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
+        productionRotationRuntimeSha256: replacementRuntimeSha256,
+      });
+      expect(result.toolchain.snarkjsRuntime.sha256).to.equal(replacementRuntimeSha256);
+      expect(result.toolchain.snarkjsRuntimeBinding).to.deep.equal({
+        source: "production-rotation-expected-digest",
+        declaredSha256: manifestRuntimeSha256,
+        expectedInstalledSha256: replacementRuntimeSha256,
+      });
+
+      await fs.appendFile(
+        artifactPath(fixture.root, ZK_RELEASE_ARTIFACTS.person_commitment.zkey),
+        "tampered",
+      );
+      expect(() =>
+        inspectZkReleaseArtifacts({
+          root: fixture.root,
+          requireProduction: true,
+          requireBuiltR1cs: true,
+          expectedProductionPhase1: fixture.expectedProductionPhase1,
+          productionRotationRuntimeSha256: replacementRuntimeSha256,
+        }),
+      ).to.throw("person_commitment zkey SHA-256 mismatch");
+    });
+
     it("rejects fixture Phase 1 metadata unless the caller supplies the exact expected production identity", function () {
       expect(fixture.manifest.trustedSetup.phase1.source).not.to.equal(ZK_PRODUCTION_PHASE1.source);
       expect(() =>

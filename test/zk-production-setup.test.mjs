@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { runZkeyContributionFromStdin } from "../scripts/zk-contribute-from-stdin.mjs";
+import { parseArguments as parseProductionSetupArguments } from "../scripts/zk-production-setup.mjs";
 import { ZK_ARTIFACT_MANIFEST_PATH, sha256Text } from "../scripts/lib/zkArtifactTrust.mjs";
 import {
   SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
@@ -91,6 +92,147 @@ describe("single-operator production ZK setup safety", function () {
   afterEach(async function () {
     await fs.rm(root, { recursive: true, force: true });
     await fs.rm(stage, { recursive: true, force: true });
+  });
+
+  it("requires both reviewed production rotation digests with the explicit rotate flag", function () {
+    const currentManifestSha256 = "11".repeat(32);
+    const replacementRuntimeSha256 = "22".repeat(32);
+    expect(
+      parseProductionSetupArguments([
+        "--expected-snarkjs-runtime-sha256",
+        replacementRuntimeSha256,
+        "--rotate",
+        "--ceremony-id",
+        "deepfamily-rotation-fixture",
+        "--expected-current-manifest-sha256",
+        currentManifestSha256,
+      ]),
+    ).to.deep.equal({
+      help: false,
+      rotate: true,
+      ceremonyId: "deepfamily-rotation-fixture",
+      expectedCurrentManifestSha256: currentManifestSha256,
+      expectedSnarkjsRuntimeSha256: replacementRuntimeSha256,
+    });
+    for (const argumentsWithoutBinding of [
+      ["--rotate"],
+      ["--rotate", "--expected-current-manifest-sha256", currentManifestSha256],
+      ["--expected-snarkjs-runtime-sha256", replacementRuntimeSha256],
+    ]) {
+      expect(() => parseProductionSetupArguments(argumentsWithoutBinding)).to.throw(
+        "Usage: npm run zk:production:setup",
+      );
+    }
+  });
+
+  it("checks the reviewed current manifest digest before the rotation runtime exemption", async function () {
+    const manifestPath = path.join(root, ZK_ARTIFACT_MANIFEST_PATH);
+    await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+    await fs.writeFile(manifestPath, `${JSON.stringify({ fixture: true }, null, 2)}\n`);
+    let artifactInspectorCalled = false;
+
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        root,
+        rotate: true,
+        expectedCurrentManifestSha256: "11".repeat(32),
+        expectedSnarkjsRuntimeSha256: "22".repeat(32),
+        env: {},
+        platform: "darwin",
+        arch: "arm64",
+        captureRunner: createFixtureGitCaptureRunner(),
+        artifactInspector: () => {
+          artifactInspectorCalled = true;
+          throw new Error("rotation runtime exemption must not run");
+        },
+      }),
+    );
+
+    expect(error?.message).to.include("rotation current manifest SHA-256 mismatch");
+    expect(artifactInspectorCalled).to.equal(false);
+  });
+
+  it("rejects unsafe production rotation baselines before installing the pTau", async function () {
+    let ptauInstallerCalled = false;
+    const attempt = async ({ trustedSetup, expectedRuntimeSha256, ceremonyId }) => {
+      const manifest = {
+        schemaVersion: 3,
+        toolchain: { snarkjsRuntimeSha256: "33".repeat(32) },
+        trustedSetup,
+      };
+      const manifestRaw = `${JSON.stringify(manifest, null, 2)}\n`;
+      const manifestPath = path.join(root, ZK_ARTIFACT_MANIFEST_PATH);
+      await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+      await fs.writeFile(manifestPath, manifestRaw);
+      return captureError(() =>
+        runSingleOperatorProductionSetup({
+          root,
+          ceremonyId,
+          rotate: true,
+          expectedCurrentManifestSha256: sha256Text(manifestRaw),
+          expectedSnarkjsRuntimeSha256: expectedRuntimeSha256,
+          env: {},
+          platform: "darwin",
+          arch: "arm64",
+          captureRunner: createFixtureGitCaptureRunner(),
+          artifactInspector: () => ({
+            circomVersion: CIRCOM_VERSION,
+            toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
+            trustedSetupStatus: trustedSetup.status,
+            manifestSha256: sha256Text(manifestRaw),
+          }),
+          ptauInstaller: async () => {
+            ptauInstallerCalled = true;
+            throw new Error("pTau installation must not run");
+          },
+        }),
+      );
+    };
+    const oldCeremonyId = "deepfamily-old-rotation-fixture";
+    const singleOperatorSetup = {
+      status: "production",
+      trustModel: "single-operator",
+      minimumContributors: 1,
+      contributorCount: 1,
+      ceremonyId: oldCeremonyId,
+    };
+    const cases = [
+      {
+        trustedSetup: { ...singleOperatorSetup, status: "development" },
+        expectedRuntimeSha256: "44".repeat(32),
+        ceremonyId: "deepfamily-new-rotation-fixture",
+        message: "requires an existing single-operator production manifest",
+      },
+      {
+        trustedSetup: {
+          ...singleOperatorSetup,
+          trustModel: "multi-party",
+          minimumContributors: 2,
+          contributorCount: 2,
+        },
+        expectedRuntimeSha256: "44".repeat(32),
+        ceremonyId: "deepfamily-new-rotation-fixture",
+        message: "requires an existing single-operator production manifest",
+      },
+      {
+        trustedSetup: singleOperatorSetup,
+        expectedRuntimeSha256: "33".repeat(32),
+        ceremonyId: "deepfamily-new-rotation-fixture",
+        message: "requires a new snarkjs runtime SHA-256",
+      },
+      {
+        trustedSetup: singleOperatorSetup,
+        expectedRuntimeSha256: "44".repeat(32),
+        ceremonyId: oldCeremonyId,
+        message: "requires a new ceremonyId",
+      },
+    ];
+
+    for (const fixture of cases) {
+      const error = await attempt(fixture);
+      expect(error?.message).to.include(fixture.message);
+    }
+    expect(ptauInstallerCalled).to.equal(false);
   });
 
   it("rejects native and x64-emulated Node on Windows ARM64 hosts", async function () {
@@ -192,7 +334,7 @@ describe("single-operator production ZK setup safety", function () {
     expect(command.args[0]).not.to.match(/\.cmd$/u);
   });
 
-  it("records the inspected native compiler in a schema-v3 transcript without changing the canonical manifest toolchain", async function () {
+  it("records a reviewed replacement runtime without changing the canonical compiler or CLI", async function () {
     const releaseDirectory = path.join(stage, "release");
     await fs.mkdir(releaseDirectory, { recursive: true });
     await fs.mkdir(path.join(root, "circuits"), { recursive: true });
@@ -272,13 +414,17 @@ describe("single-operator production ZK setup safety", function () {
       },
       circuits,
       beaconHash: "77".repeat(32),
+      snarkjsRuntimeSha256: "35".repeat(32),
     });
 
     expect(records.transcript).to.include({
       schemaVersion: 3,
       compiler,
     });
-    expect(records.manifest.toolchain).to.deep.equal(canonicalToolchain);
+    expect(records.manifest.toolchain).to.deep.equal({
+      ...canonicalToolchain,
+      snarkjsRuntimeSha256: "35".repeat(32),
+    });
   });
 
   it("rejects a manifest-selected canonical compiler digest before installing the pTau", async function () {
@@ -379,7 +525,7 @@ describe("single-operator production ZK setup safety", function () {
     expect(ptauError?.message).to.include("staged Powers of Tau");
   });
 
-  it("checks every staged R1CS/WASM hash before the first Groth16 or Phase 2 command", async function () {
+  it("checks every rotated R1CS/WASM hash before requesting new entropy", async function () {
     const compilerPath = path.join(root, "bin", "circom");
     const compilerContents = "fixture native compiler\n";
     const setupDirectory = path.join(root, "setup");
@@ -399,6 +545,13 @@ describe("single-operator production ZK setup safety", function () {
       schemaVersion: 3,
       toolchain: {
         snarkjsRuntimeSha256: "78".repeat(32),
+      },
+      trustedSetup: {
+        status: "production",
+        trustModel: "single-operator",
+        minimumContributors: 1,
+        contributorCount: 1,
+        ceremonyId: "deepfamily-old-production-fixture",
       },
       circuits: {
         person_commitment: {
@@ -421,19 +574,32 @@ describe("single-operator production ZK setup safety", function () {
 
     const runnerEvents = [];
     let cachedCompilerInspected = false;
+    let entropyRequested = false;
+    const replacementRuntimeSha256 = "79".repeat(32);
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
         root,
+        ceremonyId: "deepfamily-new-production-fixture",
+        rotate: true,
+        expectedCurrentManifestSha256: sha256Text(manifestRaw),
+        expectedSnarkjsRuntimeSha256: replacementRuntimeSha256,
         env: {},
         platform: "darwin",
         arch: "arm64",
         captureRunner: createFixtureGitCaptureRunner(),
-        artifactInspector: () => ({
-          circomVersion: CIRCOM_VERSION,
-          toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
-          trustedSetupStatus: "development",
-          manifestSha256: sha256Text(manifestRaw),
-        }),
+        artifactInspector: (request) => {
+          expect(request).to.include({
+            requireProduction: true,
+            requireBuiltR1cs: false,
+            productionRotationRuntimeSha256: replacementRuntimeSha256,
+          });
+          return {
+            circomVersion: CIRCOM_VERSION,
+            toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
+            trustedSetupStatus: "production",
+            manifestSha256: sha256Text(manifestRaw),
+          };
+        },
         compilerInspector: async () => {
           cachedCompilerInspected = true;
           throw new Error("cached source-built compiler must not execute");
@@ -450,8 +616,12 @@ describe("single-operator production ZK setup safety", function () {
           };
         },
         runtimeSnapshotter: ({ destinationRoot, expectedSha256 }) => {
-          expect(expectedSha256).to.equal(manifest.toolchain.snarkjsRuntimeSha256);
+          expect(expectedSha256).to.equal(replacementRuntimeSha256);
           return { root: destinationRoot, sha256: expectedSha256 };
+        },
+        randomBytesFn: (length) => {
+          entropyRequested = true;
+          return Buffer.alloc(length);
         },
         ptauInstaller: async () => {
           await fs.mkdir(setupDirectory, { recursive: true });
@@ -485,6 +655,7 @@ describe("single-operator production ZK setup safety", function () {
 
     expect(error?.message).to.include("disclosure_binding staged WASM SHA-256 mismatch");
     expect(cachedCompilerInspected).to.equal(false);
+    expect(entropyRequested).to.equal(false);
     expect(runnerEvents.map(([kind, name]) => [kind, name])).to.deep.equal([
       ["compile", "person_commitment"],
       ["compile", "disclosure_binding"],

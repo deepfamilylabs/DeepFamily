@@ -777,6 +777,7 @@ export const inspectZkReleaseArtifacts = ({
   requireProduction = false,
   requireBuiltR1cs = false,
   expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
+  productionRotationRuntimeSha256,
 } = {}) => {
   const resolvedRoot = path.resolve(root);
   if (fs.realpathSync(resolvedRoot) !== resolvedRoot) {
@@ -785,6 +786,19 @@ export const inspectZkReleaseArtifacts = ({
   const manifestPath = path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH);
   const { parsed: manifest, raw } = readCanonicalJsonFile(manifestPath, "ZK artifact manifest");
   validateZkArtifactManifest(manifest, { requireProduction, expectedProductionPhase1 });
+  if (productionRotationRuntimeSha256 !== undefined) {
+    if (
+      requireProduction !== true ||
+      manifest.schemaVersion !== 3 ||
+      manifest.trustedSetup.status !== "production"
+    ) {
+      throw new Error(
+        "A production rotation runtime binding requires a schema-v3 production manifest inspection",
+      );
+    }
+  }
+  const expectedInstalledRuntimeSha256 =
+    productionRotationRuntimeSha256 ?? manifest.toolchain.snarkjsRuntimeSha256;
   const toolchain = Object.freeze({
     circom: assertFileHash(
       resolvedRoot,
@@ -802,10 +816,34 @@ export const inspectZkReleaseArtifacts = ({
       manifest.schemaVersion >= 3
         ? assertSnarkjsRuntimeHash({
             root: resolvedRoot,
-            expectedSha256: manifest.toolchain.snarkjsRuntimeSha256,
+            expectedSha256: expectedInstalledRuntimeSha256,
+          })
+        : null,
+    snarkjsRuntimeBinding:
+      manifest.schemaVersion >= 3
+        ? Object.freeze({
+            source:
+              productionRotationRuntimeSha256 === undefined
+                ? "manifest"
+                : "production-rotation-expected-digest",
+            declaredSha256: manifest.toolchain.snarkjsRuntimeSha256,
+            expectedInstalledSha256: expectedInstalledRuntimeSha256,
           })
         : null,
   });
+  const installedSnarkjsPackage = toolchain.snarkjsRuntime?.packages.find(
+    ({ logicalPath }) => logicalPath.length === 1 && logicalPath[0] === "snarkjs",
+  );
+  if (
+    productionRotationRuntimeSha256 !== undefined &&
+    installedSnarkjsPackage !== undefined &&
+    installedSnarkjsPackage.version !== manifest.snarkjsVersion
+  ) {
+    throw new Error(
+      `Installed snarkjs ${installedSnarkjsPackage.version} does not match artifact manifest ` +
+        manifest.snarkjsVersion,
+    );
+  }
   let transcriptEvidence = null;
   if (manifest.trustedSetup.status === "production") {
     const transcriptPath = path.join(resolvedRoot, manifest.trustedSetup.transcript.path);

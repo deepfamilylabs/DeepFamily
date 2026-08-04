@@ -178,6 +178,11 @@ again immediately before the child process receives it.
 The current ZK artifact manifest is schema v3 and commits that snarkjs runtime-graph digest.
 Schema-v2 manifests remain readable only for legacy compatibility inspection and verification;
 `zk:production:setup` and `release:preflight` both require schema v3.
+If a reviewed dependency update changes the runtime graph after production artifacts already
+exist, the setup command keeps refusing overwrite by default. Its explicit rotation mode requires
+the reviewed old-manifest and new-runtime digests, validates the complete old production bundle,
+and regenerates both Phase 2 artifact sets from scratch; see the
+[production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
 Development and production reuse the same fixed-digest public Phase 1 pTau at
 `tmp/zk-production/powersOfTau28_hez_final_13.ptau`. This removes the old locally generated
