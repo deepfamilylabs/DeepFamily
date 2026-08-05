@@ -321,6 +321,8 @@ describe("Ethereum production tooling profiles", function () {
       chainId: 11155111n,
     });
     expect(diagnostic.minDelaySeconds).to.equal(30);
+    expect(diagnostic.diagnosticMinDelaySeconds).to.equal(30);
+    expect(diagnostic.runGovernanceLifecycle).to.equal(true);
 
     expect(() =>
       parseEthereumAcceptanceConfig({
@@ -339,7 +341,6 @@ describe("Ethereum production tooling profiles", function () {
       env: {
         ...baseEnv,
         EVM_E2E_MODE: "release-rehearsal",
-        EVM_E2E_MIN_DELAY: "86400",
         MIN_DELAY: "86400",
         GOVERNANCE_MULTISIG_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
       },
@@ -347,6 +348,8 @@ describe("Ethereum production tooling profiles", function () {
       chainId: 11155111n,
     });
     expect(rehearsal.minDelaySeconds).to.equal(86400);
+    expect(rehearsal.diagnosticMinDelaySeconds).to.equal(30);
+    expect(rehearsal.runGovernanceLifecycle).to.equal(false);
     expect(rehearsal.productionMinDelaySeconds).to.equal(86400);
   });
 

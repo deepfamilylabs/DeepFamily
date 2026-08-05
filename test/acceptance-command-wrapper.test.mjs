@@ -334,4 +334,12 @@ describe("acceptance command wrapper", function () {
     expect(wrapperCheck).to.be.greaterThan(-1);
     expect(rpcConnect).to.be.greaterThan(wrapperCheck);
   });
+
+  it("self-validates release evidence before reporting a passed rehearsal", async function () {
+    const source = await fs.readFile("scripts/evm-acceptance.mjs", "utf8");
+    const selfValidation = source.indexOf("await validateTestnetReleaseEvidence");
+    const passedMessage = source.indexOf("RELEASE REHEARSAL PASSED");
+    expect(selfValidation).to.be.greaterThan(-1);
+    expect(passedMessage).to.be.greaterThan(selfValidation);
+  });
 });

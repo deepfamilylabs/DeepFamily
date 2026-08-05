@@ -26,6 +26,10 @@ These commands have not, merely by existing or by passing repository tests, depl
 Ethereum Mainnet. Plan mode makes RPC reads and writes local plan files but does not broadcast.
 Execute mode sends real Ethereum transactions and spends real ETH.
 
+A fresh protocol release deploys the Timelock and initial implementation only. It deploys no Mock,
+performs no upgrade, schedules no Timelock operation, and therefore waits for no Timelock delay.
+The configured delay applies to governance after release.
+
 ## Security and responsibility boundary
 
 `PRIVATE_KEY` is the key of the dedicated production deployer/relayer. It pays for the Safe factory
@@ -70,9 +74,11 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
    that clean commit. The default path records one Phase 2 contributor under the explicit
    `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
    prerequisite and not related to the Safe's three-owner, 2/3 policy.
-2. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia using the exact
-   production `MIN_DELAY`, and archive its successful release-rehearsal report. A diagnostic report
-   with `releaseReady=false` is useful for development but is not release evidence. Require
+2. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia in
+   `release-rehearsal` mode with `MIN_DELAY >= 86400`, and archive its successful schema-v4 report.
+   This mode rehearses a fresh release with zero Timelock waits. A diagnostic run instead uses
+   `EVM_E2E_MIN_DELAY=30` for each of four real governance windows and always has
+   `releaseReady=false`. Require
    `zkArtifactTrust.productionReady=true` and `zkCeremonyVerification.status=passed` in the accepted
    report.
 3. Use a clean, isolated checkout of the reviewed commit with exact dependencies and complete the
@@ -101,7 +107,7 @@ ZK_PTAU_PATH=
 
 # Production policy.
 GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3
-MIN_DELAY=172800
+MIN_DELAY=86400
 EVM_MAINNET_CONFIRMATIONS=2
 EVM_MAINNET_FINALITY_TIMEOUT=3600
 # Keep blank for a fresh orchestrated release.
@@ -133,10 +139,12 @@ EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 EVM_MAINNET_RECOVERY_TXS=
 ```
 
-The protocol release command validates the selected Sepolia report's schema, release-ready status,
-clean commit and artifact-input digest, `MIN_DELAY`, production ZK evidence, source verification,
-finality, terminal governance state and refund evidence. A diagnostic or another commit's report is
-rejected before any Mainnet transaction.
+The protocol release command requires a schema-v4 fresh-release report with release-ready status,
+`evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`, the same clean commit,
+artifact-input digest and deployed `MIN_DELAY`, production ZK evidence, source verification,
+finality, initial governance state and refund evidence. It rejects a report containing Mock,
+upgrade, migration, or Timelock-wait evidence, as well as diagnostic or another commit's evidence,
+before any Mainnet transaction.
 
 The acceptance runner's original ignored report path is run-specific; the example path is not
 created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file inside the
@@ -297,7 +305,9 @@ transactions and spends ETH. The release deploys and validates `GovernanceTimelo
 wires the protocol system, hands `DeepFamily` ownership to the Timelock, verifies every contract on
 Etherscan, waits for finality, re-reads receipts and block hashes, checks proxy/verifier/Token/
 Reader/Timelock/treasury invariants, and writes its terminal report. It does not create person,
-endorsement, NFT, or story business data on Mainnet.
+endorsement, NFT, or story business data on Mainnet. It also deploys no Mock, performs no upgrade,
+and waits for no Timelock operation. `MIN_DELAY=86400` is the on-chain 24-hour policy for future
+governance, not a sleep in the fresh-release command.
 
 `GOVERNANCE_OWNER` remains blank for a fresh run because the orchestrator creates and checkpoints
 the Timelock itself. Do not manually deploy pieces or mix `deploy:net`/`deploy:timelock` with an
