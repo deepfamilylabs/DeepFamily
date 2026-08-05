@@ -27,7 +27,9 @@ independent state, use the
 
 These are production tools, not a mainnet copy of the testnet acceptance suite. The Safe creator
 does not operate the owners' wallets, and the release runner does not create or migrate governance,
-perform an upgrade, or submit person, endorsement, NFT, or story transactions.
+perform an upgrade, or submit person, endorsement, NFT, or story transactions. A fresh release
+deploys the Timelock with its reviewed delay but schedules no Timelock operation, so it performs no
+Timelock wait. The delay applies to governance after release.
 
 ## Security model
 
@@ -100,10 +102,12 @@ keys into this repository.
    `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
    prerequisite and not related to the Safe's three-owner, 2/3 policy.
 2. Complete `npm run espace:acceptance` from the same audited release commit on eSpace Testnet in
-   `release-rehearsal` mode with the exact production `MIN_DELAY`. Archive only a report whose
-   `status` is `passed`, `releaseReady` is `true`,
+   `release-rehearsal` mode with the production `MIN_DELAY >= 86400`. This mode rehearses only a
+   fresh release and performs zero Timelock waits. Archive only a schema-v4 report whose `status`
+   is `passed`, `releaseReady` is `true`,
    `zkArtifactTrust.productionReady` is `true`, and `zkCeremonyVerification.status` is `passed`; a
-   30-second diagnostic report is not release evidence.
+   diagnostic report is not release evidence. Diagnostic mode instead uses
+   `EVM_E2E_MIN_DELAY=30` as the real delay for each of its four governance windows.
 3. Use a clean, isolated checkout of that commit and the reviewed Node/npm versions. Install exact
    dependencies with `npm ci --ignore-scripts --no-audit --no-fund`, then complete the repository's
    build, test, frontend, ZK artifact, and storage-layout checks. Do not reuse an untrusted global
@@ -134,7 +138,7 @@ ZK_PTAU_PATH=
 # Keep blank until the Safe deployment and real-owner acceptance are independently validated.
 GOVERNANCE_MULTISIG=
 GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1.3.0-2of3
-MIN_DELAY=172800
+MIN_DELAY=86400
 EVM_MAINNET_CONFIRMATIONS=2
 EVM_MAINNET_FINALITY_TIMEOUT=3600
 # Must remain empty for a fresh orchestrated protocol release.
@@ -171,10 +175,12 @@ deployment. Keep `GOVERNANCE_MULTISIG` empty while creating and accepting a new 
 changing `.env` later never changes chain state.
 
 The protocol release command validates the selected testnet report rather than trusting its file
-name. It requires schema v3, `releaseReady=true`, the current clean commit and artifact-input digest,
-the same `MIN_DELAY`, production ZK evidence, finalized critical transactions, complete source
-verification, terminal governance checks, and refund evidence. A report from another commit,
-diagnostic mode, or the earlier 30-second run is rejected before any Mainnet transaction.
+name. It requires schema v4, `releaseReady=true`, the current clean commit and artifact-input digest,
+`evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`, the same deployed
+`MIN_DELAY`, production ZK evidence, finalized fresh-release transactions, complete source
+verification, initial governance checks, and refund evidence. The report contains no Mock
+deployment, upgrade, governance migration, or Timelock wait. A report from another commit or
+diagnostic mode is rejected before any Mainnet transaction.
 
 The acceptance runner writes its report beneath its ignored run directory; the example path above
 is not created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file
@@ -370,9 +376,11 @@ The normal release sequence is:
 8. validate proxy, verifier, Token binding/ownerless state, Reader, Timelock roles/delay, protocol
    owner, and treasury relationships; write the final report.
 
-No mainnet business-data smoke transaction is part of this sequence. Person, proof, endorsement,
-NFT, and story behavior is exercised by the testnet release rehearsal; any mainnet data write must
-be separately approved as real production activity.
+This fresh-release sequence performs no Mock deployment, UUPS upgrade, Timelock operation, or
+Timelock wait. The configured 24-hour delay first applies when governance later schedules a fee,
+verifier, treasury, upgrade, or migration operation. No mainnet business-data smoke transaction is
+part of this sequence; any mainnet data write must be separately approved as real production
+activity.
 
 ## Safe and release checkpoints
 

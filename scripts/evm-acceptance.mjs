@@ -60,6 +60,11 @@ import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
+import {
+  TESTNET_RELEASE_EVIDENCE_TYPE,
+  TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
+  validateTestnetReleaseEvidence,
+} from "./lib/testnetReleaseEvidence.mjs";
 
 const { generatePersonCommitmentProof } = personCommitmentProof;
 const { generateDisclosureBindingProof } = disclosureBindingProof;
@@ -666,9 +671,11 @@ const runRecovery = async ({ ethers, provider, config, funder, runDeployer, base
     `${config.reportFileComponent}.recovery-${Date.now().toString(10)}.json`,
   );
   const report = {
-    schemaVersion: 3,
+    schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
     mode: "recovery",
     acceptanceMode: config.acceptanceMode,
+    evidenceType: "recovery",
+    governanceLifecycleIncluded: config.runGovernanceLifecycle,
     releaseReady: false,
     runId: config.runId,
     status: "running",
@@ -744,7 +751,9 @@ export const main = async (chainProfile) => {
   const config = {
     privateKey,
     acceptanceMode: parsedConfig.acceptanceMode,
+    runGovernanceLifecycle: parsedConfig.runGovernanceLifecycle,
     minDelay: parsedConfig.minDelaySeconds,
+    diagnosticMinDelay: parsedConfig.diagnosticMinDelaySeconds,
     productionMinDelay: parsedConfig.productionMinDelaySeconds,
     productionGovernanceMultisigProfile: parsedConfig.productionGovernanceMultisigProfile,
     confirmations: parsedConfig.confirmations,
@@ -863,9 +872,14 @@ export const main = async (chainProfile) => {
     requireBuiltR1cs: true,
   });
   const report = {
-    schemaVersion: 3,
+    schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
     mode: "acceptance",
     acceptanceMode: config.acceptanceMode,
+    evidenceType:
+      config.acceptanceMode === "release-rehearsal"
+        ? TESTNET_RELEASE_EVIDENCE_TYPE
+        : "diagnostic-governance-lifecycle",
+    governanceLifecycleIncluded: config.runGovernanceLifecycle,
     releaseReady: false,
     runId: config.runId,
     status: "running",
@@ -903,7 +917,7 @@ export const main = async (chainProfile) => {
       funder: funder.address,
       runDeployer: runDeployer.address,
       safeOwners: primarySafeOwners,
-      replacementSafeOwners,
+      ...(config.runGovernanceLifecycle ? { replacementSafeOwners } : {}),
     },
     safeInfrastructure: {
       version: CANONICAL_SAFE_VERSION,
@@ -925,9 +939,13 @@ export const main = async (chainProfile) => {
       fallbackHandler: null,
       ownerSets: {
         primary: { labels: ["A", "B", "C"], addresses: primarySafeOwners },
-        replacement: { labels: ["D", "E", "F"], addresses: replacementSafeOwners },
+        ...(config.runGovernanceLifecycle
+          ? { replacement: { labels: ["D", "E", "F"], addresses: replacementSafeOwners } }
+          : {}),
       },
-      primaryOwnerSignaturesRejectedByReplacementSafe: false,
+      ...(config.runGovernanceLifecycle
+        ? { primaryOwnerSignaturesRejectedByReplacementSafe: false }
+        : {}),
       executions: [],
     },
     timelockDeployment: {},
@@ -939,7 +957,7 @@ export const main = async (chainProfile) => {
       sameTimelockArtifactAndConfigResolver: false,
       sameProtocolDeploymentHelper: false,
       sameDeploymentMetadataWriter: false,
-      sharedGovernanceOperationBuildersMatched: false,
+      ...(config.runGovernanceLifecycle ? { sharedGovernanceOperationBuildersMatched: false } : {}),
       criticalTransactionsFinalized: false,
       cleanReleaseCommit: sourceState.clean,
       productionBuildProfileMatched: buildState.hardhatBuildProfile === "production",
@@ -956,11 +974,16 @@ export const main = async (chainProfile) => {
     steps: [],
     transactions: {},
     onchain: { status: "running" },
-    governance: {},
+    ...(config.runGovernanceLifecycle
+      ? {
+          governance: {},
+          governanceLifecycle: {},
+          treasury: {},
+          upgrade: {},
+        }
+      : {}),
     terminalGovernanceState: { status: "pending" },
     business: {},
-    treasury: {},
-    upgrade: {},
     verification: {
       enabled: config.verify,
       provider: ACCEPTANCE_PROFILE.verificationProvider,
@@ -968,7 +991,6 @@ export const main = async (chainProfile) => {
       status: config.verify ? "pending" : "skipped",
       contracts: [],
       phases: [],
-      gateBeforeUpgradeSchedule: true,
     },
     budget: {
       nativeSymbol: config.nativeSymbol,
@@ -1573,18 +1595,20 @@ export const main = async (chainProfile) => {
     });
 
     currentStep = "verify-initial-deployment";
-    const governedVerifierCandidate = await deploy("Groth16VerifierAdapter", runDeployer, [
-      addresses.personCommitmentVerifier,
-      addresses.disclosureBindingVerifier,
-    ]);
-    addresses.governedVerifierCandidate = await governedVerifierCandidate.getAddress();
-    assertCondition(
-      (await governedVerifierCandidate.personVerifier()) === addresses.personCommitmentVerifier &&
-        (await governedVerifierCandidate.disclosureBindingVerifier()) ===
-          addresses.disclosureBindingVerifier,
-      "Governed verifier candidate backend mismatch",
-    );
-    report.addresses.governedVerifierCandidate = addresses.governedVerifierCandidate;
+    if (config.runGovernanceLifecycle) {
+      const governedVerifierCandidate = await deploy("Groth16VerifierAdapter", runDeployer, [
+        addresses.personCommitmentVerifier,
+        addresses.disclosureBindingVerifier,
+      ]);
+      addresses.governedVerifierCandidate = await governedVerifierCandidate.getAddress();
+      assertCondition(
+        (await governedVerifierCandidate.personVerifier()) === addresses.personCommitmentVerifier &&
+          (await governedVerifierCandidate.disclosureBindingVerifier()) ===
+            addresses.disclosureBindingVerifier,
+        "Governed verifier candidate backend mismatch",
+      );
+      report.addresses.governedVerifierCandidate = addresses.governedVerifierCandidate;
+    }
 
     const deepFamilyFactory = await ethers.getContractFactory("DeepFamily", {
       signer: runDeployer,
@@ -1621,15 +1645,6 @@ export const main = async (chainProfile) => {
         addresses.groth16VerifierAdapter,
         [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
       ),
-      {
-        ...(await verificationEntry(
-          hre.artifacts,
-          "Groth16VerifierAdapter",
-          addresses.governedVerifierCandidate,
-          [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
-        )),
-        label: "GovernedVerifierCandidate",
-      },
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
         PoseidonT5: addresses.poseidonT5,
         AdultAgeGate: addresses.adultAgeGate,
@@ -1642,6 +1657,17 @@ export const main = async (chainProfile) => {
         addresses.deepFamily,
       ]),
     ];
+    if (config.runGovernanceLifecycle) {
+      initialVerificationEntries.push({
+        ...(await verificationEntry(
+          hre.artifacts,
+          "Groth16VerifierAdapter",
+          addresses.governedVerifierCandidate,
+          [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+        )),
+        label: "GovernedVerifierCandidate",
+      });
+    }
     if (config.verify) {
       const initialVerificationFailures = await verifyEntries(
         initialVerificationEntries,
@@ -1702,189 +1728,196 @@ export const main = async (chainProfile) => {
       );
     };
 
-    currentStep = "governance-fee";
     const feeBefore = await deepFamily.protocolEndorsementFeeBps();
-    const newFee = feeBefore === 501n ? 502n : 501n;
-    await expectRevert(
-      () => deepFamily.connect(runDeployer).updateEndorsementFee.staticCall(newFee),
-      "Direct non-owner endorsement fee update",
-      {
-        expectedErrorNames: ["OwnableUnauthorizedAccount"],
-        expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
-      },
-    );
-    await expectRevert(
-      () =>
-        deepFamily
-          .connect(runDeployer)
-          .setVerifier.staticCall(1, 0, addresses.governedVerifierCandidate),
-      "Direct non-owner verifier update",
-      {
-        expectedErrorNames: ["OwnableUnauthorizedAccount"],
-        expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
-      },
-    );
-    const feeData = deepFamily.interface.encodeFunctionData("updateEndorsementFee", [newFee]);
-    const feeOperation = await scheduleOperation({
-      label: "fee-update",
-      target: addresses.deepFamily,
-      data: feeData,
-      salt: deriveGovernanceSalt(ethers, {
-        targetAddress: addresses.deepFamily,
-        calldata: feeData,
-      }),
-      signers: [ownerA, ownerB],
-    });
-    // With a short diagnostic delay, waiting for multiple confirmations can consume the entire
-    // wall-clock delay. Simulate at the schedule receipt's historical block instead of assuming
-    // the operation is still early when the RPC finally returns.
-    const feeScheduleBlock = await retryBounded(
-      () => provider.getBlock(feeOperation.scheduleBlockNumber),
-      {
-        attempts: 4,
-        timeoutMs: 60_000,
-        label: "fee schedule block read",
-      },
-    );
-    assertCondition(feeScheduleBlock, "Fee schedule block is unavailable");
-    const feeReadyTimestamp = await retryBounded(
-      () => timelock.getTimestamp(feeOperation.operationId),
-      {
-        attempts: 4,
-        timeoutMs: 60_000,
-        label: "fee operation ready timestamp read",
-      },
-    );
-    assertCondition(
-      feeReadyTimestamp > BigInt(feeScheduleBlock.timestamp),
-      "Fee operation did not preserve a non-zero early-execution window at schedule time",
-    );
-    const earlyExecuteData = timelock.interface.encodeFunctionData("execute", [
-      feeOperation.target,
-      0n,
-      feeOperation.data,
-      ZERO_HASH,
-      feeOperation.salt,
-    ]);
-    const early = await signedExecution(timelockAddress, 0n, earlyExecuteData, [ownerB, ownerC]);
-    const nonceBeforeEarly = await safeReader.getNonce();
-    await expectSafeSimulationFailure({
-      provider,
-      from: runDeployer.address,
-      safeAddress,
-      data: early.encodedTransaction,
-      blockTag: feeOperation.scheduleBlockNumber,
-      safeInterface,
-      label: "Early Timelock execution through Safe",
-      expectedSafeRevertCodes: ["GS013"],
-    });
-    assertCondition(
-      (await safeReader.getNonce()) === nonceBeforeEarly,
-      "Early execution simulation changed Safe nonce",
-    );
-    assertCondition(
-      (await deepFamily.protocolEndorsementFeeBps()) === feeBefore,
-      "Early execution changed endorsement fee",
-    );
-    const verifierOperation = await scheduleOperation({
-      label: "verifier-update",
-      target: addresses.deepFamily,
-      data: deepFamily.interface.encodeFunctionData("setVerifier", [
-        1,
-        0,
-        addresses.governedVerifierCandidate,
-      ]),
-      salt: deriveGovernanceSalt(ethers, {
-        targetAddress: addresses.deepFamily,
-        calldata: deepFamily.interface.encodeFunctionData("setVerifier", [
+    let activeProtocolFee = feeBefore;
+    let activePersonVerifier = addresses.groth16VerifierAdapter;
+    let governedFeeData = null;
+    if (config.runGovernanceLifecycle) {
+      currentStep = "governance-fee";
+      const newFee = feeBefore === 501n ? 502n : 501n;
+      await expectRevert(
+        () => deepFamily.connect(runDeployer).updateEndorsementFee.staticCall(newFee),
+        "Direct non-owner endorsement fee update",
+        {
+          expectedErrorNames: ["OwnableUnauthorizedAccount"],
+          expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
+        },
+      );
+      await expectRevert(
+        () =>
+          deepFamily
+            .connect(runDeployer)
+            .setVerifier.staticCall(1, 0, addresses.governedVerifierCandidate),
+        "Direct non-owner verifier update",
+        {
+          expectedErrorNames: ["OwnableUnauthorizedAccount"],
+          expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
+        },
+      );
+      governedFeeData = deepFamily.interface.encodeFunctionData("updateEndorsementFee", [newFee]);
+      const feeOperation = await scheduleOperation({
+        label: "fee-update",
+        target: addresses.deepFamily,
+        data: governedFeeData,
+        salt: deriveGovernanceSalt(ethers, {
+          targetAddress: addresses.deepFamily,
+          calldata: governedFeeData,
+        }),
+        signers: [ownerA, ownerB],
+      });
+      // With a short diagnostic delay, waiting for multiple confirmations can consume the entire
+      // wall-clock delay. Simulate at the schedule receipt's historical block instead of assuming
+      // the operation is still early when the RPC finally returns.
+      const feeScheduleBlock = await retryBounded(
+        () => provider.getBlock(feeOperation.scheduleBlockNumber),
+        {
+          attempts: 4,
+          timeoutMs: 60_000,
+          label: "fee schedule block read",
+        },
+      );
+      assertCondition(feeScheduleBlock, "Fee schedule block is unavailable");
+      const feeReadyTimestamp = await retryBounded(
+        () => timelock.getTimestamp(feeOperation.operationId),
+        {
+          attempts: 4,
+          timeoutMs: 60_000,
+          label: "fee operation ready timestamp read",
+        },
+      );
+      assertCondition(
+        feeReadyTimestamp > BigInt(feeScheduleBlock.timestamp),
+        "Fee operation did not preserve a non-zero early-execution window at schedule time",
+      );
+      const earlyExecuteData = timelock.interface.encodeFunctionData("execute", [
+        feeOperation.target,
+        0n,
+        feeOperation.data,
+        ZERO_HASH,
+        feeOperation.salt,
+      ]);
+      const early = await signedExecution(timelockAddress, 0n, earlyExecuteData, [ownerB, ownerC]);
+      const nonceBeforeEarly = await safeReader.getNonce();
+      await expectSafeSimulationFailure({
+        provider,
+        from: runDeployer.address,
+        safeAddress,
+        data: early.encodedTransaction,
+        blockTag: feeOperation.scheduleBlockNumber,
+        safeInterface,
+        label: "Early Timelock execution through Safe",
+        expectedSafeRevertCodes: ["GS013"],
+      });
+      assertCondition(
+        (await safeReader.getNonce()) === nonceBeforeEarly,
+        "Early execution simulation changed Safe nonce",
+      );
+      assertCondition(
+        (await deepFamily.protocolEndorsementFeeBps()) === feeBefore,
+        "Early execution changed endorsement fee",
+      );
+      const verifierOperation = await scheduleOperation({
+        label: "verifier-update",
+        target: addresses.deepFamily,
+        data: deepFamily.interface.encodeFunctionData("setVerifier", [
           1,
           0,
           addresses.governedVerifierCandidate,
         ]),
-      }),
-      signers: [ownerB, ownerC],
-    });
-    await waitForReady(timelock, feeOperation.operationId, config.minDelay);
-    await waitForReady(timelock, verifierOperation.operationId, config.minDelay);
-    await executeOperation("fee-update", feeOperation, [ownerA, ownerC]);
-    assertCondition(
-      (await deepFamily.protocolEndorsementFeeBps()) === newFee,
-      "Governed endorsement fee was not updated",
-    );
-    await executeOperation("verifier-update", verifierOperation, [ownerA, ownerB]);
-    assertCondition(
-      (await deepFamily.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate,
-      "Governed person-commitment verifier route was not updated",
-    );
+        salt: deriveGovernanceSalt(ethers, {
+          targetAddress: addresses.deepFamily,
+          calldata: deepFamily.interface.encodeFunctionData("setVerifier", [
+            1,
+            0,
+            addresses.governedVerifierCandidate,
+          ]),
+        }),
+        signers: [ownerB, ownerC],
+      });
+      await waitForReady(timelock, feeOperation.operationId, config.minDelay);
+      await waitForReady(timelock, verifierOperation.operationId, config.minDelay);
+      await executeOperation("fee-update", feeOperation, [ownerA, ownerC]);
+      assertCondition(
+        (await deepFamily.protocolEndorsementFeeBps()) === newFee,
+        "Governed endorsement fee was not updated",
+      );
+      await executeOperation("verifier-update", verifierOperation, [ownerA, ownerB]);
+      assertCondition(
+        (await deepFamily.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate,
+        "Governed person-commitment verifier route was not updated",
+      );
 
-    const cancelledFee = newFee === 502n ? 503n : 502n;
-    const cancelOperation = await scheduleOperation({
-      label: "fee-update-cancelled",
-      target: addresses.deepFamily,
-      data: deepFamily.interface.encodeFunctionData("updateEndorsementFee", [cancelledFee]),
-      salt: deriveGovernanceSalt(ethers, {
-        targetAddress: addresses.deepFamily,
-        calldata: deepFamily.interface.encodeFunctionData("updateEndorsementFee", [cancelledFee]),
-      }),
-      signers: [ownerB, ownerC],
-    });
-    const cancelData = timelock.interface.encodeFunctionData("cancel", [
-      cancelOperation.operationId,
-    ]);
-    await executeSafe("fee-update-cancel", timelockAddress, 0n, cancelData, [ownerA, ownerB]);
-    assertCondition(
-      !(await timelock.isOperation(cancelOperation.operationId)),
-      "Cancelled operation still exists",
-    );
-    assertCondition(
-      (await deepFamily.protocolEndorsementFeeBps()) === newFee,
-      "Cancelled operation changed the endorsement fee",
-    );
-    const cancelledExecuteData = timelock.interface.encodeFunctionData("execute", [
-      cancelOperation.target,
-      0n,
-      cancelOperation.data,
-      ZERO_HASH,
-      cancelOperation.salt,
-    ]);
-    const cancelledExecution = await signedExecution(timelockAddress, 0n, cancelledExecuteData, [
-      ownerA,
-      ownerC,
-    ]);
-    await expectSafeSimulationFailure({
-      provider,
-      from: runDeployer.address,
-      safeAddress,
-      data: cancelledExecution.encodedTransaction,
-      safeInterface,
-      label: "Execution of a cancelled Timelock operation through Safe",
-      expectedSafeRevertCodes: ["GS013"],
-    });
-    report.governance = {
-      feeBefore,
-      feeAfter: newFee,
-      executedOperationId: feeOperation.operationId,
-      verifierOperationId: verifierOperation.operationId,
-      verifierBefore: addresses.groth16VerifierAdapter,
-      verifierAfter: addresses.governedVerifierCandidate,
-      directPrivilegedCallsRejected: true,
-      cancelledOperationId: cancelOperation.operationId,
-      earlyExecutionRejected: true,
-      earlyExecutionSimulationBlock: feeOperation.scheduleBlockNumber,
-      scheduleBlockTimestamp: feeScheduleBlock.timestamp,
-      operationReadyTimestamp: feeReadyTimestamp,
-      cancelled: true,
-      cancelledExecutionRejected: true,
-      signaturePairs: {
-        feeSchedule: "AB",
-        feeExecute: "AC",
-        verifierSchedule: "BC",
-        verifierExecute: "AB",
-        cancelledFeeSchedule: "BC",
-        cancel: "AB",
-      },
-    };
-    await addStep("safe-timelock-schedule-wait-execute-cancel", report.governance);
+      const cancelledFee = newFee === 502n ? 503n : 502n;
+      const cancelOperation = await scheduleOperation({
+        label: "fee-update-cancelled",
+        target: addresses.deepFamily,
+        data: deepFamily.interface.encodeFunctionData("updateEndorsementFee", [cancelledFee]),
+        salt: deriveGovernanceSalt(ethers, {
+          targetAddress: addresses.deepFamily,
+          calldata: deepFamily.interface.encodeFunctionData("updateEndorsementFee", [cancelledFee]),
+        }),
+        signers: [ownerB, ownerC],
+      });
+      const cancelData = timelock.interface.encodeFunctionData("cancel", [
+        cancelOperation.operationId,
+      ]);
+      await executeSafe("fee-update-cancel", timelockAddress, 0n, cancelData, [ownerA, ownerB]);
+      assertCondition(
+        !(await timelock.isOperation(cancelOperation.operationId)),
+        "Cancelled operation still exists",
+      );
+      assertCondition(
+        (await deepFamily.protocolEndorsementFeeBps()) === newFee,
+        "Cancelled operation changed the endorsement fee",
+      );
+      const cancelledExecuteData = timelock.interface.encodeFunctionData("execute", [
+        cancelOperation.target,
+        0n,
+        cancelOperation.data,
+        ZERO_HASH,
+        cancelOperation.salt,
+      ]);
+      const cancelledExecution = await signedExecution(timelockAddress, 0n, cancelledExecuteData, [
+        ownerA,
+        ownerC,
+      ]);
+      await expectSafeSimulationFailure({
+        provider,
+        from: runDeployer.address,
+        safeAddress,
+        data: cancelledExecution.encodedTransaction,
+        safeInterface,
+        label: "Execution of a cancelled Timelock operation through Safe",
+        expectedSafeRevertCodes: ["GS013"],
+      });
+      report.governance = {
+        feeBefore,
+        feeAfter: newFee,
+        executedOperationId: feeOperation.operationId,
+        verifierOperationId: verifierOperation.operationId,
+        verifierBefore: addresses.groth16VerifierAdapter,
+        verifierAfter: addresses.governedVerifierCandidate,
+        directPrivilegedCallsRejected: true,
+        cancelledOperationId: cancelOperation.operationId,
+        earlyExecutionRejected: true,
+        earlyExecutionSimulationBlock: feeOperation.scheduleBlockNumber,
+        scheduleBlockTimestamp: feeScheduleBlock.timestamp,
+        operationReadyTimestamp: feeReadyTimestamp,
+        cancelled: true,
+        cancelledExecutionRejected: true,
+        signaturePairs: {
+          feeSchedule: "AB",
+          feeExecute: "AC",
+          verifierSchedule: "BC",
+          verifierExecute: "AB",
+          cancelledFeeSchedule: "BC",
+          cancel: "AB",
+        },
+      };
+      activeProtocolFee = newFee;
+      activePersonVerifier = addresses.governedVerifierCandidate;
+      await addStep("safe-timelock-schedule-wait-execute-cancel", report.governance);
+    }
 
     currentStep = "real-zk-business";
     const person = {
@@ -1972,7 +2005,7 @@ export const main = async (chainProfile) => {
       "endorse-person-version",
       await deepFamily.connect(runDeployer).endorseVersion(personHash, 1),
     );
-    const protocolShare = (reward * newFee) / 10_000n;
+    const protocolShare = (reward * activeProtocolFee) / 10_000n;
     const treasuryAfter = await token.balanceOf(timelockAddress);
     assertCondition(protocolShare > 0n, "Calculated protocol share is zero");
     assertCondition(
@@ -2093,741 +2126,773 @@ export const main = async (chainProfile) => {
         personCommitment: { stableDuringGeneration: true, files: personProofArtifacts },
         disclosureBinding: { stableDuringGeneration: true, files: disclosureProofArtifacts },
       },
-      governedVerifierRouteUsedByRealProof:
-        (await deepFamily.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate,
+      activePersonVerifier,
+      activeProtocolFee,
+      activeVerifierRouteUsedByRealProof:
+        (await deepFamily.verifierRegistry(1, 0)) === activePersonVerifier,
     };
     await addStep("real-zk-endorsement-nft-story", report.business);
 
-    currentStep = "treasury";
-    const treasuryAmount = ethers.parseEther("1");
-    assertCondition(
-      (await token.balanceOf(timelockAddress)) >= treasuryAmount,
-      "Timelock treasury has less than 1 DEEP",
-    );
-    const treasuryRecipient = ownerA.address;
-    const recipientBefore = await token.balanceOf(treasuryRecipient);
-    const treasuryOperation = await scheduleOperation({
-      label: "treasury-transfer",
-      target: addresses.token,
-      data: token.interface.encodeFunctionData("transfer", [treasuryRecipient, treasuryAmount]),
-      salt: deriveTreasuryTransferSalt(ethers, {
-        timelockAddress,
-        tokenAddress: addresses.token,
+    let governanceLifecycleTerminalContext = null;
+    if (config.runGovernanceLifecycle) {
+      currentStep = "treasury";
+      const treasuryAmount = ethers.parseEther("1");
+      assertCondition(
+        (await token.balanceOf(timelockAddress)) >= treasuryAmount,
+        "Timelock treasury has less than 1 DEEP",
+      );
+      const treasuryRecipient = ownerA.address;
+      const recipientBefore = await token.balanceOf(treasuryRecipient);
+      const treasuryOperation = await scheduleOperation({
+        label: "treasury-transfer",
+        target: addresses.token,
+        data: token.interface.encodeFunctionData("transfer", [treasuryRecipient, treasuryAmount]),
+        salt: deriveTreasuryTransferSalt(ethers, {
+          timelockAddress,
+          tokenAddress: addresses.token,
+          recipient: treasuryRecipient,
+          rawAmount: treasuryAmount,
+        }),
+        signers: [ownerA, ownerC],
+      });
+      await waitForReady(timelock, treasuryOperation.operationId, config.minDelay);
+      await executeOperation("treasury-transfer", treasuryOperation, [ownerB, ownerC]);
+      const recipientAfter = await token.balanceOf(treasuryRecipient);
+      assertCondition(
+        recipientAfter - recipientBefore === treasuryAmount,
+        "Delayed treasury transfer balance delta mismatch",
+      );
+      report.treasury = {
+        operationId: treasuryOperation.operationId,
         recipient: treasuryRecipient,
-        rawAmount: treasuryAmount,
-      }),
-      signers: [ownerA, ownerC],
-    });
-    await waitForReady(timelock, treasuryOperation.operationId, config.minDelay);
-    await executeOperation("treasury-transfer", treasuryOperation, [ownerB, ownerC]);
-    const recipientAfter = await token.balanceOf(treasuryRecipient);
-    assertCondition(
-      recipientAfter - recipientBefore === treasuryAmount,
-      "Delayed treasury transfer balance delta mismatch",
-    );
-    report.treasury = {
-      operationId: treasuryOperation.operationId,
-      recipient: treasuryRecipient,
-      amount: treasuryAmount,
-      balanceBefore: treasuryBefore,
-      balanceAfterEndorsement: treasuryAfter,
-      signaturePairs: { schedule: "AC", execute: "BC" },
-    };
-    await addStep("delayed-deep-treasury-transfer", report.treasury);
+        amount: treasuryAmount,
+        balanceBefore: treasuryBefore,
+        balanceAfterEndorsement: treasuryAfter,
+        signaturePairs: { schedule: "AC", execute: "BC" },
+      };
+      await addStep("delayed-deep-treasury-transfer", report.treasury);
 
-    currentStep = "upgrade-candidate";
-    await assertImplementationStorageSafe(hre, "DeepFamily", "DeepFamilyV2Mock");
-    const v2 = await deploy("DeepFamilyV2Mock", runDeployer, [], {
-      libraries: {
-        PoseidonT5: addresses.poseidonT5,
-        AdultAgeGate: addresses.adultAgeGate,
-      },
-    });
-    const v2Address = await v2.getAddress();
-    await assertImplementationMatchesArtifact({
-      connection,
-      ethers,
-      hre,
-      contractName: "DeepFamilyV2Mock",
-      implementation: v2Address,
-      spec: {
-        needsLibraries: true,
-        libraryAddresses: {
+      currentStep = "upgrade-candidate";
+      await assertImplementationStorageSafe(hre, "DeepFamily", "DeepFamilyV2Mock");
+      const v2 = await deploy("DeepFamilyV2Mock", runDeployer, [], {
+        libraries: {
           PoseidonT5: addresses.poseidonT5,
           AdultAgeGate: addresses.adultAgeGate,
         },
-      },
-    });
-    report.addresses.deepFamilyV2 = v2Address;
-    await saveReport();
-
-    const candidateVerificationEntries = [
-      await verificationEntry(hre.artifacts, "DeepFamilyV2Mock", v2Address, [], {
-        PoseidonT5: addresses.poseidonT5,
-        AdultAgeGate: addresses.adultAgeGate,
-      }),
-    ];
-    if (config.verify) {
-      const verificationFailures = await verifyEntries(
-        candidateVerificationEntries,
-        report,
-        saveReport,
-        "upgrade-candidate",
-      );
-      if (verificationFailures.length > 0) {
-        currentStep = "explorer-verification";
-        throw new Error(
-          `${verificationFailures.length} ${ACCEPTANCE_PROFILE.explorerName} verification(s) ` +
-            "failed before upgrade scheduling; see report",
-        );
-      }
-    }
-
-    currentStep = "timelocked-upgrade";
-    await expectRevert(
-      () => deepFamily.connect(runDeployer).upgradeToAndCall.staticCall(v2Address, "0x"),
-      "Direct deployer UUPS upgrade",
-      {
-        expectedErrorNames: ["OwnableUnauthorizedAccount"],
-        expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
-      },
-    );
-    const implementationBefore = await implementationAddress(
-      ethers,
-      provider,
-      addresses.deepFamily,
-    );
-    const upgradeOperation = await scheduleOperation({
-      label: "uups-upgrade",
-      target: addresses.deepFamily,
-      data: deepFamily.interface.encodeFunctionData("upgradeToAndCall", [v2Address, "0x"]),
-      salt: deriveUpgradeSalt(ethers, {
-        target: addresses.deepFamily,
-        implementation: v2Address,
-        initData: "0x",
-      }),
-      signers: [ownerA, ownerB],
-    });
-    await waitForReady(timelock, upgradeOperation.operationId, config.minDelay);
-    await executeOperation("uups-upgrade", upgradeOperation, [ownerA, ownerC]);
-    const implementationAfter = await implementationAddress(ethers, provider, addresses.deepFamily);
-    assertCondition(
-      implementationAfter === ethers.getAddress(v2Address),
-      "ERC-1967 implementation slot was not updated",
-    );
-    const deepFamilyV2 = await ethers.getContractAt(
-      "DeepFamilyV2Mock",
-      addresses.deepFamily,
-      runDeployer,
-    );
-    assertCondition((await deepFamilyV2.version()) === "V2", "Upgraded proxy does not expose V2");
-    assertCondition(
-      (await deepFamilyV2.owner()) === timelockAddress,
-      "Upgrade changed DeepFamily owner",
-    );
-    assertCondition(
-      (await deepFamilyV2.personVersionsCount(personHash)) === 1n &&
-        (await deepFamilyV2.versionToTokenId(personHash, 1)) === tokenId,
-      "Upgrade did not preserve person/NFT state",
-    );
-    assertCondition(
-      (await deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT()) === addresses.token &&
-        (await token.deepFamilyContract()) === addresses.deepFamily &&
-        (await token.owner()) === ethers.ZeroAddress,
-      "Upgrade changed Token wiring",
-    );
-    assertCondition(
-      (await deepFamilyV2.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate &&
-        (await deepFamilyV2.verifierRegistry(1, 1)) === addresses.groth16VerifierAdapter,
-      "Upgrade changed verifier routes",
-    );
-    assertCondition(
-      (await deepFamilyV2.protocolEndorsementFeeBps()) === newFee,
-      "Upgrade changed the governed endorsement fee",
-    );
-    assertCondition(
-      (await deepFamilyV2.endorsedVersionIndex(personHash, runDeployer.address)) === 0n,
-      "Upgrade changed the cancelled endorsement state",
-    );
-    const storyMetadataAfterUpgrade = await deepFamilyReader.getStoryMetadata(tokenId);
-    assertCondition(
-      storyMetadataAfterUpgrade.isSealed &&
-        storyMetadataAfterUpgrade.totalChunks === storyMetadata.totalChunks &&
-        storyMetadataAfterUpgrade.fullStoryHash === storyMetadata.fullStoryHash,
-      "Upgrade changed the sealed story state",
-    );
-    await recordTx("v2-set-new-value", await deepFamilyV2.setNewValue(42));
-    assertCondition((await deepFamilyV2.newValue()) === 42n, "V2 appended storage is not writable");
-    report.upgrade = {
-      storageLayoutSafe: true,
-      candidateRuntimeArtifactMatch: true,
-      operationId: upgradeOperation.operationId,
-      implementationBefore,
-      implementationAfter,
-      version: "V2",
-      ownerPreserved: true,
-      businessStatePreserved: true,
-      keyWiringPreserved: true,
-      governedFeePreserved: true,
-      sealedStoryPreserved: true,
-      newValue: 42,
-      signaturePairs: { schedule: "AB", execute: "AC" },
-    };
-    await addStep("storage-safe-timelocked-uups-upgrade", report.upgrade);
-
-    currentStep = "governance-lifecycle-migrations";
-    const replacementSafeSaltNonce = BigInt(
-      ethers.id(`deepfamily-e2e:${config.runId}:replacement-safe`),
-    ).toString();
-    const preparedReplacementSafe = await prepareCanonicalSafeDeployment({
-      provider,
-      chainId: EXPECTED_CHAIN_ID,
-      owners: replacementSafeOwners,
-      saltNonce: replacementSafeSaltNonce,
-    });
-    assertCondition(
-      preparedReplacementSafe.safeAddress !== safeAddress,
-      "Replacement Safe address equals the primary Safe",
-    );
-    assertCondition(
-      (await provider.getCode(preparedReplacementSafe.safeAddress)) === "0x",
-      `Predicted replacement Safe ${preparedReplacementSafe.safeAddress} is already deployed`,
-    );
-    await recordTx(
-      "deploy-replacement-canonical-governance-safe",
-      await runDeployer.sendTransaction(preparedReplacementSafe.deploymentTransaction),
-    );
-    const replacementSafeAddress = preparedReplacementSafe.safeAddress;
-    const replacementSafeProfile = await assertCanonicalSafeProfile({
-      provider,
-      chainId: EXPECTED_CHAIN_ID,
-      safeAddress: replacementSafeAddress,
-      expectedOwners: replacementSafeOwners,
-      expectedNonce: 0n,
-    });
-    const replacementSafeReader = await connectCanonicalSafe({
-      provider,
-      chainId: EXPECTED_CHAIN_ID,
-      safeAddress: replacementSafeAddress,
-    });
-    const replacementSafeContext = {
-      label: "replacement",
-      safeAddress: replacementSafeAddress,
-      safeReader: replacementSafeReader,
-    };
-    report.addresses.replacementGovernanceSafe = replacementSafeAddress;
-    report.safeInfrastructure.replacement = {
-      saltNonce: replacementSafeSaltNonce,
-      address: replacementSafeAddress,
-      singleton: replacementSafeProfile.singleton,
-      proxyCodeHash: replacementSafeProfile.proxyCodeHash,
-      canonicalProxyCodeHash: replacementSafeProfile.canonicalProxyCodeHash,
-      proxyRuntimeMatched:
-        replacementSafeProfile.proxyCodeHash === replacementSafeProfile.canonicalProxyCodeHash,
-      owners: replacementSafeProfile.owners,
-      threshold: replacementSafeProfile.threshold,
-      nonce: replacementSafeProfile.nonce,
-      modules: replacementSafeProfile.modules,
-      guard: replacementSafeProfile.guard,
-      fallbackHandler: replacementSafeProfile.fallbackHandler,
-    };
-    await saveReport();
-    await expectSafeSimulationFailure({
-      provider,
-      from: runDeployer.address,
-      safeAddress: replacementSafeAddress,
-      data: abExecution.encodedTransaction,
-      safeInterface,
-      label: "Primary Safe owner signatures against replacement Safe",
-      expectedSafeRevertCodes: ["GS026"],
-    });
-    assertCondition(
-      BigInt(await replacementSafeReader.getNonce()) === 0n,
-      "Rejected primary-owner signatures changed the replacement Safe nonce",
-    );
-    report.safePolicy.primaryOwnerSignaturesRejectedByReplacementSafe = true;
-
-    const replacementTimelockConfig = await resolveTimelockDeploymentConfig({
-      connection,
-      ethers,
-      provider,
-      deployerAddress: runDeployer.address,
-      env: {
-        ...process.env,
-        MIN_DELAY: String(config.minDelay),
-        GOVERNANCE_MULTISIG: replacementSafeAddress,
-      },
-      inspectMultisig: ({ provider: inspectionProvider, address }) =>
-        assertCanonicalSafeProfile({
-          provider: inspectionProvider,
-          chainId: EXPECTED_CHAIN_ID,
-          safeAddress: address,
-          expectedOwners: replacementSafeOwners,
-        }),
-    });
-    const ReplacementTimelockFactory = await ethers.getContractFactory(
-      "GovernanceTimelock",
-      runDeployer,
-    );
-    const replacementTimelock = await ReplacementTimelockFactory.deploy(
-      replacementTimelockConfig.minDelay,
-      replacementTimelockConfig.governanceMultisig,
-    );
-    const replacementTimelockDeploymentTx = replacementTimelock.deploymentTransaction();
-    assertCondition(
-      replacementTimelockDeploymentTx,
-      "Replacement GovernanceTimelock deployment transaction is unavailable",
-    );
-    await recordTx("deploy-replacement-GovernanceTimelock", replacementTimelockDeploymentTx);
-    const replacementTimelockAddress = await replacementTimelock.getAddress();
-    report.addresses.replacementTimelock = replacementTimelockAddress;
-
-    if (config.verify) {
-      const replacementVerificationFailures = await verifyEntries(
-        [
-          {
-            ...(await verificationEntry(
-              hre.artifacts,
-              "GovernanceTimelock",
-              replacementTimelockAddress,
-              [config.minDelay, replacementSafeAddress],
-            )),
-            label: "ReplacementGovernanceTimelock",
-          },
-        ],
-        report,
-        saveReport,
-        "governance-replacements",
-      );
-      if (replacementVerificationFailures.length > 0) {
-        throw new Error(
-          `${replacementVerificationFailures.length} governance replacement verification(s) failed; see report`,
-        );
-      }
-    }
-
-    // A newly deployed contract can briefly be visible to one public-RPC backend while another
-    // backend still returns `0x` for the same eth_call. Ethers reports that transient response as
-    // "could not decode result data". Keep every migration-planning read bounded and retryable;
-    // these operations are view-only, so retrying cannot duplicate a governance transaction.
-    const migrationRead = (label, operation) =>
-      retryBounded(operation, { attempts: 4, timeoutMs: 60_000, label });
-    const originalRoleState = await migrationRead("pre-migration primary Timelock roles", () =>
-      readExactTimelockRoleState({
+      });
+      const v2Address = await v2.getAddress();
+      await assertImplementationMatchesArtifact({
+        connection,
         ethers,
-        timelock,
-        timelockAddress,
-      }),
-    );
-    const replacementRoleState = await migrationRead(
-      "pre-migration replacement Timelock roles",
-      () =>
+        hre,
+        contractName: "DeepFamilyV2Mock",
+        implementation: v2Address,
+        spec: {
+          needsLibraries: true,
+          libraryAddresses: {
+            PoseidonT5: addresses.poseidonT5,
+            AdultAgeGate: addresses.adultAgeGate,
+          },
+        },
+      });
+      report.addresses.deepFamilyV2 = v2Address;
+      await saveReport();
+
+      const candidateVerificationEntries = [
+        await verificationEntry(hre.artifacts, "DeepFamilyV2Mock", v2Address, [], {
+          PoseidonT5: addresses.poseidonT5,
+          AdultAgeGate: addresses.adultAgeGate,
+        }),
+      ];
+      if (config.verify) {
+        const verificationFailures = await verifyEntries(
+          candidateVerificationEntries,
+          report,
+          saveReport,
+          "upgrade-candidate",
+        );
+        if (verificationFailures.length > 0) {
+          currentStep = "explorer-verification";
+          throw new Error(
+            `${verificationFailures.length} ${ACCEPTANCE_PROFILE.explorerName} verification(s) ` +
+              "failed before upgrade scheduling; see report",
+          );
+        }
+      }
+
+      currentStep = "timelocked-upgrade";
+      await expectRevert(
+        () => deepFamily.connect(runDeployer).upgradeToAndCall.staticCall(v2Address, "0x"),
+        "Direct deployer UUPS upgrade",
+        {
+          expectedErrorNames: ["OwnableUnauthorizedAccount"],
+          expectedSelectors: [OWNABLE_UNAUTHORIZED_SELECTOR],
+        },
+      );
+      const implementationBefore = await implementationAddress(
+        ethers,
+        provider,
+        addresses.deepFamily,
+      );
+      const upgradeOperation = await scheduleOperation({
+        label: "uups-upgrade",
+        target: addresses.deepFamily,
+        data: deepFamily.interface.encodeFunctionData("upgradeToAndCall", [v2Address, "0x"]),
+        salt: deriveUpgradeSalt(ethers, {
+          target: addresses.deepFamily,
+          implementation: v2Address,
+          initData: "0x",
+        }),
+        signers: [ownerA, ownerB],
+      });
+      await waitForReady(timelock, upgradeOperation.operationId, config.minDelay);
+      await executeOperation("uups-upgrade", upgradeOperation, [ownerA, ownerC]);
+      const implementationAfter = await implementationAddress(
+        ethers,
+        provider,
+        addresses.deepFamily,
+      );
+      assertCondition(
+        implementationAfter === ethers.getAddress(v2Address),
+        "ERC-1967 implementation slot was not updated",
+      );
+      const deepFamilyV2 = await ethers.getContractAt(
+        "DeepFamilyV2Mock",
+        addresses.deepFamily,
+        runDeployer,
+      );
+      assertCondition((await deepFamilyV2.version()) === "V2", "Upgraded proxy does not expose V2");
+      assertCondition(
+        (await deepFamilyV2.owner()) === timelockAddress,
+        "Upgrade changed DeepFamily owner",
+      );
+      assertCondition(
+        (await deepFamilyV2.personVersionsCount(personHash)) === 1n &&
+          (await deepFamilyV2.versionToTokenId(personHash, 1)) === tokenId,
+        "Upgrade did not preserve person/NFT state",
+      );
+      assertCondition(
+        (await deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT()) === addresses.token &&
+          (await token.deepFamilyContract()) === addresses.deepFamily &&
+          (await token.owner()) === ethers.ZeroAddress,
+        "Upgrade changed Token wiring",
+      );
+      assertCondition(
+        (await deepFamilyV2.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate &&
+          (await deepFamilyV2.verifierRegistry(1, 1)) === addresses.groth16VerifierAdapter,
+        "Upgrade changed verifier routes",
+      );
+      assertCondition(
+        (await deepFamilyV2.protocolEndorsementFeeBps()) === activeProtocolFee,
+        "Upgrade changed the governed endorsement fee",
+      );
+      assertCondition(
+        (await deepFamilyV2.endorsedVersionIndex(personHash, runDeployer.address)) === 0n,
+        "Upgrade changed the cancelled endorsement state",
+      );
+      const storyMetadataAfterUpgrade = await deepFamilyReader.getStoryMetadata(tokenId);
+      assertCondition(
+        storyMetadataAfterUpgrade.isSealed &&
+          storyMetadataAfterUpgrade.totalChunks === storyMetadata.totalChunks &&
+          storyMetadataAfterUpgrade.fullStoryHash === storyMetadata.fullStoryHash,
+        "Upgrade changed the sealed story state",
+      );
+      await recordTx("v2-set-new-value", await deepFamilyV2.setNewValue(42));
+      assertCondition(
+        (await deepFamilyV2.newValue()) === 42n,
+        "V2 appended storage is not writable",
+      );
+      report.upgrade = {
+        storageLayoutSafe: true,
+        candidateRuntimeArtifactMatch: true,
+        operationId: upgradeOperation.operationId,
+        implementationBefore,
+        implementationAfter,
+        version: "V2",
+        ownerPreserved: true,
+        businessStatePreserved: true,
+        keyWiringPreserved: true,
+        governedFeePreserved: true,
+        sealedStoryPreserved: true,
+        newValue: 42,
+        signaturePairs: { schedule: "AB", execute: "AC" },
+      };
+      await addStep("storage-safe-timelocked-uups-upgrade", report.upgrade);
+
+      currentStep = "governance-lifecycle-migrations";
+      const replacementSafeSaltNonce = BigInt(
+        ethers.id(`deepfamily-e2e:${config.runId}:replacement-safe`),
+      ).toString();
+      const preparedReplacementSafe = await prepareCanonicalSafeDeployment({
+        provider,
+        chainId: EXPECTED_CHAIN_ID,
+        owners: replacementSafeOwners,
+        saltNonce: replacementSafeSaltNonce,
+      });
+      assertCondition(
+        preparedReplacementSafe.safeAddress !== safeAddress,
+        "Replacement Safe address equals the primary Safe",
+      );
+      assertCondition(
+        (await provider.getCode(preparedReplacementSafe.safeAddress)) === "0x",
+        `Predicted replacement Safe ${preparedReplacementSafe.safeAddress} is already deployed`,
+      );
+      await recordTx(
+        "deploy-replacement-canonical-governance-safe",
+        await runDeployer.sendTransaction(preparedReplacementSafe.deploymentTransaction),
+      );
+      const replacementSafeAddress = preparedReplacementSafe.safeAddress;
+      const replacementSafeProfile = await assertCanonicalSafeProfile({
+        provider,
+        chainId: EXPECTED_CHAIN_ID,
+        safeAddress: replacementSafeAddress,
+        expectedOwners: replacementSafeOwners,
+        expectedNonce: 0n,
+      });
+      const replacementSafeReader = await connectCanonicalSafe({
+        provider,
+        chainId: EXPECTED_CHAIN_ID,
+        safeAddress: replacementSafeAddress,
+      });
+      const replacementSafeContext = {
+        label: "replacement",
+        safeAddress: replacementSafeAddress,
+        safeReader: replacementSafeReader,
+      };
+      report.addresses.replacementGovernanceSafe = replacementSafeAddress;
+      report.safeInfrastructure.replacement = {
+        saltNonce: replacementSafeSaltNonce,
+        address: replacementSafeAddress,
+        singleton: replacementSafeProfile.singleton,
+        proxyCodeHash: replacementSafeProfile.proxyCodeHash,
+        canonicalProxyCodeHash: replacementSafeProfile.canonicalProxyCodeHash,
+        proxyRuntimeMatched:
+          replacementSafeProfile.proxyCodeHash === replacementSafeProfile.canonicalProxyCodeHash,
+        owners: replacementSafeProfile.owners,
+        threshold: replacementSafeProfile.threshold,
+        nonce: replacementSafeProfile.nonce,
+        modules: replacementSafeProfile.modules,
+        guard: replacementSafeProfile.guard,
+        fallbackHandler: replacementSafeProfile.fallbackHandler,
+      };
+      await saveReport();
+      await expectSafeSimulationFailure({
+        provider,
+        from: runDeployer.address,
+        safeAddress: replacementSafeAddress,
+        data: abExecution.encodedTransaction,
+        safeInterface,
+        label: "Primary Safe owner signatures against replacement Safe",
+        expectedSafeRevertCodes: ["GS026"],
+      });
+      assertCondition(
+        BigInt(await replacementSafeReader.getNonce()) === 0n,
+        "Rejected primary-owner signatures changed the replacement Safe nonce",
+      );
+      report.safePolicy.primaryOwnerSignaturesRejectedByReplacementSafe = true;
+
+      const replacementTimelockConfig = await resolveTimelockDeploymentConfig({
+        connection,
+        ethers,
+        provider,
+        deployerAddress: runDeployer.address,
+        env: {
+          ...process.env,
+          MIN_DELAY: String(config.minDelay),
+          GOVERNANCE_MULTISIG: replacementSafeAddress,
+        },
+        inspectMultisig: ({ provider: inspectionProvider, address }) =>
+          assertCanonicalSafeProfile({
+            provider: inspectionProvider,
+            chainId: EXPECTED_CHAIN_ID,
+            safeAddress: address,
+            expectedOwners: replacementSafeOwners,
+          }),
+      });
+      const ReplacementTimelockFactory = await ethers.getContractFactory(
+        "GovernanceTimelock",
+        runDeployer,
+      );
+      const replacementTimelock = await ReplacementTimelockFactory.deploy(
+        replacementTimelockConfig.minDelay,
+        replacementTimelockConfig.governanceMultisig,
+      );
+      const replacementTimelockDeploymentTx = replacementTimelock.deploymentTransaction();
+      assertCondition(
+        replacementTimelockDeploymentTx,
+        "Replacement GovernanceTimelock deployment transaction is unavailable",
+      );
+      await recordTx("deploy-replacement-GovernanceTimelock", replacementTimelockDeploymentTx);
+      const replacementTimelockAddress = await replacementTimelock.getAddress();
+      report.addresses.replacementTimelock = replacementTimelockAddress;
+
+      if (config.verify) {
+        const replacementVerificationFailures = await verifyEntries(
+          [
+            {
+              ...(await verificationEntry(
+                hre.artifacts,
+                "GovernanceTimelock",
+                replacementTimelockAddress,
+                [config.minDelay, replacementSafeAddress],
+              )),
+              label: "ReplacementGovernanceTimelock",
+            },
+          ],
+          report,
+          saveReport,
+          "governance-replacements",
+        );
+        if (replacementVerificationFailures.length > 0) {
+          throw new Error(
+            `${replacementVerificationFailures.length} governance replacement verification(s) failed; see report`,
+          );
+        }
+      }
+
+      // A newly deployed contract can briefly be visible to one public-RPC backend while another
+      // backend still returns `0x` for the same eth_call. Ethers reports that transient response as
+      // "could not decode result data". Keep every migration-planning read bounded and retryable;
+      // these operations are view-only, so retrying cannot duplicate a governance transaction.
+      const migrationRead = (label, operation) =>
+        retryBounded(operation, { attempts: 4, timeoutMs: 60_000, label });
+      const originalRoleState = await migrationRead("pre-migration primary Timelock roles", () =>
         readExactTimelockRoleState({
           ethers,
-          timelock: replacementTimelock,
-          timelockAddress: replacementTimelockAddress,
+          timelock,
+          timelockAddress,
         }),
-    );
-    assertCondition(
-      originalRoleState.currentMultisig === safeAddress,
-      "Primary Timelock role owner changed before migration",
-    );
-    assertCondition(
-      replacementRoleState.currentMultisig === replacementSafeAddress,
-      "Replacement Timelock role owner mismatch",
-    );
+      );
+      const replacementRoleState = await migrationRead(
+        "pre-migration replacement Timelock roles",
+        () =>
+          readExactTimelockRoleState({
+            ethers,
+            timelock: replacementTimelock,
+            timelockAddress: replacementTimelockAddress,
+          }),
+      );
+      assertCondition(
+        originalRoleState.currentMultisig === safeAddress,
+        "Primary Timelock role owner changed before migration",
+      );
+      assertCondition(
+        replacementRoleState.currentMultisig === replacementSafeAddress,
+        "Replacement Timelock role owner mismatch",
+      );
 
-    const multisigMigration = await migrationRead("build governance Safe migration operation", () =>
-      buildMultisigMigrationOperation({
-        ethers,
-        timelock,
+      const multisigMigration = await migrationRead(
+        "build governance Safe migration operation",
+        () =>
+          buildMultisigMigrationOperation({
+            ethers,
+            timelock,
+            timelockAddress,
+            roles: originalRoleState.roles,
+            oldMultisig: safeAddress,
+            newMultisig: replacementSafeAddress,
+          }),
+      );
+      const updatedRetiredTimelockDelay = BigInt(config.minDelay) + 1n;
+      const delayUpdatePayload = timelock.interface.encodeFunctionData("updateDelay", [
+        updatedRetiredTimelockDelay,
+      ]);
+      const delayUpdateSalt = deriveDelayUpdateSalt(ethers, {
         timelockAddress,
-        roles: originalRoleState.roles,
-        oldMultisig: safeAddress,
-        newMultisig: replacementSafeAddress,
-      }),
-    );
-    const updatedRetiredTimelockDelay = BigInt(config.minDelay) + 1n;
-    const delayUpdatePayload = timelock.interface.encodeFunctionData("updateDelay", [
-      updatedRetiredTimelockDelay,
-    ]);
-    const delayUpdateSalt = deriveDelayUpdateSalt(ethers, {
-      timelockAddress,
-      newDelay: updatedRetiredTimelockDelay,
-    });
-    const delayUpdateOperationId = await migrationRead(
-      "hash retired Timelock delay update operation",
-      () =>
-        timelock.hashOperation(timelockAddress, 0n, delayUpdatePayload, ZERO_HASH, delayUpdateSalt),
-    );
-    const ownerMigration = await migrationRead("build Timelock owner migration operation", () =>
-      buildOwnerMigrationOperation({
-        ethers,
-        oldTimelock: timelock,
-        oldTimelockAddress: timelockAddress,
-        deepFamily: deepFamilyV2,
-        deepFamilyAddress: addresses.deepFamily,
-        tokenAddress: addresses.token,
-        newTimelockAddress: replacementTimelockAddress,
-      }),
-    );
-    const postMigrationFee = newFee === 504n ? 505n : newFee + 1n;
-    const postMigrationFeeData = deepFamilyV2.interface.encodeFunctionData("updateEndorsementFee", [
-      postMigrationFee,
-    ]);
-    const postMigrationFeeSalt = deriveGovernanceSalt(ethers, {
-      targetAddress: addresses.deepFamily,
-      calldata: postMigrationFeeData,
-    });
-    const postMigrationFeeOperationId = await migrationRead(
-      "hash replacement Timelock fee operation",
-      () =>
-        replacementTimelock.hashOperation(
-          addresses.deepFamily,
+        newDelay: updatedRetiredTimelockDelay,
+      });
+      const delayUpdateOperationId = await migrationRead(
+        "hash retired Timelock delay update operation",
+        () =>
+          timelock.hashOperation(
+            timelockAddress,
+            0n,
+            delayUpdatePayload,
+            ZERO_HASH,
+            delayUpdateSalt,
+          ),
+      );
+      const ownerMigration = await migrationRead("build Timelock owner migration operation", () =>
+        buildOwnerMigrationOperation({
+          ethers,
+          oldTimelock: timelock,
+          oldTimelockAddress: timelockAddress,
+          deepFamily: deepFamilyV2,
+          deepFamilyAddress: addresses.deepFamily,
+          tokenAddress: addresses.token,
+          newTimelockAddress: replacementTimelockAddress,
+        }),
+      );
+      const postMigrationFee = activeProtocolFee === 504n ? 505n : activeProtocolFee + 1n;
+      const postMigrationFeeData = deepFamilyV2.interface.encodeFunctionData(
+        "updateEndorsementFee",
+        [postMigrationFee],
+      );
+      const postMigrationFeeSalt = deriveGovernanceSalt(ethers, {
+        targetAddress: addresses.deepFamily,
+        calldata: postMigrationFeeData,
+      });
+      const postMigrationFeeOperationId = await migrationRead(
+        "hash replacement Timelock fee operation",
+        () =>
+          replacementTimelock.hashOperation(
+            addresses.deepFamily,
+            0n,
+            postMigrationFeeData,
+            ZERO_HASH,
+            postMigrationFeeSalt,
+          ),
+      );
+
+      const scheduleBatchThroughSafe = async ({
+        label,
+        targetTimelock,
+        targetTimelockAddress,
+        operation,
+        signers,
+        safeContext,
+      }) => {
+        const calldata = targetTimelock.interface.encodeFunctionData("scheduleBatch", [
+          operation.targets,
+          operation.values,
+          operation.payloads,
+          operation.predecessor,
+          operation.salt,
+          config.minDelay,
+        ]);
+        await executeSafe(
+          `${label}-schedule`,
+          targetTimelockAddress,
           0n,
-          postMigrationFeeData,
+          calldata,
+          signers,
+          safeContext,
+        );
+        assertCondition(
+          await migrationRead(`${label} pending-state read`, () =>
+            targetTimelock.isOperationPending(operation.operationId),
+          ),
+          `${label} is not pending`,
+        );
+      };
+      const executeBatchThroughSafe = async ({
+        label,
+        targetTimelock,
+        targetTimelockAddress,
+        operation,
+        signers,
+        safeContext,
+      }) => {
+        const calldata = targetTimelock.interface.encodeFunctionData("executeBatch", [
+          operation.targets,
+          operation.values,
+          operation.payloads,
+          operation.predecessor,
+          operation.salt,
+        ]);
+        await executeSafe(
+          `${label}-execute`,
+          targetTimelockAddress,
+          0n,
+          calldata,
+          signers,
+          safeContext,
+        );
+        assertCondition(
+          await migrationRead(`${label} done-state read`, () =>
+            targetTimelock.isOperationDone(operation.operationId),
+          ),
+          `${label} is not done`,
+        );
+      };
+      const scheduleSingleThroughSafe = async ({
+        label,
+        targetTimelock,
+        targetTimelockAddress,
+        target,
+        data,
+        salt,
+        operationId,
+        signers,
+        safeContext,
+      }) => {
+        const calldata = targetTimelock.interface.encodeFunctionData("schedule", [
+          target,
+          0n,
+          data,
           ZERO_HASH,
-          postMigrationFeeSalt,
-        ),
-    );
+          salt,
+          config.minDelay,
+        ]);
+        await executeSafe(
+          `${label}-schedule`,
+          targetTimelockAddress,
+          0n,
+          calldata,
+          signers,
+          safeContext,
+        );
+        assertCondition(
+          await migrationRead(`${label} pending-state read`, () =>
+            targetTimelock.isOperationPending(operationId),
+          ),
+          `${label} is not pending`,
+        );
+      };
+      const executeSingleThroughSafe = async ({
+        label,
+        targetTimelock,
+        targetTimelockAddress,
+        target,
+        data,
+        salt,
+        operationId,
+        signers,
+        safeContext,
+      }) => {
+        const calldata = targetTimelock.interface.encodeFunctionData("execute", [
+          target,
+          0n,
+          data,
+          ZERO_HASH,
+          salt,
+        ]);
+        await executeSafe(
+          `${label}-execute`,
+          targetTimelockAddress,
+          0n,
+          calldata,
+          signers,
+          safeContext,
+        );
+        assertCondition(
+          await migrationRead(`${label} done-state read`, () =>
+            targetTimelock.isOperationDone(operationId),
+          ),
+          `${label} is not done`,
+        );
+      };
 
-    const scheduleBatchThroughSafe = async ({
-      label,
-      targetTimelock,
-      targetTimelockAddress,
-      operation,
-      signers,
-      safeContext,
-    }) => {
-      const calldata = targetTimelock.interface.encodeFunctionData("scheduleBatch", [
-        operation.targets,
-        operation.values,
-        operation.payloads,
-        operation.predecessor,
-        operation.salt,
+      await scheduleBatchThroughSafe({
+        label: "governance-safe-migration",
+        targetTimelock: timelock,
+        targetTimelockAddress: timelockAddress,
+        operation: multisigMigration,
+        signers: [ownerA, ownerB],
+        safeContext: primarySafeContext,
+      });
+      await scheduleSingleThroughSafe({
+        label: "timelock-delay-update",
+        targetTimelock: timelock,
+        targetTimelockAddress: timelockAddress,
+        target: timelockAddress,
+        data: delayUpdatePayload,
+        salt: delayUpdateSalt,
+        operationId: delayUpdateOperationId,
+        signers: [ownerA, ownerC],
+        safeContext: primarySafeContext,
+      });
+      await scheduleBatchThroughSafe({
+        label: "timelock-owner-treasury-migration",
+        targetTimelock: timelock,
+        targetTimelockAddress: timelockAddress,
+        operation: ownerMigration,
+        signers: [ownerB, ownerC],
+        safeContext: primarySafeContext,
+      });
+      await scheduleSingleThroughSafe({
+        label: "post-migration-fee",
+        targetTimelock: replacementTimelock,
+        targetTimelockAddress: replacementTimelockAddress,
+        target: addresses.deepFamily,
+        data: postMigrationFeeData,
+        salt: postMigrationFeeSalt,
+        operationId: postMigrationFeeOperationId,
+        signers: [ownerD, ownerE],
+        safeContext: replacementSafeContext,
+      });
+
+      const oldTreasuryAtOwnerMigrationSchedule = await token.balanceOf(timelockAddress);
+      await recordTx(
+        "migration-window-endorsement-approve",
+        await token.connect(runDeployer).approve(addresses.deepFamily, reward),
+      );
+      await recordTx(
+        "migration-window-endorsement",
+        await deepFamilyV2.connect(runDeployer).endorseVersion(personHash, 1),
+      );
+      const oldTreasuryBeforeOwnerMigration = await token.balanceOf(timelockAddress);
+      assertCondition(
+        oldTreasuryBeforeOwnerMigration - oldTreasuryAtOwnerMigrationSchedule === protocolShare,
+        "Protocol fee received during the owner-migration delay window is incorrect",
+      );
+      await recordTx(
+        "migration-window-cancel-endorsement",
+        await deepFamilyV2.connect(runDeployer).cancelEndorsement(personHash),
+      );
+
+      await Promise.all([
+        waitForReady(timelock, multisigMigration.operationId, config.minDelay),
+        waitForReady(timelock, delayUpdateOperationId, config.minDelay),
+        waitForReady(timelock, ownerMigration.operationId, config.minDelay),
+        waitForReady(replacementTimelock, postMigrationFeeOperationId, config.minDelay),
+      ]);
+
+      // Keep the same preconditions and order enforced by timelock-migrate-owner: the old
+      // Timelock still has its original delay and the original Safe still holds every operational
+      // role when ownership and the complete execution-time treasury balance migrate atomically.
+      const replacementTreasuryBeforeOwnerMigration = await token.balanceOf(
+        replacementTimelockAddress,
+      );
+      await executeBatchThroughSafe({
+        label: "timelock-owner-treasury-migration",
+        targetTimelock: timelock,
+        targetTimelockAddress: timelockAddress,
+        operation: ownerMigration,
+        signers: [ownerB, ownerC],
+        safeContext: primarySafeContext,
+      });
+      const oldTreasuryAfterOwnerMigration = await token.balanceOf(timelockAddress);
+      const replacementTreasuryAfterOwnerMigration = await token.balanceOf(
+        replacementTimelockAddress,
+      );
+      assertCondition(
+        (await deepFamilyV2.owner()) === replacementTimelockAddress,
+        "DeepFamily ownership did not migrate to the replacement Timelock",
+      );
+      assertCondition(oldTreasuryAfterOwnerMigration === 0n, "Retired Timelock still holds DEEP");
+      assertCondition(
+        replacementTreasuryAfterOwnerMigration - replacementTreasuryBeforeOwnerMigration ===
+          oldTreasuryBeforeOwnerMigration,
+        "Replacement Timelock did not receive the complete execution-time DEEP balance",
+      );
+
+      await executeBatchThroughSafe({
+        label: "governance-safe-migration",
+        targetTimelock: timelock,
+        targetTimelockAddress: timelockAddress,
+        operation: multisigMigration,
+        signers: [ownerA, ownerB],
+        safeContext: primarySafeContext,
+      });
+      const migratedRoleState = await migrationRead("post-migration primary Timelock roles", () =>
+        readExactTimelockRoleState({
+          ethers,
+          timelock,
+          timelockAddress,
+        }),
+      );
+      assertCondition(
+        migratedRoleState.currentMultisig === replacementSafeAddress,
+        "Primary Timelock roles did not atomically migrate to the replacement Safe",
+      );
+
+      const unauthorizedOldSafeSalt = ethers.id(
+        `deepfamily-e2e:${config.runId}:old-safe-must-fail`,
+      );
+      const unauthorizedOldSafeData = timelock.interface.encodeFunctionData("schedule", [
+        addresses.deepFamily,
+        0n,
+        governedFeeData,
+        ZERO_HASH,
+        unauthorizedOldSafeSalt,
         config.minDelay,
       ]);
-      await executeSafe(
-        `${label}-schedule`,
-        targetTimelockAddress,
-        0n,
-        calldata,
-        signers,
-        safeContext,
-      );
-      assertCondition(
-        await migrationRead(`${label} pending-state read`, () =>
-          targetTimelock.isOperationPending(operation.operationId),
-        ),
-        `${label} is not pending`,
-      );
-    };
-    const executeBatchThroughSafe = async ({
-      label,
-      targetTimelock,
-      targetTimelockAddress,
-      operation,
-      signers,
-      safeContext,
-    }) => {
-      const calldata = targetTimelock.interface.encodeFunctionData("executeBatch", [
-        operation.targets,
-        operation.values,
-        operation.payloads,
-        operation.predecessor,
-        operation.salt,
-      ]);
-      await executeSafe(
-        `${label}-execute`,
-        targetTimelockAddress,
-        0n,
-        calldata,
-        signers,
-        safeContext,
-      );
-      assertCondition(
-        await migrationRead(`${label} done-state read`, () =>
-          targetTimelock.isOperationDone(operation.operationId),
-        ),
-        `${label} is not done`,
-      );
-    };
-    const scheduleSingleThroughSafe = async ({
-      label,
-      targetTimelock,
-      targetTimelockAddress,
-      target,
-      data,
-      salt,
-      operationId,
-      signers,
-      safeContext,
-    }) => {
-      const calldata = targetTimelock.interface.encodeFunctionData("schedule", [
-        target,
-        0n,
-        data,
-        ZERO_HASH,
-        salt,
-        config.minDelay,
-      ]);
-      await executeSafe(
-        `${label}-schedule`,
-        targetTimelockAddress,
-        0n,
-        calldata,
-        signers,
-        safeContext,
-      );
-      assertCondition(
-        await migrationRead(`${label} pending-state read`, () =>
-          targetTimelock.isOperationPending(operationId),
-        ),
-        `${label} is not pending`,
-      );
-    };
-    const executeSingleThroughSafe = async ({
-      label,
-      targetTimelock,
-      targetTimelockAddress,
-      target,
-      data,
-      salt,
-      operationId,
-      signers,
-      safeContext,
-    }) => {
-      const calldata = targetTimelock.interface.encodeFunctionData("execute", [
-        target,
-        0n,
-        data,
-        ZERO_HASH,
-        salt,
-      ]);
-      await executeSafe(
-        `${label}-execute`,
-        targetTimelockAddress,
-        0n,
-        calldata,
-        signers,
-        safeContext,
-      );
-      assertCondition(
-        await migrationRead(`${label} done-state read`, () =>
-          targetTimelock.isOperationDone(operationId),
-        ),
-        `${label} is not done`,
-      );
-    };
-
-    await scheduleBatchThroughSafe({
-      label: "governance-safe-migration",
-      targetTimelock: timelock,
-      targetTimelockAddress: timelockAddress,
-      operation: multisigMigration,
-      signers: [ownerA, ownerB],
-      safeContext: primarySafeContext,
-    });
-    await scheduleSingleThroughSafe({
-      label: "timelock-delay-update",
-      targetTimelock: timelock,
-      targetTimelockAddress: timelockAddress,
-      target: timelockAddress,
-      data: delayUpdatePayload,
-      salt: delayUpdateSalt,
-      operationId: delayUpdateOperationId,
-      signers: [ownerA, ownerC],
-      safeContext: primarySafeContext,
-    });
-    await scheduleBatchThroughSafe({
-      label: "timelock-owner-treasury-migration",
-      targetTimelock: timelock,
-      targetTimelockAddress: timelockAddress,
-      operation: ownerMigration,
-      signers: [ownerB, ownerC],
-      safeContext: primarySafeContext,
-    });
-    await scheduleSingleThroughSafe({
-      label: "post-migration-fee",
-      targetTimelock: replacementTimelock,
-      targetTimelockAddress: replacementTimelockAddress,
-      target: addresses.deepFamily,
-      data: postMigrationFeeData,
-      salt: postMigrationFeeSalt,
-      operationId: postMigrationFeeOperationId,
-      signers: [ownerD, ownerE],
-      safeContext: replacementSafeContext,
-    });
-
-    const oldTreasuryAtOwnerMigrationSchedule = await token.balanceOf(timelockAddress);
-    await recordTx(
-      "migration-window-endorsement-approve",
-      await token.connect(runDeployer).approve(addresses.deepFamily, reward),
-    );
-    await recordTx(
-      "migration-window-endorsement",
-      await deepFamilyV2.connect(runDeployer).endorseVersion(personHash, 1),
-    );
-    const oldTreasuryBeforeOwnerMigration = await token.balanceOf(timelockAddress);
-    assertCondition(
-      oldTreasuryBeforeOwnerMigration - oldTreasuryAtOwnerMigrationSchedule === protocolShare,
-      "Protocol fee received during the owner-migration delay window is incorrect",
-    );
-    await recordTx(
-      "migration-window-cancel-endorsement",
-      await deepFamilyV2.connect(runDeployer).cancelEndorsement(personHash),
-    );
-
-    await Promise.all([
-      waitForReady(timelock, multisigMigration.operationId, config.minDelay),
-      waitForReady(timelock, delayUpdateOperationId, config.minDelay),
-      waitForReady(timelock, ownerMigration.operationId, config.minDelay),
-      waitForReady(replacementTimelock, postMigrationFeeOperationId, config.minDelay),
-    ]);
-
-    // Keep the same preconditions and order enforced by timelock-migrate-owner: the old
-    // Timelock still has its original delay and the original Safe still holds every operational
-    // role when ownership and the complete execution-time treasury balance migrate atomically.
-    const replacementTreasuryBeforeOwnerMigration = await token.balanceOf(
-      replacementTimelockAddress,
-    );
-    await executeBatchThroughSafe({
-      label: "timelock-owner-treasury-migration",
-      targetTimelock: timelock,
-      targetTimelockAddress: timelockAddress,
-      operation: ownerMigration,
-      signers: [ownerB, ownerC],
-      safeContext: primarySafeContext,
-    });
-    const oldTreasuryAfterOwnerMigration = await token.balanceOf(timelockAddress);
-    const replacementTreasuryAfterOwnerMigration = await token.balanceOf(
-      replacementTimelockAddress,
-    );
-    assertCondition(
-      (await deepFamilyV2.owner()) === replacementTimelockAddress,
-      "DeepFamily ownership did not migrate to the replacement Timelock",
-    );
-    assertCondition(oldTreasuryAfterOwnerMigration === 0n, "Retired Timelock still holds DEEP");
-    assertCondition(
-      replacementTreasuryAfterOwnerMigration - replacementTreasuryBeforeOwnerMigration ===
-        oldTreasuryBeforeOwnerMigration,
-      "Replacement Timelock did not receive the complete execution-time DEEP balance",
-    );
-
-    await executeBatchThroughSafe({
-      label: "governance-safe-migration",
-      targetTimelock: timelock,
-      targetTimelockAddress: timelockAddress,
-      operation: multisigMigration,
-      signers: [ownerA, ownerB],
-      safeContext: primarySafeContext,
-    });
-    const migratedRoleState = await migrationRead("post-migration primary Timelock roles", () =>
-      readExactTimelockRoleState({
-        ethers,
-        timelock,
+      const unauthorizedOldSafeExecution = await signedExecution(
         timelockAddress,
-      }),
-    );
-    assertCondition(
-      migratedRoleState.currentMultisig === replacementSafeAddress,
-      "Primary Timelock roles did not atomically migrate to the replacement Safe",
-    );
+        0n,
+        unauthorizedOldSafeData,
+        [ownerA, ownerC],
+        primarySafeContext,
+      );
+      const primaryNonceBeforeUnauthorizedCall = await safeReader.getNonce();
+      await expectSafeSimulationFailure({
+        provider,
+        from: runDeployer.address,
+        safeAddress,
+        data: unauthorizedOldSafeExecution.encodedTransaction,
+        safeInterface,
+        label: "Retired Safe governance call",
+        expectedSafeRevertCodes: ["GS013"],
+      });
+      assertCondition(
+        (await safeReader.getNonce()) === primaryNonceBeforeUnauthorizedCall,
+        "Retired Safe failure simulation changed its nonce",
+      );
 
-    const unauthorizedOldSafeSalt = ethers.id(`deepfamily-e2e:${config.runId}:old-safe-must-fail`);
-    const unauthorizedOldSafeData = timelock.interface.encodeFunctionData("schedule", [
-      addresses.deepFamily,
-      0n,
-      feeData,
-      ZERO_HASH,
-      unauthorizedOldSafeSalt,
-      config.minDelay,
-    ]);
-    const unauthorizedOldSafeExecution = await signedExecution(
-      timelockAddress,
-      0n,
-      unauthorizedOldSafeData,
-      [ownerA, ownerC],
-      primarySafeContext,
-    );
-    const primaryNonceBeforeUnauthorizedCall = await safeReader.getNonce();
-    await expectSafeSimulationFailure({
-      provider,
-      from: runDeployer.address,
-      safeAddress,
-      data: unauthorizedOldSafeExecution.encodedTransaction,
-      safeInterface,
-      label: "Retired Safe governance call",
-      expectedSafeRevertCodes: ["GS013"],
-    });
-    assertCondition(
-      (await safeReader.getNonce()) === primaryNonceBeforeUnauthorizedCall,
-      "Retired Safe failure simulation changed its nonce",
-    );
+      await executeSingleThroughSafe({
+        label: "timelock-delay-update",
+        targetTimelock: timelock,
+        targetTimelockAddress: timelockAddress,
+        target: timelockAddress,
+        data: delayUpdatePayload,
+        salt: delayUpdateSalt,
+        operationId: delayUpdateOperationId,
+        signers: [ownerD, ownerF],
+        safeContext: replacementSafeContext,
+      });
+      assertCondition(
+        (await timelock.getMinDelay()) === updatedRetiredTimelockDelay,
+        "Timelock delay update did not take effect",
+      );
 
-    await executeSingleThroughSafe({
-      label: "timelock-delay-update",
-      targetTimelock: timelock,
-      targetTimelockAddress: timelockAddress,
-      target: timelockAddress,
-      data: delayUpdatePayload,
-      salt: delayUpdateSalt,
-      operationId: delayUpdateOperationId,
-      signers: [ownerD, ownerF],
-      safeContext: replacementSafeContext,
-    });
-    assertCondition(
-      (await timelock.getMinDelay()) === updatedRetiredTimelockDelay,
-      "Timelock delay update did not take effect",
-    );
+      await executeSingleThroughSafe({
+        label: "post-migration-fee",
+        targetTimelock: replacementTimelock,
+        targetTimelockAddress: replacementTimelockAddress,
+        target: addresses.deepFamily,
+        data: postMigrationFeeData,
+        salt: postMigrationFeeSalt,
+        operationId: postMigrationFeeOperationId,
+        signers: [ownerD, ownerE],
+        safeContext: replacementSafeContext,
+      });
+      assertCondition(
+        (await deepFamilyV2.protocolEndorsementFeeBps()) === postMigrationFee,
+        "Replacement Safe and Timelock could not execute post-migration governance",
+      );
 
-    await executeSingleThroughSafe({
-      label: "post-migration-fee",
-      targetTimelock: replacementTimelock,
-      targetTimelockAddress: replacementTimelockAddress,
-      target: addresses.deepFamily,
-      data: postMigrationFeeData,
-      salt: postMigrationFeeSalt,
-      operationId: postMigrationFeeOperationId,
-      signers: [ownerD, ownerE],
-      safeContext: replacementSafeContext,
-    });
-    assertCondition(
-      (await deepFamilyV2.protocolEndorsementFeeBps()) === postMigrationFee,
-      "Replacement Safe and Timelock could not execute post-migration governance",
-    );
-
-    report.governanceLifecycle = {
-      replacementSafe: replacementSafeAddress,
-      replacementTimelock: replacementTimelockAddress,
-      multisigMigrationOperationId: multisigMigration.operationId,
-      oldSafeRejectedAfterMigration: true,
-      delayUpdateOperationId,
-      previousDelay: config.minDelay,
-      updatedRetiredTimelockDelay,
-      ownerMigrationOperationId: ownerMigration.operationId,
-      ownerAfterMigration: replacementTimelockAddress,
-      treasuryAtOwnerMigrationSchedule: oldTreasuryAtOwnerMigrationSchedule,
-      treasuryBeforeOwnerMigration: oldTreasuryBeforeOwnerMigration,
-      treasuryAfterOwnerMigration: replacementTreasuryAfterOwnerMigration,
-      delayWindowProtocolFeeIncluded: true,
-      retiredTimelockTreasuryEmpty: true,
-      postMigrationFeeOperationId,
-      postMigrationFee,
-      ownerSets: {
-        primary: { labels: ["A", "B", "C"], addresses: primarySafeOwners },
-        replacement: { labels: ["D", "E", "F"], addresses: replacementSafeOwners },
-      },
-      primaryOwnerSignaturesRejectedByReplacementSafe: true,
-      replacementSignaturePairs: {
-        postMigrationFeeSchedule: "DE",
-        retiredTimelockDelayExecute: "DF",
-        postMigrationFeeExecute: "DE",
-      },
-      replacementGovernanceOperational: true,
-    };
-    report.productionParity.sharedGovernanceOperationBuildersMatched = true;
-    await addStep("safe-delay-timelock-and-treasury-migrations", report.governanceLifecycle);
+      report.governanceLifecycle = {
+        replacementSafe: replacementSafeAddress,
+        replacementTimelock: replacementTimelockAddress,
+        multisigMigrationOperationId: multisigMigration.operationId,
+        oldSafeRejectedAfterMigration: true,
+        delayUpdateOperationId,
+        previousDelay: config.minDelay,
+        updatedRetiredTimelockDelay,
+        ownerMigrationOperationId: ownerMigration.operationId,
+        ownerAfterMigration: replacementTimelockAddress,
+        treasuryAtOwnerMigrationSchedule: oldTreasuryAtOwnerMigrationSchedule,
+        treasuryBeforeOwnerMigration: oldTreasuryBeforeOwnerMigration,
+        treasuryAfterOwnerMigration: replacementTreasuryAfterOwnerMigration,
+        delayWindowProtocolFeeIncluded: true,
+        retiredTimelockTreasuryEmpty: true,
+        postMigrationFeeOperationId,
+        postMigrationFee,
+        ownerSets: {
+          primary: { labels: ["A", "B", "C"], addresses: primarySafeOwners },
+          replacement: { labels: ["D", "E", "F"], addresses: replacementSafeOwners },
+        },
+        primaryOwnerSignaturesRejectedByReplacementSafe: true,
+        replacementSignaturePairs: {
+          postMigrationFeeSchedule: "DE",
+          retiredTimelockDelayExecute: "DF",
+          postMigrationFeeExecute: "DE",
+        },
+        replacementGovernanceOperational: true,
+      };
+      report.productionParity.sharedGovernanceOperationBuildersMatched = true;
+      await addStep("safe-delay-timelock-and-treasury-migrations", report.governanceLifecycle);
+      governanceLifecycleTerminalContext = {
+        deepFamilyV2,
+        postMigrationFee,
+        replacementSafeAddress,
+        replacementTimelock,
+        replacementTimelockAddress,
+        updatedRetiredTimelockDelay,
+        v2Address,
+      };
+    }
 
     currentStep = "chain-finality";
     const lastCriticalBlock = Math.max(
@@ -2912,153 +2977,279 @@ export const main = async (chainProfile) => {
     currentStep = "terminal-governance-state";
     const terminalRead = (label, operation) =>
       retryBounded(operation, { attempts: 4, timeoutMs: 60_000, label });
-    const terminalPrimarySafeProfile = await terminalRead("terminal primary Safe profile", () =>
-      assertCanonicalSafeProfile({
-        provider,
-        chainId: EXPECTED_CHAIN_ID,
-        safeAddress,
-        expectedOwners: primarySafeOwners,
-      }),
-    );
-    const terminalReplacementSafeProfile = await terminalRead(
-      "terminal replacement Safe profile",
-      () =>
+    if (config.runGovernanceLifecycle) {
+      assertCondition(
+        governanceLifecycleTerminalContext,
+        "Diagnostic governance lifecycle terminal context is unavailable",
+      );
+      const {
+        deepFamilyV2,
+        postMigrationFee,
+        replacementSafeAddress,
+        replacementTimelock,
+        replacementTimelockAddress,
+        updatedRetiredTimelockDelay,
+        v2Address,
+      } = governanceLifecycleTerminalContext;
+      const terminalPrimarySafeProfile = await terminalRead("terminal primary Safe profile", () =>
         assertCanonicalSafeProfile({
           provider,
           chainId: EXPECTED_CHAIN_ID,
-          safeAddress: replacementSafeAddress,
-          expectedOwners: replacementSafeOwners,
+          safeAddress,
+          expectedOwners: primarySafeOwners,
         }),
-    );
-    const terminalPrimaryTimelockRoles = await terminalRead("terminal retired Timelock roles", () =>
-      readExactTimelockRoleState({ ethers, timelock, timelockAddress }),
-    );
-    const terminalReplacementTimelockRoles = await terminalRead(
-      "terminal replacement Timelock roles",
-      () =>
-        readExactTimelockRoleState({
-          ethers,
-          timelock: replacementTimelock,
-          timelockAddress: replacementTimelockAddress,
+      );
+      const terminalReplacementSafeProfile = await terminalRead(
+        "terminal replacement Safe profile",
+        () =>
+          assertCanonicalSafeProfile({
+            provider,
+            chainId: EXPECTED_CHAIN_ID,
+            safeAddress: replacementSafeAddress,
+            expectedOwners: replacementSafeOwners,
+          }),
+      );
+      const terminalPrimaryTimelockRoles = await terminalRead(
+        "terminal retired Timelock roles",
+        () => readExactTimelockRoleState({ ethers, timelock, timelockAddress }),
+      );
+      const terminalReplacementTimelockRoles = await terminalRead(
+        "terminal replacement Timelock roles",
+        () =>
+          readExactTimelockRoleState({
+            ethers,
+            timelock: replacementTimelock,
+            timelockAddress: replacementTimelockAddress,
+          }),
+      );
+      const terminalPrimaryTimelockDelay = await terminalRead(
+        "terminal retired Timelock delay",
+        () => timelock.getMinDelay(),
+      );
+      const terminalReplacementTimelockDelay = await terminalRead(
+        "terminal replacement Timelock delay",
+        () => replacementTimelock.getMinDelay(),
+      );
+      const terminalDeepFamilyOwner = await terminalRead("terminal DeepFamily owner", () =>
+        deepFamilyV2.owner(),
+      );
+      const terminalDeepFamilyImplementation = await terminalRead(
+        "terminal DeepFamily implementation",
+        () => implementationAddress(ethers, provider, addresses.deepFamily),
+      );
+      const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
+        deepFamilyV2.verifierRegistry(1, 0),
+      );
+      const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
+        deepFamilyV2.verifierRegistry(1, 1),
+      );
+      const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
+        deepFamilyV2.protocolEndorsementFeeBps(),
+      );
+      const terminalTokenOwner = await terminalRead("terminal token owner", () => token.owner());
+      const terminalTokenBinding = await terminalRead("terminal token binding", () =>
+        token.deepFamilyContract(),
+      );
+      const terminalDeepFamilyToken = await terminalRead("terminal protocol token binding", () =>
+        deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT(),
+      );
+      const terminalRetiredTreasuryBalance = await terminalRead(
+        "terminal retired treasury balance",
+        () => token.balanceOf(timelockAddress),
+      );
+      assertCondition(
+        ethers.getAddress(terminalPrimaryTimelockRoles.currentMultisig) === replacementSafeAddress,
+        "Retired Timelock terminal governance roles do not belong exclusively to replacement Safe",
+      );
+      assertCondition(
+        ethers.getAddress(terminalReplacementTimelockRoles.currentMultisig) ===
+          replacementSafeAddress,
+        "Replacement Timelock terminal governance roles do not belong exclusively to replacement Safe",
+      );
+      assertCondition(
+        terminalPrimaryTimelockDelay === updatedRetiredTimelockDelay,
+        "Retired Timelock terminal delay mismatch",
+      );
+      assertCondition(
+        terminalReplacementTimelockDelay === BigInt(config.minDelay),
+        "Replacement Timelock terminal delay mismatch",
+      );
+      assertCondition(
+        ethers.getAddress(terminalDeepFamilyOwner) === replacementTimelockAddress,
+        "DeepFamily terminal owner is not replacement Timelock",
+      );
+      assertCondition(
+        ethers.getAddress(terminalDeepFamilyImplementation) === v2Address,
+        "DeepFamily terminal implementation is not the verified V2 candidate",
+      );
+      assertCondition(
+        ethers.getAddress(terminalPersonVerifier) === addresses.governedVerifierCandidate &&
+          ethers.getAddress(terminalDisclosureVerifier) === addresses.groth16VerifierAdapter,
+        "DeepFamily terminal verifier routes changed unexpectedly",
+      );
+      assertCondition(
+        terminalProtocolFee === postMigrationFee,
+        "DeepFamily terminal endorsement fee mismatch",
+      );
+      assertCondition(
+        terminalTokenOwner === ethers.ZeroAddress,
+        "DeepFamilyToken terminal owner must remain renounced",
+      );
+      assertCondition(
+        ethers.getAddress(terminalTokenBinding) === addresses.deepFamily &&
+          ethers.getAddress(terminalDeepFamilyToken) === addresses.token,
+        "DeepFamilyToken terminal two-way binding mismatch",
+      );
+      assertCondition(
+        terminalRetiredTreasuryBalance === 0n,
+        "Retired Timelock terminal DEEP treasury is not empty",
+      );
+      report.terminalGovernanceState = {
+        status: "passed",
+        observedAfterFinality: report.network.finality.status === "passed",
+        observedAtBlock: await provider.getBlockNumber(),
+        safes: {
+          primary: terminalPrimarySafeProfile,
+          replacement: terminalReplacementSafeProfile,
+        },
+        timelocks: {
+          retired: {
+            address: timelockAddress,
+            ...terminalPrimaryTimelockRoles,
+            minDelay: terminalPrimaryTimelockDelay,
+          },
+          replacement: {
+            address: replacementTimelockAddress,
+            ...terminalReplacementTimelockRoles,
+            minDelay: terminalReplacementTimelockDelay,
+          },
+        },
+        deepFamily: {
+          address: addresses.deepFamily,
+          owner: terminalDeepFamilyOwner,
+          implementation: terminalDeepFamilyImplementation,
+          personCommitmentVerifier: terminalPersonVerifier,
+          disclosureBindingVerifier: terminalDisclosureVerifier,
+          protocolEndorsementFeeBps: terminalProtocolFee,
+        },
+        token: {
+          address: addresses.token,
+          owner: terminalTokenOwner,
+          deepFamilyContract: terminalTokenBinding,
+          deepFamilyTokenFromProtocol: terminalDeepFamilyToken,
+        },
+        retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
+      };
+    } else {
+      const terminalSafeProfile = await terminalRead("terminal governance Safe profile", () =>
+        assertCanonicalSafeProfile({
+          provider,
+          chainId: EXPECTED_CHAIN_ID,
+          safeAddress,
+          expectedOwners: primarySafeOwners,
         }),
-    );
-    const terminalPrimaryTimelockDelay = await terminalRead("terminal retired Timelock delay", () =>
-      timelock.getMinDelay(),
-    );
-    const terminalReplacementTimelockDelay = await terminalRead(
-      "terminal replacement Timelock delay",
-      () => replacementTimelock.getMinDelay(),
-    );
-    const terminalDeepFamilyOwner = await terminalRead("terminal DeepFamily owner", () =>
-      deepFamilyV2.owner(),
-    );
-    const terminalDeepFamilyImplementation = await terminalRead(
-      "terminal DeepFamily implementation",
-      () => implementationAddress(ethers, provider, addresses.deepFamily),
-    );
-    const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
-      deepFamilyV2.verifierRegistry(1, 0),
-    );
-    const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
-      deepFamilyV2.verifierRegistry(1, 1),
-    );
-    const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
-      deepFamilyV2.protocolEndorsementFeeBps(),
-    );
-    const terminalTokenOwner = await terminalRead("terminal token owner", () => token.owner());
-    const terminalTokenBinding = await terminalRead("terminal token binding", () =>
-      token.deepFamilyContract(),
-    );
-    const terminalDeepFamilyToken = await terminalRead("terminal protocol token binding", () =>
-      deepFamilyV2.DEEP_FAMILY_TOKEN_CONTRACT(),
-    );
-    const terminalRetiredTreasuryBalance = await terminalRead(
-      "terminal retired treasury balance",
-      () => token.balanceOf(timelockAddress),
-    );
-    assertCondition(
-      ethers.getAddress(terminalPrimaryTimelockRoles.currentMultisig) === replacementSafeAddress,
-      "Retired Timelock terminal governance roles do not belong exclusively to replacement Safe",
-    );
-    assertCondition(
-      ethers.getAddress(terminalReplacementTimelockRoles.currentMultisig) ===
-        replacementSafeAddress,
-      "Replacement Timelock terminal governance roles do not belong exclusively to replacement Safe",
-    );
-    assertCondition(
-      terminalPrimaryTimelockDelay === updatedRetiredTimelockDelay,
-      "Retired Timelock terminal delay mismatch",
-    );
-    assertCondition(
-      terminalReplacementTimelockDelay === BigInt(config.minDelay),
-      "Replacement Timelock terminal delay mismatch",
-    );
-    assertCondition(
-      ethers.getAddress(terminalDeepFamilyOwner) === replacementTimelockAddress,
-      "DeepFamily terminal owner is not replacement Timelock",
-    );
-    assertCondition(
-      ethers.getAddress(terminalDeepFamilyImplementation) === v2Address,
-      "DeepFamily terminal implementation is not the verified V2 candidate",
-    );
-    assertCondition(
-      ethers.getAddress(terminalPersonVerifier) === addresses.governedVerifierCandidate &&
-        ethers.getAddress(terminalDisclosureVerifier) === addresses.groth16VerifierAdapter,
-      "DeepFamily terminal verifier routes changed unexpectedly",
-    );
-    assertCondition(
-      terminalProtocolFee === postMigrationFee,
-      "DeepFamily terminal endorsement fee mismatch",
-    );
-    assertCondition(
-      terminalTokenOwner === ethers.ZeroAddress,
-      "DeepFamilyToken terminal owner must remain renounced",
-    );
-    assertCondition(
-      ethers.getAddress(terminalTokenBinding) === addresses.deepFamily &&
-        ethers.getAddress(terminalDeepFamilyToken) === addresses.token,
-      "DeepFamilyToken terminal two-way binding mismatch",
-    );
-    assertCondition(
-      terminalRetiredTreasuryBalance === 0n,
-      "Retired Timelock terminal DEEP treasury is not empty",
-    );
-    report.terminalGovernanceState = {
-      status: "passed",
-      observedAfterFinality: report.network.finality.status === "passed",
-      observedAtBlock: await provider.getBlockNumber(),
-      safes: {
-        primary: terminalPrimarySafeProfile,
-        replacement: terminalReplacementSafeProfile,
-      },
-      timelocks: {
-        retired: {
+      );
+      const terminalTimelockRoles = await terminalRead("terminal Timelock roles", () =>
+        readExactTimelockRoleState({ ethers, timelock, timelockAddress }),
+      );
+      const terminalTimelockDelay = await terminalRead("terminal Timelock delay", () =>
+        timelock.getMinDelay(),
+      );
+      const terminalDeepFamilyOwner = await terminalRead("terminal DeepFamily owner", () =>
+        deepFamily.owner(),
+      );
+      const terminalDeepFamilyImplementation = await terminalRead(
+        "terminal DeepFamily implementation",
+        () => implementationAddress(ethers, provider, addresses.deepFamily),
+      );
+      const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
+        deepFamily.verifierRegistry(1, 0),
+      );
+      const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
+        deepFamily.verifierRegistry(1, 1),
+      );
+      const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
+        deepFamily.protocolEndorsementFeeBps(),
+      );
+      const terminalTokenOwner = await terminalRead("terminal token owner", () => token.owner());
+      const terminalTokenBinding = await terminalRead("terminal token binding", () =>
+        token.deepFamilyContract(),
+      );
+      const terminalDeepFamilyToken = await terminalRead("terminal protocol token binding", () =>
+        deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
+      );
+      const terminalReaderBinding = await terminalRead("terminal reader binding", () =>
+        deepFamilyReader.DEEP_FAMILY(),
+      );
+      assertCondition(
+        ethers.getAddress(terminalTimelockRoles.currentMultisig) === safeAddress,
+        "Timelock terminal governance roles do not belong exclusively to the release Safe",
+      );
+      assertCondition(
+        terminalTimelockDelay === BigInt(config.productionMinDelay),
+        "Timelock terminal production delay mismatch",
+      );
+      assertCondition(
+        ethers.getAddress(terminalDeepFamilyOwner) === timelockAddress,
+        "DeepFamily terminal owner is not the initial Timelock",
+      );
+      assertCondition(
+        ethers.getAddress(terminalDeepFamilyImplementation) ===
+          ethers.getAddress(addresses.deepFamilyImplementation),
+        "DeepFamily terminal implementation is not the initial release implementation",
+      );
+      assertCondition(
+        ethers.getAddress(terminalPersonVerifier) === addresses.groth16VerifierAdapter &&
+          ethers.getAddress(terminalDisclosureVerifier) === addresses.groth16VerifierAdapter,
+        "DeepFamily initial verifier routes changed unexpectedly",
+      );
+      assertCondition(
+        terminalProtocolFee === 500n && feeBefore === 500n,
+        "DeepFamily initial endorsement fee must remain 500 bps",
+      );
+      assertCondition(
+        terminalTokenOwner === ethers.ZeroAddress,
+        "DeepFamilyToken terminal owner must remain renounced",
+      );
+      assertCondition(
+        ethers.getAddress(terminalTokenBinding) === addresses.deepFamily &&
+          ethers.getAddress(terminalDeepFamilyToken) === addresses.token,
+        "DeepFamilyToken terminal two-way binding mismatch",
+      );
+      assertCondition(
+        ethers.getAddress(terminalReaderBinding) === addresses.deepFamily,
+        "DeepFamilyReader terminal binding mismatch",
+      );
+      report.terminalGovernanceState = {
+        status: "passed",
+        observedAfterFinality: report.network.finality.status === "passed",
+        observedAtBlock: await provider.getBlockNumber(),
+        safe: terminalSafeProfile,
+        timelock: {
           address: timelockAddress,
-          ...terminalPrimaryTimelockRoles,
-          minDelay: terminalPrimaryTimelockDelay,
+          ...terminalTimelockRoles,
+          minDelay: terminalTimelockDelay,
         },
-        replacement: {
-          address: replacementTimelockAddress,
-          ...terminalReplacementTimelockRoles,
-          minDelay: terminalReplacementTimelockDelay,
+        deepFamily: {
+          address: addresses.deepFamily,
+          owner: terminalDeepFamilyOwner,
+          implementation: terminalDeepFamilyImplementation,
+          personCommitmentVerifier: terminalPersonVerifier,
+          disclosureBindingVerifier: terminalDisclosureVerifier,
+          protocolEndorsementFeeBps: terminalProtocolFee,
         },
-      },
-      deepFamily: {
-        address: addresses.deepFamily,
-        owner: terminalDeepFamilyOwner,
-        implementation: terminalDeepFamilyImplementation,
-        personCommitmentVerifier: terminalPersonVerifier,
-        disclosureBindingVerifier: terminalDisclosureVerifier,
-        protocolEndorsementFeeBps: terminalProtocolFee,
-      },
-      token: {
-        address: addresses.token,
-        owner: terminalTokenOwner,
-        deepFamilyContract: terminalTokenBinding,
-        deepFamilyTokenFromProtocol: terminalDeepFamilyToken,
-      },
-      retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
-    };
+        token: {
+          address: addresses.token,
+          owner: terminalTokenOwner,
+          deepFamilyContract: terminalTokenBinding,
+          deepFamilyTokenFromProtocol: terminalDeepFamilyToken,
+        },
+        reader: {
+          address: addresses.deepFamilyReader,
+          deepFamily: terminalReaderBinding,
+        },
+      };
+    }
     await addStep("terminal-governance-state-verified", report.terminalGovernanceState);
 
     currentStep = "source-input-integrity";
@@ -3188,7 +3379,6 @@ export const main = async (chainProfile) => {
         report.productionParity.sameTimelockArtifactAndConfigResolver === true &&
         report.productionParity.sameProtocolDeploymentHelper === true &&
         report.productionParity.sameDeploymentMetadataWriter === true &&
-        report.productionParity.sharedGovernanceOperationBuildersMatched === true &&
         report.isolatedDeploymentArtifacts.productionWriterExercised === true,
       productionConfigurationMatched:
         config.productionMinDelay === config.minDelay &&
@@ -3211,6 +3401,29 @@ export const main = async (chainProfile) => {
     report.releaseReady =
       config.acceptanceMode === "release-rehearsal" &&
       Object.values(releaseReadinessGates).every((passed) => passed === true);
+    if (config.acceptanceMode === "release-rehearsal" && report.releaseReady) {
+      await saveReport();
+      try {
+        await validateTestnetReleaseEvidence({
+          reportPath,
+          repositoryRoot: process.cwd(),
+          expectedTestnetChainId: EXPECTED_CHAIN_ID,
+          expectedTestnetNetworkName: EXPECTED_NETWORK,
+          mainnetMinDelaySeconds: config.productionMinDelay,
+          currentCommit: report.releaseCommit,
+          expectedAcceptanceInputDigest: report.sourceState.acceptanceInputDigest,
+        });
+      } catch (validationError) {
+        originalError = new Error(
+          `release-rehearsal report failed schema-v4 self-validation: ` +
+            safeErrorMessage(validationError, secretValues),
+        );
+        report.releaseReady = false;
+        report.status = "failed";
+        report.failedStep = "release-evidence-self-validation";
+        report.error = originalError.message;
+      }
+    }
     if (
       config.acceptanceMode === "release-rehearsal" &&
       !report.releaseReady &&

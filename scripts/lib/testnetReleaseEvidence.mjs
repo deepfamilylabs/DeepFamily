@@ -13,7 +13,8 @@ import {
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
 } from "./zkArtifactTrust.mjs";
 
-export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 3;
+export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 4;
+export const TESTNET_RELEASE_EVIDENCE_TYPE = "initial-mainnet-release";
 export const TESTNET_RELEASE_READINESS_GATES = Object.freeze([
   "allRecordedStepsPassed",
   "canonicalSafeMatched",
@@ -35,17 +36,13 @@ export const TESTNET_RELEASE_REQUIRED_STEPS = Object.freeze([
   "canonical-safe-mainnet-infrastructure",
   "canonical-safe-testnet-infrastructure",
   "critical-transactions-finalized",
-  "delayed-deep-treasury-transfer",
   "deployment-directory-unchanged",
   "fund-isolated-run-deployer",
   "isolated-integrated-protocol-wiring",
   "production-build-manifest-preflight",
   "real-zk-endorsement-nft-story",
   "release-rehearsal-clean-source-preflight",
-  "safe-delay-timelock-and-treasury-migrations",
-  "safe-timelock-schedule-wait-execute-cancel",
   "source-verified-initial-deployment",
-  "storage-safe-timelocked-uups-upgrade",
   "terminal-governance-state-verified",
   "zk-artifact-trust-preflight",
 ]);
@@ -58,25 +55,33 @@ const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
 const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
 const ZERO_HASH = `0x${"0".repeat(64)}`;
 const REQUIRED_VERIFIED_CONTRACTS = Object.freeze([
-  "governance-replacements:ReplacementGovernanceTimelock",
   "initial-deployment:AdultAgeGate",
   "initial-deployment:DeepFamily",
   "initial-deployment:DeepFamilyReader",
   "initial-deployment:DeepFamilyToken",
   "initial-deployment:DisclosureBindingVerifier",
   "initial-deployment:GovernanceTimelock",
-  "initial-deployment:GovernedVerifierCandidate",
   "initial-deployment:Groth16VerifierAdapter",
   "initial-deployment:PersonCommitmentVerifier",
   "initial-deployment:PoseidonT5",
   "initial-deployment:UUPSProxy",
-  "upgrade-candidate:DeepFamilyV2Mock",
 ]);
-const REQUIRED_VERIFICATION_PHASES = Object.freeze([
-  "governance-replacements",
-  "initial-deployment",
-  "upgrade-candidate",
+const REQUIRED_VERIFICATION_PHASES = Object.freeze(["initial-deployment"]);
+const FORBIDDEN_GOVERNANCE_LIFECYCLE_FIELDS = Object.freeze([
+  "governance",
+  "governanceLifecycle",
+  "treasury",
+  "upgrade",
 ]);
+const FORBIDDEN_GOVERNANCE_LIFECYCLE_ADDRESSES = Object.freeze([
+  "deepFamilyV2",
+  "governedVerifierCandidate",
+  "replacementGovernanceSafe",
+  "replacementSafeOwners",
+  "replacementTimelock",
+]);
+const FORBIDDEN_GOVERNANCE_LIFECYCLE_TRANSACTION_LABEL =
+  /(?:^deploy-Groth16VerifierAdapter$|DeepFamilyV2Mock|GovernedVerifierCandidate|ReplacementGovernanceTimelock|schedule|execute|fee-update|verifier-update|treasury|upgrade|\bv2\b|migration|migrate|replacement|timelock-delay)/iu;
 
 const deepFreeze = (value) => {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -91,6 +96,27 @@ const isRecord = (value) => value !== null && typeof value === "object" && !Arra
 const requireRecord = (value, label) => {
   if (!isRecord(value)) throw new Error(`${label} must be a JSON object`);
   return value;
+};
+
+const requireExactRecordKeys = (value, label, expectedKeys) => {
+  const record = requireRecord(value, label);
+  const actualKeys = Object.keys(record).sort();
+  const normalizedExpectedKeys = [...expectedKeys].sort();
+  if (JSON.stringify(actualKeys) !== JSON.stringify(normalizedExpectedKeys)) {
+    throw new Error(`${label} must contain exactly: ${normalizedExpectedKeys.join(", ")}`);
+  }
+  return record;
+};
+
+const rejectPresentFields = (value, label, forbiddenFields) => {
+  const record = requireRecord(value, label);
+  const present = forbiddenFields.filter((field) => Object.hasOwn(record, field));
+  if (present.length > 0) {
+    throw new Error(
+      `${label} contains forbidden governance lifecycle fields: ${present.join(", ")}`,
+    );
+  }
+  return record;
 };
 
 const requireExact = (actual, expected, label) => {
@@ -325,7 +351,7 @@ const requireAllReadinessGates = (value) => {
   const names = Object.keys(gates).sort();
   if (JSON.stringify(names) !== JSON.stringify(TESTNET_RELEASE_READINESS_GATES)) {
     throw new Error(
-      "releaseReadinessGates must contain exactly the schema v3 gate set: " +
+      "releaseReadinessGates must contain exactly the schema v4 initial-release gate set: " +
         TESTNET_RELEASE_READINESS_GATES.join(", "),
     );
   }
@@ -366,11 +392,11 @@ const requireVerificationEvidence = (report) => {
   const verification = requireRecord(report.verification, "verification");
   requireExact(verification.enabled, true, "verification.enabled");
   requireExact(verification.status, "passed", "verification.status");
-  requireExact(
-    verification.gateBeforeUpgradeSchedule,
-    true,
-    "verification.gateBeforeUpgradeSchedule",
-  );
+  if (Object.hasOwn(verification, "gateBeforeUpgradeSchedule")) {
+    throw new Error(
+      "verification.gateBeforeUpgradeSchedule is forbidden in schema v4 initial-release evidence",
+    );
+  }
   if (!Array.isArray(verification.contracts) || verification.contracts.length === 0) {
     throw new Error("verification.contracts must contain at least one verified contract");
   }
@@ -390,7 +416,7 @@ const requireVerificationEvidence = (report) => {
     JSON.stringify(sortedVerifiedContracts) !== JSON.stringify(REQUIRED_VERIFIED_CONTRACTS)
   ) {
     throw new Error(
-      "verification.contracts must contain exactly the schema v3 release contract set",
+      "verification.contracts must contain exactly the schema v4 initial-release contract set",
     );
   }
   if (!Array.isArray(verification.phases) || verification.phases.length === 0) {
@@ -409,7 +435,9 @@ const requireVerificationEvidence = (report) => {
     new Set(sortedPhases).size !== sortedPhases.length ||
     JSON.stringify(sortedPhases) !== JSON.stringify(REQUIRED_VERIFICATION_PHASES)
   ) {
-    throw new Error("verification.phases must contain exactly the schema v3 release phase set");
+    throw new Error(
+      "verification.phases must contain exactly the schema v4 initial-release phase set",
+    );
   }
   return verification;
 };
@@ -449,6 +477,11 @@ const requireFinalityEvidence = (report) => {
   let maximumTransactionBlock = 0;
   for (const [label, receipt] of transactionEntries) {
     requireNonemptyString(label, `transactions label ${label}`, 100);
+    if (FORBIDDEN_GOVERNANCE_LIFECYCLE_TRANSACTION_LABEL.test(label)) {
+      throw new Error(
+        `transactions.${label} is forbidden governance lifecycle content in initial-release evidence`,
+      );
+    }
     const item = requireRecord(receipt, `transactions.${label}`);
     const blockNumber = requireSafeInteger(
       item.blockNumber,
@@ -595,7 +628,20 @@ const requireTerminalTimelock = ({
 };
 
 const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinDelay) => {
-  const terminal = requireRecord(report.terminalGovernanceState, "terminalGovernanceState");
+  const terminal = requireExactRecordKeys(
+    report.terminalGovernanceState,
+    "terminalGovernanceState",
+    [
+      "deepFamily",
+      "observedAfterFinality",
+      "observedAtBlock",
+      "reader",
+      "safe",
+      "status",
+      "timelock",
+      "token",
+    ],
+  );
   requireExact(terminal.status, "passed", "terminalGovernanceState.status");
   requireExact(
     terminal.observedAfterFinality,
@@ -607,99 +653,92 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
     "terminalGovernanceState.observedAtBlock",
     1,
   );
-  const addresses = requireRecord(report.addresses, "addresses");
-  const primarySafeAddress = requireAddress(addresses.governanceSafe, "addresses.governanceSafe");
-  const replacementSafeAddress = requireAddress(
-    addresses.replacementGovernanceSafe,
-    "addresses.replacementGovernanceSafe",
+  const addresses = rejectPresentFields(
+    report.addresses,
+    "addresses",
+    FORBIDDEN_GOVERNANCE_LIFECYCLE_ADDRESSES,
   );
-  const primaryOwners = requireAddressArray(addresses.safeOwners, "addresses.safeOwners", 3);
-  const replacementOwners = requireAddressArray(
-    addresses.replacementSafeOwners,
-    "addresses.replacementSafeOwners",
-    3,
+  const governanceSafeAddress = requireAddress(
+    addresses.governanceSafe,
+    "addresses.governanceSafe",
   );
-  const safes = requireRecord(terminal.safes, "terminalGovernanceState.safes");
+  const safeOwners = requireAddressArray(addresses.safeOwners, "addresses.safeOwners", 3);
   requireTerminalSafe({
-    value: safes.primary,
-    label: "terminalGovernanceState.safes.primary",
+    value: terminal.safe,
+    label: "terminalGovernanceState.safe",
     expectedChainId,
-    expectedAddress: primarySafeAddress,
-    expectedOwners: primaryOwners,
-  });
-  requireTerminalSafe({
-    value: safes.replacement,
-    label: "terminalGovernanceState.safes.replacement",
-    expectedChainId,
-    expectedAddress: replacementSafeAddress,
-    expectedOwners: replacementOwners,
+    expectedAddress: governanceSafeAddress,
+    expectedOwners: safeOwners,
   });
 
-  const primaryTimelockAddress = requireAddress(addresses.timelock, "addresses.timelock");
-  const replacementTimelockAddress = requireAddress(
-    addresses.replacementTimelock,
-    "addresses.replacementTimelock",
-  );
-  const timelocks = requireRecord(terminal.timelocks, "terminalGovernanceState.timelocks");
+  const timelockAddress = requireAddress(addresses.timelock, "addresses.timelock");
   requireTerminalTimelock({
-    value: timelocks.retired,
-    label: "terminalGovernanceState.timelocks.retired",
-    expectedAddress: primaryTimelockAddress,
-    expectedMultisig: replacementSafeAddress,
-    expectedMinDelay: expectedMinDelay + 1,
-  });
-  requireTerminalTimelock({
-    value: timelocks.replacement,
-    label: "terminalGovernanceState.timelocks.replacement",
-    expectedAddress: replacementTimelockAddress,
-    expectedMultisig: replacementSafeAddress,
+    value: terminal.timelock,
+    label: "terminalGovernanceState.timelock",
+    expectedAddress: timelockAddress,
+    expectedMultisig: governanceSafeAddress,
     expectedMinDelay,
   });
 
   const deepFamilyAddress = requireAddress(addresses.deepFamily, "addresses.deepFamily");
-  const deepFamilyV2Address = requireAddress(addresses.deepFamilyV2, "addresses.deepFamilyV2");
-  const tokenAddress = requireAddress(addresses.token, "addresses.token");
-  const governedVerifierAddress = requireAddress(
-    addresses.governedVerifierCandidate,
-    "addresses.governedVerifierCandidate",
+  const deepFamilyImplementationAddress = requireAddress(
+    addresses.deepFamilyImplementation,
+    "addresses.deepFamilyImplementation",
   );
-  const disclosureAdapterAddress = requireAddress(
+  const tokenAddress = requireAddress(addresses.token, "addresses.token");
+  const verifierAdapterAddress = requireAddress(
     addresses.groth16VerifierAdapter,
     "addresses.groth16VerifierAdapter",
   );
-  const deepFamily = requireRecord(terminal.deepFamily, "terminalGovernanceState.deepFamily");
+  const deepFamily = requireExactRecordKeys(
+    terminal.deepFamily,
+    "terminalGovernanceState.deepFamily",
+    [
+      "address",
+      "disclosureBindingVerifier",
+      "implementation",
+      "owner",
+      "personCommitmentVerifier",
+      "protocolEndorsementFeeBps",
+    ],
+  );
   requireSameAddress(
     deepFamily.address,
     deepFamilyAddress,
     "terminalGovernanceState.deepFamily.address",
   );
-  requireSameAddress(
-    deepFamily.owner,
-    replacementTimelockAddress,
-    "terminalGovernanceState.deepFamily.owner",
-  );
+  requireSameAddress(deepFamily.owner, timelockAddress, "terminalGovernanceState.deepFamily.owner");
   requireSameAddress(
     deepFamily.implementation,
-    deepFamilyV2Address,
+    deepFamilyImplementationAddress,
     "terminalGovernanceState.deepFamily.implementation",
   );
   requireSameAddress(
     deepFamily.personCommitmentVerifier,
-    governedVerifierAddress,
+    verifierAdapterAddress,
     "terminalGovernanceState.deepFamily.personCommitmentVerifier",
   );
   requireSameAddress(
     deepFamily.disclosureBindingVerifier,
-    disclosureAdapterAddress,
+    verifierAdapterAddress,
     "terminalGovernanceState.deepFamily.disclosureBindingVerifier",
   );
-  requireSafeInteger(
-    deepFamily.protocolEndorsementFeeBps,
+  requireExact(
+    requireSafeInteger(
+      deepFamily.protocolEndorsementFeeBps,
+      "terminalGovernanceState.deepFamily.protocolEndorsementFeeBps",
+      0,
+    ),
+    500,
     "terminalGovernanceState.deepFamily.protocolEndorsementFeeBps",
-    0,
   );
 
-  const token = requireRecord(terminal.token, "terminalGovernanceState.token");
+  const token = requireExactRecordKeys(terminal.token, "terminalGovernanceState.token", [
+    "address",
+    "deepFamilyContract",
+    "deepFamilyTokenFromProtocol",
+    "owner",
+  ]);
   requireSameAddress(token.address, tokenAddress, "terminalGovernanceState.token.address");
   requireSameAddress(token.owner, ZERO_ADDRESS, "terminalGovernanceState.token.owner");
   requireSameAddress(
@@ -712,12 +751,19 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
     tokenAddress,
     "terminalGovernanceState.token.deepFamilyTokenFromProtocol",
   );
-  requireExact(
-    terminal.retiredTimelockTreasuryBalance,
-    "0",
-    "terminalGovernanceState.retiredTimelockTreasuryBalance",
+
+  const readerAddress = requireAddress(addresses.deepFamilyReader, "addresses.deepFamilyReader");
+  const reader = requireExactRecordKeys(terminal.reader, "terminalGovernanceState.reader", [
+    "address",
+    "deepFamily",
+  ]);
+  requireSameAddress(reader.address, readerAddress, "terminalGovernanceState.reader.address");
+  requireSameAddress(
+    reader.deepFamily,
+    deepFamilyAddress,
+    "terminalGovernanceState.reader.deepFamily",
   );
-  return { observedAtBlock, replacementDelay: expectedMinDelay };
+  return { observedAtBlock, minDelay: expectedMinDelay };
 };
 
 const requireRefundEvidence = (report) => {
@@ -751,7 +797,6 @@ const requireProductionParityEvidence = (report) => {
     "sameTimelockArtifactAndConfigResolver",
     "sameProtocolDeploymentHelper",
     "sameDeploymentMetadataWriter",
-    "sharedGovernanceOperationBuildersMatched",
     "criticalTransactionsFinalized",
     "cleanReleaseCommit",
     "productionBuildProfileMatched",
@@ -762,6 +807,12 @@ const requireProductionParityEvidence = (report) => {
   ];
   for (const name of requiredParityFacts) {
     requireExact(productionParity[name], true, `productionParity.${name}`);
+  }
+  if (Object.hasOwn(productionParity, "sharedGovernanceOperationBuildersMatched")) {
+    throw new Error(
+      "productionParity.sharedGovernanceOperationBuildersMatched is forbidden in schema v4 " +
+        "initial-release evidence",
+    );
   }
 
   const buildState = requireRecord(report.buildState, "buildState");
@@ -906,8 +957,9 @@ const requireProductionZkEvidence = (report) => {
 };
 
 /**
- * Loads one explicitly selected schema-v3 release-rehearsal report and fails closed unless it is
- * valid evidence for the exact Git commit, testnet chain and production MIN_DELAY being released.
+ * Loads one explicitly selected schema-v4 initial-mainnet-release rehearsal report and fails closed
+ * unless it is valid evidence for the exact Git commit, testnet chain and production MIN_DELAY being
+ * released. Governance lifecycle exercises are deliberately outside this evidence type.
  *
  * External archived reports are rejected by default. Set allowExternalArchive=true only for a
  * directly selected regular JSON file; symlinks (including symlinked path components) remain
@@ -943,6 +995,8 @@ export const validateTestnetReleaseEvidence = async ({
   const { report } = file;
 
   requireExact(report.schemaVersion, TESTNET_RELEASE_REPORT_SCHEMA_VERSION, "schemaVersion");
+  requireExact(report.evidenceType, TESTNET_RELEASE_EVIDENCE_TYPE, "evidenceType");
+  requireExact(report.governanceLifecycleIncluded, false, "governanceLifecycleIncluded");
   requireExact(report.mode, "acceptance", "mode");
   requireExact(report.acceptanceMode, "release-rehearsal", "acceptanceMode");
   requireExact(report.status, "passed", "status");
@@ -950,6 +1004,11 @@ export const validateTestnetReleaseEvidence = async ({
   requireExact(report.failedStep, null, "failedStep");
   requireExact(report.error, null, "error");
   requireExact(report.releaseCommit, expectedCommit, "releaseCommit");
+  rejectPresentFields(
+    report,
+    "testnet release evidence root",
+    FORBIDDEN_GOVERNANCE_LIFECYCLE_FIELDS,
+  );
 
   const network = requireRecord(report.network, "network");
   const networkName = requireNonemptyString(network.name, "network.name", 100);
@@ -1007,9 +1066,13 @@ export const validateTestnetReleaseEvidence = async ({
   if (new Set(stepNames).size !== stepNames.length) {
     throw new Error("steps must not contain duplicate names");
   }
-  const missingSteps = TESTNET_RELEASE_REQUIRED_STEPS.filter((name) => !stepNames.includes(name));
-  if (missingSteps.length > 0) {
-    throw new Error(`steps is missing required schema v3 steps: ${missingSteps.join(", ")}`);
+  const sortedStepNames = [...stepNames].sort();
+  const expectedStepNames = [...TESTNET_RELEASE_REQUIRED_STEPS].sort();
+  if (JSON.stringify(sortedStepNames) !== JSON.stringify(expectedStepNames)) {
+    throw new Error(
+      "steps must contain exactly the schema v4 initial-release step set: " +
+        expectedStepNames.join(", "),
+    );
   }
   const readinessGates = requireAllReadinessGates(report.releaseReadinessGates);
 
@@ -1029,6 +1092,8 @@ export const validateTestnetReleaseEvidence = async ({
       sha256: file.sha256,
     },
     schemaVersion: report.schemaVersion,
+    evidenceType: report.evidenceType,
+    governanceLifecycleIncluded: report.governanceLifecycleIncluded,
     mode: report.mode,
     acceptanceMode: report.acceptanceMode,
     status: report.status,

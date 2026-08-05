@@ -452,10 +452,22 @@ npm run espace:mainnet:release
 Before this command can plan a release, the development proving keys must have been replaced with
 `npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
 artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
-that clean commit, and `EVM_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v3
-`releaseReady=true` rehearsal report from the current commit and production `MIN_DELAY`. The
+that clean commit, and `EVM_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v4
+`releaseReady=true` fresh-release rehearsal report from the current commit and production
+`MIN_DELAY >= 86400`. The
 default ZK setup records one Phase 2 contributor under `trustModel=single-operator`; this is
 independent of the three-owner, 2/3 governance Safe.
+
+Acceptance modes deliberately prove different things:
+
+- `diagnostic` uses `EVM_E2E_MIN_DELAY=30` as the deployed Testnet delay and runs all four real
+  governance windows. It is fast lifecycle coverage and never release evidence.
+- `release-rehearsal` deploys the initial production shape with `MIN_DELAY >= 86400`, but schedules
+  no Timelock operation and waits zero Timelock windows. Its schema-v4 report contains no Mock,
+  upgrade, or governance migration and records `evidenceType=initial-mainnet-release` with
+  `governanceLifecycleIncluded=false`.
+- a fresh Mainnet release follows the same zero-wait shape. Its 24-hour Timelock delay constrains
+  the first future governance operation, not deployment itself.
 
 With `EVM_MAINNET_CONFIRM` and `EVM_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
 After review, at least two current Safe owners sign the complete printed EIP-191 plan-approval
@@ -488,8 +500,9 @@ The Ethereum production flow requires
 exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
 `EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
 the exact chain-1 confirmation strings, reviewed production ZK setup artifacts, and an exact Sepolia
-release-rehearsal report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands
-default to read-only plan mode while their respective confirmation/digest pair is blank. Protocol
+schema-v4 fresh-release rehearsal report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and
+release commands default to read-only plan mode while their respective confirmation/digest pair is
+blank. Protocol
 execution additionally requires `EVM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct
 valid EIP-191 signatures from at least two current Safe owners over the exact printed approval
 message. Filling the reviewed authorization values and rerunning enters execute/resume mode and
@@ -536,8 +549,8 @@ timelock still grants `DEFAULT_ADMIN_ROLE` to itself, so roles can be migrated, 
 and executing a delayed timelock operation. A zero delay is rejected both initially and on updates.
 
 ```bash
-# Advanced stepwise example: rehearse the intended 48-hour delay with the actual testnet multisig.
-MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
+# Advanced stepwise example: rehearse the intended 24-hour delay with the actual testnet multisig.
+MIN_DELAY=86400 GOVERNANCE_MULTISIG=0xMultisig... \
   npm run deploy:timelock --net=confluxTestnet
 
 # Use the resulting timelock address, not the multisig address, as the protocol owner.

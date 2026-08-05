@@ -130,12 +130,13 @@ export const parseAcceptanceConfig = ({
     acceptance.modeEnvironmentName,
     env[acceptance.modeEnvironmentName],
   );
-  const minDelaySeconds = parseInteger(
+  const diagnosticMinDelaySeconds = parseInteger(
     acceptance.minDelayEnvironmentName,
     env[acceptance.minDelayEnvironmentName],
     30,
     10,
   );
+  let minDelaySeconds = diagnosticMinDelaySeconds;
   const confirmations = parseInteger(
     acceptance.confirmationsEnvironmentName,
     env[acceptance.confirmationsEnvironmentName],
@@ -162,6 +163,7 @@ export const parseAcceptanceConfig = ({
   );
   let productionMinDelaySeconds = null;
   let productionGovernanceMultisigProfile = null;
+  const runGovernanceLifecycle = acceptanceMode === ACCEPTANCE_MODE_DIAGNOSTIC;
   if (acceptanceMode === ACCEPTANCE_MODE_RELEASE_REHEARSAL) {
     if (!verify) {
       throw new Error(`release-rehearsal requires ${acceptance.verifyEnvironmentName}=1`);
@@ -170,19 +172,13 @@ export const parseAcceptanceConfig = ({
       throw new Error(`release-rehearsal requires ${acceptance.requireFinalityEnvironmentName}=1`);
     }
     productionMinDelaySeconds = parseRequiredPositiveInteger("MIN_DELAY", env.MIN_DELAY);
-    if (productionMinDelaySeconds !== minDelaySeconds) {
-      throw new Error(
-        `release-rehearsal requires ${acceptance.minDelayEnvironmentName} ` +
-          `(${minDelaySeconds}) to equal ` +
-          `MIN_DELAY (${productionMinDelaySeconds})`,
-      );
-    }
     if (productionMinDelaySeconds < MAINNET_MIN_DELAY_FLOOR_SECONDS) {
       throw new Error(
         `release-rehearsal requires MIN_DELAY >= ` +
           `${MAINNET_MIN_DELAY_FLOOR_SECONDS} seconds to match the production minimum`,
       );
     }
+    minDelaySeconds = productionMinDelaySeconds;
     productionGovernanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
     if (productionGovernanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
       throw new Error(
@@ -235,6 +231,8 @@ export const parseAcceptanceConfig = ({
     networkName,
     chainId: normalizedChainId,
     minDelaySeconds,
+    diagnosticMinDelaySeconds,
+    runGovernanceLifecycle,
     confirmations,
     verify,
     recover,

@@ -48,6 +48,8 @@ describe("eSpace acceptance safety helpers", function () {
       expect(result.chainId).to.equal(71n);
       expect(result.acceptanceMode).to.equal(ACCEPTANCE_MODE_DIAGNOSTIC);
       expect(result.minDelaySeconds).to.equal(30);
+      expect(result.diagnosticMinDelaySeconds).to.equal(30);
+      expect(result.runGovernanceLifecycle).to.equal(true);
       expect(result.productionMinDelaySeconds).to.equal(null);
       expect(result.productionGovernanceMultisigProfile).to.equal(null);
       expect(result.confirmations).to.equal(2);
@@ -70,10 +72,10 @@ describe("eSpace acceptance safety helpers", function () {
       );
     });
 
-    it("requires complete release-rehearsal flags and the exact production delay", function () {
+    it("uses the explicit production delay for release rehearsals", function () {
       const releaseEnv = {
         EVM_E2E_MODE: ACCEPTANCE_MODE_RELEASE_REHEARSAL,
-        EVM_E2E_MIN_DELAY: "172800",
+        EVM_E2E_MIN_DELAY: "30",
         MIN_DELAY: "172800",
         GOVERNANCE_MULTISIG_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
       };
@@ -82,6 +84,8 @@ describe("eSpace acceptance safety helpers", function () {
       expect(result.verify).to.equal(true);
       expect(result.requireFinality).to.equal(true);
       expect(result.minDelaySeconds).to.equal(172800);
+      expect(result.diagnosticMinDelaySeconds).to.equal(30);
+      expect(result.runGovernanceLifecycle).to.equal(false);
       expect(result.productionMinDelaySeconds).to.equal(172800);
       expect(result.productionGovernanceMultisigProfile).to.equal(ESPACE_E2E_RELEASE_SAFE_PROFILE);
 
@@ -94,9 +98,6 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "" })),
       ).to.throw(/MIN_DELAY.*explicitly set.*positive/i);
-      expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "30" })),
-      ).to.throw(/EVM_E2E_MIN_DELAY \(172800\).*MIN_DELAY \(30\)/i);
       expect(() =>
         parseESpaceAcceptanceConfig(
           baseConfig({
@@ -136,9 +137,11 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MAX_NATIVE: "1e2" }))).to.throw(
         /positive plain decimal/i,
       );
-      expect(
-        parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MIN_DELAY: "172800" })).minDelaySeconds,
-      ).to.equal(172800);
+      expect(parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_MIN_DELAY: "172800" }))).to.include({
+        minDelaySeconds: 172800,
+        diagnosticMinDelaySeconds: 172800,
+        runGovernanceLifecycle: true,
+      });
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_CONFIRMATIONS: "101" })),
       ).to.throw(/must not exceed 100/i);

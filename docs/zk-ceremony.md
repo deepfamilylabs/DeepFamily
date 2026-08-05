@@ -388,15 +388,21 @@ contract, frontend, localization, XSS, storage, and dependency checks.
 
 Only after `release:preflight` passes:
 
-1. run the target testnet acceptance command in `release-rehearsal` mode with the real production
-   Timelock delay;
-2. accept only a report with `status=passed`, `releaseReady=true`,
+1. run the target testnet acceptance command in `release-rehearsal` mode with
+   `MIN_DELAY >= 86400`;
+2. accept only a schema-v4 fresh-release report with `status=passed`, `releaseReady=true`,
+   `evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`,
    `zkArtifactTrust.productionReady=true`, and `zkCeremonyVerification.status=passed`;
 3. archive that exact report with the release commit and ZK evidence;
 4. prepare and validate the production governance Safe;
 5. generate the read-only Mainnet release plan;
 6. obtain the required Safe-owner approvals over the exact plan;
 7. execute only the unchanged reviewed plan.
+
+The release rehearsal deploys that Timelock delay but schedules no Timelock operation, so it has
+zero Timelock waits. `EVM_E2E_MIN_DELAY=30` belongs to diagnostic mode, where it is the actual delay
+for each of four governance windows; diagnostic output is never release evidence. A fresh Mainnet
+release also has zero Timelock waits. Its 24-hour delay governs later changes.
 
 The Safe remains a separate 2/3 governance control. The testnet/Mainnet release tools validate the
 recorded ZK trust model but do not reinterpret one ZK contributor as one governance signer.
