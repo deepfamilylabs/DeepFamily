@@ -1,8 +1,7 @@
 /**
  * Ethereum Mainnet protocol release:
- *   npm run ethereum:mainnet:release
- *   EVM_MAINNET_PLAN_DIGEST=0x... \
- *     npm run ethereum:mainnet:release
+ *   npm run ethereum:mainnet:release:plan
+ *   npm run ethereum:mainnet:release:execute -- --approval-file <path>
  */
 import { ETHEREUM_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { main, publicError } from "./evm-mainnet-release.mjs";

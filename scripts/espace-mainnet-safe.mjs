@@ -1,8 +1,7 @@
 /**
  * Conflux eSpace Mainnet Safe:
- *   npm run espace:mainnet:safe
- *   EVM_MAINNET_SAFE_PLAN_DIGEST=0x... \
- *     npm run espace:mainnet:safe
+ *   npm run espace:mainnet:safe:plan
+ *   npm run espace:mainnet:safe:execute -- --digest 0x...
  *   npm run espace:mainnet:safe:status
  */
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";

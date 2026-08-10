@@ -1,9 +1,10 @@
 /**
  * Conflux eSpace Mainnet protocol release wrapper:
- *   npm run espace:mainnet:release
+ *   npm run espace:mainnet:release:plan
+ *   npm run espace:mainnet:release:execute -- --approval-file <path>
  *
- * Plan is the default. Execute/resume requires the reviewed digest and owner approvals documented
- * in docs/espace-mainnet-release.md. Any command-line argument is rejected.
+ * Plan and execute are explicit. Execute/resume requires the reviewed approval file documented in
+ * docs/espace-mainnet-release.md.
  */
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { runMainnetReleaseCommand } from "./lib/mainnetCommandWrapper.mjs";

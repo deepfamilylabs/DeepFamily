@@ -74,6 +74,7 @@ let LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-release.lock");
 let SHARED_COMMAND_LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-command.lock");
 let COMMAND_LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-release-command.lock");
 let WRAPPER_TOKEN_ENV = MAINNET_PROFILE.releaseWrapperTokenEnvironmentName;
+let WRAPPER_MODE_ENV = MAINNET_PROFILE.releaseWrapperModeEnvironmentName;
 let SHARED_WRAPPER_TOKEN_ENV = MAINNET_PROFILE.sharedWrapperTokenEnvironmentName;
 
 const configureChainProfile = (chainProfile) => {
@@ -93,6 +94,7 @@ const configureChainProfile = (chainProfile) => {
   SHARED_COMMAND_LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-command.lock");
   COMMAND_LOCK_PATH = path.join(DEPLOYMENTS_DIRECTORY, ".mainnet-release-command.lock");
   WRAPPER_TOKEN_ENV = MAINNET_PROFILE.releaseWrapperTokenEnvironmentName;
+  WRAPPER_MODE_ENV = MAINNET_PROFILE.releaseWrapperModeEnvironmentName;
   SHARED_WRAPPER_TOKEN_ENV = MAINNET_PROFILE.sharedWrapperTokenEnvironmentName;
 };
 const CORE_DEPLOYMENT_FILES = [
@@ -142,7 +144,10 @@ const assertReleaseCommandWrapper = async () => {
   const expectedToken = String(process.env[WRAPPER_TOKEN_ENV] ?? "").trim();
   const expectedSharedToken = String(process.env[SHARED_WRAPPER_TOKEN_ENV] ?? "").trim();
   if (expectedToken === "" || expectedSharedToken === "") {
-    throw new Error(`Use ${MAINNET_PROFILE.releaseCommand}; direct script execution is forbidden`);
+    throw new Error(
+      `Use ${MAINNET_PROFILE.releasePlanCommand} or ` +
+        `${MAINNET_PROFILE.releaseExecuteCommand}; direct script execution is forbidden`,
+    );
   }
   const [commandLock, sharedCommandLock] = await Promise.all([
     readJsonIfExists(COMMAND_LOCK_PATH),
@@ -154,16 +159,18 @@ const assertReleaseCommandWrapper = async () => {
   if (!sharedCommandLock || sharedCommandLock.token !== expectedSharedToken) {
     throw new Error("Shared mainnet command wrapper lock is missing or does not match");
   }
+  const mode = String(process.env[WRAPPER_MODE_ENV] ?? "").trim();
+  if (mode !== "plan" && mode !== "execute") {
+    throw new Error("Mainnet release command wrapper mode is invalid");
+  }
+  return mode;
 };
 
 const assertRecoveryClaims = (checkpoint, recoveryTransactions) => {
   const labels = Object.keys(recoveryTransactions);
   if (labels.length === 0) return;
   if (!checkpoint) {
-    throw new Error(
-      `${MAINNET_PROFILE.recoveryTransactionsEnvironmentName} requires an existing release ` +
-        "checkpoint",
-    );
+    throw new Error("--recovery-file requires an existing release checkpoint");
   }
   for (const label of labels) {
     const transaction = checkpoint.transactions?.[label];
@@ -783,9 +790,14 @@ const revalidateCompletedRelease = async ({
 
 export const main = async (chainProfile) => {
   configureChainProfile(chainProfile);
-  await assertReleaseCommandWrapper();
-  // Invalid non-empty plan digests fail before even opening the configured RPC.
-  parseMainnetAuthorization(process.env, CHAIN_PROFILE);
+  const wrapperMode = await assertReleaseCommandWrapper();
+  // Invalid approval input and wrapper/child mode mismatches fail before opening the configured RPC.
+  const authorization = parseMainnetAuthorization(process.env, CHAIN_PROFILE, {
+    planDigestLabel: "--approval-file planDigest",
+  });
+  if (authorization.mode !== wrapperMode) {
+    throw new Error("Mainnet release command mode does not match its approval input");
+  }
 
   const connection = await hre.network.connect();
   const { ethers } = connection;
@@ -803,6 +815,11 @@ export const main = async (chainProfile) => {
     env: process.env,
     networkName: connection.networkName,
     chainId: network.chainId,
+    commandInputLabels: {
+      planDigest: "--approval-file planDigest",
+      planApprovalSignatures: "--approval-file signatures",
+      recoveryTransactions: "--recovery-file",
+    },
   });
   if (hre.globalOptions?.buildProfile !== "production") {
     throw new Error(
@@ -877,10 +894,7 @@ export const main = async (chainProfile) => {
   });
 
   if (Object.keys(config.recoveryTransactions).length > 0 && config.mode !== "execute") {
-    throw new Error(
-      `${MAINNET_PROFILE.recoveryTransactionsEnvironmentName} is accepted only in confirmed ` +
-        "execute mode",
-    );
+    throw new Error("--recovery-file is accepted only by the explicit execute command");
   }
   assertRecoveryClaims(existingCheckpoint, config.recoveryTransactions);
 
@@ -940,7 +954,8 @@ export const main = async (chainProfile) => {
           `An incomplete protocol release checkpoint (${existingCheckpoint.status}/` +
             `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. A blank plan digest ` +
             "cannot create a new plan or claim that no transaction was broadcast. Review and " +
-            "resume the existing checkpoint with its approved digest and owner approvals.",
+            `resume the existing checkpoint with ${MAINNET_PROFILE.releaseExecuteCommand} -- ` +
+            "--approval-file <path> and the approved digest and owner signatures.",
         );
       }
       await revalidateCompletedRelease({
@@ -1002,19 +1017,18 @@ export const main = async (chainProfile) => {
     console.log(`  report:         ${PLAN_REPORT_PATH}`);
     console.log("\nRequired EIP-191 message for at least two Safe owners to sign:");
     console.log(planApprovalMessage);
-    console.log("\nAfter reviewing the report, execute or resume with:");
     console.log(
-      `  ${MAINNET_PROFILE.planDigestEnvironmentName}=${plan.planDigest} ` +
-        `${MAINNET_PROFILE.planApprovalSignaturesEnvironmentName}='["0x...","0x..."]' ` +
-        MAINNET_PROFILE.releaseCommand,
+      "\nAfter reviewing the report and collecting the required signatures, create an approval JSON file:",
     );
+    console.log(`  {"planDigest":"${plan.planDigest}","signatures":["0x...","0x..."]}`);
+    console.log("Then execute or resume with:");
+    console.log(`  ${MAINNET_PROFILE.releaseExecuteCommand} -- --approval-file <path>`);
     return;
   }
 
   if (config.configuredPlanDigest !== planDigest.toLowerCase()) {
     throw new Error(
-      `${MAINNET_PROFILE.planDigestEnvironmentName} does not match the current reviewed ` +
-        "release plan",
+      "The approval file planDigest does not match the current reviewed release plan",
     );
   }
   const planApproval = verifyMainnetPlanApprovals({
@@ -1148,7 +1162,7 @@ export const main = async (chainProfile) => {
       expectedNonces,
       expectedIntents: releaseIntents,
       budgetEnvironmentName: MAINNET_PROFILE.maximumCostEnvironmentName,
-      recoveryEnvironmentName: MAINNET_PROFILE.recoveryTransactionsEnvironmentName,
+      recoveryEnvironmentName: "--recovery-file",
       nativeSymbol: CHAIN_PROFILE.nativeSymbol,
       gasChargingPolicy: MAINNET_PROFILE.gasChargingPolicy,
     });
@@ -1177,6 +1191,31 @@ export const main = async (chainProfile) => {
       gasChargingPolicy: MAINNET_PROFILE.gasChargingPolicy,
       saveCheckpoint,
     });
+    if (Object.keys(config.recoveryTransactions).length > 0) {
+      checkpoint.status = "paused";
+      checkpoint.error = null;
+      delete checkpoint.failedPhase;
+      await saveCheckpoint();
+      await writeReport({
+        checkpoint,
+        config,
+        sourceState,
+        releaseInputs,
+        buildState,
+        safeOperationalAcceptance,
+      });
+      console.log(
+        `${CHAIN_PROFILE.displayName} Mainnet recovery evidence was adopted; no new transaction ` +
+          "was broadcast by this run.",
+      );
+      console.log(`  state:  ${STATE_PATH}`);
+      console.log(`  report: ${REPORT_PATH}`);
+      console.log(
+        `Resume with ${MAINNET_PROFILE.releaseExecuteCommand} -- --approval-file <path> and ` +
+          "omit --recovery-file.",
+      );
+      return;
+    }
 
     checkpoint.phase = "timelock-deployment";
     await saveCheckpoint();

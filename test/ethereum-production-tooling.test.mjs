@@ -155,23 +155,40 @@ describe("Ethereum production tooling profiles", function () {
     const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
     expect(packageJson.scripts).to.include({
       "espace:acceptance": "node scripts/espace-acceptance-command.mjs",
-      "espace:mainnet:safe": "node scripts/espace-mainnet-safe-command.mjs",
+      "espace:mainnet:safe:plan": "node scripts/espace-mainnet-safe-command.mjs --plan",
+      "espace:mainnet:safe:execute": "node scripts/espace-mainnet-safe-command.mjs --execute",
       "espace:mainnet:safe:status": "node scripts/espace-mainnet-safe-command.mjs --status",
-      "espace:mainnet:release": "node scripts/espace-mainnet-release-command.mjs",
+      "espace:mainnet:release:plan": "node scripts/espace-mainnet-release-command.mjs --plan",
+      "espace:mainnet:release:execute": "node scripts/espace-mainnet-release-command.mjs --execute",
       "ethereum:acceptance": "node scripts/ethereum-acceptance-command.mjs",
-      "ethereum:mainnet:safe": "node scripts/ethereum-mainnet-safe-command.mjs",
+      "ethereum:mainnet:safe:plan": "node scripts/ethereum-mainnet-safe-command.mjs --plan",
+      "ethereum:mainnet:safe:execute": "node scripts/ethereum-mainnet-safe-command.mjs --execute",
       "ethereum:mainnet:safe:status": "node scripts/ethereum-mainnet-safe-command.mjs --status",
-      "ethereum:mainnet:release": "node scripts/ethereum-mainnet-release-command.mjs",
+      "ethereum:mainnet:release:plan": "node scripts/ethereum-mainnet-release-command.mjs --plan",
+      "ethereum:mainnet:release:execute":
+        "node scripts/ethereum-mainnet-release-command.mjs --execute",
     });
+    for (const removedName of [
+      "espace:mainnet:safe",
+      "espace:mainnet:release",
+      "ethereum:mainnet:safe",
+      "ethereum:mainnet:release",
+    ]) {
+      expect(packageJson.scripts).not.to.have.property(removedName);
+    }
     for (const name of [
       "espace:acceptance",
-      "espace:mainnet:safe",
+      "espace:mainnet:safe:plan",
+      "espace:mainnet:safe:execute",
       "espace:mainnet:safe:status",
-      "espace:mainnet:release",
+      "espace:mainnet:release:plan",
+      "espace:mainnet:release:execute",
       "ethereum:acceptance",
-      "ethereum:mainnet:safe",
+      "ethereum:mainnet:safe:plan",
+      "ethereum:mainnet:safe:execute",
       "ethereum:mainnet:safe:status",
-      "ethereum:mainnet:release",
+      "ethereum:mainnet:release:plan",
+      "ethereum:mainnet:release:execute",
     ]) {
       expect(packageJson.scripts[name], name).not.to.include("$npm_config_net");
     }
@@ -219,14 +236,9 @@ describe("Ethereum production tooling profiles", function () {
       "EVM_MAINNET_SAFE_OWNERS",
       "EVM_MAINNET_SAFE_SALT_NONCE",
       "EVM_MAINNET_SAFE_MAX_NATIVE",
-      "EVM_MAINNET_SAFE_PLAN_DIGEST",
-      "EVM_MAINNET_SAFE_RECOVERY_TX",
       "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
-      "EVM_MAINNET_PLAN_DIGEST",
-      "EVM_MAINNET_PLAN_APPROVAL_SIGNATURES",
       "EVM_MAINNET_MAX_NATIVE",
       "EVM_MAINNET_TESTNET_RELEASE_REPORT",
-      "EVM_MAINNET_RECOVERY_TXS",
     ]) {
       expect(example, name).to.include(`${name}=`);
     }
@@ -585,7 +597,9 @@ describe("Ethereum production tooling profiles", function () {
     expect(shared).to.include("chainProfile.mainnet.deploymentDirectoryName");
     expect(shared).to.include('".mainnet-command.lock"');
     expect(shared).to.include("`.mainnet-${kind}-command.lock`");
-    expect(shared).to.include("arguments_.length !== 0");
+    expect(shared).to.include("parseMainnetSafeCommandArguments");
+    expect(shared).to.include("parseMainnetReleaseCommandArguments");
+    expect(shared).to.include('"--approval-file"');
     expect(shared).to.include("PRODUCTION_BUILD_LOCK_PATH");
     expect(shared).to.include("productionBuildLockPath(ROOT)");
     expect(locks).to.include('".production-build.lock"');

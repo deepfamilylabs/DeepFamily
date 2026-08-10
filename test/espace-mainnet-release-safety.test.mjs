@@ -208,6 +208,41 @@ describe("eSpace Mainnet release safety", function () {
     ).to.throw("blank while generating a plan");
   });
 
+  it("can label wrapper-provided approval and recovery inputs without exposing bridge env names", function () {
+    const commandInputLabels = {
+      planDigest: "--approval-file planDigest",
+      planApprovalSignatures: "--approval-file signatures",
+      recoveryTransactions: "--recovery-file",
+    };
+    expect(() =>
+      parseMainnetAuthorization(
+        baseEnv({ EVM_MAINNET_PLAN_DIGEST: "0x1234" }),
+        ESPACE_CHAIN_PROFILE,
+        { planDigestLabel: commandInputLabels.planDigest },
+      ),
+    ).to.throw("--approval-file planDigest");
+    expect(() =>
+      parseESpaceMainnetReleaseConfig({
+        env: baseEnv({ EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST }),
+        networkName: "conflux",
+        chainId: 1030n,
+        commandInputLabels,
+      }),
+    ).to.throw("--approval-file signatures");
+    expect(() =>
+      parseESpaceMainnetReleaseConfig({
+        env: baseEnv({
+          EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+          EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES,
+          EVM_MAINNET_RECOVERY_TXS: JSON.stringify({ unknownReleaseStep: PLAN_DIGEST }),
+        }),
+        networkName: "conflux",
+        chainId: 1030n,
+        commandInputLabels,
+      }),
+    ).to.throw("--recovery-file contains an unknown release label");
+  });
+
   it("cryptographically requires distinct approvals from the expected Safe owners", async function () {
     const ownerWallets = [
       new ethers.Wallet(`0x${"11".repeat(32)}`),

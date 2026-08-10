@@ -1,8 +1,7 @@
 /**
  * Conflux eSpace Mainnet protocol release:
- *   npm run espace:mainnet:release
- *   EVM_MAINNET_PLAN_DIGEST=0x... \
- *     npm run espace:mainnet:release
+ *   npm run espace:mainnet:release:plan
+ *   npm run espace:mainnet:release:execute -- --approval-file <path>
  */
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { main, publicError } from "./evm-mainnet-release.mjs";

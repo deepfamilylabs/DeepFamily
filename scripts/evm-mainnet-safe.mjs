@@ -89,13 +89,16 @@ const configureChainProfile = (chainProfile) => {
 const nowIso = () => new Date().toISOString();
 const sameAddress = (left, right) =>
   String(left ?? "").toLowerCase() === String(right ?? "").toLowerCase();
+const reviewedExecuteCommand = (digest = "<reviewed-digest>") =>
+  `${MAINNET_PROFILE.safeExecuteCommand} -- --digest ${digest}`;
 
 const assertSafeCommandWrapper = async () => {
   const expectedToken = String(process.env[WRAPPER_TOKEN_ENV] ?? "").trim();
   const expectedSharedToken = String(process.env[SHARED_WRAPPER_TOKEN_ENV] ?? "").trim();
   if (expectedToken === "" || expectedSharedToken === "") {
     throw new Error(
-      `Use ${MAINNET_PROFILE.safeCommand} or ${MAINNET_PROFILE.safeStatusCommand}; ` +
+      `Use ${MAINNET_PROFILE.safePlanCommand}, ${MAINNET_PROFILE.safeExecuteCommand}, or ` +
+        `${MAINNET_PROFILE.safeStatusCommand}; ` +
         "direct script execution is forbidden",
     );
   }
@@ -110,7 +113,7 @@ const assertSafeCommandWrapper = async () => {
     throw new Error("Shared mainnet command wrapper lock is missing or does not match");
   }
   const mode = String(process.env[WRAPPER_MODE_ENV] ?? "").trim();
-  if (mode !== "run" && mode !== "status") {
+  if (!new Set(["plan", "execute", "status"]).has(mode)) {
     throw new Error("Mainnet Safe command wrapper mode is invalid");
   }
   return mode;
@@ -298,9 +301,9 @@ const assertRecoveryClaim = (checkpoint, config) => {
   const entry = checkpoint?.transactions?.[TRANSACTION_LABEL];
   if (!entry || entry.status !== "planned" || entry.hash) {
     throw new Error(
-      `${MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName} requires a hashless planned ` +
-        "createGovernanceSafe " +
-        "checkpoint entry",
+      "--recovery-tx requires a hashless planned " +
+        "createGovernanceSafe checkpoint entry. Resume recovery with " +
+        reviewedExecuteCommand(checkpoint?.planDigest),
     );
   }
 };
@@ -596,9 +599,12 @@ const runStatus = async ({ connection, ethers, provider }) => {
 export const main = async (chainProfile) => {
   configureChainProfile(chainProfile);
   const wrapperMode = await assertSafeCommandWrapper();
-  if (wrapperMode === "run") {
-    // Reject an incorrect or half-filled authorization pair before opening the configured RPC.
-    parseMainnetSafeAuthorization(process.env, CHAIN_PROFILE);
+  if (wrapperMode !== "status") {
+    // Reject malformed command input and any wrapper/child mode mismatch before opening the RPC.
+    const authorization = parseMainnetSafeAuthorization(process.env, CHAIN_PROFILE);
+    if (authorization.mode !== wrapperMode) {
+      throw new Error("Mainnet Safe command mode does not match its reviewed digest input");
+    }
   }
 
   const connection = await hre.network.connect();
@@ -683,8 +689,9 @@ export const main = async (chainProfile) => {
     assertRecoveryClaim(existingCheckpoint, config);
   } else if (config.recoveryTransaction) {
     throw new Error(
-      `${MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName} requires an existing hashless ` +
-        "planned checkpoint",
+      "--recovery-tx requires an existing hashless " +
+        `planned checkpoint; ${MAINNET_PROFILE.safeExecuteCommand} cannot recover an unmanaged ` +
+        "deployment",
     );
   }
 
@@ -712,8 +719,8 @@ export const main = async (chainProfile) => {
     ) {
       throw new Error(
         "The predicted Safe now has code while its checkpoint has no transaction hash. " +
-          `Supply the independently verified original hash in ` +
-          `${MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName}.`,
+          "Supply the independently verified original hash with --recovery-tx, then resume with " +
+          `${reviewedExecuteCommand(planDigest)}.`,
       );
     }
     if (["confirmed", "finalized"].includes(entry.status) && predictedCode === "0x") {
@@ -725,9 +732,11 @@ export const main = async (chainProfile) => {
     if (existingCheckpoint && existingCheckpoint.status !== "passed") {
       throw new Error(
         `An incomplete Safe deployment checkpoint (${existingCheckpoint.status}/` +
-          `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. A blank plan digest ` +
+          `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. ` +
+          `${MAINNET_PROFILE.safePlanCommand} ` +
           "cannot create a new plan or claim that no transaction was broadcast. Review the " +
-          "checkpoint and resume it with its approved digest; use the documented " +
+          "checkpoint and resume with " +
+          `${reviewedExecuteCommand(planDigest)}; use the documented ` +
           "recovery hash flow when the planned transaction hash was not persisted.",
       );
     }
@@ -755,7 +764,7 @@ export const main = async (chainProfile) => {
         decodedSetup,
         sourceState,
         safeToolInputs,
-        reportPath: PLAN_REPORT_PATH,
+        reportPath: REPORT_PATH,
         mode: "plan",
       });
       console.log(
@@ -766,7 +775,7 @@ export const main = async (chainProfile) => {
       console.log(
         `  governance ready: ${completed.operationalAcceptance.governanceReady ? "yes" : "no"}`,
       );
-      console.log(`  report:            ${PLAN_REPORT_PATH}`);
+      console.log(`  report:            ${REPORT_PATH}`);
       return;
     }
     await writeSafeReport({
@@ -791,17 +800,14 @@ export const main = async (chainProfile) => {
     console.log(`  plan digest:    ${planDigest}`);
     console.log(`  report:         ${PLAN_REPORT_PATH}`);
     console.log("\nAfter independent review, deploy or resume with:");
-    console.log(
-      `  ${MAINNET_PROFILE.safePlanDigestEnvironmentName}=${planDigest} ` +
-        MAINNET_PROFILE.safeCommand,
-    );
+    console.log(`  ${reviewedExecuteCommand(planDigest)}`);
     return;
   }
 
   if (config.configuredPlanDigest !== planDigest.toLowerCase()) {
     throw new Error(
-      `${MAINNET_PROFILE.safePlanDigestEnvironmentName} does not match the current reviewed ` +
-        "Safe plan",
+      `The digest supplied to ${MAINNET_PROFILE.safeExecuteCommand} does not match the current ` +
+        "reviewed Safe plan",
     );
   }
   if (existingCheckpoint?.status === "passed") {
@@ -887,8 +893,9 @@ export const main = async (chainProfile) => {
       ) {
         throw new Error(
           "The predicted Safe acquired code after preflight while its checkpoint still has no " +
-            "transaction hash. Supply the independently verified original hash in " +
-            `${MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName}.`,
+            "transaction hash. Supply the independently verified original hash with " +
+            "--recovery-tx, then resume with " +
+            `${reviewedExecuteCommand(planDigest)}.`,
         );
       }
       checkpoint = lockedCheckpoint;
@@ -949,7 +956,7 @@ export const main = async (chainProfile) => {
       expectedNonces: { [TRANSACTION_LABEL]: deployerNonce },
       expectedIntents: [intent],
       budgetEnvironmentName: MAINNET_PROFILE.safeMaximumCostEnvironmentName,
-      recoveryEnvironmentName: MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName,
+      recoveryEnvironmentName: "--recovery-tx",
       nativeSymbol: CHAIN_PROFILE.nativeSymbol,
       gasChargingPolicy: MAINNET_PROFILE.gasChargingPolicy,
     });
@@ -958,8 +965,8 @@ export const main = async (chainProfile) => {
       if ((await provider.getCode(predictedSafeAddress)) !== "0x") {
         throw new Error(
           "The predicted Safe acquired code immediately before factory broadcast. Supply the " +
-            `independently verified original hash in ` +
-            `${MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName}.`,
+            "independently verified original hash with --recovery-tx, then resume with " +
+            `${reviewedExecuteCommand(planDigest)}.`,
         );
       }
       await simulateFactoryCreation({

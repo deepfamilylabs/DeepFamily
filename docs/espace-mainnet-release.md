@@ -1,15 +1,17 @@
 # Conflux eSpace Mainnet Safe bootstrap and release
 
-The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has three deliberately
-separate commands:
+The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has five deliberately
+explicit commands:
 
-- `npm run espace:mainnet:safe` predicts and, after explicit approval, deploys one canonical
-  governance Safe through its pinned factory call;
+- `npm run espace:mainnet:safe:plan` predicts one canonical governance Safe without broadcasting;
+- `npm run espace:mainnet:safe:execute -- --digest 0x...` deploys or resumes that exact reviewed
+  Safe plan through its pinned factory call;
 - `npm run espace:mainnet:safe:status` performs read-only validation of the deployment and the
   real-owner smoke transaction;
-- `npm run espace:mainnet:release` plans and, after a separate approval, deploys the Timelock and
-  protocol, verifies sources, waits for finality, checks terminal governance, and records a
-  resumable checkpoint.
+- `npm run espace:mainnet:release:plan` produces the read-only Timelock and protocol release plan;
+- `npm run espace:mainnet:release:execute -- --approval-file <path>` verifies the separate owner
+  approval file, deploys or resumes the reviewed release, verifies sources, waits for finality,
+  checks terminal governance, and records a resumable checkpoint.
 
 Use only these npm commands. Do not invoke either lower-level `.mjs` entry with `hardhat run`. The
 release wrapper holds the shared production-build lock, performs the complete
@@ -150,21 +152,16 @@ EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 
 # Safe creation: owner order and this explicit decimal uint256 determine the address.
 EVM_MAINNET_SAFE_SALT_NONCE=2026072301
-# Set explicitly for this operation; espace:mainnet:safe interprets the value as CFX.
+# Set explicitly for this operation; espace:mainnet:safe:* interprets the value as CFX.
 EVM_MAINNET_SAFE_MAX_NATIVE=0.2
-EVM_MAINNET_SAFE_PLAN_DIGEST=
-EVM_MAINNET_SAFE_RECOVERY_TX=
 # Fill only after two real owners complete the documented external smoke transaction.
 EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 
-# Protocol release: separate budget, authorization and recovery; shared finality policy is above.
-# Set explicitly for this operation; espace:mainnet:release interprets the value as CFX.
+# Protocol release: separate budget; authorization and recovery use explicit JSON files.
+# Set explicitly for this operation; espace:mainnet:release:* interprets the value as CFX.
 EVM_MAINNET_MAX_NATIVE=5
 # Exact reviewed release-rehearsal report copied to a regular path inside this checkout.
 EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/espace-release-rehearsal.json
-EVM_MAINNET_PLAN_DIGEST=
-EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
-EVM_MAINNET_RECOVERY_TXS=
 ```
 
 For a fresh release, leave `GOVERNANCE_OWNER` empty: the orchestrator deploys
@@ -203,25 +200,25 @@ Final receipts record both `gasUsed` and Conflux `gasCharged`; actual cost uses
 `gasUsed × effectiveGasPrice` assumption.
 
 The receipt/finality policy is shared through `EVM_MAINNET_CONFIRMATIONS` and
-`EVM_MAINNET_FINALITY_TIMEOUT`, but the Safe budget, plan digest, and single recovery hash remain
-independent from the protocol release variables with similar names. Never copy a Safe plan digest
-into the release digest or use one operation's budget/recovery evidence for the other.
+`EVM_MAINNET_FINALITY_TIMEOUT`, but the Safe budget, digest argument, and optional recovery hash
+remain independent from the protocol release budget, approval file, and recovery file. Never put a
+Safe digest or recovery hash into a release approval/recovery file, or use one operation's budget or
+evidence for the other.
 
 ## Create and validate the production Safe
 
 ### 1. Generate a read-only Safe plan
 
-Confirm that these two values are empty:
+Confirm that the not-yet-deployed governance address is empty:
 
 ```dotenv
 GOVERNANCE_MULTISIG=
-EVM_MAINNET_SAFE_PLAN_DIGEST=
 ```
 
 `PRIVATE_KEY` is not needed for this read-only phase. Run:
 
 ```bash
-npm run espace:mainnet:safe
+npm run espace:mainnet:safe:plan
 ```
 
 The command is restricted to chain `1030`. It verifies the raw RPC chain ID, clean Git state,
@@ -245,17 +242,11 @@ plan and a fresh independent review.
 
 ### 2. Deploy or resume the reviewed Safe
 
-After approval, copy the exact printed digest:
-
-```dotenv
-EVM_MAINNET_SAFE_PLAN_DIGEST=0x...
-```
-
-Set `PRIVATE_KEY` only to the approved `EVM_MAINNET_EXPECTED_DEPLOYER` key and run the same
-command:
+After approval, set `PRIVATE_KEY` only to the approved `EVM_MAINNET_EXPECTED_DEPLOYER` key and pass
+the exact printed digest to the explicit execute command:
 
 ```bash
-npm run espace:mainnet:safe
+npm run espace:mainnet:safe:execute -- --digest 0x...
 ```
 
 The command recomputes the complete plan before any broadcast, requires enough deployer balance for
@@ -315,10 +306,10 @@ will reject that Safe state; stop and obtain a new reviewed operational decision
 
 ## Plan, approve, and execute the protocol release
 
-First run the command with `EVM_MAINNET_PLAN_DIGEST` empty:
+First run the explicit read-only plan command:
 
 ```bash
-npm run espace:mainnet:release
+npm run espace:mainnet:release:plan
 ```
 
 This is the default read-only plan. It must not broadcast a transaction. The command still performs
@@ -333,19 +324,23 @@ The plan also prints one exact UTF-8 EIP-191 approval message. At least two of t
 production Safe owners must independently compare the plan and archived testnet report, then sign
 that complete message using their normal external hardware-wallet/wallet signing workflow. Do not
 sign only the digest, retype the message, or give an owner key to this repository. Collect the two
-signatures as a one-line JSON array.
+signatures and the exact printed digest in an approval JSON file inside this checkout, for example
+`tmp/release-evidence/espace-mainnet-release-approval.json`:
 
-Only after that review and owner approval, copy the exact printed digest and signatures into `.env`:
-
-```dotenv
-EVM_MAINNET_PLAN_DIGEST=0x...
-EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
+```json
+{
+  "planDigest": "0x...",
+  "signatures": ["0xFirstOwnerSignature...", "0xSecondOwnerSignature..."]
+}
 ```
 
-Then run the exact same command (do not replace it with a direct Hardhat/script invocation):
+The file must be a regular, non-symlink JSON file under the repository root and contain exactly
+`planDigest` and `signatures`. Only after review and owner approval, run the explicit execute command
+(do not replace it with a direct Hardhat/script invocation):
 
 ```bash
-npm run espace:mainnet:release
+npm run espace:mainnet:release:execute -- \
+  --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
 ```
 
 Execution recomputes the plan and recovers each signer from the exact EIP-191 message. It requires
@@ -415,8 +410,9 @@ Protocol release uses:
 commit, build information, ConfluxScan links, and external approval record to controlled immutable
 storage. Do not rely on the deployment machine as the sole copy.
 
-If either command exits, loses RPC connectivity, or is restarted, rerun that same npm command with
-the same reviewed inputs and authorization. It validates its checkpoint and on-chain state, skips
+If an execute command exits, loses RPC connectivity, or is restarted, rerun that same explicit npm
+execute command with the same reviewed digest or approval file and all other inputs. It validates
+its checkpoint and on-chain state, skips
 only completed phases that still match, and resumes at the first safe incomplete phase. A completed
 Safe or release rerun is read-only revalidation only while its pinned initial terminal state still
 matches. It does not deploy another copy or rewrite/downgrade an archived successful checkpoint.
@@ -425,13 +421,13 @@ the initial-release runner is expected to reject current-state revalidation; use
 archived completion report as historical release evidence and the governance status tasks for the
 new state.
 
-For Safe creation, an incomplete execution checkpoint must be resumed with its original reviewed
-digest. Clearing that field does not turn an interrupted execution back into a fresh plan:
-blank-digest mode stops and points to the existing checkpoint, so it can never
-claim “no transaction was broadcast” after a planned, submitted, or confirmed factory step exists.
-The protocol release applies the same rule to an incomplete 14-step checkpoint. For an already
-completed checkpoint, blank-authorization mode performs read-only revalidation while the pinned
-initial state remains unchanged; it does not emit a new “no broadcast” plan.
+For Safe creation, an incomplete execution checkpoint must be resumed with
+`espace:mainnet:safe:execute` and its original reviewed digest. The Safe plan command stops when an
+incomplete checkpoint exists, so it can never claim “no transaction was broadcast” after a planned,
+submitted, or confirmed factory step. The release plan command applies the same rule to an
+incomplete 14-step checkpoint; resume it with `espace:mainnet:release:execute` and the original
+approval file. A completed execute rerun performs read-only revalidation while the pinned initial
+state remains unchanged; it does not emit a new “no broadcast” plan.
 
 Never delete or edit the checkpoint to make a rerun proceed. Never use `deploy:timelock` or
 `deploy:net` after a timeout merely because the terminal did not print an address.
@@ -444,38 +440,45 @@ phase. First recover the transaction hash using the approved deployer address an
 from the RPC and ConfluxScan, and verify its chain, sender, nonce, destination or creation input,
 value, calldata, receipt, and resulting contract address.
 
-For the Safe creator's single factory call, set only the independently verified hash:
-
-```dotenv
-EVM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
-```
-
-Keep the same reviewed `EVM_MAINNET_SAFE_PLAN_DIGEST`, owner order, salt, deployer, and all other
-Safe inputs, then rerun:
+For the Safe creator's single factory call, keep the same reviewed digest, owner order, salt,
+deployer, and all other Safe inputs, then pass only the independently verified hash to execute:
 
 ```bash
-npm run espace:mainnet:safe
+npm run espace:mainnet:safe:execute -- \
+  --digest 0xReviewedSafePlanDigest \
+  --recovery-tx 0xTransactionHash
 ```
 
-This recovery variable is accepted only in execute mode and only when the checkpoint contains a
+The recovery option is accepted only by the execute command and only when the checkpoint contains a
 hashless planned `createGovernanceSafe` entry. The tool verifies the original sender, nonce,
 factory target, calldata, proxy address, receipt, runtime, and profile before adopting it. If the
 predicted address has code but there is no matching checkpoint and independently verified factory
-hash, the creator refuses to adopt that unmanaged deployment. Clear the recovery variable after
-the checkpoint records it.
+hash, the creator refuses to adopt that unmanaged deployment. After the checkpoint records it,
+resume without `--recovery-tx`.
 
-For protocol release, supply independently verified missing hashes as a one-line JSON object whose
-keys are the exact transaction labels printed in the failure message:
+For protocol release, put independently verified missing hashes in a regular JSON file under the
+repository root whose keys are the exact transaction labels printed in the failure message, for
+example `tmp/release-evidence/espace-mainnet-release-recovery.json`:
 
-```dotenv
-EVM_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
+```json
+{
+  "exact-runner-label": "0xTransactionHash"
+}
 ```
 
-Run the same command again. Recovery input does not authorize a new transaction: it only lets the
+Run execute with both the original approval and recovery files:
+
+```bash
+npm run espace:mainnet:release:execute -- \
+  --approval-file tmp/release-evidence/espace-mainnet-release-approval.json \
+  --recovery-file tmp/release-evidence/espace-mainnet-release-recovery.json
+```
+
+Recovery input does not authorize a new transaction: it only lets the
 runner match an already-mined transaction to the expected phase and persist evidence after all
 sender, nonce, input, receipt, address, code, and state checks pass. Unknown labels, extra hashes,
-failed/replaced transactions, or any mismatch stop the release. Remove the recovery variable after
-the checkpoint has adopted the evidence.
+failed/replaced transactions, or any mismatch stop the release. After the checkpoint has adopted
+the evidence, resume with the approval file only and omit `--recovery-file`.
 
 If any integrated deployment transaction is known to have succeeded but the expected full
 deployment metadata cannot be reconstructed and validated, the runner stops in a manual-recovery
@@ -501,7 +504,7 @@ Repository automated tests and this documentation change never execute or broadc
 on eSpace Mainnet. Transactional test coverage runs only on an in-process local Hardhat chain; pure
 safety/recovery tests use fixtures. A chain-1030 Safe factory or release broadcast is possible only
 when an operator explicitly runs the corresponding production npm command with that tool's
-reviewed digest configured.
+reviewed digest or approval file.
 
 Apart from read-only validation of the recorded acceptance transaction, repository production
 commands do not sign for or operate the Safe. Subsequent configuration, treasury spending, verifier

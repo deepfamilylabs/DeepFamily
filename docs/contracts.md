@@ -415,18 +415,25 @@ For a new Conflux eSpace Mainnet governance wallet, configure the approved deplo
 distinct EOA/hardware-wallet owner addresses in their final order, a fixed
 `EVM_MAINNET_SAFE_SALT_NONCE`, and a separate Safe factory-call budget in
 `EVM_MAINNET_SAFE_MAX_NATIVE`. The `espace:mainnet:*` command interprets that shared setting as CFX;
-set it explicitly for the current plan/execution rather than carrying it across chains. Keep the Safe
-plan digest and `GOVERNANCE_MULTISIG` empty, then generate a read-only plan:
+set it explicitly for the current plan/execution rather than carrying it across chains. Keep
+`GOVERNANCE_MULTISIG` empty, then generate a read-only plan:
 
 ```bash
-npm run espace:mainnet:safe
+npm run espace:mainnet:safe:plan
 ```
 
 The creator supports only canonical Safe v1.3.0, the exact ordered three-owner setup, and threshold
-`2`. Owner order and salt both change the deterministic address. After independent review, set the
-exact printed `EVM_MAINNET_SAFE_PLAN_DIGEST`, then run the same command to deploy or safely resume
-the one factory call. The creator reads only public addresses; owner private keys,
-signatures, seed phrases, and keystores must remain in the controllers' external signing system.
+`2`. Owner order and salt both change the deterministic address. After independent review, pass the
+exact printed digest to the explicit execute command:
+
+```bash
+npm run espace:mainnet:safe:execute -- --digest 0x...
+```
+
+Rerunning that command with the same digest safely resumes the one factory call. Only a hashless
+checkpoint recovery adds `--recovery-tx 0xTransactionHash`. The creator reads only public addresses;
+owner private keys, signatures, seed phrases, and keystores must remain in the controllers' external
+signing system.
 
 Before protocol release, two real owners must externally execute the documented refund-free
 `0 CFX`, empty-calldata `CALL` to `EVM_MAINNET_EXPECTED_DEPLOYER`. Put the outer transaction
@@ -441,11 +448,11 @@ Only after that read-only validation should the reviewed address be copied to
 execution (`nonce == 1`); do not submit another Safe transaction before release planning and
 execution finish.
 
-Then run the protocol release command with its separate plan digest, CFX budget, block-confirmation
-count, finality timeout, and recovery mapping:
+Then run the protocol release plan command with its separate CFX budget, block-confirmation count,
+finality timeout, and testnet evidence:
 
 ```bash
-npm run espace:mainnet:release
+npm run espace:mainnet:release:plan
 ```
 
 Before this command can plan a release, the development proving keys must have been replaced with
@@ -468,10 +475,27 @@ Acceptance modes deliberately prove different things:
 - a fresh Mainnet release follows the same zero-wait shape. Its 48-hour Timelock delay constrains
   the first future governance operation, not deployment itself.
 
-With `EVM_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
-After review, at least two current Safe owners sign the complete printed EIP-191 plan-approval
-message externally. Set the printed digest, the resulting JSON signature array in
-`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES`, and rerun to execute or resume. The
+The plan command is always read-only. After review, at least two current Safe owners sign the
+complete printed EIP-191 plan-approval message externally. Store the printed digest and signatures
+in the operation-specific, Git-ignored
+`tmp/release-evidence/espace-mainnet-release-approval.json` file containing exactly these fields:
+
+```json
+{
+  "planDigest": "0x...",
+  "signatures": ["0xFirstOwnerSignature...", "0xSecondOwnerSignature..."]
+}
+```
+
+Then execute or resume with:
+
+```bash
+npm run espace:mainnet:release:execute -- --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
+```
+
+For a hashless protocol checkpoint, put the exact runner-label-to-transaction-hash mapping in a
+separate Git-ignored `tmp/release-evidence/espace-mainnet-release-recovery.json` file and add
+`--recovery-file tmp/release-evidence/espace-mainnet-release-recovery.json` to that execute command. The
 orchestrator deploys and validates the Timelock before the protocol, records an atomic checkpoint,
 verifies every source, waits for finalized coverage, and validates the terminal governance state.
 It does not write test person/NFT/story data to Mainnet. Full configuration and recovery
@@ -485,12 +509,14 @@ equivalent fixed entries are:
 # Destructive Sepolia acceptance; chain ID is fixed to 11155111.
 npm run ethereum:acceptance
 
-# Ethereum Mainnet Safe plan/execute and read-only owner-smoke validation.
-npm run ethereum:mainnet:safe
+# Ethereum Mainnet Safe plan, digest-bound execute, and read-only owner-smoke validation.
+npm run ethereum:mainnet:safe:plan
+npm run ethereum:mainnet:safe:execute -- --digest 0x...
 npm run ethereum:mainnet:safe:status
 
-# Ethereum Mainnet protocol plan/execute.
-npm run ethereum:mainnet:release
+# Ethereum Mainnet protocol plan and approval-file-bound execute.
+npm run ethereum:mainnet:release:plan
+npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
 ```
 
 The Ethereum production flow requires
@@ -498,12 +524,14 @@ The Ethereum production flow requires
 exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
 `EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
 reviewed production ZK setup artifacts, and an exact Sepolia schema-v4 fresh-release rehearsal
-report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands default to read-only
-plan mode while their respective plan digest is blank. Protocol
-execution additionally requires `EVM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct
-valid EIP-191 signatures from at least two current Safe owners over the exact printed approval
-message. Filling the reviewed authorization values and rerunning enters execute/resume mode and
-broadcasts real Mainnet transactions.
+report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. Safe planning and execution are separate commands;
+the execute command requires the exact reviewed digest through `--digest`. Protocol release planning
+and execution are also separate commands. Release execution requires an operation-specific approval
+JSON file with the exact printed `planDigest` and distinct valid EIP-191 `signatures` from at least
+two current Safe owners over the complete printed approval message. A Safe hashless-checkpoint
+recovery uses `--recovery-tx`, while protocol recovery uses a separate runner-label-to-hash JSON file
+at `tmp/release-evidence/ethereum-mainnet-release-recovery.json` through `--recovery-file`. These
+transient authorization and recovery values do not belong in long-lived environment configuration.
 
 As with eSpace, the repository never accepts a production Safe owner's private key. After Safe
 deployment, two real owners must externally execute the exact refund-free zero-ETH smoke
