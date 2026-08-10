@@ -1,9 +1,10 @@
 /**
  * Conflux eSpace Mainnet Safe wrapper:
- *   npm run espace:mainnet:safe
+ *   npm run espace:mainnet:safe:plan
+ *   npm run espace:mainnet:safe:execute -- --digest 0x...
  *   npm run espace:mainnet:safe:status
  *
- * Plan is the default. Execute requires the reviewed digest documented in
+ * Plan and execute are explicit. Execute requires the reviewed digest documented in
  * docs/espace-mainnet-release.md. This wrapper does not accept a caller-selected network.
  */
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";

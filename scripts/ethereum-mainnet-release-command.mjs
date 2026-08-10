@@ -1,9 +1,10 @@
 /**
  * Ethereum Mainnet protocol release wrapper:
- *   npm run ethereum:mainnet:release
+ *   npm run ethereum:mainnet:release:plan
+ *   npm run ethereum:mainnet:release:execute -- --approval-file <path>
  *
- * Plan is the default. Execute/resume requires the reviewed digest and owner approvals documented
- * in docs/ethereum-mainnet-release.md. Any command-line argument is rejected.
+ * Plan and execute are explicit. Execute/resume requires the reviewed approval file documented in
+ * docs/ethereum-mainnet-release.md.
  */
 import { ETHEREUM_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { runMainnetReleaseCommand } from "./lib/mainnetCommandWrapper.mjs";

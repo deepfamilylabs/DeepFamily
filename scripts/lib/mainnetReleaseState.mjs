@@ -435,8 +435,8 @@ const assertCumulativeActualCost = ({
 /**
  * Builds the transaction boundary used by the mainnet release. Every transaction is persisted as
  * planned before broadcast, then submitted and confirmed. A consumed planned nonce is never
- * resent; the operator must supply the original hash through the selected profile's recovery
- * environment variable.
+ * resent; the operator must supply the original hash through the selected command's explicit
+ * recovery input.
  */
 export const createCheckpointedTransactionExecutor = ({
   provider,
@@ -448,7 +448,7 @@ export const createCheckpointedTransactionExecutor = ({
   expectedNonces = {},
   expectedIntents = {},
   budgetEnvironmentName = "EVM_MAINNET_MAX_NATIVE",
-  recoveryEnvironmentName = "EVM_MAINNET_RECOVERY_TXS",
+  recoveryEnvironmentName = "recovery input",
   nativeSymbol = "CFX",
   gasChargingPolicy = GAS_CHARGING_CONFLUX_THREE_QUARTER,
 }) => {

@@ -2,16 +2,22 @@ import fs from "node:fs/promises";
 import { expect } from "chai";
 
 describe("eSpace Mainnet Safe command wiring", function () {
-  it("exposes separate plan/deploy and status npm entry points", async function () {
+  it("exposes separate plan, execute and status npm entry points", async function () {
     const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
-    expect(packageJson.scripts["espace:mainnet:safe"]).to.equal(
-      "node scripts/espace-mainnet-safe-command.mjs",
+    expect(packageJson.scripts["espace:mainnet:safe:plan"]).to.equal(
+      "node scripts/espace-mainnet-safe-command.mjs --plan",
+    );
+    expect(packageJson.scripts["espace:mainnet:safe:execute"]).to.equal(
+      "node scripts/espace-mainnet-safe-command.mjs --execute",
     );
     expect(packageJson.scripts["espace:mainnet:safe:status"]).to.equal(
       "node scripts/espace-mainnet-safe-command.mjs --status",
     );
-    expect(packageJson.scripts["espace:mainnet:release"]).to.equal(
-      "node scripts/espace-mainnet-release-command.mjs",
+    expect(packageJson.scripts["espace:mainnet:release:plan"]).to.equal(
+      "node scripts/espace-mainnet-release-command.mjs --plan",
+    );
+    expect(packageJson.scripts["espace:mainnet:release:execute"]).to.equal(
+      "node scripts/espace-mainnet-release-command.mjs --execute",
     );
   });
 
@@ -97,6 +103,33 @@ describe("eSpace Mainnet Safe command wiring", function () {
     expect(source).to.include("exactlyMatchesApprovedPlan");
   });
 
+  it("preserves the original Safe plan report during completed-state revalidation", async function () {
+    const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
+    const planBranch = source.indexOf('if (config.mode === "plan")');
+    const completedBranch = source.indexOf(
+      'if (existingCheckpoint?.status === "passed")',
+      planBranch,
+    );
+    const freshPlanWrite = source.indexOf("await writeSafeReport({", completedBranch + 1);
+    const completedSource = source.slice(completedBranch, freshPlanWrite);
+
+    expect(planBranch).to.be.greaterThan(-1);
+    expect(completedBranch).to.be.greaterThan(planBranch);
+    expect(completedSource).to.include("reportPath: REPORT_PATH");
+    expect(completedSource).not.to.include("reportPath: PLAN_REPORT_PATH");
+  });
+
+  it("points Safe operators to explicit plan and digest-bearing execute commands", async function () {
+    const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
+    expect(source).to.include("MAINNET_PROFILE.safePlanCommand");
+    expect(source).to.include("MAINNET_PROFILE.safeExecuteCommand");
+    expect(source).to.include("reviewedExecuteCommand(planDigest)");
+    expect(source).to.include("-- --digest ${digest}");
+    expect(source).not.to.include(
+      "`${MAINNET_PROFILE.safePlanDigestEnvironmentName}=${planDigest}",
+    );
+  });
+
   it("rechecks a hashless factory step after taking the execution lock", async function () {
     const source = await fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8");
     const lockStart = source.indexOf("const releaseLock =");
@@ -120,20 +153,35 @@ describe("eSpace Mainnet Safe command wiring", function () {
     expect(source).to.include("revalidation passed");
     expect(source).to.include("governanceSafeOperationalAcceptance");
     expect(source).to.include("safeOperationalAcceptance?.finality");
+    const recoveryExit = source.indexOf("Mainnet recovery evidence was adopted");
+    const nextDeploymentPhase = source.indexOf(
+      'checkpoint.phase = "timelock-deployment"',
+      recoveryExit,
+    );
+    expect(recoveryExit).to.be.greaterThan(-1);
+    expect(nextDeploymentPhase).to.be.greaterThan(recoveryExit);
+    expect(source.slice(recoveryExit, nextDeploymentPhase)).to.include("return;");
   });
 
-  it("documents every Safe-specific authorization, budget and recovery input", async function () {
+  it("documents persistent Safe configuration without one-shot command inputs", async function () {
     const example = await fs.readFile(".env.example", "utf8");
     for (const name of [
       "EVM_MAINNET_SAFE_SALT_NONCE",
       "EVM_MAINNET_SAFE_MAX_NATIVE",
       "EVM_MAINNET_CONFIRMATIONS",
       "EVM_MAINNET_FINALITY_TIMEOUT",
-      "EVM_MAINNET_SAFE_PLAN_DIGEST",
-      "EVM_MAINNET_SAFE_RECOVERY_TX",
       "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
     ]) {
       expect(example, name).to.include(`${name}=`);
+    }
+    for (const name of [
+      "EVM_MAINNET_SAFE_PLAN_DIGEST",
+      "EVM_MAINNET_SAFE_RECOVERY_TX",
+      "EVM_MAINNET_PLAN_DIGEST",
+      "EVM_MAINNET_PLAN_APPROVAL_SIGNATURES",
+      "EVM_MAINNET_RECOVERY_TXS",
+    ]) {
+      expect(example, name).not.to.include(`${name}=`);
     }
   });
 });

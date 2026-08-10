@@ -246,18 +246,21 @@ commit, artifact digest, production delay, ZK status, verification, finality and
 
 For a new production governance wallet, first configure three reviewed EOA/hardware-wallet owner
 addresses in their final order, a fixed decimal salt nonce, the approved deployer, the Safe-only
-CFX limit, and the shared Mainnet finality policy. Keep `GOVERNANCE_MULTISIG` and
-`EVM_MAINNET_SAFE_PLAN_DIGEST` empty, then generate a read-only deterministic deployment plan:
+CFX limit, and the shared Mainnet finality policy. Keep `GOVERNANCE_MULTISIG` empty, then generate a
+read-only deterministic deployment plan:
 
 ```bash
-npm run espace:mainnet:safe
+npm run espace:mainnet:safe:plan
 ```
 
 The creator is fixed to canonical Safe v1.3.0 with exactly three ordered EOA owners and a `2/3`
 threshold. Owner order and `EVM_MAINNET_SAFE_SALT_NONCE` both affect the predicted address.
-After an independent review, set `EVM_MAINNET_SAFE_PLAN_DIGEST` to the exact printed digest, then
-run the same command to deploy or resume. It reads only public owner addresses and never accepts an
-owner private key.
+After an independent review, pass the exact printed digest to the explicit execute command to deploy
+or resume. It reads only public owner addresses and never accepts an owner private key:
+
+```bash
+npm run espace:mainnet:safe:execute -- --digest 0x...
+```
 
 Deployment alone does not prove that the real controllers can sign. Two owners must use their
 external signing workflow to execute the documented refund-free `0 CFX`, empty-calldata `CALL` to
@@ -272,18 +275,31 @@ Only then copy the reviewed Safe address to `GOVERNANCE_MULTISIG`. That acceptan
 Safe's first and only execution (`nonce == 1`) until the protocol release plan and execution
 complete.
 
-Next use the resumable protocol orchestrator. With `EVM_MAINNET_PLAN_DIGEST` empty, this command is
-read-only:
+Next use the resumable protocol orchestrator's explicit read-only plan command:
 
 ```bash
-npm run espace:mainnet:release
+npm run espace:mainnet:release:plan
 ```
 
 Every release invocation performs the complete clean `release:preflight` gate. Review the plan with
 a second operator. At least two current Safe owners must sign the complete printed EIP-191
-plan-approval message using their external wallet/hardware-wallet workflow. Copy the printed digest to
-`EVM_MAINNET_PLAN_DIGEST`, put the signatures in
-`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES`, and run the same command to execute or resume.
+plan-approval message using their external wallet/hardware-wallet workflow. Put the exact printed
+digest and signatures in a regular JSON file inside the repository, for example:
+
+```json
+{
+  "planDigest": "0x...",
+  "signatures": ["0xFirstOwnerSignature...", "0xSecondOwnerSignature..."]
+}
+```
+
+Then execute or resume with that reviewed file:
+
+```bash
+npm run espace:mainnet:release:execute -- \
+  --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
+```
+
 The repository recovers the owner addresses and rejects a changed plan, report, Safe or owner set;
 it never receives an owner private key.
 It checkpoints every phase, verifies every contract, waits for finalized coverage, and validates
@@ -309,32 +325,44 @@ clean release commit with `EVM_E2E_MODE=release-rehearsal`,
 `GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, verification/finality enabled, and
 `MIN_DELAY` exactly equal to `EVM_E2E_MIN_DELAY`.
 
-For Mainnet, configure three reviewed public owner addresses and a fixed salt, then leave the Safe
-plan digest blank to create a read-only plan:
+For Mainnet, configure three reviewed public owner addresses and a fixed salt, then create a
+read-only Safe plan:
 
 ```bash
-npm run ethereum:mainnet:safe
+npm run ethereum:mainnet:safe:plan
 ```
 
-After independent review, setting `EVM_MAINNET_SAFE_PLAN_DIGEST` to the exact printed digest and
-rerunning broadcasts the real Safe factory transaction. Two real owners must then execute the
-documented zero-ETH smoke transaction externally; this repository never accepts owner private keys.
-Record its outer hash and validate it without broadcasting:
+After independent review, pass the exact printed digest to the explicit execute command; this
+broadcasts the real Safe factory transaction:
+
+```bash
+npm run ethereum:mainnet:safe:execute -- --digest 0x...
+```
+
+Two real owners must then execute the documented zero-ETH smoke transaction externally; this
+repository never accepts owner private keys. Record its outer hash and validate it without
+broadcasting:
 
 ```bash
 npm run ethereum:mainnet:safe:status
 ```
 
-Finally, leave the release plan digest blank for a read-only protocol plan:
+Finally, generate the read-only protocol plan:
 
 ```bash
-npm run ethereum:mainnet:release
+npm run ethereum:mainnet:release:plan
 ```
 
 At least two current Safe owners must sign the complete EIP-191 plan-approval message printed by
-plan mode. Setting `EVM_MAINNET_PLAN_DIGEST` to the independently reviewed digest and
-`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES` to those external signatures before rerunning enters
-execute/resume mode, broadcasts real Ethereum Mainnet transactions, and spends real ETH. A real
+plan mode. Store the independently reviewed digest and those external signatures in the same
+`planDigest`/`signatures` approval JSON shape shown above, then execute or resume with:
+
+```bash
+npm run ethereum:mainnet:release:execute -- \
+  --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
+```
+
+This broadcasts real Ethereum Mainnet transactions and spends real ETH. A real
 `EXPLORER_API_KEY` is mandatory for Ethereum Mainnet source verification; Sepolia
 acceptance uses API-key-free Blockscout. See the complete
 environment, owner-smoke, approval, checkpoint, resumption, and recovery procedure in the
@@ -394,8 +422,8 @@ owned by the Timelock: `DeepFamilyToken.owner()` remains permanently zero. Treas
 separate delayed operation approved through the governance multisig.
 
 The governance examples below use `confluxTestnet` for a stepwise rehearsal. For the initial eSpace
-Mainnet deployment, use `npm run espace:mainnet:release`; direct deployment commands are retained
-for advanced recovery and other supported networks.
+Mainnet deployment, start with `npm run espace:mainnet:release:plan`; direct deployment commands are
+retained for advanced recovery and other supported networks.
 
 ```bash
 MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \

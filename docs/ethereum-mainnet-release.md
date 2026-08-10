@@ -1,26 +1,29 @@
 # Ethereum Mainnet Safe bootstrap and release
 
 The guarded Ethereum production path is fixed to Ethereum Mainnet (`mainnet`, chain ID `1`) and
-uses three explicit commands:
+uses five explicit commands:
 
-- `npm run ethereum:mainnet:safe` predicts a canonical governance Safe and, only after an
-  independently reviewed approval, broadcasts its single factory transaction;
+- `npm run ethereum:mainnet:safe:plan` predicts a canonical governance Safe without broadcasting;
+- `npm run ethereum:mainnet:safe:execute -- --digest 0x...` deploys or resumes that Safe only from
+  its independently reviewed plan digest;
 - `npm run ethereum:mainnet:safe:status` performs read-only validation of the Safe deployment and
   the real-owner acceptance transaction;
-- `npm run ethereum:mainnet:release` creates a read-only protocol release plan and, only after a
-  separate approval, broadcasts or resumes the protocol release.
+- `npm run ethereum:mainnet:release:plan` creates a read-only protocol release plan;
+- `npm run ethereum:mainnet:release:execute -- --approval-file <path>` broadcasts or resumes only
+  from a separate operation-specific approval JSON file.
 
 Use these npm commands directly. Do not invoke the lower-level `.mjs` files, add a different
-`--network`, or reuse an eSpace digest or recovery value. The public entries select an
+`--network`, or reuse an eSpace digest, approval file, or recovery value. The public entries select an
 immutable Ethereum profile in code: Mainnet chain ID `1`, canonical Safe v1.3.0 **L1** singleton,
 three ordered EOA owners, threshold `2`, Etherscan verification, ETH budgets, Ethereum receipt gas
-accounting, and `deployments/mainnet/` checkpoints. Environment variables can supply approved
-addresses, limits, and authorization, but cannot change those profile properties.
+accounting, and `deployments/mainnet/` checkpoints. Environment variables supply stable approved
+addresses, limits, and evidence; explicit commands and one-operation files supply authorization and
+recovery without persisting those transient values in `.env`.
 
 The eSpace and Ethereum production commands share the public `EVM_MAINNET_*` setting names. The
-named command fixes their chain, plan-digest domain, native unit, and evidence requirements;
-before switching command families, clear and replace every identity, budget, authorization,
-report, and recovery value rather than reusing it across chains.
+named command fixes their chain, plan-digest domain, native unit, and evidence requirements. Review
+and replace the persistent public identities and testnet report when switching command families;
+never reuse a digest, approval file, or recovery file across chains.
 
 These commands have not, merely by existing or by passing repository tests, deployed anything on
 Ethereum Mainnet. Plan mode makes RPC reads and writes local plan files but does not broadcast.
@@ -123,8 +126,6 @@ EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 EVM_MAINNET_SAFE_SALT_NONCE=2026072401
 # Set explicitly for this operation; ethereum:mainnet:safe interprets the value as ETH.
 EVM_MAINNET_SAFE_MAX_NATIVE=0.1
-EVM_MAINNET_SAFE_PLAN_DIGEST=
-EVM_MAINNET_SAFE_RECOVERY_TX=
 EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 
 # Protocol release phase.
@@ -132,9 +133,6 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 EVM_MAINNET_MAX_NATIVE=1
 # Exact reviewed Sepolia report copied to a regular path inside this checkout.
 EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/ethereum-release-rehearsal.json
-EVM_MAINNET_PLAN_DIGEST=
-EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
-EVM_MAINNET_RECOVERY_TXS=
 ```
 
 The protocol release command requires a schema-v4 fresh-release report with release-ready status,
@@ -159,25 +157,25 @@ funds before broadcasts.
 Ethereum charged gas is accounted from the receipt as
 `gasUsed × effectiveGasPrice`; the Conflux three-quarter gas-limit rule is not used.
 
-The Safe and release plan digests are deliberately independent. A blank digest means plan mode;
-setting the exact reviewed digest printed by that plan means execute/resume mode. Protocol release
-execution separately requires the reviewed Safe-owner approval signatures.
+The Safe and release plan digests are deliberately independent. Plan and execute are separate npm
+commands: Safe execution receives its reviewed digest through `--digest`, while protocol release
+execution receives its digest and reviewed Safe-owner signatures from an operation-specific approval
+JSON file. Neither authorization belongs in persistent `.env` configuration.
 
 ## Phase A: create and accept the governance Safe
 
 ### A1. Generate a read-only Safe plan
 
-Leave the following values blank:
+Keep `GOVERNANCE_MULTISIG` blank while planning a fresh Safe:
 
 ```dotenv
 GOVERNANCE_MULTISIG=
-EVM_MAINNET_SAFE_PLAN_DIGEST=
 ```
 
 Run:
 
 ```bash
-npm run ethereum:mainnet:safe
+npm run ethereum:mainnet:safe:plan
 ```
 
 The command is hard-locked to network `mainnet` and raw RPC chain ID `1`. It checks the canonical
@@ -196,23 +194,18 @@ printed plan digest.
 
 ### A2. Execute or resume the reviewed factory call
 
-After independent approval, set the exact output value:
-
-```dotenv
-EVM_MAINNET_SAFE_PLAN_DIGEST=0x...
-```
-
-Set `PRIVATE_KEY` to the approved deployer key and run the same command:
+After independent approval, keep `PRIVATE_KEY` set only to the approved deployer key and pass the
+exact printed digest to the explicit execute command:
 
 ```bash
-npm run ethereum:mainnet:safe
+npm run ethereum:mainnet:safe:execute -- --digest 0x...
 ```
 
 This is a real Mainnet transaction. The tool recomputes the complete plan, rejects drift, records a
 checkpoint before broadcast, waits for confirmations/finality, and validates the resulting Safe's
 singleton, owners, threshold, nonce `0`, empty module set, zero guard, and canonical fallback
-handler. Rerunning with the same checkpoint resumes or revalidates; it does not intentionally
-deploy a second Safe.
+handler. Rerunning the same execute command with the same reviewed digest resumes or revalidates; it
+does not intentionally deploy a second Safe.
 
 ### A3. Prove real 2-of-3 owner control
 
@@ -246,23 +239,16 @@ Keep the Safe frozen at nonce `1` until the protocol release completes.
 
 ### B1. Generate a read-only release plan
 
-Leave the release digest and approval signatures blank:
-
-```dotenv
-EVM_MAINNET_PLAN_DIGEST=
-EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
-```
-
 Run:
 
 ```bash
-npm run ethereum:mainnet:release
+npm run ethereum:mainnet:release:plan
 ```
 
 The wrapper obtains per-chain and shared production-build locks, runs the complete
 `npm run release:preflight` gate, and invokes the Mainnet engine with compilation disabled without
 releasing the shared build lock.
-Plan mode makes chain reads and writes:
+Plan mode performs chain reads, does not broadcast, and writes this local plan file:
 
 ```text
 deployments/mainnet/mainnet-release-plan.json
@@ -280,17 +266,21 @@ Sepolia report, then sign the complete printed EIP-191 message with their extern
 hardware-wallet/wallet workflow. The repository accepts only the resulting signatures and never
 their private keys. Do not sign only the digest or retype the message.
 
-After collecting the signatures, set:
+After collecting the signatures, create an operation-specific JSON file inside this repository. It
+must be a regular, non-symlink file containing exactly `planDigest` and `signatures`, for example
+the Git-ignored `tmp/release-evidence/ethereum-mainnet-release-approval.json`:
 
-```dotenv
-EVM_MAINNET_PLAN_DIGEST=0x...
-EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
+```json
+{
+  "planDigest": "0x...",
+  "signatures": ["0xFirstOwnerSignature...", "0xSecondOwnerSignature..."]
+}
 ```
 
-Run the same command:
+Keep this reviewed file unchanged for execution and any resume, then run:
 
 ```bash
-npm run ethereum:mainnet:release
+npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
 ```
 
 This execute phase first recomputes the plan and requires distinct valid signatures from at least
@@ -329,31 +319,41 @@ from racing in this checkout. A repository-wide production-build lock also preve
 Ethereum release wrappers from cleaning/replacing the same Hardhat artifacts concurrently. These
 locks do not replace the team's external release coordination.
 
-After an ordinary RPC interruption, rerun the exact same npm command with unchanged reviewed
-inputs. The checkpoint validates completed phases and resumes at the first safe incomplete phase.
-Never edit or delete a checkpoint to force progress.
+After an ordinary RPC interruption, rerun the same Safe execute command with its unchanged digest,
+or the same release execute command with its unchanged approval file. The checkpoint validates
+completed phases and resumes at the first safe incomplete phase. Never edit or delete a checkpoint
+to force progress.
 
 If the Safe factory transaction was accepted by the RPC but its hash was not persisted, first
 recover and independently validate the exact chain, sender, nonce, target, value, calldata, receipt,
-and proxy result. Then set:
+and proxy result. Keep the original Safe digest and supply the recovered hash only for that resume:
 
-```dotenv
-EVM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
+```bash
+npm run ethereum:mainnet:safe:execute -- --digest 0xApprovedPlanDigest --recovery-tx 0xTransactionHash
 ```
 
-Keep the original Safe digest and rerun `npm run ethereum:mainnet:safe`. The recovery
-hash can only adopt a transaction matching the checkpointed intent; it does not authorize a new
-broadcast.
+The recovery hash can only adopt a transaction matching the checkpointed intent; it does not
+authorize a new broadcast. Once adopted, later revalidation does not need `--recovery-tx`.
 
-For a hashless planned protocol phase, use the exact label printed by the runner:
+For a hashless planned protocol phase, create a regular, non-symlink recovery JSON file inside this
+repository using the exact label printed by the runner, for example
+the Git-ignored `tmp/release-evidence/ethereum-mainnet-release-recovery.json`:
 
-```dotenv
-EVM_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
+```json
+{
+  "exact-runner-label": "0xTransactionHash"
+}
 ```
 
-Keep the original release digest and rerun `npm run ethereum:mainnet:release`.
+Keep the original approval file and run:
+
+```bash
+npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json --recovery-file tmp/release-evidence/ethereum-mainnet-release-recovery.json
+```
+
 Unknown labels, extra hashes, failed/replaced transactions, or sender/nonce/input/address/code/state
-mismatches stop recovery. Clear recovery variables after the checkpoint adopts the evidence.
+mismatches stop recovery. Once the checkpoint adopts the evidence, later resumes can omit
+`--recovery-file` while continuing to use the unchanged approval file.
 
 Preserve stale lock files and checkpoints after abnormal termination until operators have proved no
 related process or transaction remains active. Do not remove a lock simply to silence an error.

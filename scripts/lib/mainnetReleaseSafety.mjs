@@ -156,6 +156,7 @@ const parsePlanApprovalSignatures = ({ value, environmentName, authorizationMode
 export const parseMainnetAuthorization = (
   env = process.env,
   chainProfile = ESPACE_CHAIN_PROFILE,
+  { planDigestLabel = chainProfile.mainnet.planDigestEnvironmentName } = {},
 ) => {
   const mainnet = chainProfile.mainnet;
   const configuredPlanDigest = String(env[mainnet.planDigestEnvironmentName] ?? "").trim();
@@ -163,9 +164,7 @@ export const parseMainnetAuthorization = (
     return Object.freeze({ mode: "plan", configuredPlanDigest: null });
   }
   if (!ethers.isHexString(configuredPlanDigest, 32)) {
-    throw new Error(
-      `${mainnet.planDigestEnvironmentName} must be the 32-byte digest printed by a reviewed plan`,
-    );
+    throw new Error(`${planDigestLabel} must be the 32-byte digest printed by a reviewed plan`);
   }
   return Object.freeze({
     mode: "execute",
@@ -178,9 +177,15 @@ export const parseProductionMainnetReleaseConfig = ({
   env = process.env,
   networkName,
   chainId,
+  commandInputLabels = {},
 } = {}) => {
   const mainnet = chainProfile.mainnet;
-  const authorization = parseMainnetAuthorization(env, chainProfile);
+  const planDigestLabel = commandInputLabels.planDigest ?? mainnet.planDigestEnvironmentName;
+  const planApprovalSignaturesLabel =
+    commandInputLabels.planApprovalSignatures ?? mainnet.planApprovalSignaturesEnvironmentName;
+  const recoveryTransactionsLabel =
+    commandInputLabels.recoveryTransactions ?? mainnet.recoveryTransactionsEnvironmentName;
+  const authorization = parseMainnetAuthorization(env, chainProfile, { planDigestLabel });
   if (networkName !== mainnet.networkName) {
     throw new Error(
       `${chainProfile.displayName} mainnet release is restricted to network ` +
@@ -277,7 +282,7 @@ export const parseProductionMainnetReleaseConfig = ({
   }
   const planApprovalSignatures = parsePlanApprovalSignatures({
     value: env[mainnet.planApprovalSignaturesEnvironmentName],
-    environmentName: mainnet.planApprovalSignaturesEnvironmentName,
+    environmentName: planApprovalSignaturesLabel,
     authorizationMode: authorization.mode,
     ownerCount: expectedSafeOwners.length,
   });
@@ -302,7 +307,7 @@ export const parseProductionMainnetReleaseConfig = ({
     testnetReleaseReportPath: testnetReleaseReportPath === "" ? null : testnetReleaseReportPath,
     recoveryTransactions: parseRecoveryTransactions(
       env[mainnet.recoveryTransactionsEnvironmentName],
-      mainnet.recoveryTransactionsEnvironmentName,
+      recoveryTransactionsLabel,
     ),
     safeAcceptanceTransaction: parseSafeAcceptanceTransaction(
       env[mainnet.safeAcceptanceTransactionEnvironmentName],

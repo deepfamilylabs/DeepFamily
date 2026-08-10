@@ -1,8 +1,7 @@
 /**
  * Ethereum Mainnet Safe:
- *   npm run ethereum:mainnet:safe
- *   EVM_MAINNET_SAFE_PLAN_DIGEST=0x... \
- *     npm run ethereum:mainnet:safe
+ *   npm run ethereum:mainnet:safe:plan
+ *   npm run ethereum:mainnet:safe:execute -- --digest 0x...
  *   npm run ethereum:mainnet:safe:status
  */
 import { ETHEREUM_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
