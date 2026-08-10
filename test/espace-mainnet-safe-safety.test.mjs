@@ -2,7 +2,6 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 
 import {
-  ESPACE_MAINNET_SAFE_CONFIRMATION,
   ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN,
   assertMainnetSafePlanMatchesCheckpoint,
   buildMainnetSafePlanFingerprint,
@@ -26,7 +25,6 @@ const RECOVERY_TX = `0x${"cd".repeat(32)}`;
 const RELEASE_COMMIT = "12".repeat(20);
 
 const baseEnv = (overrides = {}) => ({
-  EVM_MAINNET_SAFE_CONFIRM: "",
   EVM_MAINNET_SAFE_PLAN_DIGEST: "",
   EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
   EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
@@ -91,11 +89,10 @@ const fingerprintArguments = (overrides = {}) => {
 };
 
 describe("eSpace Mainnet Safe creation safety", function () {
-  it("uses an atomic blank authorization pair for plan mode", function () {
+  it("uses a blank reviewed-plan digest for plan mode", function () {
     const authorization = parseESpaceMainnetSafeAuthorization(baseEnv());
     expect(authorization).to.deep.equal({
       mode: "plan",
-      confirmation: null,
       configuredPlanDigest: null,
     });
     // Planning must not depend on or even inspect a deployer private key.
@@ -103,43 +100,16 @@ describe("eSpace Mainnet Safe creation safety", function () {
     expect(parseMainnetSafeAuthorization(baseEnv())).to.deep.equal(authorization);
   });
 
-  it("requires the exact confirmation and a 32-byte reviewed digest for execute mode", function () {
+  it("uses only a valid 32-byte reviewed digest for execute mode", function () {
     const config = parse({
-      EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
       EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST.toUpperCase().replace("0X", "0x"),
     });
     expect(config.mode).to.equal("execute");
-    expect(config.confirmation).to.equal(ESPACE_MAINNET_SAFE_CONFIRMATION);
     expect(config.configuredPlanDigest).to.equal(PLAN_DIGEST);
 
     expect(() =>
       parseESpaceMainnetSafeAuthorization(
         baseEnv({
-          EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
-          EVM_MAINNET_SAFE_PLAN_DIGEST: "",
-        }),
-      ),
-    ).to.throw("must either both be blank");
-    expect(() =>
-      parseESpaceMainnetSafeAuthorization(
-        baseEnv({
-          EVM_MAINNET_SAFE_CONFIRM: "",
-          EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
-        }),
-      ),
-    ).to.throw("must either both be blank");
-    expect(() =>
-      parseESpaceMainnetSafeAuthorization(
-        baseEnv({
-          EVM_MAINNET_SAFE_CONFIRM: "yes",
-          EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
-        }),
-      ),
-    ).to.throw(`must be exactly ${ESPACE_MAINNET_SAFE_CONFIRMATION}`);
-    expect(() =>
-      parseESpaceMainnetSafeAuthorization(
-        baseEnv({
-          EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
           EVM_MAINNET_SAFE_PLAN_DIGEST: "0x1234",
         }),
       ),
@@ -204,15 +174,14 @@ describe("eSpace Mainnet Safe creation safety", function () {
     expect(() => parse({ EVM_MAINNET_FINALITY_TIMEOUT: "59" })).to.throw("between 60 and 604800");
   });
 
-  it("accepts a recovery hash only in confirmed execute mode", function () {
+  it("accepts a recovery hash only in reviewed-digest execute mode", function () {
     expect(parse().recoveryTransaction).to.equal(null);
     expect(() => parse({ EVM_MAINNET_SAFE_RECOVERY_TX: "0x12" })).to.throw("blank or a 32-byte");
     expect(() => parse({ EVM_MAINNET_SAFE_RECOVERY_TX: RECOVERY_TX })).to.throw(
-      "only in confirmed execute mode",
+      "only in execute mode",
     );
     expect(
       parse({
-        EVM_MAINNET_SAFE_CONFIRM: ESPACE_MAINNET_SAFE_CONFIRMATION,
         EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
         EVM_MAINNET_SAFE_RECOVERY_TX: RECOVERY_TX.toUpperCase().replace("0X", "0x"),
       }).recoveryTransaction,

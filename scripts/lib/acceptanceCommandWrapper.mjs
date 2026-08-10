@@ -85,12 +85,6 @@ export const runAcceptanceCommand = async ({
     throw new Error(`Usage: ${chainProfile.acceptance.command}`);
   }
   const acceptance = chainProfile.acceptance;
-  const confirmation = String(environment[acceptance.confirmationEnvironmentName] ?? "").trim();
-  if (confirmation !== acceptance.confirmation) {
-    throw new Error(
-      `${acceptance.confirmationEnvironmentName} must be exactly ${acceptance.confirmation}`,
-    );
-  }
   const mode = String(environment[acceptance.modeEnvironmentName] ?? "diagnostic").trim();
   if (!["diagnostic", "release-rehearsal"].includes(mode)) {
     throw new Error(`${acceptance.modeEnvironmentName} must be diagnostic or release-rehearsal`);

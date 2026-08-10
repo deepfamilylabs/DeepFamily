@@ -416,7 +416,7 @@ distinct EOA/hardware-wallet owner addresses in their final order, a fixed
 `EVM_MAINNET_SAFE_SALT_NONCE`, and a separate Safe factory-call budget in
 `EVM_MAINNET_SAFE_MAX_NATIVE`. The `espace:mainnet:*` command interprets that shared setting as CFX;
 set it explicitly for the current plan/execution rather than carrying it across chains. Keep the Safe
-authorization pair and `GOVERNANCE_MULTISIG` empty, then generate a read-only plan:
+plan digest and `GOVERNANCE_MULTISIG` empty, then generate a read-only plan:
 
 ```bash
 npm run espace:mainnet:safe
@@ -424,9 +424,8 @@ npm run espace:mainnet:safe
 
 The creator supports only canonical Safe v1.3.0, the exact ordered three-owner setup, and threshold
 `2`. Owner order and salt both change the deterministic address. After independent review, set the
-printed `EVM_MAINNET_SAFE_PLAN_DIGEST` and exact
-`EVM_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030`, then run the same command to deploy
-or safely resume the one factory call. The creator reads only public addresses; owner private keys,
+exact printed `EVM_MAINNET_SAFE_PLAN_DIGEST`, then run the same command to deploy or safely resume
+the one factory call. The creator reads only public addresses; owner private keys,
 signatures, seed phrases, and keystores must remain in the controllers' external signing system.
 
 Before protocol release, two real owners must externally execute the documented refund-free
@@ -442,8 +441,8 @@ Only after that read-only validation should the reviewed address be copied to
 execution (`nonce == 1`); do not submit another Safe transaction before release planning and
 execution finish.
 
-Then run the protocol release command with its separate confirmation, digest, CFX budget,
-confirmation count, finality timeout, and recovery mapping:
+Then run the protocol release command with its separate plan digest, CFX budget, block-confirmation
+count, finality timeout, and recovery mapping:
 
 ```bash
 npm run espace:mainnet:release
@@ -469,11 +468,10 @@ Acceptance modes deliberately prove different things:
 - a fresh Mainnet release follows the same zero-wait shape. Its 24-hour Timelock delay constrains
   the first future governance operation, not deployment itself.
 
-With `EVM_MAINNET_CONFIRM` and `EVM_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
+With `EVM_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
 After review, at least two current Safe owners sign the complete printed EIP-191 plan-approval
 message externally. Set the printed digest, the resulting JSON signature array in
-`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES`, plus
-`EVM_MAINNET_CONFIRM=conflux-mainnet-chain-1030` and rerun to execute or resume. The
+`EVM_MAINNET_PLAN_APPROVAL_SIGNATURES`, and rerun to execute or resume. The
 orchestrator deploys and validates the Timelock before the protocol, records an atomic checkpoint,
 verifies every source, waits for finalized coverage, and validates the terminal governance state.
 It does not write test person/NFT/story data to Mainnet. Full configuration and recovery
@@ -499,10 +497,9 @@ The Ethereum production flow requires
 `GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
 exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
 `EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
-the exact chain-1 confirmation strings, reviewed production ZK setup artifacts, and an exact Sepolia
-schema-v4 fresh-release rehearsal report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and
-release commands default to read-only plan mode while their respective confirmation/digest pair is
-blank. Protocol
+reviewed production ZK setup artifacts, and an exact Sepolia schema-v4 fresh-release rehearsal
+report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. The Safe and release commands default to read-only
+plan mode while their respective plan digest is blank. Protocol
 execution additionally requires `EVM_MAINNET_PLAN_APPROVAL_SIGNATURES` containing distinct
 valid EIP-191 signatures from at least two current Safe owners over the exact printed approval
 message. Filling the reviewed authorization values and rerunning enters execute/resume mode and
@@ -540,7 +537,7 @@ when blank, the project can derive them from `INFURA_API_KEY`.
 The named `espace:*` and `ethereum:*` npm entries select immutable profiles in code and verify the
 raw chain ID. Do not invoke lower-level entry scripts with an arbitrary `--network`, copy an
 authorization digest between profiles, or point one profile at another chain. Safe singleton type,
-confirmation string, currency budget, wallet derivation, gas accounting, explorer policy, report
+plan-digest domain, currency budget, wallet derivation, gas accounting, explorer policy, report
 directory and checkpoints all form part of the reviewed evidence.
 
 The wrapper internally fixes the external admin to `address(0)`, makes role membership enumerable,

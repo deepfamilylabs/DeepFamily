@@ -489,7 +489,6 @@ const revalidateCompletedSafe = async ({
 const runStatus = async ({ connection, ethers, provider }) => {
   const statusEnv = {
     ...process.env,
-    [MAINNET_PROFILE.safeConfirmationEnvironmentName]: "",
     [MAINNET_PROFILE.safePlanDigestEnvironmentName]: "",
     [MAINNET_PROFILE.safeRecoveryTransactionEnvironmentName]: "",
   };
@@ -726,9 +725,9 @@ export const main = async (chainProfile) => {
     if (existingCheckpoint && existingCheckpoint.status !== "passed") {
       throw new Error(
         `An incomplete Safe deployment checkpoint (${existingCheckpoint.status}/` +
-          `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. Blank authorization ` +
+          `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. A blank plan digest ` +
           "cannot create a new plan or claim that no transaction was broadcast. Review the " +
-          "checkpoint and resume it with its approved digest and confirmation; use the documented " +
+          "checkpoint and resume it with its approved digest; use the documented " +
           "recovery hash flow when the planned transaction hash was not persisted.",
       );
     }
@@ -794,7 +793,6 @@ export const main = async (chainProfile) => {
     console.log("\nAfter independent review, deploy or resume with:");
     console.log(
       `  ${MAINNET_PROFILE.safePlanDigestEnvironmentName}=${planDigest} ` +
-        `${MAINNET_PROFILE.safeConfirmationEnvironmentName}=${MAINNET_PROFILE.safeConfirmation} ` +
         MAINNET_PROFILE.safeCommand,
     );
     return;

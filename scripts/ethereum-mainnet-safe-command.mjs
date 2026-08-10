@@ -3,7 +3,7 @@
  *   npm run ethereum:mainnet:safe
  *   npm run ethereum:mainnet:safe:status
  *
- * Plan is the default. Execute requires the reviewed digest and exact confirmation documented in
+ * Plan is the default. Execute requires the reviewed digest documented in
  * docs/ethereum-mainnet-release.md. This wrapper does not accept a caller-selected network.
  */
 import { ETHEREUM_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";

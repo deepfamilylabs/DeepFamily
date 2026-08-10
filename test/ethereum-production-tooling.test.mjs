@@ -22,16 +22,12 @@ import {
 import {
   ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN,
   ETHEREUM_MAINNET_SAFE_PLAN_DIGEST_DOMAIN,
-  ETHEREUM_MAINNET_SAFE_CONFIRMATION,
   assertMainnetSafePlanMatchesCheckpoint,
   buildMainnetSafePlanFingerprint,
   deriveMainnetSafePlanDigest,
   parseEthereumMainnetSafeConfig,
 } from "../scripts/lib/mainnetSafeSafety.mjs";
-import {
-  ETHEREUM_MAINNET_CONFIRMATION,
-  parseEthereumMainnetReleaseConfig,
-} from "../scripts/lib/mainnetReleaseSafety.mjs";
+import { parseEthereumMainnetReleaseConfig } from "../scripts/lib/mainnetReleaseSafety.mjs";
 import { chargedGasForReceipt } from "../scripts/lib/mainnetReleaseState.mjs";
 import {
   buildCanonicalSafeDeploymentTransaction,
@@ -52,9 +48,20 @@ const OWNERS = [
 ];
 const PLAN_DIGEST = `0x${"ab".repeat(32)}`;
 const SAFE_ACCEPTANCE_TX = `0x${"ef".repeat(32)}`;
+const PLACEHOLDER_APPROVAL_SIGNATURES = JSON.stringify([
+  ethers.Signature.from({
+    r: `0x${"01".repeat(32)}`,
+    s: `0x${"02".repeat(32)}`,
+    v: 27,
+  }).serialized,
+  ethers.Signature.from({
+    r: `0x${"03".repeat(32)}`,
+    s: `0x${"04".repeat(32)}`,
+    v: 28,
+  }).serialized,
+]);
 
 const ethereumSafeEnv = (overrides = {}) => ({
-  EVM_MAINNET_SAFE_CONFIRM: "",
   EVM_MAINNET_SAFE_PLAN_DIGEST: "",
   EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
   EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
@@ -67,7 +74,6 @@ const ethereumSafeEnv = (overrides = {}) => ({
 });
 
 const ethereumReleaseEnv = (overrides = {}) => ({
-  EVM_MAINNET_CONFIRM: "",
   EVM_MAINNET_PLAN_DIGEST: "",
   EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: "",
   EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
@@ -90,15 +96,12 @@ describe("Ethereum production tooling profiles", function () {
       chainId: 71n,
       productionNetworkName: "conflux",
       productionChainId: 1030n,
-      confirmation: "conflux-testnet-chain-71",
       verificationProvider: "etherscan",
       explorerName: "ConfluxScan",
     });
     expect(ESPACE_CHAIN_PROFILE.mainnet).to.include({
       networkName: "conflux",
       chainId: 1030n,
-      confirmation: "conflux-mainnet-chain-1030",
-      safeConfirmation: "conflux-mainnet-safe-chain-1030",
       deploymentDirectoryName: "conflux",
       gasChargingPolicy: GAS_CHARGING_CONFLUX_THREE_QUARTER,
       verificationProvider: "etherscan",
@@ -109,15 +112,12 @@ describe("Ethereum production tooling profiles", function () {
       chainId: 11155111n,
       productionNetworkName: "mainnet",
       productionChainId: 1n,
-      confirmation: "ethereum-sepolia-chain-11155111",
       verificationProvider: "blockscout",
       explorerName: "Blockscout",
     });
     expect(ETHEREUM_CHAIN_PROFILE.mainnet).to.include({
       networkName: "mainnet",
       chainId: 1n,
-      confirmation: "ethereum-mainnet-chain-1",
-      safeConfirmation: "ethereum-mainnet-safe-chain-1",
       deploymentDirectoryName: "mainnet",
       gasChargingPolicy: GAS_CHARGING_ETHEREUM_RECEIPT,
       verificationProvider: "etherscan",
@@ -204,7 +204,6 @@ describe("Ethereum production tooling profiles", function () {
       "ETHEREUM_SEPOLIA_RPC_URL",
       "ETHEREUM_MAINNET_RPC_URL",
       "EXPLORER_API_KEY",
-      "EVM_E2E_CONFIRM",
       "EVM_E2E_MODE",
       "EVM_E2E_MIN_DELAY",
       "EVM_E2E_CONFIRMATIONS",
@@ -220,11 +219,9 @@ describe("Ethereum production tooling profiles", function () {
       "EVM_MAINNET_SAFE_OWNERS",
       "EVM_MAINNET_SAFE_SALT_NONCE",
       "EVM_MAINNET_SAFE_MAX_NATIVE",
-      "EVM_MAINNET_SAFE_CONFIRM",
       "EVM_MAINNET_SAFE_PLAN_DIGEST",
       "EVM_MAINNET_SAFE_RECOVERY_TX",
       "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
-      "EVM_MAINNET_CONFIRM",
       "EVM_MAINNET_PLAN_DIGEST",
       "EVM_MAINNET_PLAN_APPROVAL_SIGNATURES",
       "EVM_MAINNET_MAX_NATIVE",
@@ -235,39 +232,27 @@ describe("Ethereum production tooling profiles", function () {
     }
   });
 
-  it("shares testnet settings while isolating confirmations and deterministic wallets", function () {
+  it("shares testnet settings while isolating chain guards and deterministic wallets", function () {
     const ethereum = parseEthereumAcceptanceConfig({
-      env: {
-        EVM_E2E_CONFIRM: "ethereum-sepolia-chain-11155111",
-        EVM_E2E_MAX_NATIVE: "0.15",
-      },
+      env: { EVM_E2E_MAX_NATIVE: "0.15" },
       networkName: "sepolia",
       chainId: 11155111n,
     });
     expect(ethereum.chainProfileId).to.equal("ethereum");
     expect(ethereum.nativeSymbol).to.equal("ETH");
+    expect(ethereum.confirmations).to.equal(2);
     expect(ethereum.maximumCost).to.equal("0.15");
 
     expect(() =>
       parseEthereumAcceptanceConfig({
-        env: {
-          EVM_E2E_CONFIRM: "conflux-testnet-chain-71",
-          EVM_E2E_MAX_NATIVE: "0.1",
-        },
+        env: {},
         networkName: "sepolia",
-        chainId: 11155111n,
-      }),
-    ).to.throw("Set EVM_E2E_CONFIRM=ethereum-sepolia-chain-11155111");
-    expect(() =>
-      parseESpaceAcceptanceConfig({
-        env: { EVM_E2E_CONFIRM: "ethereum-sepolia-chain-11155111" },
-        networkName: "confluxTestnet",
         chainId: 71n,
       }),
-    ).to.throw("Set EVM_E2E_CONFIRM=conflux-testnet-chain-71");
+    ).to.throw("requires chainId 11155111");
     expect(() =>
       parseEthereumAcceptanceConfig({
-        env: { EVM_E2E_CONFIRM: "ethereum-sepolia-chain-11155111" },
+        env: {},
         networkName: "confluxTestnet",
         chainId: 71n,
       }),
@@ -290,17 +275,14 @@ describe("Ethereum production tooling profiles", function () {
 
     expect(
       parseEthereumAcceptanceConfig({
-        env: { EVM_E2E_CONFIRM: "ethereum-sepolia-chain-11155111" },
+        env: {},
         networkName: "sepolia",
         chainId: 11155111n,
       }).maximumCost,
     ).to.equal("0.2");
     expect(() =>
       parseEthereumAcceptanceConfig({
-        env: {
-          EVM_E2E_CONFIRM: "ethereum-sepolia-chain-11155111",
-          EVM_E2E_MAX_NATIVE: "0.200000000000000001",
-        },
+        env: { EVM_E2E_MAX_NATIVE: "0.200000000000000001" },
         networkName: "sepolia",
         chainId: 11155111n,
       }),
@@ -308,10 +290,7 @@ describe("Ethereum production tooling profiles", function () {
   });
 
   it("keeps 30-second diagnostics but enforces the production delay floor for rehearsals", function () {
-    const baseEnv = {
-      EVM_E2E_CONFIRM: "ethereum-sepolia-chain-11155111",
-      EVM_E2E_MIN_DELAY: "30",
-    };
+    const baseEnv = { EVM_E2E_MIN_DELAY: "30" };
     const diagnostic = parseEthereumAcceptanceConfig({
       env: {
         ...baseEnv,
@@ -353,7 +332,7 @@ describe("Ethereum production tooling profiles", function () {
     expect(rehearsal.productionMinDelaySeconds).to.equal(86400);
   });
 
-  it("shares public Safe variables but rejects the eSpace exact confirmation on Ethereum", function () {
+  it("shares public Safe variables while retaining Ethereum network, chain and digest guards", function () {
     const config = parseEthereumMainnetSafeConfig({
       env: ethereumSafeEnv(),
       networkName: "mainnet",
@@ -369,23 +348,25 @@ describe("Ethereum production tooling profiles", function () {
       "safeOwnersEnvironmentName",
       "safeSaltNonceEnvironmentName",
       "safeMaximumCostEnvironmentName",
-      "safeConfirmationEnvironmentName",
       "safePlanDigestEnvironmentName",
       "safeRecoveryTransactionEnvironmentName",
       "safeAcceptanceTransactionEnvironmentName",
     ]) {
       expect(ETHEREUM_CHAIN_PROFILE.mainnet[field]).to.equal(ESPACE_CHAIN_PROFILE.mainnet[field]);
     }
+    const execution = parseEthereumMainnetSafeConfig({
+      env: ethereumSafeEnv({ EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST }),
+      networkName: "mainnet",
+      chainId: 1n,
+    });
+    expect(execution).to.include({ mode: "execute", configuredPlanDigest: PLAN_DIGEST });
     expect(() =>
       parseEthereumMainnetSafeConfig({
-        env: ethereumSafeEnv({
-          EVM_MAINNET_SAFE_CONFIRM: "conflux-mainnet-safe-chain-1030",
-          EVM_MAINNET_SAFE_PLAN_DIGEST: PLAN_DIGEST,
-        }),
+        env: ethereumSafeEnv({ EVM_MAINNET_SAFE_PLAN_DIGEST: "0x1234" }),
         networkName: "mainnet",
         chainId: 1n,
       }),
-    ).to.throw(`must be exactly ${ETHEREUM_MAINNET_SAFE_CONFIRMATION}`);
+    ).to.throw("32-byte digest");
     expect(() =>
       parseEthereumMainnetSafeConfig({
         env: ethereumSafeEnv(),
@@ -393,6 +374,13 @@ describe("Ethereum production tooling profiles", function () {
         chainId: 1030n,
       }),
     ).to.throw("restricted to network mainnet");
+    expect(() =>
+      parseEthereumMainnetSafeConfig({
+        env: ethereumSafeEnv(),
+        networkName: "mainnet",
+        chainId: 1030n,
+      }),
+    ).to.throw("requires chainId 1");
   });
 
   it("binds the Safe plan fingerprint and digest to the Ethereum profile", function () {
@@ -462,7 +450,7 @@ describe("Ethereum production tooling profiles", function () {
     ).to.throw("do not match the approved plan digest");
   });
 
-  it("shares public release variables but rejects the eSpace exact confirmation on Ethereum", function () {
+  it("shares public release variables while retaining Ethereum network, chain and digest guards", function () {
     const config = parseEthereumMainnetReleaseConfig({
       env: ethereumReleaseEnv(),
       networkName: "mainnet",
@@ -474,7 +462,6 @@ describe("Ethereum production tooling profiles", function () {
     expect(config.maximumCostWei).to.equal(ethers.parseEther("2"));
 
     for (const field of [
-      "confirmationEnvironmentName",
       "planDigestEnvironmentName",
       "planApprovalSignaturesEnvironmentName",
       "maximumCostEnvironmentName",
@@ -483,16 +470,29 @@ describe("Ethereum production tooling profiles", function () {
     ]) {
       expect(ETHEREUM_CHAIN_PROFILE.mainnet[field]).to.equal(ESPACE_CHAIN_PROFILE.mainnet[field]);
     }
+    const execution = parseEthereumMainnetReleaseConfig({
+      env: ethereumReleaseEnv({
+        EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+        EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES,
+      }),
+      networkName: "mainnet",
+      chainId: 1n,
+    });
+    expect(execution).to.include({ mode: "execute", configuredPlanDigest: PLAN_DIGEST });
     expect(() =>
       parseEthereumMainnetReleaseConfig({
-        env: ethereumReleaseEnv({
-          EVM_MAINNET_CONFIRM: "conflux-mainnet-chain-1030",
-          EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
-        }),
+        env: ethereumReleaseEnv({ EVM_MAINNET_PLAN_DIGEST: "0x1234" }),
         networkName: "mainnet",
         chainId: 1n,
       }),
-    ).to.throw(ETHEREUM_MAINNET_CONFIRMATION);
+    ).to.throw("32-byte digest");
+    expect(() =>
+      parseEthereumMainnetReleaseConfig({
+        env: ethereumReleaseEnv({ EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST }),
+        networkName: "mainnet",
+        chainId: 1n,
+      }),
+    ).to.throw("PLAN_APPROVAL_SIGNATURES must contain approval signatures");
     expect(() =>
       parseEthereumMainnetReleaseConfig({
         env: ethereumReleaseEnv(),
@@ -500,6 +500,13 @@ describe("Ethereum production tooling profiles", function () {
         chainId: 1030n,
       }),
     ).to.throw("restricted to network mainnet");
+    expect(() =>
+      parseEthereumMainnetReleaseConfig({
+        env: ethereumReleaseEnv(),
+        networkName: "mainnet",
+        chainId: 1030n,
+      }),
+    ).to.throw("requires chainId 1");
   });
 
   it("uses the Conflux three-quarter gas floor only on eSpace", function () {

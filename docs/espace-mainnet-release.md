@@ -19,7 +19,7 @@ binds its own pinned deployment inputs instead.
 
 The eSpace and Ethereum commands share reviewed orchestration internals, but the public entry fixes
 an immutable chain profile. This runbook is only for eSpace Mainnet: Safe v1.3.0 L2 singleton,
-CFX budgets, Conflux gas charging, Conflux RPC/ConfluxScan, eSpace confirmation strings, and
+CFX budgets, Conflux gas charging, Conflux RPC/ConfluxScan, eSpace plan-digest domains, and
 `deployments/conflux/` state. Do not append an arbitrary `--network` or substitute Ethereum
 values into the shared `EVM_MAINNET_*` settings. For Ethereum's Safe v1.3.0 L1 profile and
 independent state, use the
@@ -152,7 +152,6 @@ EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 EVM_MAINNET_SAFE_SALT_NONCE=2026072301
 # Set explicitly for this operation; espace:mainnet:safe interprets the value as CFX.
 EVM_MAINNET_SAFE_MAX_NATIVE=0.2
-EVM_MAINNET_SAFE_CONFIRM=
 EVM_MAINNET_SAFE_PLAN_DIGEST=
 EVM_MAINNET_SAFE_RECOVERY_TX=
 # Fill only after two real owners complete the documented external smoke transaction.
@@ -163,7 +162,6 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 EVM_MAINNET_MAX_NATIVE=5
 # Exact reviewed release-rehearsal report copied to a regular path inside this checkout.
 EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/espace-release-rehearsal.json
-EVM_MAINNET_CONFIRM=
 EVM_MAINNET_PLAN_DIGEST=
 EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 EVM_MAINNET_RECOVERY_TXS=
@@ -205,19 +203,18 @@ Final receipts record both `gasUsed` and Conflux `gasCharged`; actual cost uses
 `gasUsed × effectiveGasPrice` assumption.
 
 The receipt/finality policy is shared through `EVM_MAINNET_CONFIRMATIONS` and
-`EVM_MAINNET_FINALITY_TIMEOUT`, but the Safe budget, confirmation/digest pair, and single recovery
-hash remain independent from the protocol release variables with similar names. Never copy a Safe
-plan digest into the release digest or use one operation's budget/recovery evidence for the other.
+`EVM_MAINNET_FINALITY_TIMEOUT`, but the Safe budget, plan digest, and single recovery hash remain
+independent from the protocol release variables with similar names. Never copy a Safe plan digest
+into the release digest or use one operation's budget/recovery evidence for the other.
 
 ## Create and validate the production Safe
 
 ### 1. Generate a read-only Safe plan
 
-Confirm that these three values are empty:
+Confirm that these two values are empty:
 
 ```dotenv
 GOVERNANCE_MULTISIG=
-EVM_MAINNET_SAFE_CONFIRM=
 EVM_MAINNET_SAFE_PLAN_DIGEST=
 ```
 
@@ -248,11 +245,10 @@ plan and a fresh independent review.
 
 ### 2. Deploy or resume the reviewed Safe
 
-After approval, copy the exact printed digest and exact confirmation string:
+After approval, copy the exact printed digest:
 
 ```dotenv
 EVM_MAINNET_SAFE_PLAN_DIGEST=0x...
-EVM_MAINNET_SAFE_CONFIRM=conflux-mainnet-safe-chain-1030
 ```
 
 Set `PRIVATE_KEY` only to the approved `EVM_MAINNET_EXPECTED_DEPLOYER` key and run the same
@@ -319,7 +315,7 @@ will reject that Safe state; stop and obtain a new reviewed operational decision
 
 ## Plan, approve, and execute the protocol release
 
-First run the command with `EVM_MAINNET_CONFIRM` and `EVM_MAINNET_PLAN_DIGEST` empty:
+First run the command with `EVM_MAINNET_PLAN_DIGEST` empty:
 
 ```bash
 npm run espace:mainnet:release
@@ -339,13 +335,11 @@ that complete message using their normal external hardware-wallet/wallet signing
 sign only the digest, retype the message, or give an owner key to this repository. Collect the two
 signatures as a one-line JSON array.
 
-Only after that review and owner approval, copy the exact printed digest, signatures and chain
-confirmation into `.env`:
+Only after that review and owner approval, copy the exact printed digest and signatures into `.env`:
 
 ```dotenv
 EVM_MAINNET_PLAN_DIGEST=0x...
 EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
-EVM_MAINNET_CONFIRM=conflux-mainnet-chain-1030
 ```
 
 Then run the exact same command (do not replace it with a direct Hardhat/script invocation):
@@ -432,8 +426,8 @@ archived completion report as historical release evidence and the governance sta
 new state.
 
 For Safe creation, an incomplete execution checkpoint must be resumed with its original reviewed
-digest and confirmation. Clearing those two fields does not turn an interrupted execution back into
-a fresh plan: blank-authorization mode stops and points to the existing checkpoint, so it can never
+digest. Clearing that field does not turn an interrupted execution back into a fresh plan:
+blank-digest mode stops and points to the existing checkpoint, so it can never
 claim “no transaction was broadcast” after a planned, submitted, or confirmed factory step exists.
 The protocol release applies the same rule to an incomplete 14-step checkpoint. For an already
 completed checkpoint, blank-authorization mode performs read-only revalidation while the pinned
@@ -456,8 +450,8 @@ For the Safe creator's single factory call, set only the independently verified 
 EVM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
 ```
 
-Keep the same reviewed `EVM_MAINNET_SAFE_PLAN_DIGEST`, exact Safe confirmation string, owner
-order, salt, deployer, and all other Safe inputs, then rerun:
+Keep the same reviewed `EVM_MAINNET_SAFE_PLAN_DIGEST`, owner order, salt, deployer, and all other
+Safe inputs, then rerun:
 
 ```bash
 npm run espace:mainnet:safe
@@ -507,7 +501,7 @@ Repository automated tests and this documentation change never execute or broadc
 on eSpace Mainnet. Transactional test coverage runs only on an in-process local Hardhat chain; pure
 safety/recovery tests use fixtures. A chain-1030 Safe factory or release broadcast is possible only
 when an operator explicitly runs the corresponding production npm command with that tool's
-reviewed digest and exact confirmation value configured.
+reviewed digest configured.
 
 Apart from read-only validation of the recorded acceptance transaction, repository production
 commands do not sign for or operate the Safe. Subsequent configuration, treasury spending, verifier
@@ -528,5 +522,5 @@ terminal-state report. Do not mix manual and orchestrated deployment in one rele
 
 Ethereum Mainnet has a separate guarded entry, authorization domain, Etherscan requirement, ETH gas
 accounting, and `deployments/mainnet/` checkpoint tree. Neither EVM compatibility nor identical
-Solidity artifacts makes an eSpace digest, Safe singleton, confirmation string, report, or recovery
-hash valid for Ethereum.
+Solidity artifacts makes an eSpace plan digest, Safe singleton, report, or recovery hash valid for
+Ethereum.
