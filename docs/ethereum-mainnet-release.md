@@ -107,7 +107,7 @@ ZK_PTAU_PATH=
 
 # Production policy.
 GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3
-MIN_DELAY=86400
+MIN_DELAY=172800
 EVM_MAINNET_CONFIRMATIONS=2
 EVM_MAINNET_FINALITY_TIMEOUT=3600
 # Keep blank for a fresh orchestrated release.
@@ -301,7 +301,7 @@ wires the protocol system, hands `DeepFamily` ownership to the Timelock, verifie
 Etherscan, waits for finality, re-reads receipts and block hashes, checks proxy/verifier/Token/
 Reader/Timelock/treasury invariants, and writes its terminal report. It does not create person,
 endorsement, NFT, or story business data on Mainnet. It also deploys no Mock, performs no upgrade,
-and waits for no Timelock operation. `MIN_DELAY=86400` is the on-chain 24-hour policy for future
+and waits for no Timelock operation. `MIN_DELAY=172800` is the on-chain 48-hour policy for future
 governance, not a sleep in the fresh-release command.
 
 `GOVERNANCE_OWNER` remains blank for a fresh run because the orchestrator creates and checkpoints

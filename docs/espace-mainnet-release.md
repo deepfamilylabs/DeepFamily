@@ -138,7 +138,7 @@ ZK_PTAU_PATH=
 # Keep blank until the Safe deployment and real-owner acceptance are independently validated.
 GOVERNANCE_MULTISIG=
 GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1.3.0-2of3
-MIN_DELAY=86400
+MIN_DELAY=172800
 EVM_MAINNET_CONFIRMATIONS=2
 EVM_MAINNET_FINALITY_TIMEOUT=3600
 # Must remain empty for a fresh orchestrated protocol release.
@@ -371,7 +371,7 @@ The normal release sequence is:
    owner, and treasury relationships; write the final report.
 
 This fresh-release sequence performs no Mock deployment, UUPS upgrade, Timelock operation, or
-Timelock wait. The configured 24-hour delay first applies when governance later schedules a fee,
+Timelock wait. The configured 48-hour delay first applies when governance later schedules a fee,
 verifier, treasury, upgrade, or migration operation. No mainnet business-data smoke transaction is
 part of this sequence; any mainnet data write must be separately approved as real production
 activity.
