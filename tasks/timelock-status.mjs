@@ -20,7 +20,10 @@ import {
   resolveTarget,
 } from "./lib/timelockUpgrade.mjs";
 import { DEFAULT_TIMELOCK_ARTIFACT, parseArtifactName } from "./lib/timelockArtifacts.mjs";
-import { assertGovernanceMultisigProfile } from "../scripts/lib/governanceSafety.mjs";
+import {
+  assertGovernanceMultisigProfile,
+  assertNoRemovedGovernanceEnvironmentVariables,
+} from "../scripts/lib/governanceSafety.mjs";
 
 const MULTISIG_INSPECTION_ABI = [
   "function getThreshold() view returns (uint256)",
@@ -149,6 +152,7 @@ const printMembers = (label, members) => {
 };
 
 export const action = async (args, hre) => {
+  assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const contractName = parseArtifactName(

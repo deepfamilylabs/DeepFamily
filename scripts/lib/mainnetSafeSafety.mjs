@@ -4,6 +4,7 @@
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE, getChainProfile } from "./chainProfiles.mjs";
+import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
 import {
   CANONICAL_SAFE_OWNER_COUNT,
   CANONICAL_SAFE_THRESHOLD,
@@ -196,6 +197,7 @@ export const parseProductionMainnetSafeConfig = ({
   networkName,
   chainId,
 } = {}) => {
+  assertNoRemovedGovernanceEnvironmentVariables(env);
   const mainnet = chainProfile.mainnet;
   // Authorization is parsed first so an invalid non-empty plan digest fails before any caller needs
   // to open an RPC connection or load a deployer private key.
@@ -208,10 +210,10 @@ export const parseProductionMainnetSafeConfig = ({
   }
   const normalizedChainId = normalizeChainId(chainId, chainProfile);
 
-  const governanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
+  const governanceMultisigProfile = String(env.GOVERNANCE_SAFE_PROFILE ?? "").trim();
   if (governanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
     throw new Error(
-      `${chainProfile.displayName} mainnet Safe creation requires GOVERNANCE_MULTISIG_PROFILE=` +
+      `${chainProfile.displayName} mainnet Safe creation requires GOVERNANCE_SAFE_PROFILE=` +
         chainProfile.governanceMultisigProfile,
     );
   }
@@ -233,11 +235,11 @@ export const parseProductionMainnetSafeConfig = ({
     env[mainnet.safeSaltNonceEnvironmentName],
     mainnet.safeSaltNonceEnvironmentName,
   );
-  const governanceMultisigRaw = String(env.GOVERNANCE_MULTISIG ?? "").trim();
+  const governanceMultisigRaw = String(env.GOVERNANCE_SAFE_ADDRESS ?? "").trim();
   const governanceMultisig =
     governanceMultisigRaw === ""
       ? null
-      : requiredAddress("GOVERNANCE_MULTISIG", governanceMultisigRaw);
+      : requiredAddress("GOVERNANCE_SAFE_ADDRESS", governanceMultisigRaw);
   const { maximumCost, maximumCostWei } = parseMaximumCost(
     env[mainnet.safeMaximumCostEnvironmentName],
     mainnet.safeMaximumCostEnvironmentName,

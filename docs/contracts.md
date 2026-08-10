@@ -386,15 +386,16 @@ verifiers, the verifier adapter, and the libraries.
 
 - Upgrades are gated by `_authorizeUpgrade(newImplementation) onlyOwner` on the proxy.
 - Intended production owner is **`GovernanceTimelock`** (an OpenZeppelin `TimelockController`)
-  whose `PROPOSER`/`CANCELLER` and `EXECUTOR` roles are held by a **governance multisig**.
-  The multisig approval policy decides _who_ can propose or execute; the timelock separately
+  whose `PROPOSER`/`CANCELLER` and `EXECUTOR` roles are held solely by a production **Safe Proxy**.
+  The Safe approval policy decides _who_ can propose or execute; the Timelock separately
   enforces a public delay so the community can audit, exit, or cancel before a change lands.
 - The same Timelock is the **DEEP protocol treasury**. Paid endorsements send their protocol share
   to `DeepFamily.owner()`, which is the Timelock in production. A treasury transfer is therefore a
-  Timelock operation and must pass the governance multisig plus the configured delay. This token
+  Timelock operation and must pass the Safe Proxy plus the configured delay. This token
   balance is unrelated to ERC-20 ownership: `DeepFamilyToken.owner()` remains `address(0)`.
-- On live networks the deployment refuses to keep upgrade authority on an EOA: `GOVERNANCE_OWNER`
-  must match the current `GovernanceTimelock` runtime bytecode and have a non-zero delay. Ownership
+- On live networks the deployment refuses to keep upgrade authority on an EOA:
+  `GOVERNANCE_TIMELOCK_ADDRESS` identifies an already-deployed `GovernanceTimelock`, which must
+  match the current runtime bytecode and have a non-zero delay. Ownership
   of `DeepFamily` is handed over after wiring. Local/simulated networks keep the deployer as
   `DeepFamily.owner()` for test flows.
 - `DeepFamilyToken` is deliberately outside Timelock **administrative ownership**. Its deployer owner
@@ -402,8 +403,9 @@ verifiers, the verifier adapter, and the libraries.
   `token.initialize(DeepFamily)` atomically sets `owner()` to `address(0)` on every network; Token
   contract ownership is never transferred to the multisig or Timelock, and the binding cannot be
   changed afterward. The Timelock can still hold and transfer its own DEEP balance like any account.
-- A multisig must not be assigned as `DeepFamily.owner()` directly: that would remove the timelock
-  delay. Live deployment requires `GOVERNANCE_MULTISIG` to contain contract code, expose
+- A Safe must not be assigned as `DeepFamily.owner()` directly: that would remove the Timelock
+  delay. `GOVERNANCE_SAFE_ADDRESS` identifies the Safe Proxy contract. Live deployment requires it
+  to contain contract code, expose
   `getOwners()` and `getThreshold()` state with threshold at least 2, and to be the sole holder of
   the timelock's `PROPOSER_ROLE`, `CANCELLER_ROLE`, and `EXECUTOR_ROLE`. It rejects EOAs,
   single-signer policies, lookalike contracts that merely expose `getMinDelay()`, open roles, and
@@ -415,8 +417,9 @@ For a new Conflux eSpace Mainnet governance wallet, configure the approved deplo
 distinct EOA/hardware-wallet owner addresses in their final order, a fixed
 `EVM_MAINNET_SAFE_SALT_NONCE`, and a separate Safe factory-call budget in
 `EVM_MAINNET_SAFE_MAX_NATIVE`. The `espace:mainnet:*` command interprets that shared setting as CFX;
-set it explicitly for the current plan/execution rather than carrying it across chains. Keep
-`GOVERNANCE_MULTISIG` empty, then generate a read-only plan:
+set it explicitly for the current plan/execution rather than carrying it across chains.
+`GOVERNANCE_SAFE_PROFILE` selects the pinned implementation and three-owner, 2/3 policy; it is not
+an address. Keep `GOVERNANCE_SAFE_ADDRESS` empty, then generate a read-only plan:
 
 ```bash
 npm run espace:mainnet:safe:plan
@@ -443,8 +446,11 @@ hash in `EVM_MAINNET_SAFE_ACCEPTANCE_TX` and run:
 npm run espace:mainnet:safe:status
 ```
 
-Only after that read-only validation should the reviewed address be copied to
-`GOVERNANCE_MULTISIG`. The release requires this acceptance to be the Safe's first and only
+Only after that read-only validation should the reviewed Safe Proxy address be copied to
+`GOVERNANCE_SAFE_ADDRESS`. Do not configure `GOVERNANCE_TIMELOCK_ADDRESS` for a fresh Mainnet
+release: the orchestrator deploys and checkpoints the Timelock itself. That setting is reserved as
+a temporary input for a later manual/reuse/upgrade command that explicitly needs an existing
+Timelock. The release requires this acceptance to be the Safe's first and only
 execution (`nonce == 1`); do not submit another Safe transaction before release planning and
 execution finish.
 
@@ -458,16 +464,19 @@ npm run espace:mainnet:release:plan
 Before this command can plan a release, the development proving keys must have been replaced with
 `npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
 artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
-that clean commit, and `EVM_MAINNET_TESTNET_RELEASE_REPORT` must select the exact schema-v4
-`releaseReady=true` fresh-release rehearsal report from the current commit and production
-`MIN_DELAY >= 86400`. The
-default ZK setup records one Phase 2 contributor under `trustModel=single-operator`; this is
+that clean commit, and a successful eSpace `release-rehearsal` must have automatically published the
+exact schema-v4 `releaseReady=true` evidence to the chain-specific, Git-ignored
+`tmp/release-evidence/espace-release-rehearsal.json`. The Mainnet release reads that fixed file
+automatically and rejects a missing file or evidence from an older commit, a different artifact
+input, or a different production `MIN_DELAY >= 86400`. Diagnostic, failed, and recovery acceptance
+runs never overwrite the published evidence. The default ZK setup records one Phase 2 contributor
+under `trustModel=single-operator`; this is
 independent of the three-owner, 2/3 governance Safe.
 
 Acceptance modes deliberately prove different things:
 
-- `diagnostic` uses `EVM_E2E_MIN_DELAY=30` as the deployed Testnet delay and runs all four real
-  governance windows. It is fast lifecycle coverage and never release evidence.
+- `diagnostic` uses the built-in 30-second Testnet delay and runs all four real governance windows.
+  It is fast lifecycle coverage and never release evidence.
 - `release-rehearsal` deploys the initial production shape with `MIN_DELAY >= 86400`, but schedules
   no Timelock operation and waits zero Timelock windows. Its schema-v4 report contains no Mock,
   upgrade, or governance migration and records `evidenceType=initial-mainnet-release` with
@@ -520,11 +529,14 @@ npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence
 ```
 
 The Ethereum production flow requires
-`GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
+`GOVERNANCE_SAFE_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
 exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
 `EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
 reviewed production ZK setup artifacts, and an exact Sepolia schema-v4 fresh-release rehearsal
-report in `EVM_MAINNET_TESTNET_RELEASE_REPORT`. Safe planning and execution are separate commands;
+report automatically published at the chain-specific, Git-ignored
+`tmp/release-evidence/ethereum-release-rehearsal.json`. The Ethereum Mainnet release reads that fixed
+file automatically and rejects it when missing or tied to an older commit; diagnostic, failed, and
+recovery acceptance runs do not overwrite it. Safe planning and execution are separate commands;
 the execute command requires the exact reviewed digest through `--digest`. Protocol release planning
 and execution are also separate commands. Release execution requires an operation-specific approval
 JSON file with the exact printed `planDigest` and distinct valid EIP-191 `signatures` from at least
@@ -544,10 +556,10 @@ in the [Ethereum Mainnet release runbook](ethereum-mainnet-release.md). The loca
 acceptance procedure is in `ethereum-sepolia-acceptance.local.md`.
 
 For manual deployment on another supported network, or an explicitly reviewed recovery, deploy the
-timelock first with one governance multisig. The deploy script requires `MIN_DELAY` and
-`GOVERNANCE_MULTISIG` explicitly on every non-local network, validates the delay as a positive safe
-integer, and checks the `getOwners()`/`getThreshold()` state. This confirms the reported threshold
-and owners, but it does not independently attest the multisig implementation or bytecode; verify
+Timelock first with one Safe Proxy. The deploy script requires `MIN_DELAY` and
+`GOVERNANCE_SAFE_ADDRESS` explicitly on every non-local network, validates the delay as a positive
+safe integer, and checks the `getOwners()`/`getThreshold()` state. This confirms the reported threshold
+and owners, but it does not independently attest the Safe implementation or bytecode; verify
 the wallet deployment, signer policy, modules, and guards before funding or transferring ownership.
 
 Conflux eSpace is an EVM-compatible execution environment within Conflux Network, not an Ethereum
@@ -568,18 +580,23 @@ authorization digest between profiles, or point one profile at another chain. Sa
 plan-digest domain, currency budget, wallet derivation, gas accounting, explorer policy, report
 directory and checkpoints all form part of the reviewed evidence.
 
+Here `GOVERNANCE_SAFE_ADDRESS` is the Safe Proxy that receives the Timelock's proposer, canceller,
+and executor roles. `GOVERNANCE_TIMELOCK_ADDRESS` is the already-deployed Timelock that becomes
+`DeepFamily.owner()`; pass it only to the exact manual/reuse/upgrade command that needs it. Fresh
+Mainnet release does not configure this address because its orchestrator deploys the Timelock.
+
 The wrapper internally fixes the external admin to `address(0)`, makes role membership enumerable,
 and restricts `grantRole`, `revokeRole`, and `renounceRole` to timelock self-calls. OpenZeppelin's
 timelock still grants `DEFAULT_ADMIN_ROLE` to itself, so roles can be migrated, but only by scheduling
 and executing a delayed timelock operation. A zero delay is rejected both initially and on updates.
 
 ```bash
-# Advanced stepwise example: rehearse the intended 48-hour delay with the actual testnet multisig.
-MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
+# Advanced stepwise example: temporary overrides using the actual testnet Safe Proxy.
+MIN_DELAY=172800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
   npm run deploy:timelock --net=confluxTestnet
 
-# Use the resulting timelock address, not the multisig address, as the protocol owner.
-GOVERNANCE_OWNER=0xTimelock... GOVERNANCE_MULTISIG=0xMultisig... \
+# Use the resulting Timelock address, not the Safe Proxy, as the protocol owner.
+GOVERNANCE_TIMELOCK_ADDRESS=0xTimelock... GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
   npm run deploy:net --net=confluxTestnet
 ```
 
@@ -653,7 +670,7 @@ npx hardhat --config hardhat.config.mjs treasury-status --network confluxTestnet
 ```
 
 To transfer 125.5 DEEP from the treasury to a reviewed non-zero recipient, schedule and execute the
-same operation through the governance multisig:
+same operation through the Safe Proxy:
 
 ```bash
 npx hardhat --config hardhat.config.mjs treasury-transfer --network confluxTestnet \
@@ -674,7 +691,7 @@ and their binding, and encodes `DeepFamilyToken.transfer(recipient, amount)`. Sc
 must use identical recipient, amount, optional `--salt`, and artifact arguments. Omitting `--salt`
 derives a deterministic call-bound value. Scheduling does not reserve DEEP; execution re-checks the
 live balance. If the CLI signer lacks the required role, each phase prints generic `to`, `value`,
-`data`, and `operation` fields for submission through the governance multisig.
+`data`, and `operation` fields for submission through the Safe Proxy.
 
 This treasury design deliberately puts protocol spending behind the same approval threshold and
 public delay as administrative changes. Do not send unrelated or unsupported assets to the
@@ -692,7 +709,7 @@ transferred or burned.
 
 There is intentionally no convenience task for this operation. If a final, immutable protocol is a
 documented governance objective, first complete an end-state audit, decide and execute the treasury
-disposition, publish the exact consequences and calldata, and obtain explicit multisig approval.
+disposition, publish the exact consequences and calldata, and obtain explicit Safe-owner approval.
 Only then construct the raw Timelock `schedule` and `execute` calls for `renounceOwnership()` and
 wait the full configured delay. Losing keys or accidentally executing this call provides no recovery
 path and must not be treated as a routine maintenance action.
@@ -719,8 +736,9 @@ deployment.
 If the selected artifact does not expose the required Timelock inspection ABI, the task fails
 instead of producing a partial status report.
 
-Replace the Timelock's sole governance multisig using one atomic batch. The batch first grants all
-three roles to the inspected new multisig, then revokes all three from the expected old multisig.
+Replace the Timelock's sole governance Safe Proxy using one atomic batch. The batch first grants all
+three roles to the inspected new Safe Proxy, then revokes all three from the expected old Safe
+Proxy.
 The task rejects a codeless or threshold-1 replacement, unexpected existing role membership, a
 non-self admin, and a runtime that does not match the selected `--contract-name` artifact:
 
@@ -736,9 +754,10 @@ npx hardhat --config hardhat.config.mjs timelock-migrate-multisig --network conf
 ```
 
 Use the same optional `--salt` in both phases. `--delay` may be supplied to the schedule phase but
-cannot be below the current minimum. Update the operator's `GOVERNANCE_MULTISIG` only after the
-execute transaction and final role state are confirmed. Changing owners or threshold _inside the
-same multisig address_ is a wallet-internal operation and is not delayed by this Timelock.
+cannot be below the current minimum. Pass the new `GOVERNANCE_SAFE_ADDRESS` to subsequent operator
+commands only after the execute transaction and final role state are confirmed. Changing owners or
+threshold _inside the same Safe Proxy address_ is a wallet-internal operation and is not delayed by
+this Timelock.
 
 Change the minimum delay through a Timelock self-call. The update itself is always scheduled using
 the current delay; zero and no-op values are rejected. Raising the delay does not extend operations
@@ -752,11 +771,11 @@ npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxT
 ```
 
 To replace the Timelock contract, first deploy a new `GovernanceTimelock` using the intended new
-multisig as a one-command override. Keep the persistent operator environment pointed at the old
+Safe Proxy as a one-command override. Keep the persistent operator environment pointed at the old
 governance until migration is confirmed:
 
 ```bash
-MIN_DELAY=259200 GOVERNANCE_MULTISIG=0xNewMultisig... \
+MIN_DELAY=259200 GOVERNANCE_SAFE_ADDRESS=0xNewSafeProxy... \
   npm run deploy:timelock --net=confluxTestnet
 ```
 
@@ -784,7 +803,7 @@ npx hardhat --config hardhat.config.mjs timelock-migrate-owner --network conflux
   --token-contract-name DeepFamilyToken
 ```
 
-This migration requires explicit expected old/new multisig addresses and explicit artifacts for both
+This migration requires explicit expected old/new Safe Proxy addresses and explicit artifacts for both
 Timelocks, the proxy, the current `DeepFamily` implementation, and the token. It verifies every
 selected runtime, both exact role policies and multisig thresholds, non-zero delays, bidirectional
 proxy/token wiring, `DeepFamily.owner() == oldTimelock`, and `DeepFamilyToken.owner() == address(0)`.
@@ -794,8 +813,9 @@ deployed Timelock; the old and new contracts are deliberately verified independe
 as `GovernanceTimelockV1` and `GovernanceTimelockV2`—and there is no unsafe bypass.
 It rejects a new Timelock whose delay is shorter than the old one. If a shorter delay is an
 intentional governance decision, first execute `timelock-update-delay` on the old Timelock, then
-deploy the replacement with a delay at least equal to that approved value. Only update
-`GOVERNANCE_OWNER` after the ownership and treasury migration is confirmed. A directly sent DEEP
+deploy the replacement with a delay at least equal to that approved value. Pass the new
+`GOVERNANCE_TIMELOCK_ADDRESS` to later operator commands only after the ownership and treasury
+migration is confirmed. Do not persist this migration override in a fresh-release environment. A directly sent DEEP
 dust balance that arrives at the old Timelock after execution is not part of the already-completed
 migration and is reported separately rather than making the completed operation appear to fail.
 

@@ -57,8 +57,8 @@ and execute one refund-free Safe smoke transaction whose inner fields are exactl
 | `gasToken`, `refundReceiver`       | zero address                    |
 
 The outer transaction must also carry zero ETH, succeed, emit exactly one `ExecutionSuccess`, emit
-no `ExecutionFailure`, and reach the configured finality requirement. Record the **outer**
-transaction hash in `EVM_MAINNET_SAFE_ACCEPTANCE_TX`.
+no `ExecutionFailure`, and reach the built-in finality requirement. Record the **outer** transaction
+hash in `EVM_MAINNET_SAFE_ACCEPTANCE_TX`.
 
 This smoke transaction must be the new Safe's first and only execution. The release planner
 requires Safe nonce `1`; after smoke acceptance, do not submit any other Safe transaction or change
@@ -78,10 +78,13 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
    `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
    prerequisite and not related to the Safe's three-owner, 2/3 policy.
 2. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia in
-   `release-rehearsal` mode with `MIN_DELAY >= 86400`, and archive its successful schema-v4 report.
-   This mode rehearses a fresh release with zero Timelock waits. A diagnostic run instead uses
-   `EVM_E2E_MIN_DELAY=30` for each of four real governance windows and always has
-   `releaseReady=false`. Require
+   `release-rehearsal` mode with `MIN_DELAY >= 86400`. After self-validation succeeds, the runner
+   automatically publishes the exact evidence to the Git-ignored, Ethereum-specific
+   `tmp/release-evidence/ethereum-release-rehearsal.json`; diagnostic, failed, and recovery runs do
+   not overwrite it. Review and archive only that published successful schema-v4 report. This mode
+   rehearses a fresh release with zero Timelock waits. A diagnostic run instead uses the built-in
+   30-second delay for each of four real governance windows and always has `releaseReady=false`.
+   Require
    `zkArtifactTrust.productionReady=true` and `zkCeremonyVerification.status=passed` in the accepted
    report.
 3. Use a clean, isolated checkout of the reviewed commit with exact dependencies and complete the
@@ -108,15 +111,11 @@ EXPLORER_API_KEY=your-real-etherscan-api-key
 # Optional: blank uses tmp/zk-production/powersOfTau28_hez_final_13.ptau.
 ZK_PTAU_PATH=
 
-# Production policy.
-GOVERNANCE_MULTISIG_PROFILE=ethereum-safe-1.3.0-2of3
+# Safe implementation plus the exact three-owner, 2/3 policy; this is not an address.
+GOVERNANCE_SAFE_PROFILE=ethereum-safe-1.3.0-2of3
 MIN_DELAY=172800
-EVM_MAINNET_CONFIRMATIONS=2
-EVM_MAINNET_FINALITY_TIMEOUT=3600
-# Keep blank for a fresh orchestrated release.
-GOVERNANCE_OWNER=
-# Keep blank until Safe deployment and owner smoke validation have passed.
-GOVERNANCE_MULTISIG=
+# Deployed production Safe Proxy address. Keep blank through Safe plan/deploy/owner acceptance.
+GOVERNANCE_SAFE_ADDRESS=
 
 # Public deployer and owner identities.
 EVM_MAINNET_EXPECTED_DEPLOYER=0x...
@@ -131,22 +130,32 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 # Protocol release phase.
 # Set explicitly for this operation; ethereum:mainnet:release interprets the value as ETH.
 EVM_MAINNET_MAX_NATIVE=1
-# Exact reviewed Sepolia report copied to a regular path inside this checkout.
-EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/ethereum-release-rehearsal.json
 ```
 
-The protocol release command requires a schema-v4 fresh-release report with release-ready status,
-`evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`, the same clean commit,
-artifact-input digest and deployed `MIN_DELAY`, production ZK evidence, source verification,
-finality, initial governance state and refund evidence. It rejects a report containing Mock,
-upgrade, migration, or Timelock-wait evidence, as well as diagnostic or another commit's evidence,
-before any Mainnet transaction.
+For a fresh release, do not configure `GOVERNANCE_TIMELOCK_ADDRESS` at all: the orchestrator
+deploys and checkpoints the Timelock that becomes the protocol owner. That variable identifies an
+already-deployed Timelock and is only a temporary input to a later, explicitly reviewed
+manual/reuse/upgrade command. Keep `GOVERNANCE_SAFE_ADDRESS` empty while creating and accepting the
+new Safe, then set it to the accepted Safe Proxy address before protocol release planning. The Safe
+Proxy becomes the sole holder of the Timelock's proposer, canceller, and executor roles; the
+Timelock becomes `DeepFamily.owner()` and the DEEP protocol treasury.
 
-The acceptance runner's original ignored report path is run-specific; the example path is not
-created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file inside the
-release checkout, compare its SHA-256 against the immutable off-machine archive, and point
-`EVM_MAINNET_TESTNET_RELEASE_REPORT` at that in-checkout file. External paths and symlinks are
-rejected so the reviewed report bytes are included in the plan and Safe-owner signatures.
+The protocol release command automatically reads the Ethereum profile's fixed
+`tmp/release-evidence/ethereum-release-rehearsal.json` file. It requires a schema-v4 fresh-release
+report with release-ready status, `evidenceType=initial-mainnet-release`,
+`governanceLifecycleIncluded=false`, the same clean commit, artifact-input digest and deployed
+`MIN_DELAY`, production ZK evidence, source verification, finality, initial governance state and
+refund evidence. A missing file, a symbolic link, evidence from an older commit, or a report from a
+diagnostic, failed, or recovery run is rejected before any Mainnet transaction. Reports containing
+Mock, upgrade, migration, or Timelock-wait evidence are rejected as well.
+
+The acceptance runner retains its run-specific report beneath the ignored run directory and, only
+after a successful release rehearsal passes schema-v4 self-validation, publishes the exact bytes to
+the fixed evidence path above. No environment setting or manual in-checkout copy selects release
+evidence. Compare the published file's SHA-256 against the immutable off-machine archive before
+planning; that archive is a review and recovery record, not an alternate input path. A later
+diagnostic, failed, or recovery run leaves the last successful published evidence untouched, but the
+Mainnet release still rejects it when its commit or inputs are stale.
 
 Choose the two ETH ceilings from reviewed estimates plus a documented margin; they are hard
 authorization ceilings, not spending targets. `EVM_MAINNET_SAFE_MAX_NATIVE` covers only the Safe
@@ -157,6 +166,9 @@ funds before broadcasts.
 Ethereum charged gas is accounted from the receipt as
 `gasUsed × effectiveGasPrice`; the Conflux three-quarter gas-limit rule is not used.
 
+The Safe tools, status check, and protocol release use the built-in receipt/finality policy of two
+confirmations and a 3600-second finality timeout; these are not persistent `.env` settings.
+
 The Safe and release plan digests are deliberately independent. Plan and execute are separate npm
 commands: Safe execution receives its reviewed digest through `--digest`, while protocol release
 execution receives its digest and reviewed Safe-owner signatures from an operation-specific approval
@@ -166,10 +178,10 @@ JSON file. Neither authorization belongs in persistent `.env` configuration.
 
 ### A1. Generate a read-only Safe plan
 
-Keep `GOVERNANCE_MULTISIG` blank while planning a fresh Safe:
+Keep `GOVERNANCE_SAFE_ADDRESS` blank while planning a fresh Safe:
 
 ```dotenv
-GOVERNANCE_MULTISIG=
+GOVERNANCE_SAFE_ADDRESS=
 ```
 
 Run:
@@ -189,8 +201,8 @@ deployments/mainnet/mainnet-safe-plan.json
 
 No Safe transaction is broadcast in plan mode. Independently review the release commit and tool
 input digest, deployer and reserved nonce, owner order, salt, predicted address, canonical
-components and code hashes, target/value/calldata hash, budget, confirmation/finality settings, and
-printed plan digest.
+components and code hashes, target/value/calldata hash, budget, built-in confirmation/finality
+policy, and printed plan digest.
 
 ### A2. Execute or resume the reviewed factory call
 
@@ -230,7 +242,7 @@ Status is read-only. It revalidates the factory deployment, canonical profile, s
 reports governance ready and Safe nonce `1`. Then set:
 
 ```dotenv
-GOVERNANCE_MULTISIG=0xReviewedSafeAddress
+GOVERNANCE_SAFE_ADDRESS=0xReviewedSafeProxyAddress
 ```
 
 Keep the Safe frozen at nonce `1` until the protocol release completes.
@@ -294,9 +306,10 @@ endorsement, NFT, or story business data on Mainnet. It also deploys no Mock, pe
 and waits for no Timelock operation. `MIN_DELAY=172800` is the on-chain 48-hour policy for future
 governance, not a sleep in the fresh-release command.
 
-`GOVERNANCE_OWNER` remains blank for a fresh run because the orchestrator creates and checkpoints
-the Timelock itself. Do not manually deploy pieces or mix `deploy:net`/`deploy:timelock` with an
-active orchestrated checkpoint.
+`GOVERNANCE_TIMELOCK_ADDRESS` is not a fresh-run setting because the orchestrator creates and
+checkpoints the Timelock itself. Supply it only as a one-command input when a later reviewed
+manual/reuse/upgrade workflow explicitly needs an existing Timelock. Do not manually deploy pieces
+or mix `deploy:net`/`deploy:timelock` with an active orchestrated checkpoint.
 
 ## Checkpoints, resumption, and recovery
 

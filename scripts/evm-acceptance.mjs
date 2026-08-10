@@ -65,6 +65,7 @@ import {
   TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
   validateTestnetReleaseEvidence,
 } from "./lib/testnetReleaseEvidence.mjs";
+import { publishTestnetReleaseEvidence } from "./lib/releaseEvidencePublisher.mjs";
 
 const { generatePersonCommitmentProof } = personCommitmentProof;
 const { generateDisclosureBindingProof } = disclosureBindingProof;
@@ -1010,6 +1011,7 @@ export const main = async (chainProfile) => {
 
   let currentStep = "acceptance-mode-preflight";
   let originalError = null;
+  let publishedReleaseEvidence = null;
   let funded = false;
   const secretValues = [
     config.privateKey,
@@ -1048,9 +1050,9 @@ export const main = async (chainProfile) => {
     return contract;
   };
 
-  let oldGovernanceOwner = process.env.GOVERNANCE_OWNER;
-  let oldGovernanceMultisig = process.env.GOVERNANCE_MULTISIG;
-  let oldGovernanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
+  let oldGovernanceTimelockAddress = process.env.GOVERNANCE_TIMELOCK_ADDRESS;
+  let oldGovernanceSafeAddress = process.env.GOVERNANCE_SAFE_ADDRESS;
+  let oldGovernanceSafeProfile = process.env.GOVERNANCE_SAFE_PROFILE;
   let mainnetSafeInfrastructure;
   let testnetSafeInfrastructure;
 
@@ -1086,7 +1088,7 @@ export const main = async (chainProfile) => {
       );
       assertCondition(
         config.productionGovernanceMultisigProfile === CHAIN_PROFILE.governanceMultisigProfile,
-        `release-rehearsal requires GOVERNANCE_MULTISIG_PROFILE=` +
+        `release-rehearsal requires GOVERNANCE_SAFE_PROFILE=` +
           CHAIN_PROFILE.governanceMultisigProfile,
       );
       await addStep("release-rehearsal-clean-source-preflight", {
@@ -1216,7 +1218,7 @@ export const main = async (chainProfile) => {
       env: {
         ...process.env,
         MIN_DELAY: String(config.minDelay),
-        GOVERNANCE_MULTISIG: safeAddress,
+        GOVERNANCE_SAFE_ADDRESS: safeAddress,
       },
       inspectMultisig: ({ provider: inspectionProvider, address }) =>
         assertCanonicalSafeProfile({
@@ -1457,9 +1459,9 @@ export const main = async (chainProfile) => {
     });
 
     currentStep = "deploy-protocol";
-    process.env.GOVERNANCE_OWNER = timelockAddress;
-    process.env.GOVERNANCE_MULTISIG = safeAddress;
-    process.env.GOVERNANCE_MULTISIG_PROFILE = CHAIN_PROFILE.governanceMultisigProfile;
+    process.env.GOVERNANCE_TIMELOCK_ADDRESS = timelockAddress;
+    process.env.GOVERNANCE_SAFE_ADDRESS = safeAddress;
+    process.env.GOVERNANCE_SAFE_PROFILE = CHAIN_PROFILE.governanceMultisigProfile;
     const deployed = await deployIntegratedSystem(connection, {
       writeDeployments: true,
       signer: runDeployer,
@@ -2388,7 +2390,7 @@ export const main = async (chainProfile) => {
         env: {
           ...process.env,
           MIN_DELAY: String(config.minDelay),
-          GOVERNANCE_MULTISIG: replacementSafeAddress,
+          GOVERNANCE_SAFE_ADDRESS: replacementSafeAddress,
         },
         inspectMultisig: ({ provider: inspectionProvider, address }) =>
           assertCanonicalSafeProfile({
@@ -3285,12 +3287,15 @@ export const main = async (chainProfile) => {
     report.error = safeErrorMessage(error, secretValues);
     if (report.onchain.status !== "passed") report.onchain.status = "failed";
   } finally {
-    if (oldGovernanceOwner === undefined) delete process.env.GOVERNANCE_OWNER;
-    else process.env.GOVERNANCE_OWNER = oldGovernanceOwner;
-    if (oldGovernanceMultisig === undefined) delete process.env.GOVERNANCE_MULTISIG;
-    else process.env.GOVERNANCE_MULTISIG = oldGovernanceMultisig;
-    if (oldGovernanceMultisigProfile === undefined) delete process.env.GOVERNANCE_MULTISIG_PROFILE;
-    else process.env.GOVERNANCE_MULTISIG_PROFILE = oldGovernanceMultisigProfile;
+    if (oldGovernanceTimelockAddress === undefined) {
+      delete process.env.GOVERNANCE_TIMELOCK_ADDRESS;
+    } else {
+      process.env.GOVERNANCE_TIMELOCK_ADDRESS = oldGovernanceTimelockAddress;
+    }
+    if (oldGovernanceSafeAddress === undefined) delete process.env.GOVERNANCE_SAFE_ADDRESS;
+    else process.env.GOVERNANCE_SAFE_ADDRESS = oldGovernanceSafeAddress;
+    if (oldGovernanceSafeProfile === undefined) delete process.env.GOVERNANCE_SAFE_PROFILE;
+    else process.env.GOVERNANCE_SAFE_PROFILE = oldGovernanceSafeProfile;
 
     if (funded) {
       try {
@@ -3429,7 +3434,43 @@ export const main = async (chainProfile) => {
       report.error = originalError.message;
     }
     await saveReport();
+    if (
+      config.acceptanceMode === "release-rehearsal" &&
+      report.releaseReady &&
+      originalError === null
+    ) {
+      try {
+        publishedReleaseEvidence = await publishTestnetReleaseEvidence({
+          sourceReportPath: reportPath,
+          destinationRelativePath: CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath,
+          repositoryRoot: process.cwd(),
+          expectedTestnetChainId: EXPECTED_CHAIN_ID,
+          expectedTestnetNetworkName: EXPECTED_NETWORK,
+          mainnetMinDelaySeconds: config.productionMinDelay,
+          currentCommit: report.releaseCommit,
+          expectedAcceptanceInputDigest: report.sourceState.acceptanceInputDigest,
+        });
+      } catch (publicationError) {
+        originalError = new Error(
+          `release-rehearsal evidence publication failed: ` +
+            safeErrorMessage(publicationError, secretValues),
+        );
+        report.releaseReadinessGates.completedWithoutError = false;
+        report.releaseReady = false;
+        report.status = "failed";
+        report.failedStep = "release-evidence-publication";
+        report.error = originalError.message;
+        await saveReport();
+      }
+    }
     console.log(`[${CHAIN_PROFILE.id}-acceptance] report: ${reportPath}`);
+    if (publishedReleaseEvidence) {
+      console.log(
+        `[${CHAIN_PROFILE.id}-acceptance] release evidence: ` +
+          `${publishedReleaseEvidence.reportPath} ` +
+          `(sha256 ${publishedReleaseEvidence.reportSha256})`,
+      );
+    }
   }
 
   if (originalError) {

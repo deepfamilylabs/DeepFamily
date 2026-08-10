@@ -4,6 +4,7 @@
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
+import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
 
 export const ESPACE_MAINNET_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
 export const ESPACE_MAINNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.mainnet.chainId;
@@ -179,6 +180,7 @@ export const parseProductionMainnetReleaseConfig = ({
   chainId,
   commandInputLabels = {},
 } = {}) => {
+  assertNoRemovedGovernanceEnvironmentVariables(env);
   const mainnet = chainProfile.mainnet;
   const planDigestLabel = commandInputLabels.planDigest ?? mainnet.planDigestEnvironmentName;
   const planApprovalSignaturesLabel =
@@ -213,20 +215,24 @@ export const parseProductionMainnetReleaseConfig = ({
         "orchestrator",
     );
   }
-  if (String(env.GOVERNANCE_OWNER ?? "").trim() !== "") {
+  if (String(env.GOVERNANCE_TIMELOCK_ADDRESS ?? "").trim() !== "") {
     throw new Error(
-      "GOVERNANCE_OWNER must be blank; the release orchestrator deploys and checkpoints it",
+      "GOVERNANCE_TIMELOCK_ADDRESS must be blank for a fresh mainnet release; " +
+        "the release orchestrator deploys and checkpoints the GovernanceTimelock",
     );
   }
 
-  const governanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
+  const governanceMultisigProfile = String(env.GOVERNANCE_SAFE_PROFILE ?? "").trim();
   if (governanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
     throw new Error(
-      `${chainProfile.displayName} mainnet release requires GOVERNANCE_MULTISIG_PROFILE=` +
+      `${chainProfile.displayName} mainnet release requires GOVERNANCE_SAFE_PROFILE=` +
         chainProfile.governanceMultisigProfile,
     );
   }
-  const governanceMultisig = requiredAddress("GOVERNANCE_MULTISIG", env.GOVERNANCE_MULTISIG);
+  const governanceMultisig = requiredAddress(
+    "GOVERNANCE_SAFE_ADDRESS",
+    env.GOVERNANCE_SAFE_ADDRESS,
+  );
   const expectedDeployer = requiredAddress(
     mainnet.expectedDeployerEnvironmentName,
     env[mainnet.expectedDeployerEnvironmentName],
@@ -274,12 +280,6 @@ export const parseProductionMainnetReleaseConfig = ({
     throw new Error(`${mainnet.maximumCostEnvironmentName} must be greater than zero`);
   }
 
-  const testnetReleaseReportPath = String(
-    env[mainnet.testnetReleaseReportEnvironmentName] ?? "",
-  ).trim();
-  if (testnetReleaseReportPath.length > 4_096) {
-    throw new Error(`${mainnet.testnetReleaseReportEnvironmentName} is too long`);
-  }
   const planApprovalSignatures = parsePlanApprovalSignatures({
     value: env[mainnet.planApprovalSignaturesEnvironmentName],
     environmentName: planApprovalSignaturesLabel,
@@ -304,7 +304,7 @@ export const parseProductionMainnetReleaseConfig = ({
     maximumCost,
     maximumCostWei,
     planApprovalSignatures,
-    testnetReleaseReportPath: testnetReleaseReportPath === "" ? null : testnetReleaseReportPath,
+    testnetReleaseReportPath: mainnet.testnetReleaseReportRelativePath,
     recoveryTransactions: parseRecoveryTransactions(
       env[mainnet.recoveryTransactionsEnvironmentName],
       recoveryTransactionsLabel,

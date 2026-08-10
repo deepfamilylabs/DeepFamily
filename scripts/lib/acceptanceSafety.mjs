@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
+import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 
 export const ESPACE_TESTNET_NAME = ESPACE_CHAIN_PROFILE.acceptance.networkName;
@@ -93,6 +94,7 @@ export const parseAcceptanceConfig = ({
   networkName,
   chainId,
 } = {}) => {
+  assertNoRemovedGovernanceEnvironmentVariables(env);
   const acceptance = chainProfile.acceptance;
   if (networkName !== acceptance.networkName) {
     throw new Error(
@@ -170,10 +172,10 @@ export const parseAcceptanceConfig = ({
       );
     }
     minDelaySeconds = productionMinDelaySeconds;
-    productionGovernanceMultisigProfile = String(env.GOVERNANCE_MULTISIG_PROFILE ?? "").trim();
+    productionGovernanceMultisigProfile = String(env.GOVERNANCE_SAFE_PROFILE ?? "").trim();
     if (productionGovernanceMultisigProfile !== chainProfile.governanceMultisigProfile) {
       throw new Error(
-        `release-rehearsal requires GOVERNANCE_MULTISIG_PROFILE=` +
+        `release-rehearsal requires GOVERNANCE_SAFE_PROFILE=` +
           chainProfile.governanceMultisigProfile,
       );
     }

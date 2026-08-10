@@ -4,7 +4,7 @@ import { resolveTimelockDeploymentConfig } from "./lib/timelockDeployment.mjs";
 // Deploy a TimelockController (via the GovernanceTimelock artifact) to own the UUPS proxy.
 //
 // Usage:
-//   MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig.. \
+//   MIN_DELAY=172800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy.. \
 //     hardhat --config hardhat.config.mjs run scripts/deploy-timelock.mjs --network <network>
 //
 // Deployer defaults (120 seconds) exist only on edr-simulated and named localhost networks.
@@ -44,7 +44,8 @@ const main = async () => {
   console.log(`  external admin: ${ethers.ZeroAddress} (timelock self-admin only)`);
   console.log("  role admin: timelock itself; role changes require a scheduled, delayed operation");
   console.log(
-    `\nNext: GOVERNANCE_OWNER=${address} GOVERNANCE_MULTISIG=${governanceMultisig} ` +
+    `\nNext: GOVERNANCE_TIMELOCK_ADDRESS=${address} ` +
+      `GOVERNANCE_SAFE_ADDRESS=${governanceMultisig} ` +
       "npm run deploy:net --net=<network>",
   );
 };

@@ -67,9 +67,7 @@ const ethereumSafeEnv = (overrides = {}) => ({
   EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
   EVM_MAINNET_SAFE_SALT_NONCE: "42",
   EVM_MAINNET_SAFE_MAX_NATIVE: "0.25",
-  EVM_MAINNET_CONFIRMATIONS: "2",
-  EVM_MAINNET_FINALITY_TIMEOUT: "3600",
-  GOVERNANCE_MULTISIG_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
+  GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
   ...overrides,
 });
 
@@ -79,12 +77,10 @@ const ethereumReleaseEnv = (overrides = {}) => ({
   EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
   EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
   EVM_MAINNET_MAX_NATIVE: "2",
-  EVM_MAINNET_CONFIRMATIONS: "2",
-  EVM_MAINNET_FINALITY_TIMEOUT: "3600",
   EVM_MAINNET_SAFE_ACCEPTANCE_TX: SAFE_ACCEPTANCE_TX,
-  GOVERNANCE_MULTISIG: SAFE,
-  GOVERNANCE_MULTISIG_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
-  GOVERNANCE_OWNER: "",
+  GOVERNANCE_SAFE_ADDRESS: SAFE,
+  GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
+  GOVERNANCE_TIMELOCK_ADDRESS: "",
   MIN_DELAY: "172800",
   ...overrides,
 });
@@ -135,6 +131,18 @@ describe("Ethereum production tooling profiles", function () {
     expect(Object.isFrozen(ESPACE_CHAIN_PROFILE.mainnet)).to.equal(true);
     expect(Object.isFrozen(ETHEREUM_CHAIN_PROFILE)).to.equal(true);
     expect(Object.isFrozen(ETHEREUM_CHAIN_PROFILE.safe)).to.equal(true);
+    expect(ESPACE_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
+      "tmp/release-evidence/espace-release-rehearsal.json",
+    );
+    expect(ETHEREUM_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
+      "tmp/release-evidence/ethereum-release-rehearsal.json",
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property(
+      "testnetReleaseReportEnvironmentName",
+    );
+    expect(ETHEREUM_CHAIN_PROFILE.mainnet).not.to.have.property(
+      "testnetReleaseReportEnvironmentName",
+    );
     expect(() => {
       ETHEREUM_CHAIN_PROFILE.mainnet.chainId = 2n;
     }).to.throw(TypeError);
@@ -214,7 +222,7 @@ describe("Ethereum production tooling profiles", function () {
     expect(hardhatConfig).to.include('enabled: HARDHAT_NETWORK_NAME !== "sepolia"');
   });
 
-  it("documents Ethereum RPCs and every shared acceptance, Safe and release input", async function () {
+  it("documents routine Ethereum acceptance, Safe and release inputs", async function () {
     const example = await fs.readFile(".env.example", "utf8");
     for (const name of [
       "INFURA_API_KEY",
@@ -222,26 +230,36 @@ describe("Ethereum production tooling profiles", function () {
       "ETHEREUM_MAINNET_RPC_URL",
       "EXPLORER_API_KEY",
       "EVM_E2E_MODE",
-      "EVM_E2E_MIN_DELAY",
-      "EVM_E2E_CONFIRMATIONS",
-      "EVM_E2E_MAX_NATIVE",
-      "EVM_E2E_RUN_ID",
-      "EVM_E2E_RECOVER",
-      "EVM_E2E_VERIFY",
-      "EVM_E2E_REQUIRE_FINALITY",
-      "EVM_E2E_FINALITY_TIMEOUT",
-      "EVM_MAINNET_CONFIRMATIONS",
-      "EVM_MAINNET_FINALITY_TIMEOUT",
       "EVM_MAINNET_EXPECTED_DEPLOYER",
       "EVM_MAINNET_SAFE_OWNERS",
       "EVM_MAINNET_SAFE_SALT_NONCE",
       "EVM_MAINNET_SAFE_MAX_NATIVE",
       "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
       "EVM_MAINNET_MAX_NATIVE",
-      "EVM_MAINNET_TESTNET_RELEASE_REPORT",
+      "GOVERNANCE_SAFE_PROFILE",
+      "GOVERNANCE_SAFE_ADDRESS",
     ]) {
       expect(example, name).to.include(`${name}=`);
     }
+    for (const name of [
+      "EVM_E2E_MIN_DELAY",
+      "EVM_E2E_MAX_NATIVE",
+      "EVM_E2E_CONFIRMATIONS",
+      "EVM_E2E_VERIFY",
+      "EVM_E2E_REQUIRE_FINALITY",
+      "EVM_E2E_FINALITY_TIMEOUT",
+      "EVM_MAINNET_CONFIRMATIONS",
+      "EVM_MAINNET_FINALITY_TIMEOUT",
+    ]) {
+      expect(example, name).not.to.include(`${name}=`);
+    }
+    expect(example).not.to.include("EVM_E2E_RUN_ID=");
+    expect(example).not.to.include("EVM_E2E_RECOVER=");
+    expect(example).not.to.include("EVM_MAINNET_TESTNET_RELEASE_REPORT=");
+    expect(example).not.to.include("GOVERNANCE_MULTISIG=");
+    expect(example).not.to.include("GOVERNANCE_OWNER=");
+    expect(example).not.to.include("GOVERNANCE_MULTISIG_PROFILE=");
+    expect(example).not.to.include("GOVERNANCE_TIMELOCK_ADDRESS=");
   });
 
   it("shares testnet settings while isolating chain guards and deterministic wallets", function () {
@@ -321,7 +339,7 @@ describe("Ethereum production tooling profiles", function () {
           ...baseEnv,
           EVM_E2E_MODE: "release-rehearsal",
           MIN_DELAY: "30",
-          GOVERNANCE_MULTISIG_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
+          GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
         },
         networkName: "sepolia",
         chainId: 11155111n,
@@ -333,7 +351,7 @@ describe("Ethereum production tooling profiles", function () {
         ...baseEnv,
         EVM_E2E_MODE: "release-rehearsal",
         MIN_DELAY: "86400",
-        GOVERNANCE_MULTISIG_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
+        GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
       },
       networkName: "sepolia",
       chainId: 11155111n,
@@ -464,7 +482,9 @@ describe("Ethereum production tooling profiles", function () {
 
   it("shares public release variables while retaining Ethereum network, chain and digest guards", function () {
     const config = parseEthereumMainnetReleaseConfig({
-      env: ethereumReleaseEnv(),
+      env: ethereumReleaseEnv({
+        EVM_MAINNET_TESTNET_RELEASE_REPORT: "/tmp/untrusted-release-report.json",
+      }),
       networkName: "mainnet",
       chainId: 1n,
     });
@@ -472,12 +492,14 @@ describe("Ethereum production tooling profiles", function () {
     expect(config.nativeSymbol).to.equal("ETH");
     expect(config.gasChargingPolicy).to.equal(GAS_CHARGING_ETHEREUM_RECEIPT);
     expect(config.maximumCostWei).to.equal(ethers.parseEther("2"));
+    expect(config.testnetReleaseReportPath).to.equal(
+      "tmp/release-evidence/ethereum-release-rehearsal.json",
+    );
 
     for (const field of [
       "planDigestEnvironmentName",
       "planApprovalSignaturesEnvironmentName",
       "maximumCostEnvironmentName",
-      "testnetReleaseReportEnvironmentName",
       "recoveryTransactionsEnvironmentName",
     ]) {
       expect(ETHEREUM_CHAIN_PROFILE.mainnet[field]).to.equal(ESPACE_CHAIN_PROFILE.mainnet[field]);

@@ -18,8 +18,8 @@ export const assertConfiguredTimelockGovernanceProfile = async ({
   timelock,
   timelockAddress,
   roleState,
-  label = "current governance multisig",
-  profile = process.env.GOVERNANCE_MULTISIG_PROFILE,
+  label = "current governance Safe",
+  profile,
 }) => {
   const normalizedProfile = normalizeGovernanceMultisigProfile(profile);
   if (normalizedProfile === "") return null;

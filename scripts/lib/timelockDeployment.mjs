@@ -1,4 +1,5 @@
 import {
+  assertNoRemovedGovernanceEnvironmentVariables,
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "./governanceSafety.mjs";
@@ -23,11 +24,11 @@ export const parsePositiveSafeInteger = (value, name) => {
 export const parseGovernanceMultisig = ({ ethers, value }) => {
   const address = String(value ?? "").trim();
   if (!ethers.isAddress(address)) {
-    throw new Error(`GOVERNANCE_MULTISIG must be a valid address (got ${value ?? "unset"})`);
+    throw new Error(`GOVERNANCE_SAFE_ADDRESS must be a valid address (got ${value ?? "unset"})`);
   }
   const normalized = ethers.getAddress(address);
   if (normalized === ethers.ZeroAddress) {
-    throw new Error("GOVERNANCE_MULTISIG must not be the zero address");
+    throw new Error("GOVERNANCE_SAFE_ADDRESS must not be the zero address");
   }
   return normalized;
 };
@@ -37,15 +38,16 @@ export const isLocalTimelockNetwork = ({ connection }) => isLocalDevelopmentConn
 export const resolveTimelockDeploymentConfig = async ({
   connection,
   ethers,
-  env,
+  env = process.env,
   deployerAddress,
   provider = ethers.provider,
   inspectMultisig,
 }) => {
+  assertNoRemovedGovernanceEnvironmentVariables(env);
   const isLocal = isLocalTimelockNetwork({ connection });
 
   if (!isLocal) {
-    const missing = ["MIN_DELAY", "GOVERNANCE_MULTISIG"].filter((name) => !hasValue(env[name]));
+    const missing = ["MIN_DELAY", "GOVERNANCE_SAFE_ADDRESS"].filter((name) => !hasValue(env[name]));
     if (missing.length > 0) {
       throw new Error(
         `Live timelock deployment requires explicit ${missing.join(", ")}; ` +
@@ -60,7 +62,7 @@ export const resolveTimelockDeploymentConfig = async ({
   );
   const governanceMultisig = parseGovernanceMultisig({
     ethers,
-    value: hasValue(env.GOVERNANCE_MULTISIG) ? env.GOVERNANCE_MULTISIG : deployerAddress,
+    value: hasValue(env.GOVERNANCE_SAFE_ADDRESS) ? env.GOVERNANCE_SAFE_ADDRESS : deployerAddress,
   });
 
   if (!isLocal) {
@@ -72,13 +74,13 @@ export const resolveTimelockDeploymentConfig = async ({
           // `env` is an explicit configuration boundary for this resolver. Passing undefined
           // would trigger the helper's process.env default and make injected/test environments
           // unexpectedly inherit a host-level production profile.
-          profile: env.GOVERNANCE_MULTISIG_PROFILE ?? "",
+          profile: env.GOVERNANCE_SAFE_PROFILE ?? "",
         }));
     await inspect({
       ethers,
       provider,
       address: governanceMultisig,
-      label: "GOVERNANCE_MULTISIG",
+      label: "GOVERNANCE_SAFE_ADDRESS",
     });
   }
 

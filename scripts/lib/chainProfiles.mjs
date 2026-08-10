@@ -80,7 +80,7 @@ const profile = ({
       confirmationsEnvironmentName: EVM_MAINNET_CONFIRMATIONS_ENVIRONMENT_NAME,
       finalityTimeoutEnvironmentName: EVM_MAINNET_FINALITY_TIMEOUT_ENVIRONMENT_NAME,
       recoveryTransactionsEnvironmentName: `${EVM_MAINNET_ENV_PREFIX}_RECOVERY_TXS`,
-      testnetReleaseReportEnvironmentName: `${EVM_MAINNET_ENV_PREFIX}_TESTNET_RELEASE_REPORT`,
+      testnetReleaseReportRelativePath: `tmp/release-evidence/${id}-release-rehearsal.json`,
       safePlanDigestDomain: `deepfamily:${id}-mainnet-safe:v1`,
       releasePlanDigestDomain: `deepfamily:${id}-mainnet-release:v1`,
       releasePlanApprovalDomain: `deepfamily:${id}-mainnet-release-approval:v1`,

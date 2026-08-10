@@ -12,14 +12,36 @@ const MULTISIG_INSPECTION_ABI = [
 const LOCAL_HTTP_NETWORK_NAMES = new Set(["localhost"]);
 export { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE, ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE };
 
+const REMOVED_GOVERNANCE_ENVIRONMENT_NAMES = Object.freeze({
+  GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
+  GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
+  GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
+});
+
+export const assertNoRemovedGovernanceEnvironmentVariables = (env = process.env) => {
+  for (const [removedName, replacementName] of Object.entries(
+    REMOVED_GOVERNANCE_ENVIRONMENT_NAMES,
+  )) {
+    if (String(env[removedName] ?? "").trim() !== "") {
+      throw new Error(
+        `${removedName} has been removed; use ${replacementName} instead (do not set both)`,
+      );
+    }
+  }
+};
+
 const PROFILE_CHAIN_IDS = Object.freeze({
   [CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE]: new Set([71n, 1030n]),
   [ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE]: new Set([1n, 11155111n]),
 });
 
-export const normalizeGovernanceMultisigProfile = (
-  profile = process.env.GOVERNANCE_MULTISIG_PROFILE,
-) => String(profile ?? "").trim();
+export const normalizeGovernanceMultisigProfile = (profile) => {
+  if (profile === undefined) {
+    assertNoRemovedGovernanceEnvironmentVariables(process.env);
+    return String(process.env.GOVERNANCE_SAFE_PROFILE ?? "").trim();
+  }
+  return String(profile ?? "").trim();
+};
 
 export const isLocalDevelopmentConnection = (connection) => {
   if (connection?.networkConfig?.type === "edr-simulated") return true;
@@ -85,7 +107,7 @@ export const assertGovernanceMultisigWithProfile = async ({
   provider,
   address,
   label,
-  profile = process.env.GOVERNANCE_MULTISIG_PROFILE,
+  profile,
 }) => {
   const genericPolicy = await assertGovernanceMultisig({ ethers, provider, address, label });
   const configuredProfile = await assertGovernanceMultisigProfile({
@@ -104,18 +126,13 @@ export const assertGovernanceMultisigWithProfile = async ({
  * status reporting that already ran `assertGovernanceMultisig` can use this without performing the
  * generic threshold/owner inspection twice.
  */
-export const assertGovernanceMultisigProfile = async ({
-  provider,
-  address,
-  owners,
-  profile = process.env.GOVERNANCE_MULTISIG_PROFILE,
-}) => {
+export const assertGovernanceMultisigProfile = async ({ provider, address, owners, profile }) => {
   const normalizedProfile = normalizeGovernanceMultisigProfile(profile);
   if (normalizedProfile === "") return null;
   const allowedChainIds = PROFILE_CHAIN_IDS[normalizedProfile];
   if (!allowedChainIds) {
     throw new Error(
-      `Unsupported GOVERNANCE_MULTISIG_PROFILE=${normalizedProfile}; supported profiles: ` +
+      `Unsupported GOVERNANCE_SAFE_PROFILE=${normalizedProfile}; supported profiles: ` +
         `${CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE}, ${ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE}`,
     );
   }
@@ -127,7 +144,7 @@ export const assertGovernanceMultisigProfile = async ({
         ? "restricted to Conflux eSpace chainIds 71 and 1030"
         : "restricted to Ethereum chainIds 1 and 11155111";
     throw new Error(
-      `GOVERNANCE_MULTISIG_PROFILE=${normalizedProfile} is ${scope}; got ${network.chainId}`,
+      `GOVERNANCE_SAFE_PROFILE=${normalizedProfile} is ${scope}; got ${network.chainId}`,
     );
   }
   const safeProfile = await assertCanonicalSafeProfile({

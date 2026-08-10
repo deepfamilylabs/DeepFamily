@@ -105,11 +105,14 @@ keys into this repository.
    prerequisite and not related to the Safe's three-owner, 2/3 policy.
 2. Complete `npm run espace:acceptance` from the same audited release commit on eSpace Testnet in
    `release-rehearsal` mode with the production `MIN_DELAY >= 86400`. This mode rehearses only a
-   fresh release and performs zero Timelock waits. Archive only a schema-v4 report whose `status`
-   is `passed`, `releaseReady` is `true`,
+   fresh release and performs zero Timelock waits. After self-validation succeeds, the runner
+   automatically publishes the exact evidence to the Git-ignored, eSpace-specific
+   `tmp/release-evidence/espace-release-rehearsal.json`; diagnostic, failed, and recovery runs do not
+   overwrite it. Review and archive only that published schema-v4 report when its `status` is
+   `passed`, `releaseReady` is `true`,
    `zkArtifactTrust.productionReady` is `true`, and `zkCeremonyVerification.status` is `passed`; a
-   diagnostic report is not release evidence. Diagnostic mode instead uses
-   `EVM_E2E_MIN_DELAY=30` as the real delay for each of its four governance windows.
+   diagnostic report is not release evidence. Diagnostic mode instead uses the built-in 30-second
+   delay for each of its four governance windows.
 3. Use a clean, isolated checkout of that commit and the reviewed Node/npm versions. Install exact
    dependencies with `npm ci --ignore-scripts --no-audit --no-fund`, then complete the repository's
    build, test, frontend, ZK artifact, and storage-layout checks. Do not reuse an untrusted global
@@ -137,14 +140,11 @@ CONFLUX_RPC_URL=https://your-reviewed-espace-mainnet-rpc
 # Optional: blank uses tmp/zk-production/powersOfTau28_hez_final_13.ptau.
 ZK_PTAU_PATH=
 
-# Keep blank until the Safe deployment and real-owner acceptance are independently validated.
-GOVERNANCE_MULTISIG=
-GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1.3.0-2of3
+# Deployed production Safe Proxy address. Keep blank through Safe plan/deploy/owner acceptance.
+GOVERNANCE_SAFE_ADDRESS=
+# Safe implementation plus the exact three-owner, 2/3 policy; this is not an address.
+GOVERNANCE_SAFE_PROFILE=conflux-safe-1.3.0-2of3
 MIN_DELAY=172800
-EVM_MAINNET_CONFIRMATIONS=2
-EVM_MAINNET_FINALITY_TIMEOUT=3600
-# Must remain empty for a fresh orchestrated protocol release.
-GOVERNANCE_OWNER=
 
 # Public identities shared by Safe creation and protocol release.
 EVM_MAINNET_EXPECTED_DEPLOYER=0x...
@@ -160,29 +160,35 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 # Protocol release: separate budget; authorization and recovery use explicit JSON files.
 # Set explicitly for this operation; espace:mainnet:release:* interprets the value as CFX.
 EVM_MAINNET_MAX_NATIVE=5
-# Exact reviewed release-rehearsal report copied to a regular path inside this checkout.
-EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/espace-release-rehearsal.json
 ```
 
-For a fresh release, leave `GOVERNANCE_OWNER` empty: the orchestrator deploys
-`GovernanceTimelock`, validates it, and uses that exact address for the integrated protocol
-deployment. Keep `GOVERNANCE_MULTISIG` empty while creating and accepting a new Safe. Setting or
-changing `.env` later never changes chain state.
+For a fresh release, do not configure `GOVERNANCE_TIMELOCK_ADDRESS` at all: the orchestrator
+deploys `GovernanceTimelock`, validates it, checkpoints its address, and makes it the protocol
+owner. That variable identifies an already-deployed Timelock and is only a temporary input to a
+later, explicitly reviewed manual/reuse/upgrade command. Keep `GOVERNANCE_SAFE_ADDRESS` empty while
+creating and accepting a new Safe, then set it to the accepted Safe Proxy address before protocol
+release planning. The Safe Proxy becomes the sole holder of the Timelock's proposer, canceller, and
+executor roles; the Timelock becomes `DeepFamily.owner()` and the DEEP protocol treasury. Setting
+or changing `.env` later never changes chain state.
 
-The protocol release command validates the selected testnet report rather than trusting its file
-name. It requires schema v4, `releaseReady=true`, the current clean commit and artifact-input digest,
-`evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`, the same deployed
-`MIN_DELAY`, production ZK evidence, finalized fresh-release transactions, complete source
-verification, initial governance checks, and refund evidence. The report contains no Mock
-deployment, upgrade, governance migration, or Timelock wait. A report from another commit or
-diagnostic mode is rejected before any Mainnet transaction.
+The protocol release command automatically reads the eSpace profile's fixed
+`tmp/release-evidence/espace-release-rehearsal.json` file and validates its contents rather than
+trusting its file name. It requires schema v4, `releaseReady=true`, the current clean commit and
+artifact-input digest, `evidenceType=initial-mainnet-release`,
+`governanceLifecycleIncluded=false`, the same deployed `MIN_DELAY`, production ZK evidence,
+finalized fresh-release transactions, complete source verification, initial governance checks, and
+refund evidence. A missing file, a symbolic link, evidence from an older commit, or a report from
+diagnostic, failed, or recovery mode is rejected before any Mainnet transaction. The report contains
+no Mock deployment, upgrade, governance migration, or Timelock wait.
 
-The acceptance runner writes its report beneath its ignored run directory; the example path above
-is not created automatically. Copy the exact reviewed JSON into an ordinary, non-symlink file
-inside the release checkout, record and independently compare its SHA-256 with the immutable
-off-machine archive, then set `EVM_MAINNET_TESTNET_RELEASE_REPORT` to that relative or absolute
-in-checkout path. Repository-external paths and symbolic links are rejected so that plan bytes and
-owner signatures bind one stable local report.
+The acceptance runner retains its run-specific report beneath the ignored run directory and, only
+after a successful release rehearsal passes schema-v4 self-validation, publishes the exact bytes to
+the fixed evidence path above. No environment setting or manual in-checkout copy selects release
+evidence. Record the published file's SHA-256 and independently compare it with the immutable
+off-machine archive before planning; that archive remains a review and recovery record, not an
+alternate input path. A later diagnostic, failed, or recovery run leaves the last successful
+published evidence untouched, but the Mainnet release still rejects it if its commit or inputs are
+stale.
 
 `EXPLORER_API_KEY` may remain empty for ConfluxScan; the Hardhat configuration supplies its
 non-secret `espace` placeholder. It is not a wallet credential or an authorization key. Do not use
@@ -199,20 +205,20 @@ Final receipts record both `gasUsed` and Conflux `gasCharged`; actual cost uses
 `max(gasUsed, ceil(3 × gasLimit / 4)) × effectiveGasPrice`, rather than the Ethereum-only
 `gasUsed × effectiveGasPrice` assumption.
 
-The receipt/finality policy is shared through `EVM_MAINNET_CONFIRMATIONS` and
-`EVM_MAINNET_FINALITY_TIMEOUT`, but the Safe budget, digest argument, and optional recovery hash
-remain independent from the protocol release budget, approval file, and recovery file. Never put a
-Safe digest or recovery hash into a release approval/recovery file, or use one operation's budget or
-evidence for the other.
+The Safe tools, status check, and protocol release use the built-in receipt/finality policy of two
+confirmations and a 3600-second finality timeout; these are not persistent `.env` settings. The Safe
+budget, digest argument, and optional recovery hash remain independent from the protocol release
+budget, approval file, and recovery file. Never put a Safe digest or recovery hash into a release
+approval/recovery file, or use one operation's budget or evidence for the other.
 
 ## Create and validate the production Safe
 
 ### 1. Generate a read-only Safe plan
 
-Confirm that the not-yet-deployed governance address is empty:
+Confirm that the not-yet-deployed Safe Proxy address is empty:
 
 ```dotenv
-GOVERNANCE_MULTISIG=
+GOVERNANCE_SAFE_ADDRESS=
 ```
 
 `PRIVATE_KEY` is not needed for this read-only phase. Run:
@@ -298,7 +304,7 @@ The protocol release independently requires the current Safe nonce to be exactly
 1. make this acceptance the newly deployed Safe's first execution;
 2. after it succeeds, send no owner change, module/guard transaction, transfer, or governance call;
 3. run status and archive the report;
-4. only then set `GOVERNANCE_MULTISIG` to the reviewed predicted/deployed Safe address;
+4. only then set `GOVERNANCE_SAFE_ADDRESS` to the reviewed predicted/deployed Safe Proxy address;
 5. keep the Safe frozen at nonce `1` until protocol release planning and execution finish.
 
 If the nonce advances beyond `1`, do not try to edit a report or checkpoint. The first-release gate

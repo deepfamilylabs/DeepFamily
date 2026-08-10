@@ -39,12 +39,10 @@ const baseEnv = (overrides = {}) => ({
   EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
   EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
   EVM_MAINNET_MAX_NATIVE: "12.5",
-  EVM_MAINNET_CONFIRMATIONS: "2",
-  EVM_MAINNET_FINALITY_TIMEOUT: "3600",
   EVM_MAINNET_SAFE_ACCEPTANCE_TX: `0x${"ef".repeat(32)}`,
-  GOVERNANCE_MULTISIG: SAFE,
-  GOVERNANCE_MULTISIG_PROFILE: "conflux-safe-1.3.0-2of3",
-  GOVERNANCE_OWNER: "",
+  GOVERNANCE_SAFE_ADDRESS: SAFE,
+  GOVERNANCE_SAFE_PROFILE: "conflux-safe-1.3.0-2of3",
+  GOVERNANCE_TIMELOCK_ADDRESS: "",
   MIN_DELAY: "172800",
   ...overrides,
 });
@@ -80,9 +78,24 @@ describe("eSpace Mainnet release safety", function () {
     expect(() => parse({}, { chainId: 71n })).to.throw("requires chainId 1030");
   });
 
+  it("uses immutable testnet release evidence instead of a legacy environment override", function () {
+    const config = parse({
+      EVM_MAINNET_TESTNET_RELEASE_REPORT: "/tmp/untrusted-release-report.json",
+    });
+    expect(config.testnetReleaseReportPath).to.equal(
+      "tmp/release-evidence/espace-release-rehearsal.json",
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
+      config.testnetReleaseReportPath,
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property(
+      "testnetReleaseReportEnvironmentName",
+    );
+  });
+
   it("requires the exact Safe profile and independent three-owner allowlist", function () {
-    expect(() => parse({ GOVERNANCE_MULTISIG_PROFILE: "" })).to.throw(
-      "requires GOVERNANCE_MULTISIG_PROFILE",
+    expect(() => parse({ GOVERNANCE_SAFE_PROFILE: "" })).to.throw(
+      "requires GOVERNANCE_SAFE_PROFILE",
     );
     expect(() => parse({ EVM_MAINNET_SAFE_OWNERS: OWNERS.slice(0, 2).join(",") })).to.throw(
       "exactly three",
@@ -95,7 +108,22 @@ describe("eSpace Mainnet release safety", function () {
     );
   });
 
+  it("rejects every removed governance environment variable instead of accepting aliases", function () {
+    const removedVariables = {
+      GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
+      GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
+      GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
+    };
+
+    for (const [removedName, replacementName] of Object.entries(removedVariables)) {
+      expect(() => parse({ [removedName]: "legacy-value" })).to.throw(
+        `${removedName} has been removed; use ${replacementName} instead`,
+      );
+    }
+  });
+
   it("enforces the production delay floor, finality, verification and an explicit budget", function () {
+    expect(parse()).to.include({ confirmations: 2, finalityTimeoutSeconds: 3600 });
     expect(() => parse({ MIN_DELAY: "86399" })).to.throw("between 86400");
     expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property("verifyEnvironmentName");
     expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property("requireFinalityEnvironmentName");
@@ -103,9 +131,9 @@ describe("eSpace Mainnet release safety", function () {
     expect(() => parse({ EVM_MAINNET_CONFIRMATIONS: "1" })).to.throw("between 2 and 100");
   });
 
-  it("forbids force-new and a caller-supplied governance owner", function () {
+  it("forbids force-new and a caller-supplied Timelock address", function () {
     expect(() => parse({ FORCE_NEW_DEPLOYMENT: "1" })).to.throw("forbidden");
-    expect(() => parse({ GOVERNANCE_OWNER: SAFE })).to.throw("must be blank");
+    expect(() => parse({ GOVERNANCE_TIMELOCK_ADDRESS: SAFE })).to.throw("must be blank");
   });
 
   it("strictly parses recovery transaction hashes without accepting arbitrary JSON", function () {
