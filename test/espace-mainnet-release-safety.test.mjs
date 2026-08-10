@@ -3,7 +3,6 @@ import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
 import {
-  ESPACE_MAINNET_CONFIRMATION,
   assertMainnetReleaseSafeAcceptanceNonce,
   assertPlanMatchesCheckpoint,
   buildMainnetPlanApprovalMessage,
@@ -35,7 +34,6 @@ const PLACEHOLDER_APPROVAL_SIGNATURES = JSON.stringify([
 ]);
 
 const baseEnv = (overrides = {}) => ({
-  EVM_MAINNET_CONFIRM: "",
   EVM_MAINNET_PLAN_DIGEST: "",
   EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: "",
   EVM_MAINNET_EXPECTED_DEPLOYER: DEPLOYER,
@@ -59,21 +57,20 @@ const parse = (overrides = {}, context = {}) =>
   });
 
 describe("eSpace Mainnet release safety", function () {
-  it("uses blank confirmation for plan mode and the exact mainnet string for execute mode", function () {
-    expect(parseMainnetAuthorization(baseEnv()).mode).to.equal("plan");
+  it("uses a blank digest for plan mode and a valid reviewed digest for execute mode", function () {
+    expect(parseMainnetAuthorization(baseEnv())).to.deep.equal({
+      mode: "plan",
+      configuredPlanDigest: null,
+    });
     const config = parse({
-      EVM_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
-      EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
+      EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST.toUpperCase().replace("0X", "0x"),
       EVM_MAINNET_PLAN_APPROVAL_SIGNATURES: PLACEHOLDER_APPROVAL_SIGNATURES,
     });
     expect(config.mode).to.equal("execute");
     expect(config.configuredPlanDigest).to.equal(PLAN_DIGEST);
-  });
-
-  it("rejects a wrong non-empty confirmation before release configuration is accepted", function () {
-    expect(() => parseMainnetAuthorization(baseEnv({ EVM_MAINNET_CONFIRM: "yes" }))).to.throw(
-      "blank for a read-only plan",
-    );
+    expect(() =>
+      parseMainnetAuthorization(baseEnv({ EVM_MAINNET_PLAN_DIGEST: "0x1234" })),
+    ).to.throw("32-byte digest");
   });
 
   it("hard-locks the Hardhat network and raw chain identity", function () {
@@ -203,7 +200,6 @@ describe("eSpace Mainnet release safety", function () {
   it("requires execute-mode plan approvals and forbids stale approvals in plan mode", function () {
     expect(() =>
       parse({
-        EVM_MAINNET_CONFIRM: ESPACE_MAINNET_CONFIRMATION,
         EVM_MAINNET_PLAN_DIGEST: PLAN_DIGEST,
       }),
     ).to.throw("PLAN_APPROVAL_SIGNATURES must contain approval signatures");

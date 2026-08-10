@@ -7,10 +7,8 @@ import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mj
 
 export const ESPACE_MAINNET_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
 export const ESPACE_MAINNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.mainnet.chainId;
-export const ESPACE_MAINNET_CONFIRMATION = ESPACE_CHAIN_PROFILE.mainnet.confirmation;
 export const ETHEREUM_MAINNET_NETWORK = ETHEREUM_CHAIN_PROFILE.mainnet.networkName;
 export const ETHEREUM_MAINNET_CHAIN_ID = ETHEREUM_CHAIN_PROFILE.mainnet.chainId;
-export const ETHEREUM_MAINNET_CONFIRMATION = ETHEREUM_CHAIN_PROFILE.mainnet.confirmation;
 export const MAINNET_MIN_DELAY_FLOOR_SECONDS = 86_400;
 export const MAINNET_STATE_SCHEMA_VERSION = 1;
 export const MAINNET_TRANSACTION_LABELS = Object.freeze([
@@ -160,15 +158,19 @@ export const parseMainnetAuthorization = (
   chainProfile = ESPACE_CHAIN_PROFILE,
 ) => {
   const mainnet = chainProfile.mainnet;
-  const confirmation = String(env[mainnet.confirmationEnvironmentName] ?? "").trim();
-  if (confirmation === "") return Object.freeze({ mode: "plan", confirmation: null });
-  if (confirmation !== mainnet.confirmation) {
+  const configuredPlanDigest = String(env[mainnet.planDigestEnvironmentName] ?? "").trim();
+  if (configuredPlanDigest === "") {
+    return Object.freeze({ mode: "plan", configuredPlanDigest: null });
+  }
+  if (!ethers.isHexString(configuredPlanDigest, 32)) {
     throw new Error(
-      `${mainnet.confirmationEnvironmentName} must be blank for a read-only plan or exactly ` +
-        mainnet.confirmation,
+      `${mainnet.planDigestEnvironmentName} must be the 32-byte digest printed by a reviewed plan`,
     );
   }
-  return Object.freeze({ mode: "execute", confirmation });
+  return Object.freeze({
+    mode: "execute",
+    configuredPlanDigest: configuredPlanDigest.toLowerCase(),
+  });
 };
 
 export const parseProductionMainnetReleaseConfig = ({
@@ -267,15 +269,6 @@ export const parseProductionMainnetReleaseConfig = ({
     throw new Error(`${mainnet.maximumCostEnvironmentName} must be greater than zero`);
   }
 
-  const configuredPlanDigest = String(env[mainnet.planDigestEnvironmentName] ?? "").trim();
-  if (authorization.mode === "execute" && !ethers.isHexString(configuredPlanDigest, 32)) {
-    throw new Error(
-      `${mainnet.planDigestEnvironmentName} must be the 32-byte digest printed by a reviewed plan`,
-    );
-  }
-  if (authorization.mode === "plan" && configuredPlanDigest !== "") {
-    throw new Error(`Leave ${mainnet.planDigestEnvironmentName} blank while generating a plan`);
-  }
   const testnetReleaseReportPath = String(
     env[mainnet.testnetReleaseReportEnvironmentName] ?? "",
   ).trim();
@@ -305,7 +298,6 @@ export const parseProductionMainnetReleaseConfig = ({
     finalityTimeoutSeconds,
     maximumCost,
     maximumCostWei,
-    configuredPlanDigest: configuredPlanDigest === "" ? null : configuredPlanDigest.toLowerCase(),
     planApprovalSignatures,
     testnetReleaseReportPath: testnetReleaseReportPath === "" ? null : testnetReleaseReportPath,
     recoveryTransactions: parseRecoveryTransactions(

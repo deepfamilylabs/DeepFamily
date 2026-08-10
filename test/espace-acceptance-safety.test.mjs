@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import {
-  ESPACE_E2E_CONFIRMATION,
   ACCEPTANCE_MODE_DIAGNOSTIC,
   ACCEPTANCE_MODE_RELEASE_REHEARSAL,
   ESPACE_E2E_RELEASE_SAFE_PROFILE,
@@ -22,10 +21,7 @@ describe("eSpace acceptance safety helpers", function () {
   const basePrivateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   const runId = "acceptance-run-20260721";
   const baseConfig = (overrides = {}) => ({
-    env: {
-      EVM_E2E_CONFIRM: ESPACE_E2E_CONFIRMATION,
-      ...overrides,
-    },
+    env: { ...overrides },
     networkName: "confluxTestnet",
     chainId: 71n,
   });
@@ -112,15 +108,12 @@ describe("eSpace acceptance safety helpers", function () {
       ).to.throw(/GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1\.3\.0-2of3/i);
     });
 
-    it("requires exact network name, chain ID, and confirmation phrase", function () {
+    it("requires exact network name and chain ID", function () {
       expect(() =>
         parseESpaceAcceptanceConfig({ ...baseConfig(), networkName: "conflux" }),
       ).to.throw(/restricted.*confluxTestnet/i);
       expect(() => parseESpaceAcceptanceConfig({ ...baseConfig(), chainId: 1030 })).to.throw(
         /chainId 71/i,
-      );
-      expect(() => parseESpaceAcceptanceConfig(baseConfig({ EVM_E2E_CONFIRM: "yes" }))).to.throw(
-        new RegExp(ESPACE_E2E_CONFIRMATION),
       );
     });
 

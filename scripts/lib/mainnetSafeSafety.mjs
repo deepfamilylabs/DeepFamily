@@ -13,11 +13,9 @@ import {
 export const ESPACE_MAINNET_SAFE_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
 export const ESPACE_MAINNET_SAFE_CHAIN_ID = ESPACE_CHAIN_PROFILE.mainnet.chainId;
 export const ESPACE_MAINNET_SAFE_PROFILE = ESPACE_CHAIN_PROFILE.governanceMultisigProfile;
-export const ESPACE_MAINNET_SAFE_CONFIRMATION = ESPACE_CHAIN_PROFILE.mainnet.safeConfirmation;
 export const ETHEREUM_MAINNET_SAFE_NETWORK = ETHEREUM_CHAIN_PROFILE.mainnet.networkName;
 export const ETHEREUM_MAINNET_SAFE_CHAIN_ID = ETHEREUM_CHAIN_PROFILE.mainnet.chainId;
 export const ETHEREUM_MAINNET_SAFE_PROFILE = ETHEREUM_CHAIN_PROFILE.governanceMultisigProfile;
-export const ETHEREUM_MAINNET_SAFE_CONFIRMATION = ETHEREUM_CHAIN_PROFILE.mainnet.safeConfirmation;
 export const MAINNET_SAFE_STATE_SCHEMA_VERSION = 1;
 export const ESPACE_MAINNET_SAFE_PLAN_DIGEST_DOMAIN =
   ESPACE_CHAIN_PROFILE.mainnet.safePlanDigestDomain;
@@ -159,35 +157,20 @@ const parseAcceptanceTransaction = (
 };
 
 /**
- * The two execute authorizations are deliberately atomic: a blank pair is plan mode and a fully
- * valid pair is execute mode. This prevents an old digest or confirmation flag from silently
- * changing a later planning run into an execution.
+ * A blank reviewed-plan digest selects plan mode; a valid digest selects execute mode. The execute
+ * path still recomputes the complete plan and rejects a stale or mismatched digest before broadcast.
  */
 export const parseMainnetSafeAuthorization = (
   env = process.env,
   chainProfile = ESPACE_CHAIN_PROFILE,
 ) => {
   const mainnet = chainProfile.mainnet;
-  const confirmation = String(env[mainnet.safeConfirmationEnvironmentName] ?? "").trim();
   const configuredPlanDigest = String(env[mainnet.safePlanDigestEnvironmentName] ?? "").trim();
-  if (confirmation === "" && configuredPlanDigest === "") {
+  if (configuredPlanDigest === "") {
     return Object.freeze({
       mode: "plan",
-      confirmation: null,
       configuredPlanDigest: null,
     });
-  }
-  if (confirmation === "" || configuredPlanDigest === "") {
-    throw new Error(
-      `${mainnet.safeConfirmationEnvironmentName} and ${mainnet.safePlanDigestEnvironmentName} ` +
-        "must either both " +
-        "be blank for plan mode or both be set for execute mode",
-    );
-  }
-  if (confirmation !== mainnet.safeConfirmation) {
-    throw new Error(
-      `${mainnet.safeConfirmationEnvironmentName} must be exactly ${mainnet.safeConfirmation}`,
-    );
   }
   if (!ethers.isHexString(configuredPlanDigest, 32)) {
     throw new Error(
@@ -197,7 +180,6 @@ export const parseMainnetSafeAuthorization = (
   }
   return Object.freeze({
     mode: "execute",
-    confirmation,
     configuredPlanDigest: configuredPlanDigest.toLowerCase(),
   });
 };
@@ -215,8 +197,8 @@ export const parseProductionMainnetSafeConfig = ({
   chainId,
 } = {}) => {
   const mainnet = chainProfile.mainnet;
-  // Authorization is parsed first so an invalid non-empty confirmation fails before any caller
-  // needs to open an RPC connection or load a deployer private key.
+  // Authorization is parsed first so an invalid non-empty plan digest fails before any caller needs
+  // to open an RPC connection or load a deployer private key.
   const authorization = parseMainnetSafeAuthorization(env, chainProfile);
   if (networkName !== mainnet.networkName) {
     throw new Error(
@@ -284,8 +266,7 @@ export const parseProductionMainnetSafeConfig = ({
   );
   if (recoveryTransaction !== null && authorization.mode !== "execute") {
     throw new Error(
-      `${mainnet.safeRecoveryTransactionEnvironmentName} is accepted only in confirmed ` +
-        "execute mode",
+      `${mainnet.safeRecoveryTransactionEnvironmentName} is accepted only in execute mode`,
     );
   }
 

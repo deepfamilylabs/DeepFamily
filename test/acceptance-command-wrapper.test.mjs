@@ -34,7 +34,6 @@ const runFixture = async ({
       arguments_,
       environment: {
         ...process.env,
-        [acceptance.confirmationEnvironmentName]: acceptance.confirmation,
         [acceptance.modeEnvironmentName]: mode,
         ...overrides,
       },
@@ -62,7 +61,6 @@ describe("acceptance command wrapper", function () {
     const ethereum = ETHEREUM_CHAIN_PROFILE.acceptance;
     const publicEnvironmentNames = {
       envPrefix: "EVM_E2E",
-      confirmationEnvironmentName: "EVM_E2E_CONFIRM",
       modeEnvironmentName: "EVM_E2E_MODE",
       minDelayEnvironmentName: "EVM_E2E_MIN_DELAY",
       confirmationsEnvironmentName: "EVM_E2E_CONFIRMATIONS",
@@ -76,7 +74,6 @@ describe("acceptance command wrapper", function () {
 
     expect(espace).to.include(publicEnvironmentNames);
     expect(ethereum).to.include(publicEnvironmentNames);
-    expect(espace.confirmation).not.to.equal(ethereum.confirmation);
     expect(espace.runIdDigestDomain).not.to.equal(ethereum.runIdDigestDomain);
     expect(espace.walletDerivationDomain).not.to.equal(ethereum.walletDerivationDomain);
     expect(espace.wrapperTokenEnvironmentName).to.equal("DEEPFAMILY_ESPACE_E2E_WRAPPER_TOKEN");
@@ -89,11 +86,9 @@ describe("acceptance command wrapper", function () {
       safeMaximumCostEnvironmentName: "EVM_MAINNET_SAFE_MAX_NATIVE",
       safeConfirmationsEnvironmentName: "EVM_MAINNET_CONFIRMATIONS",
       safeFinalityTimeoutEnvironmentName: "EVM_MAINNET_FINALITY_TIMEOUT",
-      safeConfirmationEnvironmentName: "EVM_MAINNET_SAFE_CONFIRM",
       safePlanDigestEnvironmentName: "EVM_MAINNET_SAFE_PLAN_DIGEST",
       safeRecoveryTransactionEnvironmentName: "EVM_MAINNET_SAFE_RECOVERY_TX",
       safeAcceptanceTransactionEnvironmentName: "EVM_MAINNET_SAFE_ACCEPTANCE_TX",
-      confirmationEnvironmentName: "EVM_MAINNET_CONFIRM",
       planDigestEnvironmentName: "EVM_MAINNET_PLAN_DIGEST",
       planApprovalSignaturesEnvironmentName: "EVM_MAINNET_PLAN_APPROVAL_SIGNATURES",
       maximumCostEnvironmentName: "EVM_MAINNET_MAX_NATIVE",
@@ -104,12 +99,6 @@ describe("acceptance command wrapper", function () {
     };
     expect(ESPACE_CHAIN_PROFILE.mainnet).to.include(mainnetPublicEnvironmentNames);
     expect(ETHEREUM_CHAIN_PROFILE.mainnet).to.include(mainnetPublicEnvironmentNames);
-    expect(ESPACE_CHAIN_PROFILE.mainnet.safeConfirmation).not.to.equal(
-      ETHEREUM_CHAIN_PROFILE.mainnet.safeConfirmation,
-    );
-    expect(ESPACE_CHAIN_PROFILE.mainnet.confirmation).not.to.equal(
-      ETHEREUM_CHAIN_PROFILE.mainnet.confirmation,
-    );
     expect(ESPACE_CHAIN_PROFILE.mainnet.safePlanDigestDomain).not.to.equal(
       ETHEREUM_CHAIN_PROFILE.mainnet.safePlanDigestDomain,
     );
@@ -183,7 +172,7 @@ describe("acceptance command wrapper", function () {
     }
   });
 
-  it("fails before spawning for a missing confirmation, invalid mode or arguments", async function () {
+  it("fails before spawning for an invalid mode or arguments", async function () {
     const calls = [];
     const options = {
       chainProfile: ESPACE_CHAIN_PROFILE,
@@ -191,16 +180,13 @@ describe("acceptance command wrapper", function () {
       childRunner: async (invocation) => calls.push(invocation),
     };
     for (const variant of [
-      { environment: {} },
       {
         environment: {
-          EVM_E2E_CONFIRM: ESPACE_CHAIN_PROFILE.acceptance.confirmation,
           EVM_E2E_MODE: "unsafe",
         },
       },
       {
         environment: {
-          EVM_E2E_CONFIRM: ESPACE_CHAIN_PROFILE.acceptance.confirmation,
           EVM_E2E_MODE: "diagnostic",
         },
         arguments_: ["--network", "mainnet"],
@@ -230,7 +216,6 @@ describe("acceptance command wrapper", function () {
         entryScript: "scripts/espace-acceptance.mjs",
         arguments_: [],
         environment: {
-          [acceptance.confirmationEnvironmentName]: acceptance.confirmation,
           [acceptance.modeEnvironmentName]: "release-rehearsal",
         },
         root,
@@ -309,7 +294,6 @@ describe("acceptance command wrapper", function () {
           entryScript: "scripts/espace-acceptance.mjs",
           arguments_: [],
           environment: {
-            [acceptance.confirmationEnvironmentName]: acceptance.confirmation,
             [acceptance.modeEnvironmentName]: "release-rehearsal",
           },
           root,

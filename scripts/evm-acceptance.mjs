@@ -73,7 +73,6 @@ let CHAIN_PROFILE = ESPACE_CHAIN_PROFILE;
 let ACCEPTANCE_PROFILE = CHAIN_PROFILE.acceptance;
 let EXPECTED_NETWORK = ACCEPTANCE_PROFILE.networkName;
 let EXPECTED_CHAIN_ID = ACCEPTANCE_PROFILE.chainId;
-let REQUIRED_CONFIRMATION = ACCEPTANCE_PROFILE.confirmation;
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
 const PROOF_TIMEOUT_MS = 5 * 60 * 1000;
 const READY_GRACE_MS = 5 * 60 * 1000;
@@ -103,7 +102,6 @@ const configureChainProfile = (chainProfile) => {
   ACCEPTANCE_PROFILE = chainProfile.acceptance;
   EXPECTED_NETWORK = ACCEPTANCE_PROFILE.networkName;
   EXPECTED_CHAIN_ID = ACCEPTANCE_PROFILE.chainId;
-  REQUIRED_CONFIRMATION = ACCEPTANCE_PROFILE.confirmation;
   REPORT_ROOT = path.join(process.cwd(), "tmp", ACCEPTANCE_PROFILE.reportDirectoryName);
   DEPLOYMENTS_DIR = path.join(process.cwd(), "deployments", EXPECTED_NETWORK);
 };
@@ -707,13 +705,6 @@ const runRecovery = async ({ ethers, provider, config, funder, runDeployer, base
 
 export const main = async (chainProfile) => {
   configureChainProfile(chainProfile);
-  // Fail closed without touching the RPC when the explicit live-test acknowledgement is absent.
-  if (process.env[ACCEPTANCE_PROFILE.confirmationEnvironmentName] !== REQUIRED_CONFIRMATION) {
-    throw new Error(
-      `Set ${ACCEPTANCE_PROFILE.confirmationEnvironmentName}=${REQUIRED_CONFIRMATION} ` +
-        "to authorize testnet transactions",
-    );
-  }
   const requestedMode = String(
     process.env[ACCEPTANCE_PROFILE.modeEnvironmentName] ?? "diagnostic",
   ).trim();
@@ -738,8 +729,8 @@ export const main = async (chainProfile) => {
       `got ${String(rawTestnetChainId)}`,
   );
   const network = await retryBounded(() => provider.getNetwork(), { label: "RPC chain-id query" });
-  // The tested safety parser evaluates the network name, chain ID and explicit confirmation
-  // together before report creation, funding, or any other transaction.
+  // The tested safety parser evaluates the network name and chain ID together before report
+  // creation, funding, or any other transaction.
   const parsedConfig = parseAcceptanceConfig({
     chainProfile: CHAIN_PROFILE,
     env: process.env,
@@ -904,12 +895,10 @@ export const main = async (chainProfile) => {
       finality: { required: config.requireFinality, status: "pending" },
     },
     safety: {
-      confirmationMatched: true,
       isolatedDeployment: true,
       privateKeysPersisted: false,
       reportContainsProofsOrSignatures: false,
       recoveryCommand:
-        `${ACCEPTANCE_PROFILE.confirmationEnvironmentName}=${REQUIRED_CONFIRMATION} ` +
         `${ACCEPTANCE_PROFILE.runIdEnvironmentName}=${config.runId} ` +
         `${ACCEPTANCE_PROFILE.recoverEnvironmentName}=1 ${ACCEPTANCE_PROFILE.command}`,
     },

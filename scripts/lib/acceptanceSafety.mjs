@@ -6,13 +6,11 @@ import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 
 export const ESPACE_TESTNET_NAME = ESPACE_CHAIN_PROFILE.acceptance.networkName;
 export const ESPACE_TESTNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.acceptance.chainId;
-export const ESPACE_E2E_CONFIRMATION = ESPACE_CHAIN_PROFILE.acceptance.confirmation;
 export const ACCEPTANCE_MODE_DIAGNOSTIC = "diagnostic";
 export const ACCEPTANCE_MODE_RELEASE_REHEARSAL = "release-rehearsal";
 export const ESPACE_E2E_RELEASE_SAFE_PROFILE = ESPACE_CHAIN_PROFILE.governanceMultisigProfile;
 export const ETHEREUM_TESTNET_NAME = ETHEREUM_CHAIN_PROFILE.acceptance.networkName;
 export const ETHEREUM_TESTNET_CHAIN_ID = ETHEREUM_CHAIN_PROFILE.acceptance.chainId;
-export const ETHEREUM_E2E_CONFIRMATION = ETHEREUM_CHAIN_PROFILE.acceptance.confirmation;
 export const ETHEREUM_E2E_RELEASE_SAFE_PROFILE = ETHEREUM_CHAIN_PROFILE.governanceMultisigProfile;
 
 const SECP256K1_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
@@ -116,13 +114,6 @@ export const parseAcceptanceConfig = ({
     throw new Error(
       `${chainProfile.displayName} acceptance requires chainId ${acceptance.chainId}; got ` +
         normalizedChainId,
-    );
-  }
-
-  if (env[acceptance.confirmationEnvironmentName] !== acceptance.confirmation) {
-    throw new Error(
-      `Set ${acceptance.confirmationEnvironmentName}=${acceptance.confirmation} ` +
-        "to authorize testnet transactions",
     );
   }
 

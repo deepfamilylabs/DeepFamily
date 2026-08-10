@@ -3,7 +3,7 @@
  *   npm run espace:mainnet:safe
  *   npm run espace:mainnet:safe:status
  *
- * Plan is the default. Execute requires the reviewed digest and exact confirmation documented in
+ * Plan is the default. Execute requires the reviewed digest documented in
  * docs/espace-mainnet-release.md. This wrapper does not accept a caller-selected network.
  */
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";

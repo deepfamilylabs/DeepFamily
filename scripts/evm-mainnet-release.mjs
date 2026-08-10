@@ -784,7 +784,7 @@ const revalidateCompletedRelease = async ({
 export const main = async (chainProfile) => {
   configureChainProfile(chainProfile);
   await assertReleaseCommandWrapper();
-  // Invalid non-empty confirmation values fail before even opening the configured RPC.
+  // Invalid non-empty plan digests fail before even opening the configured RPC.
   parseMainnetAuthorization(process.env, CHAIN_PROFILE);
 
   const connection = await hre.network.connect();
@@ -938,9 +938,9 @@ export const main = async (chainProfile) => {
       if (existingCheckpoint.status !== "passed") {
         throw new Error(
           `An incomplete protocol release checkpoint (${existingCheckpoint.status}/` +
-            `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. Blank authorization ` +
+            `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. A blank plan digest ` +
             "cannot create a new plan or claim that no transaction was broadcast. Review and " +
-            "resume the existing checkpoint with its approved digest and confirmation.",
+            "resume the existing checkpoint with its approved digest and owner approvals.",
         );
       }
       await revalidateCompletedRelease({
@@ -1006,7 +1006,6 @@ export const main = async (chainProfile) => {
     console.log(
       `  ${MAINNET_PROFILE.planDigestEnvironmentName}=${plan.planDigest} ` +
         `${MAINNET_PROFILE.planApprovalSignaturesEnvironmentName}='["0x...","0x..."]' ` +
-        `${MAINNET_PROFILE.confirmationEnvironmentName}=${MAINNET_PROFILE.confirmation} ` +
         MAINNET_PROFILE.releaseCommand,
     );
     return;

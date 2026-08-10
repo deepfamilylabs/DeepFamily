@@ -11,14 +11,14 @@ uses three explicit commands:
   separate approval, broadcasts or resumes the protocol release.
 
 Use these npm commands directly. Do not invoke the lower-level `.mjs` files, add a different
-`--network`, or reuse an eSpace digest or confirmation value. The public entries select an
+`--network`, or reuse an eSpace digest or recovery value. The public entries select an
 immutable Ethereum profile in code: Mainnet chain ID `1`, canonical Safe v1.3.0 **L1** singleton,
 three ordered EOA owners, threshold `2`, Etherscan verification, ETH budgets, Ethereum receipt gas
 accounting, and `deployments/mainnet/` checkpoints. Environment variables can supply approved
 addresses, limits, and authorization, but cannot change those profile properties.
 
 The eSpace and Ethereum production commands share the public `EVM_MAINNET_*` setting names. The
-named command fixes their chain, confirmation domain, native unit, and evidence requirements;
+named command fixes their chain, plan-digest domain, native unit, and evidence requirements;
 before switching command families, clear and replace every identity, budget, authorization,
 report, and recovery value rather than reusing it across chains.
 
@@ -123,7 +123,6 @@ EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 EVM_MAINNET_SAFE_SALT_NONCE=2026072401
 # Set explicitly for this operation; ethereum:mainnet:safe interprets the value as ETH.
 EVM_MAINNET_SAFE_MAX_NATIVE=0.1
-EVM_MAINNET_SAFE_CONFIRM=
 EVM_MAINNET_SAFE_PLAN_DIGEST=
 EVM_MAINNET_SAFE_RECOVERY_TX=
 EVM_MAINNET_SAFE_ACCEPTANCE_TX=
@@ -133,7 +132,6 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 EVM_MAINNET_MAX_NATIVE=1
 # Exact reviewed Sepolia report copied to a regular path inside this checkout.
 EVM_MAINNET_TESTNET_RELEASE_REPORT=tmp/release-evidence/ethereum-release-rehearsal.json
-EVM_MAINNET_CONFIRM=
 EVM_MAINNET_PLAN_DIGEST=
 EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 EVM_MAINNET_RECOVERY_TXS=
@@ -161,8 +159,9 @@ funds before broadcasts.
 Ethereum charged gas is accounted from the receipt as
 `gasUsed × effectiveGasPrice`; the Conflux three-quarter gas-limit rule is not used.
 
-The Safe and release confirmation/digest pairs are deliberately independent. A blank pair means
-plan mode. A valid complete pair means execute/resume mode. A half-filled pair is rejected.
+The Safe and release plan digests are deliberately independent. A blank digest means plan mode;
+setting the exact reviewed digest printed by that plan means execute/resume mode. Protocol release
+execution separately requires the reviewed Safe-owner approval signatures.
 
 ## Phase A: create and accept the governance Safe
 
@@ -172,7 +171,6 @@ Leave the following values blank:
 
 ```dotenv
 GOVERNANCE_MULTISIG=
-EVM_MAINNET_SAFE_CONFIRM=
 EVM_MAINNET_SAFE_PLAN_DIGEST=
 ```
 
@@ -198,11 +196,10 @@ printed plan digest.
 
 ### A2. Execute or resume the reviewed factory call
 
-After independent approval, set the exact output values:
+After independent approval, set the exact output value:
 
 ```dotenv
 EVM_MAINNET_SAFE_PLAN_DIGEST=0x...
-EVM_MAINNET_SAFE_CONFIRM=ethereum-mainnet-safe-chain-1
 ```
 
 Set `PRIVATE_KEY` to the approved deployer key and run the same command:
@@ -249,10 +246,9 @@ Keep the Safe frozen at nonce `1` until the protocol release completes.
 
 ### B1. Generate a read-only release plan
 
-Leave both release authorization values blank:
+Leave the release digest and approval signatures blank:
 
 ```dotenv
-EVM_MAINNET_CONFIRM=
 EVM_MAINNET_PLAN_DIGEST=
 EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=
 ```
@@ -289,7 +285,6 @@ After collecting the signatures, set:
 ```dotenv
 EVM_MAINNET_PLAN_DIGEST=0x...
 EVM_MAINNET_PLAN_APPROVAL_SIGNATURES=["0xFirstOwnerSignature...","0xSecondOwnerSignature..."]
-EVM_MAINNET_CONFIRM=ethereum-mainnet-chain-1
 ```
 
 Run the same command:
@@ -346,7 +341,7 @@ and proxy result. Then set:
 EVM_MAINNET_SAFE_RECOVERY_TX=0xTransactionHash
 ```
 
-Keep the original Safe digest/confirmation and rerun `npm run ethereum:mainnet:safe`. The recovery
+Keep the original Safe digest and rerun `npm run ethereum:mainnet:safe`. The recovery
 hash can only adopt a transaction matching the checkpointed intent; it does not authorize a new
 broadcast.
 
@@ -356,7 +351,7 @@ For a hashless planned protocol phase, use the exact label printed by the runner
 EVM_MAINNET_RECOVERY_TXS={"exact-runner-label":"0xTransactionHash"}
 ```
 
-Keep the original release digest/confirmation and rerun `npm run ethereum:mainnet:release`.
+Keep the original release digest and rerun `npm run ethereum:mainnet:release`.
 Unknown labels, extra hashes, failed/replaced transactions, or sender/nonce/input/address/code/state
 mismatches stop recovery. Clear recovery variables after the checkpoint adopts the evidence.
 
