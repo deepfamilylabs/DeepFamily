@@ -402,7 +402,7 @@ Only after `release:preflight` passes:
 The release rehearsal deploys that Timelock delay but schedules no Timelock operation, so it has
 zero Timelock waits. `EVM_E2E_MIN_DELAY=30` belongs to diagnostic mode, where it is the actual delay
 for each of four governance windows; diagnostic output is never release evidence. A fresh Mainnet
-release also has zero Timelock waits. Its 24-hour delay governs later changes.
+release also has zero Timelock waits. Its configured 48-hour delay governs later changes.
 
 The Safe remains a separate 2/3 governance control. The testnet/Mainnet release tools validate the
 recorded ZK trust model but do not reinterpret one ZK contributor as one governance signer.

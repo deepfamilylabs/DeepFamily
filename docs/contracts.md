@@ -465,7 +465,7 @@ Acceptance modes deliberately prove different things:
   no Timelock operation and waits zero Timelock windows. Its schema-v4 report contains no Mock,
   upgrade, or governance migration and records `evidenceType=initial-mainnet-release` with
   `governanceLifecycleIncluded=false`.
-- a fresh Mainnet release follows the same zero-wait shape. Its 24-hour Timelock delay constrains
+- a fresh Mainnet release follows the same zero-wait shape. Its 48-hour Timelock delay constrains
   the first future governance operation, not deployment itself.
 
 With `EVM_MAINNET_PLAN_DIGEST` empty, it produces a read-only plan.
@@ -546,8 +546,8 @@ timelock still grants `DEFAULT_ADMIN_ROLE` to itself, so roles can be migrated, 
 and executing a delayed timelock operation. A zero delay is rejected both initially and on updates.
 
 ```bash
-# Advanced stepwise example: rehearse the intended 24-hour delay with the actual testnet multisig.
-MIN_DELAY=86400 GOVERNANCE_MULTISIG=0xMultisig... \
+# Advanced stepwise example: rehearse the intended 48-hour delay with the actual testnet multisig.
+MIN_DELAY=172800 GOVERNANCE_MULTISIG=0xMultisig... \
   npm run deploy:timelock --net=confluxTestnet
 
 # Use the resulting timelock address, not the multisig address, as the protocol owner.
