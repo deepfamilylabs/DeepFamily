@@ -24,7 +24,7 @@ import {
 // Covers the upgrade-tooling layer that the contract-level UUPS tests
 // (test/contract-upgradeability.test.mjs) do not reach: the storage / bytecode safety gates
 // used by `upgrade-schedule`, the deterministic salt shared by schedule/execute, the timelock
-// role dual-mode, and the GOVERNANCE_OWNER deploy-handover path in integratedDeployment.mjs.
+// role dual-mode, and the GOVERNANCE_TIMELOCK_ADDRESS deploy-handover path in integratedDeployment.mjs.
 describe("Upgrade tooling & governance deploy path", function () {
   this.timeout(120_000);
 
@@ -347,22 +347,22 @@ describe("Upgrade tooling & governance deploy path", function () {
     });
   });
 
-  describe("GOVERNANCE_OWNER deploy handover (live-network path)", function () {
-    const OWNER_ENV = "GOVERNANCE_OWNER";
-    const MULTISIG_ENV = "GOVERNANCE_MULTISIG";
-    let originalOwner;
-    let originalMultisig;
+  describe("GOVERNANCE_TIMELOCK_ADDRESS deploy handover (live-network path)", function () {
+    const TIMELOCK_ENV = "GOVERNANCE_TIMELOCK_ADDRESS";
+    const SAFE_ENV = "GOVERNANCE_SAFE_ADDRESS";
+    let originalTimelock;
+    let originalSafe;
     beforeEach(() => {
-      originalOwner = process.env[OWNER_ENV];
-      originalMultisig = process.env[MULTISIG_ENV];
-      delete process.env[OWNER_ENV];
-      delete process.env[MULTISIG_ENV];
+      originalTimelock = process.env[TIMELOCK_ENV];
+      originalSafe = process.env[SAFE_ENV];
+      delete process.env[TIMELOCK_ENV];
+      delete process.env[SAFE_ENV];
     });
     afterEach(() => {
-      if (originalOwner === undefined) delete process.env[OWNER_ENV];
-      else process.env[OWNER_ENV] = originalOwner;
-      if (originalMultisig === undefined) delete process.env[MULTISIG_ENV];
-      else process.env[MULTISIG_ENV] = originalMultisig;
+      if (originalTimelock === undefined) delete process.env[TIMELOCK_ENV];
+      else process.env[TIMELOCK_ENV] = originalTimelock;
+      if (originalSafe === undefined) delete process.env[SAFE_ENV];
+      else process.env[SAFE_ENV] = originalSafe;
     });
 
     // deployIntegratedSystem exempts local/simulated networks from the governance-owner
@@ -388,8 +388,8 @@ describe("Upgrade tooling & governance deploy path", function () {
       await tl.waitForDeployment();
       const tlAddr = await tl.getAddress();
 
-      process.env[OWNER_ENV] = tlAddr;
-      process.env[MULTISIG_ENV] = multisigAddr;
+      process.env[TIMELOCK_ENV] = tlAddr;
+      process.env[SAFE_ENV] = multisigAddr;
       const deployed = await deployIntegratedSystem(fakeLiveConnection(), {
         writeDeployments: false,
         signer: deployer,
@@ -399,7 +399,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(await deployed.token.owner()).to.equal(hre.ethers.ZeroAddress);
     });
 
-    it("refuses to deploy without GOVERNANCE_OWNER on a live network", async () => {
+    it("refuses to deploy without GOVERNANCE_TIMELOCK_ADDRESS on a live network", async () => {
       const [deployer] = await hre.ethers.getSigners();
       let err;
       try {
@@ -411,12 +411,12 @@ describe("Upgrade tooling & governance deploy path", function () {
         err = e;
       }
       expect(err, "expected a missing-governance-owner abort").to.be.an("error");
-      expect(err.message).to.match(/GOVERNANCE_OWNER must be set/);
+      expect(err.message).to.match(/GOVERNANCE_TIMELOCK_ADDRESS must be set/);
     });
 
     it("refuses an EOA (codeless) governance owner", async () => {
       const [deployer, eoa] = await hre.ethers.getSigners();
-      process.env[OWNER_ENV] = await eoa.getAddress();
+      process.env[TIMELOCK_ENV] = await eoa.getAddress();
       let err;
       try {
         await deployIntegratedSystem(fakeLiveConnection(), {
@@ -438,8 +438,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         await member2.getAddress(),
       );
       await multisig.waitForDeployment();
-      process.env[OWNER_ENV] = await multisig.getAddress();
-      process.env[MULTISIG_ENV] = await multisig.getAddress();
+      process.env[TIMELOCK_ENV] = await multisig.getAddress();
+      process.env[SAFE_ENV] = await multisig.getAddress();
 
       let err;
       try {
@@ -463,7 +463,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
       const tl = await Timelock.deploy(3600, memberAddr);
       await tl.waitForDeployment();
-      process.env[OWNER_ENV] = await tl.getAddress();
+      process.env[TIMELOCK_ENV] = await tl.getAddress();
 
       let err;
       try {
@@ -476,7 +476,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       }
 
       expect(err, "expected a missing-multisig abort").to.be.an("error");
-      expect(err.message).to.match(/GOVERNANCE_MULTISIG must be set/i);
+      expect(err.message).to.match(/GOVERNANCE_SAFE_ADDRESS must be set/i);
     });
 
     it("rejects a contract wallet whose reported threshold is below two", async () => {
@@ -489,8 +489,8 @@ describe("Upgrade tooling & governance deploy path", function () {
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
       const tl = await Timelock.deploy(3600, walletAddress);
       await tl.waitForDeployment();
-      process.env[OWNER_ENV] = await tl.getAddress();
-      process.env[MULTISIG_ENV] = walletAddress;
+      process.env[TIMELOCK_ENV] = await tl.getAddress();
+      process.env[SAFE_ENV] = walletAddress;
 
       let err;
       try {
@@ -506,14 +506,14 @@ describe("Upgrade tooling & governance deploy path", function () {
       expect(err.message).to.match(/threshold=1.*requires at least 2/i);
     });
 
-    it("rejects a codeless GOVERNANCE_MULTISIG even when that EOA holds timelock roles", async () => {
+    it("rejects a codeless GOVERNANCE_SAFE_ADDRESS even when that EOA holds timelock roles", async () => {
       const [deployer, roleHolder] = await hre.ethers.getSigners();
       const roleHolderAddr = await roleHolder.getAddress();
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
       const tl = await Timelock.deploy(3600, roleHolderAddr);
       await tl.waitForDeployment();
-      process.env[OWNER_ENV] = await tl.getAddress();
-      process.env[MULTISIG_ENV] = roleHolderAddr;
+      process.env[TIMELOCK_ENV] = await tl.getAddress();
+      process.env[SAFE_ENV] = roleHolderAddr;
 
       let err;
       try {
@@ -526,7 +526,7 @@ describe("Upgrade tooling & governance deploy path", function () {
       }
 
       expect(err, "expected a codeless-multisig abort").to.be.an("error");
-      expect(err.message).to.match(/GOVERNANCE_MULTISIG .* has no contract code/i);
+      expect(err.message).to.match(/GOVERNANCE_SAFE_ADDRESS .* has no contract code/i);
     });
 
     it("requires all timelock governance roles to belong to the configured multisig", async () => {
@@ -543,8 +543,8 @@ describe("Upgrade tooling & governance deploy path", function () {
       const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
       const tl = await Timelock.deploy(3600, unrelatedAddr);
       await tl.waitForDeployment();
-      process.env[OWNER_ENV] = await tl.getAddress();
-      process.env[MULTISIG_ENV] = multisigAddr;
+      process.env[TIMELOCK_ENV] = await tl.getAddress();
+      process.env[SAFE_ENV] = multisigAddr;
 
       let err;
       try {

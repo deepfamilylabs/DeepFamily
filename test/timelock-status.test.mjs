@@ -56,6 +56,42 @@ describe("timelock-status task", function () {
     ...overrides,
   });
 
+  it("rejects removed governance environment variables before connecting", async () => {
+    const removedVariables = {
+      GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
+      GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
+      GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
+    };
+
+    for (const [removedName, replacementName] of Object.entries(removedVariables)) {
+      const originalValue = process.env[removedName];
+      process.env[removedName] = "legacy-value";
+      let connected = false;
+      try {
+        let error;
+        try {
+          await timelockStatus(statusArgs(), {
+            network: {
+              connect: async () => {
+                connected = true;
+                throw new Error("should not connect");
+              },
+            },
+          });
+        } catch (caught) {
+          error = caught;
+        }
+        expect(error, `expected ${removedName} rejection`).to.be.an("error");
+        expect(error.message).to.include(`${removedName} has been removed`);
+        expect(error.message).to.include(`use ${replacementName} instead`);
+        expect(connected).to.equal(false);
+      } finally {
+        if (originalValue === undefined) delete process.env[removedName];
+        else process.env[removedName] = originalValue;
+      }
+    }
+  });
+
   it("reports the exact self-admin roles and the multisig threshold and owners", async () => {
     const integrated = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [, ownerA, ownerB] = await hre.ethers.getSigners();

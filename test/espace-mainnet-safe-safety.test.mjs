@@ -30,9 +30,7 @@ const baseEnv = (overrides = {}) => ({
   EVM_MAINNET_SAFE_OWNERS: OWNERS.join(","),
   EVM_MAINNET_SAFE_SALT_NONCE: "123456789",
   EVM_MAINNET_SAFE_MAX_NATIVE: "0.25",
-  EVM_MAINNET_CONFIRMATIONS: "2",
-  EVM_MAINNET_FINALITY_TIMEOUT: "3600",
-  GOVERNANCE_MULTISIG_PROFILE: "conflux-safe-1.3.0-2of3",
+  GOVERNANCE_SAFE_PROFILE: "conflux-safe-1.3.0-2of3",
   ...overrides,
 });
 
@@ -121,8 +119,8 @@ describe("eSpace Mainnet Safe creation safety", function () {
       "restricted to network conflux",
     );
     expect(() => parse({}, { chainId: 71n })).to.throw("requires chainId 1030");
-    expect(() => parse({ GOVERNANCE_MULTISIG_PROFILE: "" })).to.throw(
-      "requires GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1.3.0-2of3",
+    expect(() => parse({ GOVERNANCE_SAFE_PROFILE: "" })).to.throw(
+      "requires GOVERNANCE_SAFE_PROFILE=conflux-safe-1.3.0-2of3",
     );
   });
 
@@ -164,7 +162,11 @@ describe("eSpace Mainnet Safe creation safety", function () {
   });
 
   it("enforces a positive Safe-only CFX cap and bounded finality settings", function () {
-    expect(parse().maximumCostWei).to.equal(ethers.parseEther("0.25"));
+    expect(parse()).to.include({
+      confirmations: 2,
+      finalityTimeoutSeconds: 3600,
+      maximumCostWei: ethers.parseEther("0.25"),
+    });
     for (const invalid of ["", "0", "-1", "1e2", "1.0000000000000000001"]) {
       expect(() => parse({ EVM_MAINNET_SAFE_MAX_NATIVE: invalid })).to.throw(
         invalid === "0" ? "greater than zero" : "explicitly set",
@@ -188,13 +190,13 @@ describe("eSpace Mainnet Safe creation safety", function () {
     ).to.equal(RECOVERY_TX);
   });
 
-  it("allows a fresh bootstrap without GOVERNANCE_MULTISIG and parses optional post-deploy evidence", function () {
-    expect(parse({ GOVERNANCE_MULTISIG: "" }).governanceMultisig).to.equal(null);
+  it("allows a fresh bootstrap without GOVERNANCE_SAFE_ADDRESS and parses optional post-deploy evidence", function () {
+    expect(parse({ GOVERNANCE_SAFE_ADDRESS: "" }).governanceMultisig).to.equal(null);
     expect(
-      parse({ GOVERNANCE_MULTISIG: PREDICTED_SAFE.toLowerCase() }).governanceMultisig,
+      parse({ GOVERNANCE_SAFE_ADDRESS: PREDICTED_SAFE.toLowerCase() }).governanceMultisig,
     ).to.equal(PREDICTED_SAFE);
-    expect(() => parse({ GOVERNANCE_MULTISIG: "0x1234" })).to.throw(
-      "GOVERNANCE_MULTISIG must be an explicit nonzero EVM address",
+    expect(() => parse({ GOVERNANCE_SAFE_ADDRESS: "0x1234" })).to.throw(
+      "GOVERNANCE_SAFE_ADDRESS must be an explicit nonzero EVM address",
     );
 
     expect(parse().acceptanceTransaction).to.equal(null);

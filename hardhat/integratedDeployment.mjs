@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 import {
+  assertNoRemovedGovernanceEnvironmentVariables,
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "../scripts/lib/governanceSafety.mjs";
@@ -165,7 +166,7 @@ const writeDeployment = async (
   await fs.rename(temporaryPath, filePath);
 };
 
-// Validate the governance-owner address itself satisfies the production-safety invariants.
+// Validate that the configured protocol-owner address is the production GovernanceTimelock.
 // `_authorizeUpgrade` is `onlyOwner`, so anything we hand the owner role can replace the proxy
 // implementation. Requiring the exact GovernanceTimelock runtime blocks both EOA owners and
 // contracts that merely imitate `getMinDelay()`; reading the delay then confirms that the genuine
@@ -177,20 +178,22 @@ const assertGovernanceOwnerInvariants = async ({
   ethers,
   artifacts,
   address,
-  governanceMultisig = process.env.GOVERNANCE_MULTISIG,
-  governanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE,
+  governanceMultisig = process.env.GOVERNANCE_SAFE_ADDRESS,
+  governanceMultisigProfile = process.env.GOVERNANCE_SAFE_PROFILE,
 }) => {
   if (!artifacts?.readArtifact) {
     throw new Error(
-      "Validating GOVERNANCE_OWNER on a live network requires current Hardhat artifacts so " +
+      "Validating GOVERNANCE_TIMELOCK_ADDRESS on a live network requires current Hardhat " +
+        "artifacts so " +
         "the GovernanceTimelock runtime bytecode can be verified",
     );
   }
   const code = await ethers.provider.getCode(address);
   if (code === "0x") {
     throw new Error(
-      `Governance owner ${address} has no code on this network; refusing to grant UUPS upgrade ` +
-        `authority to an EOA. Configure GOVERNANCE_OWNER to a TimelockController before deploying.`,
+      `GovernanceTimelock ${address} has no code on this network; refusing to grant UUPS ` +
+        `upgrade authority to an EOA. Configure GOVERNANCE_TIMELOCK_ADDRESS to a deployed ` +
+        `GovernanceTimelock before deploying.`,
     );
   }
   let timelock;
@@ -208,13 +211,13 @@ const assertGovernanceOwnerInvariants = async ({
     minDelay = await timelock.getMinDelay();
     if (minDelay <= 0n) {
       throw new Error(
-        `Governance owner ${address} is a TimelockController but minDelay=${minDelay}; ` +
+        `GovernanceTimelock ${address} has minDelay=${minDelay}; ` +
           `a non-zero delay is required so upgrades pass through the intended governance window.`,
       );
     }
   } catch (error) {
     throw new Error(
-      `Governance owner ${address} does not behave like a TimelockController ` +
+      `GOVERNANCE_TIMELOCK_ADDRESS ${address} does not behave like a TimelockController ` +
         `with a non-zero delay (${error.message}). Configure the multisig as the timelock's ` +
         `proposer/canceller/executor instead of making it the protocol owner directly.`,
     );
@@ -227,7 +230,7 @@ const assertGovernanceOwnerInvariants = async ({
     configuredMultisig !== ethers.ZeroAddress;
   if (!hasConfiguredMultisig) {
     throw new Error(
-      `GOVERNANCE_MULTISIG must be set to a valid nonzero contract address before using ` +
+      `GOVERNANCE_SAFE_ADDRESS must be set to a valid nonzero Safe Proxy address before using ` +
         `GovernanceTimelock ${address} on a live network (got ${configuredMultisig ?? "unset"})`,
     );
   }
@@ -237,7 +240,7 @@ const assertGovernanceOwnerInvariants = async ({
     ethers,
     provider: ethers.provider,
     address: multisig,
-    label: "GOVERNANCE_MULTISIG",
+    label: "GOVERNANCE_SAFE_ADDRESS",
     profile: governanceMultisigProfile,
   });
 
@@ -252,7 +255,7 @@ const assertGovernanceOwnerInvariants = async ({
   const missingRoles = roleEntries.filter((_, index) => !roleGrants[index]).map(([name]) => name);
   if (missingRoles.length > 0) {
     throw new Error(
-      `GOVERNANCE_MULTISIG ${multisig} is missing ${missingRoles.join(", ")} on ` +
+      `GOVERNANCE_SAFE_ADDRESS ${multisig} is missing ${missingRoles.join(", ")} on ` +
         `GovernanceTimelock ${address}; all proposer/canceller/executor roles must be assigned ` +
         `to the multisig`,
     );
@@ -281,26 +284,27 @@ const assertGovernanceOwnerInvariants = async ({
   }
 
   console.log(
-    `governance-owner: ${address} GovernanceTimelock minDelay=${minDelay}s; ` +
-      `multisig=${multisig} threshold=${multisigPolicy.threshold} roles exclusive OK`,
+    `governance-timelock: ${address} minDelay=${minDelay}s; ` +
+      `Safe=${multisig} threshold=${multisigPolicy.threshold} roles exclusive OK`,
   );
 };
 
 // On live networks, refuse to reuse a deployment whose administrative ownership is not the
-// intended governance owner. Without this, an existing JSON pointing at contracts that still
+// intended GovernanceTimelock. Without this, an existing JSON pointing at contracts that still
 // belong to a deployer EOA would silently be accepted and downstream tasks would proceed as if
 // the system were under timelock/multisig control. Local dev networks intentionally keep
 // deployer-as-owner and are exempt.
 const assertExistingGovernanceOwner = async (connection, ethers, artifacts, contracts) => {
   if (isLocalDevNetwork(connection)) return;
-  const governanceOwner = process.env.GOVERNANCE_OWNER;
+  const governanceOwner = process.env.GOVERNANCE_TIMELOCK_ADDRESS;
   const hasGovernanceOwner =
     Boolean(governanceOwner) &&
     ethers.isAddress(governanceOwner) &&
     governanceOwner !== ethers.ZeroAddress;
   if (!hasGovernanceOwner) {
     throw new Error(
-      `Reusing an existing deployment on a live network requires GOVERNANCE_OWNER to be set so ` +
+      `Reusing an existing deployment on a live network requires GOVERNANCE_TIMELOCK_ADDRESS ` +
+        `to be set so ` +
         `upgrade authority can be verified (got ${governanceOwner ?? "unset"}).`,
     );
   }
@@ -309,8 +313,9 @@ const assertExistingGovernanceOwner = async (connection, ethers, artifacts, cont
     const actual = ethers.getAddress(await contract.owner());
     if (actual !== expected) {
       throw new Error(
-        `Deployment ${contractName} owner=${actual} does not match GOVERNANCE_OWNER=${expected}; ` +
-          `refusing to reuse a deployment whose ownership is not assigned to the intended governance owner.`,
+        `Deployment ${contractName} owner=${actual} does not match ` +
+          `GOVERNANCE_TIMELOCK_ADDRESS=${expected}; refusing to reuse a deployment whose ` +
+          `ownership is not assigned to the intended GovernanceTimelock.`,
       );
     }
   }
@@ -434,10 +439,11 @@ export const deployIntegratedSystem = async (
     onTransactionReceipt,
     deploymentDirectory,
     governanceOwner: configuredGovernanceOwner,
-    governanceMultisig = process.env.GOVERNANCE_MULTISIG,
-    governanceMultisigProfile = process.env.GOVERNANCE_MULTISIG_PROFILE,
+    governanceMultisig = process.env.GOVERNANCE_SAFE_ADDRESS,
+    governanceMultisigProfile = process.env.GOVERNANCE_SAFE_PROFILE,
   } = {},
 ) => {
+  assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
   const { ethers } = connection;
   const currentArtifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
@@ -501,18 +507,19 @@ export const deployIntegratedSystem = async (
     return factory.attach(address);
   };
 
-  // Validate the governance owner up front so a misconfigured live deployment fails before any
+  // Validate the GovernanceTimelock up front so a misconfigured live deployment fails before any
   // contracts are created, rather than leaving orphaned modules after a late-stage throw. Local
   // dev networks (edr-simulated / localhost) are exempt and keep the deployer as owner.
   const isLocalDev = isLocalDevNetwork(connection);
-  const governanceOwner = configuredGovernanceOwner ?? process.env.GOVERNANCE_OWNER;
+  const governanceOwner = configuredGovernanceOwner ?? process.env.GOVERNANCE_TIMELOCK_ADDRESS;
   const hasGovernanceOwner =
     Boolean(governanceOwner) &&
     ethers.isAddress(governanceOwner) &&
     governanceOwner !== ethers.ZeroAddress;
   if (!hasGovernanceOwner && !isLocalDev) {
     throw new Error(
-      `GOVERNANCE_OWNER must be set to a valid nonzero address before deploying a UUPS proxy to ` +
+      `GOVERNANCE_TIMELOCK_ADDRESS must be set to a valid nonzero address before deploying a ` +
+        `UUPS proxy to ` +
         `a live network (got ${governanceOwner ?? "unset"}); otherwise unilateral upgrade ` +
         `authority would remain on the deployer key.`,
     );
@@ -643,8 +650,9 @@ export const deployIntegratedSystem = async (
   // remains ownerless. Must run after verifier registration, which requires the deployer to still
   // be the DeepFamily owner.
   // With UUPS the owner can replace the entire implementation, so on live networks a governance
-  // owner is mandatory (validated up front). Local dev networks always keep the deployer as owner
-  // so owner-only test/dev flows keep working even if GOVERNANCE_OWNER leaks in from .env.
+  // GovernanceTimelock is mandatory (validated up front). Local dev networks always keep the
+  // deployer as owner so owner-only test/dev flows keep working even if
+  // GOVERNANCE_TIMELOCK_ADDRESS leaks in from .env.
   if (hasGovernanceOwner && !isLocalDev) {
     const currentOwner = await deepFamily.owner();
     if (!sameAddress(currentOwner, governanceOwner)) {
@@ -766,6 +774,7 @@ export const ensureIntegratedSystem = async (
   hreOrConnection,
   { writeDeployments, artifacts: artifactReader, allowNewDeployment = false } = {},
 ) => {
+  assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
   if (connection.__deepfamilyIntegrated?.deepFamily) return connection.__deepfamilyIntegrated;
 

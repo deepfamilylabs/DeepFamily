@@ -9,6 +9,7 @@ import {
   TESTNET_RELEASE_REQUIRED_STEPS,
   validateTestnetReleaseEvidence,
 } from "../scripts/lib/testnetReleaseEvidence.mjs";
+import { publishTestnetReleaseEvidence } from "../scripts/lib/releaseEvidencePublisher.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
@@ -25,6 +26,7 @@ const FINALIZED_TRANSACTION_HASH = `0x${"78".repeat(32)}`;
 const REFUND_TRANSACTION_HASH = `0x${"9a".repeat(32)}`;
 const MIN_DELAY = 172800;
 const CHAIN_ID = 71;
+const DESTINATION_RELATIVE_PATH = "tmp/release-evidence/espace-release-rehearsal.json";
 const address = (suffix) => `0x${String(suffix).padStart(40, "0")}`;
 const GOVERNANCE_SAFE = address(1);
 const TIMELOCK = address(3);
@@ -289,6 +291,7 @@ const expectRejected = async (operation, pattern) => {
 describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
   let repositoryRoot;
   let reportPath;
+  let destinationPath;
 
   const validate = (overrides = {}) =>
     validateTestnetReleaseEvidence({
@@ -308,11 +311,35 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
     return raw;
   };
 
+  const publish = (overrides = {}) =>
+    publishTestnetReleaseEvidence({
+      sourceReportPath: reportPath,
+      destinationRelativePath: DESTINATION_RELATIVE_PATH,
+      repositoryRoot,
+      expectedTestnetChainId: CHAIN_ID,
+      expectedTestnetNetworkName: "confluxTestnet",
+      mainnetMinDelaySeconds: MIN_DELAY,
+      currentCommit: COMMIT,
+      expectedAcceptanceInputDigest: INPUT_DIGEST,
+      ...overrides,
+    });
+
+  const expectNoStagedEvidence = async () => {
+    let entries = [];
+    try {
+      entries = await fs.readdir(path.dirname(destinationPath));
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    expect(entries.filter((entry) => entry.endsWith(".staged.json"))).to.deep.equal([]);
+  };
+
   beforeEach(async function () {
     repositoryRoot = await createCanonicalTemporaryDirectory(
       "deepfamily-testnet-release-evidence-",
     );
     reportPath = path.join(repositoryRoot, "archive", "release-rehearsal.json");
+    destinationPath = path.join(repositoryRoot, ...DESTINATION_RELATIVE_PATH.split("/"));
   });
 
   afterEach(async function () {
@@ -368,6 +395,118 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary.finality)).to.equal(true);
+  });
+
+  it("publishes the exact validated bytes to the fixed repository-relative path with mode 0600", async function () {
+    const raw = await writeReport();
+    const expectedSha256 = createHash("sha256").update(raw).digest("hex");
+
+    const result = await publish();
+
+    expect(result).to.deep.equal({
+      reportPath: destinationPath,
+      repositoryRelativePath: DESTINATION_RELATIVE_PATH,
+      reportSha256: expectedSha256,
+    });
+    expect(await fs.readFile(destinationPath, "utf8")).to.equal(raw);
+    expect((await fs.lstat(destinationPath)).mode & 0o777).to.equal(0o600);
+    expect((await validate({ reportPath: destinationPath })).reportSha256).to.equal(expectedSha256);
+    await expectNoStagedEvidence();
+  });
+
+  it("atomically replaces an existing regular evidence file with newly validated evidence", async function () {
+    const priorBytes = '{"prior":"evidence"}\n';
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await fs.writeFile(destinationPath, priorBytes, { mode: 0o644 });
+    const stateBefore = await fs.lstat(destinationPath);
+    const report = validReport();
+    report.runId = "release-rehearsal-20260728-replacement";
+    const raw = await writeReport(report);
+
+    const result = await publish();
+    const stateAfter = await fs.lstat(destinationPath);
+
+    expect(await fs.readFile(destinationPath, "utf8")).to.equal(raw);
+    expect(result.reportSha256).to.equal(createHash("sha256").update(raw).digest("hex"));
+    expect(stateAfter.ino).to.not.equal(stateBefore.ino);
+    expect(stateAfter.mode & 0o777).to.equal(0o600);
+    await expectNoStagedEvidence();
+  });
+
+  it("does not replace existing evidence when the source report is invalid", async function () {
+    const priorBytes = Buffer.from('{"prior":"validated-evidence"}\n');
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await fs.writeFile(destinationPath, priorBytes, { mode: 0o600 });
+    const stateBefore = await fs.lstat(destinationPath);
+    const report = validReport();
+    report.status = "failed";
+    await writeReport(report);
+
+    await expectRejected(() => publish(), /status must be "passed"/iu);
+
+    expect(await fs.readFile(destinationPath)).to.deep.equal(priorBytes);
+    expect((await fs.lstat(destinationPath)).ino).to.equal(stateBefore.ino);
+    await expectNoStagedEvidence();
+  });
+
+  it("rejects a destination symlink without writing through it", async function () {
+    const victimPath = path.join(repositoryRoot, "victim.json");
+    const victimBytes = Buffer.from('{"must":"remain-unchanged"}\n');
+    await writeReport();
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await fs.writeFile(victimPath, victimBytes);
+    await fs.symlink(victimPath, destinationPath);
+
+    await expectRejected(
+      () => publish(),
+      /existing release evidence destination must be a regular non-symlink file/iu,
+    );
+
+    expect((await fs.lstat(destinationPath)).isSymbolicLink()).to.equal(true);
+    expect(await fs.readFile(victimPath)).to.deep.equal(victimBytes);
+    await expectNoStagedEvidence();
+  });
+
+  it("rejects a symlinked destination parent without writing outside the repository", async function () {
+    const externalRoot = await createCanonicalTemporaryDirectory(
+      "deepfamily-release-evidence-symlink-target-",
+    );
+    try {
+      await writeReport();
+      await fs.mkdir(path.join(repositoryRoot, "tmp"));
+      await fs.symlink(externalRoot, path.join(repositoryRoot, "tmp", "release-evidence"), "dir");
+
+      await expectRejected(
+        () => publish(),
+        /release evidence directory must be a real directory/iu,
+      );
+
+      expect(await fs.readdir(externalRoot)).to.deep.equal([]);
+    } finally {
+      await fs.rm(externalRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("removes the staged file when the final atomic rename fails", async function () {
+    const priorBytes = Buffer.from('{"prior":"validated-evidence"}\n');
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await fs.writeFile(destinationPath, priorBytes, { mode: 0o600 });
+    await writeReport();
+    const originalRename = fs.rename;
+    fs.rename = async (source, destination) => {
+      if (destination === destinationPath) {
+        throw new Error("simulated atomic rename failure");
+      }
+      return originalRename(source, destination);
+    };
+    try {
+      await expectRejected(() => publish(), /simulated atomic rename failure/iu);
+    } finally {
+      fs.rename = originalRename;
+    }
+
+    expect(await fs.readFile(destinationPath)).to.deep.equal(priorBytes);
+    await expectNoStagedEvidence();
   });
 
   it("uses caller-selected chain evidence and is not hard-coded to eSpace", async function () {

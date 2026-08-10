@@ -73,7 +73,7 @@ describe("eSpace acceptance safety helpers", function () {
         EVM_E2E_MODE: ACCEPTANCE_MODE_RELEASE_REHEARSAL,
         EVM_E2E_MIN_DELAY: "30",
         MIN_DELAY: "172800",
-        GOVERNANCE_MULTISIG_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
+        GOVERNANCE_SAFE_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
       };
       const result = parseESpaceAcceptanceConfig(baseConfig(releaseEnv));
       expect(result.acceptanceMode).to.equal(ACCEPTANCE_MODE_RELEASE_REHEARSAL);
@@ -104,8 +104,8 @@ describe("eSpace acceptance safety helpers", function () {
         ),
       ).to.throw(/release-rehearsal requires MIN_DELAY >= 86400 seconds/i);
       expect(() =>
-        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, GOVERNANCE_MULTISIG_PROFILE: "" })),
-      ).to.throw(/GOVERNANCE_MULTISIG_PROFILE=conflux-safe-1\.3\.0-2of3/i);
+        parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, GOVERNANCE_SAFE_PROFILE: "" })),
+      ).to.throw(/GOVERNANCE_SAFE_PROFILE=conflux-safe-1\.3\.0-2of3/i);
     });
 
     it("requires exact network name and chain ID", function () {

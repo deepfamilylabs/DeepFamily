@@ -58,15 +58,31 @@ describe("Timelock deployment configuration", function () {
 
   it("does not trust chainId 31337 when the HTTP network is not explicitly local", async () => {
     await expect(resolve({ provider: provider({ chainId: 31337n }) })).to.be.rejectedWith(
-      /requires explicit MIN_DELAY, GOVERNANCE_MULTISIG/i,
+      /requires explicit MIN_DELAY, GOVERNANCE_SAFE_ADDRESS/i,
     );
   });
 
   it("requires every live-network setting explicitly", async () => {
-    await expect(resolve()).to.be.rejectedWith(/requires explicit MIN_DELAY, GOVERNANCE_MULTISIG/i);
+    await expect(resolve()).to.be.rejectedWith(
+      /requires explicit MIN_DELAY, GOVERNANCE_SAFE_ADDRESS/i,
+    );
     await expect(
-      resolve({ env: { MIN_DELAY: "172800", GOVERNANCE_MULTISIG: " " } }),
-    ).to.be.rejectedWith(/requires explicit GOVERNANCE_MULTISIG/i);
+      resolve({ env: { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: " " } }),
+    ).to.be.rejectedWith(/requires explicit GOVERNANCE_SAFE_ADDRESS/i);
+  });
+
+  it("rejects removed governance aliases before resolving live-network settings", async () => {
+    const removedVariables = {
+      GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
+      GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
+      GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
+    };
+
+    for (const [removedName, replacementName] of Object.entries(removedVariables)) {
+      await expect(resolve({ env: { [removedName]: "legacy-value" } })).to.be.rejectedWith(
+        `${removedName} has been removed; use ${replacementName} instead`,
+      );
+    }
   });
 
   it("accepts only positive safe integer delays", function () {
@@ -90,7 +106,7 @@ describe("Timelock deployment configuration", function () {
   });
 
   it("requires a deployed, inspectable multisig on live networks", async () => {
-    const env = { MIN_DELAY: "172800", GOVERNANCE_MULTISIG: multisig };
+    const env = { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: multisig };
     await expect(resolve({ env })).to.be.rejectedWith(
       new RegExp(`${multisig}.*no contract code`, "i"),
     );
@@ -106,7 +122,7 @@ describe("Timelock deployment configuration", function () {
   });
 
   it("propagates multisig policy inspection failures", async () => {
-    const env = { MIN_DELAY: "172800", GOVERNANCE_MULTISIG: multisig };
+    const env = { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: multisig };
     await expect(
       resolve({
         env,
@@ -126,14 +142,14 @@ describe("Timelock deployment configuration", function () {
     );
     await deployedMultisig.waitForDeployment();
     const deployedAddress = await deployedMultisig.getAddress();
-    const originalProfile = process.env.GOVERNANCE_MULTISIG_PROFILE;
-    process.env.GOVERNANCE_MULTISIG_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
+    const originalProfile = process.env.GOVERNANCE_SAFE_PROFILE;
+    process.env.GOVERNANCE_SAFE_PROFILE = CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE;
 
     try {
       const config = await resolveTimelockDeploymentConfig({
         connection: { networkConfig: { type: "http" } },
         ethers: hre.ethers,
-        env: { MIN_DELAY: "172800", GOVERNANCE_MULTISIG: deployedAddress },
+        env: { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: deployedAddress },
         deployerAddress: deployer,
         provider: hre.ethers.provider,
       });
@@ -143,8 +159,8 @@ describe("Timelock deployment configuration", function () {
         governanceMultisig: deployedAddress,
       });
     } finally {
-      if (originalProfile === undefined) delete process.env.GOVERNANCE_MULTISIG_PROFILE;
-      else process.env.GOVERNANCE_MULTISIG_PROFILE = originalProfile;
+      if (originalProfile === undefined) delete process.env.GOVERNANCE_SAFE_PROFILE;
+      else process.env.GOVERNANCE_SAFE_PROFILE = originalProfile;
     }
   });
 });

@@ -147,7 +147,7 @@ const assertExternallyOwnedControllers = async ({ provider, config }) => {
 const assertConfiguredSafeAddress = (configuredAddress, predictedAddress) => {
   if (configuredAddress && !sameAddress(configuredAddress, predictedAddress)) {
     throw new Error(
-      `GOVERNANCE_MULTISIG=${configuredAddress} differs from predicted Safe ${predictedAddress}`,
+      `GOVERNANCE_SAFE_ADDRESS=${configuredAddress} differs from predicted Safe ${predictedAddress}`,
     );
   }
 };
@@ -334,7 +334,7 @@ const assertStatusConfigurationMatchesCheckpoint = ({ config, checkpoint }) => {
     );
   }
   if (config.governanceMultisigProfile !== fingerprint.governanceSafe?.profile) {
-    throw new Error("GOVERNANCE_MULTISIG_PROFILE differs from the completed Safe checkpoint");
+    throw new Error("GOVERNANCE_SAFE_PROFILE differs from the completed Safe checkpoint");
   }
   assertConfiguredSafeAddress(config.governanceMultisig, checkpoint.safeAddress);
 };
@@ -1096,7 +1096,7 @@ export const main = async (chainProfile) => {
     console.log(`  transaction:       ${checkpoint.transactions[TRANSACTION_LABEL].hash}`);
     console.log(`  state:             ${STATE_PATH}`);
     console.log(`  report:            ${REPORT_PATH}`);
-    console.log(`\nSet GOVERNANCE_MULTISIG=${predictedSafeAddress} after independent review.`);
+    console.log(`\nSet GOVERNANCE_SAFE_ADDRESS=${predictedSafeAddress} after independent review.`);
     if (!operationalAcceptance.governanceReady) {
       console.log(
         `Before protocol release, two real owners must execute the documented 0 ` +

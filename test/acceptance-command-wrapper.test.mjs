@@ -95,10 +95,21 @@ describe("acceptance command wrapper", function () {
       confirmationsEnvironmentName: "EVM_MAINNET_CONFIRMATIONS",
       finalityTimeoutEnvironmentName: "EVM_MAINNET_FINALITY_TIMEOUT",
       recoveryTransactionsEnvironmentName: "EVM_MAINNET_RECOVERY_TXS",
-      testnetReleaseReportEnvironmentName: "EVM_MAINNET_TESTNET_RELEASE_REPORT",
     };
     expect(ESPACE_CHAIN_PROFILE.mainnet).to.include(mainnetPublicEnvironmentNames);
     expect(ETHEREUM_CHAIN_PROFILE.mainnet).to.include(mainnetPublicEnvironmentNames);
+    expect(ESPACE_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
+      "tmp/release-evidence/espace-release-rehearsal.json",
+    );
+    expect(ETHEREUM_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
+      "tmp/release-evidence/ethereum-release-rehearsal.json",
+    );
+    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property(
+      "testnetReleaseReportEnvironmentName",
+    );
+    expect(ETHEREUM_CHAIN_PROFILE.mainnet).not.to.have.property(
+      "testnetReleaseReportEnvironmentName",
+    );
     expect(ESPACE_CHAIN_PROFILE.mainnet.safePlanDigestDomain).not.to.equal(
       ETHEREUM_CHAIN_PROFILE.mainnet.safePlanDigestDomain,
     );
@@ -319,11 +330,15 @@ describe("acceptance command wrapper", function () {
     expect(rpcConnect).to.be.greaterThan(wrapperCheck);
   });
 
-  it("self-validates release evidence before reporting a passed rehearsal", async function () {
+  it("self-validates and publishes release evidence before reporting a passed rehearsal", async function () {
     const source = await fs.readFile("scripts/evm-acceptance.mjs", "utf8");
     const selfValidation = source.indexOf("await validateTestnetReleaseEvidence");
+    const publication = source.indexOf("await publishTestnetReleaseEvidence");
     const passedMessage = source.indexOf("RELEASE REHEARSAL PASSED");
     expect(selfValidation).to.be.greaterThan(-1);
-    expect(passedMessage).to.be.greaterThan(selfValidation);
+    expect(publication).to.be.greaterThan(selfValidation);
+    expect(passedMessage).to.be.greaterThan(publication);
+    expect(source).to.include('report.failedStep = "release-evidence-publication"');
+    expect(source).to.include("report.releaseReady = false");
   });
 });
