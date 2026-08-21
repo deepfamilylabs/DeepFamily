@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 3,
+  "trustModel": "single-operator",
+  "compiler": {
+    "version": "2.2.3",
+    "target": "linux-x64",
+    "platform": "linux",
+    "arch": "x64",
+    "strategy": "official-binary",
+    "binarySha256": "85342c7ff332d948df7c0c50ecf201e6129349aef550ce873f3c811b79fe53a3",
+    "libcEvidence": {
+      "family": "glibc",
+      "version": "2.35",
+      "source": "process.report.header.glibcVersionRuntime"
+    },
+    "sourceBuild": null
+  },
+  "ceremonyId": "deepfamily-single-operator-20260804T103721Z",
+  "phase1Sha256": "95751b5207f20aa822f01109902315c01c15250303feacea2b8aa7dc9fdfeefd",
+  "circuits": {
+    "person_commitment": {
+      "sourceSha256": "a524df0e78d09ccb7e1340f75fe72649c15879eb4d82401df3993d96d28c92f6",
+      "r1csSha256": "6fd8036b197df526da6e23a435453c74a5db1090815b8e3c658f1c7d9351013b"
+    },
+    "disclosure_binding": {
+      "sourceSha256": "e726e33f80b0086a90bfc1b1ce937bd1e6197fabd9f4389bb8e166a4b6bed9e1",
+      "r1csSha256": "15c2b2b7f78914d306668def6505d6a51663827b7497707e38606eb3ae6ed2b2"
+    }
+  },
+  "contributions": [
+    {
+      "sequence": 1,
+      "participantId": "deepfamily-single-operator",
+      "personCommitmentContributionHash": "2e3ce33a1958dfa63630bbfc5021a77cef918dbc0d29da22acd368e5cea8718304a6dcb781697bde20eef46310c1bafa8e4868e174b8f00bffafebbc183b29e6",
+      "disclosureBindingContributionHash": "47ed26fd1f8499bc270e3d815a9c994a683f4ca310e6474dfd315f285fef98fc1594455c8e146477617a954f475ed09c62961fe3b8e00340acee4371bb32d8da"
+    }
+  ],
+  "beacon": {
+    "name": "deepfamily-single-operator-finalization",
+    "hash": "f13aaf702298f199d8404e135bcddd39d516c0c18a392215767c1144108c45c9",
+    "numIterationsExp": 10,
+    "source": "node:crypto.randomBytes(32), generated after both Phase 2 contributions",
+    "personCommitmentContributionHash": "7efb7c05cd39f6e6f63266a2abd88f293ad9743e3e3b95a234425a9924e6eb41af938f31003ab13b83cb0622a6ce8c20efc745c60ca9fb4c9e7f4784c94a12b9",
+    "disclosureBindingContributionHash": "0f69763681750b5f9629cd3e4558d8293988ddda619a82495ddb3202908164a9d445f5f2c6c2fd1d9bf63eec99a0a09da7f0845b5bb7f1367e1baf1dc8ec1446"
+  }
+}

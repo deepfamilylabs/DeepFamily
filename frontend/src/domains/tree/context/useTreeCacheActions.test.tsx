@@ -111,6 +111,54 @@ describe("useTreeCacheActions", () => {
     ).toBeUndefined();
   });
 
+  it("clears only decrypted metadata while preserving public version anchors", () => {
+    const personHash = `0x${"12".repeat(32)}`;
+    const id = makeNodeId(personHash, 1);
+    const harness = createTreeCacheActionsHarness({
+      [id]: {
+        id,
+        personHash,
+        versionIndex: 1,
+        versionCommitment: "123",
+        metadataPointer: `0x${"34".repeat(20)}`,
+        metadataPayloadHash: `0x${"56".repeat(32)}`,
+        metadataPayloadLength: 256,
+        metadataUnlockValidated: true,
+        metadataProtocolGeneration: "df-onchain-biography-v1",
+        metadataFormatVersion: 1,
+        identitySuiteId: 1,
+        metadataPerson: {
+          fullName: "Alice",
+          gender: 2,
+          birthYear: 1980,
+          birthMonth: 1,
+          birthDay: 2,
+          isBirthBC: false,
+          personHash,
+        },
+        metadataParents: { father: null, mother: null },
+        tag: "revision",
+        biography: "private biography",
+      },
+    });
+
+    act(() => {
+      harness.hook.result.current.clearMetadataUnlockCache();
+    });
+
+    expect(harness.nodesData[id]).toMatchObject({
+      id,
+      personHash,
+      versionIndex: 1,
+      versionCommitment: "123",
+      metadataPayloadLength: 256,
+      metadataUnlockValidated: false,
+    });
+    expect(harness.nodesData[id]?.tag).toBeUndefined();
+    expect(harness.nodesData[id]?.biography).toBeUndefined();
+    expect(harness.nodesData[id]?.metadataPerson).toBeUndefined();
+  });
+
   it("invalidateByTx clears trusted visibility cache for an endorsed version", () => {
     const personHash = `0x${"ef".repeat(32)}`;
     const sources = ["0xsource"];

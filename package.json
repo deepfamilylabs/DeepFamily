@@ -7,7 +7,8 @@
   "type": "module",
   "workspaces": [
     "frontend",
-    "packages/proof-core"
+    "packages/proof-core",
+    "packages/protocol-core"
   ],
   "scripts": {
     "setup": "npm install",
@@ -75,6 +76,7 @@
     "zk:ptau:fetch": "node scripts/fetch-production-ptau.mjs",
     "zk:build": "node scripts/zk-build.mjs",
     "zk:dev:refresh": "node scripts/zk-dev-refresh.mjs",
+    "zk:dev:fresh-v1": "node scripts/zk-dev-refresh.mjs --fresh-v1",
     "zk:production:setup": "node scripts/zk-production-setup.mjs",
     "zk:check": "node scripts/zk-check.mjs",
     "zk:artifacts:check": "npm run zk:build && node scripts/check-zk-artifacts.mjs",
@@ -152,12 +154,10 @@
   },
   "dependencies": {
     "@deepfamily/proof-core": "0.1.0",
-    "@noble/hashes": "^1.8.0",
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.6.1",
     "big-integer": "^1.6.52",
     "dotenv": "^16.0.0",
-    "multiformats": "^12.1.3",
     "poseidon-lite": "^0.3.0",
     "poseidon-solidity": "^0.0.5"
   },

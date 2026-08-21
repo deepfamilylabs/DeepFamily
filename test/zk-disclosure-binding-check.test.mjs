@@ -24,9 +24,7 @@ describe("zk-disclosure-binding-check helpers", function () {
         derivedSecretField: 0,
         packedBirthGenderField: "456",
         minter: "4660",
-        schemaVersion: 1,
-        cryptoSuiteVersion: "1",
-        hashAlgoId: 1,
+        selfSuiteId: 2,
       };
       const validated = validateDisclosureBindingInput(raw);
       expect(validated.nameField).to.equal(123n);
@@ -54,6 +52,7 @@ describe("zk-disclosure-binding-check helpers", function () {
           gender: 1,
         },
         "0x1234567890123456789012345678901234567890",
+        { selfSuiteId: 2 },
       );
 
       const expected = await computeExpectedSignals(validateDisclosureBindingInput(built.input));
@@ -61,9 +60,7 @@ describe("zk-disclosure-binding-check helpers", function () {
         built.person.identityCommitment.toString(),
         built.disclosureBinding.toString(),
         built.input.minter,
-        String(built.schemaVersion),
-        String(built.cryptoSuiteVersion),
-        String(built.hashAlgoId),
+        built.suiteCommitment.toString(),
       ]);
     });
   });

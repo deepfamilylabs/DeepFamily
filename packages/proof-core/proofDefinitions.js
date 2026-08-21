@@ -1,15 +1,18 @@
-import { DEFAULT_PROOF_ENCODING_ID, DEFAULT_PROOF_SYSTEM_ID } from "./proofEnvelopeCodec.js";
+import { PROOF_ENCODING_ID_ABI_GROTH16_ABC } from "./proofEnvelopeCodec.js";
 import {
-  DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
-  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
+  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
 } from "./publicSignalSpecs.js";
 
-function defineProofDefinition({ key, purpose, publicSignalSpec }) {
+export const PERSON_RELATION_CIRCUIT_ID_V1 = 1;
+export const DISCLOSURE_BINDING_CIRCUIT_ID_V1 = 1;
+
+function defineProofDefinition({ key, purpose, circuitId, publicSignalSpec }) {
   return Object.freeze({
     key,
     purpose,
-    proofSystemId: DEFAULT_PROOF_SYSTEM_ID,
-    proofEncodingId: DEFAULT_PROOF_ENCODING_ID,
+    circuitId,
+    proofEncodingId: PROOF_ENCODING_ID_ABI_GROTH16_ABC,
     backend: "groth16-bn254",
     publicSignalSpec: publicSignalSpec.name,
     proverDriver: "snarkjs-groth16",
@@ -17,25 +20,27 @@ function defineProofDefinition({ key, purpose, publicSignalSpec }) {
   });
 }
 
-export const PERSON_COMMITMENT_PROOF_DEFINITION = defineProofDefinition({
-  key: "person-commitment-groth16-bn254-v1",
-  purpose: "PersonCommitment",
-  publicSignalSpec: PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
+export const PERSON_RELATION_PROOF_DEFINITION = defineProofDefinition({
+  key: "person-relation-groth16-bn254-v1",
+  purpose: "PersonRelation",
+  circuitId: PERSON_RELATION_CIRCUIT_ID_V1,
+  publicSignalSpec: PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
 });
 
 export const DISCLOSURE_BINDING_PROOF_DEFINITION = defineProofDefinition({
   key: "disclosure-binding-groth16-bn254-v1",
   purpose: "DisclosureBinding",
-  publicSignalSpec: DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
+  circuitId: DISCLOSURE_BINDING_CIRCUIT_ID_V1,
+  publicSignalSpec: DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
 });
 
 export const PROOF_DEFINITIONS = Object.freeze({
-  [PERSON_COMMITMENT_PROOF_DEFINITION.key]: PERSON_COMMITMENT_PROOF_DEFINITION,
+  [PERSON_RELATION_PROOF_DEFINITION.key]: PERSON_RELATION_PROOF_DEFINITION,
   [DISCLOSURE_BINDING_PROOF_DEFINITION.key]: DISCLOSURE_BINDING_PROOF_DEFINITION,
 });
 
 export const PROOF_DEFINITIONS_BY_PURPOSE = Object.freeze({
-  [PERSON_COMMITMENT_PROOF_DEFINITION.purpose]: PERSON_COMMITMENT_PROOF_DEFINITION,
+  [PERSON_RELATION_PROOF_DEFINITION.purpose]: PERSON_RELATION_PROOF_DEFINITION,
   [DISCLOSURE_BINDING_PROOF_DEFINITION.purpose]: DISCLOSURE_BINDING_PROOF_DEFINITION,
 });
 

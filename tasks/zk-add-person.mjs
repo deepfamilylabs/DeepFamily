@@ -5,17 +5,17 @@ import path from "node:path";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import {
   packGroth16ProofEnvelope,
-  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
 } from "@deepfamily/proof-core";
 
 // Usage:
 // npx hardhat add-person-version --proof ./proof.json --public ./public.json \
 //   --father-version 0 --mother-version 0 \
-//   --tag v1 --ipfs Qm...
+//   --metadata-envelope ./metadata.dfm1
 // Notes:
 // - publicSignals order: [identityCommitment, fatherIdentityCommitment,
-//   motherIdentityCommitment, submitter, schemaVersion, cryptoSuiteVersion, hashAlgoId]
-// - The submitter must equal msg.sender as uint160.
+//   motherIdentityCommitment, submitterAndSelfSuiteId, versionCommitment]
+// - The packed signal's low 160 bits must equal msg.sender.
 // - Ensure your DeepFamily deployment is configured with a valid verifier address.
 
 function toBigIntArray(arr) {
@@ -39,18 +39,23 @@ function normalizePublicSignals(pubJson, sender) {
   const rawSignals = pubJson.publicSignals || pubJson;
   const publicSignals = toBigIntArray(rawSignals);
 
-  if (publicSignals.length !== PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.length) {
+  if (publicSignals.length !== PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.length) {
     throw new Error(
-      `publicSignals length must be ${PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.length}, got ${publicSignals.length}`,
+      `publicSignals length must be ${PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.length}, got ${publicSignals.length}`,
     );
   }
 
   const senderUint160 = addressToUint160(sender);
-  const submitter = publicSignals[3];
-  if (submitter !== senderUint160) {
+  const submitterAndSelfSuiteId = publicSignals[3];
+  const submitterMask = (1n << 160n) - 1n;
+  if ((submitterAndSelfSuiteId & submitterMask) !== senderUint160) {
     throw new Error(
-      `submitter mismatch: publicSignals[3]=${submitter} expected ${senderUint160} (from ${sender})`,
+      `submitter mismatch in publicSignals[3]=${submitterAndSelfSuiteId} ` +
+        `(expected low 160 bits ${senderUint160} from ${sender})`,
     );
+  }
+  if (submitterAndSelfSuiteId >> 192n !== 0n) {
+    throw new Error("submitterAndSelfSuiteId must not set bits above bit 191");
   }
 
   return publicSignals;
@@ -83,21 +88,21 @@ const action = async (args, hre) => {
 
   const proofJson = loadJson(args.proof);
   const pubJson = loadJson(args.public);
+  const metadataEnvelope = fs.readFileSync(path.resolve(process.cwd(), args.metadataEnvelope));
 
   const rawProof = extractProofShape(proofJson);
   const publicSignals = normalizePublicSignals(pubJson, sender);
 
   console.log("Public signals breakdown:");
-  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.forEach((fieldName, index) => {
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.fieldOrder.forEach((fieldName, index) => {
     console.log(`  ${fieldName}:`, publicSignals[index].toString());
   });
 
-  const proofSystemId = Number(args.proofsystem);
-
-  const proofEnvelope = packGroth16ProofEnvelope(rawProof, { proofSystemId });
+  const circuitId = Number(args.circuit);
+  const proofEnvelope = packGroth16ProofEnvelope(rawProof, { circuitId });
 
   const personProofPublicSignals = Object.fromEntries(
-    PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.fieldOrder.map((fieldName, index) => [
+    PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.fieldOrder.map((fieldName, index) => [
       fieldName,
       publicSignals[index],
     ]),
@@ -114,8 +119,7 @@ const action = async (args, hre) => {
       personProofPublicSignals,
       Number(args.fatherVersion),
       Number(args.motherVersion),
-      args.tag,
-      args.ipfs,
+      metadataEnvelope,
     );
 
   console.log("Tx:", tx.hash);
@@ -164,21 +168,15 @@ export default task("add-person-version", "Submit Groth16 proof to addPersonVers
     defaultValue: "0",
   })
   .addOption({
-    name: "proofsystem",
-    description: "Proof system ID (default 1)",
+    name: "circuit",
+    description: "PersonRelation circuit ID (default 1)",
     type: ArgumentType.STRING,
     defaultValue: "1",
   })
   .addOption({
-    name: "tag",
-    description: "Version tag, e.g. v1",
-    type: ArgumentType.STRING_WITHOUT_DEFAULT,
-    defaultValue: undefined,
-  })
-  .addOption({
-    name: "ipfs",
-    description: "Metadata IPFS CID / hash",
-    type: ArgumentType.STRING_WITHOUT_DEFAULT,
+    name: "metadataEnvelope",
+    description: "Path to the complete encrypted metadata envelope",
+    type: ArgumentType.FILE_WITHOUT_DEFAULT,
     defaultValue: undefined,
   })
   .setAction(() => Promise.resolve({ default: action }))

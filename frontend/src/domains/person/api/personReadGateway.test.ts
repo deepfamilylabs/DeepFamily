@@ -7,14 +7,20 @@ describe("personReadGateway", () => {
     const contract = {
       getVersionDetails: vi.fn(async () => [
         {
+          personHash: "0xabc",
           fatherHash: "0xfather",
           motherHash: "0xmother",
+          versionIndex: 2,
           fatherVersionIndex: 1,
           motherVersionIndex: 2,
+          versionCommitment: "0xcommitment",
           addedBy: "0xadder",
           timestamp: 123,
-          tag: "v2",
-          metadataCID: "cid://meta",
+        },
+        {
+          pointer: "0x00000000000000000000000000000000000000cc",
+          payloadHash: "0xpayload",
+          payloadLength: 512,
         },
         7,
         42n,
@@ -42,14 +48,20 @@ describe("personReadGateway", () => {
 
     expect(first).toEqual({
       version: {
+        personHash: "0xabc",
         fatherHash: "0xfather",
         motherHash: "0xmother",
-        fatherVersionIndex: 1,
-        motherVersionIndex: 2,
+        versionIndex: "2",
+        fatherVersionIndex: "1",
+        motherVersionIndex: "2",
+        versionCommitment: "0xcommitment",
         addedBy: "0xadder",
         timestamp: 123,
-        tag: "v2",
-        metadataCID: "cid://meta",
+      },
+      metadata: {
+        pointer: "0x00000000000000000000000000000000000000cc",
+        payloadHash: "0xpayload",
+        payloadLength: 512,
       },
       endorsementCount: 7,
       tokenId: "42",
@@ -83,7 +95,12 @@ describe("personReadGateway", () => {
       2,
       {
         fatherHash: "0xfather",
-        metadataCID: "cid://meta",
+        versionCommitment: "0xcommitment",
+      },
+      {
+        pointer: "0x00000000000000000000000000000000000000cc",
+        payloadHash: "0xpayload",
+        payloadLength: 512,
       },
       {
         basicInfo: { gender: 2, birthYear: 1990, birthMonth: 5, birthDay: 10, isBirthBC: false },
@@ -100,7 +117,12 @@ describe("personReadGateway", () => {
       versionIndex: 2,
       version: {
         fatherHash: "0xfather",
-        metadataCID: "cid://meta",
+        versionCommitment: "0xcommitment",
+      },
+      metadata: {
+        pointer: "0x00000000000000000000000000000000000000cc",
+        payloadHash: "0xpayload",
+        payloadLength: 512,
       },
       core: {
         fullName: "Alice",
@@ -109,7 +131,7 @@ describe("personReadGateway", () => {
         birthMonth: 5,
         birthDay: 10,
         birthPlace: "HK",
-        story: "hello",
+        nftPublicStory: "hello",
       },
       endorsementCount: 9,
       nftTokenURI: "ipfs://token",

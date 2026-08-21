@@ -7,7 +7,8 @@ const personHash = `0x${"12".repeat(32)}`;
 
 const mocks = vi.hoisted(() => ({
   zkWorkerCall: vi.fn(),
-  computeIdentityHashMaterial: vi.fn(),
+  cryptoWorkerCall: vi.fn(),
+  formatGroth16ProofForContract: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -20,13 +21,17 @@ vi.mock("../../../../../shared/workers/zkWorkerClient", () => ({
   zkWorkerCall: (...args: any[]) => mocks.zkWorkerCall(...args),
 }));
 
+vi.mock("../../../../../shared/workers/cryptoWorkerClient", () => ({
+  cryptoWorkerCall: (...args: any[]) => mocks.cryptoWorkerCall(...args),
+}));
+
 vi.mock("../../../../../shared/zk/zk", () => ({
   computeDisclosureBinding: () => 99n,
-  formatGroth16ProofForContract: () => ({
-    proofSystemId: 1,
-    proofEncodingId: 1,
-    proofData: "0xproof",
-  }),
+  formatGroth16ProofForContract: (...args: any[]) => mocks.formatGroth16ProofForContract(...args),
+}));
+
+vi.mock("../../../../../shared/zk/proofDescriptors", () => ({
+  DISCLOSURE_BINDING_PROOF_DESCRIPTOR: { circuitId: 1, proofEncodingId: 1 },
 }));
 
 vi.mock("../../../../../shared/zk/publicSignalSpecs", () => ({
@@ -34,9 +39,7 @@ vi.mock("../../../../../shared/zk/publicSignalSpecs", () => ({
     identityCommitment: 1n,
     disclosureBinding: 99n,
     minter: 2n,
-    schemaVersion: 1,
-    cryptoSuiteVersion: 1,
-    hashAlgoId: 1,
+    suiteCommitment: 3n,
   }),
 }));
 
@@ -44,33 +47,38 @@ vi.mock("../../../../../shared/crypto/identityCommitment", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
 }));
 
-vi.mock("../../../../../shared/crypto/identityHash", () => ({
-  computeIdentityHashMaterial: (...args: any[]) => mocks.computeIdentityHashMaterial(...args),
-  normalizeIdentitySaltHex: (value: string) => value,
-}));
-
-vi.mock("../../../../../shared/crypto/passphraseStrength", () => ({
-  normalizePassphraseForHash: (value: string) => value.trim(),
-}));
-
 describe("useDisclosureProof", () => {
   beforeEach(() => {
     mocks.zkWorkerCall.mockReset();
-    mocks.computeIdentityHashMaterial.mockReset();
-    mocks.computeIdentityHashMaterial.mockResolvedValue({
-      canonicalFullName: "Ada Lovelace",
-      derivedSecretField: 1n,
-      identityCommitment: 1n,
+    mocks.cryptoWorkerCall.mockReset();
+    mocks.formatGroth16ProofForContract.mockReset();
+    mocks.formatGroth16ProofForContract.mockReturnValue({
+      circuitId: 1,
+      proofEncodingId: 1,
+      proofData: "0xproof",
+    });
+    mocks.cryptoWorkerCall.mockResolvedValue({
+      identitySuiteId: 1,
+      identity: {
+        fullName: "Ada Lovelace",
+        gender: 2,
+        birthYear: 1815,
+        birthMonth: 12,
+        birthDay: 10,
+        isBirthBC: false,
+      },
+      derivedSecretField: "1",
+      identityCommitment: "1",
       personHash,
-      nameField: 2n,
-      suiteCommitment: 3n,
-      packedBirthGenderField: 4n,
+      nameField: "2",
+      suiteCommitment: "3",
+      packedBirthGenderField: "4",
     });
     mocks.zkWorkerCall.mockImplementation((method: string) => {
       if (method === "generateDisclosureBindingProof") {
         return Promise.resolve({
           proof: { pi_a: [], pi_b: [], pi_c: [] },
-          publicSignals: ["1", "99", "2", "1", "1", "1"],
+          publicSignals: ["1", "99", "2", "3"],
         });
       }
       if (method === "verifyDisclosureBindingProof") {
@@ -106,31 +114,33 @@ describe("useDisclosureProof", () => {
           tokenURI: "ipfs://token",
         },
         targetPersonHash: personHash,
-        identityMode: "deterministic",
-        recoverySaltHex: "",
+        selfSuiteId: 1,
         getPassphrase: () => "secret",
       });
     });
 
-    expect(mocks.computeIdentityHashMaterial).toHaveBeenCalledWith(
+    expect(mocks.cryptoWorkerCall).toHaveBeenCalledWith(
+      "deriveIdentityMaterialV1",
       expect.objectContaining({
-        fullName: "Ada Lovelace",
-        passphrase: "secret",
-        identityMode: "deterministic",
+        identity: expect.objectContaining({ fullName: "Ada Lovelace" }),
+        rawPassphrase: "secret",
+        identitySuiteId: 1,
       }),
+      { timeoutMs: 240_000 },
     );
     expect(mocks.zkWorkerCall).toHaveBeenNthCalledWith(
       1,
       "generateDisclosureBindingProof",
       expect.objectContaining({
         minterAddress: "0x00000000000000000000000000000000000000aa",
+        selfSuiteId: 1,
       }),
       { timeoutMs: 240_000 },
     );
     expect(proofResult!).toEqual(
       expect.objectContaining({
         computedPersonHash: personHash,
-        proofEnvelope: { proofSystemId: 1, proofEncodingId: 1, proofData: "0xproof" },
+        proofEnvelope: { circuitId: 1, proofEncodingId: 1, proofData: "0xproof" },
         tokenURI: "ipfs://token",
         coreInfo: expect.objectContaining({
           supplementInfo: expect.objectContaining({
@@ -142,6 +152,10 @@ describe("useDisclosureProof", () => {
         }),
       }),
     );
+    expect(mocks.formatGroth16ProofForContract).toHaveBeenCalledWith(expect.anything(), {
+      circuitId: 1,
+      proofEncodingId: 1,
+    });
     expect(result.current.proofGenerationStep).toBe(
       "Zero-knowledge proof verified. Submitting transaction...",
     );

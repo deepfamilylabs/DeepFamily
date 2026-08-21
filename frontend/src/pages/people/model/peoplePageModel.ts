@@ -21,7 +21,6 @@ export interface PeopleFiltersState {
   filterType: PeopleFilterType;
   sortOrder: PeopleSortOrder;
   selectedAddresses: string[];
-  selectedTags: string[];
 }
 
 export interface ProjectedPeopleLookup {
@@ -103,15 +102,11 @@ export function getPeoplePageStats(params: {
 }
 
 export function hasVisiblePeopleFilters(filters: PeopleFiltersState): boolean {
-  return (
-    filters.selectedAddresses.length > 0 ||
-    filters.selectedTags.length > 0 ||
-    Boolean(filters.searchTerm)
-  );
+  return filters.selectedAddresses.length > 0 || Boolean(filters.searchTerm);
 }
 
 export function hasPeopleRuleFilters(filters: PeopleFiltersState): boolean {
-  return filters.selectedAddresses.length > 0 || filters.selectedTags.length > 0;
+  return filters.selectedAddresses.length > 0;
 }
 
 function matchesText(value: string | undefined, term: string): boolean {
@@ -129,9 +124,8 @@ export function filterPeople(people: NodeData[], filters: PeopleFiltersState): N
         person.personHash.toLowerCase().includes(term) ||
         matchesText(person.birthPlace, term) ||
         matchesText(person.deathPlace, term) ||
-        matchesText(person.story, term) ||
-        matchesText(person.addedBy, term) ||
-        matchesText(person.tag, term),
+        matchesText(person.nftPublicStory, term) ||
+        matchesText(person.addedBy, term),
     );
   }
 
@@ -140,12 +134,6 @@ export function filterPeople(people: NodeData[], filters: PeopleFiltersState): N
       filters.selectedAddresses.some((address) =>
         person.addedBy?.toLowerCase().includes(address.toLowerCase()),
       ),
-    );
-  }
-
-  if (filters.selectedTags.length > 0) {
-    filtered = filtered.filter((person) =>
-      filters.selectedTags.some((tag) => person.tag?.toLowerCase().includes(tag.toLowerCase())),
     );
   }
 

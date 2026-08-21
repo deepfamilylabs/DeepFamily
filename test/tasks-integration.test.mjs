@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import hre from "hardhat";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
-import personCommitmentProof from "../lib/personCommitmentProof.js";
+import seedHelpers from "../lib/seedHelpers.js";
 
-const { computePersonHashFromInput } = personCommitmentProof;
+const { computePersonHash } = seedHelpers;
 
 describe("Hardhat Tasks Integration", function () {
   this.timeout(240_000);
@@ -17,10 +17,11 @@ describe("Hardhat Tasks Integration", function () {
   let signer;
   let signerAddress;
   let originalConnect;
+  let personHash;
 
   const personArgs = {
     fullname: "Task Runner Example",
-    passphrase: "",
+    passphrase: "task runner unified passphrase",
     birthbc: "false",
     birthyear: "1990",
     birthmonth: "5",
@@ -31,18 +32,8 @@ describe("Hardhat Tasks Integration", function () {
     fatherversion: "0",
     motherversion: "0",
     tag: "task-v1",
-    ipfs: "ipfs://task-runner-person",
+    biography: "Task integration encrypted biography",
   };
-
-  const personHash = computePersonHashFromInput({
-    fullName: personArgs.fullname,
-    derivedSecretField: 0n,
-    isBirthBC: false,
-    birthYear: 1990,
-    birthMonth: 5,
-    birthDay: 15,
-    gender: 255,
-  }).personHash;
 
   before(async function () {
     connection = await hre.network.connect();
@@ -52,6 +43,17 @@ describe("Hardhat Tasks Integration", function () {
     ({ deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection));
     [signer] = await connection.ethers.getSigners();
     signerAddress = await signer.getAddress();
+    personHash = await computePersonHash({
+      personData: {
+        fullName: personArgs.fullname,
+        passphrase: personArgs.passphrase,
+        isBirthBC: false,
+        birthYear: 1990,
+        birthMonth: 5,
+        birthDay: 15,
+        gender: 255,
+      },
+    });
   });
 
   after(async function () {
@@ -110,7 +112,7 @@ describe("Hardhat Tasks Integration", function () {
       vindex: "1",
       tokenuri: "ipfs://task-runner-nft",
       fullname: "Task Runner Example",
-      passphrase: "",
+      passphrase: personArgs.passphrase,
       birthyear: "1990",
       birthbc: "false",
       birthmonth: "5",
@@ -172,9 +174,7 @@ describe("Hardhat Tasks Integration", function () {
         birthmonth: "5",
         birthday: "15",
         gender: "1",
-        schemaversion: "1",
-        cryptosuiteversion: "1",
-        hashalgoid: "1",
+        selfsuiteid: "1",
         output: outputDir,
         wasm: "",
         zkey: "",

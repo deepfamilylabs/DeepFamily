@@ -1,11 +1,9 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import personCommitmentProof from "../lib/personCommitmentProof.js";
-import disclosureBindingProof from "../lib/disclosureBindingProof.js";
+import seedHelpers from "../lib/seedHelpers.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
-const { computePersonHashFromInput } = personCommitmentProof;
-const { generateDisclosureBindingProof } = disclosureBindingProof;
+const { mintPersonVersionNFT } = seedHelpers;
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
@@ -54,21 +52,13 @@ const action = async (args, hre) => {
 
   const basicInfo = {
     fullName: args.fullname,
-    derivedSecretField: 0n,
+    passphrase: args.passphrase || "",
     isBirthBC: String(args.birthbc).toLowerCase() === "true",
     birthYear,
     birthMonth,
     birthDay,
     gender,
   };
-
-  // Recompute hash to sanity check user input matches person hash
-  const computedHash = computePersonHashFromInput(basicInfo).personHash;
-  if (computedHash.toLowerCase() !== args.person.toLowerCase()) {
-    throw new Error(
-      `Provided --person hash does not match computed hash (${computedHash}). Check fullname/birth data.`,
-    );
-  }
 
   const supplementInfo = {
     fullName: args.fullname,
@@ -81,37 +71,19 @@ const action = async (args, hre) => {
     story: args.story,
   };
 
-  const result = await generateDisclosureBindingProof(basicInfo, signerAddr);
-
-  const coreInfo = {
-    basicInfo: {
-      identityCommitment: ethers.zeroPadValue(ethers.toBeHex(result.person.identityCommitment), 32),
-      isBirthBC: basicInfo.isBirthBC,
-      birthYear: basicInfo.birthYear,
-      birthMonth: basicInfo.birthMonth,
-      birthDay: basicInfo.birthDay,
-      gender: basicInfo.gender,
-    },
-    supplementInfo: {
-      ...supplementInfo,
-      fullName: result.canonicalFullName,
-    },
-  };
-
-  const tx = await deepFamily
-    .connect(signer)
-    .mintPersonVersionNFT(
-      result.proofEnvelope,
-      result.publicSignalsStruct,
-      versionIndex,
-      args.tokenuri,
-      coreInfo,
-    );
-  const receipt = await tx.wait();
+  const result = await mintPersonVersionNFT({
+    deepFamily,
+    signer,
+    personHash: args.person,
+    versionIndex,
+    tokenURI: args.tokenuri,
+    basicInfo,
+    supplementInfo,
+  });
 
   console.log(`NFT minted for person ${args.person}`);
-  console.log(`Transaction: ${tx.hash}`);
-  console.log(`Block: ${receipt?.blockNumber ?? "n/a"}`);
+  console.log(`Transaction: ${result.tx.hash}`);
+  console.log(`Block: ${result.receipt?.blockNumber ?? "n/a"}`);
 };
 
 export default task("mint-nft", "Mint NFT for a person version (requires prior endorsement)")

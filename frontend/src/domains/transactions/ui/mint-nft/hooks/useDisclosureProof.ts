@@ -6,15 +6,11 @@ import {
   formatGroth16ProofForContract,
   type PersonData,
 } from "../../../../../shared/zk/zk";
+import { DISCLOSURE_BINDING_PROOF_DESCRIPTOR } from "../../../../../shared/zk/proofDescriptors";
 import { decodeDisclosureBindingPublicSignals } from "../../../../../shared/zk/publicSignalSpecs";
+import { cryptoWorkerCall } from "../../../../../shared/workers/cryptoWorkerClient";
 import { zkWorkerCall } from "../../../../../shared/workers/zkWorkerClient";
 import { safeCanonicalizeFullName } from "../../../../../shared/crypto/identityCommitment";
-import {
-  computeIdentityHashMaterial,
-  normalizeIdentitySaltHex,
-  type IdentitySaltMode,
-} from "../../../../../shared/crypto/identityHash";
-import { normalizePassphraseForHash } from "../../../../../shared/crypto/passphraseStrength";
 import type { MintNFTFormValues, MintPersonInfo } from "../model/mintNftTypes";
 
 interface GenerateDisclosureProofArgs {
@@ -22,8 +18,7 @@ interface GenerateDisclosureProofArgs {
   personInfo: MintPersonInfo;
   formData: MintNFTFormValues;
   targetPersonHash: string;
-  identityMode: IdentitySaltMode;
-  recoverySaltHex: string;
+  selfSuiteId: number;
   getPassphrase: () => string;
 }
 
@@ -45,8 +40,7 @@ export function useDisclosureProof() {
       personInfo,
       formData,
       targetPersonHash,
-      identityMode,
-      recoverySaltHex,
+      selfSuiteId,
       getPassphrase,
     }: GenerateDisclosureProofArgs) => {
       setProofGenerationStep(t("mintNFT.preparingProof", "Preparing proof inputs..."));
@@ -56,55 +50,35 @@ export function useDisclosureProof() {
         throw new Error(t("mintNFT.fullNameRequired", "Full name is required to generate proof"));
       }
 
-      const passphrase = getPassphrase();
-      const identitySaltHex = (() => {
-        if (identityMode !== "random") return null;
-
-        const normalizedPassphrase = normalizePassphraseForHash(passphrase);
-        if (!normalizedPassphrase.length) {
-          throw new Error(
-            t(
-              "mintNFT.randomModePassphraseRequired",
-              "Enhanced identity mode requires a non-empty identity passphrase",
-            ),
-          );
-        }
-        if (recoverySaltHex.trim()) {
-          return normalizeIdentitySaltHex(recoverySaltHex);
-        }
-        throw new Error(
-          t(
-            "mintNFT.recoverySaltRequired",
-            "Enhanced identity mode requires the saved recovery salt for this identity",
-          ),
-        );
-      })();
-
-      const {
-        canonicalFullName,
-        derivedSecretField,
-        identityCommitment,
-        personHash: computedPersonHash,
-        nameField,
-        suiteCommitment,
-        packedBirthGenderField,
-      } = await computeIdentityHashMaterial({
-        fullName: normalizedFullName,
-        passphrase,
-        isBirthBC: personInfo.isBirthBC,
-        birthYear: personInfo.birthYear,
-        birthMonth: personInfo.birthMonth,
-        birthDay: personInfo.birthDay,
-        gender: personInfo.gender,
-        identityMode,
-        identitySaltHex,
-      });
+      const identity = await cryptoWorkerCall(
+        "deriveIdentityMaterialV1",
+        {
+          identity: {
+            fullName: normalizedFullName,
+            isBirthBC: personInfo.isBirthBC,
+            birthYear: personInfo.birthYear,
+            birthMonth: personInfo.birthMonth,
+            birthDay: personInfo.birthDay,
+            gender: personInfo.gender,
+          },
+          rawPassphrase: getPassphrase(),
+          identitySuiteId: selfSuiteId,
+        },
+        { timeoutMs: 240_000 },
+      );
+      const canonicalFullName = identity.identity.fullName;
+      const derivedSecretField = BigInt(identity.derivedSecretField);
+      const identityCommitment = BigInt(identity.identityCommitment);
+      const computedPersonHash = identity.personHash;
+      const nameField = BigInt(identity.nameField);
+      const suiteCommitment = BigInt(identity.suiteCommitment);
+      const packedBirthGenderField = BigInt(identity.packedBirthGenderField);
 
       if (targetPersonHash && computedPersonHash !== targetPersonHash) {
         throw new Error(
           t(
             "mintNFT.personHashMismatch",
-            "The selected identity mode or recovery salt does not match the target person hash",
+            "The passphrase or identity suite does not match the target person hash",
           ),
         );
       }
@@ -117,6 +91,7 @@ export function useDisclosureProof() {
         birthDay: personInfo.birthDay,
         isBirthBC: personInfo.isBirthBC,
         gender: personInfo.gender,
+        identitySuiteId: selfSuiteId,
       };
 
       const processedData = {
@@ -158,6 +133,7 @@ export function useDisclosureProof() {
         {
           person: personData,
           minterAddress: address,
+          selfSuiteId,
         },
         { timeoutMs: 240_000 },
       );
@@ -174,7 +150,10 @@ export function useDisclosureProof() {
         );
       }
 
-      const proofEnvelope = formatGroth16ProofForContract(generatedProof);
+      const proofEnvelope = formatGroth16ProofForContract(generatedProof, {
+        circuitId: DISCLOSURE_BINDING_PROOF_DESCRIPTOR.circuitId,
+        proofEncodingId: DISCLOSURE_BINDING_PROOF_DESCRIPTOR.proofEncodingId,
+      });
       const publicSignalsStruct = decodeDisclosureBindingPublicSignals(publicSignals);
       const disclosureBindingValue = computeDisclosureBinding(
         nameField,
@@ -183,6 +162,9 @@ export function useDisclosureProof() {
       );
       if (publicSignalsStruct.disclosureBinding !== disclosureBindingValue) {
         throw new Error("Disclosure binding mismatch");
+      }
+      if (publicSignalsStruct.suiteCommitment !== suiteCommitment) {
+        throw new Error("Disclosure suite commitment mismatch");
       }
 
       setProofGenerationStep(

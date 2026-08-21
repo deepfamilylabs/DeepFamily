@@ -3,13 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
-  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+  PERSON_RELATION_PROOF_DESCRIPTOR,
   getProofDescriptor,
   getProofDescriptorByPurpose,
 } from "../lib/proofDescriptors.js";
 import {
   DISCLOSURE_BINDING_PROOF_DEFINITION,
-  PERSON_COMMITMENT_PROOF_DEFINITION,
+  PERSON_RELATION_PROOF_DEFINITION,
   getProofDefinitionByPurpose,
 } from "@deepfamily/proof-core";
 import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
@@ -19,21 +19,21 @@ const __dirname = path.dirname(__filename);
 
 describe("proof descriptors", function () {
   it("keeps shared proof definitions free of environment-specific artifact paths", function () {
-    expect(PERSON_COMMITMENT_PROOF_DEFINITION).not.to.have.property("files");
+    expect(PERSON_RELATION_PROOF_DEFINITION).not.to.have.property("files");
     expect(DISCLOSURE_BINDING_PROOF_DEFINITION).not.to.have.property("files");
-    expect(getProofDefinitionByPurpose("PersonCommitment")).to.equal(
-      PERSON_COMMITMENT_PROOF_DEFINITION,
+    expect(getProofDefinitionByPurpose("PersonRelation")).to.equal(
+      PERSON_RELATION_PROOF_DEFINITION,
     );
   });
 
   it("exports the active person and disclosure descriptors", function () {
-    expect(PERSON_COMMITMENT_PROOF_DESCRIPTOR).to.include({
-      key: "person-commitment-groth16-bn254-v1",
-      purpose: "PersonCommitment",
-      proofSystemId: 1,
+    expect(PERSON_RELATION_PROOF_DESCRIPTOR).to.include({
+      key: "person-relation-groth16-bn254-v1",
+      purpose: "PersonRelation",
+      circuitId: 1,
       proofEncodingId: 1,
       backend: "groth16-bn254",
-      publicSignalSpec: "person-commitment-v2",
+      publicSignalSpec: "person-relation-v1",
       proverDriver: "snarkjs-groth16",
       proofPacker: "abi-groth16-abc",
     });
@@ -41,19 +41,19 @@ describe("proof descriptors", function () {
     expect(DISCLOSURE_BINDING_PROOF_DESCRIPTOR).to.include({
       key: "disclosure-binding-groth16-bn254-v1",
       purpose: "DisclosureBinding",
-      proofSystemId: 1,
+      circuitId: 1,
       proofEncodingId: 1,
       backend: "groth16-bn254",
-      publicSignalSpec: "disclosure-binding-v2",
+      publicSignalSpec: "disclosure-binding-v1",
       proverDriver: "snarkjs-groth16",
       proofPacker: "abi-groth16-abc",
     });
-    expect(PERSON_COMMITMENT_PROOF_DESCRIPTOR.files).not.to.have.property("browser");
+    expect(PERSON_RELATION_PROOF_DESCRIPTOR.files).not.to.have.property("browser");
   });
 
   it("resolves descriptors by key and purpose", function () {
-    expect(getProofDescriptor(PERSON_COMMITMENT_PROOF_DESCRIPTOR.key)).to.equal(
-      PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+    expect(getProofDescriptor(PERSON_RELATION_PROOF_DESCRIPTOR.key)).to.equal(
+      PERSON_RELATION_PROOF_DESCRIPTOR,
     );
     expect(getProofDescriptorByPurpose("DisclosureBinding")).to.equal(
       DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
@@ -70,7 +70,7 @@ describe("proof descriptors", function () {
   it("resolves node artifact candidates from repo-relative descriptor paths", function () {
     const wasmCandidates = resolveDescriptorNodeArtifactCandidates(
       path.join(__dirname, "../lib"),
-      PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+      PERSON_RELATION_PROOF_DESCRIPTOR,
       "wasm",
     );
     const vkeyCandidates = resolveDescriptorNodeArtifactCandidates(

@@ -204,7 +204,8 @@ describe("SuBookRenderer", () => {
         personHash: family.root.personHash,
         versionIndex: 1,
         fullName: "曹操",
-        story,
+        metadataUnlockValidated: true,
+        biography: story,
       },
     };
 
@@ -249,7 +250,8 @@ describe("SuBookRenderer", () => {
         versionIndex: 1,
         fullName: "曹长文",
         gender: 1,
-        story,
+        metadataUnlockValidated: true,
+        biography: story,
       },
     };
     const generations = buildPaperGenerations({

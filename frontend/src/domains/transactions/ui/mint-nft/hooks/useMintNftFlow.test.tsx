@@ -54,14 +54,13 @@ vi.mock("../../../services/mintNftService", () => ({
 const flowArgs = {
   personHash: "0xperson",
   versionIndex: 2,
+  selfSuiteId: 1,
   proofEnvelope: { proof: "ok" },
   publicSignals: {
     identityCommitment: 1n,
     disclosureBinding: 2n,
     minter: 3n,
-    schemaVersion: 1,
-    cryptoSuiteVersion: 1,
-    hashAlgoId: 1,
+    suiteCommitment: 4n,
   },
   tokenURI: "ipfs://token",
   coreInfo: {
@@ -159,6 +158,7 @@ describe("useMintNftFlow", () => {
         address: mocks.wallet.address,
         personHash: flowArgs.personHash,
         versionIndex: flowArgs.versionIndex,
+        selfSuiteId: flowArgs.selfSuiteId,
         proofEnvelope: flowArgs.proofEnvelope,
         publicSignals: flowArgs.publicSignals,
         tokenURI: flowArgs.tokenURI,

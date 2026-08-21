@@ -7,6 +7,7 @@ import {
   addPerson,
   computeDisclosureBinding,
   computeProfileIdentityCommitment,
+  computeSuiteCommitment,
   makeStubProof,
   makeTestPerson,
 } from "./helpers/testHelper.mjs";
@@ -296,9 +297,7 @@ describe("Endorse Tests", function () {
       identityCommitment: BigInt(cC),
       disclosureBinding: dbVal,
       minter: BigInt(nftHolderAddr),
-      schemaVersion: 1,
-      cryptoSuiteVersion: 1,
-      hashAlgoId: 1,
+      suiteCommitment: computeSuiteCommitment(1),
     };
     const coreInfo = {
       basicInfo,

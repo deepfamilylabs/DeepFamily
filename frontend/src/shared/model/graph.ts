@@ -27,18 +27,47 @@ export interface StoryChunkCreateData {
   attachmentCID?: string;
 }
 
+export interface MetadataPersonDisplay {
+  fullName: string;
+  gender: number;
+  birthYear: number;
+  birthMonth: number;
+  birthDay: number;
+  isBirthBC: boolean;
+  personHash: string;
+}
+
+export interface MetadataParentDisplay extends MetadataPersonDisplay {
+  versionIndex: string;
+}
+
+export interface MetadataParentsDisplay {
+  father: MetadataParentDisplay | null;
+  mother: MetadataParentDisplay | null;
+}
+
 export interface NodeData {
   personHash: string;
   versionIndex: number;
   id: string; // = makeNodeId
   tag?: string;
+  biography?: string;
   fatherHash?: string;
   motherHash?: string;
-  fatherVersionIndex?: number;
-  motherVersionIndex?: number;
+  fatherVersionIndex?: number | string;
+  motherVersionIndex?: number | string;
   addedBy?: string;
   timestamp?: number;
-  metadataCID?: string;
+  versionCommitment?: string;
+  metadataPointer?: string;
+  metadataPayloadHash?: string;
+  metadataPayloadLength?: number;
+  metadataUnlockValidated?: boolean;
+  metadataProtocolGeneration?: string;
+  metadataFormatVersion?: number;
+  identitySuiteId?: number;
+  metadataPerson?: MetadataPersonDisplay;
+  metadataParents?: MetadataParentsDisplay;
   endorsementCount?: number;
   tokenId?: string;
   versionDetailsFetchedAt?: number;
@@ -55,7 +84,7 @@ export interface NodeData {
   deathDay?: number;
   deathPlace?: string;
   isDeathBC?: boolean;
-  story?: string;
+  nftPublicStory?: string;
   nftTokenURI?: string;
   storyMetadata?: StoryMetadata;
   storyChunks?: StoryChunk[];

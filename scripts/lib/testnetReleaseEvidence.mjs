@@ -12,6 +12,7 @@ import {
   ZK_TRUST_MODEL_MULTI_PARTY,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
 } from "./zkArtifactTrust.mjs";
+import { inspectProtocolReleaseManifest } from "./protocolReleaseManifest.mjs";
 
 export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 4;
 export const TESTNET_RELEASE_EVIDENCE_TYPE = "initial-mainnet-release";
@@ -40,6 +41,7 @@ export const TESTNET_RELEASE_REQUIRED_STEPS = Object.freeze([
   "fund-isolated-run-deployer",
   "isolated-integrated-protocol-wiring",
   "production-build-manifest-preflight",
+  "protocol-release-manifest-preflight",
   "real-zk-endorsement-nft-story",
   "release-rehearsal-clean-source-preflight",
   "source-verified-initial-deployment",
@@ -956,6 +958,40 @@ const requireProductionZkEvidence = (report) => {
   return zkArtifactTrust;
 };
 
+const requireProtocolManifestEvidence = (report, repositoryRoot, protocolManifestInspector) => {
+  const evidence = requireExactRecordKeys(
+    report.protocolManifestEvidence,
+    "protocolManifestEvidence",
+    ["path", "sha256", "protocol", "protocolGeneration", "releaseStatus", "goldenVectorSha256"],
+  );
+  if (typeof protocolManifestInspector !== "function") {
+    throw new Error("protocolManifestInspector must be a function");
+  }
+  const current = protocolManifestInspector({
+    root: repositoryRoot,
+    requireProduction: true,
+  });
+  requireExact(
+    evidence.path,
+    path.relative(repositoryRoot, current.manifestPath),
+    "protocolManifestEvidence.path",
+  );
+  requireExact(evidence.sha256, current.manifestSha256, "protocolManifestEvidence.sha256");
+  requireExact(evidence.protocol, current.manifest.protocol, "protocolManifestEvidence.protocol");
+  requireExact(
+    evidence.protocolGeneration,
+    current.manifest.protocolGeneration,
+    "protocolManifestEvidence.protocolGeneration",
+  );
+  requireExact(evidence.releaseStatus, "production", "protocolManifestEvidence.releaseStatus");
+  requireExact(
+    evidence.goldenVectorSha256,
+    current.manifest.goldenVectors.sha256,
+    "protocolManifestEvidence.goldenVectorSha256",
+  );
+  return evidence;
+};
+
 /**
  * Loads one explicitly selected schema-v4 initial-mainnet-release rehearsal report and fails closed
  * unless it is valid evidence for the exact Git commit, testnet chain and production MIN_DELAY being
@@ -975,6 +1011,7 @@ export const validateTestnetReleaseEvidence = async ({
   mainnetMinDelaySeconds,
   currentCommit,
   expectedAcceptanceInputDigest,
+  protocolManifestInspector = inspectProtocolReleaseManifest,
 } = {}) => {
   const expectedChainId = requireSafeInteger(expectedTestnetChainId, "expectedTestnetChainId", 1);
   const expectedMinDelay = requireSafeInteger(
@@ -1037,6 +1074,11 @@ export const validateTestnetReleaseEvidence = async ({
   requireExact(reportMinDelay, expectedMinDelay, "timelockDeployment.minDelaySeconds");
 
   requireProductionParityEvidence(report);
+  const protocolManifest = requireProtocolManifestEvidence(
+    report,
+    repositoryRoot,
+    protocolManifestInspector,
+  );
   const zkArtifactTrust = requireProductionZkEvidence(report);
   const verification = requireVerificationEvidence(report);
   const finality = requireFinalityEvidence(report);
@@ -1118,6 +1160,12 @@ export const validateTestnetReleaseEvidence = async ({
       contributorCount: zkArtifactTrust.contributorCount,
       minimumContributors: zkArtifactTrust.minimumContributors,
       productionReady: zkArtifactTrust.productionReady,
+    },
+    protocolManifest: {
+      sha256: protocolManifest.sha256,
+      protocol: protocolManifest.protocol,
+      protocolGeneration: protocolManifest.protocolGeneration,
+      goldenVectorSha256: protocolManifest.goldenVectorSha256,
     },
     verification: {
       status: verification.status,

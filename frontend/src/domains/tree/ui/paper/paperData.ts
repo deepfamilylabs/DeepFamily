@@ -195,7 +195,9 @@ function buildClassicalLines(params: {
   const death = deathDateString(nodeData);
   const origin = ui.birthPlace || nodeData?.birthPlace;
   const deathPlace = nodeData?.deathPlace;
-  const story = nodeData?.story;
+  // The encrypted version biography and the NFT's public story are distinct.
+  // Paper genealogy consumes only a fully validated local biography.
+  const story = nodeData?.metadataUnlockValidated ? nodeData.biography : undefined;
   const tag = ui.tagText || nodeData?.tag;
 
   return compactUnique([

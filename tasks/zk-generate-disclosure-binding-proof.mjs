@@ -109,9 +109,7 @@ export function buildDisclosureBindingTaskInput(args, defaultMinter = "") {
   const person = parseDisclosureBindingPersonArgs(args);
   const minter = args.minter || defaultMinter;
   const opts = {
-    schemaVersion: Number(args.schemaversion ?? 1),
-    cryptoSuiteVersion: Number(args.cryptosuiteversion ?? 1),
-    hashAlgoId: Number(args.hashalgoid ?? 1),
+    selfSuiteId: Number(args.selfsuiteid ?? 1),
   };
 
   const built = buildProofInput(person, minter, opts);
@@ -128,21 +126,14 @@ export function formatBytePreview(value) {
 }
 
 export function logPublicSignals(publicSignals) {
-  const [
-    identityCommitment,
-    disclosureBinding,
-    minter,
-    schemaVersion,
-    cryptoSuiteVersion,
-    hashAlgoId,
-  ] = publicSignals.map((x) => x.toString());
+  const [identityCommitment, disclosureBinding, minter, suiteCommitment] = publicSignals.map((x) =>
+    x.toString(),
+  );
   console.log("\nPublic signals breakdown:");
   console.log("  identityCommitment:", identityCommitment);
   console.log("  disclosureBinding:", disclosureBinding);
   console.log("  minter:", minter);
-  console.log("  schemaVersion:", schemaVersion);
-  console.log("  cryptoSuiteVersion:", cryptoSuiteVersion);
-  console.log("  hashAlgoId:", hashAlgoId);
+  console.log("  suiteCommitment:", suiteCommitment);
 }
 
 const action = async (args, hre) => {
@@ -179,9 +170,7 @@ const action = async (args, hre) => {
   const result = await generateDisclosureBindingProof(person, minter, {
     wasm: args.wasm,
     zkey: args.zkey,
-    schemaVersion: Number(args.schemaversion ?? 1),
-    cryptoSuiteVersion: Number(args.cryptosuiteversion ?? 1),
-    hashAlgoId: Number(args.hashalgoid ?? 1),
+    selfSuiteId: Number(args.selfsuiteid ?? 1),
   });
 
   const proofPath = path.join(outputDir, "disclosure_binding_proof.json");
@@ -244,20 +233,8 @@ function applyTaskOptions(builder) {
       defaultValue: "0",
     })
     .addOption({
-      name: "schemaversion",
-      description: "Schema version",
-      type: ArgumentType.STRING,
-      defaultValue: "1",
-    })
-    .addOption({
-      name: "cryptosuiteversion",
-      description: "Crypto suite version",
-      type: ArgumentType.STRING,
-      defaultValue: "1",
-    })
-    .addOption({
-      name: "hashalgoid",
-      description: "Hash algorithm id",
+      name: "selfsuiteid",
+      description: "Private nonzero uint32 identity suite ID",
       type: ArgumentType.STRING,
       defaultValue: "1",
     })
@@ -294,9 +271,5 @@ function applyTaskOptions(builder) {
 export default applyTaskOptions(
   task("generate-disclosure-binding-proof", "Generate a disclosure-binding ZK proof"),
 )
-  .setAction(() => Promise.resolve({ default: action }))
-  .build();
-
-applyTaskOptions(task("generate-name-poseidon-proof", "Legacy alias for disclosure-binding proof"))
   .setAction(() => Promise.resolve({ default: action }))
   .build();

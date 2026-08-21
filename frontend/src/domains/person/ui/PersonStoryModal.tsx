@@ -426,7 +426,7 @@ export default function PersonStoryModal({
 
           {/* Story Content */}
           <div className="space-y-6">
-            <BasicStorySection t={t} story={person.story} />
+            <BasicStorySection t={t} story={person.nftPublicStory} />
             <DetailedStorySection
               t={t}
               person={person}
@@ -442,7 +442,7 @@ export default function PersonStoryModal({
               getChunkTypeLabel={getChunkTypeLabel}
               copyText={copyText}
             />
-            {!person.story &&
+            {!person.nftPublicStory &&
               !(
                 personHasDetailedStory ||
                 person.storyMetadata ||

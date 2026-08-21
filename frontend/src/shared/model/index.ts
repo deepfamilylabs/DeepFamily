@@ -1,4 +1,5 @@
 export * from "./graph";
+export * from "./metadataUnlock";
 export * from "./nodeDetailSync";
 export * from "./nodeEnrichment";
 export * from "./nodeLookup";

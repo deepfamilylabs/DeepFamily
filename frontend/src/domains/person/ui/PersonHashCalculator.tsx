@@ -31,12 +31,9 @@ import {
 import {
   computeIdentityHash,
   computePersonHash,
-  type IdentitySaltMode,
 } from "../../../shared/crypto/identityHash";
 import { safeCanonicalizeFullName } from "../../../shared/crypto/identityCommitment";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
-
-// Align with contract convention: blank passphrase -> zero salt limbs
 
 const MAX_FULL_NAME_BYTES = 256;
 
@@ -180,7 +177,7 @@ const hashFormSchema = z.object({
 export type HashForm = z.infer<typeof hashFormSchema>;
 
 export type PublicHashForm = Omit<HashForm, "passphrase"> & { hasPassphrase: boolean };
-export type SecretHashInputs = { passphrase: string };
+export type SecretHashInputs = { passphrase: string; confirmPassphrase?: string };
 
 type HashFormInput = {
   fullName: string;
@@ -216,14 +213,16 @@ interface PersonHashCalculatorProps {
     birthDay?: number;
     isBirthBC?: boolean;
   };
-  identityMode?: IdentitySaltMode;
-  identitySaltHex?: string;
+  identitySuiteId?: number;
+  requirePassphraseConfirmation?: boolean;
 }
 
 export type PersonHashCalculatorHandle = {
   getPublicFormData: () => PublicHashForm;
   getSecretInputs: () => SecretHashInputs;
   hasPassphrase: () => boolean;
+  passphrasesMatch: () => boolean;
+  clearSecretInputs: () => void;
 };
 
 export const PersonHashCalculator = forwardRef<
@@ -239,18 +238,20 @@ export const PersonHashCalculator = forwardRef<
       isOpen = true,
       onToggle,
       initialValues,
-      identityMode = "deterministic",
-      identitySaltHex,
+      identitySuiteId = 1,
+      requirePassphraseConfirmation = false,
     },
     ref,
   ) => {
     const { t, i18n } = useTranslation();
     const [internalOpen, setInternalOpen] = useState(true);
     const [showPassphrase, setShowPassphrase] = useState(false);
+    const [showConfirmPassphrase, setShowConfirmPassphrase] = useState(false);
     const [showPassphraseHelp, setShowPassphraseHelp] = useState(false);
     const [passphraseRevision, setPassphraseRevision] = useState(0);
     const toast = useToast();
     const passphraseInputRef = useRef<HTMLInputElement | null>(null);
+    const confirmPassphraseInputRef = useRef<HTMLInputElement | null>(null);
     const passphraseHelpTitleId = useId();
     const passphraseHelpDescriptionId = useId();
 
@@ -410,11 +411,25 @@ export const PersonHashCalculator = forwardRef<
           const { passphrase: _passphrase, ...rest } = data;
           return { ...rest, hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0 };
         },
-        getSecretInputs: () => ({ passphrase: passphraseInputRef.current?.value ?? "" }),
+        getSecretInputs: () => ({
+          passphrase: passphraseInputRef.current?.value ?? "",
+          ...(requirePassphraseConfirmation
+            ? { confirmPassphrase: confirmPassphraseInputRef.current?.value ?? "" }
+            : {}),
+        }),
         hasPassphrase: () =>
           normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
+        passphrasesMatch: () =>
+          !requirePassphraseConfirmation ||
+          normalizePassphraseForHash(passphraseInputRef.current?.value ?? "") ===
+            normalizePassphraseForHash(confirmPassphraseInputRef.current?.value ?? ""),
+        clearSecretInputs: () => {
+          if (passphraseInputRef.current) passphraseInputRef.current.value = "";
+          if (confirmPassphraseInputRef.current) confirmPassphraseInputRef.current.value = "";
+          setPassphraseRevision((revision) => revision + 1);
+        },
       }),
-      [getValues, passphraseRevision],
+      [getValues, passphraseRevision, requirePassphraseConfirmation],
     );
 
     useEffect(() => {
@@ -454,11 +469,7 @@ export const PersonHashCalculator = forwardRef<
         cryptoWorkerCall(
           "computeIdentityHash",
           {
-            input: {
-              ...transformedData,
-              identityMode,
-              identitySaltHex,
-            },
+            input: { ...transformedData, identitySuiteId },
           },
           { timeoutMs: 180_000 },
         )
@@ -491,8 +502,7 @@ export const PersonHashCalculator = forwardRef<
       birthDay,
       gender,
       passphraseRevision,
-      identityMode,
-      identitySaltHex,
+      identitySuiteId,
     ]);
 
     const content = (
@@ -751,6 +761,38 @@ export const PersonHashCalculator = forwardRef<
                 {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+
+            {requirePassphraseConfirmation ? (
+              <div className="relative mt-2">
+                <input
+                  type={showConfirmPassphrase ? "text" : "password"}
+                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 outline-hidden transition"
+                  placeholder={t(
+                    "search.hashCalculator.confirmPassphrasePlaceholder",
+                    "Repeat the identity passphrase (empty is allowed)",
+                  )}
+                  inputMode="text"
+                  autoCapitalize="none"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  lang={i18n.language}
+                  ref={confirmPassphraseInputRef}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassphrase((value) => !value)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
+                  aria-label={
+                    showConfirmPassphrase
+                      ? t("search.hashCalculator.passphraseVisibility.hide", "Hide passphrase")
+                      : t("search.hashCalculator.passphraseVisibility.show", "Show passphrase")
+                  }
+                >
+                  {showConfirmPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            ) : null}
 
             {hasPassphrase && (
               <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">

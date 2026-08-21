@@ -1,4 +1,5 @@
 import { makeNodeId, type NodeData, type StoryMetadata } from "./graph";
+import { clearMetadataUnlock } from "./metadataUnlock";
 import type { ParsedNftDetails, ParsedVersionDetails } from "./personDetailParsers";
 
 export interface NodePair {
@@ -184,8 +185,25 @@ export function buildVersionDetailsPatch(options: {
   versionDetailsFetchedAt: number;
 }): Partial<NodeData> {
   const versionFields = options.parsed.version;
+  const metadataFields = options.parsed.metadata ?? {};
+  const nextVersionCommitment =
+    versionFields.versionCommitment ?? options.current?.versionCommitment;
+  const nextMetadataPayloadHash =
+    metadataFields.payloadHash ?? options.current?.metadataPayloadHash;
+  const nextMetadataPointer = metadataFields.pointer ?? options.current?.metadataPointer;
+  const nextMetadataPayloadLength =
+    metadataFields.payloadLength ?? options.current?.metadataPayloadLength;
+  const anchorsMatch =
+    options.current?.versionCommitment === nextVersionCommitment &&
+    options.current?.metadataPayloadHash === nextMetadataPayloadHash &&
+    options.current?.metadataPointer === nextMetadataPointer &&
+    options.current?.metadataPayloadLength === nextMetadataPayloadLength;
+  const current =
+    !anchorsMatch && options.current?.metadataUnlockValidated
+      ? clearMetadataUnlock(options.current)
+      : options.current;
   return {
-    ...(options.current || {
+    ...(current || {
       personHash: options.original.h,
       versionIndex: options.original.v,
       id: options.id,
@@ -196,10 +214,12 @@ export function buildVersionDetailsPatch(options: {
     motherHash: versionFields.motherHash,
     fatherVersionIndex: versionFields.fatherVersionIndex,
     motherVersionIndex: versionFields.motherVersionIndex,
+    versionCommitment: nextVersionCommitment,
+    metadataPointer: nextMetadataPointer,
+    metadataPayloadHash: nextMetadataPayloadHash,
+    metadataPayloadLength: nextMetadataPayloadLength,
     addedBy: versionFields.addedBy,
     timestamp: versionFields.timestamp,
-    tag: versionFields.tag ?? options.current?.tag,
-    metadataCID: versionFields.metadataCID,
     versionDetailsFetchedAt: options.versionDetailsFetchedAt,
   };
 }
@@ -211,16 +231,20 @@ export function buildNftDetailsPatch(options: {
   storyMetadata: StoryMetadata;
 }): Partial<NodeData> {
   const versionFields = options.nftRet.version;
+  const metadataFields = options.nftRet.metadata ?? {};
   const coreFields = options.nftRet.core;
   return {
     fatherHash: versionFields.fatherHash ?? options.current?.fatherHash,
     motherHash: versionFields.motherHash ?? options.current?.motherHash,
     fatherVersionIndex: versionFields.fatherVersionIndex ?? options.current?.fatherVersionIndex,
     motherVersionIndex: versionFields.motherVersionIndex ?? options.current?.motherVersionIndex,
+    versionCommitment: versionFields.versionCommitment ?? options.current?.versionCommitment,
+    metadataPointer: metadataFields.pointer ?? options.current?.metadataPointer,
+    metadataPayloadHash: metadataFields.payloadHash ?? options.current?.metadataPayloadHash,
+    metadataPayloadLength:
+      metadataFields.payloadLength ?? options.current?.metadataPayloadLength,
     addedBy: versionFields.addedBy ?? options.current?.addedBy,
     timestamp: versionFields.timestamp ?? options.current?.timestamp,
-    tag: versionFields.tag || options.current?.tag,
-    metadataCID: versionFields.metadataCID ?? options.current?.metadataCID,
     endorsementCount: options.nftRet.endorsementCount ?? options.current?.endorsementCount,
     tokenId: options.tokenId,
     fullName: coreFields.fullName,
@@ -235,7 +259,7 @@ export function buildNftDetailsPatch(options: {
     deathDay: coreFields.deathDay,
     deathPlace: coreFields.deathPlace,
     isDeathBC: coreFields.isDeathBC,
-    story: coreFields.story,
+    nftPublicStory: coreFields.nftPublicStory,
     nftTokenURI: options.nftRet.nftTokenURI,
     storyMetadata: options.storyMetadata,
     versionDetailsFetchedAt: Date.now(),

@@ -5,39 +5,38 @@ import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "../libraries/ProofConstants.sol";
 
 /**
- * @dev Minimal Groth16/BN254 verifier interface for the person-commitment circuit
- *      (7 public signals). Matches the existing PersonCommitmentVerifier output.
+ * @dev Minimal Groth16/BN254 verifier interface for the person-relation circuit
+ *      (5 public signals).
  */
-interface IGroth16PersonVerifier {
+interface IGroth16PersonRelationVerifier {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[7] calldata publicSignals
+    uint256[5] calldata publicSignals
   ) external view returns (bool);
 }
 
 /**
  * @dev Minimal Groth16/BN254 verifier interface for the disclosure-binding circuit
- *      (6 public signals). Matches the existing DisclosureBindingVerifier output.
+ *      (4 public signals).
  */
 interface IGroth16DisclosureBindingVerifier {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[6] calldata publicSignals
+    uint256[4] calldata publicSignals
   ) external view returns (bool);
 }
 
 /**
  * @title Groth16VerifierAdapter
  * @notice Transport-layer adapter between DeepFamily's business entrypoints and the
- *         two existing Groth16 verifier contracts.
+ *         two v1 Groth16 verifier contracts.
  *
- *         Registered under `PROOF_SYSTEM_ID_GROTH16_BN254_V1` for both purposes
- *         (`PersonCommitment` and `DisclosureBinding`). Routes internally to the correct
- *         backend verifier based on `purpose`.
+ *         A DeepFamily `(purpose, circuitId)` route selects this adapter. The adapter then
+ *         validates the proof encoding and forwards to the purpose-specific verifier.
  */
 contract Groth16VerifierAdapter is IProofVerifierAdapter {
   error UnsupportedProofEncoding();
@@ -63,7 +62,7 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
    *        `PROOF_ENCODING_ID_ABI_GROTH16_ABC`.
    *      - `MalformedProofData` — `proofData` is not exactly 256 bytes, or
    *        `publicSignals.length` does not match the purpose-specific constant.
-   *      - `UnsupportedPurpose` — `purpose` is neither `PersonCommitment` nor `DisclosureBinding`.
+   *      - `UnsupportedPurpose` — `purpose` is neither `PersonRelation` nor `DisclosureBinding`.
    *      - `false` — proof cryptographically rejected by the underlying Groth16 verifier.
    */
   function verifyProof(
@@ -84,22 +83,22 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       (uint256[2], uint256[2][2], uint256[2])
     );
 
-    if (purpose == ProofConstants.PROOF_PURPOSE_PERSON_COMMITMENT) {
-      if (publicSignals.length != ProofConstants.PERSON_PUBLIC_SIGNALS_LEN) {
+    if (purpose == ProofConstants.PROOF_PURPOSE_PERSON_RELATION) {
+      if (publicSignals.length != ProofConstants.PERSON_RELATION_PUBLIC_SIGNALS_LEN) {
         revert MalformedProofData();
       }
-      uint256[7] memory buf;
-      for (uint256 i = 0; i < ProofConstants.PERSON_PUBLIC_SIGNALS_LEN; ++i) {
+      uint256[5] memory buf;
+      for (uint256 i = 0; i < ProofConstants.PERSON_RELATION_PUBLIC_SIGNALS_LEN; ++i) {
         buf[i] = publicSignals[i];
       }
-      return IGroth16PersonVerifier(personVerifier).verifyProof(a, b, c, buf);
+      return IGroth16PersonRelationVerifier(personVerifier).verifyProof(a, b, c, buf);
     }
 
     if (purpose == ProofConstants.PROOF_PURPOSE_DISCLOSURE_BINDING) {
       if (publicSignals.length != ProofConstants.DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN) {
         revert MalformedProofData();
       }
-      uint256[6] memory buf;
+      uint256[4] memory buf;
       for (uint256 i = 0; i < ProofConstants.DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN; ++i) {
         buf[i] = publicSignals[i];
       }

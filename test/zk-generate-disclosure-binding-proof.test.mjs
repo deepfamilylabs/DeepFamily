@@ -79,9 +79,7 @@ describe("zk-generate-disclosure-binding-proof helpers", function () {
         birthmonth: "5",
         birthday: "15",
         gender: "1",
-        schemaversion: "1",
-        cryptosuiteversion: "1",
-        hashalgoid: "1",
+        selfsuiteid: "2",
         minter: "0x1234567890123456789012345678901234567890",
       };
 
@@ -97,6 +95,7 @@ describe("zk-generate-disclosure-binding-proof helpers", function () {
           gender: 1,
         },
         "0x1234567890123456789012345678901234567890",
+        { selfSuiteId: 2 },
       );
 
       expect(taskBuilt.built.input).to.deep.equal(expected.input);

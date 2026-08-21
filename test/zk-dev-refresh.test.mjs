@@ -157,6 +157,25 @@ describe("development ZK refresh", function () {
     expect(calls).to.deep.equal(["guard"]);
   });
 
+  it("uses the explicit fresh-v1 initializer instead of the normal development guard", async function () {
+    const root = path.resolve("/tmp/deepfamily-fresh-v1-transition-fixture");
+    const calls = [];
+    await runZkDevelopmentRefresh({
+      root,
+      freshV1: true,
+      freshV1Initializer: ({ root: initializedRoot }) => calls.push(["fresh-v1", initializedRoot]),
+      manifestGuard: () => calls.push(["unexpected-guard"]),
+      ptauInstaller: async () => fakePtau(root),
+      temporaryDirectoryFactory: () => path.join(root, "temporary"),
+      temporaryDirectoryRemover: () => {},
+      commandRunner: async () => {},
+      assetSynchronizer: async () => ({ exitCode: 0, failedFiles: [] }),
+      manifestUpdater: () => ({ manifestSha256: "ab".repeat(32) }),
+      output: { log: () => {}, warn: () => {}, error: () => {} },
+    });
+    expect(calls).to.deep.equal([["fresh-v1", root]]);
+  });
+
   it("uses the pinned pTau before rebuilding keys, then syncs, updates and proves", async function () {
     const root = path.resolve("/tmp/deepfamily-development-refresh-fixture");
     const temporaryDirectory = path.join(root, "temporary");

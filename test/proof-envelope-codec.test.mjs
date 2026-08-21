@@ -51,10 +51,24 @@ describe("proof envelope codec", () => {
     };
 
     expect(normalizeGroth16Proof(rawProof)).to.deep.equal(abcProof);
-    expect(packGroth16ProofEnvelope(rawProof)).to.deep.equal({
-      proofSystemId: 1,
+    expect(packGroth16ProofEnvelope(rawProof, { circuitId: 1 })).to.deep.equal({
+      circuitId: 1,
       proofEncodingId: 1,
       proofData: encodeGroth16AbcProofData(abcProof),
+    });
+  });
+
+  it("requires a nonzero uint32 circuit route and freezes proof encoding 1 by default", () => {
+    expect(() => packGroth16ProofEnvelope(abcProof)).to.throw(/circuitId is required/);
+    expect(() => packGroth16ProofEnvelope(abcProof, { circuitId: 0 })).to.throw(
+      /circuitId must be a nonzero integer/,
+    );
+    expect(() => packGroth16ProofEnvelope(abcProof, { circuitId: 1n << 32n })).to.throw(
+      /circuitId must be a nonzero integer/,
+    );
+    expect(packGroth16ProofEnvelope(abcProof, { circuitId: 7 })).to.include({
+      circuitId: 7,
+      proofEncodingId: 1,
     });
   });
 

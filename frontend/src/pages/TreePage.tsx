@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ColorThemeProvider,
+  MetadataUnlockControl,
   TreeDebugPanel,
   TreeInteractionProvider,
   useTreeGraphData,
@@ -430,6 +431,7 @@ export default function TreePage() {
                     }}
                     hideSwitch={true}
                   />
+                  <MetadataUnlockControl />
                 </div>
               </div>
 

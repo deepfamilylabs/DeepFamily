@@ -78,7 +78,12 @@ describe("person query hooks", () => {
 
     await act(async () => {
       deferred.resolve({
-        version: { metadataCID: "cid://meta" },
+        version: { versionCommitment: "0xcommitment" },
+        metadata: {
+          pointer: "0x00000000000000000000000000000000000000cc",
+          payloadHash: "0xpayload",
+          payloadLength: 512,
+        },
         endorsementCount: 7,
         tokenId: "42",
       });
@@ -88,7 +93,12 @@ describe("person query hooks", () => {
     expect(result.current.data).toMatchObject({
       endorsementCount: 7,
       tokenId: "42",
-      version: { metadataCID: "cid://meta" },
+      version: { versionCommitment: "0xcommitment" },
+      metadata: {
+        pointer: "0x00000000000000000000000000000000000000cc",
+        payloadHash: "0xpayload",
+        payloadLength: 512,
+      },
     });
     expect(result.current.error).toBeNull();
   });

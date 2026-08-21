@@ -4,10 +4,10 @@ pragma solidity ^0.8.20;
 /**
  * @title IProofVerifierAdapter
  * @notice Minimal transport-layer adapter contract between DeepFamily business entrypoints
- *         and backend-specific ZK verifiers. Phase 2 uses this interface to decouple
+ *         and backend-specific ZK verifiers. This interface decouples
  *         proof encoding / verifier backend from business semantics.
  *
- * @dev Responsibility boundaries (see docs/anti-quantum-phase2-execution-plan.local.md §3.2):
+ * @dev Responsibility boundaries:
  *      The adapter is ONLY responsible for:
  *        1. Validating `proofEncodingId` is supported
  *        2. Decoding `proofData` into the backend-specific proof form
@@ -26,7 +26,7 @@ pragma solidity ^0.8.20;
 interface IProofVerifierAdapter {
   /**
    * @notice Verify a proof envelope against its declared encoding and a backend verifier.
-   * @param purpose          Business proof purpose (must match DeepFamily.ProofPurpose ordinal).
+   * @param purpose          Frozen entrypoint purpose (PersonRelation or DisclosureBinding).
    * @param proofEncodingId  Payload encoding identifier (see ProofConstants).
    * @param proofData        Encoded proof payload whose layout is defined by `proofEncodingId`.
    * @param publicSignals    Flattened public signals already ordered per the business contract.

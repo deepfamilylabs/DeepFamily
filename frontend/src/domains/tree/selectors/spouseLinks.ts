@@ -14,6 +14,12 @@ function sameHash(a?: string, b?: string): boolean {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
 
+function toSafeVersionIndex(value: number | string | undefined): number {
+  if (value === undefined) return 0;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
 // A bytes32 hash that is present and not the all-zero sentinel ("no parent recorded").
 export function isMeaningfulHash(hash?: string): hash is string {
   return Boolean(hash) && !/^0x0+$/i.test(hash as string);
@@ -62,10 +68,10 @@ function spouseRefsForPerson(
     let spouseVersion: number | undefined;
     if (sameHash(child.fatherHash, personHash)) {
       spouseHash = child.motherHash;
-      spouseVersion = child.motherVersionIndex;
+      spouseVersion = toSafeVersionIndex(child.motherVersionIndex);
     } else if (sameHash(child.motherHash, personHash)) {
       spouseHash = child.fatherHash;
-      spouseVersion = child.fatherVersionIndex;
+      spouseVersion = toSafeVersionIndex(child.fatherVersionIndex);
     } else {
       // Child carries no parent reference for this person (e.g. graph-only fixtures); co-parenthood
       // cannot be determined, so no spouse is inferred.

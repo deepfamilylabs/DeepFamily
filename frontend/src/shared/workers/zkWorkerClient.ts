@@ -1,24 +1,20 @@
-import type { Groth16Proof, PersonData } from "../zk/zk";
+import type { Groth16Proof } from "../zk/zk";
+import type {
+  DisclosureBindingProofParameters,
+  PersonRelationProofParameters,
+} from "../zk/zkSnark";
 
 type ZkWorkerCallMap = {
-  generatePersonCommitmentProof: {
-    params: {
-      person: PersonData;
-      father: PersonData | null;
-      mother: PersonData | null;
-      submitterAddress: string;
-    };
+  generatePersonRelationProof: {
+    params: PersonRelationProofParameters;
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
-  verifyPersonCommitmentProof: {
+  verifyPersonRelationProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
   generateDisclosureBindingProof: {
-    params: {
-      person: PersonData;
-      minterAddress: string;
-    };
+    params: DisclosureBindingProofParameters;
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
   verifyDisclosureBindingProof: {
@@ -32,23 +28,61 @@ type ZkWorkerResponse =
   | { id: number; ok: true; result: any }
   | { id: number; ok: false; error: { message: string; name?: string } };
 
+interface PendingZkWorkerCall {
+  resolve: (value: any) => void;
+  reject: (error: Error) => void;
+  timeoutId?: ReturnType<typeof setTimeout>;
+}
+
+export class ZkWorkerTerminatedError extends Error {
+  constructor(message = "ZK worker terminated") {
+    super(message);
+    this.name = "ZkWorkerTerminatedError";
+  }
+}
+
 let workerSingleton: Worker | null = null;
 let nextId = 1;
-const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+const pending = new Map<number, PendingZkWorkerCall>();
+
+const rejectPending = (error: Error): void => {
+  for (const [, entry] of pending) {
+    if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+    entry.reject(error);
+  }
+  pending.clear();
+};
+
+export function terminateZkWorker(
+  reason: Error = new ZkWorkerTerminatedError(),
+): void {
+  const worker = workerSingleton;
+  workerSingleton = null;
+  if (worker) worker.terminate();
+  rejectPending(reason);
+}
+
+export function terminateZkWorkerIfIdle(): boolean {
+  if (pending.size > 0) return false;
+  terminateZkWorker();
+  return true;
+}
 
 const ensureWorker = (): Worker => {
   if (typeof window === "undefined") {
     throw new Error("ZK worker is not available (no window)");
   }
   if (workerSingleton) return workerSingleton;
-  workerSingleton = new Worker(new URL("../../workers/zk.worker.ts", import.meta.url), {
+  const worker = new Worker(new URL("../../workers/zk.worker.ts", import.meta.url), {
     type: "module",
   });
-  workerSingleton.addEventListener("message", (event: MessageEvent<ZkWorkerResponse>) => {
+  workerSingleton = worker;
+  worker.addEventListener("message", (event: MessageEvent<ZkWorkerResponse>) => {
     const msg = event.data;
     const entry = pending.get(msg.id);
     if (!entry) return;
     pending.delete(msg.id);
+    if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
     if (msg.ok) entry.resolve(msg.result);
     else
       entry.reject(
@@ -57,15 +91,14 @@ const ensureWorker = (): Worker => {
         }),
       );
   });
-  workerSingleton.addEventListener("error", () => {
-    for (const [, entry] of pending) entry.reject(new Error("ZK worker crashed"));
-    pending.clear();
-    workerSingleton = null;
+  worker.addEventListener("error", () => {
+    if (workerSingleton !== worker) return;
+    terminateZkWorker(new Error("ZK worker crashed"));
   });
-  return workerSingleton;
+  return worker;
 };
 
-export async function zkWorkerCall<M extends keyof ZkWorkerCallMap>(
+export function zkWorkerCall<M extends keyof ZkWorkerCallMap>(
   method: M,
   params: ZkWorkerCallMap[M]["params"],
   opts?: { timeoutMs?: number },
@@ -74,22 +107,22 @@ export async function zkWorkerCall<M extends keyof ZkWorkerCallMap>(
   const id = nextId++;
   const timeoutMs = opts?.timeoutMs ?? 180_000;
 
-  const promise = new Promise<ZkWorkerCallMap[M]["result"]>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    const req: ZkWorkerRequest = { id, method, params };
-    worker.postMessage(req);
-  });
-
-  if (!timeoutMs) return promise;
-  return await Promise.race([
-    promise,
-    new Promise<ZkWorkerCallMap[M]["result"]>((_, reject) => {
-      setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          reject(new Error(`ZK worker timeout (${String(method)})`));
-        }
+  return new Promise<ZkWorkerCallMap[M]["result"]>((resolve, reject) => {
+    const entry: PendingZkWorkerCall = { resolve, reject };
+    if (timeoutMs > 0) {
+      entry.timeoutId = setTimeout(() => {
+        if (!pending.has(id)) return;
+        terminateZkWorker(new Error(`ZK worker timeout (${String(method)})`));
       }, timeoutMs);
-    }),
-  ]);
+    }
+    pending.set(id, entry);
+    try {
+      const request: ZkWorkerRequest = { id, method, params };
+      worker.postMessage(request);
+    } catch (error) {
+      pending.delete(id);
+      if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 }

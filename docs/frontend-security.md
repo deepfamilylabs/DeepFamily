@@ -1,97 +1,141 @@
 # Frontend Security Guide
 
-This document describes the security posture and engineering practices for the DeepFamily frontend (Vite + React). It focuses on protecting **sensitive user inputs** (passphrases, decryption passwords, future BIP39 mnemonic + passphrase) and reducing the **data exfiltration surface** (network egress, CSP, XSS).
+This document describes the security posture of the DeepFamily Vite/React frontend. The current
+protocol uses one user-entered passphrase for a person's deterministic identity derivation and for
+that version's encrypted metadata envelope. The two derivations remain domain-separated and use
+different salts; "one passphrase" does not mean reusing the same KDF output as both keys.
 
-## Threat Model (What We Can / Cannot Defend)
+## Threat Model
 
 ### In scope
 
-- Accidental leakage via application code:
-  - React state/props, form libraries (`watch`), debug logs, analytics hooks
-  - storing secrets in `localStorage` / URL / query params
-  - unbounded `connect-src` allowing secrets to be sent to arbitrary origins
-- Opportunistic browser exposure:
-  - DevTools inspection, common extensions reading DOM/state, crash reports
-  - over-permissive CSP enabling inline scripts or `eval`-like execution
-- Supply chain and dependency risks (auditing, pinning, upgrades).
+- Accidental secret disclosure through React state/props, form watchers, logs, telemetry, URLs,
+  browser storage, transaction state, or long-lived Worker caches.
+- Malformed, unsupported, truncated, or context-mismatched on-chain metadata reaching a KDF or
+  being displayed as authenticated plaintext.
+- Opportunistic browser exposure caused by an over-permissive CSP or avoidable network egress.
+- Supply-chain and dependency risks addressed through pinning, review, and auditing.
 
-### Out of scope / limitations
+### Out of scope and explicit product boundaries
 
-- **If attacker-controlled JavaScript executes in the page (XSS / compromised dependency)**, it can read input values and intercept worker messages. CSP reduces likelihood/impact but does not make the page “safe” under XSS.
-- Browser extensions with broad privileges can observe the DOM and network.
-- OS-level malware and malicious browsers.
+- If attacker-controlled JavaScript runs in the origin (XSS or a compromised dependency), it can
+  read an input before dispatch, intercept Worker messages, and read unlocked IndexedDB records.
+- Browser extensions with broad privileges, a compromised browser profile, backups, DevTools,
+  and OS-level malware can read or alter locally cached plaintext.
+- A weak or empty passphrase is subject to offline guessing. Empty is a valid protocol value and
+  still runs the full KDF; the UI warns and requires explicit high-risk confirmation, but cannot
+  make it secret.
+- The contract cannot prove that `versionCommitment` was computed from the plaintext encrypted in
+  an envelope. A holder of a valid identity witness can deliberately use a false private
+  `contentDigest`. The canonical client detects this only after decrypting, reserializing, and
+  recomputing all bindings.
+- Encryption provides no field-level access control. The current person's one passphrase unlocks
+  the whole metadata JSON, including person data, parent snapshots, `tag`, and `biography`.
 
-## Sensitive Inputs: Handling Policy
+## Sensitive Inputs
 
-Treat the following as **sensitive inputs**:
+Treat all of the following as sensitive working material:
 
-- `passphrase` used for identity hash / proof generation (Add Version / Mint / Key derivation).
-- decryption password for metadata bundles (`DecryptMetadataPage`).
-- future BIP39 mnemonic + passphrase (planned).
-
-### Policy: “Minimal Exposure Surface” (Scheme B)
-
-Goal: keep secrets **out of React state/props** and minimize copies in memory.
+- raw and NFKD-normalized passphrases for the current person and non-null parents;
+- domain-separated identity/file password bytes;
+- deterministic identity salts and random file salts;
+- Argon2id outputs, `derivedSecretField`, KEK, DEK, and proof witnesses;
+- plaintext `contentDigest` and canonical/gzip working buffers before they are intentionally
+  converted into an unlocked display DTO.
 
 Rules:
 
-- Do not store secrets in component state, context, Redux, URL, or persistent storage.
-- Do not include secrets in error objects, telemetry, or `console.*` logs.
-- Keep secrets inside the input element (uncontrolled inputs) and read them only at the moment of use via `ref`/imperative handle.
-- After use, best-effort clear input values (UX permitting) and clear local variables (best-effort; not a hard guarantee in JS runtimes).
+- Keep passphrases in uncontrolled input elements. Read them only at the action boundary and pass
+  them directly to the crypto/prover Worker or the owning service.
+- Never put secrets in React state, props, context, reducers, URLs, errors, telemetry, or
+  `console.*` output.
+- Never persist a passphrase, password fingerprint, identity salt, derived secret, key, proof
+  witness, or `contentDigest` in localStorage, sessionStorage, IndexedDB, or a Service Worker cache.
+- Best-effort clear DOM inputs and working buffers as soon as the immutable submission package or
+  validated unlock result has been produced. JavaScript memory erasure is not a hard guarantee.
+- An uncertain RPC result may retain and resubmit the exact frozen proof/public-signals/envelope
+  package. It must not rerun the KDF, prover, or encryption with already-cleared secrets.
 
-This repo implements Scheme B by keeping passphrases/passwords in uncontrolled inputs and exposing a small imperative API (via `ref`/`useImperativeHandle`) to pull the secret only at submit/proof/encrypt/decrypt time.
+The identity and file KDF paths both normalize the raw passphrase with NFKD and do not trim it.
+They prepend different nonempty domains before Argon2id, so even an empty raw passphrase executes
+the full KDF. Identity suite 1 derives a deterministic salt from the suite ID and canonical
+identity fields; format 1 uses a fresh random `fileSalt` for every envelope.
 
-## Content Security Policy (CSP)
+## Metadata Read and Unlock Boundary
 
-### Goals
+Version metadata is fetched from the on-chain Archive. `DeepFamilyReader` returns the immutable
+`MetadataRef(pointer,payloadHash,payloadLength)` associated with the person version, and the client
+reads the pointer's runtime bytecode with `eth_getCode`.
 
-- Prevent inline script execution (`script-src` without `'unsafe-inline'`).
-- Prevent runtime string evaluation (`'unsafe-eval'`) in preview/production.
-- Constrain network egress (`connect-src`) to known RPC/IPFS/CDN origins where possible.
-- Reduce style injection risk (`style-src-attr 'none'` when feasible).
+Before showing a password field or invoking Argon2id, the client must fail closed unless all of
+these preflight checks pass:
 
-### Operational approach
+1. the data-contract runtime length is exactly `payloadLength + 1`;
+2. byte zero is the `STOP` opcode and is removed before interpreting the envelope;
+3. `keccak256(code[1:])` equals `payloadHash`;
+4. the 20-byte DFM1 common prefix has magic `DFM1`, a nonzero `formatVersion`, and a nonzero
+   big-endian `identitySuiteId` at offset `0x10`;
+5. the format is supported; format 1 then passes all fixed header, selector, length, flags, and
+   reserved-field checks.
 
-- Start in `Content-Security-Policy-Report-Only` to collect real violations.
-- Fix/whitelist only what is required by real usage.
-- Switch preview/production to enforced `Content-Security-Policy` once clean.
+After KDF and AES-GCM authentication, a result is usable only after strict gzip and canonical-JSON
+decoding, canonical byte-for-byte reserialization, chain-context checks for the person and parents,
+person-hash rederivation, and `versionCommitment` recomputation. A wrong password and malformed or
+malicious data share the same fail-closed outcome: no decrypted field is merged or displayed.
 
-## Logging & Error Hygiene
+Batch unlock performs these preflights first and then runs KDF work sequentially. Cancellation
+terminates the active Worker rather than merely ignoring its result. Versions validated before a
+cancellation remain cached; a failed item is never written.
 
-Principle: errors often carry unexpected context. Log only a minimal whitelist.
+## Plaintext IndexedDB Cache
 
-Guidelines:
+After all unlock checks succeed, the product intentionally stores the complete `NodeData` as
+plaintext in IndexedDB. This includes decrypted identity/parent display fields, `tag`, `biography`,
+the public chain/archive anchors, and an explicit validation marker. Empty `tag` and empty
+`biography` are still a successfully unlocked record; truthiness is not the validation marker.
 
-- Use a sanitizer for `console.error` in sensitive paths.
-- Never log user inputs, derived keys, decrypted payloads, proofs, or intermediate buffers.
-- Prefer structured, non-sensitive telemetry fields (e.g., `{ name, message, code }`).
+This cache is scoped by at least chain ID, DeepFamily proxy address, and protocol/cache generation.
+Reloading the same scope may display the cached fields without another KDF. If IndexedDB is
+unavailable or a write fails, the app keeps only the current in-memory result and must not fall back
+to storing secrets elsewhere. "Clear local unlocked metadata" is a best-effort deletion that makes
+the UI locked again; it cannot erase browser-profile backups or copies already read by another
+same-origin script.
 
-## Storage & Persistence
+The cache is a product convenience, not a cryptographic trust anchor. Without the passphrase and
+derived keys, a hydrated plaintext DTO cannot be independently reauthenticated after local
+tampering. Re-establishing authenticity requires clearing/replacing it with a fresh on-chain read
+and complete unlock.
 
-- Do not persist secrets in `localStorage`, `sessionStorage`, IndexedDB, or Service Worker caches.
-- If something must be cached (e.g., ZK verification keys), cache only public artifacts (`.wasm`, `.zkey`, `.vkey.json`) and validate fetch origins with CSP and a strict allowlist.
+Private `biography` is part of this encrypted metadata snapshot. The NFT supplement `story` and
+on-chain `StoryChunk` records are separate, intentionally public data. The UI must not silently copy
+private biography text into the public NFT story; any copy is an explicit user action with public
+disclosure confirmation.
 
-## Dependency Governance
+## Content Security Policy
 
-Minimum practices:
+- Keep `script-src` free of `'unsafe-inline'` and keep preview/production free of `'unsafe-eval'`.
+- Restrict `connect-src` to reviewed RPC and other required public-resource origins.
+- Use Report-Only while discovering a necessary source, then move the reviewed policy to enforced
+  mode.
+- CSP reduces the chance and reach of injection; it does not protect input or IndexedDB plaintext
+  after arbitrary same-origin JavaScript executes.
 
-- Keep `package-lock.json` committed and reviewed.
-- Run `npm audit` regularly; treat “no fix available” as a risk to isolate/replace rather than ignore.
-- Prefer audited, actively maintained crypto and ZK libraries.
-- Avoid libraries that rely on `eval`/`new Function` in production builds.
+## Logging and Error Hygiene
 
-Project-specific dependency notes:
+- Sanitize errors at the Worker/service boundary and expose only a small non-sensitive shape such
+  as `{ name, message, code }`.
+- Never log passphrases, plaintext metadata, identity material, keys, proofs, or intermediate
+  buffers.
+- Do not distinguish wrong-passphrase failures in a way that leaks decrypted structure. Detailed
+  protocol errors may be useful in development tests, but production UI should remain generic.
 
-- Metadata CID generation intentionally uses `multiformats` + `@noble/hashes` directly. Do not re-add IPFS hashing wrapper packages that pull protobuf-based importer stacks unless there is a reviewed need and `npm run security:audit` stays clean.
-- `frontend/package.json` overrides `bfj` to `9.1.3` because `snarkjs` depends on a broad `bfj` range and older resolved versions pull `jsonpath -> underscore`, which is flagged by production audit. Keep the override until `snarkjs` resolves to a non-vulnerable dependency tree on its own.
+## Dependency Governance and Workers
 
-## Workers & Isolation (Recommended)
-
-Moving crypto and ZK into Web Workers:
-
-- reduces main-thread exposure time for secrets (but does not stop XSS),
-- prevents UI freezes and improves UX,
-- helps avoid accidental logging/state capture in React code.
-
-Implementation note: keep worker code “pure” (no React/DOM imports, no `window`/`document`/storage) and communicate via a minimal message interface. This repo uses dedicated workers for crypto and ZK proof generation/verification.
+- Keep `package-lock.json` committed and review crypto, compression, ZK, and serialization changes
+  as protocol-sensitive updates.
+- Run `npm run security:audit`, `npm run security:xss-scan`, and the frontend CSP scan before a
+  release.
+- Keep Worker code free of React, DOM, `window`, and browser-storage dependencies. Workers reduce
+  UI blocking and accidental React-state exposure, but do not form a security boundary against XSS.
+- Only public ZK artifacts (`.wasm`, `.zkey`, `.vkey.json`) are candidates for ordinary asset
+  caching. Validate their release-manifest hashes and fetch origins.

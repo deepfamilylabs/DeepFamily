@@ -2,9 +2,12 @@
 pragma solidity ^0.8.20;
 
 import {DeepFamily} from "./DeepFamily.sol";
+import {IMetadataArchiveV1} from "./interfaces/IMetadataArchiveV1.sol";
 
 contract DeepFamilyReader {
   error InvalidDeepFamilyAddress();
+  error InvalidMetadataArchiveAddress();
+  error MetadataArchiveBindingMismatch();
   error InvalidPersonHash();
   error InvalidVersionIndex();
   error ChunkIndexOutOfRange();
@@ -26,10 +29,34 @@ contract DeepFamilyReader {
 
   uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
   DeepFamily public immutable DEEP_FAMILY;
+  IMetadataArchiveV1 public immutable METADATA_ARCHIVE;
 
   constructor(address deepFamily) {
-    if (deepFamily == address(0)) revert InvalidDeepFamilyAddress();
-    DEEP_FAMILY = DeepFamily(payable(deepFamily));
+    if (deepFamily == address(0) || deepFamily.code.length == 0) {
+      revert InvalidDeepFamilyAddress();
+    }
+
+    DeepFamily boundDeepFamily = DeepFamily(payable(deepFamily));
+    address archive;
+    try boundDeepFamily.metadataArchive() returns (address configuredArchive) {
+      archive = configuredArchive;
+    } catch {
+      revert InvalidDeepFamilyAddress();
+    }
+    if (archive == address(0) || archive.code.length == 0) {
+      revert InvalidMetadataArchiveAddress();
+    }
+
+    address archiveDeepFamily;
+    try IMetadataArchiveV1(archive).DEEP_FAMILY() returns (address bound) {
+      archiveDeepFamily = bound;
+    } catch {
+      revert InvalidMetadataArchiveAddress();
+    }
+    if (archiveDeepFamily != deepFamily) revert MetadataArchiveBindingMismatch();
+
+    DEEP_FAMILY = boundDeepFamily;
+    METADATA_ARCHIVE = IMetadataArchiveV1(archive);
   }
 
   function getVersionDetails(
@@ -38,11 +65,17 @@ contract DeepFamilyReader {
   )
     external
     view
-    returns (DeepFamily.PersonVersion memory version, uint256 endorsementCount, uint256 tokenId)
+    returns (
+      DeepFamily.PersonVersion memory version,
+      IMetadataArchiveV1.MetadataRef memory metadata,
+      uint256 endorsementCount,
+      uint256 tokenId
+    )
   {
     _validateVersion(personHash, versionIndex);
     uint256 arrayIndex = versionIndex - 1;
     version = _readPersonVersion(personHash, arrayIndex);
+    metadata = _readMetadataRef(personHash, versionIndex);
     endorsementCount = DEEP_FAMILY.versionEndorsementCount(personHash, arrayIndex);
     tokenId = DEEP_FAMILY.versionToTokenId(personHash, versionIndex);
   }
@@ -56,6 +89,7 @@ contract DeepFamilyReader {
       bytes32 personHash,
       uint256 versionIndex,
       DeepFamily.PersonVersion memory version,
+      IMetadataArchiveV1.MetadataRef memory metadata,
       DeepFamily.PersonCoreInfo memory coreInfo,
       uint256 endorsementCount,
       string memory nftTokenURI
@@ -66,9 +100,18 @@ contract DeepFamilyReader {
     versionIndex = DEEP_FAMILY.tokenIdToVersionIndex(tokenId);
     uint256 arrayIndex = versionIndex - 1;
     version = _readPersonVersion(personHash, arrayIndex);
+    metadata = _readMetadataRef(personHash, versionIndex);
     coreInfo = _readCoreInfo(tokenId);
     endorsementCount = DEEP_FAMILY.versionEndorsementCount(personHash, arrayIndex);
     nftTokenURI = DEEP_FAMILY.tokenURI(tokenId);
+  }
+
+  function getVersionMetadataRef(
+    bytes32 personHash,
+    uint256 versionIndex
+  ) external view returns (IMetadataArchiveV1.MetadataRef memory metadata) {
+    _validateVersion(personHash, versionIndex);
+    return _readMetadataRef(personHash, versionIndex);
   }
 
   function getStoryMetadata(
@@ -391,6 +434,13 @@ contract DeepFamilyReader {
     uint256 arrayIndex
   ) internal view returns (DeepFamily.PersonVersion memory version) {
     return DEEP_FAMILY.personVersionAt(personHash, arrayIndex);
+  }
+
+  function _readMetadataRef(
+    bytes32 personHash,
+    uint256 versionIndex
+  ) internal view returns (IMetadataArchiveV1.MetadataRef memory metadata) {
+    return METADATA_ARCHIVE.metadataRef(personHash, versionIndex);
   }
 
   function _readCoreInfo(

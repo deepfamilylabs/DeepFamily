@@ -22,9 +22,11 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "groth16VerifierAdapter",
   "deepFamilyImplementation",
   "deepFamilyProxy",
-  "deepFamilyReader",
   "tokenInitialize",
-  "setPersonCommitmentVerifier",
+  "metadataArchiveV1",
+  "setMetadataArchive",
+  "deepFamilyReader",
+  "setPersonRelationVerifier",
   "setDisclosureBindingVerifier",
   "transferDeepFamilyOwnership",
 ]);

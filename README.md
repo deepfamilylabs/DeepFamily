@@ -23,6 +23,10 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 > This is an open-source protocol/tooling suite—feel free to deploy and operate it yourself.
 
+> **Release status:** the on-chain biography v1 implementation is still development-only. Identity
+> and file KDF suite 1 await the required device/attacker-cost studies, and production requires a
+> fresh reviewed ZK ceremony plus finalized artifact, vector, deployment, and runtime evidence.
+
 ### Core Principles
 
 - **Zero-Knowledge Privacy**: Private family tree construction with selective disclosure through NFT minting
@@ -36,15 +40,19 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 ### Privacy-Preserving Family Graph
 
 - Build a global family tree graph through parent-child hash connections
-- Zero-knowledge proofs protect privacy — no plaintext personal data stored on-chain
+- Zero-knowledge proofs bind private identity witnesses to person/parent commitments
+- Each version stores an immutable encrypted DFM1 metadata envelope on-chain; person, parent,
+  `tag`, and private `biography` plaintext stay off-chain
 - Multiple versions per person allow different contributors to record the same individual
-- Supports both collaborative (shared passphrase) and fully private (unique passphrase) modes
+- One user-entered passphrase drives domain-separated identity and file KDFs; matching identity
+  fields, suite, and passphrase reproduce the same person hash
 
 ### Endorsement, Incentives & Public Records
 
 - Community endorsement validates data quality across versions
-- Endorsed versions can be minted as permanent on-chain NFT records with biographical data
-- On-chain biographical storage with permanent sealing
+- Endorsed versions can be minted as permanent public NFT records
+- Private encrypted biography and public NFT story data are independent; public story chunks can be
+  permanently sealed
 - Personal details remain private until an endorsed contributor mints an NFT
 
 ## Technology Stack
@@ -59,7 +67,8 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | Contract                          | Purpose                                                                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **DeepFamily.sol**                | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding. UUPS-upgradeable behind a proxy |
-| **DeepFamilyReader.sol**          | Stateless aggregated/paginated read views over the core protocol                                                          |
+| **MetadataArchiveV1.sol**         | Immutable opaque envelope writer/index; stores each blob in a `STOP || envelope` data contract                            |
+| **DeepFamilyReader.sol**          | Aggregated/paginated read views with immutable proxy/Archive bindings and metadata refs                                    |
 | **DeepFamilyToken.sol**           | Utility token powering endorsement and incentive mechanics                                                                |
 | **GovernanceTimelock.sol**        | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending            |
 | **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                              |
@@ -565,7 +574,8 @@ Do not keep these migration overrides in the persistent fresh-release environmen
 `DeepFamily.renounceOwnership()` remains available as an irreversible final governance-exit
 mechanism, but the ordinary governance tasks deliberately reject it. It is not a routine
 "decentralize" switch: once a separately constructed and audited Timelock operation executes it,
-the proxy can never be upgraded, verifiers and protocol-fee settings can never be changed, and
+the proxy can never be upgraded, no new verifier route can be registered, protocol-fee settings
+can never be changed, and
 ownership can never be migrated. Future protocol fee shares are burned because `owner()` is zero;
 already accumulated treasury assets are not automatically moved. Consider it only after a final
 protocol audit, treasury disposition, public notice, and explicit Safe-owner approval of the exact
@@ -585,6 +595,7 @@ governance task rejects upgrade and ownership-transfer functions. See
 - [Ethereum Mainnet release](docs/ethereum-mainnet-release.md) - Guarded Safe and release runbook
 - [Zero-Knowledge Proofs](docs/zk-proofs.md) - ZK proof system and circuit documentation
 - [Frontend Integration](docs/frontend.md) - React component and UI development guide
+- [Frontend Security](docs/frontend-security.md) - Passphrase, Archive unlock, and plaintext cache boundaries
 
 ## Contributing
 

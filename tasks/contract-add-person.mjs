@@ -1,16 +1,15 @@
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
-import personCommitmentProof from "../lib/personCommitmentProof.js";
+import seedHelpers from "../lib/seedHelpers.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
-const { generatePersonCommitmentProof } = personCommitmentProof;
+const { addPersonVersion } = seedHelpers;
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const { deepFamily } = await ensureIntegratedSystem(connection, { artifacts: hre.artifacts });
   const [signer] = await ethers.getSigners();
-  const submitterAddress = await signer.getAddress();
 
   // Parse numeric fields
   const birthYearNum = Number(args.birthyear);
@@ -70,7 +69,7 @@ const action = async (args, hre) => {
   const motherData = args.mothername
     ? {
         fullName: args.mothername,
-        derivedSecretField: 0n,
+        passphrase: args.motherpassphrase || "",
         isBirthBC: String(args.motherbirthbc).toLowerCase() === "true",
         birthYear: Number(args.motherbirthyear),
         birthMonth: Number(args.motherbirthmonth),
@@ -86,32 +85,23 @@ const action = async (args, hre) => {
     throw new Error(`Mother gender must be an integer in [0, 255]: ${motherData.gender}`);
   }
 
-  personData.derivedSecretField = 0n;
-  if (fatherData) fatherData.derivedSecretField = 0n;
-  if (motherData) motherData.derivedSecretField = 0n;
-
-  const result = await generatePersonCommitmentProof(
+  const result = await addPersonVersion({
+    deepFamily,
+    signer,
     personData,
     fatherData,
     motherData,
-    submitterAddress,
-  );
+    fatherVersion: fatherData ? Number(args.fatherversion) : 0,
+    motherVersion: motherData ? Number(args.motherversion) : 0,
+    versionContent: {
+      tag: args.tag,
+      biography: args.biography,
+    },
+  });
 
-  const tx = await deepFamily
-    .connect(signer)
-    .addPersonVersion(
-      result.proofEnvelope,
-      result.publicSignalsStruct,
-      fatherData ? Number(args.fatherversion) : 0,
-      motherData ? Number(args.motherversion) : 0,
-      args.tag,
-      args.ipfs,
-    );
-  const receipt = await tx.wait();
-
-  console.log(`Person version added: ${result.person.personHash}`);
-  console.log(`Transaction: ${tx.hash}`);
-  console.log(`Block: ${receipt?.blockNumber ?? "n/a"}`);
+  console.log(`Person version added: ${result.personHash}`);
+  console.log(`Transaction: ${result.tx.hash}`);
+  console.log(`Block: ${result.receipt?.blockNumber ?? "n/a"}`);
 };
 
 export default task("add-person", "Add a person version using ZK proof")
@@ -255,15 +245,15 @@ export default task("add-person", "Add a person version using ZK proof")
   })
   .addOption({
     name: "tag",
-    description: "Version tag, e.g. v1",
-    type: ArgumentType.STRING_WITHOUT_DEFAULT,
-    defaultValue: undefined,
+    description: "Encrypted version display label",
+    type: ArgumentType.STRING,
+    defaultValue: "",
   })
   .addOption({
-    name: "ipfs",
-    description: "Metadata IPFS CID / hash",
-    type: ArgumentType.STRING_WITHOUT_DEFAULT,
-    defaultValue: undefined,
+    name: "biography",
+    description: "Encrypted biography text",
+    type: ArgumentType.STRING,
+    defaultValue: "",
   })
   .setAction(() => Promise.resolve({ default: action }))
   .build();

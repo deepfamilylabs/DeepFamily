@@ -32,7 +32,8 @@ frontend/src/
 │   ├── cache/         # Query cache + IndexedDB persistence
 │   ├── clients/       # Ethers provider/contract clients
 │   ├── config/        # Env-driven runtime config
-│   ├── crypto/        # Worker-safe crypto (scrypt, key derivation, metadata encryption)
+│   ├── crypto/        # Worker-safe identity and key-derivation adapters
+│   ├── metadata/      # Archive preflight, DFM1 unlock, validation, and batch coordination
 │   ├── zk/            # Worker-safe ZK helpers (proof I/O, hashing)
 │   ├── ipfs/          # IPFS gateways + CID helpers
 │   ├── model/         # Shared domain types
@@ -55,7 +56,12 @@ Use the directory tree for ownership boundaries, and these files as first-read e
 - Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/app/config/brandBadge.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
 - Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/domains/person/api/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
-- Worker/ZK/crypto boundaries: `frontend/src/workers/crypto.worker.ts`, `frontend/src/workers/zk.worker.ts`, `frontend/src/shared/workers/`, `frontend/src/shared/crypto/identityCommitment.ts`, `frontend/src/shared/zk/proofDescriptors.ts`
+- Worker/ZK/metadata boundaries: `frontend/src/workers/crypto.worker.ts`,
+  `frontend/src/workers/zk.worker.ts`, `frontend/src/shared/workers/`,
+  `frontend/src/shared/metadata/metadataArchiveService.ts`,
+  `frontend/src/shared/metadata/metadataUnlockCoordinator.ts`,
+  `frontend/src/shared/crypto/identityCommitment.ts`, and
+  `frontend/src/shared/zk/proofDescriptors.ts`
 - Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`
 
 Update this section when adding or moving stable entry points, route groups, domain gateways, app providers, shared config/client/cache layers, worker boundaries, or boundary-level tests. Do not list ordinary leaf components, local renderers, or one-off helpers here; keep them discoverable through their owning directory.
@@ -215,9 +221,17 @@ Heavy and sensitive computation runs off the main thread:
 
 - Worker entries: `frontend/src/workers/crypto.worker.ts`, `frontend/src/workers/zk.worker.ts`
 - Main-thread clients: `frontend/src/shared/workers/cryptoWorkerClient.ts`, `frontend/src/shared/workers/zkWorkerClient.ts`
-- Worker-safe logic: `frontend/src/shared/crypto/`, `frontend/src/shared/zk/`
+- Worker-safe logic: `frontend/src/shared/crypto/`, `frontend/src/shared/zk/`, and
+  `packages/protocol-core/`
 
-The most common worker crash is accidentally pulling React or DOM code into the worker bundle via a transitive import. If a worker breaks after a refactor, check the new import graph under `shared/crypto` and `shared/zk` first.
+Identity/file Argon2id, DFM1 encryption/decryption, and proof generation execute through these
+boundaries. Metadata batch unlock runs KDF jobs strictly one at a time; cancellation terminates the
+active Worker. Do not add a password-fingerprint cache or retain passphrases, salts, derived
+secrets, keys, content digests, or witnesses in Worker state.
+
+The most common worker crash is accidentally pulling React or DOM code into the worker bundle via a
+transitive import. If a worker breaks after a refactor, check the new import graph under
+`shared/crypto`, `shared/zk`, and `packages/protocol-core` first.
 
 ### On-chain integration
 
@@ -244,7 +258,7 @@ VITE_ROOT_VERSION_INDEX=...
 | Variable                                                         | Purpose                                                  |
 | ---------------------------------------------------------------- | -------------------------------------------------------- |
 | `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`)          |
-| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override IPFS gateway dropdown; must match CSP allowlist |
+| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override gateways for NFT/attachment CIDs; must match CSP allowlist |
 | `VITE_DF_HARD_NODE_LIMIT`                                        | Cap tree node count for public/low-budget RPCs           |
 | `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                       |
 | `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                         |
@@ -321,19 +335,75 @@ Proof workflows load public artifacts from `/zk/*` at runtime:
 
 If proof generation or verification fails, first confirm the expected files exist in `public/zk/` and are reachable under `/zk/…` in dev/preview.
 
-## Metadata CIDs
+## Encrypted Version Metadata
 
-Metadata CID generation uses CIDv1 with the raw codec and sha2-256 multihash:
+Person-version metadata uses an on-chain Archive ref. Add Version canonicalizes one JSON snapshot
+containing the current person, parent snapshots, `tag`, and private `biography`; computes
+the deterministic keyed `versionCommitment`; gzip-compresses and AES-GCM-encrypts the content into
+a randomized DFM1 envelope; then submits that envelope in the same transaction as the relation
+proof. `tag` and `biography` never appear as plaintext contract fields.
 
-- Frontend worker path: `frontend/src/shared/ipfs/cid.ts`
-- Node seed path: `lib/versionMetadata.js`
-- Fixture check: `node frontend/scripts/verify-cid-methods.mjs`
+The canonical plaintext has top-level keys in this fixed order:
 
-Do not reintroduce IPFS hashing runtime wrappers for metadata CID generation unless they are audited and necessary. The current `multiformats` + `@noble/hashes` path avoids Node polyfills in the browser and keeps the vulnerable protobuf-based hashing dependency chain out of production installs.
+```json
+{
+  "schema": "deepfamily/person-version@1.0",
+  "person": { "fullName": "…", "personHash": "0x…" },
+  "parents": { "father": null, "mother": null },
+  "tag": "v1",
+  "biography": "private biography"
+}
+```
+
+The abbreviated identity objects above also contain the frozen gender/birth fields; non-null
+parents additionally contain their referenced `versionIndex`. The envelope's
+`contentCiphertext` is not readable JSON bytes: it is the AES-GCM ciphertext of
+`gzip(canonicalJsonBytes)`. Fresh file salt, DEK, and IV values normally make two envelopes for the
+same plaintext different. `versionCommitment`, by contrast, is derived from the pre-gzip canonical
+JSON digest and remains deterministic for the same identity secret and plaintext.
+
+Shared protocol primitives live in the browser/Node-neutral `@deepfamily/protocol-core` workspace.
+The frontend service boundary is `frontend/src/shared/metadata/`.
+
+The read path is deliberately staged:
+
+1. `DeepFamilyReader` supplies the version and `MetadataRef(pointer,payloadHash,payloadLength)`.
+2. Before asking for a passphrase or invoking a KDF, the client reads `eth_getCode(pointer)`, checks
+   exact `STOP || envelope` length/encoding, hashes the envelope, validates the DFM1 common prefix,
+   and rejects unsupported formats.
+3. Format 1 then receives strict selector/header validation, Argon2id/AES-GCM processing, strict
+   gzip and canonical JSON decoding, person/parent context checks, person-hash derivation, and
+   `versionCommitment` recomputation.
+4. Only the complete validated DTO may merge into `NodeData`.
+
+Format-1 AES-GCM AAD includes the chain ID, DeepFamily proxy, person hash, both parent hash/version
+references, `versionCommitment`, self identity suite, and the format selectors. Moving a valid
+envelope to a different context therefore fails authentication for a holder of the correct key;
+this does not create a contract-level global replay check.
+
+The Tree page batch-unlock control preflights loaded locked versions first and runs KDF work
+sequentially. Each successful item is cached immediately, a failed item is not written, and cancel
+terminates the current crypto Worker. The page never automatically tries an empty passphrase.
+
+After validation, the product intentionally persists the entire `NodeData` as plaintext in
+IndexedDB, including decrypted display fields, `tag`, and `biography`. Cache scope includes chain
+ID, DeepFamily proxy, and protocol/cache generation. Refreshing the same scope can display that
+plaintext without another KDF. Users can clear local unlocked metadata, but this is best-effort and
+does not protect browser-profile backups or defend against same-origin XSS. Passphrases, identity
+salts, derived secrets, KEK/DEK, witnesses, and `contentDigest` are never part of `NodeData` or the
+cache.
+
+Private `biography` is distinct from the NFT supplement `story` and public on-chain `StoryChunk`
+data. Any UI action that copies private text into an NFT story must require explicit confirmation
+that the destination is public. Attachment CIDs and NFT token URIs remain supported; the legacy
+external person-metadata/decryption flow is retired.
 
 ## Security
 
-- Passphrases and other sensitive inputs must not be placed in React state/props or persistent storage. Pass them directly to a worker and clear as soon as possible.
+- Passphrases and cryptographic working material must not be placed in React state/props or
+  persistent storage. Pass them directly to a Worker/service and clear them as soon as possible.
+- Validated unlocked `NodeData` is intentionally cached as plaintext. Treat that as a separate,
+  explicit product boundary rather than as secret persistence.
 - CSP is strict in preview/production. Iterate with Report-Only and `csp:scan`, then enforce.
 - Security commands (from repo root):
 

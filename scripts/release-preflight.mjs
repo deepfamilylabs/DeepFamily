@@ -26,6 +26,7 @@ import {
 } from "./lib/portableCommand.mjs";
 import { createPrivateTemporaryDirectory } from "./lib/privateTemporaryDirectory.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
+import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
 import { ZK_PRODUCTION_PHASE1, inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import {
   buildProductionCompilerEvidence,
@@ -107,6 +108,7 @@ export const runReleasePreflight = async ({
   ptauPath,
   mpcMetadataReader,
   expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
+  protocolManifestInspector = inspectProtocolReleaseManifest,
 } = {}) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (!Array.isArray(commands)) throw new Error("commands must be an array");
@@ -121,6 +123,9 @@ export const runReleasePreflight = async ({
   }
   if (typeof privateDirectoryFactory !== "function") {
     throw new Error("privateDirectoryFactory must be a function");
+  }
+  if (typeof protocolManifestInspector !== "function") {
+    throw new Error("protocolManifestInspector must be a function");
   }
   assertReleaseRuntimeCompatibility({ platform, arch, env, operation: "Release preflight" });
 
@@ -137,6 +142,13 @@ export const runReleasePreflight = async ({
     env: baseEnvironment,
     gitExecutable,
   });
+  const initialProtocolEvidence = protocolManifestInspector({
+    root,
+    requireProduction: true,
+  });
+  if (!/^[0-9a-f]{64}$/.test(initialProtocolEvidence?.manifestSha256 ?? "")) {
+    throw new Error("Release preflight protocol manifest SHA-256 is invalid");
+  }
   // Refuse an unreviewed artifact set before inspecting or building any local compiler.
   const initialZkEvidence = inspectZkReleaseArtifacts({
     root,
@@ -254,6 +266,13 @@ export const runReleasePreflight = async ({
     if (finalZkEvidence.manifestSha256 !== initialZkEvidence.manifestSha256) {
       throw new Error("ZK artifact manifest changed while release preflight was running");
     }
+    const finalProtocolEvidence = protocolManifestInspector({
+      root,
+      requireProduction: true,
+    });
+    if (finalProtocolEvidence.manifestSha256 !== initialProtocolEvidence.manifestSha256) {
+      throw new Error("Protocol release manifest changed while release preflight was running");
+    }
 
     return Object.freeze({
       status: "passed",
@@ -264,6 +283,7 @@ export const runReleasePreflight = async ({
       zkMinimumContributors: finalZkEvidence.minimumContributors,
       zkManifestSha256: finalZkEvidence.manifestSha256,
       zkTranscriptSha256: ceremonyVerification.transcriptSha256,
+      protocolManifestSha256: finalProtocolEvidence.manifestSha256,
       ptauSha256: ceremonyVerification.ptau.sha256,
       checks: commands.map(([executable, args]) => `${executable} ${args.join(" ")}`),
     });
@@ -284,6 +304,7 @@ export const main = async () => {
       `${result.zkContributorCount}/${result.zkMinimumContributors} contributor(s)`,
   );
   console.log(`  ZK manifest:    ${result.zkManifestSha256}`);
+  console.log(`  Protocol:       ${result.protocolManifestSha256}`);
 };
 
 const isMain =

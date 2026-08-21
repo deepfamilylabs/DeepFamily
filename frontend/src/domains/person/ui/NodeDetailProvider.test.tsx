@@ -119,13 +119,20 @@ describe("NodeDetailProvider", () => {
       return {
         data: {
           version: {
+            personHash: "0xperson",
+            versionIndex: "2",
             fatherHash: "0xfather",
             motherHash: "0xmother",
             fatherVersionIndex: 1,
             motherVersionIndex: 1,
+            versionCommitment: "0xcommitment",
             addedBy: "0xadder",
             timestamp: 123,
-            metadataCID: "cid://meta",
+          },
+          metadata: {
+            pointer: "0x00000000000000000000000000000000000000cc",
+            payloadHash: "0xpayload",
+            payloadLength: 512,
           },
           endorsementCount: 8,
           tokenId: "42",
@@ -142,12 +149,18 @@ describe("NodeDetailProvider", () => {
           personHash: "0xperson",
           versionIndex: 2,
           version: {
-            metadataCID: "cid://nft-meta",
+            versionCommitment: "0xcommitment",
+          },
+          metadata: {
+            pointer: "0x00000000000000000000000000000000000000cc",
+            payloadHash: "0xpayload",
+            payloadLength: 512,
           },
           core: {
             fullName: "Fetched Ada",
             gender: 2,
             birthPlace: "London",
+            nftPublicStory: "Public NFT story",
           },
           endorsementCount: 9,
           nftTokenURI: "ipfs://token",

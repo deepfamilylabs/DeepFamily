@@ -6,7 +6,7 @@ import path from "node:path";
 import {
   RELEASE_PREFLIGHT_COMMANDS,
   defaultRunner,
-  runReleasePreflight,
+  runReleasePreflight as runReleasePreflightRaw,
 } from "../scripts/release-preflight.mjs";
 import {
   CIRCOM_VERSION,
@@ -35,6 +35,12 @@ const SUPPORTED_RUNTIMES = Object.freeze([
   Object.freeze({ platform: "darwin", arch: "arm64" }),
   Object.freeze({ platform: "win32", arch: "x64" }),
 ]);
+const inspectFixtureProtocolManifest = () => ({ manifestSha256: "cd".repeat(32) });
+const runReleasePreflight = (options) =>
+  runReleasePreflightRaw({
+    protocolManifestInspector: inspectFixtureProtocolManifest,
+    ...options,
+  });
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -245,6 +251,7 @@ const runWithFixtureCompiler = (options) =>
   runReleasePreflight({
     compilerInspector: inspectFixtureCompiler,
     compilerSourceBuilder: buildFixtureSourceCompiler,
+    protocolManifestInspector: inspectFixtureProtocolManifest,
     ...options,
   });
 
@@ -730,6 +737,7 @@ describe("production release preflight", function () {
       zkMinimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
       zkManifestSha256: sha256File(fixture.manifestPath),
       zkTranscriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
+      protocolManifestSha256: "cd".repeat(32),
       ptauSha256: fixture.manifest.trustedSetup.phase1.sha256,
       checks: RELEASE_PREFLIGHT_COMMANDS.map(
         ([executable, args]) => `${executable} ${args.join(" ")}`,

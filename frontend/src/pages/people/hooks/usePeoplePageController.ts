@@ -40,9 +40,7 @@ export function usePeoplePageController() {
   const [sortOrder, setSortOrder] = useState<PeopleSortOrder>("asc");
   const [selectedPerson, setSelectedPerson] = useState<NodeData | null>(null);
   const [selectedAddresses, setSelectedAddresses] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [addressInput, setAddressInput] = useState("");
-  const [tagInput, setTagInput] = useState("");
   const [personQueryError, setPersonQueryError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PEOPLE_PAGE_SIZE);
 
@@ -73,33 +71,9 @@ export function usePeoplePageController() {
     [addAddress],
   );
 
-  const addTag = useCallback(() => {
-    const trimmed = tagInput.trim();
-    if (trimmed && !selectedTags.includes(trimmed)) {
-      setSelectedTags((prev) => [...prev, trimmed]);
-      setTagInput("");
-    }
-  }, [tagInput, selectedTags]);
-
-  const removeTag = useCallback((tag: string) => {
-    setSelectedTags((prev) => prev.filter((item) => item !== tag));
-  }, []);
-
-  const handleTagKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Enter" || event.key === ",") {
-        event.preventDefault();
-        addTag();
-      }
-    },
-    [addTag],
-  );
-
   const clearFilters = useCallback(() => {
     setSelectedAddresses([]);
-    setSelectedTags([]);
     setAddressInput("");
-    setTagInput("");
     setSearchTerm("");
     setFilterType("all");
     setSortOrder("asc");
@@ -187,9 +161,8 @@ export function usePeoplePageController() {
       filterType,
       sortOrder,
       selectedAddresses,
-      selectedTags,
     }),
-    [filterType, searchTerm, selectedAddresses, selectedTags, sortOrder],
+    [filterType, searchTerm, selectedAddresses, sortOrder],
   );
 
   const filteredPeople = useMemo(() => filterPeople(people, filterState), [people, filterState]);
@@ -236,17 +209,11 @@ export function usePeoplePageController() {
       sortOrder,
       setSortOrder,
       selectedAddresses,
-      selectedTags,
       addressInput,
       setAddressInput,
-      tagInput,
-      setTagInput,
       addAddress,
       removeAddress,
       handleAddressKeyDown,
-      addTag,
-      removeTag,
-      handleTagKeyDown,
       clearFilters,
       hasVisibleFilters: hasVisiblePeopleFilters(filterState),
       hasRuleFilters: hasPeopleRuleFilters(filterState),

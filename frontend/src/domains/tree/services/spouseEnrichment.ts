@@ -18,9 +18,11 @@ export function collectParentRefs(
 ): SpouseIdentity[] {
   const seen = new Set<string>();
   const refs: SpouseIdentity[] = [];
-  const add = (hash: string | undefined, version: number | undefined) => {
+  const add = (hash: string | undefined, version: number | string | undefined) => {
     if (!isMeaningfulHash(hash)) return;
-    const versionIndex = version ?? 0;
+    const numericVersion = version === undefined ? 0 : Number(version);
+    const versionIndex =
+      Number.isSafeInteger(numericVersion) && numericVersion >= 0 ? numericVersion : 0;
     const key = `${hash.toLowerCase()}-v-${versionIndex}`;
     if (seen.has(key)) return;
     seen.add(key);

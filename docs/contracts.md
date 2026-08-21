@@ -8,12 +8,12 @@
 
 ### Critical Constants
 
-| Constant                   | Value | Purpose & Impact                                       |
-| -------------------------- | ----- | ------------------------------------------------------ |
-| `MAX_LONG_TEXT_LENGTH`     | 256   | Max length for tags, IPFS CIDs, names, places, stories |
-| `MAX_CHUNK_CONTENT_LENGTH` | 2048  | Story chunk size limit (≈2KB per shard)                |
-| `PROTOCOL_FEE_BPS_MAX`     | 2000  | Maximum protocol endorsement fee (20%)                 |
-| `FEE_BPS_DENOMINATOR`      | 10000 | Basis-point denominator for fee accounting             |
+| Constant                   | Value | Purpose and impact                                      |
+| -------------------------- | ----- | ------------------------------------------------------- |
+| `MAX_LONG_TEXT_LENGTH`     | 256   | Maximum bytes for NFT names, places, story, and token URI |
+| `MAX_CHUNK_CONTENT_LENGTH` | 2048  | Public NFT story chunk byte limit                       |
+| `PROTOCOL_FEE_BPS_MAX`     | 2000  | Maximum protocol endorsement fee (20%)                  |
+| `FEE_BPS_DENOMINATOR`      | 10000 | Basis-point denominator                                 |
 
 ### Core Data Structures
 
@@ -35,7 +35,8 @@ struct PersonBasicInfo {
 - canonicalized full name
 - `derivedSecretField`
 - packed birth / gender fields
-- `schemaVersion`, `cryptoSuiteVersion`, and `hashAlgoId`
+- the role's atomic nonzero `identitySuiteId`, committed as
+  `Poseidon4(1000, identitySuiteId, 0, 0)`
 
 The packed field uses non-overlapping bit ranges: `birthYear[25..40]`,
 `birthMonth[17..24]`, `birthDay[9..16]`, `gender[1..8]`, and `isBirthBC[0]`.
@@ -50,12 +51,46 @@ struct PersonVersion {
   uint256 versionIndex; // Version index (starts from 1)
   uint256 fatherVersionIndex; // Father's version reference (0=unspecified)
   uint256 motherVersionIndex; // Mother's version reference (0=unspecified)
+  uint256 versionCommitment; // Keyed canonical-metadata commitment from the relation proof
   address addedBy; // Contributor address (packed with timestamp)
   uint96 timestamp; // Addition timestamp (packed with addedBy)
-  string tag; // Version tag/description
-  string metadataCID; // IPFS metadata CID
 }
 ```
+
+`tag` and private `biography` are encrypted inside the metadata envelope; neither is stored as a
+plaintext `PersonVersion` field. `versionCommitment` is deterministic for a canonical plaintext and
+identity secret, while the encrypted envelope is randomized.
+
+#### Proof Transport and Public Signals
+
+```solidity
+enum ProofPurpose { PersonRelation, DisclosureBinding }
+
+struct ProofEnvelope {
+  uint32 circuitId;
+  uint8 proofEncodingId;
+  bytes proofData;
+}
+
+struct PersonProofPublicSignals {
+  uint256 identityCommitment;
+  uint256 fatherIdentityCommitment;
+  uint256 motherIdentityCommitment;
+  uint256 submitterAndSelfSuiteId;
+  uint256 versionCommitment;
+}
+
+struct DisclosureBindingPublicSignals {
+  uint256 identityCommitment;
+  uint256 disclosureBinding;
+  uint256 minter;
+  uint256 suiteCommitment;
+}
+```
+
+`ProofEnvelope` has exactly the three fields shown above. The entrypoint fixes the purpose,
+`circuitId` chooses one exact permanent verifier route under that purpose, and `proofEncodingId`
+only describes the bytes encoding understood by the adapter.
 
 #### PersonCoreInfo
 
@@ -107,7 +142,14 @@ The active system derives person hashes as follows:
 2. The contract derives `personHash` as `keccak256(bytes32(identityCommitment))`
 3. Parent references are validated against wrapped parent commitments
 
-The mint flow also computes a separate `disclosureBinding` from the disclosed full name and the same packed birth / suite metadata.
+For canonical metadata bytes, the client splits `keccak256(canonicalJsonBytes)` into low/high
+128-bit limbs. The relation circuit publishes
+`Poseidon4(1004,derivedSecretField,contentDigestLo,contentDigestHi)` as `versionCommitment`, using
+the same self secret as `identityCommitment`. This proves keying, but not that the private digest
+matches the encrypted plaintext; clients must verify that after decryption.
+
+The mint flow computes a separate `disclosureBinding` from the intentionally disclosed canonical
+full name, packed birth/gender fields, and the proof's `suiteCommitment`.
 
 ### Core Functions
 
@@ -119,25 +161,35 @@ function addPersonVersion(
     PersonProofPublicSignals calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
-    string calldata metadataCID
+    bytes calldata metadataEnvelope
 ) external
 ```
 
 **Verification Process**:
 
-1. Validates `publicSignals.submitter == uint256(uint160(msg.sender))`
-2. Calls the registered `PersonCommitmentVerifier`
-3. Wraps each non-zero identity commitment as `keccak256(bytes32(identityCommitment))`
-4. Uses the proof-derived parent hashes plus the provided parent version indices to update lineage links
-5. Routes to `_addPersonInternal()` for family tree update
+1. Requires the one-time `metadataArchive` binding to be configured.
+2. Reads only the 20-byte envelope common prefix: magic `DFM1`, nonzero `formatVersion`, and the
+   nonzero big-endian self suite at bytes `0x10..0x13`.
+3. Requires `submitterAndSelfSuiteId` to equal the caller in the low 160 bits plus that header suite
+   in the next 32 bits; bits above 191 are therefore rejected.
+4. Selects `verifierRegistry[PersonRelation][proof.circuitId]` and sends the five ordered public
+   signals to its adapter.
+5. Wraps each nonzero identity commitment as `keccak256(bytes32(identityCommitment))` and validates
+   the parent references.
+6. Rejects a duplicate `versionHash` scoped to the person, parent references, and
+   `versionCommitment`.
+7. Creates the version and calls the fixed Archive with the exact envelope in the same transaction.
+
+DeepFamily does not parse format-1 selectors, salts, IVs, ciphertext, GCM tags, gzip, or JSON. It
+also does not calculate `versionCommitment` from `contentCiphertext`; the contract has neither the
+plaintext nor the identity secret required to do so.
 
 **Mining Reward Semantics**:
 
 - Each `personHash` can receive at most one mining reward, on its first version whose proof-derived father and mother identity commitments are both non-zero.
 - A person may be added without parents and claim the one-time reward later when a complete-parent version is submitted.
 - Parent records do not need to exist on-chain. Both parent version indices may remain `0` (“unspecified”).
-- Later versions, including replaying the same proof with a different free-form `tag`, do not mint another reward for that person.
+- Later versions do not mint another reward for that person.
 
 #### Community Endorsement
 
@@ -172,12 +224,18 @@ function mintPersonVersionNFT(
 **Minting Requirements**:
 
 1. Caller must have endorsed this version
-2. `DisclosureBindingVerifier.verifyProof()` must succeed
+2. The permanent `verifierRegistry[DisclosureBinding][proof.circuitId]` route must accept the proof
 3. `publicSignals.identityCommitment` must match `coreInfo.basicInfo.identityCommitment`
 4. `publicSignals.disclosureBinding` must match the contract's recomputed disclosure binding
 5. `publicSignals.minter` must equal `uint256(uint160(msg.sender))`
 6. `personHash` is derived from `publicSignals.identityCommitment`
-7. Linked `AdultAgeGate` age validation must pass
+7. `publicSignals.suiteCommitment` is used in the contract's disclosure-binding recomputation
+8. Linked `AdultAgeGate` age validation must pass
+
+The frontend obtains the target self suite from the archived envelope before proof generation. The
+Mint contract itself does not read or parse the envelope header. Private encrypted `biography` and
+the public NFT `PersonSupplementInfo.story` are independent fields; copying one into the other is
+an explicit product action, not protocol behavior.
 
 #### Story Sharding System
 
@@ -216,19 +274,104 @@ function sealStory(uint256 tokenId) external
 | 7     | Correction                      |
 | 8     | Editorial note                  |
 
+## MetadataArchiveV1.sol - Opaque On-Chain Metadata Archive
+
+`MetadataArchiveV1` is a non-upgradeable, ownerless blob writer and reference index. Its constructor
+immutably binds one DeepFamily proxy in `DEEP_FAMILY`; only that address can call `store`.
+
+```solidity
+struct MetadataRef {
+  address pointer;
+  bytes32 payloadHash;
+  uint32 payloadLength;
+}
+
+function store(
+  bytes32 personHash,
+  uint256 versionIndex,
+  bytes calldata envelope
+) external returns (MetadataRef memory metadata);
+
+function metadataRef(
+  bytes32 personHash,
+  uint256 versionIndex
+) external view returns (MetadataRef memory metadata);
+```
+
+For every nonempty envelope of at most 16,384 bytes, the Archive deploys a data contract whose
+runtime code is exactly `0x00 || envelope`. The leading `0x00` is a safe `STOP` opcode and is not
+included in `payloadLength` or `payloadHash`. The Archive derives
+`payloadHash = keccak256(envelope)` and `payloadLength = envelope.length` from the actual calldata,
+stores one immutable ref per `(personHash,versionIndex)`, and emits `MetadataStored`.
+
+The Archive deliberately does not understand DFM1, `formatVersion`, JSON, compression, KDFs,
+ciphers, or identity suites. `V1` names the storage/ref ABI, not the envelope format. As long as the
+data-contract encoding, 16 KiB limit, and `MetadataRef` ABI remain unchanged, the same Archive can
+hold later envelope formats. DeepFamily permanently binds one Archive with the one-time,
+proxy-only, owner-only `setMetadataArchive`; there is no Archive ID, registry, active route, or
+per-version Archive selection. If the data-contract encoding, size limit, ref ABI, or Archive logic
+itself must change incompatibly, this simplified generation requires a new DeepFamily protocol
+deployment rather than routing old and new versions between Archive contracts.
+
+### DFM1 Contract-Visible Prefix and Format-1 Layout
+
+All envelopes accepted by the current `addPersonVersion` ABI share a permanent 20-byte prefix:
+
+| Envelope offset | Bytes | Meaning checked by DeepFamily |
+| ---: | ---: | --- |
+| `0x00` | 4 | ASCII `DFM1` (`0x44464d31`) |
+| `0x04` | 1 | nonzero `formatVersion` |
+| `0x05..0x0f` | 11 | format-specific; not interpreted by DeepFamily |
+| `0x10` | 4 | nonzero big-endian `uint32` self identity-suite ID |
+
+The current client implements format 1 with this exact layout:
+
+| Offset | Bytes | Field | Format-1 rule |
+| ---: | ---: | --- | --- |
+| `0x00` | 4 | magic | `DFM1` |
+| `0x04` | 1 | `formatVersion` | `1` |
+| `0x05` | 1 | flags | `0` |
+| `0x06` | 1 | plaintext codec | `1`, canonical JSON v1 |
+| `0x07` | 1 | compression suite | `1`, gzip-v1 |
+| `0x08` | 1 | cipher suite | `1`, AES-256-GCM |
+| `0x09` | 1 | file-KDF suite | `1`, candidate Argon2id profile |
+| `0x0a` | 2 | header length | big-endian `112` |
+| `0x0c` | 4 | content ciphertext length `N` | big-endian, `1..16,256` |
+| `0x10` | 4 | self identity-suite ID | nonzero big-endian `uint32` |
+| `0x14` | 4 | reserved | zero |
+| `0x18` | 16 | random file salt | file-KEK salt |
+| `0x28` | 12 | wrap IV | AES-GCM DEK wrapping |
+| `0x34` | 12 | content IV | AES-GCM content encryption |
+| `0x40` | 32 | wrapped DEK | ciphertext without tag |
+| `0x60` | 16 | wrapped-DEK tag | AES-GCM tag |
+| `0x70` | `N` | content ciphertext | encrypted `gzip(canonical JSON)` |
+| `0x70 + N` | 16 | content tag | AES-GCM tag |
+
+The envelope length is exactly `128 + N`. The data-contract STOP byte precedes envelope offset
+zero, so runtime code length is `129 + N`; none of the table offsets include STOP. Archive and
+Reader enforce none of these format-1 rows. DeepFamily enforces only the common-prefix rows, while
+the client strictly validates the complete table before running a KDF.
+
 ## DeepFamilyReader.sol - Aggregated Read Contract
 
 Phase 3 moves expensive detail and paginated read aggregation out of `DeepFamily`.
-`DeepFamilyReader` is constructed with the main contract address and uses the main
-contract's primitive getters. Write calls continue to target `DeepFamily`.
+`DeepFamilyReader` is constructed after Archive binding with the DeepFamily proxy address. It
+validates the proxy's configured Archive and the Archive's reverse `DEEP_FAMILY` binding, then
+stores both as immutables. Write calls continue to target `DeepFamily`.
+
+Reader returns references; it never returns or parses the large envelope. Clients read the pointer
+with `eth_getCode`, require runtime length `payloadLength + 1`, require the leading STOP, hash
+`code[1:]`, parse the 20-byte common prefix, and only then dispatch a supported format parser.
 
 ### Query Functions (Paginated)
 
 #### Version Queries
 
 ```solidity
-function getVersionDetails(bytes32 personHash, uint256 versionIndex) external view returns (PersonVersion memory, uint256, uint256)
+function getVersionDetails(bytes32 personHash, uint256 versionIndex)
+  external view returns (PersonVersion memory, MetadataRef memory, uint256, uint256)
 function listPersonVersions(bytes32 personHash, uint256 offset, uint256 limit) external view returns (PersonVersion[] memory, uint256, bool, uint256)
+function getVersionMetadataRef(bytes32 personHash, uint256 versionIndex) external view returns (MetadataRef memory)
 ```
 
 #### Family Tree Queries
@@ -240,7 +383,8 @@ function listChildren(bytes32 parentHash, uint256 parentVersionIndex, uint256 of
 #### NFT Queries
 
 ```solidity
-function getNFTDetails(uint256 tokenId) external view returns (bytes32, uint256, PersonVersion memory, PersonCoreInfo memory, uint256, string memory)
+function getNFTDetails(uint256 tokenId)
+  external view returns (bytes32, uint256, PersonVersion memory, MetadataRef memory, PersonCoreInfo memory, uint256, string memory)
 ```
 
 #### Story Queries
@@ -265,7 +409,7 @@ event PersonVersionAdded(
   uint256 fatherVersionIndex,
   bytes32 motherHash,
   uint256 motherVersionIndex,
-  string tag
+  uint256 versionCommitment
 );
 
 event PersonVersionEndorsed(
@@ -309,7 +453,25 @@ event TokenURIUpdated(uint256 indexed tokenId, address indexed owner, string old
 
 event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
-event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
+event CircuitVerifierSet(
+  uint8 indexed purpose,
+  uint32 indexed circuitId,
+  address indexed adapter
+);
+
+event MetadataArchiveSet(address indexed archive);
+```
+
+`MetadataArchiveV1` separately emits:
+
+```solidity
+event MetadataStored(
+  bytes32 indexed personHash,
+  uint256 indexed versionIndex,
+  address pointer,
+  bytes32 payloadHash,
+  uint32 payloadLength
+);
 ```
 
 #### Story Events
@@ -345,6 +507,8 @@ mapping(uint256 => bytes32) public tokenIdToPerson;                           //
 mapping(uint256 => uint256) public tokenIdToVersionIndex;                     // NFT => version mapping
 mapping(uint256 => PersonCoreInfo) public nftCoreInfo;                        // NFT core data
 mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      // Version => NFT mapping
+mapping(uint8 => mapping(uint32 => address)) public verifierRegistry;         // purpose => circuitId => adapter
+address public metadataArchive;                                               // One-time protocol binding
 ```
 
 ### Access Control & Security
@@ -354,7 +518,7 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 - **Open Submission**: Anyone can add person versions with valid ZK proofs
 - **Endorsement Gating**: Requires DEEP utility point (ERC20) balance and allowance
 - **NFT Holder Rights**: Exclusive story management and tokenURI updates
-- **Immutability**: Sealed stories cannot be modified by anyone
+- **Immutability**: Sealed public stories and archived metadata blobs cannot be modified
 
 #### Security Features
 
@@ -363,14 +527,19 @@ mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      //
 - **Input Validation**: Comprehensive parameter checking with constraints
 - **Native-Currency Rejection**: Contract rejects direct native-currency transfers (ETH on Ethereum,
   CFX on Conflux eSpace; receive/fallback revert)
-- **ZK Proof Validation**: Verifier registry routes person and name-disclosure proofs by proof purpose
+- **Permanent ZK Routing**: Each `(purpose,circuitId)` adapter route is once-set and can neither be
+  replaced nor cleared; the contract never designates one route as current or newer
+- **Opaque Archive Boundary**: DeepFamily checks only the fixed DFM1 common prefix and packed
+  caller/self-suite binding; Archive and Reader do not interpret envelope formats
+- **Atomic Version Storage**: proof verification, duplicate marking, version creation, and Archive
+  write all succeed or revert in one transaction
 
 ## Upgradeability & Governance (UUPS)
 
 `DeepFamily` is deployed as a **UUPS (ERC-1967) proxy**, so its logic can evolve while its address
 and state persist. The other contracts are **not**
 upgradeable by design: `DeepFamilyToken` (the value contract is kept minimal/immutable),
-`DeepFamilyReader` (stateless; redeploy + point at the same proxy to change read logic), the ZK
+`MetadataArchiveV1`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
 verifiers, the verifier adapter, and the libraries.
 
 ### Proxy & Initialization
@@ -410,6 +579,33 @@ verifiers, the verifier adapter, and the libraries.
   the timelock's `PROPOSER_ROLE`, `CANCELLER_ROLE`, and `EXECUTOR_ROLE`. It rejects EOAs,
   single-signer policies, lookalike contracts that merely expose `getMinDelay()`, open roles, and
   extra role holders.
+
+The one-time `metadataArchive` setter and once-set verifier routes are protocol invariants expected
+of every supported implementation. Because DeepFamily remains a governed UUPS proxy, a malicious
+upgrade could deliberately violate storage semantics; the storage-layout and release gates reduce
+accidental changes but are not an immutable trust root.
+
+#### Protocol component order
+
+A fresh deployment wires protocol components in this order:
+
+```text
+Token
+→ Poseidon/age-gate libraries, both Groth16 verifiers, and their adapter
+→ DeepFamily implementation and ERC-1967 proxy
+→ initialize proxy and perform the one-time Token/DeepFamily binding
+→ MetadataArchiveV1(proxy)
+→ proxy.setMetadataArchive(archive) exactly once
+→ DeepFamilyReader(proxy), after Archive binding
+→ proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
+→ transfer DeepFamily ownership to the validated governance Timelock on live networks
+→ verify proxy/implementation slot, Archive reverse binding, Reader immutables, routes,
+  parameterized runtimes, and release-manifest hashes
+```
+
+The Archive must bind the proxy, not the implementation. Archive and Reader immutables change their
+deployed runtime bytes, so release validation computes expected runtime hashes with the actual
+deployment arguments rather than treating every instance as byte-identical.
 
 #### Production setup
 
@@ -702,7 +898,7 @@ Timelock: the dedicated tooling only manages the deployed DEEP token.
 `DeepFamily.renounceOwnership()` is retained at the contract layer, but the ordinary governance
 tasks intentionally reject it. Renouncing is not automatically equivalent to decentralization; it
 is an irreversible decision to freeze the current implementation and all owner-controlled policy.
-After execution, upgrades, verifier changes, protocol-fee changes, ownership migration, and every
+After execution, upgrades, new verifier-route registrations, protocol-fee changes, ownership migration, and every
 other `onlyOwner` operation become permanently unavailable. Future protocol fee shares are burned
 because `owner()` is `address(0)`, while DEEP already held by the Timelock is not automatically
 transferred or burned.
@@ -842,6 +1038,9 @@ cancelled with `governance-cancel` while the old Timelock still owns `main`.
   before staging an upgrade through the timelock. When `upgrade-schedule` deploys a candidate, it
   prints an exact source-verification command and exits without scheduling; after explorer
   verification succeeds, rerun with that address in `--implementation` to create the operation.
+- The current baseline includes the single `metadataArchive` slot and the `PersonVersion`
+  `versionCommitment` field. A supported implementation must not move, reuse, clear, or reinterpret
+  that Archive binding, and must not reintroduce the retired plaintext version fields.
 
 ### Reentrancy Guard
 
@@ -996,32 +1195,36 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 ### PersonCommitmentVerifier.sol
 
 **Purpose**: Validates person identity commitments and optional parent commitments for `addPersonVersion()`
-**Public Signals**: 7 values (`identityCommitment`, `fatherIdentityCommitment`, `motherIdentityCommitment`, `submitter`, `schemaVersion`, `cryptoSuiteVersion`, `hashAlgoId`)
+**Public Signals**: 5 values (`identityCommitment`, `fatherIdentityCommitment`,
+`motherIdentityCommitment`, `submitterAndSelfSuiteId`, `versionCommitment`)
 **Verification**: Groth16 proof with circuit `person_commitment.circom`
 
 ### DisclosureBindingVerifier.sol
 
 **Purpose**: Validates mint disclosure binding for `mintPersonVersionNFT()`
-**Public Signals**: 6 values (`identityCommitment`, `disclosureBinding`, `minter`, `schemaVersion`, `cryptoSuiteVersion`, `hashAlgoId`)
+**Public Signals**: 4 values (`identityCommitment`, `disclosureBinding`, `minter`,
+`suiteCommitment`)
 **Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
-Both verifiers are auto-generated from circom circuits. `DeepFamily` calls them through typed interfaces:
+Both verifiers are auto-generated from circom circuits. DeepFamily does not call them directly;
+the permanent `(purpose,circuitId)` route selects an `IProofVerifierAdapter`. Encoding ID `1`
+requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:
 
 ```solidity
-// PersonCommitmentVerifier (7 public signals)
+// PersonCommitmentVerifier (5 public signals)
 function verifyProof(
   uint256[2] calldata a,
   uint256[2][2] calldata b,
   uint256[2] calldata c,
-  uint256[7] calldata publicSignals
+  uint256[5] calldata publicSignals
 ) external view returns (bool);
 
-// DisclosureBindingVerifier (6 public signals)
+// DisclosureBindingVerifier (4 public signals)
 function verifyProof(
   uint256[2] calldata a,
   uint256[2][2] calldata b,
   uint256[2] calldata c,
-  uint256[6] calldata publicSignals
+  uint256[4] calldata publicSignals
 ) external view returns (bool);
 ```
 
@@ -1041,7 +1244,7 @@ error InvalidFullName();
 error InvalidZKProof();
 
 // Business logic errors
-error DuplicateVersion();
+error DuplicateVersionCommitment();
 error MustEndorseVersionFirst();
 error VersionAlreadyMinted();
 
@@ -1058,7 +1261,8 @@ error TokenContractNotSet();
 - **Input Validation**: Comprehensive parameter checking with custom constraints
 - **Access Control**: Role-based permissions with explicit error types
 - **Immutability Controls**: Sealed stories and initialized contracts prevent further modification
-- **Domain Separation**: domain constants (1000–1003) in Poseidon inputs + keccak256 wrapping for personHash
+- **Domain Separation**: domain constants (1000–1004) in Poseidon inputs + Keccak wrapping for
+  `personHash` and a distinct Keccak domain for `versionHash`
 
 ### Gas Optimization Features
 

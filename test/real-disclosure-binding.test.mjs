@@ -1,12 +1,10 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import disclosureBindingProof from "../lib/disclosureBindingProof.js";
-import personCommitmentProof from "../lib/personCommitmentProof.js";
+import { generateDisclosureBindingProof } from "../lib/disclosureBindingProof.js";
+import { generatePersonRelationProof } from "../lib/personCommitmentProof.js";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
-
-const { generateDisclosureBindingProof } = disclosureBindingProof;
-const { generatePersonCommitmentProof } = personCommitmentProof;
+import { makeMetadataEnvelope } from "./helpers/testHelper.mjs";
 
 describe("Real disclosure binding proof", function () {
   this.timeout(90_000);
@@ -25,7 +23,9 @@ describe("Real disclosure binding proof", function () {
       gender: 255,
     };
 
-    const personProof = await generatePersonCommitmentProof(person, null, null, signerAddress);
+    const personProof = await generatePersonRelationProof(person, null, null, signerAddress, {
+      contentDigest: hre.ethers.id("real-disclosure-gender-255"),
+    });
     await deepFamily
       .connect(signer)
       .addPersonVersion(
@@ -33,8 +33,7 @@ describe("Real disclosure binding proof", function () {
         personProof.publicSignalsStruct,
         0,
         0,
-        "real-disclosure",
-        "",
+        makeMetadataEnvelope(hre.ethers, 1, { tag: "real-disclosure" }),
       );
 
     const personHash = personProof.person.personHash;

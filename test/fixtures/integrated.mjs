@@ -8,6 +8,7 @@ export const deployIntegratedFixture = async (connection) => {
   connection.__deepfamilyIntegrated = {
     deepFamily: deployed.deepFamily,
     token: deployed.token,
+    metadataArchive: deployed.metadataArchive,
     deepFamilyReader: deployed.deepFamilyReader,
   };
   return deployed;

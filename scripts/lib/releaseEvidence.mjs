@@ -56,7 +56,12 @@ export const hashReleaseInputs = async (ethers, root = process.cwd()) => {
     "scripts",
     "tasks",
   ];
-  const fileNames = ["hardhat.config.mjs", "package.json", "package-lock.json"];
+  const fileNames = [
+    "hardhat.config.mjs",
+    "package.json",
+    "package-lock.json",
+    "protocol-release-manifest.json",
+  ];
   const directories = {};
   const files = {};
   const entries = [];

@@ -13,6 +13,7 @@ export interface MintNftFooterProps {
   hasPersonInfo: boolean;
   hasTargetInputs: boolean;
   hasValidTarget: boolean;
+  hasVerifiedTargetEnvelope: boolean;
   onClose: () => void;
   onContinueMinting: () => void;
   onShowEndorseConfirm: () => void;
@@ -29,6 +30,7 @@ export function MintNftFooter({
   hasPersonInfo,
   hasTargetInputs,
   hasValidTarget,
+  hasVerifiedTargetEnvelope,
   onClose,
   onContinueMinting,
   onShowEndorseConfirm,
@@ -37,26 +39,16 @@ export function MintNftFooter({
     <div className="flex flex-col-reverse sm:flex-row gap-4 p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 pb-[calc(2rem+env(safe-area-inset-bottom))]">
       {successResult ? (
         <>
-          <TransactionButton
-            onClick={onClose}
-            className="flex-1"
-          >
+          <TransactionButton onClick={onClose} className="flex-1">
             {t("common.close", "Close")}
           </TransactionButton>
-          <TransactionButton
-            variant="primary"
-            onClick={onContinueMinting}
-            className="flex-1"
-          >
+          <TransactionButton variant="primary" onClick={onContinueMinting} className="flex-1">
             {t("mintNFT.continueMinting", "Continue Minting")}
           </TransactionButton>
         </>
       ) : (
         <>
-          <TransactionButton
-            onClick={onClose}
-            className="flex-1"
-          >
+          <TransactionButton onClick={onClose} className="flex-1">
             {t("common.cancel", "Cancel")}
           </TransactionButton>
 
@@ -80,7 +72,8 @@ export function MintNftFooter({
                     isCheckingStatus ||
                     !allConsentsChecked ||
                     !hasPersonInfo ||
-                    !hasTargetInputs
+                    !hasTargetInputs ||
+                    !hasVerifiedTargetEnvelope
                   }
                   className="flex-[1.5]"
                 >

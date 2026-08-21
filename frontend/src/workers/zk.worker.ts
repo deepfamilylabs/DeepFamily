@@ -1,31 +1,27 @@
-import type { Groth16Proof, PersonData } from "../shared/zk/zk";
+import type { Groth16Proof } from "../shared/zk/zk";
+import type {
+  DisclosureBindingProofParameters,
+  PersonRelationProofParameters,
+} from "../shared/zk/zkSnark";
 import { getProofDescriptorByPurpose } from "../shared/zk/proofDescriptors";
 import {
-  generatePersonCommitmentProof,
-  verifyPersonCommitmentProof,
+  generatePersonRelationProof,
+  verifyPersonRelationProof,
   generateDisclosureBindingProof,
   verifyDisclosureBindingProof,
 } from "../shared/zk/zkSnark";
 
 type ZkWorkerMethods = {
-  generatePersonCommitmentProof: {
-    params: {
-      person: PersonData;
-      father: PersonData | null;
-      mother: PersonData | null;
-      submitterAddress: string;
-    };
+  generatePersonRelationProof: {
+    params: PersonRelationProofParameters;
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
-  verifyPersonCommitmentProof: {
+  verifyPersonRelationProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
   generateDisclosureBindingProof: {
-    params: {
-      person: PersonData;
-      minterAddress: string;
-    };
+    params: DisclosureBindingProofParameters;
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
   verifyDisclosureBindingProof: {
@@ -51,7 +47,7 @@ const getErrorShape = (err: unknown): { message: string; name?: string } => {
   return { message: String(err) };
 };
 
-function assertDescriptorPurpose(purpose: "PersonCommitment" | "DisclosureBinding") {
+function assertDescriptorPurpose(purpose: "PersonRelation" | "DisclosureBinding") {
   return getProofDescriptorByPurpose(purpose);
 }
 
@@ -60,17 +56,17 @@ const handlers: {
     params: ZkWorkerMethods[K]["params"],
   ) => Promise<ZkWorkerMethods[K]["result"]> | ZkWorkerMethods[K]["result"];
 } = {
-  generatePersonCommitmentProof: async ({ person, father, mother, submitterAddress }) => {
-    assertDescriptorPurpose("PersonCommitment");
-    return await generatePersonCommitmentProof(person, father, mother, submitterAddress);
+  generatePersonRelationProof: async (parameters) => {
+    assertDescriptorPurpose("PersonRelation");
+    return await generatePersonRelationProof(parameters);
   },
-  verifyPersonCommitmentProof: async ({ proof, publicSignals }) => {
-    assertDescriptorPurpose("PersonCommitment");
-    return { ok: await verifyPersonCommitmentProof(proof, publicSignals) };
+  verifyPersonRelationProof: async ({ proof, publicSignals }) => {
+    assertDescriptorPurpose("PersonRelation");
+    return { ok: await verifyPersonRelationProof(proof, publicSignals) };
   },
-  generateDisclosureBindingProof: async ({ person, minterAddress }) => {
+  generateDisclosureBindingProof: async (parameters) => {
     assertDescriptorPurpose("DisclosureBinding");
-    return await generateDisclosureBindingProof(person, minterAddress);
+    return await generateDisclosureBindingProof(parameters);
   },
   verifyDisclosureBindingProof: async ({ proof, publicSignals }) => {
     assertDescriptorPurpose("DisclosureBinding");
